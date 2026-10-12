@@ -1,8 +1,12 @@
 import { it, expect, vi } from "vitest";
 import {
   Concurrent,
+  Enumerator,
   Mutex,
   Process,
+  Timeout,
+  block,
+  rbObjSingletonClass,
   rbFPublicSend,
   rbFSend,
   rbObjIvarSet,
@@ -12,6 +16,7 @@ import {
   ThreadError,
 } from "@blazetrails/ruby-compat";
 import {
+  IsolatedExecutionState,
   Notifications,
   NullLock,
   assertRaise,
@@ -692,6 +697,44 @@ it("pool sets connection schema cache", async () => {
   pool.checkin(connection);
 });
 
+it("concurrent connection establishment", async () => {
+  const pool = makePool();
+  expect(pool.connections.length).toBeLessThanOrEqual(1);
+
+  const allThreadsInNewConnection = new Concurrent.CountDownLatch(
+    pool.size - pool.connections.length,
+  );
+  const allGo = new Concurrent.CountDownLatch();
+
+  Object.assign(rbObjSingletonClass(pool).prototype, {
+    async newConnection(this: ConnectionPool) {
+      allThreadsInNewConnection.countDown();
+      await allGo.wait();
+      return ConnectionPool.prototype.newConnection.call(this);
+    },
+  });
+
+  const connectingThreads: Thread<unknown>[] = [];
+  for (let i = 0; i < pool.size; i++) {
+    connectingThreads.push(newThread(() => pool.checkout()));
+  }
+
+  try {
+    await Timeout.timeout(5, undefined, undefined, async () => {
+      await allThreadsInNewConnection.wait();
+    });
+  } catch (error) {
+    if (!(error instanceof Timeout.Error)) throw error;
+    expect.fail(
+      "pool unable to establish connections concurrently or implementation has " +
+        "changed, this test then needs to patch a different :new_connection method",
+    );
+  } finally {
+    allGo.countDown();
+    for (const thread of connectingThreads) await thread.join();
+  }
+});
+
 it("non bang disconnect and clear reloadable connections throw exception if threads dont return their conns", async () => {
   const pool = makePool();
   pool.checkoutTimeout = 0.001;
@@ -1082,4 +1125,20 @@ it("inspect does not show secrets", async () => {
   expect(readingPool.inspect()).toMatch(
     /#<ActiveRecord::ConnectionAdapters::ConnectionPool env_name="\w+" role=:reading shard=:shard_one>/,
   );
+});
+
+it("lock thread allow fiber reentrency", async () => {
+  const pool = makePool();
+  const connection = await pool.checkout();
+  connection.setLockThread(IsolatedExecutionState.context());
+  await connection.transaction(async () => {
+    const enumerator = new Enumerator(
+      block(async (yielder: { yield(value: number): unknown }) => {
+        await connection.transaction(async () => {
+          await yielder.yield(1);
+        });
+      }),
+    );
+    expect(await enumerator.next()).toEqual(1);
+  });
 });

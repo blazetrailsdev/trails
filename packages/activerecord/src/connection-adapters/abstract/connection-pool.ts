@@ -978,7 +978,7 @@ async function tryToCheckoutNewConnection(this: Pool): Promise<DatabaseAdapter |
   if (!doCheckout) return null;
   let conn: DatabaseAdapter | undefined;
   try {
-    conn = this.checkoutNewConnection();
+    conn = await this.checkoutNewConnection();
   } finally {
     await synchronize.call(this, async () => {
       if (conn) {

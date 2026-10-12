@@ -245,6 +245,7 @@ export { kernelInteger } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
 export { rbFSystem } from "./kernel-system.js";
 export { IndexError } from "./index-error.js";
+export { StopIteration } from "./stop-iteration.js";
 export { RangeError } from "./range-error.js";
 export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";
