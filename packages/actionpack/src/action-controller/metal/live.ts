@@ -19,6 +19,7 @@ import {
   merge,
   rbObjClassname,
   rbObjRespondTo,
+  stringDelete,
   toS,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
@@ -181,8 +182,6 @@ export class SSE {
 }
 
 export class Response extends DispatchResponse {
-  declare stream: Buffer;
-
   /** @internal */
   protected override beforeCommitted(): void {
     super.beforeCommitted();
@@ -200,7 +199,7 @@ export class Response extends DispatchResponse {
 
 export interface LiveControllerHost {
   request: { getHeader?(name: string): string | undefined; format?: unknown };
-  response: Response;
+  response: Response & { stream: Buffer };
   newControllerThread(block: () => void | Promise<void>): Promise<void>;
   cleanUpThreadLocals(locals: [string, unknown][], thread: Thread): void;
   logError(exception: Error): void;
@@ -274,7 +273,7 @@ export async function sendStream(
         "Content-Type",
         (isSymbol(type) ? (Mime.get(type.slice(1))?.toString() ?? "") : type) ??
           MimeType.lookupByExtension(
-            File.extname(filename).toLowerCase().replaceAll(".", ""),
+            stringDelete(File.extname(filename).toLowerCase(), "."),
           )?.toString() ??
           "application/octet-stream",
       );

@@ -355,7 +355,7 @@ describe("ActionController::Live#process", () => {
 
     const host = new LiveHost();
     const fired = vi.fn();
-    host.response.stream.onError(fired);
+    (host.response.stream as Buffer).onError(fired);
     host.action = async () => {
       host.response.stream.write("partial");
       host.response.close();
