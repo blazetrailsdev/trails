@@ -194,16 +194,16 @@ export class MimeType {
 
   static readonly SET: Mimes = new Mimes();
 
+  hash(): number {
+    return this._hash;
+  }
+
   constructor(string: string, symbol: string | null = null, synonyms: string[] = []) {
     this.string = string;
     this.symbol = symbol;
     this.synonyms = synonyms;
     this._hash = rbHash([this.string, this.synonyms, this.symbol]);
     return new Proxy<MimeType>(this, METHOD_MISSING_HANDLER);
-  }
-
-  hash(): number {
-    return this._hash;
   }
 
   toString(): string {
