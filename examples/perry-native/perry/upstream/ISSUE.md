@@ -1,3 +1,24 @@
+> **DO NOT FILE — verified fixed upstream, 2026-10-12.**
+>
+> Built Perry from source at `main` (`d74498b2`, 0.5.1659) and the reproducer
+> below passes: `K.prototype` reads `object`. The bug is real in the published
+> npm release (0.5.1520, 2026-09-11) and absent on `main`, confirmed side by
+> side in one shell:
+>
+>     npm 0.5.1520   : K.prototype ... undefined
+>     source 0.5.1659: K.prototype ... object
+>
+> So there is nothing to report and nothing to patch — what we need is a
+> release. `perry update --check-only` still answers "up to date (v0.5.1520)",
+> so the fix is unreleased as of this date.
+>
+> The file is kept because the reproducer is still a useful regression probe,
+> and because it documents how the diagnosis was reached.
+>
+> **It also does not fix our application case.** See "Wall 3" in
+> [FINDINGS.md](../FINDINGS.md): with the fix in place the 137-module rung now
+> fails on a different Perry internal error instead.
+
 # `importedClass.prototype` reads `undefined` when the class is a class expression
 
 **Perry 0.5.1520** (npm `@perryts/perry`), Linux x86_64, clang 23.1.3.
