@@ -42,7 +42,7 @@ export interface RenderersHost {
 
 export const RENDERERS = new Set<string>();
 
-export function add<Host extends object>(key: string, block: RendererProc<Host>): void {
+export function add<H extends object = RenderersHost>(key: string, block: RendererProc<H>): void {
   Renderers.defineMethod(_renderWithRendererMethodName(key), block);
   RENDERERS.add(key);
 }
