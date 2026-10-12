@@ -941,7 +941,8 @@ export class Mapper {
     );
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${path}`;
-    const singular = singularize(name);
+    const plural = String(options.as ?? name);
+    const singular = singularize(plural);
     const namePrefix = this._scope.get("as") as string | undefined;
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
@@ -975,7 +976,7 @@ export class Mapper {
 
     const resource: ResourceLike = {
       memberName: singular,
-      collectionName: singular === name ? `${name}_index` : name,
+      collectionName: singular === plural ? `${plural}_index` : plural,
       nestedParam: `${singular}_id`,
       param: "id",
       path,
