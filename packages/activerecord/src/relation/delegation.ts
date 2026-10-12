@@ -4,6 +4,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
   type RenameKeyOptions,
+  Concern,
   Delegation as ActiveSupportDelegation,
   inGroups,
   inGroupsOf,
@@ -23,10 +24,12 @@ import {
   Range,
   arySlice,
   compact,
+  extend,
   include,
   rbEql,
   rbFPublicSend,
   rbModConstSet,
+  rbClassSuperclass,
   rbModName,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -79,7 +82,6 @@ export class DelegateCache {
     for (const klass of delegatedClasses()) {
       const delegate = class extends (klass as new (...args: never[]) => object) {} as FamilyCtor;
       include(delegate, ClassSpecificRelation);
-      Object.defineProperty(delegate, "name", { value: rbModName(klass), configurable: true });
       DelegateCache.includeRelationMethods.call(this, delegate);
       cache.set(klass, delegate);
     }
@@ -136,31 +138,42 @@ export class GeneratedRelationMethods extends Module {
   }
 }
 
-export class ClassSpecificRelation {
-  methodMissing(this: any, method: string, ...args: any[]): unknown {
-    const model = this._model as typeof Base;
-    if (rbObjRespondTo(model, method)) {
-      if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
-        // @nie disposition=TODO
-        throw new NotImplementedError(
-          "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
-        );
-      } else if (!uncacheableMethods().has(method)) {
-        model.generateRelationMethod(method);
-      }
+export const ClassSpecificRelation = new Module() as Module<{
+  methodMissing(method: string, ...args: any[]): unknown;
+}> & { ClassMethods: typeof ClassMethods };
+extend(ClassSpecificRelation, Concern);
 
-      return this.scoping(() =>
-        method in model
-          ? (model as any)[method](...args)
-          : (model as any).methodMissing(method, ...args),
+export const ClassMethods = {
+  get name(): string | null {
+    return rbModName(rbClassSuperclass(this as object)!);
+  },
+};
+ClassSpecificRelation.ClassMethods = ClassMethods;
+
+export function methodMissing(this: any, method: string, ...args: any[]): unknown {
+  const model = this._model as typeof Base;
+  if (rbObjRespondTo(model, method)) {
+    if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
+      // @nie disposition=TODO
+      throw new NotImplementedError(
+        "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
       );
-    } else {
-      throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${this.constructor.name}`,
-      );
+    } else if (!uncacheableMethods().has(method)) {
+      model.generateRelationMethod(method);
     }
+
+    return this.scoping(() =>
+      method in model
+        ? (model as any)[method](...args)
+        : (model as any).methodMissing(method, ...args),
+    );
+  } else {
+    throw new NoMethodError(
+      `undefined method '${method}' for an instance of ${this.constructor.name}`,
+    );
   }
 }
+ClassSpecificRelation.defineMethod("methodMissing", methodMissing);
 
 export function create(this: FamilyCtor, model: typeof Base, ...args: any[]): any {
   return new (relationClassFor.call(this, model))(model, ...args);
