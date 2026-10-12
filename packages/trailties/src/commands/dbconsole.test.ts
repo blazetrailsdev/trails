@@ -7,10 +7,6 @@ import { DBConsole, DbconsoleCommand } from "./dbconsole.js";
 const database = vi.hoisted(() => ({ results: {} as Record<string, unknown> }));
 
 vi.mock("../database.js", () => ({ databaseConfiguration: async () => database.results }));
-vi.mock("../command/actions.js", () => ({
-  requireApplicationBang: async () => {},
-  bootApplicationBang: async () => {},
-}));
 
 describe("Rails::DBConsoleTest", () => {
   let aborted = false;

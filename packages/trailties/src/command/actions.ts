@@ -1,4 +1,4 @@
-import { getPath } from "@blazetrails/ruby-compat";
+import { defineModule, getPath } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_PATH } from "../app-path.js";
 import { Trails } from "../rails.js";
 
@@ -23,4 +23,8 @@ export async function loadGenerators(): Promise<void> {
   await Trails.application!.loadGenerators();
 }
 
-export const Actions = { requireApplicationBang, bootApplicationBang, loadGenerators };
+export const Actions = defineModule({
+  requireApplicationBang,
+  bootApplicationBang,
+  loadGenerators,
+});
