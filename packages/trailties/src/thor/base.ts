@@ -16,7 +16,6 @@ import {
   last,
   merge,
   max,
-  mergeBang,
   NotImplementedError,
   rbArgv,
   rbFSend,
@@ -463,7 +462,7 @@ export const ClassMethods = {
     if (!Object.hasOwn(this, "_allCommands")) {
       this._allCommands = this.fromSuperclass("allCommands", {}) as Record<string, Command>;
     }
-    return mergeBang(this._allCommands!, this.commands());
+    return Object.assign(this._allCommands!, this.commands());
   },
   allTasks: undefined as unknown as BaseClass["allCommands"],
 
@@ -647,7 +646,7 @@ export const ClassMethods = {
   ): Option {
     return (scope[name] = new Option(
       name,
-      mergeBang({ checkDefaultType: this.checkDefaultType() } as OptionOptions, options),
+      Object.assign({ checkDefaultType: this.checkDefaultType() } as OptionOptions, options),
     ));
   },
 

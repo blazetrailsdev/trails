@@ -6241,6 +6241,8 @@ describe("a native hash form credits the Hash call it ports", () => {
   it("credits @options.key?(:x) from a membership test on this.options only", () => {
     expect(credited("key?", `return "x" in this.options;`, ["ivar"], ["@options"])).toBe(true);
     expect(credited("key?", `return "x" in this.other;`, ["ivar"], ["@options"])).toBe(false);
+    expect(credited("key?", `return "x" in this._options;`, ["ivar"], ["@options"])).toBe(true);
+    expect(credited("key?", `return "x" in this._options;`, ["local"], ["options"])).toBe(false);
   });
 
   it("credits no key? for a feature probe on another value", () => {

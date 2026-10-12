@@ -50,7 +50,6 @@ import {
   isSymbol,
   keepIf,
   merge,
-  mergeBang,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { deprecator } from "../deprecator.js";
@@ -378,7 +377,7 @@ export class Mapping {
     this.scopeOptions = scopeParams.options;
     this.ast = new Ast(ast, formatted);
 
-    options = { ...this.ast.wildcardOptions, ...options };
+    options = Object.assign(this.ast.wildcardOptions, options);
 
     options = this.normalizeOptionsBang(options, this.ast.pathParams, scopeParams.module);
 
@@ -401,7 +400,7 @@ export class Mapping {
         ...defaults,
       };
       this._blocks = scopeParams.blocks;
-      mergeBang(constraints, optionsConstraints);
+      Object.assign(constraints, optionsConstraints);
     } else {
       this._blocks = this.blocks(optionsConstraints);
     }

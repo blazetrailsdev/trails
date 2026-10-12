@@ -1,4 +1,4 @@
-import { dup, merge, mergeBang } from "@blazetrails/ruby-compat";
+import { dup, merge } from "@blazetrails/ruby-compat";
 
 import type { RouteSetLike } from "../abstract-controller/url-for.js";
 import { statusCode } from "@blazetrails/rack";
@@ -18,7 +18,7 @@ export class Renderer {
     this._controller = controller;
     this._defaults = defaults;
     this._env = Renderer.normalizeEnv(defaults);
-    if (env) mergeBang(this._env, Renderer.normalizeEnv(env));
+    if (env) Object.assign(this._env, Renderer.normalizeEnv(env));
   }
 
   static for(

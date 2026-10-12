@@ -1,7 +1,7 @@
 import { Logger } from "@blazetrails/activesupport";
 import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
 
-import { merge, mergeBang } from "@blazetrails/ruby-compat";
+import { merge } from "@blazetrails/ruby-compat";
 import { MimeType } from "./mime-type.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
@@ -83,7 +83,7 @@ export function parameters(this: ParametersHost): Record<string, unknown> {
   if (cached) return cached as Record<string, unknown>;
 
   const params: Record<string, unknown> = merge(this.requestParameters, this.queryParameters);
-  mergeBang(params, pathParameters.call(this));
+  Object.assign(params, pathParameters.call(this));
   this.setHeader("action_dispatch.request.parameters", params);
   return params;
 }

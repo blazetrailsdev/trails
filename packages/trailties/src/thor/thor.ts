@@ -585,7 +585,7 @@ export class Thor {
 
   /** @internal */
   static initializeAdded(this: ThorClass): void {
-    mergeBang(this.classOptions(), this.methodOptions());
+    Object.assign(this.classOptions(), this.methodOptions());
     this._methodOptions = null;
   }
 

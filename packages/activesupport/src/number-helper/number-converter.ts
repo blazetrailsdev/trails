@@ -4,7 +4,6 @@ import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { SafeBuffer } from "../core-ext/string/output-safety.js";
 import { classAttribute } from "../class-attribute.js";
-import { merge, mergeBang } from "../hash-utils.js";
 
 const RATIONAL_DEFAULT_PRECISION = 32;
 
@@ -126,13 +125,13 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected get options(): Record<string, unknown> {
     if (!this._options) {
-      this._options = merge(this.formatOptions(), this.opts as Record<string, unknown>);
+      this._options = { ...this.formatOptions(), ...(this.opts as Record<string, unknown>) };
     }
     return this._options;
   }
 
   protected formatOptions(): Record<string, unknown> {
-    return mergeBang(this.defaultFormatOptions(), this.i18nFormatOptions());
+    return Object.assign(this.defaultFormatOptions(), this.i18nFormatOptions());
   }
 
   protected defaultFormatOptions(): Record<string, unknown> {

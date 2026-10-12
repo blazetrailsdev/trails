@@ -1,4 +1,4 @@
-import { except, mergeBang } from "@blazetrails/ruby-compat";
+import { except } from "@blazetrails/ruby-compat";
 
 export const COMPARE_CHECKS = {
   greaterThan: ":>",
@@ -14,7 +14,7 @@ export function errorOptions(
   value: unknown,
   optionValue: unknown,
 ): Record<string, unknown> {
-  return mergeBang(except(this.options, ...Object.keys(COMPARE_CHECKS)), {
+  return Object.assign(except(this.options, ...Object.keys(COMPARE_CHECKS)), {
     count: optionValue,
     value: value,
   });

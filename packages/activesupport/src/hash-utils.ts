@@ -111,16 +111,6 @@ export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K
   return result;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function merge<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
-  return { ...hash, ...otherHash } as T;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function mergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
-  return Object.assign(hash, otherHash);
-}
-
 export function deepTransformKeys(obj: unknown, block: (key: string) => string): unknown {
   return _deepTransformKeysInObject.call(obj as AnyObject, obj, block);
 }

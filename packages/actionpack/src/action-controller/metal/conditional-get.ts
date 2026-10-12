@@ -7,7 +7,7 @@ import {
   tryCall,
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { hashDelete, hashReplace, mergeBang } from "@blazetrails/ruby-compat";
+import { hashDelete, hashReplace } from "@blazetrails/ruby-compat";
 import type { Metal } from "../metal.js";
 import { Head, type head } from "./head.js";
 import type { CacheControlHash } from "../../action-dispatch/http/cache.js";
@@ -71,7 +71,7 @@ export async function freshWhen(
 
   if (lastModified != null) this.response.lastModified = lastModified;
   if (public_) this.response.cacheControl.public = true;
-  mergeBang(this.response.cacheControl, cacheControl);
+  Object.assign(this.response.cacheControl, cacheControl);
 
   if (this.request.fresh(this.response)) this.head("not_modified");
 }
@@ -91,7 +91,7 @@ export function expiresIn(
   options: Record<string, unknown> = {},
 ): void {
   hashDelete(this.response.cacheControl, "noStore");
-  mergeBang(this.response.cacheControl, {
+  Object.assign(this.response.cacheControl, {
     maxAge: seconds,
     public: hashDelete(options, "public"),
     mustRevalidate: hashDelete(options, "mustRevalidate"),

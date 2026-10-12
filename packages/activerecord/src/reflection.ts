@@ -22,7 +22,6 @@ import {
   demodulize,
   constantize,
   foreignKey as deriveForeignKey,
-  merge,
   DelegationError,
   classAttribute,
   included,
@@ -33,7 +32,6 @@ import {
   RuntimeError,
   StandardError,
   except,
-  mergeBang,
   rbRegMatchP,
   rtest,
   toS,
@@ -1629,7 +1627,7 @@ export function addReflection(
   reflection: AssociationReflection | ThroughReflection,
 ): void {
   clearReflectionsCache(ar);
-  (ar as any)._reflections = mergeBang(
+  (ar as any)._reflections = Object.assign(
     except((ar as any)._reflections as Record<string, unknown>, name),
     { [name]: reflection },
   );
@@ -1640,7 +1638,7 @@ export function addAggregateReflection(
   name: string,
   reflection: AggregateReflection,
 ): void {
-  ar.aggregateReflections = merge(ar.aggregateReflections, { [name]: reflection });
+  ar.aggregateReflections = { ...ar.aggregateReflections, [name]: reflection };
 }
 
 export function reflections(

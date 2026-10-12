@@ -42,7 +42,6 @@ import {
   groupBy,
   indexBy,
   many,
-  mergeBang,
 } from "@blazetrails/activesupport";
 
 export { Range };
@@ -1370,7 +1369,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         ...(names as string[]),
         options.time,
       );
-      if (!isEmpty(touchUpdates)) mergeBang(updates, touchUpdates);
+      if (!isEmpty(touchUpdates)) Object.assign(updates, touchUpdates);
     }
 
     return this.updateAll(updates);
