@@ -254,22 +254,42 @@ because it is not obvious:
   match. Version skew is refused outright: the compiler compares its own source
   commit against the archive's.
 
-### Bug 3c — a 362-module binary links, then spins forever in module init
+### Bug 3c — module namespace objects have a non-null prototype (minimized)
 
-With Wall 2 cleared and 3b side-stepped (this probe imports `dist` JS, not
+With Wall 2 cleared and 3b side-stepped (that probe imports `dist` JS, not
 TypeScript source), the largest graph yet **compiles and links**: 362 modules,
-69MB, inside a 20GB cap. It then never starts.
+69MB, inside a 20GB cap. It then never starts — it spins at ~100% of one core
+with no output.
 
-`PERRY_DEBUG_INIT=1` names the point precisely: **143 of 362 module
-initializers run**, the last complete one being `ruby-compat/dist/uri.js`, and
-the next one never finishes. The process spins at ~100% of one core with no
-output for over ten minutes.
+Minimized to two files of plain JavaScript and no trails code at all —
+[upstream/namespace-prototype/](upstream/namespace-prototype/ISSUE.md):
 
-It is **not** the WebAssembly interpreter: zero `libxml2`/wasm modules appear
-in the init trace, so execution never reaches them. It is an init-time hang in
-the module after `uri.js`.
+    // mod.js
+    export function a() {}
+    // probe.js
+    import * as Mod from "./mod.js";
+    Object.getPrototypeOf(Mod)   // node: null | perry: [object Module]
 
-Not minimized, not filed. It is the current frontier.
+ECMA-262 gives module namespace exotic objects a `[[Prototype]]` of `null`, so
+a prototype-chain walk over an `import * as X` binding terminates after one
+step. Under Perry it never terminates: every `getPrototypeOf` returns a
+further non-null `[object Module]`, and the chain is unbounded rather than
+cyclic (`getPrototypeOf(Mod) !== Mod`).
+
+**Any code that walks an object's prototype chain hangs when handed a module
+namespace.** That is exactly what the trails graph does.
+`PERRY_DEBUG_INIT=1` placed the stall at
+`activesupport/dist/namespaces.js`, whose top-level code is
+
+    import * as Autoload from "./dependencies/autoload.js";
+    extend(ActiveSupport, Autoload);
+
+`extend` is ruby-compat's Ruby `Object#extend`, which traverses the prototype
+chain of the module handed to it. Node finishes instantly; Perry does not
+finish.
+
+The reduction ran 362-module app → `namespaces.js` → `extend(target,
+namespace)` (59 modules) → two files, zero dependencies. Ready to file.
 
 ## The SQLite result is weaker than it looks
 
