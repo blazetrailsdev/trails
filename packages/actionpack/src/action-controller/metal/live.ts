@@ -14,9 +14,10 @@ import {
   SizedQueue,
   Thread,
   ThreadError,
-  excBacktraceLocations,
+  excBacktrace,
   isSymbol,
   merge,
+  rbObjClassname,
   rbObjRespondTo,
   toS,
 } from "@blazetrails/ruby-compat";
@@ -337,14 +338,14 @@ export function logError(this: LiveControllerHost, exception: Error): void {
   const logger = ActionController.Base.logger;
   if (logger == null) return;
 
-  (logger as unknown as { fatal(block: () => string): void }).fatal(() => {
-    let message = `\n${exception.name} (${exception.message}):\n`;
+  logger.fatal(() => {
+    let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;
     if (rbObjRespondTo(exception, "annotatedSourceCode")) {
       message += toS(
         (exception as Error & { annotatedSourceCode(): unknown }).annotatedSourceCode(),
       );
     }
-    message += "  " + excBacktraceLocations(exception)!.join("\n  ");
+    message += "  " + excBacktrace(exception)!.join("\n  ");
     return `${message}\n\n`;
   });
 }

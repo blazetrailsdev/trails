@@ -516,14 +516,16 @@ describe("ActionController::Live private helpers", () => {
     const oldLogger = Base.logger;
     Base.logger = { fatal } as unknown as typeof Base.logger;
     try {
-      const exception = Object.assign(new Error("oops"), { annotatedSourceCode: () => "source\n" });
+      const exception = Object.assign(new ClientDisconnected("oops"), {
+        annotatedSourceCode: () => "source\n",
+      });
       logError.call(makeHost(), exception);
     } finally {
       Base.logger = oldLogger;
     }
     expect(fatal).toHaveBeenCalledOnce();
     const rendered = (fatal.mock.calls[0][0] as () => string)();
-    expect(rendered).toMatch(/^\nError \(oops\):\nsource\n {2}at .*\n {2}at /);
+    expect(rendered).toMatch(/^\nClientDisconnected \(oops\):\nsource\n {2}at .*\n {2}at /);
     expect(rendered.endsWith("\n\n")).toBe(true);
   });
 
