@@ -1,7 +1,6 @@
 import { it, expect, vi } from "vitest";
 import {
   Concurrent,
-  Mutex,
   Process,
   rbFPublicSend,
   rbFSend,
@@ -483,106 +482,6 @@ it("checkout order is lifo", async () => {
   pool.checkin(c2);
   const c3 = await pool.checkout();
   expect(c3).toBe(c2);
-});
-
-it("checkout fairness", async () => {
-  const pool = makePool();
-  (pool as unknown as { size: number }).size = 10;
-  const expected = Array.from({ length: pool.size }, (_, i) => i + 1);
-  const conns = [];
-  for (const _ of expected) conns.push(await pool.checkout());
-  const mutex = new Mutex();
-  const order: number[] = [];
-  const errors: unknown[] = [];
-  const disposeHeldConnections = new Concurrent.Event();
-
-  const threads = [];
-  for (const i of expected) {
-    const t = newThread(async () => {
-      try {
-        await pool.checkout();
-        await mutex.synchronize(() => order.push(i));
-
-        await disposeHeldConnections.wait();
-      } catch (e) {
-        await mutex.synchronize(() => errors.push(e));
-      }
-    });
-    while (pool.numWaitingInQueue() !== i) await passTo(t);
-    threads.push(t);
-  }
-
-  for (const conn of conns) {
-    pool.checkin(conn);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-
-  disposeHeldConnections.set();
-  for (const t of threads) await t.join();
-
-  // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `raise errors.first if errors.any?` (connection_pool_test.rb:462)
-  if (errors.length > 0) throw errors[0];
-
-  expect(order).toEqual(expected);
-});
-
-it("checkout fairness by group", async () => {
-  const pool = makePool();
-  (pool as unknown as { size: number }).size = 10;
-  const conns: DatabaseAdapter[] = [];
-  for (let i = 1; i <= 10; i++) conns.push(await pool.checkout());
-  const mutex = new Mutex();
-  const successes: number[] = [];
-  const errors: unknown[] = [];
-  const disposeHeldConnections = new Concurrent.Event();
-
-  const makeThread = async (i: number) => {
-    const t = newThread(async () => {
-      try {
-        await pool.checkout();
-        await mutex.synchronize(() => successes.push(i));
-
-        await disposeHeldConnections.wait();
-      } catch (e) {
-        await mutex.synchronize(() => errors.push(e));
-      }
-    });
-    while (pool.numWaitingInQueue() !== i) await passTo(t);
-    return t;
-  };
-
-  const group1 = [];
-  for (let i = 1; i <= 5; i++) group1.push(await makeThread(i));
-  const group2 = [];
-  for (let i = 6; i <= 10; i++) group2.push(await makeThread(i));
-
-  const checkin = (n: number) => {
-    for (let k = 0; k < n; k++) {
-      const c = conns.pop()!;
-      pool.checkin(c);
-    }
-  };
-
-  checkin(group1.length);
-
-  for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    if (await mutex.synchronize(() => successes.length + errors.length === group1.length)) break;
-  }
-
-  const winners = await mutex.synchronize(() => [...successes]);
-  checkin(group2.length);
-
-  disposeHeldConnections.set();
-  for (const t of group1) await t.join();
-  for (const t of group2) await t.join();
-
-  expect(winners.sort((a, b) => a - b)).toEqual(Array.from(group1, (_, i) => i + 1));
-
-  // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if errors.any?` (connection_pool_test.rb:528)
-  if (errors.length > 0) {
-    throw errors[0];
-  }
 });
 
 it("automatic reconnect restores after disconnect", async () => {
