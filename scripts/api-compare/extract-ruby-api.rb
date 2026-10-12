@@ -745,7 +745,7 @@ class ApiExtractor
     name = const_name(node[1])
     return unless name
 
-    superclass = qualified_const_name(node[2]) if node[2]
+    superclass = qualified_const_name(delegate_class_target(node[2]) || node[2]) if node[2]
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
@@ -4729,6 +4729,23 @@ class ApiExtractor
     else
       nil
     end
+  end
+
+  # The `X` of a `DelegateClass(X)` superclass expression
+  # (`class Serialized < DelegateClass(ActiveModel::Type::Value)`,
+  # activerecord/lib/active_record/type/serialized.rb:5). `DelegateClass`
+  # answers an anonymous class forwarding every public method of `X`
+  # (vendor/ruby/v3.3.11/lib/delegate.rb:394-436), so `X` is the parent the
+  # class is read against.
+  def delegate_class_target(node)
+    return nil unless node.is_a?(Array) && node[0] == :method_add_arg
+    fcall = node[1]
+    return nil unless fcall.is_a?(Array) && fcall[0] == :fcall && fcall[1].is_a?(Array) &&
+                      fcall[1][1] == "DelegateClass"
+    args = node[2]
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    args.is_a?(Array) ? args[0] : nil
   end
 
   def find_params(def_node)

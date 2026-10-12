@@ -3128,6 +3128,11 @@ function shortName(fqn: string | undefined | null): string | null {
   // Ruby uses `::` as the namespace separator; TS extractor stores the
   // raw superclass expression, so `extends globalThis.Error` ends up as
   // `globalThis.Error` — strip either separator to reach the leaf name.
+  // `extends DelegateClass(ValueType)` is ruby-compat's port of Ruby's
+  // `< DelegateClass(Type::Value)`, which the Ruby extractor records as the
+  // delegated class (`delegate_class_target`); read the TS side the same way.
+  const delegated = /^DelegateClass\((.+)\)$/s.exec(fqn.trim());
+  if (delegated) return shortName(delegated[1]);
   const parts = fqn.split(/::|\./);
   return parts[parts.length - 1] || null;
 }
@@ -3181,15 +3186,9 @@ export function nameMatches(rubyName: string, tsName: string): boolean {
 // Keyed by ts class name → ts superclass name that should be accepted.
 // - Arel Table/Attribute: Rails has no super (plain object or
 //   `Struct.new(...)`), TS roots them at `Node` for uniform AST walking.
-// - AR LockingType / Serialized: Rails uses `DelegateClass(Type::Value)`
-//   — a dynamic parent our extractor can't resolve (comes through as
-//   null). TS extends `ValueType` directly, which matches the intent.
 const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   ["Table", "Node"],
   ["Attribute", "Node"],
-  ["LockingType", "ValueType"],
-  ["Serialized", "ValueType"],
-  ["TimeZoneConverter", "ValueType"],
   // `ActiveRecord::Base` has no Ruby super; TS `Base` extends `Model`
   // so the ActiveModel mixin surface is type-visible on subclasses.
   ["Base", "Model"],
