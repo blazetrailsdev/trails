@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Carrier } from "./carrier.js";
 import type { Customer } from "./customer.js";
 import type { CustomerCarrier } from "./customer-carrier.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShopAccount extends Base {
@@ -16,7 +16,7 @@ export class ShopAccount extends Base {
     this.hasOne("carrier", { through: "customerCarrier" });
   }
 }
-registerConstant("ShopAccount", ShopAccount);
+registerModel(ShopAccount);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShopAccount {
   get customer(): Customer | null | Promise<Customer | null>;

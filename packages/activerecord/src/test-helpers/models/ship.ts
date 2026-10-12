@@ -1,4 +1,4 @@
-import { isEmpty, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
+import { isEmpty, kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
@@ -7,6 +7,7 @@ import type { Pirate } from "./pirate.js";
 import type { ShipPart } from "./ship-part.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Ship extends Base {
@@ -75,7 +76,7 @@ export class ShipWithoutNestedAttributes extends Base {
     this.validates("name", { presence: true, if: () => true });
   }
 }
-registerConstant("ShipWithoutNestedAttributes", ShipWithoutNestedAttributes);
+registerModel(ShipWithoutNestedAttributes);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Prisoner extends Base {
@@ -89,7 +90,7 @@ export class Prisoner extends Base {
     });
   }
 }
-registerConstant("Prisoner", Prisoner);
+registerModel(Prisoner);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Prisoner {
   get ship(): ShipWithoutNestedAttributes | null | Promise<ShipWithoutNestedAttributes | null>;
@@ -104,11 +105,11 @@ export class FamousShip extends Base {
     this.validates("name", { presence: true, on: "conference" });
   }
 }
-registerConstant("FamousShip", FamousShip);
+registerModel(FamousShip);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FamousShip {
   get famousPirate(): FamousPirate | null | Promise<FamousPirate | null>;
   set famousPirate(value: FamousPirate | null);
 }
 
-registerConstant("Ship", Ship);
+registerModel(Ship);

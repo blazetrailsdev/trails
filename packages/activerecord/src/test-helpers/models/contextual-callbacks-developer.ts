@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class ContextualCallbacksDeveloper extends Base {
   declare name: string;
@@ -41,4 +41,4 @@ export class ContextualCallbacksDeveloper extends Base {
     return (this._history ??= []);
   }
 }
-registerConstant("ContextualCallbacksDeveloper", ContextualCallbacksDeveloper);
+registerModel(ContextualCallbacksDeveloper);

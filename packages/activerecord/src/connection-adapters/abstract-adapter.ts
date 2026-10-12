@@ -470,7 +470,7 @@ export interface AbstractAdapter
     options?: RemoveReferenceOptions,
   ): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
-  removeTimestamps(tableName: string): Promise<void>;
+  removeTimestamps(tableName: string, _options?: ColumnOptions): Promise<void>;
   addCheckConstraint(
     tableName: string,
     expression: string,

@@ -1,182 +1,161 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, pgServerVersion } from "./test-helper.js";
-import { captureSql } from "../../testing/sql-capture.js";
+import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
+import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 
 const supportsNullsNotDistinct = pgServerVersion >= 150000;
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
-  });
-  afterEach(async () => {
-    await adapter.disconnectBang();
-  });
 
   describe("PostgreSQLActiveSchemaTest", () => {
+    let execute: typeof PostgreSQLAdapter.prototype.execute;
+    let executeWasOwn: boolean;
     fixtures(["people"]);
 
+    beforeEach(async () => {
+      adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
+      await adapter.materializeTransactions();
+
+      executeWasOwn = Object.hasOwn(PostgreSQLAdapter.prototype, "execute");
+      execute = PostgreSQLAdapter.prototype.execute;
+      PostgreSQLAdapter.prototype.execute = async function (sql: string, _name = null) {
+        return sql;
+      } as never;
+    });
+
+    afterEach(() => {
+      delete (PostgreSQLAdapter.prototype as Partial<PostgreSQLAdapter>).execute;
+      if (executeWasOwn) PostgreSQLAdapter.prototype.execute = execute;
+    });
+
     it("create database with encoding", async () => {
-      let sqls = await captureSql(() => adapter.createDatabase("matt"), { stub: adapter });
-      expect(sqls[0]).toBe(`CREATE DATABASE "matt" ENCODING = 'utf8'`);
+      expect(await adapter.createDatabase("matt")).toBe(`CREATE DATABASE "matt" ENCODING = 'utf8'`);
 
-      sqls = await captureSql(() => adapter.createDatabase("aimonetti", { encoding: "latin1" }), {
-        stub: adapter,
-      });
-      expect(sqls[0]).toBe(`CREATE DATABASE "aimonetti" ENCODING = 'latin1'`);
+      expect(await adapter.createDatabase("aimonetti", { encoding: "latin1" })).toBe(
+        `CREATE DATABASE "aimonetti" ENCODING = 'latin1'`,
+      );
 
-      sqls = await captureSql(() => adapter.createDatabase("aimonetti", { encoding: "latin1" }), {
-        stub: adapter,
-      });
-      expect(sqls[0]).toBe(`CREATE DATABASE "aimonetti" ENCODING = 'latin1'`);
+      expect(await adapter.createDatabase("aimonetti", { encoding: "latin1" })).toBe(
+        `CREATE DATABASE "aimonetti" ENCODING = 'latin1'`,
+      );
     });
 
     it("create database with collation and ctype", async () => {
-      const sqls = await captureSql(
-        () =>
-          adapter.createDatabase("aimonetti", {
-            encoding: "UTF8",
-            collation: "ja_JP.UTF8",
-            ctype: "ja_JP.UTF8",
-          }),
-        { stub: adapter },
-      );
-      expect(sqls[0]).toBe(
+      expect(
+        await adapter.createDatabase("aimonetti", {
+          encoding: "UTF8",
+          collation: "ja_JP.UTF8",
+          ctype: "ja_JP.UTF8",
+        }),
+      ).toBe(
         `CREATE DATABASE "aimonetti" ENCODING = 'UTF8' LC_COLLATE = 'ja_JP.UTF8' LC_CTYPE = 'ja_JP.UTF8'`,
       );
     });
 
     it("add index", async () => {
-      const sql = async (fn: () => unknown) =>
-        (await captureSql(fn, { stub: adapter, includeSchema: false }))[0];
-
       expect(
-        await sql(() =>
-          adapter.addIndex("people", "last_name", { unique: true, where: "state = 'active'" }),
-        ),
+        await adapter.addIndex("people", "last_name", { unique: true, where: "state = 'active'" }),
       ).toBe(
         `CREATE UNIQUE INDEX "index_people_on_last_name" ON "people" ("last_name") WHERE state = 'active'`,
       );
 
-      expect(
-        await sql(() => adapter.addIndex("people", "lower(last_name)", { unique: true })),
-      ).toBe(
+      expect(await adapter.addIndex("people", "lower(last_name)", { unique: true })).toBe(
         `CREATE UNIQUE INDEX "index_people_on_lower_last_name" ON "people" (lower(last_name))`,
       );
 
       expect(
-        await sql(() =>
-          adapter.addIndex("people", "last_name varchar_pattern_ops", { unique: true }),
-        ),
+        await adapter.addIndex("people", "last_name varchar_pattern_ops", { unique: true }),
       ).toBe(
         `CREATE UNIQUE INDEX "index_people_on_last_name_varchar_pattern_ops" ON "people" (last_name varchar_pattern_ops)`,
       );
 
-      expect(
-        await sql(() => adapter.addIndex("people", "last_name", { algorithm: "concurrently" })),
-      ).toBe(`CREATE INDEX CONCURRENTLY "index_people_on_last_name" ON "people" ("last_name")`);
+      expect(await adapter.addIndex("people", "last_name", { algorithm: "concurrently" })).toBe(
+        `CREATE INDEX CONCURRENTLY "index_people_on_last_name" ON "people" ("last_name")`,
+      );
 
       expect(
-        await sql(() =>
-          adapter.addIndex("people", "last_name", {
-            ifNotExists: true,
-            algorithm: "concurrently",
-          }),
-        ),
+        await adapter.addIndex("people", "last_name", {
+          ifNotExists: true,
+          algorithm: "concurrently",
+        }),
       ).toBe(
         `CREATE INDEX CONCURRENTLY IF NOT EXISTS "index_people_on_last_name" ON "people" ("last_name")`,
       );
 
       expect(
-        await sql(() =>
-          adapter.addIndex("people", ["last_name", "first_name"], {
-            order: { last_name: "desc", first_name: "asc" },
-          }),
-        ),
+        await adapter.addIndex("people", ["last_name", "first_name"], {
+          order: { last_name: "desc", first_name: "asc" },
+        }),
       ).toBe(
         `CREATE INDEX "index_people_on_last_name_and_first_name" ON "people" ("last_name" DESC, "first_name" ASC)`,
       );
 
       expect(
-        await sql(() =>
-          adapter.addIndex("people", ["last_name", "first_name"], {
-            order: { last_name: "desc", first_name: "asc" },
-          }),
-        ),
+        await adapter.addIndex("people", ["last_name", "first_name"], {
+          order: { last_name: "desc", first_name: "asc" },
+        }),
       ).toBe(
         `CREATE INDEX "index_people_on_last_name_and_first_name" ON "people" ("last_name" DESC, "first_name" ASC)`,
       );
 
       for (const type of ["gin", "gist", "hash", "btree"]) {
-        expect(await sql(() => adapter.addIndex("people", "last_name", { using: type }))).toBe(
+        expect(await adapter.addIndex("people", "last_name", { using: type })).toBe(
           `CREATE INDEX "index_people_on_last_name" ON "people" USING ${type} ("last_name")`,
         );
 
         expect(
-          await sql(() =>
-            adapter.addIndex("people", "last_name", { using: type, algorithm: "concurrently" }),
-          ),
+          await adapter.addIndex("people", "last_name", { using: type, algorithm: "concurrently" }),
         ).toBe(
           `CREATE INDEX CONCURRENTLY "index_people_on_last_name" ON "people" USING ${type} ("last_name")`,
         );
 
         expect(
-          await sql(() =>
-            adapter.addIndex("people", "last_name", {
-              using: type,
-              unique: true,
-              where: "state = 'active'",
-            }),
-          ),
+          await adapter.addIndex("people", "last_name", {
+            using: type,
+            unique: true,
+            where: "state = 'active'",
+          }),
         ).toBe(
           `CREATE UNIQUE INDEX "index_people_on_last_name" ON "people" USING ${type} ("last_name") WHERE state = 'active'`,
         );
 
         expect(
-          await sql(() =>
-            adapter.addIndex("people", "lower(last_name)", { using: type, unique: true }),
-          ),
+          await adapter.addIndex("people", "lower(last_name)", { using: type, unique: true }),
         ).toBe(
           `CREATE UNIQUE INDEX "index_people_on_lower_last_name" ON "people" USING ${type} (lower(last_name))`,
         );
       }
 
       expect(
-        await sql(() =>
-          adapter.addIndex("people", "last_name", {
-            using: "gist",
-            opclass: { last_name: "bpchar_pattern_ops" },
-          }),
-        ),
+        await adapter.addIndex("people", "last_name", {
+          using: "gist",
+          opclass: { last_name: "bpchar_pattern_ops" },
+        }),
       ).toBe(
         `CREATE INDEX "index_people_on_last_name" ON "people" USING gist ("last_name" bpchar_pattern_ops)`,
       );
 
       expect(
-        await sql(() =>
-          adapter.addIndex("people", ["last_name", "first_name"], {
-            order: { last_name: "DESC NULLS LAST", first_name: "asc" },
-          }),
-        ),
+        await adapter.addIndex("people", ["last_name", "first_name"], {
+          order: { last_name: "DESC NULLS LAST", first_name: "asc" },
+        }),
       ).toBe(
         `CREATE INDEX "index_people_on_last_name_and_first_name" ON "people" ("last_name" DESC NULLS LAST, "first_name" ASC)`,
       );
 
-      expect(
-        await sql(() => adapter.addIndex("people", "last_name", { order: "NULLS FIRST" })),
-      ).toBe(`CREATE INDEX "index_people_on_last_name" ON "people" ("last_name" NULLS FIRST)`);
+      expect(await adapter.addIndex("people", "last_name", { order: "NULLS FIRST" })).toBe(
+        `CREATE INDEX "index_people_on_last_name" ON "people" ("last_name" NULLS FIRST)`,
+      );
 
-      expect(await sql(() => adapter.addIndex("people", "last_name", { ifNotExists: true }))).toBe(
+      expect(await adapter.addIndex("people", "last_name", { ifNotExists: true })).toBe(
         `CREATE INDEX IF NOT EXISTS "index_people_on_last_name" ON "people" ("last_name")`,
       );
 
       // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
       if (supportsNullsNotDistinct) {
-        expect(
-          await sql(() => adapter.addIndex("people", "last_name", { nullsNotDistinct: true })),
-        ).toBe(
+        expect(await adapter.addIndex("people", "last_name", { nullsNotDistinct: true })).toBe(
           `CREATE INDEX "index_people_on_last_name" ON "people" ("last_name") NULLS NOT DISTINCT`,
         );
       }
@@ -187,31 +166,31 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("remove index", async () => {
-      const sqls = await captureSql(
-        () =>
-          adapter.removeIndex("people", {
-            name: "index_people_on_last_name",
-            algorithm: "concurrently",
-          }),
-        { stub: adapter },
-      );
-      expect(sqls[0]).toBe(`DROP INDEX CONCURRENTLY "index_people_on_last_name"`);
+      PostgreSQLAdapter.prototype.indexNameForRemove = async function () {
+        return "index_people_on_last_name";
+      };
+
+      expect(
+        await adapter.removeIndex("people", {
+          name: "index_people_on_last_name",
+          algorithm: "concurrently",
+        }),
+      ).toBe(`DROP INDEX CONCURRENTLY "index_people_on_last_name"`);
 
       await expect(() =>
         adapter.addIndex("people", "last_name", { algorithm: "copy" }),
       ).rejects.toThrow(ArgumentError);
+
+      delete (PostgreSQLAdapter.prototype as Partial<PostgreSQLAdapter>).indexNameForRemove;
     });
 
     it("remove index when name is specified", async () => {
-      const sqls = await captureSql(
-        () =>
-          adapter.removeIndex("people", {
-            name: "index_people_on_last_name",
-            algorithm: "concurrently",
-          }),
-        { stub: adapter },
-      );
-      expect(sqls[0]).toBe(`DROP INDEX CONCURRENTLY "index_people_on_last_name"`);
+      expect(
+        await adapter.removeIndex("people", {
+          name: "index_people_on_last_name",
+          algorithm: "concurrently",
+        }),
+      ).toBe(`DROP INDEX CONCURRENTLY "index_people_on_last_name"`);
     });
 
     it("remove index with wrong option", async () => {

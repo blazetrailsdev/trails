@@ -1,9 +1,9 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Author } from "./author.js";
 import type { Job } from "./job.js";
 import type { Person } from "./person.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reference extends Base {
@@ -33,7 +33,7 @@ export class Reference extends Base {
     }
   }
 }
-registerConstant("Reference", Reference);
+registerModel(Reference);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reference {
   get person(): Person | null | Promise<Person | null>;
@@ -51,4 +51,4 @@ export class BadReference extends Base {
     });
   }
 }
-registerConstant("BadReference", BadReference);
+registerModel(BadReference);

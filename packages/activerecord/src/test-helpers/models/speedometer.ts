@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Dashboard } from "./dashboard.js";
 import type { Minivan } from "./minivan.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Speedometer extends Base {
@@ -17,7 +17,7 @@ export class Speedometer extends Base {
     this.hasMany("minivans");
   }
 }
-registerConstant("Speedometer", Speedometer);
+registerModel(Speedometer);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Speedometer {
   get dashboard(): Dashboard | null | Promise<Dashboard | null>;

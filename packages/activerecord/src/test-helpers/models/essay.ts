@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Author } from "./author.js";
 import type { Category } from "./category.js";
 import type { Owner } from "./owner.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Essay extends Base {
@@ -21,7 +21,7 @@ export class Essay extends Base {
     this.hasOne("owner", { primaryKey: "name" });
   }
 }
-registerConstant("Essay", Essay);
+registerModel(Essay);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Essay {
   get author(): Author | null | Promise<Author | null>;
@@ -35,7 +35,7 @@ export interface Essay {
 }
 
 export class EssaySpecial extends Essay {}
-registerConstant("EssaySpecial", EssaySpecial);
+registerModel(EssaySpecial);
 
 export class TypedEssay extends Essay {}
-registerConstant("TypedEssay", TypedEssay);
+registerModel(TypedEssay);

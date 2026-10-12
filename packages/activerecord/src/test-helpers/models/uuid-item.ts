@@ -1,12 +1,12 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class UuidItem extends Base {}
-registerConstant("UuidItem", UuidItem);
+registerModel(UuidItem);
 
 export class UuidValidatingItem extends UuidItem {
   static {
     this.validatesUniquenessOf("uuid");
   }
 }
-registerConstant("UuidValidatingItem", UuidValidatingItem);
+registerModel(UuidValidatingItem);

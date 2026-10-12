@@ -1,9 +1,9 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { FirstPost } from "./post.js";
 import type { Person } from "./person.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reader extends Base {
@@ -49,7 +49,7 @@ export class SecureReader extends Base {
     });
   }
 }
-registerConstant("SecureReader", SecureReader);
+registerModel(SecureReader);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SecureReader {
   get securePost(): Post | null | Promise<Post | null>;
@@ -74,7 +74,7 @@ export class LazyReader extends Base {
     this.belongsTo("person");
   }
 }
-registerConstant("LazyReader", LazyReader);
+registerModel(LazyReader);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LazyReader {
   get post(): Post | null | Promise<Post | null>;
@@ -83,4 +83,4 @@ export interface LazyReader {
   set person(value: Person | null);
 }
 
-registerConstant("Reader", Reader);
+registerModel(Reader);

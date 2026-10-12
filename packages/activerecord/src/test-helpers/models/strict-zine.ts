@@ -1,9 +1,9 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Zine } from "./zine.js";
+import { registerModel } from "../../associations.js";
 
 export class StrictZine extends Zine {
   static {
     this.strictLoadingByDefault = true;
   }
 }
-registerConstant("StrictZine", StrictZine);
+registerModel(StrictZine);

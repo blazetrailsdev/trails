@@ -141,7 +141,7 @@ export class Comment extends Base {
     return this.readAttribute("body") as string;
   }
 }
-registerConstant("Comment", Comment);
+registerModel(Comment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Comment {
   get specialPostWithDefaultScope():
@@ -184,6 +184,7 @@ export class SpecialComment extends Comment {
     return "a special comment...";
   }
 }
+registerModel(SpecialComment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialComment {
   get ordinaryPost(): Post | null | Promise<Post | null>;
@@ -193,8 +194,10 @@ export interface SpecialComment {
 }
 
 export class SubSpecialComment extends SpecialComment {}
+registerModel(SubSpecialComment);
 
 export class VerySpecialComment extends Comment {}
+registerModel(VerySpecialComment);
 
 export class CommentThatAutomaticallyAltersPostBody extends Comment {
   static {
@@ -208,6 +211,7 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
     });
   }
 }
+registerModel(CommentThatAutomaticallyAltersPostBody);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
@@ -218,10 +222,7 @@ export class CommentWithDefaultScopeReferencesAssociation extends Comment {
     this.belongsTo("developer");
   }
 }
-registerConstant(
-  "CommentWithDefaultScopeReferencesAssociation",
-  CommentWithDefaultScopeReferencesAssociation,
-);
+registerModel(CommentWithDefaultScopeReferencesAssociation);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CommentWithDefaultScopeReferencesAssociation {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -235,14 +236,4 @@ export class CommentWithAfterCreateUpdate extends Comment {
     });
   }
 }
-
-for (const klass of [
-  SpecialComment,
-  SubSpecialComment,
-  VerySpecialComment,
-  CommentThatAutomaticallyAltersPostBody,
-  CommentWithDefaultScopeReferencesAssociation,
-  CommentWithAfterCreateUpdate,
-]) {
-  registerModel(klass);
-}
+registerModel(CommentWithAfterCreateUpdate);

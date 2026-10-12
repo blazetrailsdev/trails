@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { ARUnit2Model } from "./arunit2-model.js";
+import { registerModel } from "../../associations.js";
 
 export class College extends ARUnit2Model {
   declare name: string;
@@ -14,4 +14,4 @@ export class College extends ARUnit2Model {
     );
   }
 }
-registerConstant("College", College);
+registerModel(College);

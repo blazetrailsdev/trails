@@ -1,6 +1,7 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { DerivedSecretKeyProvider } from "../../encryption/derived-secret-key-provider.js";
+import { registerModel } from "../../associations.js";
 
 export class MutableDerivedSecretKeyProvider extends DerivedSecretKeyProvider {
   declare keys: string[];
@@ -18,4 +19,4 @@ export class EncryptedPost extends Base {
     });
   }
 }
-registerConstant("EncryptedPost", EncryptedPost);
+registerModel(EncryptedPost);

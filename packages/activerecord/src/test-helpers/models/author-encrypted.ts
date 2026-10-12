@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Scheme } from "../../encryption/scheme.js";
+import { registerModel } from "../../associations.js";
 
 export class EncryptedAuthor extends Base {
   static _tableName = "authors";
@@ -10,7 +10,7 @@ export class EncryptedAuthor extends Base {
     this.encrypts("name", { previousSchemes: [new Scheme({ deterministic: true })] });
   }
 }
-registerConstant("EncryptedAuthor", EncryptedAuthor);
+registerModel(EncryptedAuthor);
 
 export class EncryptedAuthorWithKey extends Base {
   static _tableName = "authors";
@@ -19,4 +19,4 @@ export class EncryptedAuthorWithKey extends Base {
     this.encrypts("name", { key: "some secret key!" });
   }
 }
-registerConstant("EncryptedAuthorWithKey", EncryptedAuthorWithKey);
+registerModel(EncryptedAuthorWithKey);

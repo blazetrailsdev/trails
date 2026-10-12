@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Book } from "./book.js";
 import type { Subscription } from "./subscription.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Subscriber extends Base {
   declare subscriptions: AssociationProxy<Subscription>;
@@ -21,7 +21,7 @@ export class Subscriber extends Base {
     this.hasMany("books", { through: "subscriptions" });
   }
 }
-registerConstant("Subscriber", Subscriber);
+registerModel(Subscriber);
 
 export class SpecialSubscriber extends Subscriber {}
-registerConstant("SpecialSubscriber", SpecialSubscriber);
+registerModel(SpecialSubscriber);

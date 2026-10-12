@@ -1,10 +1,10 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Pet } from "./pet.js";
 import type { Sponsor } from "./sponsor.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Toy extends Base {
@@ -28,7 +28,7 @@ export class Toy extends Base {
     });
   }
 }
-registerConstant("Toy", Toy);
+registerModel(Toy);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Toy {
   get pet(): Pet | null | Promise<Pet | null>;
@@ -46,4 +46,4 @@ export class ToyTouchPet extends Base {
     this.belongsTo("pet", { touch: true });
   }
 }
-registerConstant("ToyTouchPet", ToyTouchPet);
+registerModel(ToyTouchPet);

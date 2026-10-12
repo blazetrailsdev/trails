@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Wheel extends Base {
@@ -15,7 +15,7 @@ export class Wheel extends Base {
     });
   }
 }
-registerConstant("Wheel", Wheel);
+registerModel(Wheel);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Wheel {
   get wheelable(): Base | null | Promise<Base | null>;
@@ -32,7 +32,7 @@ export class WheelPolymorphicTouch extends Base {
     this.belongsTo("wheelable", { polymorphic: true, touch: true });
   }
 }
-registerConstant("WheelPolymorphicTouch", WheelPolymorphicTouch);
+registerModel(WheelPolymorphicTouch);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface WheelPolymorphicTouch {
   get wheelable(): Base | null | Promise<Base | null>;

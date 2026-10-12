@@ -13,7 +13,7 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
   };
   adapter.execute = (sql: string, name: string | null = "SQL") => {
     Notifications.instrument("sql.active_record", { sql, name });
-    return Promise.resolve([]);
+    return Promise.resolve(sql);
   };
   if (original.exec) {
     adapter.exec = (sql: string) => {

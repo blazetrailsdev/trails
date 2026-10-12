@@ -1,7 +1,7 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Seminar } from "./seminar.js";
 import type { Session } from "./session.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Section extends Base {
@@ -14,7 +14,7 @@ export class Section extends Base {
     this.belongsTo("seminar", { inverseOf: "sections", autosave: true });
   }
 }
-registerConstant("Section", Section);
+registerModel(Section);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Section {
   get session(): Session | null | Promise<Session | null>;

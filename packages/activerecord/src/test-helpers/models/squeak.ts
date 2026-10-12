@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Mouse } from "./mouse.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Squeak extends Base {
@@ -11,7 +11,7 @@ export class Squeak extends Base {
     this.acceptsNestedAttributesFor("mouse");
   }
 }
-registerConstant("Squeak", Squeak);
+registerModel(Squeak);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Squeak {
   get mouse(): Mouse | null | Promise<Mouse | null>;

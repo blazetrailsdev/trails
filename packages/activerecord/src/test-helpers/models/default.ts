@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import type { BigDecimal } from "@blazetrails/activesupport";
+import { registerModel } from "../../associations.js";
 
 export class Default extends Base {
   declare text_col: string;
@@ -8,4 +8,4 @@ export class Default extends Base {
   declare decimal_col: BigDecimal;
   declare bpchar_col: string;
 }
-registerConstant("Default", Default);
+registerModel(Default);

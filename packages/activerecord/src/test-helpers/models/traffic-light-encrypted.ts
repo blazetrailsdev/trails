@@ -1,13 +1,13 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { TrafficLight } from "./traffic-light.js";
+import { registerModel } from "../../associations.js";
 
 export class EncryptedTrafficLight extends TrafficLight {
   static {
     this.encrypts("state");
   }
 }
-registerConstant("EncryptedTrafficLight", EncryptedTrafficLight);
+registerModel(EncryptedTrafficLight);
 
 export class EncryptedFirstTrafficLight extends Base {
   static _tableName = "traffic_lights";
@@ -18,7 +18,7 @@ export class EncryptedFirstTrafficLight extends Base {
     this.encrypts("state");
   }
 }
-registerConstant("EncryptedFirstTrafficLight", EncryptedFirstTrafficLight);
+registerModel(EncryptedFirstTrafficLight);
 
 export class EncryptedTrafficLightWithStoreState extends TrafficLight {
   static {
@@ -26,4 +26,4 @@ export class EncryptedTrafficLightWithStoreState extends TrafficLight {
     this.encrypts("state");
   }
 }
-registerConstant("EncryptedTrafficLightWithStoreState", EncryptedTrafficLightWithStoreState);
+registerModel(EncryptedTrafficLightWithStoreState);

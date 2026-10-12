@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class DlKeyedHasManyThrough extends Base {
   declare through_key: number;
@@ -8,4 +8,4 @@ export class DlKeyedHasManyThrough extends Base {
     this.primaryKey = "through_key";
   }
 }
-registerConstant("DlKeyedHasManyThrough", DlKeyedHasManyThrough);
+registerModel(DlKeyedHasManyThrough);

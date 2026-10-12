@@ -612,7 +612,7 @@ export class SchemaStatements {
     await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragments.join(", ")}`);
   }
 
-  async removeTimestamps(tableName: string): Promise<void> {
+  async removeTimestamps(tableName: string, _options: ColumnOptions = {}): Promise<void> {
     await this.removeColumns(tableName, "updated_at", "created_at");
   }
 

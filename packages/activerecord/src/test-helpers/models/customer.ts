@@ -1,5 +1,6 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Address {
   street: string;
@@ -150,4 +151,4 @@ export class Customer extends Base {
     });
   }
 }
-registerConstant("Customer", Customer);
+registerModel(Customer);

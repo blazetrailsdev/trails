@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Book } from "./book.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Paragraph extends Base {
@@ -10,7 +10,7 @@ export class Paragraph extends Base {
     this.belongsTo("book");
   }
 }
-registerConstant("Paragraph", Paragraph);
+registerModel(Paragraph);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Paragraph {
   get book(): Book | null | Promise<Book | null>;

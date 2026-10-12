@@ -34,6 +34,7 @@ export class Reply extends Topic {
     return (this as any).approved();
   }
 }
+registerModel(Reply);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reply {
   get topic(): Topic | null | Promise<Topic | null>;
@@ -45,6 +46,7 @@ export class SillyReply extends Topic {
     this.belongsTo("reply", { foreignKey: "parent_id", counterCache: "replies_count" });
   }
 }
+registerModel(SillyReply);
 
 export class UniqueReply extends Reply {
   static {
@@ -52,12 +54,14 @@ export class UniqueReply extends Reply {
     this.validatesUniquenessOf("content", { scope: "parent_id" });
   }
 }
+registerModel(UniqueReply);
 
 export class SillyUniqueReply extends UniqueReply {
   static {
     this.validates("content", { uniqueness: true });
   }
 }
+registerModel(SillyUniqueReply);
 
 export class WrongReply extends Reply {
   static {
@@ -109,10 +113,11 @@ export class WrongReply extends Reply {
     }
   }
 }
+registerModel(WrongReply);
 
 export class WebReply extends WebTopic {
   static {
-    rbModConstSet(Web, "Reply", this);
+    registerModel(rbModConstSet(Web, "Reply", this));
   }
   static {
     this.belongsTo("topic", {
@@ -121,8 +126,4 @@ export class WebReply extends WebTopic {
       className: "Web::Topic",
     });
   }
-}
-
-for (const klass of [Reply, SillyReply, UniqueReply, SillyUniqueReply, WrongReply, WebReply]) {
-  registerModel(klass);
 }

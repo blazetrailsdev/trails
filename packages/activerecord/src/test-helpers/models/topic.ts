@@ -253,7 +253,7 @@ export class Topic extends Base {
     }
   }
 }
-registerConstant("Topic", Topic);
+registerModel(Topic);
 
 export class DefaultRejectedTopic extends Topic {
   static {
@@ -262,12 +262,14 @@ export class DefaultRejectedTopic extends Topic {
     });
   }
 }
+registerModel(DefaultRejectedTopic);
 
 export class BlankTopic extends Topic {
   blank() {
     return true;
   }
 }
+registerModel(BlankTopic);
 
 export class TitlePrimaryKeyTopic extends Topic {
   static {
@@ -275,6 +277,7 @@ export class TitlePrimaryKeyTopic extends Topic {
     this.aliasAttribute("id_value", "id");
   }
 }
+registerModel(TitlePrimaryKeyTopic);
 
 export const Web = new Module();
 registerConstant("Web", Web);
@@ -285,15 +288,11 @@ export class WebTopic extends Base {
   static _tableName = "topics";
 
   static {
-    rbModConstSet(Web, "Topic", this);
+    registerModel(rbModConstSet(Web, "Topic", this));
     this.hasMany("replies", {
       dependent: "destroy",
       foreignKey: "parent_id",
       className: "Web::Reply",
     });
   }
-}
-
-for (const klass of [DefaultRejectedTopic, BlankTopic, TitlePrimaryKeyTopic]) {
-  registerModel(klass);
 }

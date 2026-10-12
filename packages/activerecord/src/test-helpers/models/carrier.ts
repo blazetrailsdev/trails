@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Carrier extends Base {}
-registerConstant("Carrier", Carrier);
+registerModel(Carrier);

@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-delete.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DlKeyedBelongsToSoftDelete extends Base {
@@ -24,7 +24,7 @@ export class DlKeyedBelongsToSoftDelete extends Base {
     return this;
   }
 }
-registerConstant("DlKeyedBelongsToSoftDelete", DlKeyedBelongsToSoftDelete);
+registerModel(DlKeyedBelongsToSoftDelete);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DlKeyedBelongsToSoftDelete {
   get destroyAsyncParentSoftDelete():
