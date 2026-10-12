@@ -103,8 +103,7 @@ describe("AssociationsExtensionsTest", () => {
     expect(() => proxy.destroyAll()).toThrow(OopsError);
   });
 
-  it.skip("marshalling extensions", async () => {
-    // BLOCKED: activerecord-relation-round-trips-marshal
+  it("marshalling extensions", async () => {
     type Extended = CollectionProxy & { findMostRecent: () => Promise<Base | null> };
     const david = developers("david");
     expect(
@@ -125,8 +124,7 @@ describe("AssociationsExtensionsTest", () => {
     ).toBe(true);
   });
 
-  it.skip("marshalling named extensions", async () => {
-    // BLOCKED: activerecord-relation-round-trips-marshal
+  it("marshalling named extensions", async () => {
     type Extended = CollectionProxy & { findMostRecent: () => Promise<Base | null> };
     let david = developers("david");
     expect(

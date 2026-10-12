@@ -16,7 +16,6 @@ import {
   isEmpty,
   rbDefineAllocFunc,
   rbModConstSet,
-  rbModName,
   rbObjClone,
   toS,
   type Each,
@@ -364,7 +363,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _joinDependency: JoinDependency | null = null;
   /** @internal */
-  _fromLimitedIds = new WeakMap<object, unknown[]>();
+  _fromLimitedIds: [from: object, ids: unknown[]] | null = null;
 
   private _table: Table;
 
@@ -408,7 +407,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         record.inspect(),
       );
       if (entries.length === 11) entries[10] = "...";
-      return `#<${rbModName(this.constructor)} [${entries.join(", ")}]>`;
+      return `#<${(this.constructor as typeof Relation).name} [${entries.join(", ")}]>`;
     };
     if (Array.isArray(subject)) return inspectEntries(subject);
     return (
@@ -443,7 +442,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   reset(): this {
     this._arel = undefined;
-    this._fromLimitedIds = new WeakMap();
+    this._fromLimitedIds = null;
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
@@ -1046,7 +1045,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (async () => {
       if (deferredFrom) {
         this._arel = undefined;
-        this._fromLimitedIds = new WeakMap([[from, await from._materializeDistinctPkIds()]]);
+        this._fromLimitedIds = [from, await from._materializeDistinctPkIds()];
       }
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
@@ -1783,6 +1782,8 @@ export class Relation<T extends Base, G extends boolean = false> {
 }
 
 rbModConstSet(ActiveRecord, "Relation", Relation);
+rbModConstSet(Relation, "WhereClause", WhereClause);
+rbModConstSet(Relation, "QueryAttribute", QueryAttribute);
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface RelationScopes<T extends Base> {}

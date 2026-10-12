@@ -189,7 +189,7 @@ interface QueryMethodsHost {
   havingClause: WhereClause;
   fromClause: FromClause;
   /** @internal */
-  _fromLimitedIds: WeakMap<object, unknown[]>;
+  _fromLimitedIds: [from: object, ids: unknown[]] | null;
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
@@ -1851,7 +1851,9 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   let name = this.fromClause.name;
   if (opts instanceof ActiveRecord.Relation) {
     if (opts.isEagerLoading) {
-      opts = opts._applyEagerJoinDependency({ limitedIds: this._fromLimitedIds.get(opts) });
+      opts = opts._applyEagerJoinDependency({
+        limitedIds: this._fromLimitedIds?.[0] === opts ? this._fromLimitedIds[1] : undefined,
+      });
     }
     name ??= "subquery";
     return opts.arel().as(toS(name));

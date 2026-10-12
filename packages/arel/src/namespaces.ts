@@ -1,4 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { Attribute as AttributeClass } from "./attributes/attribute.js";
 import type * as CollectorsModule from "./collectors/index.js";
 import type * as NodesModule from "./nodes/index.js";
@@ -26,6 +27,7 @@ export const Arel = { name: "Arel", loadPath } as AutoloadModule & {
   SelectManager: typeof SelectManager;
   Attribute: typeof AttributeClass;
 };
+registerConstant("Arel", Arel);
 extend(Arel, Autoload);
 Arel.autoload("Table", "arel/table");
 Arel.autoload("SelectManager", "arel/select_manager");
@@ -34,12 +36,14 @@ Arel.autoload("Attribute", "arel/attributes/attribute");
 export const Attributes = { name: "Arel::Attributes", loadPath } as AutoloadModule & {
   Attribute: typeof AttributeClass;
 };
+rbModConstSet(Arel, "Attributes", Attributes);
 extend(Attributes, Autoload);
 Attributes.autoload("Attribute", "arel/attributes/attribute");
 
 export const Collectors = { name: "Arel::Collectors" } as {
   name: string;
 } & typeof CollectorsModule;
+rbModConstSet(Arel, "Collectors", Collectors);
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Collectors {
   export type SQLString = CollectorsModule.SQLString;
@@ -168,6 +172,7 @@ export declare namespace Nodes {
   export type BitwiseNot = NodesModule.BitwiseNot;
   export type Filter = NodesModule.Filter;
 }
+rbModConstSet(Arel, "Nodes", Nodes);
 extend(Nodes, Autoload);
 Nodes.autoload("Not", "arel/nodes/unary");
 Nodes.autoload("Grouping", "arel/nodes/grouping");
@@ -193,5 +198,6 @@ export declare namespace Visitors {
   export type Visitor = VisitorsModule.Visitor;
   export type ArelConnection = VisitorsModule.ArelConnection;
 }
+rbModConstSet(Arel, "Visitors", Visitors);
 extend(Visitors, Autoload);
 Visitors.autoload("Dot", "arel/visitors/dot");

@@ -1,8 +1,11 @@
 import {
   ArgumentError,
   last,
+  rbCBasicObject as BasicObject,
   rbFPublicSend,
+  rbModConstSet,
   rbObjAsString as toS,
+  rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
   Range,
@@ -244,17 +247,17 @@ export class PredicateBuilder {
   }
 
   private handlerFor(object: unknown): { call(attr: Arel.Attribute, value: any): Nodes.Node } {
-    return last(this.handlers.find(([klass]) => object instanceof klass)!) as {
+    return last(this.handlers.find(([klass]) => rbObjIsKindOf(object, klass))!) as {
       call(attr: Arel.Attribute, value: any): Nodes.Node;
     };
   }
 }
 
-class BasicObject {
-  static [Symbol.hasInstance](): boolean {
-    return true;
-  }
-}
+rbModConstSet(ActiveRecord, "PredicateBuilder", PredicateBuilder);
+rbModConstSet(PredicateBuilder, "ArrayHandler", ArrayHandler);
+rbModConstSet(PredicateBuilder, "BasicObjectHandler", BasicObjectHandler);
+rbModConstSet(PredicateBuilder, "RangeHandler", RangeHandler);
+rbModConstSet(PredicateBuilder, "RelationHandler", RelationHandler);
 
 type Attributes = Record<string, unknown> | Map<unknown, unknown>;
 
