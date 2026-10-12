@@ -5,7 +5,7 @@ import { Range } from "../../relation.js";
 import { Base } from "../../index.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { setZone, BigDecimal } from "@blazetrails/activesupport";
-import { BigIntegerType, FloatType, IntegerType, StringType } from "@blazetrails/activemodel";
+import { BigIntegerType, FloatType, IntegerType } from "@blazetrails/activemodel";
 import { Date as OidDate } from "../../connection-adapters/postgresql/oid/date.js";
 import { Decimal } from "../../connection-adapters/postgresql/oid/decimal.js";
 import { Timestamp } from "../../connection-adapters/postgresql/oid/timestamp.js";
@@ -28,7 +28,6 @@ const floatRange = new RangeType(new FloatType(), "floatrange");
 const dateRange = new RangeType(new OidDate(), "daterange");
 const tsRange = new RangeType(new Timestamp(), "tsrange");
 const tstzRange = new RangeType(new TimestampWithTimeZone(), "tstzrange");
-const stringRange = new RangeType(new StringType(), "stringrange");
 
 fixtures({}, { useTransactionalTests: false });
 

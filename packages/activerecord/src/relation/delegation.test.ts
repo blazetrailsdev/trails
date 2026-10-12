@@ -60,7 +60,8 @@ const ARRAY_DELEGATES = [
 ] as const;
 
 function DelegationTests(target: () => object): void {
-  for (const method of ARRAY_DELEGATES.filter((method) => method !== "to_yaml")) {
+  for (const method of ARRAY_DELEGATES) {
+    if (method === "to_yaml") continue;
     it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
       assertRespondTo(target(), tsName(method));
     });

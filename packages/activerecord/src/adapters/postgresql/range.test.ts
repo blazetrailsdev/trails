@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Range } from "../../relation.js";
 import { Base } from "../../index.js";
 import { defaultTimezone } from "../../active-record.js";
@@ -8,11 +7,6 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { inTimeZone } from "../../cases/helper.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, setZone, zone, BigDecimal } from "@blazetrails/activesupport";
-import { BigIntegerType, FloatType, IntegerType, StringType } from "@blazetrails/activemodel";
-import { Date as OidDate } from "../../connection-adapters/postgresql/oid/date.js";
-import { Decimal } from "../../connection-adapters/postgresql/oid/decimal.js";
-import { Timestamp } from "../../connection-adapters/postgresql/oid/timestamp.js";
-import { TimestampWithTimeZone } from "../../connection-adapters/postgresql/oid/timestamp-with-time-zone.js";
 import { fixtures } from "../../test-fixtures.js";
 
 beforeAll(() => {
@@ -22,15 +16,6 @@ beforeAll(() => {
 afterAll(() => {
   vi.unstubAllEnvs();
 });
-
-const int4Range = new RangeType(new IntegerType(), "int4range");
-const int8Range = new RangeType(new BigIntegerType(), "int8range");
-const numRange = new RangeType(new Decimal(), "numrange");
-const floatRange = new RangeType(new FloatType(), "floatrange");
-const dateRange = new RangeType(new OidDate(), "daterange");
-const tsRange = new RangeType(new Timestamp(), "tsrange");
-const tstzRange = new RangeType(new TimestampWithTimeZone(), "tstzrange");
-const stringRange = new RangeType(new StringType(), "stringrange");
 
 fixtures({}, { useTransactionalTests: false });
 
