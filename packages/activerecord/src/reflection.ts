@@ -8,6 +8,7 @@ import {
   rbModName,
   rbModToS,
   zip,
+  merge,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
@@ -22,7 +23,6 @@ import {
   demodulize,
   constantize,
   foreignKey as deriveForeignKey,
-  merge,
   DelegationError,
   classAttribute,
   included,
@@ -33,7 +33,6 @@ import {
   RuntimeError,
   StandardError,
   except,
-  mergeBang,
   rbRegMatchP,
   rtest,
   toS,
@@ -1629,7 +1628,7 @@ export function addReflection(
   reflection: AssociationReflection | ThroughReflection,
 ): void {
   clearReflectionsCache(ar);
-  (ar as any)._reflections = mergeBang(
+  (ar as any)._reflections = Object.assign(
     except((ar as any)._reflections as Record<string, unknown>, name),
     { [name]: reflection },
   );

@@ -878,6 +878,7 @@ function hasNativeFormAnalogue(
       const bare = operand.replace(/^@+/, "");
       return (
         tsNativeForms.has(`${analogue.form}:${snakeToCamel(bare)}`) ||
+        (bare !== operand && tsNativeForms.has(`${analogue.form}:_${snakeToCamel(bare)}`)) ||
         (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`))
       );
     }),

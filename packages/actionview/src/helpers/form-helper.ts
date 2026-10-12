@@ -25,7 +25,6 @@ import {
   fetch,
   hashDelete,
   merge,
-  mergeBang,
   rbFPublicSend,
   rbInspect,
   rbObjRespondTo,
@@ -184,7 +183,7 @@ export function formWith(
     throw new ArgumentError("Passed nil to the :model argument, expect an object or false");
   }
 
-  const options: Record<string, unknown> = mergeBang(
+  const options: Record<string, unknown> = Object.assign(
     { allowMethodNamesOutsideObject: true, skipDefaultIds: !formWithGeneratesIds },
     rest,
   );
@@ -225,7 +224,7 @@ export function fieldsFor(
   options: Record<string, unknown> = {},
   block?: (builder: FormBuilder) => unknown,
 ): SafeBuffer | null {
-  options = mergeBang(
+  options = Object.assign(
     { model: recordObject, allowMethodNamesOutsideObject: false, skipDefaultIds: false },
     options,
   );
@@ -239,7 +238,7 @@ export function fields(
   { model = null, ...rest }: { model?: unknown; [key: string]: unknown } = {},
   block?: (builder: FormBuilder) => unknown,
 ): SafeBuffer | null {
-  const options: Record<string, unknown> = mergeBang(
+  const options: Record<string, unknown> = Object.assign(
     { allowMethodNamesOutsideObject: true, skipDefaultIds: !formWithGeneratesIds },
     rest,
   );
@@ -431,7 +430,7 @@ export function htmlOptionsForFormWith(
     skipEnforcingUtf8?: unknown;
   } = {},
 ): Record<string, unknown> {
-  const htmlOptions = mergeBang(
+  const htmlOptions = Object.assign(
     slice(options, "id", "class", "multipart", "method", "data", "authenticityToken"),
     html,
   );

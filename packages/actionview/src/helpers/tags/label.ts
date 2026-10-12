@@ -5,7 +5,7 @@ import {
   isPresent,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import { dup, hashDelete, mergeBang } from "@blazetrails/ruby-compat";
+import { dup, hashDelete } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Translator } from "./translator.js";
@@ -67,7 +67,7 @@ export class Label extends Base {
     let content: unknown;
     const contentIsOptions = isPlainObject(contentOrOptions);
     if (contentIsOptions) {
-      mergeBang(options, contentOrOptions as Record<string, unknown>);
+      Object.assign(options, contentOrOptions as Record<string, unknown>);
       content = null;
     } else {
       content = contentOrOptions;

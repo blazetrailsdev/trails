@@ -11,7 +11,7 @@ import {
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { underscore, BigDecimal, mergeBang, slice } from "@blazetrails/activesupport";
+import { underscore, BigDecimal, slice } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -100,7 +100,7 @@ export class NumericalityValidator extends EachValidator {
           record.errors.add(
             attrName,
             `:${option}`,
-            mergeBang(this.filteredOptions(value), { count: optionValue }),
+            Object.assign(this.filteredOptions(value), { count: optionValue }),
           );
         }
       } else if (isInclude(COMPARE_CHECKS, option)) {
@@ -109,7 +109,7 @@ export class NumericalityValidator extends EachValidator {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,
-            mergeBang(this.filteredOptions(value), { count: optionValue }),
+            Object.assign(this.filteredOptions(value), { count: optionValue }),
           );
         }
       }

@@ -6,7 +6,6 @@ import {
   initialize,
   isModuleIncluded,
   merge,
-  mergeBang,
   Module,
   rbFCaller,
   rbModToS,
@@ -166,7 +165,7 @@ function _parseInitializationOptions(
   opts ||= rbObjDup(storedOpts);
 
   config ||= {};
-  config = mergeBang(merge(storedConfig, this._sharedConfiguration()), config as BaseConfig);
+  config = Object.assign(merge(storedConfig, this._sharedConfiguration()), config as BaseConfig);
 
   return [args as unknown[], opts, config as BaseConfig];
 }

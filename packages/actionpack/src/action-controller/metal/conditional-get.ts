@@ -91,7 +91,7 @@ export function expiresIn(
   options: Record<string, unknown> = {},
 ): void {
   hashDelete(this.response.cacheControl, "noStore");
-  mergeBang(this.response.cacheControl, {
+  Object.assign(this.response.cacheControl, {
     maxAge: seconds,
     public: hashDelete(options, "public"),
     mustRevalidate: hashDelete(options, "mustRevalidate"),

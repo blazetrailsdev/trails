@@ -4,7 +4,6 @@ import {
   flatten,
   last,
   merge,
-  mergeBang,
   rbFArray,
   rbObjDup,
   rbObjRespondTo,
@@ -327,10 +326,10 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
     slice(this.request.filteredParameters(), ...wrappedKeys),
   );
 
-  mergeBang(this.request.parameters, wrappedHash);
-  mergeBang(this.request.requestParameters, wrappedHash);
+  Object.assign(this.request.parameters, wrappedHash);
+  Object.assign(this.request.requestParameters, wrappedHash);
 
-  mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
+  Object.assign(this.request.filteredParameters(), wrappedFilteredHash);
 }
 
 export const ParamsWrapper = new Module((mod) => {

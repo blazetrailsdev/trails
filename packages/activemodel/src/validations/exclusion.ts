@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { include, mergeBang } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 import {
@@ -22,7 +22,7 @@ export class ExclusionValidator extends EachValidator {
       record.errors.add(
         attribute,
         ":exclusion",
-        mergeBang(except(this.options, "in", "within"), { value }),
+        Object.assign(except(this.options, "in", "within"), { value }),
       );
     }
   }

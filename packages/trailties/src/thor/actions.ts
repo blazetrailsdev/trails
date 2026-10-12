@@ -365,7 +365,7 @@ export async function thor(
 
 /** @internal */
 function _sharedConfiguration(this: ActionsHost): Record<string, unknown> {
-  return mergeBang(
+  return Object.assign(
     Actions.superMethod(this, "_sharedConfiguration")!() as Record<string, unknown>,
     { destinationRoot: this.destinationRoot },
   );

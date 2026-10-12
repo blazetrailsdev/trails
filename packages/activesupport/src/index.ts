@@ -172,8 +172,6 @@ export {
   deepMergeBang,
   deepDup,
   slice,
-  merge,
-  mergeBang,
   deepTransformKeys,
   deepCamelizeKeys,
   deepUnderscoreKeys,

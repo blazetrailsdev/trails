@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { filterMap, mergeBang } from "@blazetrails/activesupport";
+import { filterMap } from "@blazetrails/activesupport";
 import {
   casecmp,
   except,
@@ -21,7 +21,7 @@ export class ConfirmationValidator extends EachValidator {
   declare isConfirmationValueEqual: typeof isConfirmationValueEqual;
 
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
-    super(mergeBang({ caseSensitive: true }, options));
+    super(Object.assign({ caseSensitive: true }, options));
     this.setupBang(options.class as { prototype: object });
   }
 
@@ -35,7 +35,7 @@ export class ConfirmationValidator extends EachValidator {
         record.errors.add(
           `${attribute}Confirmation`,
           ":confirmation",
-          mergeBang(except(this.options, "caseSensitive"), { attribute: humanAttributeName }),
+          Object.assign(except(this.options, "caseSensitive"), { attribute: humanAttributeName }),
         );
       }
     }
