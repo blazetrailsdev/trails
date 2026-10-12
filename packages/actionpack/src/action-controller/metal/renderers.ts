@@ -11,10 +11,7 @@ import {
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 
-export function addRenderer<Host extends object = RenderersHost>(
-  key: string,
-  block: RendererProc<Host>,
-): void {
+export function addRenderer<Host extends object>(key: string, block: RendererProc<Host>): void {
   Renderers.add(key, block);
 }
 
@@ -45,10 +42,7 @@ export interface RenderersHost {
 
 export const RENDERERS = new Set<string>();
 
-export function add<Host extends object = RenderersHost>(
-  key: string,
-  block: RendererProc<Host>,
-): void {
+export function add<Host extends object>(key: string, block: RendererProc<Host>): void {
   Renderers.defineMethod(_renderWithRendererMethodName(key), block);
   RENDERERS.add(key);
 }
