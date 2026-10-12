@@ -26,34 +26,12 @@ describe("assertionValueMismatch", () => {
   });
 
   it("folds a Ruby instance variable onto this.ivar", () => {
-    const message = (receiver: string) => `s:\`${receiver}.num\` didn't change by 0, but by 1.`;
-    expect(
-      assertionValueMismatch(
-        ["assert_equal"],
-        [message("@object")],
-        ["toEqual"],
-        [message("this.object")],
-        false,
-      ),
-    ).toBeNull();
-    expect(
-      assertionValueMismatch(
-        ["assert_equal"],
-        [message("@object")],
-        ["toEqual"],
-        [message("object")],
-        false,
-      ),
-    ).not.toBeNull();
-    expect(
-      assertionValueMismatch(
-        ["assert_equal"],
-        ["s:a@b.com @@ -1 @@"],
-        ["toEqual"],
-        ["s:athis.b.com"],
-        false,
-      ),
-    ).not.toBeNull();
+    const mismatch = (rails: string, trails: string) =>
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toEqual"], [`s:${trails}`], false);
+    expect(mismatch("`@object.num` didn't change", "`this.object.num` didn't change")).toBeNull();
+    expect(mismatch("`@object.num` didn't change", "`object.num` didn't change")).not.toBeNull();
+    expect(mismatch("a@b.com", "athis.b.com")).not.toBeNull();
+    expect(mismatch("@@ -1 @@", "@this. -1 @this.")).not.toBeNull();
   });
 
   it("folds a TOKEN_RENAMES file extension onto its trails spelling", () => {
