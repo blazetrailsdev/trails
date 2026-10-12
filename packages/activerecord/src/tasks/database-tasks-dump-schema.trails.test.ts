@@ -43,14 +43,9 @@ describe("DatabaseTasksDumpSchemaTest (trails)", () => {
       vi.spyOn(DatabaseTasks, "schemaDumpPath").mockReturnValue(join(dir, "schema.js"));
       vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue(dir);
       vi.spyOn(DatabaseTasks, "migrationConnectionPool").mockReturnValue(null as never);
-      let dumpedAs: string | undefined;
-      vi.spyOn(SchemaDumper, "dump").mockImplementation((async (
-        _pool: unknown,
-        stream: unknown,
-      ) => {
-        dumpedAs = schemaFormat();
-        return stream;
-      }) as never);
+      const dump = vi
+        .spyOn(SchemaDumper, "dump")
+        .mockImplementation((async (_pool: unknown, stream: unknown) => stream) as never);
       const dbConfig = new HashConfig("storyenv", "primary", {
         adapter: "sqlite3",
         database: "primary.sqlite3",
@@ -59,7 +54,10 @@ describe("DatabaseTasksDumpSchemaTest (trails)", () => {
       expect(schemaFormat()).toBe("ts");
       await DatabaseTasks.dumpSchema(dbConfig, "js");
 
-      expect(dumpedAs).toBe("js");
+      expect(dump.mock.calls[0][2]).toMatchObject({ schemaFormat: "js" });
+      expect(SchemaDumper.generateOptions(dump.mock.calls[0][2]!)).toMatchObject({
+        schemaFormat: "js",
+      });
       expect(schemaFormat()).toBe("ts");
     } finally {
       await rm(dir, { recursive: true, force: true });

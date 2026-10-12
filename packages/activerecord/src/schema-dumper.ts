@@ -47,6 +47,7 @@ function baseClass(): typeof Base {
 export interface SchemaDumperConfig {
   tableNamePrefix?: string;
   tableNameSuffix?: string;
+  schemaFormat?: "ts" | "js" | "sql";
 }
 
 export abstract class SchemaDumper {
@@ -116,6 +117,7 @@ export abstract class SchemaDumper {
     return {
       tableNamePrefix: config.tableNamePrefix,
       tableNameSuffix: config.tableNameSuffix,
+      schemaFormat: config.schemaFormat,
     };
   }
 
@@ -183,7 +185,8 @@ export abstract class SchemaDumper {
    */
   private async header(stream: IO | StringIO): Promise<void> {
     const defineParams = await this.defineParams();
-    const adapterType = schemaFormat() === "ts" ? this.adapterType() : null;
+    const adapterType =
+      (this._options.schemaFormat ?? schemaFormat()) === "ts" ? this.adapterType() : null;
     stream.puts(
       [
         "// This file is auto-generated from the current state of the database. Instead",
