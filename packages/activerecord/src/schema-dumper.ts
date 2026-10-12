@@ -176,7 +176,11 @@ export abstract class SchemaDumper {
     return null;
   }
 
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm adapterType — PERMANENT
+   * @inventedArm schemaFormat — PERMANENT
+   */
   private async header(stream: IO | StringIO): Promise<void> {
     const defineParams = await this.defineParams();
     const adapterType = schemaFormat() === "ts" ? this.adapterType() : null;
