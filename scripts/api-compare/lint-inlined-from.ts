@@ -4,8 +4,9 @@
  *
  * A tag is red when it names a `def` the Rails manifest does not hold, cites
  * that `def` at another path or line span, names a module the Rails
- * counterpart of its class neither includes, prepends nor extends, or names a
- * `def` in the Ruby file the constructor's own file mirrors. `--fix` rewrites
+ * counterpart of its class neither includes, prepends nor extends, names a
+ * `def` in the Ruby file the constructor's own file mirrors, or sits twice or
+ * out of Ruby's chain order. `--fix` rewrites
  * a stale citation from the manifest, which is the only place one comes from.
  *
  * The reverse arm, a Rails class that reaches a module `initialize` or a
@@ -66,6 +67,13 @@ const entities = (ruby: ApiManifest, kind: "classes" | "modules"): Entity[] =>
 const defines = (entity: Entity | undefined, hook: InlinedFrom["hook"]) =>
   entity?.info.instanceMethods.find((m) => m.name === hook);
 
+/**
+ * A module's nested `ClassMethods` is extended onto its includer by
+ * `ActiveSupport::Concern#append_features` / `#prepend_features`
+ * (`activesupport/lib/active_support/concern.rb:129-150`) and by nothing else.
+ */
+export const CONCERN = "ActiveSupport::Concern";
+
 function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const byShort = new Map<string, string[]>();
   for (const fqn of modules.keys()) {
@@ -78,7 +86,11 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const mixed = [...ancestors.prepended, ...ancestors.included];
   const extended = [
     ...(entity.info.extends ?? []).map((name) => resolve(name, entity.fqn)),
-    ...mixed.map((fqn) => `${fqn}::ClassMethods`),
+    ...mixed
+      .filter((fqn) =>
+        (modules.get(fqn)?.info.extends ?? []).some((name) => resolve(name, fqn) === CONCERN),
+      )
+      .map((fqn) => `${fqn}::ClassMethods`),
   ];
   const reached = { tagged: [] as string[], sameFile: [] as string[] };
   const sort = (fqns: readonly string[], hook: InlinedFrom["hook"]) => {
@@ -150,8 +162,20 @@ export function inlinedFromFindings(
           );
         }
       }
+      const chain = reached?.tagged ?? [];
+      const placed = tags.map((tag) => chain.indexOf(`${tag.module}#${tag.hook}`));
+      placed.forEach((at, index) => {
+        if (at === -1) return;
+        const earlier = placed.slice(0, index).filter((other) => other !== -1);
+        if (earlier.includes(at)) {
+          report(chain[at], "is tagged more than once: Rails runs the body once");
+        } else if (earlier.some((other) => other > at)) {
+          const after = chain[Math.max(...earlier)];
+          report(chain[at], `is out of chain order: Rails runs it before ${after}`);
+        }
+      });
       if (!enrolled.includes(name)) continue;
-      for (const hook of reached?.tagged ?? []) {
+      for (const hook of chain) {
         if (tags.some((tag) => `${tag.module}#${tag.hook}` === hook)) continue;
         report(hook, `is inlined untagged: ${counterpart!.fqn} reaches it from another Ruby file`);
       }

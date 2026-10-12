@@ -16,6 +16,8 @@ function entity(
 const AM = "rails/v8.0.2/activemodel/lib/active_model";
 const AR = "rails/v8.0.2/activerecord/lib/active_record";
 
+const CONCERN = { extends: ["ActiveSupport::Concern"] };
+
 const ruby = {
   packages: {
     activemodel: {
@@ -28,17 +30,25 @@ const ruby = {
     activerecord: {
       classes: {
         "ActiveRecord::Base": entity("base.rb", [], {
-          includes: ["ActiveModel::API", "Core", "Inheritance", "Local"],
+          includes: ["ActiveModel::API", "Core", "Inheritance", "Local", "Plain"],
         }),
         "ActiveRecord::Relation": entity("relation.rb"),
       },
       modules: {
         "ActiveRecord::Core": entity("core.rb", [def("initialize", `${AR}/core.rb`, 471, 482)]),
-        "ActiveRecord::Inheritance": entity("inheritance.rb"),
+        "ActiveRecord::Inheritance": entity("inheritance.rb", [], CONCERN),
+        "ActiveRecord::Plain": entity("plain.rb"),
+        "ActiveRecord::Plain::ClassMethods": entity("plain.rb", [
+          def("new", `${AR}/plain.rb`, 2, 4),
+        ]),
         "ActiveRecord::Inheritance::ClassMethods": entity("inheritance.rb", [
           def("new", `${AR}/inheritance.rb`, 56, 78),
         ]),
-        "ActiveRecord::Base::Local": entity("base.rb", [def("initialize", `${AR}/base.rb`, 3, 5)]),
+        "ActiveRecord::Base::Local": entity(
+          "base.rb",
+          [def("initialize", `${AR}/base.rb`, 3, 5)],
+          CONCERN,
+        ),
         "ActiveRecord::Base::Local::ClassMethods": entity("base.rb", [
           def("new", `${AR}/base.rb`, 7, 9),
         ]),
@@ -96,6 +106,22 @@ describe("inlinedFromFindings", () => {
     ]);
     expect(messages([NEW], relation)).toEqual([
       "ActiveRecord::Inheritance::ClassMethods#new names a module ActiveRecord::Relation does not extend",
+    ]);
+  });
+
+  it("does not read a plain module's ClassMethods as extended, which only a Concern does", () => {
+    const plain = tag("ActiveRecord::Plain::ClassMethods#new", `${AR}/plain.rb:2-4`);
+    expect(messages([plain, NEW, CORE, API], { enrolled: ["activerecord"] })).toEqual([
+      "ActiveRecord::Plain::ClassMethods#new names a module ActiveRecord::Base does not extend",
+    ]);
+  });
+
+  it("flags a tag written twice, and one out of Ruby's chain order", () => {
+    expect(messages([NEW, CORE, CORE, API])).toEqual([
+      "ActiveRecord::Core#initialize is tagged more than once: Rails runs the body once",
+    ]);
+    expect(messages([NEW, API, CORE])).toEqual([
+      "ActiveRecord::Core#initialize is out of chain order: Rails runs it before ActiveModel::API#initialize",
     ]);
   });
 

@@ -509,9 +509,11 @@ step — `parity:*` is the only name to write.
 
    It reds on a tag naming a module with no `initialize` (or a `ClassMethods`
    with no `new`), a module the Rails class does not include, prepend or
-   extend, a `def` in the constructor's own mirrored Ruby file, or a citation
-   that differs from the `def` span in `rails-api.json`. Only the last has an
-   autofix. The reverse arm, a constructor missing the tag for a cross-file
+   extend, a `def` in the constructor's own mirrored Ruby file, a tag written
+   twice or out of Ruby's chain order, or a citation that differs from the
+   `def` span in `rails-api.json`. Only the last has an autofix. A nested
+   `ClassMethods` counts as extended only through an explicit `extend` or a
+   module that extends `ActiveSupport::Concern`. The reverse arm, a constructor missing the tag for a cross-file
    body its Rails class reaches, gates the packages in `MISSING_TAG_PACKAGES`
    of `scripts/api-compare/lint-inlined-from.ts`. That set is **only-grow**: a
    package joins in the PR that converts its constructors.
