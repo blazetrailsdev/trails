@@ -145,12 +145,6 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   );
 }
 
-/** @internal */
-const StrictLoadingScope = {
-  isEmptyScope: true,
-  strictLoadingValue: true,
-} as const;
-
 export type ValueMethod =
   | (typeof Relation.MULTI_VALUE_METHODS)[number]
   | (typeof Relation.SINGLE_VALUE_METHODS)[number]
@@ -1258,12 +1252,22 @@ export class Relation<T extends Base, G extends boolean = false> {
     });
   }
 
+  static StrictLoadingScope = class StrictLoadingScope {
+    static get isEmptyScope(): boolean {
+      return true;
+    }
+
+    static get strictLoadingValue(): boolean {
+      return true;
+    }
+  };
+
   async preloadAssociations(records: T[]): Promise<void> {
     const preload: AssociationSpec[] = [
       ...this.preloadValues,
       ...(this.isEagerLoading ? [] : this.includesValues),
     ];
-    const scope = this.strictLoadingValue ? StrictLoadingScope : undefined;
+    const scope = this.strictLoadingValue ? Relation.StrictLoadingScope : undefined;
     for (const associations of preload) {
       await Preloader.new({
         records: records as unknown as import("./base.js").Base[],
