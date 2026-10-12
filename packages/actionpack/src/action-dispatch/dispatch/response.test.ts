@@ -616,10 +616,7 @@ describe("Response Cache::Response wiring", () => {
         const res = new Response();
         res.sendFile(path);
         expect(res.committed).toBe(true);
-        const stream = res.stream as unknown as {
-          toPath(): string;
-          each(): IterableIterator<string>;
-        };
+        const stream = res.stream as { toPath(): string; each(): IterableIterator<string> };
         expect(typeof stream.toPath).toBe("function");
         expect(stream.toPath()).toBe(path);
       });

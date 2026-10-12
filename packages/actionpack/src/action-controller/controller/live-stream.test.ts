@@ -208,8 +208,8 @@ describe("LiveStreamTest", () => {
     }
 
     writeLines(): void {
-      (this.response.stream as Buffer).writeln("hello\n");
-      (this.response.stream as Buffer).writeln("world");
+      this.response.stream.writeln("hello\n");
+      this.response.stream.writeln("world");
       this.response.stream.close();
     }
 
@@ -317,7 +317,7 @@ describe("LiveStreamTest", () => {
     exceptionWithCallback(): void {
       this.response.headers.set("Content-Type", "text/event-stream");
 
-      (this.response.stream as Buffer).onError(() => {
+      this.response.stream.onError(() => {
         this.response.stream.write('data: "500 Internal Server Error"\n\n');
         this.response.stream.close();
       });
@@ -336,7 +336,7 @@ describe("LiveStreamTest", () => {
 
     exceptionInExceptionCallback(): void {
       this.response.headers.set("Content-Type", "text/event-stream");
-      (this.response.stream as Buffer).onError(() => {
+      this.response.stream.onError(() => {
         throw new RuntimeError("We need to go deeper.");
       });
       this.response.stream.write("");
@@ -347,7 +347,7 @@ describe("LiveStreamTest", () => {
 
     overfillBufferAndDie(): void {
       const logger = Base.logger || new Logger(STDOUT);
-      (this.response.stream as Buffer).onError(() => {
+      this.response.stream.onError(() => {
         logger.warn("Error while streaming.");
         this.errorLatch.countDown();
       });
@@ -374,7 +374,7 @@ describe("LiveStreamTest", () => {
     }
 
     ignoreClientDisconnect(): void {
-      (this.response.stream as Buffer).ignoreDisconnect = true;
+      this.response.stream.ignoreDisconnect = true;
 
       this.response.stream.write("");
 

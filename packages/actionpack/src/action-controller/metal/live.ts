@@ -181,7 +181,7 @@ export class SSE {
   }
 }
 
-export class Response extends DispatchResponse {
+export class Response extends DispatchResponse<Buffer> {
   /** @internal */
   protected override beforeCommitted(): void {
     super.beforeCommitted();
@@ -199,7 +199,7 @@ export class Response extends DispatchResponse {
 
 export interface LiveControllerHost {
   request: { getHeader?(name: string): string | undefined; format?: unknown };
-  response: Response & { stream: Buffer };
+  response: Response;
   newControllerThread(block: () => void | Promise<void>): Promise<void>;
   cleanUpThreadLocals(locals: [string, unknown][], thread: Thread): void;
   logError(exception: Error): void;

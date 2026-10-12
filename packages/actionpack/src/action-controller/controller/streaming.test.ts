@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
 import "../../test-helpers/abstract-unit.js";
+import type { ResponseBuffer } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 
@@ -12,10 +13,10 @@ describe("StreamingResponseTest", () => {
 
     basicStream(): void {
       for (const word of ["hello", "world"]) {
-        this.response.stream.write(word);
-        this.response.stream.write("\n");
+        (this.response.stream as ResponseBuffer).write(word);
+        (this.response.stream as ResponseBuffer).write("\n");
       }
-      this.response.stream.close();
+      (this.response.stream as ResponseBuffer).close();
     }
   }
 
