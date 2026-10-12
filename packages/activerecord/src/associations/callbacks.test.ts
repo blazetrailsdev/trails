@@ -515,26 +515,23 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many before add called before save", async () => {
     let dev: any = null;
     let newDev: boolean | undefined;
-    class ProjectWithCallback extends Base {
+    const klass = class extends Project {
+      static override get name() {
+        return Project.name;
+      }
       static {
-        this.tableName = "projects";
-        this.attribute("name", "string");
         this.hasAndBelongsToMany("developersWithCallbacks", {
           className: "Developer",
-          joinTable: "developers_projects",
-          foreignKey: "project_id",
-          associationForeignKey: "developer_id",
           beforeAdd: (_o: any, r: any) => {
             dev = r;
             newDev = r.isNewRecord();
           },
         });
       }
-    }
-    registerModel(ProjectWithCallback);
-    const rec = await ProjectWithCallback.create({ name: "ActiveRecord" });
+    };
+    const rec = await klass.createBang();
     const alice = new Developer({ name: "alice" });
-    await (rec.association("developersWithCallbacks") as CollectionAssociation).reader.push(alice);
+    await rec.developersWithCallbacks.push(alice);
     expect(dev).toBe(alice);
     expect(newDev).toBeDefined();
     expect(newDev).toBeTruthy();

@@ -43,6 +43,7 @@ import {
   type RegistryData,
   type IsJoinTableName,
 } from "./test-helpers/fixtures-registry.js";
+import { ensureCanonicalTables } from "./support/canonical-table-rebuild.js";
 export type { FixtureName } from "./test-helpers/fixtures-registry.js";
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
@@ -596,6 +597,10 @@ type FixturesOptions = WithTransactionalFixturesOptions & {
 type FixturesResult = {
   readonly fixtureTableNames: string[];
   readonly self: () => TestFixtures & Record<string, unknown>;
+  readonly canonicalTables: (
+    adapter: Parameters<typeof ensureCanonicalTables>[0],
+    names: readonly string[],
+  ) => Promise<void>;
 };
 
 type SuiteScope = { suite?: SuiteScope };
@@ -791,5 +796,6 @@ export function fixtures(
   }
   Object.defineProperty(result, "fixtureTableNames", { get: () => klass.fixtureTableNames });
   result.self = () => currentTestCase;
+  result.canonicalTables = ensureCanonicalTables;
   return result;
 }

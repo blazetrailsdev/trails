@@ -2,14 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HashConfig } from "./hash-config.js";
 import { assertRaises } from "@blazetrails/activesupport";
 import { AdapterNotFound } from "../errors.js";
-import * as connectionAdapters from "../connection-adapters.js";
 import "../connection-handling.js";
-
-connectionAdapters.register(
-  "abstract",
-  "ActiveRecord::ConnectionAdapters::AbstractAdapter",
-  "active_record/connection_adapters/abstract_adapter",
-);
 
 describe("DatabaseConfigurations", () => {
   describe("HashConfigTest", () => {

@@ -11,7 +11,7 @@ import type { PoolManager } from "../connection-adapters/pool-manager.js";
 import { I18n } from "@blazetrails/activemodel";
 import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
-import { registerFakeAdapter } from "../support/fake-adapter.js";
+import { register } from "../connection-adapters.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { Encryption } from "../encryption.js";
@@ -23,7 +23,16 @@ import {
   setRaiseOnAssignToAttrReadonly,
 } from "../active-record.js";
 
-registerFakeAdapter();
+register(
+  "abstract",
+  "ActiveRecord::ConnectionAdapters::AbstractAdapter",
+  "active_record/connection_adapters/abstract_adapter",
+);
+register(
+  "fake",
+  "FakeActiveRecordAdapter",
+  new URL("../support/fake-adapter.js", import.meta.url).href,
+);
 
 DatabaseTasks.env = DEFAULT_ENV();
 DatabaseTasks.root = getOs().cwd();
