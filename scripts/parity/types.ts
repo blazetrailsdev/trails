@@ -431,6 +431,12 @@ export interface ClassInfo {
   includes: string[];
   /** Ruby-side only: the `prepend` edges, in source order. Absent when there are none. */
   prepends?: string[];
+  /**
+   * Ruby-side only (RFC 0188): the `include` / `prepend` / `extend` statements
+   * in source order, each with its arguments as written. The three flat lists
+   * above lose how the statements interleave. Absent when there are none.
+   */
+  mixinOrder?: { kind: "include" | "prepend" | "extend"; names: string[] }[];
   extends: string[];
   /**
    * TS-side only: for each `include()`/`extend()` edge recorded on `extends` by

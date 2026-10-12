@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ApiManifest, InlinedFrom, MethodInfo } from "@blazetrails/parity/types";
+import type { ApiManifest, ClassInfo, InlinedFrom, MethodInfo } from "@blazetrails/parity/types";
 import { MISSING_TAG_PACKAGES, fixCitations, inlinedFromFindings } from "./lint-inlined-from.js";
 
 const def = (name: string, vendorFile: string, line: number, endLine: number): MethodInfo =>
@@ -8,7 +8,7 @@ const def = (name: string, vendorFile: string, line: number, endLine: number): M
 function entity(
   file: string,
   instanceMethods: MethodInfo[] = [],
-  mixins: { includes?: string[]; prepends?: string[]; extends?: string[] } = {},
+  mixins: Partial<Pick<ClassInfo, "includes" | "prepends" | "extends" | "mixinOrder">> = {},
 ) {
   return { file, includes: [], extends: [], instanceMethods, classMethods: [], ...mixins };
 }
@@ -32,6 +32,13 @@ const ruby = {
         "ActiveRecord::Base": entity("base.rb", [], {
           includes: ["ActiveModel::API", "Core", "Inheritance", "Local", "Plain"],
           extends: ["First::ClassMethods", "Last::ClassMethods"],
+          mixinOrder: [
+            { kind: "include", names: ["ActiveModel::API"] },
+            { kind: "extend", names: ["First::ClassMethods"] },
+            { kind: "include", names: ["Core", "Inheritance"] },
+            { kind: "extend", names: ["Last::ClassMethods"] },
+            { kind: "include", names: ["Local", "Plain"] },
+          ],
         }),
         "ActiveRecord::Relation": entity("relation.rb"),
       },
@@ -97,7 +104,7 @@ function messages(
 
 describe("inlinedFromFindings", () => {
   it("passes a constructor tagged for each cross-file hook its Rails class reaches", () => {
-    expect(messages([LAST, FIRST, NEW, CORE, API], { enrolled: ["activerecord"] })).toEqual([]);
+    expect(messages([LAST, NEW, FIRST, CORE, API], { enrolled: ["activerecord"] })).toEqual([]);
   });
 
   it("flags a tag naming a module with no initialize", () => {
@@ -118,7 +125,7 @@ describe("inlinedFromFindings", () => {
 
   it("does not read a plain module's ClassMethods as extended, which only a Concern does", () => {
     const plain = tag("ActiveRecord::Plain::ClassMethods#new", `${AR}/plain.rb:2-4`);
-    expect(messages([plain, LAST, FIRST, NEW, CORE, API], { enrolled: ["activerecord"] })).toEqual([
+    expect(messages([plain, LAST, NEW, FIRST, CORE, API], { enrolled: ["activerecord"] })).toEqual([
       "ActiveRecord::Plain::ClassMethods#new names a module ActiveRecord::Base does not extend",
     ]);
   });
@@ -132,12 +139,14 @@ describe("inlinedFromFindings", () => {
     ]);
   });
 
-  it("orders explicit extends last first, and leaves a pair across the two singleton sides unordered", () => {
-    expect(messages([FIRST, LAST])).toEqual([
-      "ActiveRecord::Last::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::First::ClassMethods#new",
+  it("orders the singleton side by statement, last extend or Concern include first", () => {
+    expect(messages([LAST, NEW, FIRST, CORE, API])).toEqual([]);
+    expect(messages([NEW, LAST, FIRST])).toEqual([
+      "ActiveRecord::Last::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::Inheritance::ClassMethods#new",
     ]);
-    expect(messages([NEW, LAST, FIRST, CORE])).toEqual([]);
-    expect(messages([LAST, NEW, FIRST, CORE])).toEqual([]);
+    expect(messages([LAST, FIRST, NEW])).toEqual([
+      "ActiveRecord::Inheritance::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::First::ClassMethods#new",
+    ]);
     expect(messages([CORE, NEW])).toEqual([
       "ActiveRecord::Inheritance::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::Core#initialize",
     ]);

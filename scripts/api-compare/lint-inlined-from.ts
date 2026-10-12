@@ -70,18 +70,12 @@ const defines = (entity: Entity | undefined, hook: InlinedFrom["hook"]) =>
 /**
  * A module's nested `ClassMethods` is extended onto its includer by
  * `ActiveSupport::Concern#append_features` / `#prepend_features`
- * (`activesupport/lib/active_support/concern.rb:129-150`) and by nothing else.
+ * (`activesupport/lib/active_support/concern.rb:129-150`) and by nothing else,
+ * at the moment of the `include`. So the singleton side of the chain is the
+ * class's `extend` and Concern `include` statements read last first, the
+ * first argument of one statement ahead of its second.
  */
 export const CONCERN = "ActiveSupport::Concern";
-
-/**
- * Where a hook enters the chain. Ruby searches the last `extend` first, and a
- * Concern's `ClassMethods` is extended when the Concern is included, so each
- * side is ordered within itself. The manifest lists `extend` and `include`
- * edges apart, so how the two singleton sides interleave is not recorded and
- * a pair across them is not ordered.
- */
-type HookSide = "extend" | "concern" | "instance";
 
 function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const byShort = new Map<string, string[]>();
@@ -93,30 +87,31 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const infos = Object.fromEntries([...modules].map(([fqn, mod]) => [fqn, mod.info]));
   const ancestors = moduleAncestors(entity.info, entity.fqn, infos, resolve);
   const mixed = [...ancestors.prepended, ...ancestors.included];
-  const explicit = (entity.info.extends ?? []).map((name) => resolve(name, entity.fqn)).reverse();
-  const concern = mixed
-    .filter((fqn) =>
-      (modules.get(fqn)?.info.extends ?? []).some((name) => resolve(name, fqn) === CONCERN),
-    )
-    .map((fqn) => `${fqn}::ClassMethods`);
-  const reached = {
-    tagged: [] as string[],
-    sameFile: [] as string[],
-    side: new Map<string, HookSide>(),
+  const concerns = (name: string): string[] => {
+    const own = moduleAncestors({ includes: [name] } as ClassInfo, entity.fqn, infos, resolve);
+    return [...own.prepended, ...own.included]
+      .filter((fqn) =>
+        (modules.get(fqn)?.info.extends ?? []).some((ext) => resolve(ext, fqn) === CONCERN),
+      )
+      .map((fqn) => `${fqn}::ClassMethods`);
   };
-  const sort = (fqns: readonly string[], hook: InlinedFrom["hook"], side: HookSide) => {
-    for (const fqn of fqns) {
+  const singleton = [...(entity.info.mixinOrder ?? [])]
+    .reverse()
+    .flatMap(({ kind, names }) =>
+      names.flatMap((name) => (kind === "extend" ? [resolve(name, entity.fqn)] : concerns(name))),
+    );
+  const reached = { tagged: [] as string[], sameFile: [] as string[] };
+  const sort = (fqns: readonly string[], hook: InlinedFrom["hook"]) => {
+    for (const fqn of new Set(fqns)) {
       const mod = modules.get(fqn);
       if (hook === "new" && !fqn.endsWith("::ClassMethods")) continue;
       if (defines(mod, hook) === undefined) continue;
       const sameFile = mod!.package === entity.package && mod!.info.file === entity.info.file;
       (sameFile ? reached.sameFile : reached.tagged).push(`${fqn}#${hook}`);
-      reached.side.set(`${fqn}#${hook}`, side);
     }
   };
-  sort(explicit, "new", "extend");
-  sort(concern, "new", "concern");
-  sort(mixed, "initialize", "instance");
+  sort(singleton, "new");
+  sort(mixed, "initialize");
   return reached;
 }
 
@@ -179,16 +174,11 @@ export function inlinedFromFindings(
       const placed = tags.map((tag) => chain.indexOf(`${tag.module}#${tag.hook}`));
       placed.forEach((at, index) => {
         if (at === -1) return;
-        const side = reached!.side.get(chain[at]);
         const earlier = placed.slice(0, index).filter((other) => other !== -1);
-        const ordered = earlier.filter((other) => {
-          const otherSide = reached!.side.get(chain[other]);
-          return otherSide === side || otherSide === "instance" || side === "instance";
-        });
         if (earlier.includes(at)) {
           report(chain[at], "is tagged more than once: Rails runs the body once");
-        } else if (ordered.some((other) => other > at)) {
-          const after = chain[Math.max(...ordered)];
+        } else if (earlier.some((other) => other > at)) {
+          const after = chain[Math.max(...earlier)];
           report(chain[at], `is out of chain order: Rails runs it before ${after}`);
         }
       });
