@@ -58,10 +58,6 @@ function citationPattern(): RegExp {
   return new RegExp(`\\bvendor\\/(${names.join("|")})\\/([\\w.+-]+)(\\/?)`, "g");
 }
 
-/**
- * An `@inlinedFrom` tag's citation (RFC 0188), which is relative to `vendor/`
- * and does not spell it.
- */
 function inlinedFromPattern(): RegExp {
   const names = SOURCES.map((s) => s.name.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&"));
   return new RegExp(`(@inlinedFrom[ \\t]+\\S+[ \\t]+)((?:${names.join("|")})\\/\\S+)`, "g");

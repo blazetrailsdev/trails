@@ -6209,9 +6209,7 @@ export function main() {
         { level, rubyName, rubyModule, notes, mixinFile, definedInFile, tsMirrorNames },
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
-        // is dropped the way `seen`'s own no-candidate gate drops one. A
-        // `ClassMethods#new` is the extender's constructor whatever sits beside
-        // it, so it is asked without the sibling set and keeps its row.
+        // is dropped the way `seen`'s own no-candidate gate drops one.
         const ownerIsModule = Object.hasOwn(rubyPkg.modules, rubyModule);
         const classMethodsNew =
           rubyName === "new" &&

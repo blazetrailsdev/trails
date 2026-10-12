@@ -66,10 +66,6 @@ const entities = (ruby: ApiManifest, kind: "classes" | "modules"): Entity[] =>
 const defines = (entity: Entity | undefined, hook: InlinedFrom["hook"]) =>
   entity?.info.instanceMethods.find((m) => m.name === hook);
 
-/**
- * The hooks an entity's constructor answers to from other Ruby files, in
- * ancestor order, and the modules whose hook shares the entity's own file.
- */
 function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const byShort = new Map<string, string[]>();
   for (const fqn of modules.keys()) {
