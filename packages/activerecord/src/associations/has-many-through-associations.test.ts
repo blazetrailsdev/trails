@@ -251,8 +251,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (book as any).subscribers.createBang({ nick: "bob" })).toBeTruthy();
   });
 
-  it.skip("marshal dump", async () => {
-    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+  it("marshal dump", async () => {
     const preloaded = await Post.includes(":firstBlueTags").first();
     expect((Marshal.load(Marshal.dump(preloaded)) as Post).equals(preloaded)).toBe(true);
   });
