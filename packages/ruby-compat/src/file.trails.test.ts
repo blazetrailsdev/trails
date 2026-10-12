@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   chmodSync,
+  closeSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,6 +17,7 @@ import { File } from "./file.js";
 import { Pathname } from "./pathname.js";
 import {
   fsAdapterConfig,
+  getFs,
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
@@ -142,6 +146,27 @@ describe("File", () => {
     expect(File.stat(join(root, "a.rb")).size).toBe(7);
     expect(File.mtime(join(root, "a.rb"))).toBeInstanceOf(Date);
     expect(() => File.stat(join(root, "nonexistent"))).toThrow();
+  });
+
+  it("mtime truncates a sub-millisecond mtime, as new Date() truncates the clock", () => {
+    const root = fixture();
+    utimesSync(join(root, "a.rb"), 1000.0007, 1000.0007);
+    expect(File.mtime(join(root, "a.rb")).getTime()).toBe(1_000_000);
+  });
+
+  it("mtime truncates toward the epoch on both sides of it, through every stat entry point", async () => {
+    const root = fixture();
+    const path = join(root, "a.rb");
+    utimesSync(path, "-0.0007", "-0.0007");
+    expect(File.mtime(path).getTime()).toBe(0);
+    utimesSync(path, 1000.0007, 1000.0007);
+    const fs = getFs();
+    const fd = openSync(path, "r");
+    expect(fs.fstatSync!(fd).mtime.getTime()).toBe(1_000_000);
+    closeSync(fd);
+    expect(fs.lstatSync(path).mtime.getTime()).toBe(1_000_000);
+    expect((await fs.stat!(path)).mtime.getTime()).toBe(1_000_000);
+    expect((await fs.lstat!(path)).mtime.getTime()).toBe(1_000_000);
   });
 
   it("readable? is an access check, not the existence check exist? is", () => {

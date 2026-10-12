@@ -264,9 +264,14 @@ function tryAutoRegisterNode(): boolean {
       chmod(path: string, mode: number): Promise<void>;
     };
     const withExecutable = (stat: FsStatResult): FsStatResult =>
-      Object.assign(stat, { isExecutable: () => (stat.mode & 0o111) !== 0 });
+      Object.assign(stat, {
+        isExecutable: () => (stat.mode & 0o111) !== 0,
+        mtime: new Date(Math.trunc((stat as FsStatResult & { mtimeMs: number }).mtimeMs)),
+      });
     const fs: FsAdapter = Object.assign({}, nodeFs, {
       statSync: (p: string) => withExecutable(nodeFs.statSync(p)),
+      fstatSync: (fd: number) => withExecutable(nodeFs.fstatSync!(fd)),
+      lstatSync: (p: string) => withExecutable(nodeFs.lstatSync(p)),
       cwd: () => proc.cwd(),
       exists: (p: string) =>
         fsPromises.access(p).then(
@@ -278,7 +283,7 @@ function tryAutoRegisterNode(): boolean {
           },
         ),
       stat: (p: string) => fsPromises.stat(p).then(withExecutable),
-      lstat: (p: string) => fsPromises.lstat(p),
+      lstat: (p: string) => fsPromises.lstat(p).then(withExecutable),
       readFile: (p: string, enc?: string) =>
         enc ? fsPromises.readFile(p, enc) : fsPromises.readFile(p),
       writeFile: (p: string, c: string | Uint8Array, opts?: { mode?: number }) =>
