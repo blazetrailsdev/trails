@@ -68,17 +68,26 @@ export function parseCreateTable(
 
 function synthesizePk(
   opts: ts.ObjectLiteralExpression | undefined,
-): DumpColumnSchema | null | "composite" {
-  if (!opts) return { type: DEFAULT_PK_TYPE, null: false };
+): { name: string; col: DumpColumnSchema } | null {
+  if (!opts) return { name: "id", col: { type: DEFAULT_PK_TYPE, null: false } };
 
   const idVal = objPropValue(opts, "id");
   const pkVal = objPropValue(opts, "primaryKey");
 
-  if (isArrayLiteral(pkVal)) return "composite";
-  if (isFalse(idVal)) return null;
-  if (strLiteral(idVal) === "uuid") return { type: "uuid", null: false };
-  return { type: DEFAULT_PK_TYPE, null: false };
+  if (isArrayLiteral(pkVal) || isFalse(idVal)) return null;
+  return {
+    name: strLiteral(pkVal) ?? "id",
+    col: { type: strLiteral(idVal) ?? DEFAULT_PK_TYPE, null: false },
+  };
 }
+
+const NON_COLUMN_METHODS = new Set([
+  "index",
+  "foreignKey",
+  "checkConstraint",
+  "exclusionConstraint",
+  "uniqueConstraint",
+]);
 
 function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpColumnSchema }[] {
   if (!ts.isExpressionStatement(stmt)) return [];
@@ -91,7 +100,7 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
 
   const args = call.arguments;
 
-  if (method === "checkConstraint") return [];
+  if (NON_COLUMN_METHODS.has(method)) return [];
 
   if (method === "timestamps") {
     return [
@@ -158,9 +167,7 @@ function visitNode(node: ts.Node, result: SchemaColumnsByTable): void {
       const table: Record<string, DumpColumnSchema> = Object.create(null);
 
       const pk = synthesizePk(opts);
-      if (pk && pk !== "composite") {
-        table["id"] = pk;
-      }
+      if (pk) table[pk.name] = pk.col;
 
       if (arrowBody) {
         walkBody(arrowBody, table);

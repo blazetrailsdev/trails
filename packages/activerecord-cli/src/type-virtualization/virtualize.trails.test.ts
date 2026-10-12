@@ -509,6 +509,21 @@ describe("virtualize — multiple classes", () => {
     expect(text).toContain("isPublished");
   });
 
+  test("an enum label that is not an identifier surfaces under its method-friendly alias", () => {
+    const src =
+      "class Story extends Base {\n" +
+      "  static {\n" +
+      '    this.enum("status", { ready: "ready", "in-progress": "in-progress" });\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).toContain("declare isInProgress: () => boolean;");
+    expect(text).toContain("declare inProgressBang:");
+    expect(text).toContain("declare static inProgress:");
+    expect(text).toContain("declare static notInProgress:");
+    expect(text).not.toMatch(/[Ii]n-progress\w*[:(]/);
+  });
+
   test("nested defineEnum binds to the same-scope class, not a sibling-scope namesake", () => {
     const src =
       'describe("d", () => {\n' +

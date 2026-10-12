@@ -353,7 +353,7 @@ function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
   const out: RenderedLine[] = [];
   const { prefix, suffix } = readPrefixSuffix(call.options, call.attr);
   for (const value of call.values) {
-    const methodBase = `${prefix}${value}${suffix}`;
+    const methodBase = `${prefix}${value.replace(/[^\w\x80-\uffff]+/g, "_")}${suffix}`;
     const predicate = `is${pascal(methodBase)}`;
     const scopeName = camelize(methodBase, false);
     const bang = `${scopeName}Bang`;
