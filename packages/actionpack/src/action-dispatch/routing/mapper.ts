@@ -941,20 +941,14 @@ export class Mapper {
     );
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${path}`;
-    const singular = singularize(name);
-    const namePrefix = this._scope.get("as") as string | undefined;
-    const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
+    const plural =
+      options.as != null && (options.as as unknown) !== false ? String(options.as) : name;
+    const singular = singularize(plural);
 
     const shallowPath = shallow
       ? `${(this._scope.get("shallowPath") as string | undefined) ?? ""}/${path}`
       : basePath;
-    const outerNamePrefix = shallow
-      ? (this._scope.get("shallowPrefix") as string | undefined)
-      : undefined;
-    const shallowRouteName = (suffix: string) =>
-      outerNamePrefix ? `${outerNamePrefix}_${suffix}` : suffix;
-    const shallowName = (suffix: string) =>
-      shallow ? shallowRouteName(suffix) : routeName(suffix);
+    const names: Record<string, string | undefined> = {};
 
     const allowed = allowedActions(options, [
       "index",
@@ -975,7 +969,7 @@ export class Mapper {
 
     const resource: ResourceLike = {
       memberName: singular,
-      collectionName: singular === name ? `${name}_index` : name,
+      collectionName: singular === plural ? `${plural}_index` : plural,
       nestedParam: `${singular}_id`,
       param: "id",
       path,
@@ -993,11 +987,26 @@ export class Mapper {
         if (cb) cb.call(this);
 
         if (options.concerns) this.concerns(options.concerns);
+
+        this.collection(() => {
+          if (allowed.has("index")) names.index = this.nameForAction(undefined, "index");
+        });
+
+        if (allowed.has("new")) {
+          this.new(() => {
+            names.new = this.nameForAction(undefined, "new");
+          });
+        }
+
+        this.member(() => {
+          if (allowed.has("edit")) names.edit = this.nameForAction(undefined, "edit");
+          if (allowed.has("show")) names.show = this.nameForAction(undefined, "show");
+        });
       }),
     );
 
     if (allowed.has("index")) {
-      const as = routeName(resource.collectionName!);
+      const as = names.index;
       this.addRouteToSet("GET", basePath, controller, "index", as, constraints);
     }
 
@@ -1006,12 +1015,12 @@ export class Mapper {
     }
 
     if (allowed.has("new")) {
-      const as = routeName(`new_${singular}`);
+      const as = names.new;
       this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", as, constraints);
     }
 
     if (allowed.has("edit")) {
-      const as = shallowName(`edit_${singular}`);
+      const as = names.edit;
       this.addRouteToSet(
         "GET",
         `${shallowPath}/:id/${editPath}`,
@@ -1023,7 +1032,7 @@ export class Mapper {
     }
 
     if (allowed.has("show")) {
-      const as = shallowName(singular);
+      const as = names.show;
       this.addRouteToSet("GET", `${shallowPath}/:id`, controller, "show", as, constraints);
     }
 
