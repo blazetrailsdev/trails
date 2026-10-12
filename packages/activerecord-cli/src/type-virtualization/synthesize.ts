@@ -343,27 +343,48 @@ function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
 function scopeLine(info: ClassInfo, name: string, params: readonly string[]): RenderedLine {
   const argList = params.join(", ");
   const relation = `${AR_IMPORT}.Relation<${info.name}>`;
+  const memberName = renderDeclaredMemberName(name);
   return {
-    ...line(`declare static ${name}: (${argList}) => ${relation};`, name, true),
-    relationScope: `${name}(${[`this: ${relation}`, ...params].join(", ")}): ${relation};`,
+    ...line(`declare static ${memberName}: (${argList}) => ${relation};`, name, true),
+    relationScope: `${memberName}(${[`this: ${relation}`, ...params].join(", ")}): ${relation};`,
   };
 }
 
 function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
   const out: RenderedLine[] = [];
   const { prefix, suffix } = readPrefixSuffix(call.options, call.attr);
-  for (const value of call.values) {
-    const methodBase = `${prefix}${value.replace(/[^\w\x80-\uffff]+/g, "_")}${suffix}`;
-    const predicate = `is${pascal(methodBase)}`;
-    const scopeName = camelize(methodBase, false);
-    const bang = `${scopeName}Bang`;
-    const notScope = `not${pascal(methodBase)}`;
-    out.push(line(`declare ${predicate}: () => boolean;`, predicate, false));
-    out.push(line(`declare ${bang}: () => Promise<true | undefined>;`, bang, false));
-    out.push(scopeLine(info, scopeName, []));
-    out.push(scopeLine(info, notScope, []));
+  const valueMethodNames: string[] = [];
+  for (const label of call.values) {
+    const valueMethodName = `${prefix}${label}${suffix}`;
+    valueMethodNames.push(valueMethodName);
+    out.push(...renderEnumMethods(info, valueMethodName));
+
+    const methodFriendlyLabel = label.replace(/[^\w\x80-\uffff]+/g, "_");
+    const valueMethodAlias = `${prefix}${methodFriendlyLabel}${suffix}`;
+
+    if (valueMethodAlias !== valueMethodName && !valueMethodNames.includes(valueMethodAlias)) {
+      valueMethodNames.push(valueMethodAlias);
+      out.push(...renderEnumMethods(info, valueMethodAlias));
+    }
   }
   return out;
+}
+
+function renderEnumMethods(info: ClassInfo, valueMethodName: string): RenderedLine[] {
+  const scopeName = camelize(valueMethodName, false);
+  const predicate = `is${pascal(valueMethodName)}`;
+  const bang = `${scopeName}Bang`;
+  const notScope = `not${pascal(valueMethodName)}`;
+  return [
+    line(`declare ${renderDeclaredMemberName(predicate)}: () => boolean;`, predicate, false),
+    line(
+      `declare ${renderDeclaredMemberName(bang)}: () => Promise<true | undefined>;`,
+      bang,
+      false,
+    ),
+    scopeLine(info, scopeName, []),
+    scopeLine(info, notScope, []),
+  ];
 }
 
 function readPrefixSuffix(

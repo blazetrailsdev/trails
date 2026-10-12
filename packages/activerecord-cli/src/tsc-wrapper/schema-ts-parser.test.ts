@@ -142,6 +142,18 @@ describe("parseSchemaTs", () => {
     expect(result["settings"]["key"]).toEqual({ type: "string", null: false });
   });
 
+  it("id: 'integer' keeps its type; an id type the registry does not map stays the default", () => {
+    const source = `
+      export default async function defineSchema(ctx: MigrationContext) {
+        await ctx.createTable("counters", { id: "integer", force: "cascade" }, (t) => {});
+        await ctx.createTable("events", { id: "bigserial", force: "cascade" }, (t) => {});
+      }
+    `;
+    const result = parseSchemaTs(source, FILE);
+    expect(result["counters"]["id"]).toEqual({ type: "integer", null: false });
+    expect(result["events"]["id"]).toEqual({ type: "bigint", null: false });
+  });
+
   it("id: false → no id column synthesized", () => {
     const source = `
       export default async function defineSchema(ctx: MigrationContext) {

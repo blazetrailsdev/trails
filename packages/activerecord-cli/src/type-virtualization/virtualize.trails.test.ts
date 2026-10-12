@@ -521,7 +521,22 @@ describe("virtualize — multiple classes", () => {
     expect(text).toContain("declare inProgressBang:");
     expect(text).toContain("declare static inProgress:");
     expect(text).toContain("declare static notInProgress:");
-    expect(text).not.toMatch(/[Ii]n-progress\w*[:(]/);
+    expect(text).toContain('declare "isIn-progress": () => boolean;');
+    expect(text).toContain('declare static "in-progress":');
+    expect(text).not.toMatch(/declare (static )?\w*[Ii]n-progress/);
+  });
+
+  test("an enum alias another label already defines is declared once", () => {
+    const src =
+      "class Story extends Base {\n" +
+      "  static {\n" +
+      '    this.enum("status", { in_progress: 0, "in-progress": 1, a$b: 2 });\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text.match(/declare isInProgress:/g)?.length).toBe(1);
+    expect(text).toContain("declare isA$b: () => boolean;");
+    expect(text).toContain("declare isAB: () => boolean;");
   });
 
   test("nested defineEnum binds to the same-scope class, not a sibling-scope namesake", () => {

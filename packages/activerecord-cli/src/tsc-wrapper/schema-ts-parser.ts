@@ -1,5 +1,6 @@
 import * as ts from "typescript/unstable/ast";
 import { tsApi } from "../type-virtualization/ts-api.js";
+import { ATTRIBUTE_TYPE_MAP } from "../type-virtualization/type-registry.js";
 
 export interface DumpColumnSchema {
   type: string;
@@ -75,9 +76,13 @@ function synthesizePk(
   const pkVal = objPropValue(opts, "primaryKey");
 
   if (isArrayLiteral(pkVal) || isFalse(idVal)) return null;
+  const idType = strLiteral(idVal);
   return {
     name: strLiteral(pkVal) ?? "id",
-    col: { type: strLiteral(idVal) ?? DEFAULT_PK_TYPE, null: false },
+    col: {
+      type: idType !== undefined && idType in ATTRIBUTE_TYPE_MAP ? idType : DEFAULT_PK_TYPE,
+      null: false,
+    },
   };
 }
 
