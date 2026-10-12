@@ -13,6 +13,8 @@ import {
   rbEqual,
   rbFPublicSend,
   rbFSend,
+  rbDeclareIvar,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
 import { ThroughAssociation } from "./through-association.js";
@@ -405,5 +407,9 @@ const throughAssociationMethods = {
 
 Object.assign(HasManyThroughAssociation.prototype, throughAssociationMethods);
 include(HasManyThroughAssociation, ThroughAssociation);
+rbDeclareIvar(HasManyThroughAssociation, "@through_reflection", "_throughReflection");
+rbDeclareIvar(HasManyThroughAssociation, "@through_association", "_throughAssociation");
+rbDeclareIvar(HasManyThroughAssociation, "@through_records", "_throughRecords");
+rbDeclareIvar(HasManyThroughAssociation, "@through_scope", "_throughScope");
 
-Associations.HasManyThroughAssociation = HasManyThroughAssociation;
+rbModConstSet(Associations, "HasManyThroughAssociation", HasManyThroughAssociation);

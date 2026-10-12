@@ -418,6 +418,7 @@ export interface ConditionalOptions {
 
 ActiveModel.ValidationError = ValidationError;
 rbModConstSet(ActiveModel, "Validations", Validations);
+rbModConstSet(ActiveModel, "ValidationContext", ValidationContext);
 rbModConstSet(Validations, "AbsenceValidator", AbsenceValidator);
 rbModConstSet(Validations, "AcceptanceValidator", AcceptanceValidator);
 rbModConstSet(Validations, "ComparisonValidator", ComparisonValidator);

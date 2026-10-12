@@ -5,6 +5,7 @@ import {
   kernelCatch,
   rbEqual,
   rbObjRespondTo,
+  rbDeclareIvar,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import {
@@ -28,9 +29,9 @@ export abstract class CollectionAssociation extends Association {
   protected _associationIds: unknown[] | null = null;
   _lastRemoveAborted = false;
   /** @internal */
-  callback = callback;
+  declare callback: typeof callback;
   /** @internal */
-  callbacksFor = callbacksFor;
+  declare callbacksFor: typeof callbacksFor;
 
   override _targetStore: Base | Base[] | null = [];
 
@@ -825,6 +826,12 @@ export function callbacksFor(this: CallbackHost, callbackName: string): unknown[
     return [];
   }
 }
+
+CollectionAssociation.prototype.callback = callback;
+CollectionAssociation.prototype.callbacksFor = callbacksFor;
+rbDeclareIvar(CollectionAssociation, "@proxy", "_proxy");
+rbDeclareIvar(CollectionAssociation, "@association_ids", "_associationIds");
+rbDeclareIvar(CollectionAssociation, "@replaced_or_added_targets", "_replacedOrAddedTargets");
 
 function arraysEqual(a: Base[], b: Base[]): boolean {
   if (a.length !== b.length) return false;

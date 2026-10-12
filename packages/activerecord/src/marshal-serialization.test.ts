@@ -79,7 +79,7 @@ describe("MarshalSerializationTest", () => {
   });
 
   it.skip("rails 6 1 rountrip", async () => {
-    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+    // BLOCKED: activerecord-relation-round-trips-marshal
     let topic = await Topic.find(1);
     await topic.replies;
     topic = Marshal.load(Marshal.dump(topic)) as Topic;

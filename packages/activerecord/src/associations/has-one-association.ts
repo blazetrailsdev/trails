@@ -1,4 +1,4 @@
-import { fetch, include, kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
+import { fetch, include, kernelThrow, rbEqual, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
@@ -280,4 +280,4 @@ function transactionIf(
 
 include(HasOneAssociation, ForeignAssociation);
 
-Associations.HasOneAssociation = HasOneAssociation;
+rbModConstSet(Associations, "HasOneAssociation", HasOneAssociation);

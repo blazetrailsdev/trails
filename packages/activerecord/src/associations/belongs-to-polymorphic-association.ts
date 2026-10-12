@@ -1,3 +1,4 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, ThroughReflection } from "../reflection.js";
@@ -62,4 +63,4 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   }
 }
 
-Associations.BelongsToPolymorphicAssociation = BelongsToPolymorphicAssociation;
+rbModConstSet(Associations, "BelongsToPolymorphicAssociation", BelongsToPolymorphicAssociation);

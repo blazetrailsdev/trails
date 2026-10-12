@@ -267,8 +267,7 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "accountUsingForeignAndPrimaryKeys")).id).toBe(account.id);
   });
 
-  it.skip("can marshal has one association with nil target", async () => {
-    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+  it("can marshal has one association with nil target", async () => {
     const firm = new Firm();
     await assertNothingRaised(() => {
       expect((Marshal.load(Marshal.dump(firm)) as Firm).attributes).toEqual(firm.attributes);
