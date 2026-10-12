@@ -263,8 +263,12 @@ function tryAutoRegisterNode(): boolean {
       link(existingPath: string, newPath: string): Promise<void>;
       chmod(path: string, mode: number): Promise<void>;
     };
+    // follows (`vendor/ruby/v3.3.11/file.c:2427`), so truncate as `new Date()` does.
     const withExecutable = (stat: FsStatResult): FsStatResult =>
-      Object.assign(stat, { isExecutable: () => (stat.mode & 0o111) !== 0 });
+      Object.assign(stat, {
+        isExecutable: () => (stat.mode & 0o111) !== 0,
+        mtime: new Date(Math.floor((stat as FsStatResult & { mtimeMs: number }).mtimeMs)),
+      });
     const fs: FsAdapter = Object.assign({}, nodeFs, {
       statSync: (p: string) => withExecutable(nodeFs.statSync(p)),
       cwd: () => proc.cwd(),

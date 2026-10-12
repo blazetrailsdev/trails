@@ -6,6 +6,7 @@ import {
   readFileSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -142,6 +143,12 @@ describe("File", () => {
     expect(File.stat(join(root, "a.rb")).size).toBe(7);
     expect(File.mtime(join(root, "a.rb"))).toBeInstanceOf(Date);
     expect(() => File.stat(join(root, "nonexistent"))).toThrow();
+  });
+
+  it("mtime truncates a sub-millisecond mtime, as new Date() truncates the clock", () => {
+    const root = fixture();
+    utimesSync(join(root, "a.rb"), 1000.0007, 1000.0007);
+    expect(File.mtime(join(root, "a.rb")).getTime()).toBe(1_000_000);
   });
 
   it("readable? is an access check, not the existence check exist? is", () => {
