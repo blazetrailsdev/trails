@@ -1,8 +1,7 @@
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { FutureResult } from "./future-result.js";
-import { globalThreadPoolAsyncQueryExecutor, setAsyncQueryExecutor } from "./active-record.js";
-import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
+import { setAsyncQueryExecutor } from "./active-record.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
@@ -15,27 +14,8 @@ describe("Relation#load_async", () => {
   registerModel("Topic", Topic);
   registerModel("Reply", Reply);
 
-  let restoreExecutor: (() => void) | undefined;
-  let tracker: AsynchronousQueriesTracker | undefined;
-
-  beforeEach(async () => {
-    setAsyncQueryExecutor("global_thread_pool");
-    tracker = AsynchronousQueriesTracker.run();
-
-    const pool = (await Base.connectionPool()) as unknown as { asyncExecutor: unknown };
-    const previous = pool.asyncExecutor;
-    pool.asyncExecutor = globalThreadPoolAsyncQueryExecutor();
-    restoreExecutor = () => {
-      pool.asyncExecutor = previous;
-    };
-  });
-
   afterEach(() => {
-    if (tracker) AsynchronousQueriesTracker.complete(tracker);
-    tracker = undefined;
-    restoreExecutor?.();
-    restoreExecutor = undefined;
-    setAsyncQueryExecutor(null);
+    setAsyncQueryExecutor("global_thread_pool");
     vi.restoreAllMocks();
   });
 
@@ -251,8 +231,6 @@ describe("Relation#load_async", () => {
   });
 
   it("runs the query in the foreground when no executor is configured", async () => {
-    restoreExecutor?.();
-    restoreExecutor = undefined;
     setAsyncQueryExecutor(null);
 
     const connection = (await Base.leaseConnection()) as unknown as {
@@ -266,8 +244,6 @@ describe("Relation#load_async", () => {
   });
 
   it("re-runs the query for a later reader when the foreground load rejected", async () => {
-    restoreExecutor?.();
-    restoreExecutor = undefined;
     setAsyncQueryExecutor(null);
     await Topic.create({ title: "rejected async topic", author_name: "David" });
 

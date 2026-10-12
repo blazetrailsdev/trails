@@ -490,11 +490,14 @@ describe("compareFile", () => {
     };
     const rails = { name: "Dusty DeadBird", parrot_sti_class: "DeadParrot", killer: "blackbeard" };
     const compare = (row: Record<string, unknown>) =>
-      compareFile("dead_parrots.yml", new Map([["dead_parrots", { deadbird: row }]]), empty, undefined, schema, new Map([["DeadParrot", new Set(["killer"])]]), tables); // prettier-ignore
+      compareFile("dead_parrots.yml", new Map([["dead_parrots", { deadbird: row }]]), empty, undefined, schema, new Map([["DeadParrot", new Set(["killer"])]]), tables, new Map([["DeadParrot", new Set(["treasures"])]])); // prettier-ignore
     const both = await compare({ ...rails, treasures: ["ruby", "sapphire"] });
-    expect([both.status, both.attrsSkipped, both.schemaPorted]).toEqual(["MATCH", 1, true]);
+    expect([both.status, both.attrsMatched, both.attrsSkipped]).toEqual(["MATCH", 4, 0]);
+    expect((await compare({ ...rails, treasures: "ruby, sapphire" })).status).toBe("MATCH");
+    expect((await compare({ ...rails, treasures: ["ruby"] })).status).toBe("DIFF");
+    expect((await compare({ ...rails, treasures: "sapphire, ruby" })).status).toBe("DIFF");
     expect((await compare(rails)).notes).toEqual(["extra-in-ts: deadbird.treasures"]);
-    expect(canonicalizeRailsRow({ treasures: ["ruby"] }, {}, new Set(["name"]), "parrots")).toEqual({ treasures: ["ruby"] }); // prettier-ignore
+    expect(canonicalizeRailsRow({ treasures: ["ruby"] }, {}, new Set(["name"]), "parrots", new Set(), new Set(["treasures"]))).toEqual({ treasures: ["ruby"] }); // prettier-ignore
   });
   it("compares a key both rows spell the same way verbatim, column or not", async () => {
     const tables = new Map([["naked/yml/parrots", { table: "parrots", modelClass: "Parrot", declared: true }]]); // prettier-ignore

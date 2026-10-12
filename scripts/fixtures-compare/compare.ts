@@ -137,21 +137,6 @@ export const SKIP_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
   binaries: new Set<string>(["data"]),
 };
 
-// Per-table HABTM / has_many:through association labels the TS fixture declares
-// directly (e.g. `david: { sharedComputers: ["laptop"] }`). Rails carries the
-// same label in YAML (`shared_computers: laptop`); the fixture loader
-// materializes it into a join table rather than a column on this row, so the
-// key is neither a schema column nor an FK-shorthand. canonicalizeRailsRow
-// already drops the Rails-side snake form (it's not a column with no `<k>_id`
-// form); this registry lets the TS-side schema check and attr-diff drop the
-// camelCase equivalent symmetrically, instead of flagging it as a phantom
-// column. Keep this precise (real association names only) — a generic
-// "non-column key" skip would also mask genuinely-unported columns.
-export const HABTM_LABEL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
-  developers: new Set<string>(["sharedComputers"]),
-  parrots: new Set<string>(["treasures"]),
-};
-
 /**
  * Per-table composite-foreign-key belongs_to labels (`book: cpk_book_with_generated_pk`
  * in cpk_reviews.yml). Both sides spell the label, and `TableRow#resolve_sti_reflections`
@@ -801,7 +786,10 @@ export function staleFixtureEntries(files: ReadonlySet<string>): string[] {
   ];
 }
 
-export function belongsToAssociationsByClass(manifest: RubyFileEntry[]): Map<string, Set<string>> {
+function associationsByClass(
+  manifest: RubyFileEntry[],
+  macro: (a: RubyAssoc) => boolean,
+): Map<string, Set<string>> {
   const classes = classesByName(manifest);
   const ancestors = (klass: RubyClass): RubyClass[] => {
     const chain: RubyClass[] = [];
@@ -815,13 +803,35 @@ export function belongsToAssociationsByClass(manifest: RubyFileEntry[]): Map<str
     for (const other of classes.values()) {
       if (!ancestors(klass).includes(other) && !ancestors(other).includes(klass)) continue;
       for (const a of other.associations) {
-        if (a.kind === "belongs_to")
-          names.add(a.name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()));
+        if (macro(a)) names.add(a.name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()));
       }
     }
     out.set(name, names);
   }
   return out;
+}
+
+export function belongsToAssociationsByClass(manifest: RubyFileEntry[]): Map<string, Set<string>> {
+  return associationsByClass(manifest, (a) => a.kind === "belongs_to");
+}
+
+/**
+ * The associations whose fixture key `TableRow#resolve_sti_reflections` hands to
+ * `add_join_records` (`table_row.rb:178-181`): a `has_many` with `:through`, which is
+ * also what a `has_and_belongs_to_many` defines. The value is a list of labels that
+ * populates the join table, not a column of the row.
+ */
+export function joinLabelAssociationsByClass(manifest: RubyFileEntry[]): Map<string, Set<string>> {
+  return associationsByClass(
+    manifest,
+    (a) =>
+      a.kind === "has_and_belongs_to_many" || (a.kind === "has_many" && "through" in a.options),
+  );
+}
+
+/** `add_join_records`' `targets` (`table_row.rb:194`). */
+function joinTargets(targets: unknown): unknown {
+  return typeof targets === "string" ? targets.split(/\s*,\s*/) : targets;
 }
 
 export function schemaCheck(
@@ -831,13 +841,13 @@ export function schemaCheck(
   notes: string[],
   belongsTo: ReadonlySet<string> = new Set(),
   railsRows: FixtureMap = {},
+  labelAttrs: ReadonlySet<string> = new Set(),
 ): { ported: boolean; extras: number } {
   const table = schema[snake];
   if (!table) return { ported: false, extras: 0 };
   const shape = tableShape(table);
   const declared = new Set(Object.keys(shape.columns));
   if (shape.hasImplicitId) declared.add("id");
-  const labelAttrs = HABTM_LABEL_ATTRS[snake];
   let extras = 0;
   for (const [rowName, row] of Object.entries(tsRows)) {
     // Skip non-object rows (null/undefined/scalar). compareFile's own row-
@@ -846,9 +856,7 @@ export function schemaCheck(
     if (!row || typeof row !== "object") continue;
     for (const attr of Object.keys(row)) {
       if (declared.has(attr)) continue;
-      // A declared HABTM / has_many:through association label isn't a column —
-      // the fixture loader materializes it into a join table (see HABTM_LABEL_ATTRS).
-      if (labelAttrs?.has(attr)) continue;
+      if (labelAttrs.has(attr)) continue;
       if (COMPOSITE_FK_LABEL_ATTRS[snake]?.has(attr)) continue;
       if (belongsTo.has(attr)) continue;
       if (Object.keys(railsRows[rowName] ?? {}).some((k) => normalizeSymbolKey(k) === attr))
@@ -875,7 +883,7 @@ export function schemaCheck(
  * column list AND the `_id` form is missing do we drop the key as HABTM-like.
  */
 // prettier-ignore
-export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null, table: string = "", belongsTo: ReadonlySet<string> = new Set()): Row {
+export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null, table: string = "", belongsTo: ReadonlySet<string> = new Set(), labelAttrs: ReadonlySet<string> = new Set()): Row {
   const out: Row = {};
   const overrides: Readonly<Record<string, string>> = FK_OVERRIDES[table] ?? {};
   // Use Object.hasOwn for the schemaless tsRow probe so prototype keys
@@ -892,7 +900,7 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
     if (known(k) || Object.hasOwn(tsRow, k) || COMPOSITE_FK_LABEL_ATTRS[table]?.has(k)) { out[k] = v; continue; }
     const assocKey = k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
     if (belongsTo.has(assocKey) && Object.hasOwn(tsRow, assocKey)) { out[assocKey] = v; continue; } // prettier-ignore
-    if (HABTM_LABEL_ATTRS[table]?.has(assocKey)) { out[assocKey] = v; continue; }
+    if (labelAttrs.has(assocKey)) { out[assocKey] = v; continue; }
     // Rails' `replace_belongs_to_keys` also handles polymorphic shorthand —
     // `assoc: label (Type)` splits into `<col>` + `<assoc>_type`. Shared
     // between the convention path and FK_OVERRIDES so an override on a
@@ -924,7 +932,7 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
 }
 
 // prettier-ignore
-export async function compareFile(yamlPath: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined, schema: Schema = FIXTURE_SCHEMA, associations: ReadonlyMap<string, ReadonlySet<string>> = new Map(), tables: ReadonlyMap<string, FixtureTable> = new Map()): Promise<FileResult> {
+export async function compareFile(yamlPath: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined, schema: Schema = FIXTURE_SCHEMA, associations: ReadonlyMap<string, ReadonlySet<string>> = new Map(), tables: ReadonlyMap<string, FixtureTable> = new Map(), joinLabels: ReadonlyMap<string, ReadonlySet<string>> = new Map()): Promise<FileResult> {
   const snake = yamlPath.replace(/\.yml$/, "");
   const resolved = tables.get(snake) ?? { table: snake.replace(/\//g, "_"), modelClass: null, declared: true };
   const tableSnake = resolved.table;
@@ -955,7 +963,8 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
     return r;
   }
   const belongsTo = associations.get(resolved.modelClass ?? "") ?? new Set<string>();
-  const sc = schemaCheck(tableSnake, tsRows, schema, r.notes, belongsTo, railsRows);
+  const labelAttrs = joinLabels.get(resolved.modelClass ?? "") ?? new Set<string>();
+  const sc = schemaCheck(tableSnake, tsRows, schema, r.notes, belongsTo, railsRows, labelAttrs);
   r.schemaPorted = sc.ported;
   r.schemaExtras = sc.extras;
   let anyDiff = sc.extras > 0;
@@ -973,23 +982,18 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
       anyDiff = true;
       continue;
     }
-    const railsRow = canonicalizeRailsRow(railsRowRaw, tsRow, cols, tableSnake, belongsTo);
+    const railsRow = canonicalizeRailsRow(railsRowRaw, tsRow, cols, tableSnake, belongsTo, labelAttrs);
     r.rowsMatched++;
     if ("id" in railsRow && (!("id" in tsRow) || tsRow.id !== railsRow.id)) {
       r.notes.push(`id-divergence: ${rowName} ts=${String(tsRow.id)} rails=${String(railsRow.id)}`);
       anyDiff = true;
     }
     const skipAttrs = SKIP_ATTRS[snake];
-    // A declared HABTM / has_many:through label (`sharedComputers`) is TS-only:
-    // canonicalizeRailsRow already dropped its snake form from the Rails side, so
-    // it would otherwise read as extra-in-ts. Skip it symmetrically.
-    const labelAttrs = HABTM_LABEL_ATTRS[tableSnake];
     for (const attr of new Set([...Object.keys(railsRow), ...Object.keys(tsRow)])) {
       // Intentionally-unmirrored columns (binary blobs) are soft skips, even
       // when the TS row drops them entirely — so the presence check below
       // doesn't flag them as missing-in-ts.
       if (skipAttrs?.has(attr)) { r.attrsSkipped++; continue; } // prettier-ignore
-      if (labelAttrs?.has(attr) && attr in tsRow && attr in railsRow) { r.attrsSkipped++; continue; }
       r.attrsTotal++;
       if (!(attr in tsRow) || !(attr in railsRow)) {
         r.notes.push(`${attr in tsRow ? "extra" : "missing"}-in-ts: ${rowName}.${attr}`);
@@ -1001,7 +1005,8 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
       if (railsRow[attr] === ERB_SKIP_SENTINEL) { r.attrsSkipped++; r.attrsTotal--; continue; } // prettier-ignore
       if (attr === "id") { if (tsRow.id === railsRow.id) r.attrsMatched++; continue; } // prettier-ignore
       const skipCounter = { n: 0 };
-      const ok = compareValue(tsRow[attr], railsRow[attr], `${rowName}.${attr}`, idIndex, r.notes, tableSnake, skipCounter); // prettier-ignore
+      const [tsVal, railsVal] = labelAttrs.has(attr) ? [joinTargets(tsRow[attr]), joinTargets(railsRow[attr])] : [tsRow[attr], railsRow[attr]]; // prettier-ignore
+      const ok = compareValue(tsVal, railsVal, `${rowName}.${attr}`, idIndex, r.notes, tableSnake, skipCounter); // prettier-ignore
       if (skipCounter.n > 0) { r.attrsSkipped += skipCounter.n; r.attrsTotal -= skipCounter.n; continue; } // prettier-ignore
       if (ok) r.attrsMatched++;
       else anyDiff = true;
@@ -1108,6 +1113,7 @@ async function main(): Promise<void> {
   }
   const idIndex = buildIdIndex(rowsByTable(yamlByTable, tables));
   const associations = belongsToAssociationsByClass(manifest);
+  const joinLabels = joinLabelAssociationsByClass(manifest);
 
   const results: FileResult[] = [];
   for (const f of yamlFiles) {
@@ -1121,6 +1127,7 @@ async function main(): Promise<void> {
         FIXTURE_SCHEMA,
         associations,
         tables,
+        joinLabels,
       ),
     );
   }

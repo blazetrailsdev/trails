@@ -10,6 +10,8 @@ import { rbInspect, StandardError } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Base, Migration, Migrator, NotNullViolation } from "../index.js";
 import type { MigrationProxy } from "../migration.js";
+import type { SchemaMigration } from "../schema-migration.js";
+import type { InternalMetadata } from "../internal-metadata.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import type { Column as MysqlColumn } from "../connection-adapters/mysql/column.js";
@@ -34,36 +36,41 @@ describe("Migration", () => {
   describe("CompatibilityTest", () => {
     fixtures({}, { useTransactionalTests: false });
     let connection: AbstractAdapter;
+    let pool: ReturnType<typeof Base.connectionPool>;
+    let schemaMigration: SchemaMigration;
+    let internalMetadata: InternalMetadata;
     let verboseWas: boolean | undefined;
 
     const precisionImplicitDefault = () =>
       currentAdapter("Mysql2Adapter", "TrilogyAdapter") ? { precision: 0 } : { precision: null };
 
     const migrate = async (migration: Migration) => {
-      const pool = Base.connectionPool();
       await new Migrator(
         "up",
         [migration as unknown as MigrationProxy],
-        pool.schemaMigration,
-        pool.internalMetadata,
+        schemaMigration,
+        internalMetadata,
       ).migrate();
     };
 
     beforeEach(async () => {
       connection = await ambientConnection();
+      pool = Base.connectionPool();
+      schemaMigration = pool.schemaMigration;
+      internalMetadata = pool.internalMetadata;
       verboseWas = Migration.verbose;
       Migration.verbose = false;
 
-      await connection.createTable("testings", { force: true }, (t) => {
+      await connection.createTable("testings", {}, (t) => {
         t.column("foo", "string", { limit: 5 });
         t.column("bar", "string", { limit: 100 });
       });
     });
 
     afterEach(async () => {
-      await connection.dropTable("testings", "more_testings", { ifExists: true });
+      await connection.dropTable("testings").catch(() => null);
       Migration.verbose = verboseWas;
-      await Base.connectionPool().schemaMigration.deleteAllVersions();
+      await schemaMigration.deleteAllVersions().catch(() => null);
     });
 
     it("migration doesnt remove named index", async () => {
@@ -107,38 +114,46 @@ describe("Migration", () => {
     });
 
     it("references does not add index by default", async () => {
-      const migration = new (class extends Migration.get(4.2) {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.references("foo");
-            t.belongsTo("bar", { index: false });
-          });
-        }
-      })();
+      try {
+        const migration = new (class extends Migration.get(4.2) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("more_testings", (t) => {
+              t.references("foo");
+              t.belongsTo("bar", { index: false });
+            });
+          }
+        })();
 
-      await migrate(migration);
+        await migrate(migration);
 
-      expect(await connection.indexExists("more_testings", "foo_id")).toBeFalsy();
-      expect(await connection.indexExists("more_testings", "bar_id")).toBeFalsy();
+        expect(await connection.indexExists("more_testings", "foo_id")).toBeFalsy();
+        expect(await connection.indexExists("more_testings", "bar_id")).toBeFalsy();
+      } finally {
+        await connection.dropTable("more_testings").catch(() => null);
+      }
     });
 
     it("timestamps have null constraints if not present in migration of create table", async () => {
-      const migration = new (class extends Migration.get(4.2) {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.timestamps();
-          });
-        }
-      })();
+      try {
+        const migration = new (class extends Migration.get(4.2) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("more_testings", (t) => {
+              t.timestamps();
+            });
+          }
+        })();
 
-      await migrate(migration);
+        await migrate(migration);
 
-      expect(
-        await connection.columnExists("more_testings", "created_at", null, { null: true }),
-      ).toBeTruthy();
-      expect(
-        await connection.columnExists("more_testings", "updated_at", null, { null: true }),
-      ).toBeTruthy();
+        expect(
+          await connection.columnExists("more_testings", "created_at", null, { null: true }),
+        ).toBeTruthy();
+        expect(
+          await connection.columnExists("more_testings", "updated_at", null, { null: true }),
+        ).toBeTruthy();
+      } finally {
+        await connection.dropTable("more_testings").catch(() => null);
+      }
     });
 
     it("timestamps have null constraints if not present in migration of change table", async () => {
@@ -222,28 +237,32 @@ describe("Migration", () => {
     });
 
     it("timestamps doesnt set precision on create table", async () => {
-      const migration = new (class extends Migration.get(5.2) {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.timestamps();
-          });
-        }
-      })();
+      try {
+        const migration = new (class extends Migration.get(5.2) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("more_testings", (t) => {
+              t.timestamps();
+            });
+          }
+        })();
 
-      await migrate(migration);
+        await migrate(migration);
 
-      expect(
-        await connection.columnExists("more_testings", "created_at", null, {
-          null: false,
-          ...precisionImplicitDefault(),
-        }),
-      ).toBeTruthy();
-      expect(
-        await connection.columnExists("more_testings", "updated_at", null, {
-          null: false,
-          ...precisionImplicitDefault(),
-        }),
-      ).toBeTruthy();
+        expect(
+          await connection.columnExists("more_testings", "created_at", null, {
+            null: false,
+            ...precisionImplicitDefault(),
+          }),
+        ).toBeTruthy();
+        expect(
+          await connection.columnExists("more_testings", "updated_at", null, {
+            null: false,
+            ...precisionImplicitDefault(),
+          }),
+        ).toBeTruthy();
+      } finally {
+        await connection.dropTable("more_testings").catch(() => null);
+      }
     });
 
     it("timestamps doesnt set precision on change table", async () => {
@@ -321,22 +340,26 @@ describe("Migration", () => {
     });
 
     it("timestamps sets default precision on create table", async () => {
-      const migration = new (class extends Migration.get(6.1) {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.timestamps();
-          });
-        }
-      })();
+      try {
+        const migration = new (class extends Migration.get(6.1) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("more_testings", (t) => {
+              t.timestamps();
+            });
+          }
+        })();
 
-      await migrate(migration);
+        await migrate(migration);
 
-      expect(
-        await connection.columnExists("more_testings", "created_at", null, { precision: 6 }),
-      ).toBeTruthy();
-      expect(
-        await connection.columnExists("more_testings", "updated_at", null, { precision: 6 }),
-      ).toBeTruthy();
+        expect(
+          await connection.columnExists("more_testings", "created_at", null, { precision: 6 }),
+        ).toBeTruthy();
+        expect(
+          await connection.columnExists("more_testings", "updated_at", null, { precision: 6 }),
+        ).toBeTruthy();
+      } finally {
+        await connection.dropTable("more_testings").catch(() => null);
+      }
     });
 
     it("change table allows if exists option on 7 0", async () => {
@@ -366,66 +389,74 @@ describe("Migration", () => {
     });
 
     it("references on create table on 6 0", async () => {
-      const migration = new (class extends Migration.get(6.0) {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.references("testings");
-          });
+      try {
+        const migration = new (class extends Migration.get(6.0) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("more_testings", (t) => {
+              t.references("testings");
+            });
+          }
+        })();
+
+        await migrate(migration);
+
+        const column = (await connection.columns("more_testings")).find(
+          (el) => el.name === "testings_id",
+        );
+
+        if (currentAdapter("SQLite3Adapter")) {
+          expect(column!.sqlType).toMatch(/integer/i);
+        } else {
+          expect(column!.isBigint()).toBeTruthy();
         }
-      })();
-
-      await migrate(migration);
-
-      const column = (await connection.columns("more_testings")).find(
-        (el) => el.name === "testings_id",
-      );
-
-      if (currentAdapter("SQLite3Adapter")) {
-        expect(column!.sqlType).toMatch(/integer/i);
-      } else {
-        expect(column!.isBigint()).toBeTruthy();
+      } finally {
+        await connection.dropTable("more_testings").catch(() => null);
       }
     });
 
     it("add reference on 6 0", async () => {
-      const createMigration = new (class extends Migration.get(6.0) {
-        override get version(): number {
-          return 100;
+      try {
+        const createMigration = new (class extends Migration.get(6.0) {
+          override get version(): number {
+            return 100;
+          }
+
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("more_testings", (t) => {
+              t.string("test");
+            });
+          }
+        })();
+
+        const migration = new (class extends Migration.get(6.0) {
+          override get version(): number {
+            return 101;
+          }
+
+          override async migrate(_x: unknown): Promise<void> {
+            await this.addReference("more_testings", "testings");
+          }
+        })();
+
+        const pool = Base.connectionPool();
+        await new Migrator(
+          "up",
+          [createMigration, migration] as unknown as MigrationProxy[],
+          pool.schemaMigration,
+          pool.internalMetadata,
+        ).migrate();
+
+        const column = (await connection.columns("more_testings")).find(
+          (el) => el.name === "testings_id",
+        );
+
+        if (currentAdapter("SQLite3Adapter")) {
+          expect(column!.sqlType).toMatch(/integer/i);
+        } else {
+          expect(column!.isBigint()).toBeTruthy();
         }
-
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.string("test");
-          });
-        }
-      })();
-
-      const migration = new (class extends Migration.get(6.0) {
-        override get version(): number {
-          return 101;
-        }
-
-        override async migrate(_x: unknown): Promise<void> {
-          await this.addReference("more_testings", "testings");
-        }
-      })();
-
-      const pool = Base.connectionPool();
-      await new Migrator(
-        "up",
-        [createMigration, migration] as unknown as MigrationProxy[],
-        pool.schemaMigration,
-        pool.internalMetadata,
-      ).migrate();
-
-      const column = (await connection.columns("more_testings")).find(
-        (el) => el.name === "testings_id",
-      );
-
-      if (currentAdapter("SQLite3Adapter")) {
-        expect(column!.sqlType).toMatch(/integer/i);
-      } else {
-        expect(column!.isBigint()).toBeTruthy();
+      } finally {
+        await connection.dropTable("more_testings").catch(() => null);
       }
     });
 
@@ -446,23 +477,27 @@ describe("Migration", () => {
     });
 
     it("create table add index errors on too long name 7 0", async () => {
-      const migration = new (class extends Migration.get(7.0) {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.integer("foo");
-            t.integer("bar");
-            t.integer("very_long_column_name_to_test_with");
-            t.index(["foo", "bar", "very_long_column_name_to_test_with"]);
-          });
-        }
-      })();
+      try {
+        const migration = new (class extends Migration.get(7.0) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("more_testings", (t) => {
+              t.integer("foo");
+              t.integer("bar");
+              t.integer("very_long_column_name_to_test_with");
+              t.index(["foo", "bar", "very_long_column_name_to_test_with"]);
+            });
+          }
+        })();
 
-      const error = await assertRaises([StandardError], {}, () => migrate(migration));
+        const error = await assertRaises([StandardError], {}, () => migrate(migration));
 
-      expect(error.message).toMatch(
-        /index_more_testings_on_foo_and_bar_and_very_long_column_name_to_test_with/i,
-      );
-      expect(error.message).toMatch(/is too long/i);
+        expect(error.message).toMatch(
+          /index_more_testings_on_foo_and_bar_and_very_long_column_name_to_test_with/i,
+        );
+        expect(error.message).toMatch(/is too long/i);
+      } finally {
+        await connection.dropTable("more_testings").catch(() => null);
+      }
     });
 
     it("invert rename table on 7 0", async () => {
@@ -483,7 +518,8 @@ describe("Migration", () => {
         expect(await connection.tableExists("new_more_testings")).toBeFalsy();
         expect(await connection.tableExists("more_testings")).toBeTruthy();
       } finally {
-        await connection.dropTable("new_more_testings", { ifExists: true });
+        await connection.dropTable("more_testings").catch(() => null);
+        await connection.dropTable("new_more_testings").catch(() => null);
       }
     });
 
@@ -658,6 +694,7 @@ describe("Migration", () => {
           expect(await connection.tableExists(longTableName)).toBeTruthy();
         }
       } finally {
+        await connection.dropTable("more_testings").catch(() => null);
         await connection.dropTable(longTableName).catch(() => null);
       }
     });

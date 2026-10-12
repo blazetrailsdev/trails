@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Migrator } from "./index.js";
+import { puts, stdout } from "@blazetrails/ruby-compat";
+import { Migration, Migrator } from "./index.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
@@ -9,6 +10,7 @@ import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { Base } from "./base.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
+import "./test-helpers/migration-helper.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 const PATH_A = [`${MIGRATIONS_ROOT}/valid`];
@@ -57,6 +59,7 @@ describe("MultiDbMigratorTest", () => {
   let internalMetadataB: InternalMetadata;
   let migrationsA: MigrationProxy[];
   let migrationsB: MigrationProxy[];
+  let verboseWas: boolean | undefined;
 
   beforeEach(async () => {
     adapterA = await Base.leaseConnection();
@@ -99,11 +102,24 @@ describe("MultiDbMigratorTest", () => {
         migration: () => anonymousMigration("PeopleHaveDescriptions", 2),
       }),
     ];
+
+    verboseWas = Migration.verbose;
+
+    Migration.messageCount = 0;
+    Migration.prototype["puts"] = function () {
+      Migration.messageCount += 1;
+      return null;
+    };
   });
 
   afterEach(async () => {
-    await schemaMigrationA.deleteAllVersions();
-    await schemaMigrationB.deleteAllVersions();
+    await schemaMigrationA.deleteAllVersions().catch(() => null);
+    await schemaMigrationB.deleteAllVersions().catch(() => null);
+
+    Migration.verbose = verboseWas;
+    Migration.prototype["puts"] = function (...args: unknown[]) {
+      return puts.call(stdout, ...args);
+    };
   });
 
   it("schema migration is different for different connections", () => {
