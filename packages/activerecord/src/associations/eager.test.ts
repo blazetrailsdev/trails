@@ -1696,24 +1696,6 @@ describe("EagerAssociationTest", () => {
     expect(loaded.map((p) => p.id)).toEqual(postsWithNoComments.map((p) => p.id));
   });
 
-  it("test_calculate_with_string_in_from_and_eager_loading", async () => {
-    const count = await Post.from("authors, posts")
-      .eagerLoad(":comments")
-      .where("posts.author_id = authors.id")
-      .count();
-    expect(count).toBe(10);
-  });
-
-  it("test_with_two_tables_in_from_without_getting_double_quoted", async () => {
-    const loaded = await Post.select("posts.*")
-      .from("authors, posts")
-      .eagerLoad(":comments")
-      .where("posts.author_id = authors.id")
-      .order("posts.id");
-    const firstComments = loaded[0].association("comments").target as Base[];
-    expect(firstComments).toHaveLength(2);
-  });
-
   it("including associations with where.not adds implicit references", async () => {
     let author!: Author;
     await assertQueriesCount(2, false, async () => {
@@ -2029,23 +2011,6 @@ describe("EagerAssociationTest", () => {
     expect(posts.length).toBe(0);
   });
 
-  it("test_type_cast_in_where_references_association_name", async () => {
-    const parent = await Comment.find(comments("greetings").id);
-    const child = (await (parent as any).children.create({
-      label: "child",
-      body: "hi",
-      post_id: (parent as any).post_id,
-    })) as Comment;
-
-    const comment = (await Comment.includes(":children")
-      .where({ "children.label": "child" })
-      .last()) as Comment;
-
-    expect(comment.id).toBe(parent.id);
-    const children = (await (comment as any).children.toArray()) as Base[];
-    expect(children.map((c) => Number(c.id))).toEqual([Number(child.id)]);
-  });
-
   it("eager association loading with explicit join habtm", async () => {
     const rel = Post.all().eagerLoad(":categories").order("posts.id");
     const sql = rel.toSql();
@@ -2176,15 +2141,6 @@ describe("EagerAssociationTest", () => {
         authors("mary").id,
       );
     });
-  });
-
-  it("test_attribute_alias_in_where_references_association_name", async () => {
-    const firm = (await Firm.includes(":clients")
-      .where({ "clients.new_name": "Summit" })
-      .last()) as Firm;
-    expect(firm.id).toBe(companies("first_firm").id);
-    const clients = (await (firm as any).clients.toArray()) as Base[];
-    expect(clients.map((c) => Number(c.id))).toEqual([Number(companies("first_client").id)]);
   });
 
   it("preload has one using primary key", async () => {

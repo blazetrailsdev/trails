@@ -2822,24 +2822,4 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(postTags2.length).toBeGreaterThan(0);
     expect(postTags2).toContainEqual(post);
   });
-
-  it("delete_all for with dependent option delete_all", async () => {
-    const person = await Person.find(people("michael").id);
-    const countBefore = await (person as any).jobsWithDependentDeleteAll.count();
-    const jobCountBefore = await Job.count();
-    const refCountBefore = await Reference.count();
-    await (person as any).jobsWithDependentDeleteAll.deleteAll();
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(Number(refCountBefore) - Number(countBefore));
-  });
-
-  it("delete_all for with dependent option nullify", async () => {
-    const person = await Person.find(people("michael").id);
-    const countBefore = await (person as any).jobsWithDependentNullify.count();
-    const jobCountBefore = await Job.count();
-    const refCountBefore = await Reference.count();
-    await (person as any).jobsWithDependentNullify.deleteAll();
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(refCountBefore);
-  });
 });

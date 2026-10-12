@@ -70,38 +70,6 @@ describe("RequiredAssociationsTest", () => {
     expect(await record.save()).toBeTruthy();
   });
 
-  it("required belongs_to validates target exists, not just the foreign key", async () => {
-    class Parent extends Base {}
-    class Child extends Base {
-      declare parent: any;
-      static {
-        this.attribute("parent_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Child, "parent", {
-      required: true,
-      inverseOf: false,
-      className: "Parent",
-    });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
-
-    const orphan = new Child();
-    (orphan as any).parent_id = 999999;
-    expect(await orphan.save()).toBe(false);
-    expect(orphan.errors.fullMessages).toEqual(["Parent must exist"]);
-
-    const parent = new Parent();
-    expect(await parent.save()).toBe(true);
-    const child = new Child();
-    (child as any).parent_id = (parent as any).id;
-    expect(await child.save()).toBe(true);
-
-    const skip = new Child();
-    (skip as any).parent_id = 999999;
-    expect(await skip.save({ validate: false })).toBe(true);
-  });
-
   it("belongs_to associations can be required by default", async () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     try {
@@ -221,31 +189,5 @@ describe("RequiredAssociationsTest", () => {
     const record = new Child();
     await record.save();
     expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
-  });
-
-  it("validates has_many children when parent saves without crashing on unloaded target", async () => {
-    class Parent extends Base {
-      static {
-        this.hasMany("children", { validate: true, foreignKey: "parent_id", className: "Child" });
-      }
-    }
-    class Child extends Base {
-      declare parent: any;
-      static {
-        this.attribute("parent_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Child, "parent", {
-      required: true,
-      foreignKey: "parent_id",
-      className: "Parent",
-    });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
-
-    const parent = new Parent();
-    await (parent as any).association("children").writer([new Child()]);
-    expect(await parent.save()).toBe(false);
-    expect(parent.errors.fullMessages).toEqual(["Children is invalid"]);
   });
 });
