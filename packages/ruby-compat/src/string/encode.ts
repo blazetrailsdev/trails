@@ -32,7 +32,10 @@ function dump(b: number[]): string {
  * and a character the destination cannot hold `Encoding::UndefinedConversionError`,
  * with `make_econv_exception`'s messages (`transcode.c:2108-2170`). The
  * replacement is `"�"` in a Unicode destination and `"?"` in any other
- * (`output_replacement_character`, `transcode.c:2291`).
+ * (`output_replacement_character`, `transcode.c:2291`). `fallback` is
+ * `transcode_loop`'s proc arm (`transcode.c:2370-2384`): it is handed a
+ * character the destination cannot hold, and what it answers is transcoded
+ * into the destination in that character's place.
  *
  * Between two equal encodings the receiver is scrubbed when `invalid` is
  * given (`transcode.c:2772-2783`) and returned as it is otherwise; ASCII-8BIT
@@ -51,7 +54,11 @@ function dump(b: number[]): string {
 export function encode(
   str: string | Uint8Array,
   encoding: string | Encoding,
-  opts: { invalid?: ":replace" | null; undef?: ":replace" | null } = {},
+  opts: {
+    invalid?: ":replace" | null;
+    undef?: ":replace" | null;
+    fallback?: ((c: string) => string | null) | null;
+  } = {},
 ): string | Uint8Array {
   const invalidReplace = econvOpts(opts.invalid, "invalid");
   const undefReplace = econvOpts(opts.undef, "undefined");
@@ -106,6 +113,15 @@ export function encode(
       dest.push(rep);
       i += 1;
       continue;
+    }
+    if (c > max && !undefReplace && opts.fallback != null) {
+      const rep = opts.fallback(String.fromCodePoint(c));
+      if (rep != null) {
+        const inserted = encode(rep, denc);
+        dest.push(...(typeof inserted === "string" ? bytes(inserted) : inserted));
+        i += len;
+        continue;
+      }
     }
     if (c > max) {
       if (!undefReplace) {

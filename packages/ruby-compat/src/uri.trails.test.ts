@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Encoding } from "./encoding.js";
 import {
   BadURIError,
   Error as URIError,
@@ -238,5 +239,20 @@ describe("URI::Generic opaque, user, password and hostname", () => {
     const uri = RFC2396_PARSER.parse("postgres://a:b@[::1]:5/db");
     expect([uri.user, uri.password, uri.host, uri.hostname]).toEqual(["a", "b", "[::1]", "::1"]);
     expect(RFC2396_PARSER.parse("postgres://localhost/db").hostname).toBe("localhost");
+  });
+});
+
+describe("URI.encode_www_form_component", () => {
+  it("transcodes to enc before escaping", () => {
+    expect(URI.encodeWwwFormComponent("é x", Encoding.find("ISO-8859-1"))).toBe("%E9+x");
+    expect(URI.encodeWwwFormComponent("é")).toBe("%C3%A9");
+    expect(URI.encodeWwwFormComponent("é€", Encoding.ASCII_8BIT)).toBe("%C3%A9%E2%82%AC");
+  });
+
+  it("writes a character enc cannot hold as a numeric reference", () => {
+    expect(URI.encodeWwwFormComponent("é€x y", Encoding.find("ISO-8859-1"))).toBe(
+      "%E9%26%238364%3Bx+y",
+    );
+    expect(URI.encodeWwwFormComponent("é€", Encoding.US_ASCII)).toBe("%26%23233%3B%26%238364%3B");
   });
 });
