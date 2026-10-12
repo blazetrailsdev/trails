@@ -365,7 +365,8 @@ describe("Engine", () => {
 
   it("add_view_paths renders through the prepended path", async () => {
     resetLoadHooks();
-    const { ActionController, ActionView, Response } = await import("@blazetrails/actionpack");
+    const { ActionController, ActionView, Request, Response } =
+      await import("@blazetrails/actionpack");
     ActionView.TemplateHandlers.registerTemplateHandler("raw", new ActionView.RawHandler());
 
     class RenderEngine extends Engine {}
@@ -379,6 +380,7 @@ describe("Engine", () => {
     runLoadHooks("action_controller", PostsController);
 
     const controller = new PostsController();
+    controller.setRequestBang(new Request(MockRequest.envFor("/posts")));
     controller.setResponseBang(new Response());
     await controller.render({ action: "index" });
     expect(controller.responseBody).toBe("posts#index\n");

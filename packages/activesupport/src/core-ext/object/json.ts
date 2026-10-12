@@ -2,7 +2,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
-import { Kernel, Range as RangeValue } from "@blazetrails/ruby-compat";
+import { Kernel, Range as RangeValue, STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 import { formattedOffset } from "../time/conversions.js";
@@ -62,6 +62,15 @@ export class String {
     return value;
   }
 }
+
+declare module "@blazetrails/ruby-compat" {
+  interface StringInstance {
+    asJson(options?: EncodeOptions | null): string;
+  }
+}
+
+STRING_METHOD_TABLE.asJson = (self, options = null) =>
+  String.asJson(self.string, options as EncodeOptions | null);
 
 export class Numeric {
   static asJson(value: number | bigint, options: EncodeOptions | null = null): number | string {

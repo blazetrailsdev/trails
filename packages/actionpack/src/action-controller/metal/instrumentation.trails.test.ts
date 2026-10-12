@@ -271,6 +271,7 @@ describe("ActionController::Instrumentation#send_file / #send_data (instrumentat
     const offFile = subscribeOnce("send_file.action_controller", file);
     try {
       const c = new (class extends Base {})();
+      c.setRequestBang(newRequest());
       c.setResponseBang(new Response());
       await c.sendData("hi", { filename: "a.txt" });
       expect(data).toEqual([{ filename: "a.txt" }]);

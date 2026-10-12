@@ -91,6 +91,7 @@ import {
   type _layoutForOption,
   type _normalizeLayout,
   type _processRenderTemplateOptions,
+  type renderedFormat,
   type _writeLayoutMethod,
   type isActionHasLayout,
   type layout,
@@ -505,6 +506,11 @@ export class Base extends Metal {
 
   declare defaultRender: typeof defaultRender;
 
+  constructor() {
+    super();
+    this._renderedFormat = null;
+  }
+
   /**
    * @internal
    * @noRailsEquivalent CONVERGEABLE response-carries-async-streaming-body
@@ -516,10 +522,6 @@ export class Base extends Metal {
       return chunks;
     }
     return body;
-  }
-
-  renderedFormat(): unknown {
-    return this._renderedFormat;
   }
 
   respondTo = respondTo;
@@ -571,6 +573,7 @@ export class Base extends Metal {
 
   declare static logAt: OmitThisParameter<typeof logAt>;
   declare static logProcessAction: typeof logProcessAction;
+  declare static render: Renderer["render"];
   declare static renderer: Renderer;
   declare static setupRendererBang: () => void;
 
@@ -646,6 +649,7 @@ export class Base extends Metal {
   /** @internal */
   declare _normalizeOptions: typeof _normalizeOptions;
   declare renderToString: typeof renderToString;
+  declare renderedFormat: OmitThisParameter<typeof renderedFormat>;
   /** @internal */
   declare _setHtmlContentType: typeof _setHtmlContentType;
   /** @internal */
@@ -654,7 +658,7 @@ export class Base extends Metal {
   declare _setVaryHeader: typeof _setVaryHeader;
   declare _renderToBodyWithRenderer: typeof _renderToBodyWithRenderer;
   /** @internal */
-  _renderedFormat?: unknown;
+  declare _renderedFormat: unknown;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
   declare _isConditionalLayout: typeof _isConditionalLayout;

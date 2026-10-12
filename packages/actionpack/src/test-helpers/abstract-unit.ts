@@ -4,6 +4,7 @@ import {
   assertNil,
   assertNotEqual,
   assertNotIncludes,
+  I18n,
   include,
   kernelArray,
   transformKeys,
@@ -78,6 +79,8 @@ await ActionPackTestSuiteUtils.requireHelpers(
 await ActionPackTestSuiteUtils.requireHelpers(
   new URL("./fixtures/alternate-helpers", import.meta.url).pathname,
 );
+
+I18n.setEnforceAvailableLocales(false);
 
 export const FIXTURE_LOAD_PATH = new URL("./fixtures", import.meta.url).pathname;
 

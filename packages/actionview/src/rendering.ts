@@ -139,6 +139,10 @@ export interface ViewRendererHost {
   _viewRenderer?: Renderer;
 }
 
+export function renderedFormat(this: { _renderedFormat?: unknown }): unknown {
+  return this._renderedFormat;
+}
+
 export function viewRenderer(this: ViewRendererHost): Renderer {
   return (this._viewRenderer ??= new Renderer(this.lookupContext));
 }
@@ -265,6 +269,7 @@ export const Rendering = new Module((mod) => {
   mod.defineMethod("viewContextClass", function (this: { constructor: ViewContextClassMethods }) {
     return this.constructor.viewContextClass();
   });
+  mod.defineMethod("renderedFormat", renderedFormat);
   mod.defineMethod("viewContext", viewContext);
   mod.defineMethod("viewRenderer", viewRenderer);
   mod.defineMethod("renderToBody", renderToBody);

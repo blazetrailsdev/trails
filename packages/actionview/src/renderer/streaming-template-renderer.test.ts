@@ -357,6 +357,26 @@ describe("StreamingTemplateRenderer", () => {
       });
       expect(await collectChunks(body)).toEqual(["chunk ", "content"]);
     });
+
+    it("each() logs the exception's own class and its joined backtrace", async () => {
+      class TemplateBoom extends Error {}
+      const body = new Body(async () => {
+        throw new TemplateBoom("oops");
+      });
+
+      const fatal = vi.fn();
+      const oldLogger = Base.logger;
+      Base.logger = { fatal };
+      try {
+        await collectChunks(body);
+      } finally {
+        Base.logger = oldLogger;
+      }
+      expect(fatal).toHaveBeenCalledOnce();
+      const message = fatal.mock.calls[0][0] as string;
+      expect(message).toMatch(/^\nTemplateBoom \(oops\):\n {2}at .*\n {2}at /);
+      expect(message.endsWith("\n\n")).toBe(true);
+    });
   });
 
   describe("Renderer#renderBody", () => {

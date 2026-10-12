@@ -13,7 +13,7 @@ export interface RendererController {
     setResponseBang(response: Response): void;
     renderToString(...args: unknown[]): unknown;
   };
-  _routes?: { defaultEnv(): Env } | null;
+  _routes?: { defaultEnv(): Env; defaultUrlOptions: Record<string, unknown> } | null;
   makeResponseBang(request: Request): Response;
 }
 

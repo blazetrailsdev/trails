@@ -60,7 +60,7 @@ export function sendData(
   this: DataStreamingHost,
   data: string | Buffer,
   options: SendDataOptions = {},
-): void | Promise<void> {
+): unknown {
   this.sendFileHeadersBang(options);
   return this.render(
     merge(slice(options as Record<string, unknown>, "status", "contentType"), { body: data }),
