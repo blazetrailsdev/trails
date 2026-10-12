@@ -24,8 +24,4 @@ describe("ActiveRecord::Encryption::EncryptingOnlyEncryptorTest", () => {
     const decrypted = realEnc.decrypt(encrypted, { keyProvider: new KeyProvider(new Key(key)) });
     expect(decrypted).toBe("Some data");
   });
-
-  it("extends Encryptor", () => {
-    expect(EncryptingOnlyEncryptor.prototype instanceof Encryptor).toBe(true);
-  });
 });

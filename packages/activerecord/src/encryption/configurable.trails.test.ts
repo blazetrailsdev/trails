@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Context } from "./context.js";
 import { KeyGenerator } from "./key-generator.js";
 import { Encryption } from "../encryption.js";
+import { NullEncryptor } from "./null-encryptor.js";
+import { encrypts } from "./encryptable-record.js";
+import { AttributeRegistration, Model } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
+import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
 
 describe("ActiveRecord::Encryption::Configurable (trails)", () => {
   let saved: {
@@ -92,6 +97,75 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
       expect("noSuchProperty" in Encryption.defaultContext).toBe(false);
     } finally {
       Encryption.defaultContext = context;
+    }
+  });
+});
+
+describe("ActiveRecord::Encryption::ConfigurableTest (trails)", () => {
+  let savedConfig: ReturnType<typeof snapshotConfig>;
+
+  function snapshotConfig() {
+    const c = Encryption.config;
+    return {
+      primaryKey: c.primaryKey,
+      deterministicKey: c.deterministicKey,
+      keyDerivationSalt: c.keyDerivationSalt,
+      previousSchemes: [...c.previousSchemes],
+      addToFilterParameters: c.addToFilterParameters,
+      excludedFromFilterParameters: [...c.excludedFromFilterParameters],
+    };
+  }
+
+  beforeEach(() => {
+    savedConfig = snapshotConfig();
+    Encryption.config.previousSchemes.length = 0;
+  });
+
+  afterEach(() => {
+    const c = Encryption.config;
+    c.primaryKey = savedConfig.primaryKey;
+    c.deterministicKey = savedConfig.deterministicKey;
+    c.keyDerivationSalt = savedConfig.keyDerivationSalt;
+    c.previousSchemes = savedConfig.previousSchemes;
+    c.addToFilterParameters = savedConfig.addToFilterParameters;
+    c.excludedFromFilterParameters = savedConfig.excludedFromFilterParameters;
+    Encryption.resetDefaultContext();
+  });
+
+  it("configure resets the default context so config-derived properties are rebuilt", () => {
+    const before = Encryption.defaultContext;
+    Encryption.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
+    expect(Encryption.defaultContext).not.toBe(before);
+  });
+
+  it("configure applies Context-only properties to the reset default context", () => {
+    const encryptor = new NullEncryptor();
+    Encryption.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt", encryptor });
+    expect(Encryption.context.encryptor).toBe(encryptor);
+  });
+
+  it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
+    Encryption.config.excludedFromFilterParameters = ["secret_token"];
+
+    const filterParameters: string[] = [];
+    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
+    autoFilteredParameters.enable();
+
+    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
+      autoFilteredParameters.attributeWasDeclared(klass, name);
+    });
+
+    try {
+      class PaymentModel extends Model {}
+      const modelClass = PaymentModel;
+      include(modelClass, AttributeRegistration);
+      encrypts.call(modelClass, "card_number");
+      encrypts.call(modelClass, "secret_token");
+
+      expect(filterParameters).toContain("payment_model.card_number");
+      expect(filterParameters).not.toContain("payment_model.secret_token");
+    } finally {
+      listeners.pop();
     }
   });
 });
