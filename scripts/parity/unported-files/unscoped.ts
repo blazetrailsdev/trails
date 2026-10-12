@@ -269,13 +269,10 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     testFile: "connection_pool_test.rb",
     tests: ["full pool blocking shares load interlock"],
     reason:
-      "PERMANENT: connection_pool_test.rb:151-188 asserts that a thread blocked on a full pool " +
-      "still lets another take `ActiveSupport::Dependencies.interlock.loading`, the lock that " +
-      "guards Zeitwerk's concurrent constant loads (dependencies/interlock.rb, over " +
-      'concurrency/share_lock.rb). packages/trailties/CLAUDE.md § "Trails has no autoloader ' +
-      '(`Rails.autoloaders` / Zeitwerk)": there is no load to guard, both files are scoped skips ' +
-      "in scripts/parity/conventions.ts, and `LoadInterlockAwareMonitor#mon_enter` makes no " +
-      "`permit_concurrent_loads` call.",
+      "connection_pool_test.rb:151-188 takes `ActiveSupport::Dependencies.interlock.running` and " +
+      "`.loading`; `ActiveSupport::Dependencies::Interlock` (dependencies/interlock.rb) is not " +
+      "ported. Tracked by story " +
+      "pool-test-full-pool-blocking-shares-load-interlock-needs-owner-ruling.",
   },
   // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
   {

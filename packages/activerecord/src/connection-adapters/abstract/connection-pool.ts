@@ -595,7 +595,7 @@ export class ConnectionPool implements ReapablePool {
     this.asyncExecutor!.post(() => futureResult.executeOrSkip());
   }
 
-  newConnection(): DatabaseAdapter {
+  newConnection(): DatabaseAdapter | Promise<DatabaseAdapter> {
     try {
       const connection = this.dbConfig.newConnection() as DatabaseAdapter;
       connection.pool = this;
@@ -716,7 +716,7 @@ export class ConnectionPool implements ReapablePool {
       }
       this._nowConnecting += 1;
       try {
-        const conn = this.checkoutNewConnection();
+        const conn = this.checkoutNewConnection() as DatabaseAdapter;
         conn.pool = this;
         this._connections!.push(conn);
         conn.lease();
@@ -1002,7 +1002,7 @@ async function adoptConnection(this: Pool, conn: DatabaseAdapter): Promise<void>
 }
 
 /** @internal */
-function checkoutNewConnection(this: Pool): DatabaseAdapter {
+function checkoutNewConnection(this: Pool): DatabaseAdapter | Promise<DatabaseAdapter> {
   if (!this.automaticReconnect) {
     throw new ConnectionNotEstablished();
   }

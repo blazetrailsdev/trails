@@ -73,7 +73,8 @@ export class Enumerator<T = unknown> {
    * `enumerator_next` (`vendor/ruby/v3.3.11/enumerator.c:921`), over
    * `get_next_values` (`:786`): the enumeration runs in a `Fiber` of its own,
    * resumed once per element. A JS body suspends only at an `await`, so the
-   * generator awaits `yielder.yield` and `next` answers a promise.
+   * generator awaits `yielder.yield` and `next` answers a promise. `peek`'s
+   * lookahead and `rewind` are not ported.
    *
    * @noRailsEquivalent PERMANENT
    */

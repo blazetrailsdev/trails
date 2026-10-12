@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import {
   Concurrent,
   Enumerator,
@@ -1128,6 +1128,14 @@ it("inspect does not show secrets", async () => {
 });
 
 describe("ConnectionPoolThreadTest", () => {
+  const previousIsolationLevel = IsolatedExecutionState.isolationLevel!;
+  beforeEach(() => {
+    IsolatedExecutionState.isolationLevel = "thread";
+  });
+  afterEach(() => {
+    IsolatedExecutionState.isolationLevel = previousIsolationLevel;
+  });
+
   it("lock thread allow fiber reentrency", async () => {
     const pool = makePool();
     const connection = await pool.checkout();

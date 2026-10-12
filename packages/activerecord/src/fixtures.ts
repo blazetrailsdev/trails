@@ -443,6 +443,6 @@ export class Fixture {
 
 ActiveRecord.Fixture = Fixture;
 rbModConstSet(ActiveRecord, "FixtureSet", FixtureSet);
-Object.defineProperty(FixtureSet, "File", { get: () => File, configurable: true });
+rbModConstSet(FixtureSet, "File", File);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);

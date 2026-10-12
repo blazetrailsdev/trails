@@ -160,9 +160,8 @@ export const ClassMethods = {
       return this._cachedAttributeTypes;
     }
     const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
-    const hash = new Hash<string, ValueType | null>().replace(
-      host._defaultAttributes().castTypes(),
-    );
+    let hash = host._defaultAttributes().castTypes();
+    if (!(hash instanceof Hash)) hash = new Hash<string, ValueType | null>().replace(hash);
     hash.setDefault(Type.defaultValue());
     this._cachedAttributeTypes = hash;
     return hash;

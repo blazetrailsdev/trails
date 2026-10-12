@@ -1,13 +1,13 @@
 import { Base64, File, rbFBinding } from "@blazetrails/ruby-compat";
 
-import { FixtureSet } from "../fixtures.js";
+import { ActiveRecord } from "../namespaces.js";
 
 export class RenderContext {
   static createSubclass(): new () => {
     getBinding(): object;
     binary(path: string): string;
   } {
-    return class extends FixtureSet.contextClass {
+    return class extends ActiveRecord.FixtureSet.contextClass {
       getBinding(): this {
         return rbFBinding(this);
       }
