@@ -88,13 +88,17 @@ describe("_normalizeOptions", () => {
 describe("_processVariant", () => {
   test("copies present variant onto options; ignores absent/empty", () => {
     const opts: Record<string, unknown> = {};
-    _processVariant.call({ request: { variant: Symbol.for("mobile") } }, opts);
+    const request = (variant: unknown) => ({
+      request: { variant, shouldApplyVaryHeader: () => true },
+    });
+    _processVariant.call(request(Symbol.for("mobile")), opts);
     expect(opts.variant).toBe(Symbol.for("mobile"));
 
     const opts2: Record<string, unknown> = {};
-    _processVariant.call({ request: { variant: undefined } }, opts2);
-    _processVariant.call({ request: { variant: [] } }, opts2);
-    _processVariant.call({}, opts2);
+    _processVariant.call(request(undefined), opts2);
+    _processVariant.call(request([]), opts2);
+    _processVariant.call({ request: null }, opts2);
+    _processVariant.call({} as { request: null }, opts2);
     expect(opts2).toEqual({});
   });
 });
@@ -131,15 +135,12 @@ describe("_setRenderedContentType", () => {
 describe("_setVaryHeader", () => {
   function makeHost(initial?: string, shouldApply = true) {
     const headers = new Map<string, string>();
-    if (initial !== undefined) headers.set("vary", initial);
+    if (initial !== undefined) headers.set("Vary", initial);
     return {
       headers,
       host: {
         request: { shouldApplyVaryHeader: () => shouldApply },
-        response: {
-          getHeader: (n: string) => headers.get(n.toLowerCase()),
-          setHeader: (n: string, v: string) => headers.set(n.toLowerCase(), v),
-        },
+        response: { headers },
       },
     };
   }
@@ -147,15 +148,15 @@ describe("_setVaryHeader", () => {
   test("sets Vary: Accept when missing and request opts in; preserves existing or opt-out", () => {
     const a = makeHost();
     _setVaryHeader.call(a.host);
-    expect(a.headers.get("vary")).toBe("Accept");
+    expect(a.headers.get("Vary")).toBe("Accept");
 
     const b = makeHost("Cookie");
     _setVaryHeader.call(b.host);
-    expect(b.headers.get("vary")).toBe("Cookie");
+    expect(b.headers.get("Vary")).toBe("Cookie");
 
     const c = makeHost(undefined, false);
     _setVaryHeader.call(c.host);
-    expect(c.headers.has("vary")).toBe(false);
+    expect(c.headers.has("Vary")).toBe(false);
   });
 });
 
@@ -248,7 +249,8 @@ describe("Metal wiring", () => {
 
   test("render delegates to abstract render when not yet performed", () => {
     const host = including({
-      response: { getHeader: () => undefined, setHeader() {} },
+      request: { shouldApplyVaryHeader: () => false },
+      response: { headers: new Map<string, string>() },
       performed: false,
       responseBody: null as unknown,
       renderToBody: (opts: Record<string, unknown>) => `body:${String(opts.plain ?? "")}`,

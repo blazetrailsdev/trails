@@ -1,4 +1,13 @@
-import { Concern, extend, htmlEscape, isPresent, Module } from "@blazetrails/activesupport";
+import {
+  Concern,
+  extend,
+  htmlEscape,
+  isBlank,
+  isPresent,
+  Module,
+} from "@blazetrails/activesupport";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Mime } from "../../action-dispatch/http/mime-type.js";
 import {
   DoubleRenderError,
   type RenderingHost as AbstractRenderHost,
@@ -44,14 +53,13 @@ export function _normalizeOptions(
 }
 
 export interface RenderingHost {
-  request?: {
+  request: {
     variant?: unknown;
-    shouldApplyVaryHeader?: () => boolean;
-  };
+    shouldApplyVaryHeader(): boolean;
+  } | null;
   response: {
     contentType?: string;
-    getHeader(name: string): string | undefined;
-    setHeader(name: string, value: string): void;
+    headers: { get(key: string): string | undefined; set(key: string, value: string): unknown };
   };
   contentType: string | null;
   status: number;
@@ -64,15 +72,14 @@ export function _processVariant(
   this: Pick<RenderingHost, "request">,
   options: Record<string, unknown>,
 ): void {
-  const variant = this.request?.variant;
-  if (isPresent(variant)) {
-    options.variant = variant;
+  if (rbObjRespondTo(this, "request") && this.request != null && isPresent(this.request.variant)) {
+    options.variant = this.request.variant;
   }
 }
 
 /** @internal */
 export function _setHtmlContentType(this: Pick<RenderingHost, "contentType">): void {
-  this.contentType = "text/html";
+  this.contentType = Mime.get("html")!.toString();
 }
 
 /** @internal */
@@ -87,10 +94,8 @@ export function _setRenderedContentType(
 
 /** @internal */
 export function _setVaryHeader(this: Pick<RenderingHost, "request" | "response">): void {
-  const cur = this.response.getHeader("Vary") ?? this.response.getHeader("vary");
-  const blank = !cur || cur.trim() === "";
-  if (blank && this.request?.shouldApplyVaryHeader?.()) {
-    this.response.setHeader("Vary", "Accept");
+  if (isBlank(this.response.headers.get("Vary")) && this.request!.shouldApplyVaryHeader()) {
+    this.response.headers.set("Vary", "Accept");
   }
 }
 
@@ -119,13 +124,12 @@ export function render(this: AbstractRenderHost, ...args: unknown[]): void | Pro
 export function renderToString(this: AbstractRenderHost, ...args: unknown[]): unknown {
   const result = Rendering.superMethod(this, "renderToString")!(...args);
   const toString = (result: unknown): unknown => {
-    if (
-      typeof (result as { [Symbol.iterator]?: unknown } | null)?.[Symbol.iterator] === "function" &&
-      typeof result !== "string"
-    ) {
+    if (rbObjRespondTo(result, "each")) {
       let string = "";
-      for (const r of result as Iterable<unknown>) string += r;
-      return string;
+      const each = rbFSend(result, "each", (r: unknown) => (string += r));
+      return typeof (each as PromiseLike<unknown> | null)?.then === "function"
+        ? Promise.resolve(each).then(() => string)
+        : string;
     } else {
       return result;
     }

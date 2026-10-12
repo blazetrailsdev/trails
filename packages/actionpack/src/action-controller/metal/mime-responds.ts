@@ -2,7 +2,6 @@ import { Collector as AbstractCollector } from "../../abstract-controller/collec
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { NullType } from "../../action-dispatch/http/mime-type.js";
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
-import { _setRenderedContentType } from "./rendering.js";
 import { ArgumentError, fetch, include, rbEqual, rbFSend } from "@blazetrails/ruby-compat";
 
 export type FormatHandler = () => unknown;
@@ -84,6 +83,7 @@ export function respondTo(
     contentType: string | null;
     response: { contentType?: string | null; mediaType?: string | null };
     _processFormat(format: Format): void;
+    _setRenderedContentType(format: Format): void;
   },
   ...mimes: Array<string | ((collector: Collector & Record<string, MimeMethod>) => void)>
 ): unknown {
@@ -105,7 +105,7 @@ export function respondTo(
       throw new RespondToMismatchError();
     }
     this._processFormat(format);
-    if (!collector.isAnyResponse()) _setRenderedContentType.call(this, format);
+    if (!collector.isAnyResponse()) this._setRenderedContentType(format);
     const response = collector.response;
     if (response) return response();
   } else {

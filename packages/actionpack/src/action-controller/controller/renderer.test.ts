@@ -1,7 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import { assert, assertEqual } from "@blazetrails/activesupport";
 import { URL } from "../../action-dispatch/http/url.js";
-import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import {
   AccountsController,
   ApplicationController,
@@ -61,10 +60,7 @@ describe("RendererTest", () => {
   });
 
   it("rendering with a controller class", async () => {
-    assertEqual(
-      "Hello world!",
-      await (ApplicationController as unknown as Renderer).render("test/hello-world"),
-    );
+    assertEqual("Hello world!", await ApplicationController.render("test/hello-world"));
   });
 
   it("rendering with locals", async () => {
@@ -220,14 +216,13 @@ describe("RendererTest", () => {
     defaultUrlOptions: Record<string, unknown>,
     block: () => Promise<void>,
   ): Promise<void> {
-    const routes = renderer().controller._routes as unknown as RouteSet;
-    const originalDefaultUrlOptions = routes.defaultUrlOptions;
-    routes.defaultUrlOptions = defaultUrlOptions;
+    const originalDefaultUrlOptions = renderer().controller._routes!.defaultUrlOptions;
+    renderer().controller._routes!.defaultUrlOptions = defaultUrlOptions;
     try {
       await block();
     } finally {
-      routes.defaultUrlOptions = originalDefaultUrlOptions;
-      routes.defaultEnv();
+      renderer().controller._routes!.defaultUrlOptions = originalDefaultUrlOptions;
+      renderer().controller._routes!.defaultEnv();
     }
   }
 

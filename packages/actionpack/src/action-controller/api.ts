@@ -33,6 +33,7 @@ import {
   Rendering as AbstractControllerRendering,
   type render,
 } from "../abstract-controller/rendering.js";
+import type { Renderer } from "./renderer.js";
 import { UrlFor } from "./metal/url-for.js";
 import { Rescue } from "./metal/rescue.js";
 import { Instrumentation } from "./metal/instrumentation.js";
@@ -61,6 +62,8 @@ export class API extends Metal {
   static {
     this.abstractBang();
   }
+
+  declare static render: Renderer["render"];
 
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
     return this;

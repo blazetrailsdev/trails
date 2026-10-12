@@ -518,10 +518,6 @@ export class Base extends Metal {
     return body;
   }
 
-  renderedFormat(): unknown {
-    return this._renderedFormat;
-  }
-
   respondTo = respondTo;
 
   declare translate: OmitThisParameter<typeof translate>;
@@ -571,6 +567,7 @@ export class Base extends Metal {
 
   declare static logAt: OmitThisParameter<typeof logAt>;
   declare static logProcessAction: typeof logProcessAction;
+  declare static render: Renderer["render"];
   declare static renderer: Renderer;
   declare static setupRendererBang: () => void;
 
@@ -646,6 +643,7 @@ export class Base extends Metal {
   /** @internal */
   declare _normalizeOptions: typeof _normalizeOptions;
   declare renderToString: typeof renderToString;
+  declare renderedFormat: () => unknown;
   /** @internal */
   declare _setHtmlContentType: typeof _setHtmlContentType;
   /** @internal */

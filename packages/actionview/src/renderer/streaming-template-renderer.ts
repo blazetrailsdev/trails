@@ -1,5 +1,5 @@
 import { I18n, Notifications, type SafeBuffer } from "@blazetrails/activesupport";
-import { Fiber } from "@blazetrails/ruby-compat";
+import { Fiber, excBacktrace, rbObjClassname, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
 import { StreamingBuffer } from "../buffers.js";
 import { StreamingFlow } from "../flows.js";
 import { ActionView } from "../namespaces.js";
@@ -26,22 +26,24 @@ export class Body {
     try {
       await this.start(block);
     } catch (exception) {
-      this.logError(exception);
+      this.logError(exception as Error);
       block(ActionView.Base.streamingCompletionOnException);
     }
     return this;
   }
 
   /** @internal */
-  private logError(exception: unknown): void {
+  private logError(exception: Error): void {
     const logger = ActionView.Base.logger as { fatal(message: string): unknown } | null;
-    if (!logger) return;
+    if (logger == null) return;
 
-    const error = exception instanceof Error ? exception : new Error(String(exception));
-    let message = `\n${error.name} (${error.message}):\n`;
-    const annotated = (error as { annotatedSourceCode?: () => unknown }).annotatedSourceCode;
-    if (typeof annotated === "function") message += String(annotated.call(error) ?? "");
-    message += "  " + (error.stack ?? "").split("\n").slice(1).join("\n  ");
+    let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;
+    if (rbObjRespondTo(exception, "annotatedSourceCode")) {
+      message += toS(
+        (exception as Error & { annotatedSourceCode(): unknown }).annotatedSourceCode(),
+      );
+    }
+    message += "  " + excBacktrace(exception)!.join("\n  ");
     logger.fatal(`${message}\n\n`);
   }
 }
