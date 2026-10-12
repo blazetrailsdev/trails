@@ -41,6 +41,14 @@ const ruby = {
           ],
         }),
         "ActiveRecord::Relation": entity("relation.rb"),
+        "ActiveRecord::Batch": entity("batch.rb", [], {
+          prepends: ["Inheritance"],
+          extends: ["First::ClassMethods"],
+          mixinOrder: [
+            { kind: "prepend", names: ["Inheritance"] },
+            { kind: "extend", names: ["First::ClassMethods"] },
+          ],
+        }),
       },
       modules: {
         "ActiveRecord::Core": entity("core.rb", [def("initialize", `${AR}/core.rb`, 471, 482)]),
@@ -149,6 +157,14 @@ describe("inlinedFromFindings", () => {
     ]);
     expect(messages([CORE, NEW])).toEqual([
       "ActiveRecord::Inheritance::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::Core#initialize",
+    ]);
+  });
+
+  it("orders a prepended Concern's ClassMethods ahead of a later explicit extend", () => {
+    const batch = { owner: "Batch", file: "batch.ts" };
+    expect(messages([NEW, FIRST], batch)).toEqual([]);
+    expect(messages([FIRST, NEW], batch)).toEqual([
+      "ActiveRecord::Inheritance::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::First::ClassMethods#new",
     ]);
   });
 

@@ -73,7 +73,9 @@ const defines = (entity: Entity | undefined, hook: InlinedFrom["hook"]) =>
  * (`activesupport/lib/active_support/concern.rb:129-150`) and by nothing else,
  * at the moment of the `include`. So the singleton side of the chain is the
  * class's `extend` and Concern `include` statements read last first, the
- * first argument of one statement ahead of its second.
+ * first argument of one statement ahead of its second. A prepended Concern's
+ * `ClassMethods` is prepended to the singleton class (`concern.rb:142-150`),
+ * so it runs ahead of every one of those.
  */
 export const CONCERN = "ActiveSupport::Concern";
 
@@ -95,11 +97,13 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
       )
       .map((fqn) => `${fqn}::ClassMethods`);
   };
-  const singleton = [...(entity.info.mixinOrder ?? [])]
-    .reverse()
-    .flatMap(({ kind, names }) =>
-      names.flatMap((name) => (kind === "extend" ? [resolve(name, entity.fqn)] : concerns(name))),
-    );
+  const statements = [...(entity.info.mixinOrder ?? [])].reverse();
+  const singleton = [
+    ...statements.filter(({ kind }) => kind === "prepend"),
+    ...statements.filter(({ kind }) => kind !== "prepend"),
+  ].flatMap(({ kind, names }) =>
+    names.flatMap((name) => (kind === "extend" ? [resolve(name, entity.fqn)] : concerns(name))),
+  );
   const reached = { tagged: [] as string[], sameFile: [] as string[] };
   const sort = (fqns: readonly string[], hook: InlinedFrom["hook"]) => {
     for (const fqn of new Set(fqns)) {
