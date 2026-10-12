@@ -4,6 +4,8 @@ import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
+  makeEncryptedPost,
+  assertEncryptedAttribute,
 } from "./test-helpers.js";
 import { Encryption } from "../encryption.js";
 import { fixtures } from "../test-fixtures.js";
@@ -14,7 +16,18 @@ import {
   EncryptedBook,
   UnencryptedBook,
 } from "../test-helpers/models/book-encrypted.js";
-import { _createRecord, deterministicEncryptedAttributes } from "./encryptable-record.js";
+import {
+  _createRecord,
+  cantModifyEncryptedAttributesWhenFrozen,
+  decryptAttributes,
+  deterministicEncryptedAttributes,
+  encryptAttributes,
+  encrypts,
+  validateEncryptionAllowed,
+} from "./encryptable-record.js";
+import { generatedAttributeMethods } from "../attribute-methods.js";
+import { AttributeRegistration, Model as ActiveModel } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Serialized } from "../type/serialized.js";
 import { Base } from "../base.js";
@@ -138,6 +151,142 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     expect(reloaded.name).toBe("Dune");
     expect(reloaded.isEncryptedAttribute("name")).toBe(true);
   });
+
+  it("isEncryptedAttribute identifies encrypted vs plain attributes", async () => {
+    await freshAdapter();
+    const Post = makeEncryptedPost();
+    new Post();
+    expect(Post.encryptedAttributes?.has("title") ?? false).toBe(true);
+    expect(Post.encryptedAttributes?.has("body") ?? false).toBe(true);
+    expect(Post.encryptedAttributes?.has("id") ?? false).toBe(false);
+  });
+
+  it("threads the reflected column default so a plaintext default deserializes without decrypting", async () => {
+    const adapter = await freshAdapter();
+    const Book = class ReflectionOnlyEncryptedBook extends Base {
+      declare name: string;
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+        this.encrypts("name", { deterministic: true });
+      }
+    };
+    await Book.loadSchema();
+
+    Encryption.config.supportUnencryptedData = false;
+
+    const book = await Encryption.withoutEncryption(() => Book.create({}));
+    expect(book.name).toBe("<untitled>");
+
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("<untitled>");
+  });
+
+  it("threads the true column default, not an attribute() override, into the encrypted type", async () => {
+    const adapter = await freshAdapter();
+    const Book = class OverriddenDefaultEncryptedBook extends Base {
+      declare name: string;
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+        this.attribute("name", "string", { default: "OVERRIDE" });
+        this.encrypts("name", { deterministic: true });
+      }
+    };
+    await Book.loadSchema();
+
+    const type = Book.typeForAttribute("name") as unknown as { _default: unknown };
+    expect(type._default).toBe("<untitled>");
+
+    Encryption.config.supportUnencryptedData = false;
+
+    const book = await Encryption.withoutEncryption(() => Book.create({ name: "<untitled>" }));
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("<untitled>");
+  });
+
+  it("when ignore_case: true is declared before the attributes, the original_<name> reader still decrypts (replay-safe)", async () => {
+    const adapter = await freshAdapter();
+    const Book = class extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+      }
+    } as unknown as typeof Base & {
+      create: (a: object) => Promise<Base>;
+      find: (id: unknown) => Promise<Base>;
+    };
+
+    const book = await Book.create({ name: "Dune" });
+    await assertEncryptedAttribute(book, "original_name", "Dune");
+
+    const reloaded = await Book.find(book.id);
+    expect((reloaded as unknown as { name: string }).name).toBe("Dune");
+  });
+
+  it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {
+    Encryption.withEncryptionContext({ frozenEncryption: true }, () => {
+      expect(() => validateEncryptionAllowed.call({})).toThrow(
+        "can't be modified because it is encrypted",
+      );
+    });
+  });
+
+  it("EncryptableRecord.validateEncryptionAllowed does not throw when encryption is not frozen", () => {
+    expect(() => validateEncryptionAllowed.call({})).not.toThrow();
+  });
+
+  it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds errors for changed encrypted attrs", async () => {
+    await freshAdapter();
+    const Post = makeEncryptedPost();
+    new Post();
+    const post = new Post({ title: "hello" });
+    post.title = "changed";
+    const errored: Array<[string, string]> = [];
+    const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
+      _errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
+    });
+    cantModifyEncryptedAttributesWhenFrozen.call(proxy);
+    expect(errored).toEqual([["title", "can't be modified because it is encrypted"]]);
+  });
+
+  it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds no errors for unchanged attrs", async () => {
+    await freshAdapter();
+    const Post = makeEncryptedPost();
+    new Post();
+    const post = new Post({});
+    const errored: Array<[string, string]> = [];
+    const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
+      _errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
+    });
+    cantModifyEncryptedAttributesWhenFrozen.call(proxy);
+    expect(errored).toEqual([]);
+  });
+
+  it("EncryptableRecord.encryptAttributes writes ciphertext to DB and keeps plaintext in memory", async () => {
+    const adp = await freshAdapter();
+    const Post = makeEncryptedPost();
+    new Post();
+    const post = await Post.create({ title: "Hello", body: "World" });
+    await assertEncryptedAttribute(post, "title", "Hello");
+    await encryptAttributes.call(post);
+    expect(post.title).toBe("Hello");
+    await assertEncryptedAttribute(await Post.find(post.id), "title", "Hello");
+  });
+
+  it("EncryptableRecord.decryptAttributes stores plaintext in DB", async () => {
+    Encryption.config.supportUnencryptedData = true;
+    const adp = await freshAdapter();
+    const Post = makeEncryptedPost();
+    new Post();
+    const post = await Post.create({ title: "Hello", body: "World" });
+    await assertEncryptedAttribute(post, "title", "Hello");
+    await decryptAttributes.call(post);
+    const reloaded = await Post.find(post.id);
+    expect(reloaded.title).toBe("Hello");
+  });
 });
 
 describe("ActiveRecord::Encryption::EncryptableRecord#_create_record (trails)", () => {
@@ -161,5 +310,108 @@ describe("ActiveRecord::Encryption::EncryptableRecord.encrypted_attributes? (tra
 
   it("is false for a model that never assigned the class_attribute", () => {
     expect(UnencryptedBook.isEncryptedAttributes).toBe(false);
+  });
+});
+
+describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring", () => {
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(configSnapshot);
+  });
+
+  function makeMockModel(columns: string[]) {
+    class MockModel extends ActiveModel {
+      static {
+        include(this, AttributeRegistration);
+      }
+    }
+    const model = Object.assign(MockModel, {
+      columnNames: () => columns,
+      generatedAttributeMethods,
+    });
+    return model as typeof model & { encryptedAttributes: Set<string> };
+  }
+
+  it("wires the case-preserving original_<name> column when ignoreCase is set", () => {
+    const modelClass = makeMockModel(["name", "original_name"]);
+    encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true });
+    const encrypted = modelClass.encryptedAttributes;
+    expect(encrypted.has("name")).toBe(true);
+    expect(encrypted.has("original_name")).toBe(true);
+  });
+
+  it("does not wire original_<name> when ignoreCase is absent", () => {
+    const modelClass = makeMockModel(["name"]);
+    encrypts.call(modelClass, "name", { deterministic: true });
+    expect(modelClass.encryptedAttributes.has("original_name")).toBe(false);
+  });
+
+  it("raises when the original_<name> column is missing and supportUnencryptedData is false", () => {
+    Encryption.config.supportUnencryptedData = false;
+    const modelClass = makeMockModel(["name"]);
+    expect(() =>
+      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
+    ).toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  it("does not raise while no columns are known (schema not loaded yet)", () => {
+    const modelClass = makeMockModel([]);
+    expect(() =>
+      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
+    ).not.toThrow();
+  });
+
+  it("does not raise when supportUnencryptedData is true even if the column is missing", () => {
+    Encryption.config.supportUnencryptedData = true;
+    const modelClass = makeMockModel(["id", "name"]);
+    expect(() =>
+      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
+    ).not.toThrow();
+  });
+});
+
+describe("EncryptableRecord — ignore_case original_<name> column requirement", () => {
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+    Encryption.config.supportUnencryptedData = false;
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(configSnapshot);
+  });
+
+  it("Base.encrypts ignoreCase raises ConfigurationError when original_<name> is missing", async () => {
+    const adapter = await freshAdapter();
+    const Model = class extends Base {
+      static _tableName = "authors";
+    };
+    await Model.loadSchema();
+    expect(() => {
+      Model.encrypts("name", { deterministic: true, ignoreCase: true });
+    }).toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  it("Base.encrypts ignoreCase does not raise after reflection when original_<name> is present", async () => {
+    const adapter = await freshAdapter();
+    const Model = class extends Base {
+      static _tableName = "encrypted_books";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("original_name", "string");
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+      }
+    };
+    await Model.loadSchema();
+    expect(() => new Model()).not.toThrow();
   });
 });

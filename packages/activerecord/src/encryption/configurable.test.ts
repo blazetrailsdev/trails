@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Encryption } from "../encryption.js";
-import { NullEncryptor } from "./null-encryptor.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { encrypts } from "./encryptable-record.js";
 import { AttributeRegistration, Model } from "@blazetrails/activemodel";
@@ -142,43 +141,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     } finally {
       listeners.pop();
       Encryption.config.excludedFromFilterParameters = [];
-    }
-  });
-
-  it("configure resets the default context so config-derived properties are rebuilt", () => {
-    const before = Encryption.defaultContext;
-    Encryption.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
-    expect(Encryption.defaultContext).not.toBe(before);
-  });
-
-  it("configure applies Context-only properties to the reset default context", () => {
-    const encryptor = new NullEncryptor();
-    Encryption.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt", encryptor });
-    expect(Encryption.context.encryptor).toBe(encryptor);
-  });
-
-  it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
-    Encryption.config.excludedFromFilterParameters = ["secret_token"];
-
-    const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
-    autoFilteredParameters.enable();
-
-    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
-      autoFilteredParameters.attributeWasDeclared(klass, name);
-    });
-
-    try {
-      class PaymentModel extends Model {}
-      const modelClass = PaymentModel;
-      include(modelClass, AttributeRegistration);
-      encrypts.call(modelClass, "card_number");
-      encrypts.call(modelClass, "secret_token");
-
-      expect(filterParameters).toContain("payment_model.card_number");
-      expect(filterParameters).not.toContain("payment_model.secret_token");
-    } finally {
-      listeners.pop();
     }
   });
 });

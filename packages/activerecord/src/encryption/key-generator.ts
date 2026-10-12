@@ -5,6 +5,8 @@ import { Encryption } from "../namespaces.js";
 
 export class KeyGenerator {
   private _hashDigestClass: DigestClass;
+  private _keyDerivationSalt?: string;
+  private _keyLength?: number;
 
   constructor({
     hashDigestClass = Encryption.config.hashDigestClass,
@@ -31,12 +33,12 @@ export class KeyGenerator {
 
   /** @internal */
   private keyDerivationSalt(): string {
-    return Encryption.config.keyDerivationSalt;
+    return (this._keyDerivationSalt ??= Encryption.config.keyDerivationSalt);
   }
 
   /** @internal */
   private keyLength(): number {
-    return 32;
+    return (this._keyLength ??= Encryption.cipher.keyLength());
   }
 }
 
