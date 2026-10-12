@@ -91,6 +91,7 @@ import {
   type _layoutForOption,
   type _normalizeLayout,
   type _processRenderTemplateOptions,
+  type renderedFormat,
   type _writeLayoutMethod,
   type isActionHasLayout,
   type layout,
@@ -643,7 +644,7 @@ export class Base extends Metal {
   /** @internal */
   declare _normalizeOptions: typeof _normalizeOptions;
   declare renderToString: typeof renderToString;
-  declare renderedFormat: () => unknown;
+  declare renderedFormat: OmitThisParameter<typeof renderedFormat>;
   /** @internal */
   declare _setHtmlContentType: typeof _setHtmlContentType;
   /** @internal */
@@ -652,7 +653,7 @@ export class Base extends Metal {
   declare _setVaryHeader: typeof _setVaryHeader;
   declare _renderToBodyWithRenderer: typeof _renderToBodyWithRenderer;
   /** @internal */
-  _renderedFormat?: unknown;
+  _renderedFormat: unknown = null;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
   declare _isConditionalLayout: typeof _isConditionalLayout;

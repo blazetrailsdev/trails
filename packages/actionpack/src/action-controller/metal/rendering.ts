@@ -121,6 +121,7 @@ export function render(this: AbstractRenderHost, ...args: unknown[]): unknown {
   return Rendering.superMethod(this, "render")!(...args);
 }
 
+/** @inventedArm then — PERMANENT */
 export function renderToString(this: AbstractRenderHost, ...args: unknown[]): unknown {
   const result = Rendering.superMethod(this, "renderToString")!(...args);
   const toString = (result: unknown): unknown => {

@@ -11,7 +11,10 @@ import {
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 
-export function addRenderer(key: string, block: RendererProc): void {
+export function addRenderer<Host extends object = RenderersHost>(
+  key: string,
+  block: RendererProc<Host>,
+): void {
   Renderers.add(key, block);
 }
 
@@ -26,7 +29,11 @@ export class MissingRenderer extends Error {
   }
 }
 
-export type RendererProc = (this: any, value: unknown, options: Record<string, unknown>) => unknown;
+export type RendererProc<Host extends object = RenderersHost> = (
+  this: Host,
+  value: unknown,
+  options: Record<string, unknown>,
+) => unknown;
 
 export interface RenderersHost {
   contentType: string | null;
@@ -38,7 +45,10 @@ export interface RenderersHost {
 
 export const RENDERERS = new Set<string>();
 
-export function add(key: string, block: RendererProc): void {
+export function add<Host extends object = RenderersHost>(
+  key: string,
+  block: RendererProc<Host>,
+): void {
   Renderers.defineMethod(_renderWithRendererMethodName(key), block);
   RENDERERS.add(key);
 }
