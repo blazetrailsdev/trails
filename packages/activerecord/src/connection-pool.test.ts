@@ -5,6 +5,7 @@ import {
   Process,
   rbFPublicSend,
   rbFSend,
+  rbObjIvarSet,
   registerConstant,
   RuntimeError,
   Thread,
@@ -328,7 +329,7 @@ it("inactive are returned from dead thread", async () => {
   const pool = makePool();
   try {
     const ready = new Concurrent.CountDownLatch();
-    (pool as unknown as { size: number }).size = 1;
+    rbObjIvarSet(pool, "@size", 1);
 
     const child = newThread(async () => {
       await pool.checkout();
@@ -487,7 +488,7 @@ it("checkout order is lifo", async () => {
 
 it("checkout fairness", async () => {
   const pool = makePool();
-  (pool as unknown as { size: number }).size = 10;
+  rbObjIvarSet(pool, "@size", 10);
   const expected = Array.from({ length: pool.size }, (_, i) => i + 1);
   const conns = [];
   for (const _ of expected) conns.push(await pool.checkout());
@@ -528,7 +529,7 @@ it("checkout fairness", async () => {
 
 it("checkout fairness by group", async () => {
   const pool = makePool();
-  (pool as unknown as { size: number }).size = 10;
+  rbObjIvarSet(pool, "@size", 10);
   const conns: DatabaseAdapter[] = [];
   for (let i = 1; i <= 10; i++) conns.push(await pool.checkout());
   const mutex = new Mutex();

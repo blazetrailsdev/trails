@@ -84,7 +84,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it("connections are cleared even if inside a non-joinable transaction", async () => {
-    await Base.connectionPool().pinConnectionBang(Thread.current());
+    await Base.connectionPool().pinConnectionBang(Thread.current() as unknown as boolean);
     try {
       await new Thread(async () => {
         expect(await Base.leaseConnection()).toBeTruthy();
