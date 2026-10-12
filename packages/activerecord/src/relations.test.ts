@@ -2510,7 +2510,7 @@ describe("RelationTest", () => {
 
   it("find_by doesn't have implicit ordering", async () => {
     await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
-      await Post.all().findByBang({ author_id: 2 });
+      await Post.all().findBy({ author_id: 2 });
     });
   });
 
@@ -2532,6 +2532,12 @@ describe("RelationTest", () => {
     expect((await (Post.order("id") as any).findByBang("author_id = ?", 2)).id).toBe(
       posts("eager_other").id,
     );
+  });
+
+  it("find_by! doesn't have implicit ordering", async () => {
+    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+      await Post.all().findByBang({ author_id: 2 });
+    });
   });
 
   it("find_by! raises RecordNotFound if the record is missing", async () => {
