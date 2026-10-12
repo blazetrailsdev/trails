@@ -1,6 +1,10 @@
-import { StringIO, type IO } from "@blazetrails/ruby-compat";
+import { rbFLoad, StringIO, type IO } from "@blazetrails/ruby-compat";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
+import { SchemaDumper as BaseSchemaDumper } from "./schema-dumper.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -14,7 +18,9 @@ import {
   ForeignKeyDefinition,
   IndexDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
-import { dumpTableSchema } from "./support/schema-dumping-helper.js";
+import { dumpTableSchema, FULL_DUMP_TIMEOUT_MS } from "./support/schema-dumping-helper.js";
+import { adapterType } from "./test-adapter.js";
+import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
 function column(name: string, type: string, defaultFunction: string | null = null): Column {
   return new Column(
@@ -289,6 +295,75 @@ describe("SchemaDumper trails-only cases", () => {
       await SchemaDumper.dump(pool(connection(mkSource(customChkName))), new StringIO())
     ).string();
     expect(customOutput).toContain(`name: "${customChkName}"`);
+  });
+});
+
+describe("SchemaDumper types its dump against the connected adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  afterEach(async () => {
+    await (await Base.leaseConnection()).dropTable("json_data_type", { ifExists: true });
+  });
+
+  it.skipIf(adapterType !== "postgres")(
+    "a PostgreSQL dump names PostgreSQLAdapter, so t.jsonb and t.oid typecheck",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
+      await connection.createTable("json_data_type", { force: true }, (t) => {
+        t.jsonb("payload");
+      });
+      const output = await dumpTableSchema("json_data_type", "postgresql_oids");
+
+      expect(output).toContain(
+        'import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";',
+      );
+      expect(output).toMatch(/^await Schema\.get\([\d.]+\)\.define<PostgreSQLAdapter>\(/m);
+      expect(output).toContain('t.jsonb("payload")');
+      expect(output).toContain('t.oid("obj_id")');
+
+      await connection.dropTable("json_data_type");
+      const storage = await mkdtemp(join(tmpdir(), "trails-schema-dumper-"));
+      try {
+        await writeFile(join(storage, "schema.ts"), output);
+        await rbFLoad(join(storage, "schema.ts"));
+      } finally {
+        await rm(storage, { recursive: true, force: true });
+      }
+      expect((await connection.columns("json_data_type")).map((c) => c.sqlType)).toContain("jsonb");
+    },
+  );
+
+  it(
+    "the dump's own schemaFormat decides the type syntax, over the global one",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const ignoreTablesWas = BaseSchemaDumper.ignoreTables;
+      BaseSchemaDumper.ignoreTables = [/./];
+      try {
+        const asJs = (
+          await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "js" })
+        ).string();
+        expect(asJs).not.toContain("import type");
+        expect(asJs).toMatch(/\.define\((?:\{ version: [0-9_]+ \}, )?async \(ctx\) => \{/);
+
+        const asTs = (
+          await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "ts" })
+        ).string();
+        expect(asTs).toMatch(/^import type \{ \w+Adapter \} from /m);
+        expect(asTs).toMatch(/\.define<\w+Adapter>\(/);
+      } finally {
+        BaseSchemaDumper.ignoreTables = ignoreTablesWas;
+      }
+    },
+  );
+
+  it("an adapter-less dumper names no adapter", async () => {
+    const output = (
+      await SchemaDumper.dump(pool(connection(EMPTY_SOURCE)), new StringIO())
+    ).string();
+    expect(output).not.toContain("import type");
+    expect(output).toMatch(/^await Schema\.get\([\d.]+\)\.define\(async \(ctx\) => \{/m);
   });
 });
 

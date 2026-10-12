@@ -494,6 +494,7 @@ export class DatabaseTasks {
     return File.join(this.dbDir, filename);
   }
 
+  /** @missingRailsArgs dump — PERMANENT */
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
@@ -510,7 +511,11 @@ export class DatabaseTasks {
         const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
         const migrationConnectionPool = this.migrationConnectionPool();
         await File.open(filename, "w:utf-8", async (file) => {
-          await SchemaDumper.dump(migrationConnectionPool, file);
+          await SchemaDumper.dump(migrationConnectionPool, file, {
+            tableNamePrefix: ActiveRecord.Base.tableNamePrefix,
+            tableNameSuffix: ActiveRecord.Base.tableNameSuffix,
+            schemaFormat: format,
+          });
         });
         break;
       }

@@ -7,8 +7,6 @@ import { quotedScope } from "./schema-statements.js";
 export class SchemaDumper extends AbstractSchemaDumper {
   declare protected connection: AbstractMysqlAdapter;
 
-  protected _tableCollationCache?: Record<string, string | undefined>;
-
   /** @internal */
   protected override async prepareColumnOptions(
     column: MysqlColumn,
@@ -30,6 +28,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
     return spec;
   }
+
+  protected _tableCollationCache?: Record<string, string | undefined>;
 
   /** @internal */
   protected override async columnSpecForPrimaryKey(
@@ -123,5 +123,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
         ((await this.connection.queryValue(sql, "SCHEMA")) as string).replace(/\\'/g, "'"),
       );
     }
+  }
+
+  protected override adapterType(): [name: string, path: string] {
+    return ["Mysql2Adapter", "mysql2-adapter"];
   }
 }

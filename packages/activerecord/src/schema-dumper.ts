@@ -23,6 +23,7 @@ import {
   isBlank,
   isPresent,
 } from "@blazetrails/activesupport";
+import { schemaFormat } from "./active-record.js";
 import { ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import type { Base } from "./base.js";
@@ -46,6 +47,7 @@ function baseClass(): typeof Base {
 export interface SchemaDumperConfig {
   tableNamePrefix?: string;
   tableNameSuffix?: string;
+  schemaFormat?: "ts" | "js" | "sql";
 }
 
 export abstract class SchemaDumper {
@@ -115,6 +117,7 @@ export abstract class SchemaDumper {
     return {
       tableNamePrefix: config.tableNamePrefix,
       tableNameSuffix: config.tableNameSuffix,
+      schemaFormat: config.schemaFormat,
     };
   }
 
@@ -171,9 +174,19 @@ export abstract class SchemaDumper {
     return Promise.resolve();
   }
 
-  /** @inventedArm if — PERMANENT */
+  protected adapterType(): [name: string, path: string] | null {
+    return null;
+  }
+
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm adapterType — PERMANENT
+   * @inventedArm schemaFormat — PERMANENT
+   */
   private async header(stream: IO | StringIO): Promise<void> {
     const defineParams = await this.defineParams();
+    const adapterType =
+      (this._options.schemaFormat ?? schemaFormat()) === "ts" ? this.adapterType() : null;
     stream.puts(
       [
         "// This file is auto-generated from the current state of the database. Instead",
@@ -189,8 +202,13 @@ export abstract class SchemaDumper {
         "// It's strongly recommended that you check this file into your version control system.",
         "",
         `import { Schema } from "@blazetrails/activerecord";`,
+        ...(adapterType === null
+          ? []
+          : [
+              `import type { ${adapterType[0]} } from "@blazetrails/activerecord/connection-adapters/${adapterType[1]}.js";`,
+            ]),
         "",
-        `await Schema.get(${ActiveRecord.Migration.currentVersion()}).define(${defineParams === "" ? "" : `{ ${defineParams} }, `}async (ctx) => {`,
+        `await Schema.get(${ActiveRecord.Migration.currentVersion()}).define${adapterType === null ? "" : `<${adapterType[0]}>`}(${defineParams === "" ? "" : `{ ${defineParams} }, `}async (ctx) => {`,
       ].join("\n"),
     );
   }

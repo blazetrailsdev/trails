@@ -160,6 +160,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return JSON.stringify(column.defaultFunction);
   }
 
+  protected override adapterType(): [name: string, path: string] {
+    return ["PostgreSQLAdapter", "postgresql-adapter"];
+  }
+
   /** @internal */
   protected override schemaLimit(column: Column): string | undefined {
     if (column.type === "integer" && column.limit === 4) return undefined;
