@@ -65,6 +65,7 @@ export class DBConsole {
     }
   }
 
+  /** @inventedArm load — PERMANENT */
   async dbConfig(): Promise<DbConfig> {
     if (this._dbConfig == null) {
       const configurations = await this.configurations();
@@ -175,12 +176,12 @@ export class DbconsoleCommand extends Base {
   }
 
   async perform(): Promise<void> {
-    await this.requireApplicationBang();
-    await bootApplicationBang();
+    await bootApplicationBang.call(this);
     await DBConsole.start(this.options);
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE vendor-thor-and-port-command-base-thor-surface */
 export function dbconsoleCommand(): Command {
   const klass = DbconsoleCommand;
   const cmd = new Command(klass.commandName());

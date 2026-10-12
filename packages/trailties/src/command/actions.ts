@@ -11,8 +11,10 @@ export async function requireApplicationBang(): Promise<void> {
   if (APP_PATH != null) await import(p.pathToFileURL(APP_PATH).href);
 }
 
-export async function bootApplicationBang(): Promise<void> {
-  await requireApplicationBang();
+export async function bootApplicationBang(
+  this: { requireApplicationBang(): Promise<void> } | void,
+): Promise<void> {
+  await (this ? this.requireApplicationBang() : requireApplicationBang());
   if (APP_PATH != null) await Trails.application!.requireEnvironmentBang();
 }
 
