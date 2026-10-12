@@ -11,7 +11,7 @@ import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { bootApplicationBang } from "../command/actions.js";
+import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
 import { Trails } from "../rails.js";
 
@@ -107,7 +107,7 @@ export class UnusedRoutesCommand extends Base {
   }
 
   async perform(): Promise<void> {
-    await bootApplicationBang();
+    await Actions.bootApplicationBang();
     await Trails.application!.reloadRoutesUnlessLoaded();
 
     this.say((await this.inspector()).format(this.formatter(), this.routesFilter()));

@@ -10,13 +10,14 @@ import {
   LoadError,
   NotImplementedError,
   abort,
+  getPath,
   include,
   rbInspect,
   type Included,
 } from "@blazetrails/ruby-compat";
 import { Command, Option } from "commander";
 import { environment } from "../command.js";
-import { bootApplicationBang, requireApplicationBang } from "../command/actions.js";
+import { APP_PATH } from "../app-path.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { databaseConfiguration } from "../database.js";
@@ -118,7 +119,7 @@ export class DBConsole {
    * @missingRailsCall application — CONVERGEABLE database-configuration-reads-config-database-yml
    */
   protected async configurations(): Promise<DatabaseConfigurations> {
-    await requireApplicationBang();
+    if (APP_PATH != null) await import(getPath().pathToFileURL!(APP_PATH).href);
     ActiveRecordBase.configurations(
       (await databaseConfiguration()) as Parameters<typeof ActiveRecordBase.configurations>[0],
     );
@@ -176,7 +177,7 @@ export class DbconsoleCommand extends Base {
   }
 
   async perform(): Promise<void> {
-    await bootApplicationBang.call(this);
+    await this.bootApplicationBang();
     await DBConsole.start(this.options);
   }
 }

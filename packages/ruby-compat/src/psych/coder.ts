@@ -42,13 +42,21 @@ export class Coder {
 
   /**
    * `Psych::Coder#represent_seq`
-   * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:49-52`), with `seq=`
-   * (`:91-94`) written in place.
+   * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:49-52`).
    *
    * @noRailsEquivalent PERMANENT
    */
   representSeq(tag: string | null, list: unknown[]): void {
     this[coderTag] = tag;
+    this.setSeq(list);
+  }
+
+  /**
+   * `Psych::Coder#seq=` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:91-94`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  setSeq(list: unknown[]): void {
     this[coderType] = ":seq";
     this[coderSeq] = list;
   }

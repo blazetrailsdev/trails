@@ -1,6 +1,7 @@
 import { classAttribute, underscore } from "@blazetrails/activesupport";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 
+import { bootApplicationBang, requireApplicationBang } from "./actions.js";
 export interface ClassOptionConfig {
   aliases?: string | string[];
   desc?: string;
@@ -21,6 +22,9 @@ export class Base {
   }
 
   options: object;
+
+  declare requireApplicationBang: typeof requireApplicationBang;
+  declare bootApplicationBang: typeof bootApplicationBang;
 
   constructor(options: object = {}) {
     this.options = options;
@@ -127,3 +131,6 @@ export class Base {
     console.log(String(message));
   }
 }
+
+Base.prototype.requireApplicationBang = requireApplicationBang;
+Base.prototype.bootApplicationBang = bootApplicationBang;
