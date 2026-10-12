@@ -174,37 +174,27 @@ Its own last line says why. Treat only `perry compile` as a result.
     will not link.
 2.  **Do not spend more time on the parallelism knobs.** Measured: serial is
     worse, and a bigger cap is not better.
-3.  **The barrel is not the lever — measured, do not spend time on it.**
-    `04b-deep-import` bypasses `@blazetrails/activesupport`'s entry point
-    completely and still collects **364 modules against the barrel's 429**: 15%.
-    The graph does not come from the public re-exports, it comes from an
-    internal hub:
+3.  **Perry's module count is not the lever; the runtime graph is a separate,
+    real problem.** `04b-deep-import` bypasses activesupport's entry point and
+    still collects 364 modules against the barrel's 429 — and no import-graph
+    change can help Perry at all, because it collects every statically
+    reachable module and cannot execute what it cannot see statically.
 
-        inflector.ts → i18n.ts → namespaces.ts (the `TopLevel` hub)
-                                   ├─ cache/index.js
-                                   ├─ dependencies/autoload.js
-                                   ├─ logger.js, broadcast-logger.js
-                                   ├─ message-pack.js  → @msgpack/msgpack
-                                   └─ hash-with-indifferent-access.js
+    But measuring the _runtime_ graph turned up a real cost that has nothing to
+    do with Perry, written up in [runtime-graph.md](runtime-graph.md): Node
+    loads **229 modules and ~300-400ms** to obtain `camelize`, and the weight
+    sits in `@blazetrails/ruby-compat`'s barrel rather than in activesupport.
 
-    `camelize` needs none of it, but `inflector.ts:4` imports `I18n`
-    statically and `transliterate.ts:3` does it again, and `i18n.ts` imports
-    `TopLevel` from `namespaces.ts`, which imports the cache, the autoloader,
-    the logger and msgpack. The deep path still reaches `libxml2-wasm`, so it
-    hits wall 2 as well.
-
-    **Adding subpath exports to activesupport would therefore not help.** An
-    `exports` map cannot change internal import edges; it would buy 15% of a
-    number that has to fall by about 100x, in exchange for permanent public API
-    surface to keep stable. If anyone wants a real lever here it is breaking the
-    `inflector → i18n → namespaces` edge so that string inflection does not
-    depend on the cache and the autoloader — a genuine architectural question
-    about activesupport's internal layering, worth asking on its own merits and
-    not as a favour to one compiler. It is also still gated behind wall 2.
+    An earlier revision of this document diagrammed `namespaces.ts` as pulling
+    the cache, the logger and msgpack into the graph. **That was wrong.** Six of
+    its nine imports are `import type` and erased at runtime, and the msgpack
+    path is already a lazy dynamic import. activesupport is disciplined here;
+    `runtime-graph.md` has the corrected measurement.
 
 4.  **Do not trust a green rung that imports a shimmed package** until
     `perry.compilePackages` has compiled the real one and that adapter's own
     tests have run against it.
-5.  **Nothing here asks trails to change.** No framework defect was found by
-    this work. The barrel-export idea is measured in (3) and is
-    not worth doing, and the nokogiri chain is explicitly Perry's to fix.
+5.  **Nothing here asks trails to change _for Perry's sake_.** Both walls are
+    Perry's and no change in this repo moves them. The runtime-graph cost in
+    (3) is a real trails issue, but it stands on its own evidence and should be
+    decided on cold-start and bundle grounds, not as a favour to one compiler.
