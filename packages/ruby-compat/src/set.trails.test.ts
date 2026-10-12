@@ -20,4 +20,14 @@ describe("Set", () => {
     set.clear();
     expect(set.has([3, 4])).toBe(false);
   });
+
+  it("compare_by_identity makes an equal Array a second member", () => {
+    const member = [1, 2];
+    const set = new Set<unknown>().compareByIdentity().add(member);
+
+    expect(set.isCompareByIdentity()).toBe(true);
+    expect(set.has(member)).toBe(true);
+    expect(set.has([1, 2])).toBe(false);
+    expect(set.add([1, 2]).size).toBe(2);
+  });
 });

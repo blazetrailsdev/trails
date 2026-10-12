@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Marshal, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { fixtures } from "../test-fixtures.js";
 import { Firm } from "../test-helpers/models/company.js";
 import { Association } from "./association.js";
@@ -24,5 +25,12 @@ describe("Association#marshal_dump / #marshal_load", () => {
     expect(loaded.isLoaded()).toBe(true);
     expect(loaded.target).toBe(association.target);
     expect(loaded.reflection).toBe(Firm._reflectOnAssociation("account"));
+  });
+
+  it("dumps a collection association's @replaced_or_added_targets as Ruby's compare_by_identity Set", () => {
+    const firm = companies("first_firm") as Firm;
+    const targets = rbObjIvarGet(firm.association("clients"), "@replaced_or_added_targets");
+
+    expect(Marshal.dump(targets)).toBe("\x04\bo:\bSet\x06:\n@hashC:\tHash}\x00F");
   });
 });

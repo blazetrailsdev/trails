@@ -24,6 +24,7 @@ import {
   rtest,
 } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
+import { Set } from "./set.js";
 import { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
@@ -123,7 +124,8 @@ interface LoadArg {
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
 function tObjectP(obj: unknown): obj is object {
   return (
-    Object.prototype.toString.call(obj) === "[object Object]" && rbObjClassname(obj) !== "Hash"
+    obj instanceof Set ||
+    (Object.prototype.toString.call(obj) === "[object Object]" && rbObjClassname(obj) !== "Hash")
   );
 }
 

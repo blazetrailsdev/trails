@@ -52,6 +52,8 @@ FIXTURES = {
   "hash default false" => Hash.new(false),
   "hash subclass" => Hsh["a", 1],
   "hash compare_by_identity" => {}.compare_by_identity.merge!(1 => 2),
+  "set" => Set[1, a],
+  "set compare_by_identity" => Set.new.compare_by_identity.add(shared),
   "class and module" => [Column, Geo::Shape, Geo::Kind],
   "object nested path" => Geo::Shape.new(:circle),
   "object link" => [shared, shared],

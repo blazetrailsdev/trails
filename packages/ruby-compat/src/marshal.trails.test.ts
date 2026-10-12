@@ -14,6 +14,7 @@ import {
 } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { RuntimeError } from "./runtime-error.js";
+import { Set as RbSet } from "./set.js";
 import { TypeError } from "./type-error.js";
 import { registerConstant, unregisterConstant } from "./variable.js";
 
@@ -137,6 +138,8 @@ const VALUES: Record<string, unknown> = {
   "hash default false": new Hash(false),
   "hash subclass": hash([["a", 1]], new Hsh()),
   "hash compare_by_identity": hash([[1, 2]], new Hash().compareByIdentity()),
+  set: new RbSet([1, "a"]),
+  "set compare_by_identity": new RbSet().compareByIdentity().add(shared),
   "class and module": [Column, Shape, Kind],
   "object nested path": new Shape(":circle"),
   "object link": [shared, shared],
@@ -334,6 +337,22 @@ describe("Marshal.load", () => {
     const ident = Marshal.load(bytes("hash compare_by_identity")) as Hash<number, number>;
     expect(ident.constructor).toBe(Hash);
     expect(ident.isCompareByIdentity()).toBe(true);
+  });
+
+  it("loads a Set from its @hash, and a compare_by_identity one", () => {
+    const set = Marshal.load(bytes("set")) as RbSet<unknown>;
+    expect(set.constructor).toBe(RbSet);
+    expect(set.isCompareByIdentity()).toBe(false);
+    expect(set.size).toBe(2);
+    expect([...set]).toEqual([1, "a"]);
+    expect(hex(Marshal.dump(set))).toBe(fixtures.set);
+    const ident = Marshal.load(bytes("set compare_by_identity")) as RbSet<Column>;
+    expect(ident.isCompareByIdentity()).toBe(true);
+    const [column] = [...ident];
+    expect(column).toEqual(shared);
+    expect(ident.has(column)).toBe(true);
+    expect(ident.has(new Column("a", ":string"))).toBe(false);
+    expect(hex(Marshal.dump(ident))).toBe(fixtures["set compare_by_identity"]);
   });
 
   it("loads an Array that holds itself, and a linked object as the same object", () => {
