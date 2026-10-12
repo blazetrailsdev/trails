@@ -412,6 +412,7 @@ export { FiberError } from "./fiber-error.js";
 export { Thread } from "./thread.js";
 export {
   Location,
+  excBacktrace,
   excBacktraceLocations,
   excSetBacktrace,
   rbFCaller,

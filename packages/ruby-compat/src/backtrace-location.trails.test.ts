@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { Location, excBacktraceLocations, excSetBacktrace } from "./backtrace-location.js";
+import {
+  Location,
+  excBacktrace,
+  excBacktraceLocations,
+  excSetBacktrace,
+} from "./backtrace-location.js";
 
 describe("Thread::Backtrace::Location", () => {
   it("reads the label, lineno and column of a V8 frame", () => {
@@ -50,6 +55,17 @@ describe("Exception#backtrace_locations", () => {
     const exc = new Error("x");
     exc.stack = undefined;
     expect(excBacktraceLocations(exc)).toBeNull();
+  });
+});
+
+describe("Exception#backtrace", () => {
+  it("answers one String per frame, or nil with no backtrace", () => {
+    const exc = new Error("x");
+    exc.stack = "Error: x\n    at foo (/a/b.ts:3:5)\n    at /a/c.ts:7:1";
+    expect(excBacktrace(exc)).toEqual(excBacktraceLocations(exc)!.map(String));
+    expect(excBacktrace(exc)).toHaveLength(2);
+    exc.stack = undefined;
+    expect(excBacktrace(exc)).toBeNull();
   });
 });
 

@@ -6,7 +6,7 @@ export interface BenchmarkLogger {
   info(message: string): void;
   warn(message: string): void;
   error(message: string): void;
-  fatal(message: string): void;
+  fatal(message: string | (() => string)): void;
   silence?(tempLevel?: number, fn?: () => void): void;
 }
 

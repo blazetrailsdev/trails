@@ -13,12 +13,18 @@ import {
   RuntimeError,
   SizedQueue,
   Thread,
+  ThreadError,
+  excBacktrace,
   isSymbol,
   merge,
+  rbObjClassname,
+  rbObjRespondTo,
+  toS,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
+import { ActionController } from "../../namespaces.js";
 
 export class ClientDisconnected extends RuntimeError {}
 
@@ -84,11 +90,18 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     if (this._strBody !== null) {
       yield this._strBody;
     } else {
-      while (true) {
-        const str = this._buf.pop(true);
-        if (str === null) break;
-        yield str;
+      const popped: string[] = [];
+      try {
+        while (true) {
+          const str = this._buf.pop(true);
+          if (str === null) break;
+          popped.push(str);
+        }
+      } catch (e) {
+        if (e instanceof ThreadError) for (const str of popped) void this._buf.push(str);
+        throw e;
       }
+      yield* popped;
     }
   }
 
@@ -185,17 +198,12 @@ export class Response extends DispatchResponse {
   }
 }
 
-interface LoggerLike {
-  fatal(message: string | (() => string)): void;
-}
-
 export interface LiveControllerHost {
   request: { getHeader?(name: string): string | undefined; format?: unknown };
   response: Response;
-  logger?: LoggerLike;
   newControllerThread(block: () => void | Promise<void>): Promise<void>;
   cleanUpThreadLocals(locals: [string, unknown][], thread: Thread): void;
-  logError(exception: unknown): void;
+  logError(exception: Error): void;
 }
 
 export async function process(this: LiveControllerHost, name: string): Promise<void> {
@@ -221,9 +229,9 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
           }
           resp.stream.callOnError();
         } catch (exception) {
-          this.logError(exception);
+          this.logError(exception as Error);
         } finally {
-          this.logError(e);
+          this.logError(e as Error);
           resp.stream.close();
         }
       } else {
@@ -326,14 +334,20 @@ export const ClassMethods: Module = new Module((mod) => {
 });
 
 /** @internal */
-export function logError(this: { logger?: LoggerLike }, exception: unknown): void {
-  const logger = this.logger;
-  if (!logger) return;
-  const err = exception as { name?: string; message?: string; stack?: string };
-  const name = err?.name ?? "Error";
-  const message = err?.message ?? String(exception);
-  const stack = err?.stack ?? "";
-  logger.fatal(() => `\n${name} (${message}):\n  ${stack}\n\n`);
+export function logError(this: LiveControllerHost, exception: Error): void {
+  const logger = ActionController.Base.logger;
+  if (logger == null) return;
+
+  logger.fatal(() => {
+    let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;
+    if (rbObjRespondTo(exception, "annotatedSourceCode")) {
+      message += toS(
+        (exception as Error & { annotatedSourceCode(): unknown }).annotatedSourceCode(),
+      );
+    }
+    message += "  " + excBacktrace(exception)!.join("\n  ");
+    return `${message}\n\n`;
+  });
 }
 
 export const Live = new Module((mod) => {

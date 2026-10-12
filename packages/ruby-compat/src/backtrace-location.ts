@@ -76,6 +76,18 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
 }
 
 /**
+ * `Exception#backtrace` (`vendor/ruby/v3.3.11/error.c:1741` `exc_backtrace`): nil for
+ * an exception that was never raised, else one String per frame.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function excBacktrace(exc: Error): string[] | null {
+  const locations = excBacktraceLocations(exc);
+  if (locations === null) return null;
+  return locations.map((location) => location.toString());
+}
+
+/**
  * `Exception#set_backtrace` (`vendor/ruby/v3.3.11/error.c:1833` `exc_set_backtrace`),
  * which `raise klass, message, backtrace` calls: the frames replace the
  * exception's own, under the header line V8 keeps the message in.

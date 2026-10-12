@@ -1,6 +1,6 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { assertEqual } from "@blazetrails/activesupport";
-import { describe, it } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import { Base } from "../../base.js";
 import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
@@ -72,27 +72,36 @@ controllerConstants.set("dispatching/simple", SimpleController);
 class BaseTest extends Rack.TestCase {}
 
 describe("BaseTest", () => {
-  it("simple dispatching", async ({ task }) => {
-    const t = new BaseTest(task.name);
+  let t: BaseTest;
+
+  const assertBody = (body: string): void => t.assertBody(body);
+
+  const assertStatus = (code: number): void => t.assertStatus(code);
+
+  const assertContentType = (type: string): void => t.assertContentType(type);
+
+  beforeEach(({ task }) => {
+    t = new BaseTest(task.name);
+  });
+
+  it("simple dispatching", async () => {
     await t.get("/dispatching/simple/index");
 
-    t.assertBody("success");
-    t.assertStatus(200);
-    t.assertContentType("text/plain; charset=utf-8");
+    assertBody("success");
+    assertStatus(200);
+    assertContentType("text/plain; charset=utf-8");
   });
 
-  it("directly modifying response body", async ({ task }) => {
-    const t = new BaseTest(task.name);
+  it("directly modifying response body", async () => {
     await t.get("/dispatching/simple/modifyResponseBody");
 
-    t.assertBody("success");
+    assertBody("success");
   });
 
-  it("directly modifying response body twice", async ({ task }) => {
-    const t = new BaseTest(task.name);
+  it("directly modifying response body twice", async () => {
     await t.get("/dispatching/simple/modifyResponseBodyTwice");
 
-    t.assertBody("success!");
+    assertBody("success!");
   });
 
   it("controller path", () => {
@@ -165,7 +174,7 @@ describe("BaseTest", () => {
   });
 
   // BLOCKED: action-methods-does-not-subtract-internal-methods
-  it.skip("action methods", async ({ task }) => {
+  it.skip("action methods", async () => {
     assertEqual(
       new Set([
         "index",
@@ -180,9 +189,8 @@ describe("BaseTest", () => {
     assertEqual(new Set(), EmptyController.actionMethods());
     assertEqual(new Set(), Submodule.ContainedEmptyController.actionMethods());
 
-    const t = new BaseTest(task.name);
     await t.get("/dispatching/simple/showActions");
-    t.assertBody(
+    assertBody(
       "actions: index, modifyResponseBody, modifyResponseBodyTwice, modifyResponseHeaders, showActions",
     );
   });
