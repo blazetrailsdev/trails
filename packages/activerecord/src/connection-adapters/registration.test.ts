@@ -74,7 +74,16 @@ describe("RegistrationIsolatedTest", () => {
     vi.resetModules();
     ConnectionAdapters = await import("../connection-adapters.js");
     ({ AdapterNotFound } = await import("../errors.js"));
-    (await import("../support/fake-adapter.js")).registerFakeAdapter();
+    ConnectionAdapters.register(
+      "abstract",
+      "ActiveRecord::ConnectionAdapters::AbstractAdapter",
+      "active_record/connection_adapters/abstract_adapter",
+    );
+    ConnectionAdapters.register(
+      "fake",
+      "FakeActiveRecordAdapter",
+      new URL("../support/fake-adapter.js", import.meta.url).href,
+    );
   });
 
   afterEach(() => {
@@ -88,7 +97,7 @@ describe("RegistrationIsolatedTest", () => {
 
     const expectedMessage =
       "Database configuration specifies nonexistent 'fake_legacy' adapter. " +
-      "Available adapters are: expo-sqlite, fake, libsql, libsql-remote, libsql-replica, mysql2, " +
+      "Available adapters are: abstract, expo-sqlite, fake, libsql, libsql-remote, libsql-replica, mysql2, " +
       "node-sqlite, postgresql, sqlite3. Ensure that the adapter is spelled correctly in " +
       "config/database.yml and that you've added the necessary adapter gem to your " +
       "Gemfile if it's not in the list of available adapters.";
