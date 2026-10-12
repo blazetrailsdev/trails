@@ -10,13 +10,14 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   describe("PostgreSQLActiveSchemaTest", () => {
-    const execute = PostgreSQLAdapter.prototype.execute;
+    let execute: typeof PostgreSQLAdapter.prototype.execute;
     fixtures(["people"]);
 
     beforeEach(async () => {
       adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await adapter.materializeTransactions();
 
+      execute = PostgreSQLAdapter.prototype.execute;
       PostgreSQLAdapter.prototype.execute = async function (sql: string, _name = null) {
         return sql;
       } as never;

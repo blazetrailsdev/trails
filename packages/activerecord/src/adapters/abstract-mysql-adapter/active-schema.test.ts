@@ -32,17 +32,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await resetConnection();
     });
 
-    async function withRealExecute(fn: () => Promise<void>): Promise<void> {
-      const singletonClass = rbObjSingletonClass(adapter) as typeof Mysql2Adapter;
-      const executeWithStub = singletonClass.prototype.execute;
-      delete (singletonClass.prototype as Partial<Mysql2Adapter>).execute;
-      try {
-        await fn();
-      } finally {
-        singletonClass.prototype.execute = executeWithStub;
-      }
-    }
-
     fixtures(["people"], {
       usesTransaction: ["add index"],
     });
@@ -118,16 +107,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
 
       await withRealExecute(async () => {
-        try {
-          await adapter.addIndex("people", "first_name");
-          expect(await adapter.indexExists("people", "first_name")).toBeTruthy();
+        await adapter.addIndex("people", "first_name");
+        expect(await adapter.indexExists("people", "first_name")).toBeTruthy();
 
-          await assertNothingRaised(async () => {
-            await adapter.addIndex("people", "first_name", { ifNotExists: true });
-          });
-        } finally {
-          await adapter.removeIndex("people", "first_name", { ifExists: true });
-        }
+        await assertNothingRaised(async () => {
+          await adapter.addIndex("people", "first_name", { ifNotExists: true });
+        });
       });
 
       await expect(() =>
@@ -148,7 +133,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
         expect(
           await adapter.createTable("people", { id: false }, (t) => {
-            t.index(["last_name"], { type });
+            t.index("last_name", { type });
           }),
         ).toMatch(
           new RegExp(
@@ -159,7 +144,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       expect(
         await adapter.createTable("people", { id: false }, (t) => {
-          t.index(["last_name"], { length: { last_name: 10 }, using: "btree" });
+          t.index("last_name", { length: 10, using: "btree" });
         }),
       ).toMatch(
         /^CREATE TABLE `people` \(INDEX `index_people_on_last_name` USING btree \(`last_name`\(10\)\)\)/,
@@ -248,12 +233,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const ss = adapter;
       await withRealExecute(async () => {
         try {
-          await ss.createTable("delete_me", { force: true });
+          await ss.createTable("delete_me");
           await ss.addTimestamps("delete_me", { null: true });
           expect(await ss.columnExists("delete_me", "updated_at", "datetime")).toBeTruthy();
           expect(await ss.columnExists("delete_me", "created_at", "datetime")).toBeTruthy();
         } finally {
-          await ss.dropTable("delete_me", { ifExists: true });
+          await ss.dropTable("delete_me").catch(() => null);
         }
       });
     });
@@ -261,14 +246,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const ss = adapter;
       await withRealExecute(async () => {
         try {
-          await ss.createTable("delete_me", { force: true }, (t) => {
+          await ss.createTable("delete_me", undefined, (t) => {
             t.timestamps({ null: true });
           });
-          await ss.removeTimestamps("delete_me");
+          await ss.removeTimestamps("delete_me", { null: true });
           expect(await ss.columnExists("delete_me", "updated_at", "datetime")).toBeFalsy();
           expect(await ss.columnExists("delete_me", "created_at", "datetime")).toBeFalsy();
         } finally {
-          await ss.dropTable("delete_me", { ifExists: true });
+          await ss.dropTable("delete_me").catch(() => null);
         }
       });
     });
@@ -278,12 +263,23 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         "temp",
         { temporary: true, as: "SELECT id, name, zip FROM a_really_complicated_query" },
         (t) => {
-          t.index(["zip"]);
+          t.index("zip");
         },
       );
       expect(actual).toMatch(
         /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\)(?: ROW_FORMAT=DYNAMIC)? AS SELECT id, name, zip FROM a_really_complicated_query/,
       );
     });
+
+    async function withRealExecute(fn: () => Promise<void>): Promise<void> {
+      const singletonClass = rbObjSingletonClass(adapter) as typeof Mysql2Adapter;
+      const executeWithStub = singletonClass.prototype.execute;
+      delete (singletonClass.prototype as Partial<Mysql2Adapter>).execute;
+      try {
+        await fn();
+      } finally {
+        singletonClass.prototype.execute = executeWithStub;
+      }
+    }
   });
 });
