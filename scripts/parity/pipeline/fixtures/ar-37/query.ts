@@ -1,3 +1,3 @@
 import { Book } from "./models.js";
 
-export default Book.all().where().associated("author");
+export default Book.all().where().associated(":author");
