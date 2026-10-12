@@ -135,61 +135,79 @@ Hiding an import does not defer its cost, it deletes the capability. **No
 import-graph change in trails can reduce Perry's module count**, so do not make
 a correctly-lazy dependency less lazy to suit it.
 
-## Wall 3: module initialization order — a Perry bug, and not workaroundable
+## Wall 3: two bugs deep, both Perry's, neither ours to fix
 
-`04d-ruby-compat-barrel` compiles **and links** (139 modules, 40MB) and then
-dies immediately:
+Reduced, diagnosed, and then verified against a from-source Perry. The
+verification mattered: it overturned the first diagnosis twice.
 
-    TypeError: Object.setPrototypeOf called on null or undefined
-        at packages/ruby-compat/src/include.ts:1953
+### Bug 3a — `importedClassExpression.prototype` reads `undefined` (FIXED upstream)
 
-That line is `Object.setPrototypeOf(rbCClass, Module)`. `rbCClass` is imported
-from `./object.js`, where it is `export const rbCClass = rbDefineClass("Class")`
-(`object.ts:236`). It is `undefined` when `include.ts`'s top-level body runs,
-so `object.js` had not been evaluated yet. The same code reached directly
-(`04c`) works; reached through the barrel (`04d`) it crashes.
+Not an init-order bug, which is what this document first claimed.
+`PERRY_DEBUG_INIT` and `perry compile -v` both show the order is correct
+(`object.js` initialises before `include.js`). The crash was a wrong property
+read, reduced to six lines of plain JavaScript in
+[upstream/](upstream/ISSUE.md):
 
-### Why it is still Perry's bug, although ruby-compat has cycles
+    // a.js
+    export const K = class {};
+    export class D {}
+    // b.js
+    typeof K.prototype      // node: object | perry 0.5.1520: undefined
+    typeof alias.prototype  // node: object | perry 0.5.1520: object
+    typeof D.prototype      // node: object | perry 0.5.1520: object
 
-Perry documents the right intent — `init_order.rs` topologically sorts by
-import dependency so "a module that imports from another module runs after
-that other module's initializer", and "cycles are broken at the back-edge".
+Three conditions are each necessary: a class _expression_, read _directly_ on
+the import binding, _across_ a module boundary. It is exactly `rbDefineClass`'s
+shape.
 
-`ruby-compat/src` does contain circular value imports: 6 circular groups,
-including one of 28 modules (`array`, `hash`, `comparable`, `complex`,
-`enumerator`, …) and a 2-module `include ↔ variable` pair. An earlier revision
-of this document claimed the graph was acyclic. **That was wrong**, and the
-cycle-breaking is the likely mechanism.
+**Already fixed on Perry `main`.** Built from source at `d74498b2` (0.5.1659):
+the reproducer passes. Confirmed side by side in one shell — npm 0.5.1520 says
+`undefined`, source 0.5.1659 says `object`. So nothing to file and nothing to
+patch; what is missing is a _release_. `perry update --check-only` still
+answers "up to date (v0.5.1520)" (published 2026-09-11).
 
-But it does not excuse the result, because **`include.ts` and `object.ts` are
-in different circular groups** — `include` sits in `{include, variable}`,
-`object` in the 28-module group. Condense each group to a node and the
-remaining graph is a DAG in which `include`'s group depends on `object`'s. A
-valid initialization order therefore exists and is unambiguous for this pair;
-Perry did not find it. Breaking a cycle perturbed the order of a module
-_outside_ that cycle.
+That fix is real and it moves us: the 58-module `include.js` rung, which
+crashed under the npm build, now compiles **and runs correctly** from source.
 
-### A workaround was tried and does not work
+### Bug 3b — `static ShapeId refused by the shape mint` (live, unreported)
 
-The obvious nudge — making the barrel force the dependency first, by putting
+With 3a fixed, the 137-module barrel rung gets further and then aborts at
+startup with an explicit internal-invariant failure:
 
-    import "./object.js";
+    Perry internal error: the static ShapeId 0x80000505 (proto 0x400000000000000c)
+    was refused by the shape mint (it is outside the static band or already names
+    other facts in this agent); a static id must name one shape
 
-as the very first statement of `ruby-compat/src/index.ts` — was implemented,
-`dist` rebuilt, and `04d` recompiled. **It changes nothing**: still 139
-modules, still the same crash at the same line. Perry honours neither the
-dependency edge nor an explicit first-statement side-effect import for this
-module, which makes the defect sharper and the prospects for a trails-side
-workaround correspondingly worse. The experiment was reverted.
+Deterministic across runs. Current state on `main` (0.5.1659), by graph size:
 
-The only thing that avoids Wall 3 is not importing through the barrel, which
-is what `04c` does. That is available to a diagnostic rung and not to real
-application code, which imports `@blazetrails/*` by package name — and it
-would buy nothing anyway while Walls 1 and 2 stand.
+| Rung                           | Modules | Result on `main`                                  |
+| ------------------------------ | ------- | ------------------------------------------------- |
+| `04c-ruby-compat`              | 54      | compiles, runs correctly                          |
+| `inc-only` (deep `include.js`) | 58      | **now** compiles and runs correctly (3a fixed it) |
+| `04d-ruby-compat-barrel`       | 137     | compiles and links, aborts on the shape mint      |
 
-So: report it upstream. `04d-ruby-compat-barrel` is a 139-module reproducer,
-and the one-line barrel experiment above is worth including, since "an
-explicit side-effect import does not fix it" narrows the cause considerably.
+So Wall 3 is two bugs deep: fixing the first revealed the second. 3b is a
+genuine candidate to report — it is Perry's own invariant check firing, not a
+misuse — but it has not been minimized, so it is not filed. Reproduce with
+`04d-ruby-compat-barrel` against a from-source `main`.
+
+### Reproducing any of this needs a from-source Perry
+
+Verifying 3a and finding 3b both required building the compiler. Recorded
+because it is not obvious:
+
+- `brew install llvm@22` — Perry links LLVM **22** statically
+  (`LLVM_SYS_221_PREFIX`); the 23 that `brew install llvm` gives is the wrong
+  one. `brew install libffi` too, or the final link fails on `-lffi`, and
+  `cmake` for `perry-stdlib`.
+- The pinned toolchain is a dated nightly. For the whole compiler use it; the
+  small `perry-wasm-host` crate alone builds on stable with
+  `RUSTFLAGS="-C force-unwind-tables=yes -C force-frame-pointers=yes"`,
+  because the pinned `-Z use-sync-unwind` only compacts unwind tables.
+- `cargo build --release -p perry -p perry-runtime-static`, then point
+  `PERRY_WORKSPACE_ROOT` at the checkout so runtime and stdlib are rebuilt to
+  match. Version skew is refused outright: the compiler compares its own source
+  commit against the archive's.
 
 ## The SQLite result is weaker than it looks
 
@@ -227,19 +245,27 @@ Treat only `perry compile` — and then running the binary — as a result.
 
 ## If someone picks this up
 
-1. **Report Wall 3 upstream first.** It is small, reproducible, needs no trails
-   knowledge, and blocks everything above 139 modules regardless of memory.
-   `04d-ruby-compat-barrel` is the reproducer.
-2. **Ask Perry for a `wasm-host`-enabled runtime in the npm package** (Wall 2),
+1. **Do not file Wall 3a — already fixed on `main`, just unreleased.** Verified
+   by building the compiler from source. What would help is asking the Perry
+   project to cut a release past 0.5.1520 (2026-09-11); until then a
+   from-source build is the only way to get it.
+2. **Wall 3b, the shape mint, is the live one.** Deterministic, and it is
+   Perry's own invariant check firing rather than a misuse. Reproducible with
+   `04d-ruby-compat-barrel` against a from-source `main`. Minimize it before
+   filing, the way 3a was cut to six lines — a 137-module reproducer that needs
+   a trails checkout is not something a compiler maintainer can act on.
+3. **Ask Perry for a `wasm-host`-enabled runtime in the npm package** (Wall 2),
    or confirm whether eager collection of a const-folded dynamic `import()` is
-   intended. Until then, any graph reaching `libxml2-wasm` is unlinkable.
-3. **Do not spend more time on the memory knobs.** Serial is worse and a bigger
+   intended. Until then any graph reaching `libxml2-wasm` is unlinkable.
+4. **Do not spend more time on the memory knobs.** Serial is worse and a bigger
    cap is not better; both measured above.
-4. **Do not trust a green rung that imports a shimmed package** until
+5. **Do not trust a green rung that imports a shimmed package** until
    `perry.compilePackages` has compiled the real one and that adapter's own
    tests have run against it.
-5. **Nothing here asks trails to change for Perry's sake.** All three walls are
-   Perry's and no change in this repo moves them. The separate, real trails
-   finding this work turned up — the runtime module graph and `ruby-compat`'s
-   barrel — is in [runtime-graph.md](runtime-graph.md) and stands on cold-start
-   and bundle-size evidence, not on the native-build story.
+6. **ruby-compat's circular imports are worth a look on their own.** Six
+   circular groups, one of 28 modules, found while diagnosing Wall 3. They are
+   not the cause of any Perry failure here, but circular value imports in the
+   foundation layer are a genuine code-quality question and they pair with the
+   module graph measured in [runtime-graph.md](runtime-graph.md).
+7. **Nothing here asks trails to change for Perry's sake.** Every wall is
+   Perry's and no change in this repo moves them.
