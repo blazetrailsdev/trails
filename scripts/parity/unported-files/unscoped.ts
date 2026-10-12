@@ -221,18 +221,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "discards the database), which is also why the surrounding suite is gated " +
       "`unless in_memory_db?`. Trails always uses :memory: SQLite.",
   },
-  {
-    testFile: "adapter_test.rb",
-    className: "AdapterThreadSafetyTest",
-    tests: ["#active? is synchronized", "#verify! is synchronized"],
-    reason:
-      "AdapterThreadSafetyTest exercises Ruby Thread.new/Thread.pass concurrency " +
-      "on a single shared connection, asserting mutex-style serialization of " +
-      "#active?/#verify!/#disconnect! under the GVL. Node Worker threads use " +
-      "isolated heaps and structured-clone message passing, not the " +
-      "shared-memory Thread.new model this test relies on, so the GVL interleaving " +
-      "this test pins has no equivalent in our runtime target.",
-  },
   // --- Permanently not-portable: single-process SQLite driver limits ---
   {
     testFile: "adapters/sqlite3/sqlite3_adapter_test.rb",
@@ -290,37 +278,30 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "connection_pool_test.rb",
-    tests: [
-      "lock thread allow fiber reentrency",
-      "released connection moves between threads",
-      "inactive are returned from dead thread",
-      "remove connection for thread",
-      "concurrent connection establishment",
-      "non bang disconnect and clear reloadable connections throw exception if threads dont return their conns",
-      "disconnect and clear reloadable connections attempt to wait for threads to return their conns",
-      "bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway",
-      "disconnect and clear reloadable connections are able to preempt other waiting threads",
-      "clear reloadable connections creates new connections for waiting threads if necessary",
-      "public connections access threadsafe",
-      "reap inactive",
-      "full pool blocking shares load interlock",
-      "checkout fairness",
-      "checkout fairness by group",
-      "pin connection synchronize the connection",
-      "pin connection nesting lock",
-      "pin connection nesting lock inverse",
-    ],
+    tests: ["lock thread allow fiber reentrency"],
     reason:
-      "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js.",
+      "connection_pool_test.rb:1026-1037 opens a nested transaction inside an `Enumerator.new` " +
+      "block and reads it with external `enumerator.next`, which MRI runs on a second Fiber " +
+      "under the same thread. ruby-compat's Enumerator has no external `next`. Tracked by " +
+      "story activerecord-port-pool-tests-blocked-on-enumerator-interlock-and-sync-new-connection.",
   },
   {
-    testFile: "connection_management_test.rb",
-    tests: [
-      "connections are cleared even if inside a non-joinable transaction",
-      "cancel asynchronous queries if an exception is raised",
-    ],
+    testFile: "connection_pool_test.rb",
+    tests: ["concurrent connection establishment"],
     reason:
-      "GVL / Ruby Thread semantics — first test pins across threads; second uses FutureResult (thread-based async queries).",
+      "connection_pool_test.rb:631-666 parks every thread inside an overridden `new_connection` " +
+      "on a latch. trails' `ConnectionPool#newConnection` is synchronous, so its body cannot " +
+      "await the latch. Tracked by story " +
+      "activerecord-port-pool-tests-blocked-on-enumerator-interlock-and-sync-new-connection.",
+  },
+  {
+    testFile: "connection_pool_test.rb",
+    tests: ["full pool blocking shares load interlock"],
+    reason:
+      "connection_pool_test.rb:151-188 takes `ActiveSupport::Dependencies.interlock.running` and " +
+      "`.loading`; `ActiveSupport::Dependencies::Interlock` (dependencies/interlock.rb) is not " +
+      "ported. Tracked by story " +
+      "activerecord-port-pool-tests-blocked-on-enumerator-interlock-and-sync-new-connection.",
   },
   // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
   {
@@ -336,13 +317,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache " +
       "visibility cannot translate to single-threaded Node.js.",
-  },
-  {
-    testFile: "connection_adapters/connection_handlers_multi_db_test.rb",
-    tests: ["multiple connections works in a threaded environment"],
-    reason:
-      "GVL / Ruby Thread semantics — concurrent multi-db connection access on shared " +
-      "objects has no single-threaded Node.js equivalent.",
   },
   // --- Permanently not-portable: Ruby SimpleDelegator (Delegator/method_missing) ---
   {

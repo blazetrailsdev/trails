@@ -47,6 +47,25 @@ export class Thread<R = unknown> {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.stop` (`vendor/ruby/v3.3.11/thread.c:2861`),
+   * which sleeps the current thread until another wakes or kills it. Nothing
+   * here wakes one, so the promise never settles and a killed thread's body
+   * stops at this call, as Ruby's does.
+   */
+  static stop(): Promise<null> {
+    return new Promise(() => {});
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.pass` (`vendor/ruby/v3.3.11/thread.c:1904`),
+   * which hands the scheduler to another thread: here, to every other pending
+   * task and timer.
+   */
+  static pass(): Promise<null> {
+    return new Promise((resolve) => setTimeout(() => resolve(null), 0));
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.current` (`vendor/ruby/v3.3.11/thread.c:2943`).
    */
   static current(): Thread {
@@ -73,6 +92,8 @@ export class Thread<R = unknown> {
   abortOnException = false;
   #value!: R;
   #error: { raised: unknown } | null = null;
+  #kill!: () => void;
+  readonly #killed = new Promise<void>((resolve) => (this.#kill = resolve));
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897`).
@@ -125,11 +146,19 @@ export class Thread<R = unknown> {
    * itself and the caller awaits it — the same language shortcoming the repo
    * guide ratifies for `serializable_hash` and `Relation`.
    */
-  join(): this | Promise<this> {
+  join(): this | Promise<this>;
+  join(limit: number): this | null | Promise<this | null>;
+  join(limit?: number): this | null | Promise<this | null> {
     if (this.#error) throw this.#error.raised;
     const value = this.#value as unknown;
     if (value && typeof (value as PromiseLike<unknown>).then === "function") {
-      return (value as PromiseLike<unknown>).then(() => this) as Promise<this>;
+      const joined = Promise.race([value as PromiseLike<unknown>, this.#killed]).then(() => this);
+      if (limit == null) return joined;
+      let timer: ReturnType<typeof setTimeout>;
+      const expired = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), limit * 1000);
+      });
+      return Promise.race([joined, expired]).finally(() => clearTimeout(timer));
     }
     return this;
   }
@@ -137,11 +166,30 @@ export class Thread<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#exit` / `#kill`
    * (`vendor/ruby/v3.3.11/thread.c:2710`), which terminates the thread and returns it.
+   * MRI interrupts the thread wherever it is. JS cannot stop a running async
+   * body from outside, so this marks the thread dead and settles a pending
+   * `join`; a body parked in `Thread.stop` never resumes, and a body awaiting
+   * anything else runs on to its end.
    */
   exit(): this {
     if (this.status === "dead") return this;
     this.status = "dead";
+    this.#kill();
     return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#kill` (`vendor/ruby/v3.3.11/thread.c:5403`).
+   */
+  kill(): this {
+    return this.exit();
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#terminate` (`vendor/ruby/v3.3.11/thread.c:5404`).
+   */
+  terminate(): this {
+    return this.exit();
   }
 
   /**

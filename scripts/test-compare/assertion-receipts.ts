@@ -31,6 +31,40 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "activerecord:connection_pool_test.rb › pin connection synchronize the connection": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:906 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+  ],
+  "activerecord:connection_pool_test.rb › pin connection nesting lock": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:954 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+  ],
+  "activerecord:connection_pool_test.rb › pin connection nesting lock inverse": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:971 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:974 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+  ],
   "activerecord:attribute_methods_test.rb › AttributeMethodsTest › attribute keys on a new instance":
     [
       {

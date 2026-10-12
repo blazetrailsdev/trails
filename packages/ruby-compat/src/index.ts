@@ -420,6 +420,8 @@ export { CachedThreadPool, ThreadPoolExecutor } from "./thread-pool-executor.js"
 export { ImmediateExecutor } from "./immediate-executor.js";
 export { ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";
+import "./concurrent/count-down-latch.js";
+import "./concurrent/event.js";
 export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";

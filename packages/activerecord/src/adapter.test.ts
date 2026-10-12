@@ -8,7 +8,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Process, StandardError } from "@blazetrails/ruby-compat";
+import { Process, StandardError, Thread } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
@@ -1056,6 +1056,59 @@ function twoWeeksAgo(): string {
     .replace("T", " ")
     .slice(0, 19);
 }
+
+describe("AdapterThreadSafetyTest", () => {
+  fixtures({});
+
+  let threadList: Thread<Promise<void>>[];
+  let connection: DatabaseAdapter;
+
+  beforeEach(async () => {
+    threadList = [];
+    connection = await Base.connectionPool().checkout();
+  });
+
+  afterEach(() => {
+    for (const thread of threadList) thread.kill();
+  });
+
+  it.skipIf(inMemoryDb())("#active? is synchronized", async () => {
+    threads(2, 25, () => connection.selectAll("SELECT 1"));
+    threads(2, 25, () => connection.verifyBang());
+    threads(2, 25, () => connection.disconnectBang());
+
+    await join();
+  });
+
+  it.skipIf(inMemoryDb())("#verify! is synchronized", async () => {
+    threads(2, 25, () => connection.verifyBang());
+    threads(2, 25, () => connection.disconnectBang());
+
+    await join();
+  });
+
+  async function join(): Promise<void> {
+    const shuffled = [...threadList];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    for (const thread of shuffled) await thread.join();
+  }
+
+  function threads(count: number, times: number, block: () => unknown): void {
+    for (let i = 0; i < count; i++) {
+      threadList.push(
+        new Thread(async () => {
+          for (let n = 0; n < times; n++) {
+            await block();
+            await Thread.pass();
+          }
+        }),
+      );
+    }
+  }
+});
 
 describe("InvalidateTransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });

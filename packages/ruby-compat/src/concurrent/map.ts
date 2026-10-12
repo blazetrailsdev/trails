@@ -1,12 +1,19 @@
 import { Hash, rbBlockGivenP, type Block } from "../hash.js";
 import { rbModConstSet } from "../include.js";
+import type { CountDownLatch } from "./count-down-latch.js";
+import type { Event } from "./event.js";
 
 /**
  * concurrent-ruby's `Concurrent` module (`vendor/ruby/v3.3.11/class.c:1087` `rb_define_module`).
  *
  * @noRailsEquivalent PERMANENT
  */
-export const Concurrent = { name: "Concurrent" } as { readonly name: string; Map: typeof Map };
+export const Concurrent = { name: "Concurrent" } as {
+  readonly name: string;
+  Map: typeof Map;
+  CountDownLatch: typeof CountDownLatch;
+  Event: typeof Event;
+};
 
 /**
  * concurrent-ruby's `Concurrent::Map` (not vendored): on MRI, `MriMapBackend`
