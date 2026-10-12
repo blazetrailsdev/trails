@@ -420,11 +420,9 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
  * Ruby `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121` `rb_hash_aref`) — the stored
  * value, or `nil` when the key is absent, whichever hash it is given. A
  * receiver that is not a Hash is sent its own `[]`, which it must spell `get`,
- * the conventions table's default spelling for the operator. A miss on a
- * hash asks the hash itself, as `rb_hash_default_value`
- * (`vendor/ruby/v3.3.11/hash.c:2068`) does: a `Hash` answers its `default`, a
- * Proxy seating `hash.default=` on a plain object answers its default, and a
- * member `Object.prototype` answers is `nil`.
+ * the conventions table's default spelling for the operator. A miss goes to
+ * `rb_hash_default_value` (`vendor/ruby/v3.3.11/hash.c:2068`): a `Hash` answers
+ * its `default`, and a plain object, which has no default seat, answers `nil`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121`).
  */
 export function hashAref(hash: object, key: unknown): unknown {
@@ -436,16 +434,12 @@ export function hashAref(hash: object, key: unknown): unknown {
       if (hash.has(key)) return hash.get(key);
       return hash instanceof Hash ? (hash.default(key) ?? null) : null;
     }
-    const val = (hash as Record<string, unknown>)[key as string];
-    if (hasKey(hash, key as string)) return val;
-    if (proto === null) return val === undefined ? null : val;
+    if (hasKey(hash, key as string)) return (hash as Record<string, unknown>)[key as string];
     return null;
   }
-  const val = (hash as Record<string, unknown>)[key as string];
-  if (Object.hasOwn(hash, key as PropertyKey)) return val;
-  return val === undefined || val === Reflect.get(Object.prototype, key as string, hash)
-    ? null
-    : val;
+  if (Object.hasOwn(hash, key as PropertyKey))
+    return (hash as Record<string, unknown>)[key as string];
+  return null;
 }
 
 /**
