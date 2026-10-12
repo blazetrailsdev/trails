@@ -30,7 +30,6 @@ import { TypeError } from "./type-error.js";
 import { BigDecimal } from "./big-decimal.js";
 import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
-import { Set as RbSet } from "./set.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
@@ -1957,7 +1956,6 @@ Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 
 rbDefineAllocFunc(Rational, (klass) => new klass(0, 1));
-rbDefineAllocFunc(RbSet, (klass) => Reflect.construct(Set, [], klass) as RbSet<unknown>);
 classpaths.set(Rational, { path: "Rational", permanent: true });
 rbSetClassPathString(Rational.compatible, Rational, "compatible");
 for (const klass of [Rational, Complex, BigDecimal]) {

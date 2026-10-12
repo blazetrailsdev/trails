@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "./argument-error.js";
 import { Set } from "./set.js";
 
 describe("Set", () => {
@@ -21,16 +22,33 @@ describe("Set", () => {
     expect(set.has([3, 4])).toBe(false);
   });
 
-  it("answers the JS set operations from its members", () => {
+  it("union, difference, intersection and symmetricDifference compare by eql? and answer a Set", () => {
     const set = new Set<unknown>([[1, 2], 3]);
 
-    expect([...set.union(new globalThis.Set([4]))]).toEqual([[1, 2], 3, 4]);
-    expect([...set.difference(new globalThis.Set([3]))]).toEqual([[1, 2]]);
-    expect([...set.intersection(new globalThis.Set([3, 4]))]).toEqual([3]);
-    expect([...set.symmetricDifference(new globalThis.Set([3, 4]))]).toEqual([[1, 2], 4]);
-    expect(set.isSubsetOf(new globalThis.Set([3]))).toBe(false);
-    expect(set.isSupersetOf(new globalThis.Set([3]))).toBe(true);
-    expect(set.isDisjointFrom(new globalThis.Set([4]))).toBe(true);
+    const union = set.union(new Set<unknown>([[1, 2], 4]));
+    expect(union).toBeInstanceOf(Set);
+    expect([...union]).toEqual([[1, 2], 3, 4]);
+    expect([...set]).toEqual([[1, 2], 3]);
+    expect([...set.union([[1, 2], 5])]).toEqual([[1, 2], 3, 5]);
+    expect([...set.difference([[1, 2]])]).toEqual([3]);
+    expect([...set.intersection(new Set<unknown>([[1, 2], 4]))]).toEqual([[1, 2]]);
+    expect([...set.intersection([3, 4])]).toEqual([3]);
+    expect([...set.symmetricDifference([[1, 2], 4])]).toEqual([4, 3]);
+    expect(set.compareByIdentity().union([]).isCompareByIdentity()).toBe(true);
+  });
+
+  it("isSupersetOf, isSubsetOf and isDisjointFrom compare by eql?", () => {
+    const set = new Set<unknown>([[1, 2], 3]);
+
+    expect(set.isSupersetOf(new Set<unknown>([[1, 2], 3]))).toBe(true);
+    expect(set.isSupersetOf(new Set<unknown>([[1, 2]]))).toBe(true);
+    expect(set.isSubsetOf(new Set<unknown>([[1, 2]]))).toBe(false);
+    expect(set.isSubsetOf(new Set<unknown>([3, [1, 2], 4]))).toBe(true);
+    expect(set.isDisjointFrom(new Set<unknown>([[1, 2]]))).toBe(false);
+    expect(set.isDisjointFrom([4])).toBe(true);
+    expect(() => set.isSupersetOf(new globalThis.Set([3]) as never)).toThrow(
+      new ArgumentError("value must be a set"),
+    );
   });
 
   it("compare_by_identity makes an equal Array a second member", () => {
