@@ -12,17 +12,35 @@ import { fixtures } from "../test-fixtures.js";
 fixtures([]);
 
 class TestEncryptor implements EncryptorLike {
-  constructor(private readonly map: Record<string, string>) {}
+  private ciphertextsByClearValue: Record<string, string>;
 
-  encrypt(clearText: string): string {
-    return this.map[clearText] ?? clearText;
+  constructor(ciphertextsByClearValue: Record<string, string>) {
+    this.ciphertextsByClearValue = ciphertextsByClearValue;
   }
 
-  decrypt(encryptedText: string): string {
-    for (const [clear, cipher] of Object.entries(this.map)) {
-      if (cipher === encryptedText) return clear;
+  encrypt(
+    clearText: string,
+    {
+      keyProvider = null,
+      cipherOptions = {},
+    }: { keyProvider?: unknown; cipherOptions?: object } = {},
+  ): string {
+    return this.ciphertextsByClearValue[clearText] ?? clearText;
+  }
+
+  decrypt(
+    encryptedText: string,
+    {
+      keyProvider = null,
+      cipherOptions = {},
+    }: { keyProvider?: unknown; cipherOptions?: object } = {},
+  ): string {
+    for (const [clearValue, encryptedValue] of Object.entries(this.ciphertextsByClearValue)) {
+      if (encryptedValue === encryptedText) return clearValue;
     }
-    throw new Decryption(`Couldn't find a match for ${encryptedText} (${rbInspect(this.map)})`);
+    throw new Decryption(
+      `Couldn't find a match for ${encryptedText} (${rbInspect(this.ciphertextsByClearValue)})`,
+    );
   }
 
   isEncrypted(text: string): boolean {
