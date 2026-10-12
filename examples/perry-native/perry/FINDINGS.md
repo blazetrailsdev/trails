@@ -5,139 +5,171 @@ x86_64 Linux box, against `examples/perry-native` — a stock `trails new`
 scaffold plus one `trails g scaffold Trail name:string length:integer`.
 Reproduce with `perry/run-ladder.sh`; setup is in [README.md](README.md).
 
-**Short answer: no, and there are two separate walls. Neither is a missing
-language feature, and the second one cannot be fixed from this repo at all.**
+**Real trails framework code does compile and run as a native binary.** A
+54-module slice of `@blazetrails/ruby-compat` produces a working 21MB
+executable with correct output. The whole application does not, and is blocked
+by three distinct walls, all of them Perry's. One of them is a plain Perry bug
+worth reporting upstream.
 
 ## The ladder
 
-| Rung                                                                    | Node | Perry    |                                 |
-| ----------------------------------------------------------------------- | ---- | -------- | ------------------------------- |
-| `02-class` — classes, `#private` fields, accessors, static blocks       | ok   | **ok**   | 2s, 17MB                        |
-| `03-proxy` — `Proxy` `get` trap + `methodMissing`                       | ok   | **ok**   | 2s, 17MB                        |
-| `04-activesupport` — one named import from `@blazetrails/activesupport` | ok   | **MEM**  | killed at 12GB after 86s        |
-| `05-model` — an `ActiveRecord` model class, no connection               | ok   | **MEM**  | killed at 12GB after 261s       |
-| `06-sqlite` — `better-sqlite3`                                          | ok   | **ok\*** | 8s, 30MB — but see below        |
-| `04a-local-modules` — control: multi-file graph, no package import      | ok   | **ok**   | 17MB                            |
-| `04b-deep-import` — control: bypasses the package barrel                | ok   | **MEM**  | 364 modules vs the barrel's 429 |
-| `07-boot` — full framework boot                                         | ok   | **MEM**  | killed at 12GB after 689s       |
+| Rung                                                              | Node | Perry       |                                                |
+| ----------------------------------------------------------------- | ---- | ----------- | ---------------------------------------------- |
+| `02-class` — classes, `#private` fields, accessors, static blocks | ok   | **ok**      | 2s, 17MB                                       |
+| `03-proxy` — `Proxy` `get` trap + `methodMissing`                 | ok   | **ok**      | 2s, 17MB                                       |
+| `04a-local-modules` — control: 2-module local graph, no package   | ok   | **ok**      | 17MB                                           |
+| `04c-ruby-compat` — **real framework code**, foundation layer     | ok   | **ok**      | **54 modules, 21MB, correct output**           |
+| `04d-ruby-compat-barrel` — the same function via the barrel       | ok   | **RUNTIME** | 139 modules, links at 40MB, crashes on startup |
+| `04b-deep-import` — activesupport leaf, barrel bypassed           | ok   | **MEM**     | 364 modules                                    |
+| `04-activesupport` — one named import from the barrel             | ok   | **MEM**     | 429 modules                                    |
+| `05-model` — an `ActiveRecord` model class, no connection         | ok   | **MEM**     | killed at 12GB after 261s                      |
+| `06-sqlite` — `better-sqlite3`                                    | ok   | **ok\***    | 8s, 30MB — shimmed, see below                  |
+| `07-boot` — full framework boot                                   | ok   | **MEM**     | killed at 12GB after 689s                      |
 
-Every rung runs correctly under Node, so each `MEM` is Perry's ceiling and not
-a broken program.
+Every rung runs correctly under Node, so no failure here is a broken program.
+Rungs are listed by module count, which is the axis that matters.
 
-## What works, including what the docs say should not
+## What works
 
 perryts.com lists `Proxy` among the unsupported dynamic patterns. It is the
-most load-bearing idiom in trails — 39 non-test source files across every core
-package construct one — so it looked like the project-ending blocker. It is
-not. Rung `03` compiles a `get` trap with a `methodMissing` fallback and the
-binary prints the right answer, including for a property that exists only
-through the trap. Static blocks, `#private` fields and accessor pairs survive
-too, which matters because `abstractClass` assignment and
-`ApplicationRecord`'s shape depend on them.
+most load-bearing idiom in trails — 39 non-test source files construct one —
+so it looked like the project-ending blocker. It is not: rung `03` compiles a
+`get` trap with a `methodMissing` fallback and gets the right answer, including
+for a property that exists only through the trap. Static blocks, `#private`
+fields and accessor pairs survive too.
 
-The language subset is not what blocks trails.
+More to the point, `04c` takes **actual framework source** —
+`ruby-compat/dist/regexp.js`, the Ruby-compatibility layer everything in trails
+sits on — and produces a 21MB binary that prints the correct
+`regexpEscape("a.b*c")`. The language subset is not the obstacle. Scale is.
 
 ## Wall 1: peak codegen memory
 
-`04-activesupport` imports exactly two functions, `camelize` and `underscore`.
-Perry reports:
+`04-activesupport` imports two functions, `camelize` and `underscore`, and
+Perry collects **429 modules**: the barrel re-exports 145 names and there is no
+tree-shake ahead of codegen. Uncapped it reached 27GB RSS, exhausted 15GB of
+swap and had not finished after 11 minutes, which is why `run-ladder.sh` caps
+Perry and why the cap is not optional.
 
-    Found 429 module(s): 429 native, 0 JavaScript
+Both obvious escapes were measured and **both fail**:
 
-The module _count_ is the problem, not module graphs as such: the
-`04a-local-modules` control compiles a two-file local graph to a working 17MB
-binary. 429 modules for two functions, because `@blazetrails/activesupport`'s entry
-point re-exports 145 names and its `dist/` is 574 files. Perry has no
-tree-shake step ahead of codegen, so one named import is a whole-package
-compile.
+| Attempt                                                          | Result                    |
+| ---------------------------------------------------------------- | ------------------------- |
+| `MemoryMax=12G`, default 2x2 parallelism                         | killed at `420/429 (98%)` |
+| `MemoryMax=20G`, default parallelism                             | killed at `252/429 (59%)` |
+| `MemoryMax=24G`, `PERRY_MODULE_JOBS=1 PERRY_CODEGEN_UNIT_JOBS=1` | killed at `29%`           |
 
-Uncapped, that rung reached **27GB RSS**, exhausted this machine's 15GB of
-swap, and had not finished after 11 minutes. That is why `run-ladder.sh` caps
-Perry, and why the cap is not optional — uncapped it takes the machine down
-rather than reporting a result.
+More headroom gave _less_ apparent progress, so the progress counter does not
+measure nearness to success — peak memory is spent inside the oversized-module
+LLVM phase, which it does not track. Serialising is worse, not better: one
+module (`activesupport/src/core-ext/object/json.ts`, 333 lines) does not fit in
+24GB as a single codegen unit, while parallel mode splits it and gets further.
 
-**Raising the cap does not help, and the progress counter does not mean what it
-looks like.** The same rung was killed at:
+The practical ceiling sits between **139 modules (links)** and **364 (does
+not)**.
 
-| Cap  | Killed at                        |
-| ---- | -------------------------------- |
-| 12GB | `modules finished 420/429 (98%)` |
-| 20GB | `modules finished 252/429 (59%)` |
+## Wall 2: WebAssembly cannot be linked by an npm-installed Perry
 
-More headroom, _less_ apparent progress. So "98%" is not "nearly succeeded" —
-peak memory is spent inside the oversized-module LLVM phase, which that
-counter does not track, and where the kill lands varies run to run. Any
-estimate of "how close is this" from that counter is worthless.
+This is structural, and it took building Perry from source to establish how
+deep it goes.
 
-**Serializing codegen makes it worse, not better.** Perry logs
-
-    [perry] codegen: 2 oversized module(s) will run exclusively to cap peak memory
-
-and exposes `PERRY_MODULE_JOBS` x `PERRY_CODEGEN_UNIT_JOBS` (2x2 by default),
-so turning both to 1 was the obvious first experiment. With `MemoryMax=24G` —
-twice the parallel run's cap — it was OOM-killed at **29%**, stuck on
-`packages/activesupport/src/core-ext/object/json.ts`, a 333-line file. Serial
-codegen puts one module in one unit, and that module alone does not fit in
-24GB. Parallel mode splits it across units and gets further. The knob is the
-wrong lever.
-
-## Wall 2: Perry's npm build cannot link WebAssembly
-
-This is the one that matters, and the memory wall was hiding it.
-
-A narrower entry point into the same package family — importing only
-`activesupport/dist/core-ext/object/json.js` — **completes codegen**: 364
-modules, 100%, 7.3 minutes, inside a 20GB cap. It then fails at the link step:
+The trigger is `activesupport → xml-mini/nokogiri.ts → @blazetrails/nokogiri →
+libxml2-wasm → WebAssembly`, and the first error is:
 
     Error: WebAssembly.* used but libperry_wasm_host.a not found.
     Build it with: cargo build --release -p perry-wasm-host
 
-`libperry_wasm_host.a` is not in the `@perryts/perry` npm package. The
-instruction is to build it from a Perry source checkout, which the npm
-distribution does not include. So this is not something trails can fix, work
-around, or configure — any trails graph reaching WebAssembly cannot be linked
-by an npm-installed Perry at all.
+That archive is genuinely absent: `@perryts/perry-linux-x64` ships exactly four
+static libs — `runtime`, `runtime_abort`, `stdlib`, `ui_gtk4`. `--enable-wasm-runtime`
+does not help. So:
 
-### Where the WebAssembly comes from, and why it is not a trails bug
+1.  **Built it.** Cloned `PerryTS/perry` at tag `v0.5.1520` and ran
+    `cargo build --release -p perry-wasm-host` (small, wasmi only, 82s). The
+    pinned toolchain is a dated nightly for a `-Z use-sync-unwind` flag that only
+    refines unwind tables into a compact form, so stable Rust with
+    `RUSTFLAGS="-C force-unwind-tables=yes -C force-frame-pointers=yes"` builds
+    it fine. Supplying it via `PERRY_LIB_DIR` gets Perry to report
+    `Using wasmi WebAssembly host runtime`.
+2.  **Then the runtime is wrong.** Linking now fails on `undefined reference to
+js_webassembly_instantiate` / `js_webassembly_module_new`. Those symbols live
+    in `perry-runtime` built with its `wasm-host` feature, and the shipped
+    `libperry_runtime.a` was not.
+3.  **And the runtime cannot be rebuilt.** `PERRY_WORKSPACE_ROOT` makes Perry
+    rebuild runtime+stdlib, which it then rejects:
 
-The chain is:
+        library build: v0.5.1520 (commit 381045a8735f)
+        Perry build:   v0.5.1520 (source 85ccd72f8e53)
 
-    activesupport (barrel) → xml-mini/nokogiri.ts → @blazetrails/nokogiri
-                           → libxml2-wasm → WebAssembly
+    The npm binary was built from commit `85ccd72f8e53`, which **is not in the
+    public repository** (`git fetch` of it fails; tag `v0.5.1520` is a different
+    commit). The compiler accepts no runtime from any other commit.
 
-It is worth being precise about the last hop, because it looks like a trails
-defect and is not one. `@blazetrails/nokogiri` is an **optional** peer
-dependency of activesupport, and activesupport loads it the correct way — a
-lazy dynamic import, guarded, with a real error message if it is absent
-(`packages/activesupport/src/xml-mini/nokogiri.ts:46`):
+So an npm-installed Perry cannot link a WebAssembly-reaching graph at all, and
+no configuration or local build closes the gap. Clearing it needs either a
+runtime shipped with `wasm-host` enabled, or building the whole compiler from
+source — which pins LLVM and is a much larger undertaking than it sounds.
 
-    nokogiri = (await import(NOKOGIRI_PACKAGE)) as unknown as NokogiriModule;
+### Why this is not a trails bug
 
-Perry const-folds that specifier and collects the target eagerly, so an
-optional backend nothing calls is pulled into the compilation unit and drags
-`libxml2-wasm` with it. Under Node the import never runs unless you ask for
-the Nokogiri XML backend.
+`@blazetrails/nokogiri` is an **optional** peer dependency and activesupport
+loads it the correct way — a lazy, guarded dynamic import with a real error
+message if absent (`xml-mini/nokogiri.ts:46`). Under Node it never loads unless
+you ask for the Nokogiri XML backend.
 
-So trails is doing the right thing and Perry is over-collecting. Changing
-trails to satisfy Perry here would mean making a correctly-lazy optional
-dependency less lazy, which is a regression for every other consumer. **Do not
-do that.**
+Perry const-folds the specifier and collects the target eagerly. Measured
+directly:
+
+| Import form                                | Modules collected |
+| ------------------------------------------ | ----------------- |
+| `import { x } from "./target.js"`          | 4                 |
+| `await import(SPEC)` — const specifier     | **4, identical**  |
+| `await import(spec)` — computed at runtime | 1                 |
+
+And the one form that escapes collection is not a workaround — the binary says
+so itself:
+
+    Error [ERR_MODULE_NOT_FOUND]: dynamic import() of a runtime-computed path
+    cannot run in an ahead-of-time compiled binary
+
+Hiding an import does not defer its cost, it deletes the capability. **No
+import-graph change in trails can reduce Perry's module count**, so do not make
+a correctly-lazy dependency less lazy to suit it.
+
+## Wall 3: module initialization order — a Perry bug
+
+`04d-ruby-compat-barrel` compiles **and links** (139 modules, 40MB) and then
+dies immediately:
+
+    TypeError: Object.setPrototypeOf called on null or undefined
+        at packages/ruby-compat/src/include.ts:1953
+
+That line is `Object.setPrototypeOf(rbCClass, Module)`. `rbCClass` is imported
+from `./object.js`, where it is `export const rbCClass = rbDefineClass("Class")`
+(`object.ts:236`). It is `undefined` when `include.ts`'s top-level body runs,
+which means `object.js` had not been evaluated yet.
+
+**`object.ts` does not import `include.ts`.** There is no cycle — the edge is
+one-directional and acyclic, so ESM guarantees `object.js` is fully evaluated
+before `include.js`'s body executes. Perry ran them in the wrong order. It is
+also entry-point dependent: the same code reached directly (`04c`) works, and
+reached through the barrel (`04d`) crashes.
+
+This is a clean, minimal, reproducible Perry defect with no trails fault to
+excuse it, and it is the single most useful thing to report upstream. It also
+means Wall 1 is not the last obstacle: even with unlimited memory, a barrel
+import of a trails package currently produces a binary that crashes on startup.
 
 ## The SQLite result is weaker than it looks
 
-Rung `06` is green, and it would be easy to read that as "the database driver
-works". It does not mean that. At `-vv`:
+Rung `06` is green, but at `-vv`:
 
     note: serving `better-sqlite3` from the bundled native binding
     `perry-ext-better-sqlite3` (a partial drop-in), ignoring your installed
     `node_modules/better-sqlite3`
 
-Perry substitutes its own partial reimplementation and never compiles the
-installed driver — which is also why this rung finds 1 module instead of
-hundreds, and why it is the only package-importing rung that passes.
-
-And it is not one package. All five Perry substitutes here are load-bearing
-for trails:
+Perry substitutes its own partial reimplementation — which is also why this
+rung finds 1 module and is the only package-importing rung that passes. All
+five substitutions are load-bearing for trails:
 
 | Shimmed package  | What trails uses it for                              |
 | ---------------- | ---------------------------------------------------- |
@@ -147,54 +179,35 @@ for trails:
 | `commander`      | the `trails` CLI's argument parsing                  |
 | `dayjs`          | `@blazetrails/date`                                  |
 
-A native build of a trails app therefore replaces **all three database
-adapters**, the CLI's argument parser and the date library with partial
-drop-ins, silently. A green compile says nothing about whether any of them
-behaves the way ActiveRecord expects. Auditing that list is probably more work
-than either wall above.
+A native build replaces **all three database adapters**, the CLI's parser and
+the date library with partial drop-ins, silently. A green compile says nothing
+about whether any of them behaves as ActiveRecord expects.
 
 ## `perry check` is not evidence
 
-`perry check` passes on the full application entry point, with
-`--check-deps --deep-deps`, including on rungs that cannot compile:
+It passes on the full application entry point with `--check-deps --deep-deps`,
+including on rungs that cannot compile, and says why itself:
 
-    All checks passed! - 1 file(s) checked
     [OK] Parsing, HIR lowering, and dependency checks passed
          (codegen not verified — run `perry compile` for end-to-end validation)
 
-Its own last line says why. Treat only `perry compile` as a result.
+Treat only `perry compile` — and then running the binary — as a result.
 
 ## If someone picks this up
 
-1.  **Wall 2 first, because it is upstream and absolute.** Either get a
-    `libperry_wasm_host.a` (build Perry from source, or ask the project to ship
-    it in the npm package), or confirm from Perry's side whether the eager
-    collection of a const-folded dynamic `import()` is intended. Until one of
-    those moves, the memory work buys nothing — a graph that compiles still
-    will not link.
-2.  **Do not spend more time on the parallelism knobs.** Measured: serial is
-    worse, and a bigger cap is not better.
-3.  **Perry's module count is not the lever; the runtime graph is a separate,
-    real problem.** `04b-deep-import` bypasses activesupport's entry point and
-    still collects 364 modules against the barrel's 429 — and no import-graph
-    change can help Perry at all, because it collects every statically
-    reachable module and cannot execute what it cannot see statically.
-
-    But measuring the _runtime_ graph turned up a real cost that has nothing to
-    do with Perry, written up in [runtime-graph.md](runtime-graph.md): Node
-    loads **229 modules and ~300-400ms** to obtain `camelize`, and the weight
-    sits in `@blazetrails/ruby-compat`'s barrel rather than in activesupport.
-
-    An earlier revision of this document diagrammed `namespaces.ts` as pulling
-    the cache, the logger and msgpack into the graph. **That was wrong.** Six of
-    its nine imports are `import type` and erased at runtime, and the msgpack
-    path is already a lazy dynamic import. activesupport is disciplined here;
-    `runtime-graph.md` has the corrected measurement.
-
-4.  **Do not trust a green rung that imports a shimmed package** until
-    `perry.compilePackages` has compiled the real one and that adapter's own
-    tests have run against it.
-5.  **Nothing here asks trails to change _for Perry's sake_.** Both walls are
-    Perry's and no change in this repo moves them. The runtime-graph cost in
-    (3) is a real trails issue, but it stands on its own evidence and should be
-    decided on cold-start and bundle grounds, not as a favour to one compiler.
+1. **Report Wall 3 upstream first.** It is small, reproducible, needs no trails
+   knowledge, and blocks everything above 139 modules regardless of memory.
+   `04d-ruby-compat-barrel` is the reproducer.
+2. **Ask Perry for a `wasm-host`-enabled runtime in the npm package** (Wall 2),
+   or confirm whether eager collection of a const-folded dynamic `import()` is
+   intended. Until then, any graph reaching `libxml2-wasm` is unlinkable.
+3. **Do not spend more time on the memory knobs.** Serial is worse and a bigger
+   cap is not better; both measured above.
+4. **Do not trust a green rung that imports a shimmed package** until
+   `perry.compilePackages` has compiled the real one and that adapter's own
+   tests have run against it.
+5. **Nothing here asks trails to change for Perry's sake.** All three walls are
+   Perry's and no change in this repo moves them. The separate, real trails
+   finding this work turned up — the runtime module graph and `ruby-compat`'s
+   barrel — is in [runtime-graph.md](runtime-graph.md) and stands on cold-start
+   and bundle-size evidence, not on the native-build story.

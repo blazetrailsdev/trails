@@ -36,16 +36,18 @@ config file would hide which flags the results below actually depend on.
 a trails app does. They are deliberately boring — the interesting part is the
 first one that fails, because that names the layer that blocks a native build.
 
-| Rung                | What it adds                                                                 |
-| ------------------- | ---------------------------------------------------------------------------- |
-| `02-class`          | plain classes, `#private` fields, accessors, static blocks                   |
-| `03-proxy`          | a `Proxy` `get` trap falling back to `methodMissing` — the core trails idiom |
-| `04-activesupport`  | a leaf import from a `@blazetrails/*` package                                |
-| `04a-local-modules` | control: a multi-file graph with no package import                           |
-| `04b-deep-import`   | control: the same function, bypassing the package barrel                     |
-| `05-model`          | an `ActiveRecord` model class definition, no connection                      |
-| `06-sqlite`         | `better-sqlite3`, a native N-API addon                                       |
-| `07-boot`           | the full framework boot: initializers, autoloading, routes                   |
+| Rung                     | What it adds                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `02-class`               | plain classes, `#private` fields, accessors, static blocks                   |
+| `03-proxy`               | a `Proxy` `get` trap falling back to `methodMissing` — the core trails idiom |
+| `04-activesupport`       | a leaf import from a `@blazetrails/*` package                                |
+| `04a-local-modules`      | control: a 2-module local graph, no package import                           |
+| `04b-deep-import`        | control: an activesupport leaf, barrel bypassed                              |
+| `04c-ruby-compat`        | real framework code below the activesupport cluster                          |
+| `04d-ruby-compat-barrel` | the same function through `ruby-compat`'s barrel                             |
+| `05-model`               | an `ActiveRecord` model class definition, no connection                      |
+| `06-sqlite`              | `better-sqlite3`, a native N-API addon                                       |
+| `07-boot`                | the full framework boot: initializers, autoloading, routes                   |
 
 Every rung is also run under Node, so a row distinguishes "Perry cannot do
 this" from "this program was broken anyway".
@@ -54,9 +56,18 @@ this" from "this program was broken anyway".
 
 Binaries and the full compiler output land in `tmp/perry/` (git-ignored).
 
+## WebAssembly
+
+Rungs that reach `@blazetrails/nokogiri` pull in `libxml2-wasm`, and an
+npm-installed Perry cannot link WebAssembly at all — the reasons are in
+[FINDINGS.md](FINDINGS.md) ("Wall 2"), including what building
+`libperry_wasm_host.a` from source does and does not fix. There is nothing to
+configure here; the rungs that hit it are expected to fail.
+
 ## Results
 
-See [FINDINGS.md](FINDINGS.md).
+See [FINDINGS.md](FINDINGS.md), and [runtime-graph.md](runtime-graph.md) for
+the separate, non-Perry finding about the runtime module graph.
 
 ## Memory caps
 
