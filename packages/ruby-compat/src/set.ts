@@ -1,5 +1,6 @@
 import { Hash } from "./hash.js";
-import { rbDeclareIvar } from "./object.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+import { rbDeclareIvar, rbModName, rbObjRespondTo } from "./object.js";
 
 const JsSet = globalThis.Set;
 
@@ -13,7 +14,7 @@ const JsSet = globalThis.Set;
  */
 export class Set<T> extends JsSet<T> {
   /** @noRailsEquivalent PERMANENT */
-  _hash = new Hash<T, true>(false as true);
+  _hash = new Hash<T, boolean>(false);
 
   /**
    * `Set#initialize` (`vendor/ruby/v3.3.11/lib/set.rb:243`).
@@ -30,8 +31,14 @@ export class Set<T> extends JsSet<T> {
    * @noRailsEquivalent PERMANENT
    */
   compareByIdentity(): this {
-    this._hash.compareByIdentity();
-    return this;
+    if (rbObjRespondTo(this._hash, "compareByIdentity")) {
+      this._hash.compareByIdentity();
+      return this;
+    } else {
+      throw new NotImplementedError(
+        `${rbModName(this.constructor as typeof Set)}#compare_by_identity is not implemented`,
+      );
+    }
   }
 
   /**
@@ -39,7 +46,7 @@ export class Set<T> extends JsSet<T> {
    * @noRailsEquivalent PERMANENT
    */
   isCompareByIdentity(): boolean {
-    return this._hash.isCompareByIdentity();
+    return rbObjRespondTo(this._hash, "isCompareByIdentity") && this._hash.isCompareByIdentity();
   }
 
   /**
