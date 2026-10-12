@@ -27,7 +27,6 @@ export abstract class CollectionAssociation extends Association {
   nestedAttributesTarget: (Base | null)[] | null = null;
   protected _proxy?: AssociationProxy;
   protected _associationIds: unknown[] | null = null;
-  _lastRemoveAborted = false;
   /** @internal */
   declare callback: typeof callback;
   /** @internal */
@@ -599,10 +598,8 @@ export abstract class CollectionAssociation extends Association {
         return records;
       }) == null
     ) {
-      this._lastRemoveAborted = true;
       return false;
     }
-    this._lastRemoveAborted = false;
     const pruned = (): boolean => {
       this._targetStore = this.target.filter((r) => !records.some((record) => rbEqual(record, r)));
       this._associationIds = null;

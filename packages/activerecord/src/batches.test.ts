@@ -1283,8 +1283,11 @@ describe("EachTest", () => {
       { author_id: 1, id: 3 },
     ]);
     const secondBook = (await CpkBook.order({ author_id: "asc", id: "desc" }).second())!;
-    // prettier-ignore
-    const relation = (await CpkBook.inBatches({ of: 1, start: secondBook.id, order: [":asc", ":desc"] })[Symbol.asyncIterator]().next()).value;
+    const relation = (await CpkBook.inBatches({
+      of: 1,
+      start: secondBook.id,
+      order: [":asc", ":desc"],
+    }).first())!;
     assertEqual(secondBook, await relation.first());
   });
 
@@ -1309,8 +1312,9 @@ describe("EachTest", () => {
     ]);
     const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).first(2);
     const [authorId, id] = book1.id as [number, number];
-    // prettier-ignore
-    const relation = (await CpkBook.where("author_id >= ? AND id < ?", authorId, id).inBatches({ of: 1, order: [":asc", ":desc"] })[Symbol.asyncIterator]().next()).value;
+    const relation = (await CpkBook.where("author_id >= ? AND id < ?", authorId, id)
+      .inBatches({ of: 1, order: [":asc", ":desc"] })
+      .first())!;
     assertEqual(book2, await relation.first());
   });
 });
