@@ -817,7 +817,7 @@ describe("DDL cache-invalidation safety-net", () => {
     const adapter = makeMockAdapter(cache);
     await adapter.createTable("widgets");
 
-    expect(cache.isCached("posts")).toBe(false);
+    expect(cache.isCached("widgets")).toBe(false);
   });
 });
 

@@ -204,6 +204,15 @@ describe("ConnectionHandler (trails)", () => {
     handler.preventWrites = false;
   });
 
+  it("retrieve connection returns a connection", async () => {
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
+    await handler.establishConnection(config, { ownerName: "primary" });
+    const conn = await handler.retrieveConnection("primary");
+    expect(conn).toBeTruthy();
+    expect(conn.adapterName).toBeTruthy();
+    handler.retrieveConnectionPool("primary")!.releaseConnection();
+  });
+
   it("retrieve connection strict throws for missing pool", async () => {
     expect(() => handler.retrieveConnection("nonexistent")).toThrow(/No database connection/);
   });
