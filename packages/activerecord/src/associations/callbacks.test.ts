@@ -1,6 +1,5 @@
-import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { registerModel } from "../index.js";
 
 import { assertEmpty } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
@@ -16,29 +15,6 @@ registerModel(Developer);
 registerModel(AuditLog);
 registerModel(Author);
 registerModel(Post);
-
-let cbIdx = 0;
-
-function makeAuthorWithCallbacks(callbacks: any) {
-  const idx = ++cbIdx;
-  class CbAuthor extends Base {
-    static {
-      this.tableName = "authors";
-      this.attribute("name", "string");
-      this.hasMany("posts", {
-        className: "Post",
-        foreignKey: "author_id",
-        ...callbacks,
-      });
-    }
-  }
-  registerModel(`AuthorWithCallbacks${idx}`, CbAuthor);
-  return { Author: CbAuthor, Post };
-}
-
-function setupAuthorPostSuite(): void {
-  fixtures({});
-}
 
 describe("AssociationCallbacksTest", () => {
   const { authors, posts } = fixtures(["authors", "posts"]);
@@ -156,6 +132,15 @@ describe("AssociationCallbacksTest", () => {
     expect((morten as any).postLog).toEqual(["before_adding<new>", `after_adding${post.id}`]);
   });
 
+  it("has many callbacks with create!", async () => {
+    const morten = await Author.createBang({ name: "Morten" });
+    const post = await (morten as any).postsWithProcCallbacks.create({
+      title: "Hello",
+      body: "How are you doing?",
+    });
+    expect((morten as any).postLog).toEqual(["before_adding<new>", `after_adding${post.id}`]);
+  });
+
   it("has many callbacks for save on parent", async () => {
     const jack = new Author({ name: "Jack" });
     (jack as any).postsWithCallbacks.build({
@@ -185,26 +170,6 @@ describe("AssociationCallbacksTest", () => {
     expect(await unchangeablePostIds()).not.toContain(authorless.id);
     await david.reload();
     expect(await unchangeablePostIds()).not.toContain(authorless.id);
-  });
-});
-
-describe("AssociationCallbacksTest", () => {
-  setupAuthorPostSuite();
-
-  it("has many callbacks with create!", async () => {
-    const log: string[] = [];
-    const { Author } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before_adding" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after_adding" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = (author.association("posts") as CollectionAssociation).reader;
-    const p = await proxy.createBang({ title: "Hello", body: "Body" });
-    expect(log).toEqual(["before_adding<new>", "after_adding" + p.id]);
   });
 });
 

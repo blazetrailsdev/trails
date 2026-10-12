@@ -71,6 +71,34 @@ function makeAuthorWithCallbacks(
 describe("AssociationCallbacksTest", () => {
   fixtures({});
 
+  it("add callback fires before save", async () => {
+    let wasNew: boolean | undefined;
+    const { Author, Post } = makeAuthorWithCallbacks({
+      beforeAdd: (_owner: BaseRecord, record: BaseRecord) => {
+        wasNew = record.isNewRecord();
+      },
+    });
+    const author = await Author.create({ name: "David" });
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
+    const p = new Post({ title: "New", body: "Body", author_id: author.id });
+    await proxy.push(p);
+    expect(wasNew).toBe(true);
+  });
+
+  it("add callback fires after save", async () => {
+    let wasNew: boolean | undefined;
+    const { Author, Post } = makeAuthorWithCallbacks({
+      afterAdd: (_owner: BaseRecord, record: BaseRecord) => {
+        wasNew = record.isNewRecord();
+      },
+    });
+    const author = await Author.create({ name: "David" });
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
+    const p = new Post({ title: "Saved", body: "Body", author_id: author.id });
+    await proxy.push(p);
+    expect(wasNew).toBe(false);
+  });
+
   it("before add abort prevents create from saving", async () => {
     const { Author, Post } = makeAuthorWithCallbacks({
       beforeAdd: () => kernelThrow(":abort"),
