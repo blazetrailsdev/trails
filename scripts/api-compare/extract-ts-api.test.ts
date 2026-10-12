@@ -3582,6 +3582,19 @@ describe("extractFromProgram — include() detection", () => {
     expect(iface.extendsFiles?.["Quoting"]).toBe("sqlite3/quoting.ts");
   });
 
+  it("reads the superclass through a parenthesized `as` cast", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `export class Base {}`,
+      "derived.ts": `
+        import { Base } from "./base.js";
+        export class Derived extends (Base as new (precision?: number) => Base) {}
+      `,
+    });
+    const cls = info.classes["derived.ts:Derived"];
+    expect(cls.superclass).toBe("Base");
+    expect(cls.superclassFile).toBe("base.ts");
+  });
+
   it("omits superclassFile when the extends clause has no resolvable declaration", () => {
     // A mixin-factory call (`extends Mixin(Base)`) has no symbol to locate, and
     // a superclass imported from another package declares outside `srcDir`.

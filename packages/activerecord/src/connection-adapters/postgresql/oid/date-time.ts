@@ -1,6 +1,6 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { format, rbStrSend, toI, registerConstant } from "@blazetrails/ruby-compat";
-import { DateTime as ArDateTime } from "../../../type/date-time.js";
+import * as Type from "../../../type.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import {
   DateInfinity,
@@ -11,7 +11,7 @@ import {
 
 type PgDateTimeResult = RubyTime | DateInfinityType | DateNegativeInfinityType;
 
-export class DateTime extends ArDateTime {
+export class DateTime extends Type.DateTime {
   override castValue(value: unknown): PgDateTimeResult | null {
     if (value === "infinity") {
       return DateInfinity;
