@@ -6,7 +6,7 @@
       "value": 0
     },
     "actioncontroller": {
-      "assertionCount": 108,
+      "assertionCount": 95,
       "kind": 160,
       "value": 25
     },
@@ -38,7 +38,7 @@
     "activesupport": {
       "assertionCount": 1,
       "kind": 3,
-      "value": 10
+      "value": 0
     },
     "arel": {
       "assertionCount": 0,

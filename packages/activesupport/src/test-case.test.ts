@@ -1,5 +1,5 @@
 import type { Callback } from "./callbacks.js";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe as suite, expect, it } from "vitest";
 import { SecureRandom, kernelRand } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { ArgumentError } from "./hash-utils.js";
@@ -33,12 +33,14 @@ class Numbered {
   }
 }
 
-describe("AssertionsTest", () => {
-  let object: Numbered;
+function describe(name: string, fn: (this: never) => void): void {
+  suite(name, fn.bind({} as never));
+}
 
+describe("AssertionsTest", function (this: { object: Numbered }) {
   beforeEach(() => {
-    object = new Numbered();
-    object.num = 0;
+    this.object = new Numbered();
+    this.object.num = 0;
   });
 
   it("assert not", async () => {
@@ -76,7 +78,7 @@ describe("AssertionsTest", () => {
 
   it("assert no difference pass", async () => {
     await assertNoDifference(
-      () => object.num,
+      () => this.object.num,
       null,
       () => {},
     );
@@ -85,43 +87,43 @@ describe("AssertionsTest", () => {
   it("assert no difference fail", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoDifference(
-        () => object.num,
+        () => this.object.num,
         null,
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
     expect(error.message).toEqual(
-      "`object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
+      "`this.object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
     );
   });
 
   it("assert no difference with message fail", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoDifference(
-        () => object.num,
+        () => this.object.num,
         "Object Changed",
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
     expect(error.message).toEqual(
-      "Object Changed.\n`object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
+      "Object Changed.\n`this.object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
     );
   });
 
   it("assert no difference with multiple expressions pass", async () => {
     const anotherObject = new Numbered();
-    await assertNoDifference([() => object.num, () => anotherObject.num], null, () => {});
+    await assertNoDifference([() => this.object.num, () => anotherObject.num], null, () => {});
   });
 
   it("assert no difference with multiple expressions fail", async () => {
     const anotherObject = new Numbered();
     await assertRaises([Assertion], {}, async () => {
       await assertNoDifference(
-        [() => object.num, () => anotherObject.num],
+        [() => this.object.num, () => anotherObject.num],
         "Another Object Changed",
         () => {
           anotherObject.increment();
@@ -132,22 +134,22 @@ describe("AssertionsTest", () => {
 
   it("assert difference", async () => {
     await assertDifference(
-      () => object.num,
+      () => this.object.num,
       +1,
       null,
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
 
   it("assert difference retval", async () => {
     const incremented = await assertDifference(
-      () => object.num,
+      () => this.object.num,
       +1,
       null,
       () => {
-        object.increment();
+        this.object.increment();
         return 1;
       },
     );
@@ -157,34 +159,34 @@ describe("AssertionsTest", () => {
 
   it("assert difference with implicit difference", async () => {
     await assertDifference(
-      () => object.num,
+      () => this.object.num,
       undefined,
       null,
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
 
   it("arbitrary expression", async () => {
     await assertDifference(
-      () => object.num + 1,
+      () => this.object.num + 1,
       +2,
       null,
       () => {
-        object.increment();
-        object.increment();
+        this.object.increment();
+        this.object.increment();
       },
     );
   });
 
   it("negative differences", async () => {
     await assertDifference(
-      () => object.num,
+      () => this.object.num,
       -1,
       null,
       () => {
-        object.decrement();
+        this.object.decrement();
       },
     );
   });
@@ -193,101 +195,106 @@ describe("AssertionsTest", () => {
     const localScope = "foo";
     void localScope;
     await assertDifference(
-      () => object.num,
+      () => this.object.num,
       undefined,
       null,
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
 
   it("array of expressions", async () => {
-    await assertDifference([() => object.num, () => object.num + 1], +1, null, () => {
-      object.increment();
+    await assertDifference([() => this.object.num, () => this.object.num + 1], +1, null, () => {
+      this.object.increment();
     });
   });
 
   it("array of expressions identify failure", async () => {
     await assertRaises([Assertion], {}, async () => {
-      await assertDifference([() => object.num, () => 1 + 1], undefined, null, () => {
-        object.increment();
+      await assertDifference([() => this.object.num, () => 1 + 1], undefined, null, () => {
+        this.object.increment();
       });
     });
   });
 
   it("array of expressions identify failure when message provided", async () => {
     await assertRaises([Assertion], {}, async () => {
-      await assertDifference([() => object.num, () => 1 + 1], 1, "something went wrong", () => {
-        object.increment();
-      });
+      await assertDifference(
+        [() => this.object.num, () => 1 + 1],
+        1,
+        "something went wrong",
+        () => {
+          this.object.increment();
+        },
+      );
     });
   });
 
   it("hash of expressions", async () => {
     await assertDifference(
       new Map([
-        [() => object.num, 1],
-        [() => object.num + 1, 1],
+        [() => this.object.num, 1],
+        [() => this.object.num + 1, 1],
       ]),
       null,
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
 
   it("hash of expressions with message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
-      await assertDifference(new Map([[() => object.num, 0]]), "Object Changed", () => {
-        object.increment();
+      await assertDifference(new Map([[() => this.object.num, 0]]), "Object Changed", () => {
+        this.object.increment();
       });
     });
     expect(error.message).toEqual(
-      "Object Changed.\n`object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
+      "Object Changed.\n`this.object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
     );
   });
 
   it("assert difference message includes change", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertDifference(
-        () => object.num,
+        () => this.object.num,
         +5,
         null,
         () => {
-          object.increment();
-          object.increment();
+          this.object.increment();
+          this.object.increment();
         },
       );
     });
     expect(error.message).toEqual(
-      "`object.num` didn't change by 5, but by 2.\nExpected: 5\n  Actual: 2",
+      "`this.object.num` didn't change by 5, but by 2.\nExpected: 5\n  Actual: 2",
     );
   });
 
   it("assert difference message with lambda", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertDifference(
-        () => object.num,
+        () => this.object.num,
         1,
         "Object Changed",
         () => {},
       );
     });
     expect(error.message).toEqual(
-      "Object Changed.\n`object.num` didn't change by 1, but by 0.\nExpected: 1\n  Actual: 0",
+      "Object Changed.\n`this.object.num` didn't change by 1, but by 0.\nExpected: 1\n  Actual: 0",
     );
   });
 
   it("hash of lambda expressions", async () => {
     await assertDifference(
       new Map([
-        [() => object.num, 1],
-        [() => object.num + 1, 1],
+        [() => this.object.num, 1],
+        [() => this.object.num + 1, 1],
       ]),
       null,
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
@@ -296,12 +303,12 @@ describe("AssertionsTest", () => {
     await assertRaises([Assertion], {}, async () => {
       await assertDifference(
         new Map([
-          [() => object.num, 1],
+          [() => this.object.num, 1],
           [() => 1 + 1, 1],
         ]),
         null,
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
@@ -309,33 +316,33 @@ describe("AssertionsTest", () => {
 
   it("assert changes pass", async () => {
     await assertChanges(
-      () => object.num,
+      () => this.object.num,
       null,
       {},
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
 
   it("assert changes pass with lambda", async () => {
     await assertChanges(
-      () => object.num,
+      () => this.object.num,
       null,
       {},
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
 
   it("assert changes with from option", async () => {
     await assertChanges(
-      () => object.num,
+      () => this.object.num,
       null,
       { from: 0 },
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
@@ -343,11 +350,11 @@ describe("AssertionsTest", () => {
   it("assert changes with from option with wrong value", async () => {
     await assertRaises([Assertion], {}, async () => {
       await assertChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { from: -1 },
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
@@ -356,11 +363,11 @@ describe("AssertionsTest", () => {
   it("assert changes with from option with nil", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { from: null },
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
@@ -370,11 +377,11 @@ describe("AssertionsTest", () => {
 
   it("assert changes with to option", async () => {
     await assertChanges(
-      () => object.num,
+      () => this.object.num,
       null,
       { to: 1 },
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
@@ -382,7 +389,7 @@ describe("AssertionsTest", () => {
   it("assert changes with to option but no change has special message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { to: 0 },
         () => {},
@@ -390,14 +397,14 @@ describe("AssertionsTest", () => {
     });
 
     expect(error.message).toEqual(
-      "`object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
+      "`this.object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
     );
   });
 
   it("assert changes message with lambda", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { to: 0 },
         () => {},
@@ -405,18 +412,18 @@ describe("AssertionsTest", () => {
     });
 
     expect(error.message).toEqual(
-      "`object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
+      "`this.object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
     );
   });
 
   it("assert changes with wrong to option", async () => {
     await assertRaises([Assertion], {}, async () => {
       await assertChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { to: 2 },
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
@@ -424,11 +431,11 @@ describe("AssertionsTest", () => {
 
   it("assert changes with from option and to option", async () => {
     await assertChanges(
-      () => object.num,
+      () => this.object.num,
       null,
       { from: 0, to: 1 },
       () => {
-        object.increment();
+        this.object.increment();
       },
     );
   });
@@ -436,11 +443,11 @@ describe("AssertionsTest", () => {
   it("assert changes with from and to options and wrong to value", async () => {
     await assertRaises([Assertion], {}, async () => {
       await assertChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { from: 0, to: 2 },
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
@@ -462,8 +469,8 @@ describe("AssertionsTest", () => {
   });
 
   it("assert changes works with nil", async () => {
-    const oldval: unknown = object;
-    let current: unknown = object;
+    const oldval: unknown = this.object;
+    let current: unknown = this.object;
 
     const retval = await assertChanges(
       () => current,
@@ -507,21 +514,21 @@ describe("AssertionsTest", () => {
   it("assert changes with message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertChanges(
-        () => object.num,
-        "object.num should be 1",
+        () => this.object.num,
+        "this.object.num should be 1",
         { to: 1 },
         () => {
-          object.decrement();
+          this.object.decrement();
         },
       );
     });
 
-    expect(error.message).toEqual("object.num should be 1.\nExpected change to 1, got -1\n");
+    expect(error.message).toEqual("this.object.num should be 1.\nExpected change to 1, got -1\n");
   });
 
   it("assert no changes pass", async () => {
     await assertNoChanges(
-      () => object.num,
+      () => this.object.num,
       null,
       {},
       () => {},
@@ -530,7 +537,7 @@ describe("AssertionsTest", () => {
 
   it("assert no changes with from option", async () => {
     await assertNoChanges(
-      () => object.num,
+      () => this.object.num,
       null,
       { from: 0 },
       () => {},
@@ -540,7 +547,7 @@ describe("AssertionsTest", () => {
   it("assert no changes with from option with wrong value", async () => {
     await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { from: -1 },
         () => {},
@@ -551,11 +558,11 @@ describe("AssertionsTest", () => {
   it("assert no changes with from option with nil", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         { from: null },
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
@@ -576,68 +583,68 @@ describe("AssertionsTest", () => {
   it("assert no changes with message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
-        () => object.num,
-        "object.num should not change",
+        () => this.object.num,
+        "this.object.num should not change",
         {},
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
 
     expect(error.message).toEqual(
-      "object.num should not change.\n`object.num` changed.\nExpected: 0\n  Actual: 1",
+      "this.object.num should not change.\n`this.object.num` changed.\nExpected: 0\n  Actual: 1",
     );
   });
 
   it("assert no changes message with lambda", async () => {
     let error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         {},
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
-    expect(error.message).toEqual("`object.num` changed.\nExpected: 0\n  Actual: 1");
+    expect(error.message).toEqual("`this.object.num` changed.\nExpected: 0\n  Actual: 1");
 
-    let check = () => object.num;
+    let check = () => this.object.num;
     error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(check, null, {}, () => {
-        object.increment();
+        this.object.increment();
       });
     });
-    expect(error.message).toEqual("`object.num` changed.\nExpected: 1\n  Actual: 2");
+    expect(error.message).toEqual("`this.object.num` changed.\nExpected: 1\n  Actual: 2");
 
-    check = () => object.num;
+    check = () => this.object.num;
     error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(check, null, {}, () => {
-        object.increment();
+        this.object.increment();
       });
     });
-    expect(error.message).toEqual("`object.num` changed.\nExpected: 2\n  Actual: 3");
+    expect(error.message).toEqual("`this.object.num` changed.\nExpected: 2\n  Actual: 3");
 
     error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
-        () => object.num,
+        () => this.object.num,
         null,
         {},
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
-    expect(error.message).toEqual("`object.num` changed.\nExpected: 3\n  Actual: 4");
+    expect(error.message).toEqual("`this.object.num` changed.\nExpected: 3\n  Actual: 4");
 
     error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
-        (a = null) => (void a, object.num),
+        (a = null) => (void a, this.object.num),
         null,
         {},
         () => {
-          object.increment();
+          this.object.increment();
         },
       );
     });
@@ -647,33 +654,33 @@ describe("AssertionsTest", () => {
   it("assert no changes message with multi line lambda", async () => {
     let check = () => {
       "title".toUpperCase();
-      return object.num;
+      return this.object.num;
     };
     let error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(check, null, {}, () => {
-        object.increment();
+        this.object.increment();
       });
     });
     expect(error.message).toMatch(/#<Proc:0x.*changed/);
 
     check = () => {
       "title".toUpperCase();
-      return object.num;
+      return this.object.num;
     };
     error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(check, null, {}, () => {
-        object.increment();
+        this.object.increment();
       });
     });
     expect(error.message).toMatch(/#<Proc:0x.*changed/);
   });
 
   it("assert no changes message with not real callable", async () => {
-    const check = { call: () => object.num };
+    const check = { call: () => this.object.num };
 
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(check as unknown as () => unknown, null, {}, () => {
-        object.increment();
+        this.object.increment();
       });
     });
     expect(error.message).toMatch(/#<Object:0x.*changed/);
