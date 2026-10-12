@@ -231,7 +231,7 @@ export class Response {
   private cv: Array<() => void> = [];
   private _sending = false;
   private _sent = false;
-  stream: unknown = null;
+  stream: ResponseBuffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
   request: Request | null = null;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
@@ -334,7 +334,7 @@ export class Response {
 
   set body(value: string | Buffer | { toPath(): string }) {
     if (typeof (value as { toPath?: unknown }).toPath === "function") {
-      this.stream = value;
+      this.stream = value as { toPath(): string };
       return;
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
@@ -588,7 +588,7 @@ export class Response {
   }
 
   /** @internal */
-  buildBuffer(response: unknown, body: unknown[]): unknown {
+  buildBuffer(response: unknown, body: unknown[]): ResponseBuffer<{ push(obj: unknown): unknown }> {
     return new ResponseBuffer(response as Response, body);
   }
 

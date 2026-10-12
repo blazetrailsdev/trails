@@ -19,6 +19,7 @@ import {
   merge,
   rbObjClassname,
   rbObjRespondTo,
+  stringDelete,
   toS,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
@@ -181,8 +182,6 @@ export class SSE {
 }
 
 export class Response extends DispatchResponse {
-  declare stream: Buffer;
-
   /** @internal */
   protected override beforeCommitted(): void {
     super.beforeCommitted();
@@ -225,14 +224,14 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
       if (resp.committed) {
         try {
           if ((this.request.format as { symbol?: string } | undefined)?.symbol === ":html") {
-            resp.stream.write(ActionViewBase.streamingCompletionOnException);
+            (resp.stream as Buffer).write(ActionViewBase.streamingCompletionOnException);
           }
-          resp.stream.callOnError();
+          (resp.stream as Buffer).callOnError();
         } catch (exception) {
           this.logError(exception as Error);
         } finally {
           this.logError(e as Error);
-          resp.stream.close();
+          (resp.stream as Buffer).close();
         }
       } else {
         error = e;
@@ -274,7 +273,7 @@ export async function sendStream(
         "Content-Type",
         (isSymbol(type) ? (Mime.get(type.slice(1))?.toString() ?? "") : type) ??
           MimeType.lookupByExtension(
-            File.extname(filename).toLowerCase().replaceAll(".", ""),
+            stringDelete(File.extname(filename).toLowerCase(), "."),
           )?.toString() ??
           "application/octet-stream",
       );
@@ -284,10 +283,10 @@ export async function sendStream(
         ContentDisposition.format({ disposition, filename }),
       );
 
-      await block(this.response.stream);
+      await block(this.response.stream as Buffer);
     });
   } finally {
-    this.response.stream.close();
+    (this.response.stream as Buffer).close();
   }
 }
 

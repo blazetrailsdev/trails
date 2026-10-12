@@ -199,7 +199,7 @@ describe("LiveStreamTest", () => {
 
     setCookie(): void {
       this.cookies().set("hello", "world");
-      this.response.stream.write("hello world");
+      (this.response.stream as Buffer).write("hello world");
       this.response.close();
     }
 
@@ -208,22 +208,22 @@ describe("LiveStreamTest", () => {
     }
 
     writeLines(): void {
-      this.response.stream.writeln("hello\n");
-      this.response.stream.writeln("world");
-      this.response.stream.close();
+      (this.response.stream as Buffer).writeln("hello\n");
+      (this.response.stream as Buffer).writeln("world");
+      (this.response.stream as Buffer).close();
     }
 
     defaultHeader(): void {
-      this.response.stream.write("<html><body>hi</body></html>");
-      this.response.stream.close();
+      (this.response.stream as Buffer).write("<html><body>hi</body></html>");
+      (this.response.stream as Buffer).close();
     }
 
     basicStream(): void {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        this.response.stream.write(word);
+        (this.response.stream as Buffer).write(word);
       }
-      this.response.stream.close();
+      (this.response.stream as Buffer).close();
     }
 
     async basicSendStream(): Promise<void> {
@@ -265,10 +265,10 @@ describe("LiveStreamTest", () => {
     async blockingStream(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        this.response.stream.write(word);
+        (this.response.stream as Buffer).write(word);
         await this.latch.wait();
       }
-      this.response.stream.close();
+      (this.response.stream as Buffer).close();
     }
 
     threadLocals(): void {
@@ -276,9 +276,9 @@ describe("LiveStreamTest", () => {
 
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        this.response.stream.write(word);
+        (this.response.stream as Buffer).write(word);
       }
-      this.response.stream.close();
+      (this.response.stream as Buffer).close();
     }
 
     noThreadLocals(): void {
@@ -286,9 +286,9 @@ describe("LiveStreamTest", () => {
 
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        this.response.stream.write(word);
+        (this.response.stream as Buffer).write(word);
       }
-      this.response.stream.close();
+      (this.response.stream as Buffer).close();
     }
 
     async isolatedState(): Promise<void> {
@@ -310,19 +310,19 @@ describe("LiveStreamTest", () => {
     }
 
     async exceptionInViewAfterCommit(): Promise<void> {
-      this.response.stream.write("");
+      (this.response.stream as Buffer).write("");
       await this.render("doesntexist");
     }
 
     exceptionWithCallback(): void {
       this.response.headers.set("Content-Type", "text/event-stream");
 
-      this.response.stream.onError(() => {
-        this.response.stream.write('data: "500 Internal Server Error"\n\n');
-        this.response.stream.close();
+      (this.response.stream as Buffer).onError(() => {
+        (this.response.stream as Buffer).write('data: "500 Internal Server Error"\n\n');
+        (this.response.stream as Buffer).close();
       });
 
-      this.response.stream.write("");
+      (this.response.stream as Buffer).write("");
       throw new RuntimeError("An exception occurred...");
     }
 
@@ -336,50 +336,50 @@ describe("LiveStreamTest", () => {
 
     exceptionInExceptionCallback(): void {
       this.response.headers.set("Content-Type", "text/event-stream");
-      this.response.stream.onError(() => {
+      (this.response.stream as Buffer).onError(() => {
         throw new RuntimeError("We need to go deeper.");
       });
-      this.response.stream.write("");
-      this.response.stream.write(
+      (this.response.stream as Buffer).write("");
+      (this.response.stream as Buffer).write(
         (this.params.get("widget") as Parameters).get("didnt_check_for_nil") as string,
       );
     }
 
     overfillBufferAndDie(): void {
       const logger = Base.logger || new Logger(STDOUT);
-      this.response.stream.onError(() => {
+      (this.response.stream as Buffer).onError(() => {
         logger.warn("Error while streaming.");
         this.errorLatch.countDown();
       });
 
       for (let i = 0; i < 10; i++) {
-        this.response.stream.write(".");
+        (this.response.stream as Buffer).write(".");
       }
-      this.response.stream.write(".");
+      (this.response.stream as Buffer).write(".");
 
       this.latch.countDown();
 
-      this.response.stream.write("x");
+      (this.response.stream as Buffer).write("x");
 
       for (let i = 0; i < 20; i++) {
-        this.response.stream.write(".");
+        (this.response.stream as Buffer).write(".");
       }
     }
 
     overfillDefaultBuffer(): void {
       for (const char of "abcdefghijklmnopqrstuvwxyz") {
-        this.response.stream.write(char);
+        (this.response.stream as Buffer).write(char);
       }
-      this.response.stream.close();
+      (this.response.stream as Buffer).close();
     }
 
     ignoreClientDisconnect(): void {
-      this.response.stream.ignoreDisconnect = true;
+      (this.response.stream as Buffer).ignoreDisconnect = true;
 
-      this.response.stream.write("");
+      (this.response.stream as Buffer).write("");
 
       for (let i = 0; i < 15; i++) {
-        this.response.stream.write("x");
+        (this.response.stream as Buffer).write("x");
       }
 
       this.logger.info("Work complete");
@@ -425,7 +425,7 @@ describe("LiveStreamTest", () => {
 
   let tc: LiveStreamTest;
   const assertStreamClosed = (): void => {
-    assertPredicate(tc.response.stream, (s) => s.isClosed, "stream should be closed");
+    assertPredicate(tc.response.stream as Buffer, (s) => s.isClosed, "stream should be closed");
     assertPredicate(tc.response, (r) => r.committed, "response should be committed");
     assertPredicate(tc.response, (r) => r.isSent, "response should be sent");
   };
@@ -527,7 +527,7 @@ describe("LiveStreamTest", () => {
     const t = new Thread(async () => {
       const resp = tc.response;
       await resp.awaitCommit();
-      for await (const part of resp.stream) {
+      for await (const part of resp.stream as Buffer) {
         assertEqual(parts.shift(), part);
         const ol = tc.controller.latch;
         tc.controller.latch = new Concurrent.CountDownLatch();
@@ -540,7 +540,7 @@ describe("LiveStreamTest", () => {
 
   it("infinite test buffer", async () => {
     await tc.get("overfillDefaultBuffer");
-    assertEqual("abcdefghijklmnopqrstuvwxyz", tc.response.stream.body);
+    assertEqual("abcdefghijklmnopqrstuvwxyz", (tc.response.stream as Buffer).body);
   });
 
   // BLOCKED: live-buffer-write-does-not-wait-on-a-full-queue
@@ -664,7 +664,7 @@ describe("LiveStreamTest", () => {
 
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionInViewAfterCommit");
-      await tc.response.stream.awaitBody();
+      await (tc.response.stream as Buffer).awaitBody();
       assertMatch(/(window\.location = "\/500\.html"<\/script><\/html>)$/, tc.response.body);
       output.rewind();
       assertMatch("Missing template test/doesntexist", output.read());
@@ -681,7 +681,7 @@ describe("LiveStreamTest", () => {
 
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionInViewAfterCommit", { format: "json" });
-      await tc.response.stream.awaitBody();
+      await (tc.response.stream as Buffer).awaitBody();
       assertEqual("", tc.response.body);
       output.rewind();
       assertMatch("Missing template test/doesntexist", output.read());
@@ -692,7 +692,7 @@ describe("LiveStreamTest", () => {
   it("exception callback when committed", async () => {
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionWithCallback", { format: "text/event-stream" });
-      await tc.response.stream.awaitBody();
+      await (tc.response.stream as Buffer).awaitBody();
 
       assertEqual('data: "500 Internal Server Error"\n\n', tc.response.body);
       output.rewind();
@@ -716,7 +716,7 @@ describe("LiveStreamTest", () => {
   it("exceptions raised handling exceptions and committed", async () => {
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionInExceptionCallback", { format: "text/event-stream" });
-      await tc.response.stream.awaitBody();
+      await (tc.response.stream as Buffer).awaitBody();
       assertEqual("", tc.response.body);
       output.rewind();
       assertMatch("We need to go deeper", output.read());
