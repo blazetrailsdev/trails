@@ -21,6 +21,18 @@ describe("Set", () => {
     expect(set.has([3, 4])).toBe(false);
   });
 
+  it("answers the JS set operations from its members", () => {
+    const set = new Set<unknown>([[1, 2], 3]);
+
+    expect([...set.union(new globalThis.Set([4]))]).toEqual([[1, 2], 3, 4]);
+    expect([...set.difference(new globalThis.Set([3]))]).toEqual([[1, 2]]);
+    expect([...set.intersection(new globalThis.Set([3, 4]))]).toEqual([3]);
+    expect([...set.symmetricDifference(new globalThis.Set([3, 4]))]).toEqual([[1, 2], 4]);
+    expect(set.isSubsetOf(new globalThis.Set([3]))).toBe(false);
+    expect(set.isSupersetOf(new globalThis.Set([3]))).toBe(true);
+    expect(set.isDisjointFrom(new globalThis.Set([4]))).toBe(true);
+  });
+
   it("compare_by_identity makes an equal Array a second member", () => {
     const member = [1, 2];
     const set = new Set<unknown>().compareByIdentity().add(member);

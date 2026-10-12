@@ -4,6 +4,22 @@ import { rbDeclareIvar, rbModName, rbObjRespondTo } from "./object.js";
 
 const JsSet = globalThis.Set;
 
+interface SetLike<U> {
+  readonly size: number;
+  has(o: U): boolean;
+  keys(): Iterator<U>;
+}
+
+interface SetOperations<T> {
+  isSupersetOf(other: SetLike<unknown>): boolean;
+  isSubsetOf(other: SetLike<unknown>): boolean;
+  isDisjointFrom(other: SetLike<unknown>): boolean;
+  union<U>(other: SetLike<U>): globalThis.Set<T | U>;
+  difference(other: SetLike<unknown>): globalThis.Set<T>;
+  intersection<U>(other: SetLike<U>): globalThis.Set<T & U>;
+  symmetricDifference<U>(other: SetLike<U>): globalThis.Set<T | U>;
+}
+
 /**
  * Ruby's `Set` (`vendor/ruby/v3.3.11/lib/set.rb:228`), which keeps its members
  * as the keys of the `Hash` in `@hash` and so compares them by `eql?`:
@@ -134,6 +150,62 @@ export class Set<T> extends JsSet<T> {
     if (!this.has(o)) return false;
     this._hash.delete(o);
     return true;
+  }
+
+  /**
+   * `Set#superset?` (`vendor/ruby/v3.3.11/lib/set.rb:399`), over the members `@hash` holds.
+   * @noRailsEquivalent PERMANENT
+   */
+  isSupersetOf<U>(other: SetLike<U>): boolean {
+    return (new JsSet<T>(this) as unknown as SetOperations<T>).isSupersetOf(other);
+  }
+
+  /**
+   * `Set#subset?` (`vendor/ruby/v3.3.11/lib/set.rb:425`), over the members `@hash` holds.
+   * @noRailsEquivalent PERMANENT
+   */
+  isSubsetOf<U>(other: SetLike<U>): boolean {
+    return (new JsSet<T>(this) as unknown as SetOperations<T>).isSubsetOf(other);
+  }
+
+  /**
+   * `Set#disjoint?` (`vendor/ruby/v3.3.11/lib/set.rb:492`), over the members `@hash` holds.
+   * @noRailsEquivalent PERMANENT
+   */
+  isDisjointFrom<U>(other: SetLike<U>): boolean {
+    return (new JsSet<T>(this) as unknown as SetOperations<T>).isDisjointFrom(other);
+  }
+
+  /**
+   * `Set#|` (`vendor/ruby/v3.3.11/lib/set.rb:619`), over the members `@hash` holds.
+   * @noRailsEquivalent PERMANENT
+   */
+  union<U>(other: SetLike<U>): globalThis.Set<T | U> {
+    return (new JsSet<T>(this) as unknown as SetOperations<T>).union(other);
+  }
+
+  /**
+   * `Set#-` (`vendor/ruby/v3.3.11/lib/set.rb:630`), over the members `@hash` holds.
+   * @noRailsEquivalent PERMANENT
+   */
+  difference<U>(other: SetLike<U>): globalThis.Set<T> {
+    return (new JsSet<T>(this) as unknown as SetOperations<T>).difference(other);
+  }
+
+  /**
+   * `Set#&` (`vendor/ruby/v3.3.11/lib/set.rb:640`), over the members `@hash` holds.
+   * @noRailsEquivalent PERMANENT
+   */
+  intersection<U>(other: SetLike<U>): globalThis.Set<T & U> {
+    return (new JsSet<T>(this) as unknown as SetOperations<T>).intersection(other);
+  }
+
+  /**
+   * `Set#^` (`vendor/ruby/v3.3.11/lib/set.rb:661`), over the members `@hash` holds.
+   * @noRailsEquivalent PERMANENT
+   */
+  symmetricDifference<U>(other: SetLike<U>): globalThis.Set<T | U> {
+    return (new JsSet<T>(this) as unknown as SetOperations<T>).symmetricDifference(other);
   }
 
   /**
