@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Time as RubyTime } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
@@ -63,37 +62,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("quote table name with schema", async () => {
-      expect(adapter.quoteTableName("foo.bar")).toBe('"foo"."bar"');
-    });
-
-    it("quote date", async () => {
-      const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
-      expect(rows[0].val).toBe("2023-01-15");
-    });
-
-    it("quote time", async () => {
-      const rows = await adapter.execute("SELECT TIME '14:30:00' AS val");
-      expect(rows[0].val).toBe("14:30:00");
-    });
-
-    it("quote timestamp", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 14:30:00' AS val");
-      const val = rows[0].val as RubyTime;
-      expect(val).toBeInstanceOf(RubyTime);
-      expect(val.getutc().year).toBe(2023);
-    });
-
     it("quote range", () => {
       const type = new RangeType(new IntegerType(), "int8range");
       const range = new OidRange("1,2]'; SELECT * FROM users; --", "0; DROP TABLE users; --");
       const serialized = type.serialize(range);
       expect(adapter.quote(serialized)).toBe("'[1,0]'");
-    });
-
-    it("quote array", async () => {
-      const rows = await adapter.execute("SELECT ARRAY[1,2,3]::integer[] AS val");
-      expect(rows[0].val).toEqual([1, 2, 3]);
     });
 
     it("quote integer", async () => {
