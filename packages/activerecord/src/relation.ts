@@ -486,11 +486,15 @@ export class Relation<T extends Base, G extends boolean = false> {
       if (!c.asyncEnabled()) {
         const token = this._loadToken;
         void c.lock
-          .synchronize(() => this.load())
+          .synchronize(() => {
+            if (this._loadResult) return;
+            const loaded = this.load();
+            this._loaded = true;
+            return loaded;
+          })
           .catch(() => {
             if (token === this._loadToken) this._loaded = false;
           });
-        this._loaded = true;
         return;
       }
 
