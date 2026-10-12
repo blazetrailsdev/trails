@@ -1,0 +1,12 @@
+<div id="<%= domId(trail) %>">
+  <p>
+    <strong>Name:</strong>
+    <%= trail.name %>
+  </p>
+
+  <p>
+    <strong>Length:</strong>
+    <%= trail.length %>
+  </p>
+
+</div>
