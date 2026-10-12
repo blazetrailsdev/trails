@@ -114,6 +114,46 @@ describe("parseSchemaTs", () => {
     expect(result["products"]["price"]).toEqual({ type: "decimal", null: false });
   });
 
+  it("t.index on an expression does not become a phantom column", () => {
+    const source = `
+      export default async function defineSchema(ctx: MigrationContext) {
+        await ctx.createTable("owners", { force: "cascade" }, (t) => {
+          t.string("login", { null: false });
+          t.index("lower((login)::text)", { name: "index_owners_on_lower_login", unique: true });
+          t.index("login", { name: "index_owners_on_login" });
+        });
+      }
+    `;
+    const result = parseSchemaTs(source, FILE);
+    expect(Object.keys(result["owners"])).toEqual(["id", "login"]);
+    expect(result["owners"]["login"]).toEqual({ type: "string", null: false });
+  });
+
+  it("primaryKey: 'key' with id: 'string' → the primary key column takes that name and type", () => {
+    const source = `
+      export default async function defineSchema(ctx: MigrationContext) {
+        await ctx.createTable("settings", { primaryKey: "key", id: "string", force: "cascade" }, (t) => {
+          t.text("value");
+        });
+      }
+    `;
+    const result = parseSchemaTs(source, FILE);
+    expect(result["settings"]).not.toHaveProperty("id");
+    expect(result["settings"]["key"]).toEqual({ type: "string", null: false });
+  });
+
+  it("id: 'integer' keeps its type; an id type the registry does not map stays the default", () => {
+    const source = `
+      export default async function defineSchema(ctx: MigrationContext) {
+        await ctx.createTable("counters", { id: "integer", force: "cascade" }, (t) => {});
+        await ctx.createTable("events", { id: "bigserial", force: "cascade" }, (t) => {});
+      }
+    `;
+    const result = parseSchemaTs(source, FILE);
+    expect(result["counters"]["id"]).toEqual({ type: "integer", null: false });
+    expect(result["events"]["id"]).toEqual({ type: "bigint", null: false });
+  });
+
   it("id: false → no id column synthesized", () => {
     const source = `
       export default async function defineSchema(ctx: MigrationContext) {
