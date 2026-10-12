@@ -30,6 +30,26 @@ the statepoint rewrite needs an assembler:
 carry one: Perry takes an entry `.ts` file and needs no project config, and a
 config file would hide which flags the results below actually depend on.
 
+## Working in a fresh checkout or worktree
+
+`examples/*` is a workspace member, so the example resolves `@blazetrails/*`
+to `packages/*` in the _same_ checkout and needs their `dist/` built there.
+Two traps, both hit while setting this up:
+
+- `pnpm install` runs the example's `prepare`
+  (`trails-tsc-views build --views app/views`) before the workspace packages
+  are built, and it fails. Install with `--ignore-scripts` first, build the
+  packages, then run `prepare` by hand.
+- Copying a prebuilt `dist/` from another checkout brings its
+  `.tsbuildinfo`, and `tsc` then reports success while emitting nothing. If a
+  source change does not show up in `dist/`, delete `dist/` _and_ every
+  `*.tsbuildinfo` before rebuilding.
+
+Note that `pnpm --filter @blazetrails/example-perry-native... build` currently
+fails in `activesupport` on `src/cache/file-store-atomic-write.trails.test.ts`
+(`Property 'on' does not exist on type 'Worker'`). That is pre-existing on
+`main` and unrelated to this example.
+
 ## The ladder
 
 `perry/ladder/` is a sequence of small programs, each adding one layer of what
