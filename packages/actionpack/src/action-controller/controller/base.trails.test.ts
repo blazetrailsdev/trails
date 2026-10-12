@@ -402,6 +402,7 @@ describe("ActionController::Base conditional GET", () => {
 describe("ActionController::Base sendData", () => {
   it("sends data with filename", async () => {
     const c = new (class extends Base {})();
+    c.setRequestBang(makeRequest());
     c.setResponseBang(makeResponse());
     await c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
     expect(c.responseBody).toBe("csv,data");
@@ -414,6 +415,7 @@ describe("ActionController::Base sendData", () => {
 
   it("sends data with custom disposition", async () => {
     const c = new (class extends Base {})();
+    c.setRequestBang(makeRequest());
     c.setResponseBang(makeResponse());
     await c.sendData("inline-data", { disposition: "inline", filename: "doc.pdf" });
     expect(c.headers.get("content-disposition")).toBe(
@@ -423,6 +425,7 @@ describe("ActionController::Base sendData", () => {
 
   it("sends data without filename", async () => {
     const c = new (class extends Base {})();
+    c.setRequestBang(makeRequest());
     c.setResponseBang(makeResponse());
     await c.sendData("raw");
     expect(c.responseBody).toBe("raw");
