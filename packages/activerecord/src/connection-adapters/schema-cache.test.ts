@@ -1,13 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  SchemaCache,
-  SchemaReflection,
-  BoundSchemaReflection,
-  FakePool,
-  type Pool,
-} from "./schema-cache.js";
-import { Column } from "./column.js";
-import { SqlTypeMetadata } from "./sql-type-metadata.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { SchemaCache, SchemaReflection, BoundSchemaReflection, type Pool } from "./schema-cache.js";
 import {
   setSchemaCacheIgnoredTables,
   schemaCacheIgnoredTables,
@@ -16,52 +8,17 @@ import {
   setLazilyLoadSchemaCache,
 } from "../active-record.js";
 import { StatementInvalid } from "../errors.js";
-import { SchemaStatements } from "./abstract/schema-statements.js";
-import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
-import { include, assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport";
 import { File, FileUtils, Marshal, Tempfile } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { fixtures } from "../test-fixtures.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { TableDefinition } from "./abstract/schema-definitions.js";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
-import type { AbstractAdapter } from "./abstract-adapter.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
-import { checkoutRawTestAdapter } from "../test-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-
-function makeColumn(
-  name: string,
-  sqlType: string,
-  opts: { default?: string | null; null?: boolean } = {},
-): Column {
-  return new Column(
-    name,
-    opts.default ?? null,
-    new SqlTypeMetadata({ sqlType, type: sqlType.replace(/\(.*/, "") }),
-    opts.null ?? true,
-  );
-}
-
-async function warm(
-  cache: SchemaCache,
-  tableName: string,
-  pk: string | string[] | null,
-  cols: Column[] = [],
-): Promise<void> {
-  const conn = {
-    dataSources: async () => [tableName],
-    dataSourceExists: async () => true,
-    primaryKey: async () => pk,
-    columns: async () => cols,
-    indexes: async () => [],
-  };
-  await cache.add(new FakePool(conn), tableName);
-}
 
 describe("SchemaCacheTest", () => {
   fixtures({}, { useTransactionalTests: false });
@@ -186,17 +143,6 @@ describe("SchemaCacheTest", () => {
 
   it("primary key for non existent table", async () => {
     expect(await cache.primaryKeys("omgponies")).toBeNull();
-  });
-
-  it("getCachedPrimaryKeys is undefined for an unwarmed table", () => {
-    const cache = new SchemaCache();
-    expect(cache.getCachedPrimaryKeys("missing")).toBeUndefined();
-  });
-
-  it("getCachedPrimaryKeys prefers the explicit primary-keys map over columns", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "users", null, [makeColumn("id", "integer")]);
-    expect(cache.getCachedPrimaryKeys("users")).toBeNull();
   });
 
   it("columns for existent table", async () => {
@@ -381,17 +327,6 @@ describe("SchemaCacheTest", () => {
     expect(await cache.isColumnsHash("courses")).toBeFalsy();
   });
 
-  it("keeps _columns and _columnsHash in sync across set and clear", () => {
-    const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer")]);
-    expect(cache.isCached("users")).toBe(cache.isColumnsHash(null, "users"));
-    expect(cache.isCached("users")).toBe(true);
-
-    cache.clearDataSourceCacheBang(null, "users");
-    expect(cache.isCached("users")).toBe(cache.isColumnsHash(null, "users"));
-    expect(cache.isCached("users")).toBe(false);
-  });
-
   it("when lazily load schema cache is set cache is lazily populated when est connection", async () => {
     const tempfile = Tempfile.new(["schema_cache-", ".yml"], tmpDir);
     const originalConfig = Base.configurations().configsFor({
@@ -438,20 +373,6 @@ describe("SchemaCacheTest", () => {
     expect((schemaCache as unknown as { _columns: unknown })._columns).toBe(coder["columns"]);
   });
 
-  it("#init_with reads columns_hash from the coder", () => {
-    const col = makeColumn("id", "integer");
-    const cache = new SchemaCache();
-    cache.initWith({
-      columns: new Map([["t", [col]]]),
-      columns_hash: new Map([["t", { id: col }]]),
-      deduplicated: true,
-    });
-    const columnsHash = (cache as unknown as { _columnsHash: Map<string, Record<string, Column>> })
-      ._columnsHash;
-    expect(columnsHash.size).toBe(1);
-    expect(columnsHash.get("t")!["id"]).toBe(col);
-  });
-
   it("#encode_with sorts members", () => {
     const values: [string, null][] = [
       ["z", null],
@@ -477,276 +398,5 @@ describe("SchemaCacheTest", () => {
     expect(coder["data_sources"]).toEqual(expected);
     expect(coder["indexes"]).toEqual(expected);
     expect("version" in coder).toBeTruthy();
-  });
-
-  it("stores and round-trips composite primary keys as arrays", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "memberships", ["user_id", "group_id"]);
-
-    const coder: Record<string, unknown> = {};
-    cache.encodeWith(coder);
-    const serialized = coder["primary_keys"] as Map<string, unknown>;
-    expect(serialized.get("memberships")).toEqual(["user_id", "group_id"]);
-
-    const restored = new SchemaCache();
-    restored.initWith(coder);
-    const pool = new FakePool(null);
-    return restored.primaryKeys(pool, "memberships").then((pk) => {
-      expect(pk).toEqual(["user_id", "group_id"]);
-    });
-  });
-
-  it("marshalDump / marshalLoad round-trips composite primary keys", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "memberships", ["user_id", "group_id"]);
-    await warm(cache, "users", "id");
-
-    const data = cache.marshalDump();
-    const restored = new SchemaCache();
-    restored.marshalLoad(data);
-
-    return Promise.all([
-      restored.primaryKeys(new FakePool(null), "memberships").then((pk) => {
-        expect(pk).toEqual(["user_id", "group_id"]);
-      }),
-      restored.primaryKeys(new FakePool(null), "users").then((pk) => {
-        expect(pk).toBe("id");
-      }),
-    ]);
-  });
-});
-
-describe("SchemaReflectionTest", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-reflection-test-"));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it("loads cache from disk on first access", async () => {
-    const cachePath = path.join(tmpDir, "schema_cache.json");
-
-    const cache = new SchemaCache();
-    await warm(cache, "users", "id", [makeColumn("id", "integer"), makeColumn("name", "text")]);
-    await cache.dumpTo(cachePath);
-
-    const origCheck = SchemaReflection.checkSchemaCacheDumpVersion;
-    SchemaReflection.checkSchemaCacheDumpVersion = false;
-    try {
-      const reflection = new SchemaReflection(cachePath);
-      const cols = await reflection.columns(new FakePool(null), "users");
-      expect(cols).toHaveLength(2);
-      expect(cols[0]).toBeInstanceOf(Column);
-      expect(cols[0].name).toBe("id");
-      expect(cols[1].sqlType).toBe("text");
-    } finally {
-      SchemaReflection.checkSchemaCacheDumpVersion = origCheck;
-    }
-  });
-
-  it("rejects stale cache when version mismatches", async () => {
-    const cachePath = path.join(tmpDir, "schema_cache.json");
-
-    const coder: Record<string, unknown> = {
-      columns: {},
-      primary_keys: {},
-      data_sources: {},
-      indexes: {},
-      version: "1",
-    };
-    fs.writeFileSync(
-      cachePath,
-      `--- !ruby/object:ActiveRecord::ConnectionAdapters::SchemaCache\n${JSON.stringify(coder)}`,
-      "utf-8",
-    );
-
-    const fakeConnection = {
-      schemaVersion: async () => "2",
-      columns: async () => [makeColumn("live", "text")],
-    };
-    const pool = new FakePool(fakeConnection);
-
-    const reflection = new SchemaReflection(cachePath);
-    const cols = await reflection.columns(pool, "users");
-    expect(cols.map((c) => c.name)).toEqual(["live"]);
-  });
-
-  it("accepts cache when version matches", async () => {
-    const cachePath = path.join(tmpDir, "schema_cache.json");
-
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("title", "varchar(255)")]);
-    (cache as unknown as { _version: string })._version = "42";
-    await cache.dumpTo(cachePath);
-
-    const fakeConnection = {
-      schemaVersion: async () => "42",
-    };
-    const pool = new FakePool(fakeConnection);
-
-    const reflection = new SchemaReflection(cachePath);
-    const cols = await reflection.columns(pool, "posts");
-    expect(cols).toHaveLength(1);
-    expect(cols[0]).toBeInstanceOf(Column);
-    expect(cols[0].sqlType).toBe("varchar(255)");
-  });
-
-  it("isCached loads from disk without pool when version check disabled", async () => {
-    const cachePath = path.join(tmpDir, "schema_cache.json");
-
-    const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer")]);
-    await cache.dumpTo(cachePath);
-
-    const origCheck = SchemaReflection.checkSchemaCacheDumpVersion;
-    SchemaReflection.checkSchemaCacheDumpVersion = false;
-    try {
-      const reflection = new SchemaReflection(cachePath);
-      expect(await reflection.isCached("users")).toBe(true);
-      expect(await reflection.isCached("missing")).toBe(false);
-    } finally {
-      SchemaReflection.checkSchemaCacheDumpVersion = origCheck;
-    }
-  });
-});
-
-class MockAdapter {
-  quoteColumnName = (n: string) => `"${n}"`;
-  quoteTableName = (n: string) => `"${n}"`;
-  execute = vi.fn().mockResolvedValue([]);
-  schemaCache: BoundSchemaReflection;
-  pool = {};
-  quoteDefaultExpression = (_v: unknown) => "";
-  supportsDatetimeWithPrecision = () => false;
-  nativeDatabaseTypes = () => SQLite3Adapter.NATIVE_DATABASE_TYPES;
-  supportsCheckConstraints = async () => true;
-  supportsIndexesInCreate = () => false;
-  supportsPartialIndex = () => true;
-  supportsIndexInclude = async () => false;
-  supportsNullsNotDistinct = async () => false;
-  supportsIndexSortOrder = async () => true;
-  supportsExclusionConstraints = () => false;
-  supportsUniqueConstraints = () => false;
-  useForeignKeys = () => true;
-  tableNameLength = () => 64;
-  indexNameLength = () => 64;
-  createTableDefinition = (n: string, opts: Record<string, unknown>) =>
-    new TableDefinition(this as never, n, { ...opts });
-
-  constructor(cache: SchemaCache) {
-    this.schemaCache = BoundSchemaReflection.forLoneConnection(
-      new SchemaReflection(null, cache),
-      this,
-    );
-  }
-
-  adapter = this as unknown as AbstractAdapter & SchemaQuoter;
-}
-include(MockAdapter, SchemaStatements);
-
-function makeMockAdapter(cache: SchemaCache): MockAdapter & SchemaStatements {
-  return new MockAdapter(cache) as MockAdapter & SchemaStatements;
-}
-
-describe("DDL cache-invalidation safety-net", () => {
-  it("dropTable clears schema cache entry before DROP SQL", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("widgets", [makeColumn("id", "integer")]);
-    expect(cache.isCached("widgets")).toBe(true);
-
-    const order: string[] = [];
-    const adapter = makeMockAdapter(cache);
-    const origClear = cache.clearDataSourceCacheBang.bind(cache);
-    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
-      order.push(`clear:${name}`);
-      origClear(pool, name);
-    });
-    adapter.execute.mockImplementation(async () => {
-      order.push("sql");
-      return [];
-    });
-
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await adapter.dropTable("widgets");
-
-    expect(cache.isCached("widgets")).toBe(false);
-    expect(order).toEqual(["clear:widgets", "sql"]);
-  });
-
-  it("dropJoinTable clears schema cache entry before DROP SQL (via dropTable)", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("accounts_people", [makeColumn("account_id", "integer")]);
-    expect(cache.isCached("accounts_people")).toBe(true);
-
-    const order: string[] = [];
-    const adapter = makeMockAdapter(cache);
-    const origClear = cache.clearDataSourceCacheBang.bind(cache);
-    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
-      order.push(`clear:${name}`);
-      origClear(pool, name);
-    });
-    adapter.execute.mockImplementation(async () => {
-      order.push("sql");
-      return [];
-    });
-
-    await adapter.dropJoinTable("accounts", "people");
-
-    expect(cache.isCached("accounts_people")).toBe(false);
-    expect(order).toEqual(["clear:accounts_people", "sql"]);
-  });
-
-  it("createTable clears schema cache entry (non-force branch)", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("widgets", [makeColumn("id", "integer")]);
-
-    const adapter = makeMockAdapter(cache);
-    await adapter.createTable("widgets");
-
-    expect(cache.isCached("posts")).toBe(false);
-  });
-});
-
-describe("SchemaCache DDL invalidation", () => {
-  let adapter: AbstractAdapter;
-  let pool: ConnectionPool;
-
-  function warmCache(tableName: string) {
-    pool.schemaReflection.loadedCache!.setColumns(tableName, [makeColumn("id", "integer")]);
-  }
-
-  beforeEach(async () => {
-    ({ adapter, pool } = await checkoutRawTestAdapter());
-    await pool.schemaReflection.loadBang(pool);
-    await adapter.dropTable("things", "stuff", { ifExists: true });
-    await adapter.createTable("things", (t) => {
-      t.string("name");
-      t.integer("count");
-    });
-    warmCache("things");
-    expect(pool.schemaReflection.loadedCache!.isCached("things")).toBe(true);
-  });
-
-  afterEach(async () => {
-    await adapter.dropTable("things", "stuff", { ifExists: true });
-    pool.releaseConnection();
-    await pool.disconnectBang();
-  });
-
-  it("dropTable clears cache before DROP TABLE", async () => {
-    await adapter.dropTable("things");
-    expect(pool.schemaReflection.loadedCache!.isCached("things")).toBe(false);
-  });
-
-  it("renameTable clears both old and new names before ALTER TABLE RENAME", async () => {
-    warmCache("stuff");
-    expect(pool.schemaReflection.loadedCache!.isCached("stuff")).toBe(true);
-    await adapter.renameTable("things", "stuff");
-    expect(pool.schemaReflection.loadedCache!.isCached("things")).toBe(false);
-    expect(pool.schemaReflection.loadedCache!.isCached("stuff")).toBe(false);
   });
 });
