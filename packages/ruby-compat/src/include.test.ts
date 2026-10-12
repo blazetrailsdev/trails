@@ -961,6 +961,28 @@ describe("extend", () => {
     expect(delegate.name).toBe("from the module");
   });
 
+  it("a module's name replaces a declared class's born name", () => {
+    class Declared {}
+    extend(Declared, {
+      get name(): string {
+        return "from the module";
+      },
+    });
+    expect(Declared.name).toBe("from the module");
+  });
+
+  it("a class body's static name field wins over a module's", () => {
+    class Named {
+      static name = "class body";
+    }
+    extend(Named, {
+      get name(): string {
+        return "from the module";
+      },
+    });
+    expect(Named.name).toBe("class body");
+  });
+
   it("a class body's static name wins over a module's", () => {
     class Named {
       static get name(): string {

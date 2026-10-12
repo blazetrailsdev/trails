@@ -1813,9 +1813,11 @@ export function prepend(
  * the module's member of that name, while a later `extend()` wins over an
  * earlier one. Accessor halves are resolved independently, since Ruby reads a
  * getter (`key`) and a setter (`key=`) as two methods where TypeScript shares
- * one property name between them. The `name` a `class` expression is born
- * with is not a method its body defines (`Class.new(parent)` has none), so a
- * module's `name` replaces it.
+ * one property name between them. The `name` a class is born with, declared
+ * or an expression, is not a method its body defines: it stands for
+ * `Module#name`, which a module method on the singleton class is found before,
+ * so a module's `name` replaces it. A born `name` is the non-writable one; a
+ * `static name` field or accessor the class body declares is not, and wins.
  *
  * Mirrors: Ruby's Object#extend — vendor/ruby/v3.3.11/eval.c:1778 `rb_obj_extend`,
  * which returns the receiver (:1800). `rb_extend_object` (:1713-1716) is
