@@ -789,6 +789,7 @@ export function staleFixtureEntries(files: ReadonlySet<string>): string[] {
 function associationsByClass(
   manifest: RubyFileEntry[],
   macro: (a: RubyAssoc) => boolean,
+  descendants: boolean,
 ): Map<string, Set<string>> {
   const classes = classesByName(manifest);
   const ancestors = (klass: RubyClass): RubyClass[] => {
@@ -801,7 +802,8 @@ function associationsByClass(
   for (const [name, klass] of classes) {
     const names = new Set<string>();
     for (const other of classes.values()) {
-      if (!ancestors(klass).includes(other) && !ancestors(other).includes(klass)) continue;
+      if (!ancestors(klass).includes(other) && !(descendants && ancestors(other).includes(klass)))
+        continue;
       for (const a of other.associations) {
         if (macro(a)) names.add(a.name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()));
       }
@@ -812,26 +814,31 @@ function associationsByClass(
 }
 
 export function belongsToAssociationsByClass(manifest: RubyFileEntry[]): Map<string, Set<string>> {
-  return associationsByClass(manifest, (a) => a.kind === "belongs_to");
+  return associationsByClass(manifest, (a) => a.kind === "belongs_to", true);
 }
 
 /**
  * The associations whose fixture key `TableRow#resolve_sti_reflections` hands to
  * `add_join_records` (`table_row.rb:178-181`): a `has_many` with `:through`, which is
  * also what a `has_and_belongs_to_many` defines. The value is a list of labels that
- * populates the join table, not a column of the row.
+ * populates the join table, not a column of the row. `reflection_class._reflections`
+ * (`table_row.rb:149`) holds the class's own and inherited associations only.
  */
 export function joinLabelAssociationsByClass(manifest: RubyFileEntry[]): Map<string, Set<string>> {
   return associationsByClass(
     manifest,
     (a) =>
       a.kind === "has_and_belongs_to_many" || (a.kind === "has_many" && "through" in a.options),
+    false,
   );
 }
 
-/** `add_join_records`' `targets` (`table_row.rb:194`). */
+/** `add_join_records`' `targets` (`table_row.rb:194`); `String#split` drops trailing empty fields. */
 function joinTargets(targets: unknown): unknown {
-  return typeof targets === "string" ? targets.split(/\s*,\s*/) : targets;
+  if (typeof targets !== "string") return targets;
+  const labels = targets.split(/\s*,\s*/);
+  while (labels.length > 0 && labels[labels.length - 1] === "") labels.pop();
+  return labels;
 }
 
 export function schemaCheck(

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries } from "./compare.js";
+import { belongsToAssociationsByClass, joinLabelAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -172,6 +172,18 @@ describe("schemaCheck", () => {
     expect([...map.get("User")!]).toEqual([]);
     expect([...map.get("Admin::User")!]).toEqual(["account"]);
     expect([...map.get("Parrot")!]).toEqual(["killer"]);
+  });
+  it("reads a join label from the class's own and inherited associations only", () => {
+    const klass = (qualifiedName: string, parent: string, habtm: string[] = []) => ({ name: qualifiedName, qualifiedName, parent, tableName: null, associations: habtm.map((name) => ({ kind: "has_and_belongs_to_many", name, options: {}, hasScope: false })), validations: [], scopes: [], callbacks: [], attributes: [], attrs: [] }); // prettier-ignore
+    const map = joinLabelAssociationsByClass([
+      {
+        package: "activerecord",
+        file: "test/models/parrot.rb",
+        classes: [klass("Parrot", "ActiveRecord::Base", ["treasures"]), klass("DeadParrot", "Parrot", ["shared_computers"])], // prettier-ignore
+      },
+    ]);
+    expect([...map.get("Parrot")!]).toEqual(["treasures"]);
+    expect([...map.get("DeadParrot")!]).toEqual(["treasures", "sharedComputers"]);
   });
   it("allows a belongs_to association label only when the association is known", () => {
     const withFk: Schema = { users: { account_id: "integer" } };
@@ -496,6 +508,7 @@ describe("compareFile", () => {
     expect((await compare({ ...rails, treasures: "ruby, sapphire" })).status).toBe("MATCH");
     expect((await compare({ ...rails, treasures: ["ruby"] })).status).toBe("DIFF");
     expect((await compare({ ...rails, treasures: "sapphire, ruby" })).status).toBe("DIFF");
+    expect((await compare({ ...rails, treasures: "ruby, sapphire," })).status).toBe("MATCH");
     expect((await compare(rails)).notes).toEqual(["extra-in-ts: deadbird.treasures"]);
     expect(canonicalizeRailsRow({ treasures: ["ruby"] }, {}, new Set(["name"]), "parrots", new Set(), new Set(["treasures"]))).toEqual({ treasures: ["ruby"] }); // prettier-ignore
   });
