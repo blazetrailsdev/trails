@@ -68,7 +68,17 @@ module (`activesupport/src/core-ext/object/json.ts`, 333 lines) does not fit in
 The practical ceiling sits between **139 modules (links)** and **364 (does
 not)**.
 
-## Wall 2: WebAssembly cannot be linked by an npm-installed Perry
+## Wall 2: WebAssembly — an npm-distribution problem, not a capability one
+
+**Update (from-source Perry `main`): this wall is GONE.** With compiler,
+runtime and `perry-wasm-host` all built from the same checkout and
+`PERRY_WORKSPACE_ROOT` set, a 362-module activesupport subgraph that reaches
+`libxml2-wasm` reports `Using wasmi WebAssembly host runtime` and **links** —
+a 69MB executable. Nothing about WebAssembly is beyond Perry; the wall was
+entirely that the npm package ships no `wasm-host` runtime and the commit it
+was built from is not public. The account below is what that looked like from
+the npm build, and is kept because anyone using the published Perry will hit
+exactly it.
 
 This is structural, and it took building Perry from source to establish how
 deep it goes.
@@ -224,6 +234,23 @@ because it is not obvious:
   `PERRY_WORKSPACE_ROOT` at the checkout so runtime and stdlib are rebuilt to
   match. Version skew is refused outright: the compiler compares its own source
   commit against the archive's.
+
+### Bug 3c — a 362-module binary links, then spins forever in module init
+
+With Wall 2 cleared and 3b side-stepped (this probe imports `dist` JS, not
+TypeScript source), the largest graph yet **compiles and links**: 362 modules,
+69MB, inside a 20GB cap. It then never starts.
+
+`PERRY_DEBUG_INIT=1` names the point precisely: **143 of 362 module
+initializers run**, the last complete one being `ruby-compat/dist/uri.js`, and
+the next one never finishes. The process spins at ~100% of one core with no
+output for over ten minutes.
+
+It is **not** the WebAssembly interpreter: zero `libxml2`/wasm modules appear
+in the init trace, so execution never reaches them. It is an init-time hang in
+the module after `uri.js`.
+
+Not minimized, not filed. It is the current frontier.
 
 ## The SQLite result is weaker than it looks
 
