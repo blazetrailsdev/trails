@@ -36,6 +36,7 @@ describe("RenderersApiTest", () => {
   }
 
   let tc: RenderersApiTest;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
 
   beforeEach(async ({ task }) => {
     tc = new RenderersApiTest(task.name);
@@ -45,19 +46,19 @@ describe("RenderersApiTest", () => {
 
   it("render json", async () => {
     await tc.get("one");
-    tc.assertResponse("success");
+    assertResponse("success");
     assertEqual(JSON.stringify({ a: "b" }), tc.response.body);
   });
 
   it("render xml", async () => {
     await tc.get("two");
-    tc.assertResponse("success");
+    assertResponse("success");
     assertEqual(toXml({ a: "b" }), tc.response.body);
   });
 
   it("render plain", async () => {
     await tc.get("plain");
-    tc.assertResponse("internal_server_error");
+    assertResponse("internal_server_error");
     assertEqual("Hi from plain", tc.response.body);
   });
 });

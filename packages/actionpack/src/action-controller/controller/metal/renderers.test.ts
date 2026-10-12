@@ -52,6 +52,7 @@ describe("RenderersMetalTest", () => {
   }
 
   let tc: RenderersMetalTest;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
 
   beforeEach(async ({ task }) => {
     tc = new RenderersMetalTest(task.name);
@@ -61,14 +62,14 @@ describe("RenderersMetalTest", () => {
 
   it("render json", async () => {
     await tc.get("one");
-    tc.assertResponse("success");
+    assertResponse("success");
     assertEqual(JSON.stringify({ a: "b" }), tc.response.body);
     assertEqual("application/json", tc.response.mediaType);
   });
 
   it("render xml", async () => {
     await tc.get("two");
-    tc.assertResponse("success");
+    assertResponse("success");
     assertEqual(" ", tc.response.body);
     assertEqual("text/plain", tc.response.mediaType);
   });

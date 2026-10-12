@@ -44,6 +44,7 @@ describe("RenderToStringTest", () => {
   }
 
   let tc: RenderToStringTest;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
 
   beforeEach(async ({ task }) => {
     tc = new RenderToStringTest(task.name);
@@ -72,6 +73,6 @@ describe("RenderToStringTest", () => {
   it("response ok for render to string with xml format", async () => {
     await tc.get("renderHeadOkWithInlineTemplateAndXmlFormat");
     assertEqual("text/html", tc.response.mediaType);
-    tc.assertResponse("ok");
+    assertResponse("ok");
   });
 });

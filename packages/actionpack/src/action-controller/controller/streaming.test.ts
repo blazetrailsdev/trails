@@ -5,7 +5,7 @@ import type { ResponseBuffer } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 
-describe("ActionController::StreamingResponseTest", () => {
+describe("StreamingResponseTest", () => {
   class TestController extends Base {
     static override controllerPath(): string {
       return "test";
