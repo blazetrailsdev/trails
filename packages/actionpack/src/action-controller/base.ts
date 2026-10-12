@@ -506,6 +506,11 @@ export class Base extends Metal {
 
   declare defaultRender: typeof defaultRender;
 
+  constructor() {
+    super();
+    this._renderedFormat = null;
+  }
+
   /**
    * @internal
    * @noRailsEquivalent CONVERGEABLE response-carries-async-streaming-body
@@ -653,7 +658,7 @@ export class Base extends Metal {
   declare _setVaryHeader: typeof _setVaryHeader;
   declare _renderToBodyWithRenderer: typeof _renderToBodyWithRenderer;
   /** @internal */
-  _renderedFormat: unknown = null;
+  declare _renderedFormat: unknown;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
   declare _isConditionalLayout: typeof _isConditionalLayout;
