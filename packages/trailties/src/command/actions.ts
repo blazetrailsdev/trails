@@ -19,7 +19,7 @@ export async function bootApplicationBang(this: {
 }
 
 /** @missingRailsCall find — CONVERGEABLE generators-configure-bang-api-only-no-color-fallbacks-templates */
-export async function loadGenerators(): Promise<void> {
+async function loadGenerators(): Promise<void> {
   await Trails.application!.loadGenerators();
 }
 
