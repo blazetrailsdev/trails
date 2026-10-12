@@ -103,6 +103,7 @@ export interface FsAdapter {
     options?: { mode?: number },
   ): Promise<void>;
   unlink?(path: string): Promise<void>;
+  rm?(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
   rename?(src: string, dest: string): Promise<void>;
   mkdtemp?(prefix: string): Promise<string>;
   realpath?(path: string): Promise<string>;
@@ -234,6 +235,39 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   return nodeModule.createRequire("file:///ruby-compat");
 }
 
+const NODE_SYNC_VERBS = [
+  "readFileSync",
+  "writeFileSync",
+  "existsSync",
+  "mkdirSync",
+  "appendFileSync",
+  "unlinkSync",
+  "readdirSync",
+  "rmSync",
+  "rmdirSync",
+  "renameSync",
+  "statSync",
+  "fstatSync",
+  "lstatSync",
+  "chmodSync",
+  "utimesSync",
+  "chownSync",
+  "lchmodSync",
+  "lchownSync",
+  "readlinkSync",
+  "symlinkSync",
+  "realpathSync",
+  "accessSync",
+  "openSync",
+  "readSync",
+  "writeSync",
+  "closeSync",
+  "copyFileSync",
+  "mkdtempSync",
+] as const satisfies readonly (keyof FsAdapter)[];
+
+type NodeSyncFs = Pick<FsAdapter, (typeof NODE_SYNC_VERBS)[number]>;
+
 function tryAutoRegisterNode(): boolean {
   if (registry.has("node")) return true;
   if (nodeAttempted) return false;
@@ -245,7 +279,10 @@ function tryAutoRegisterNode(): boolean {
     }
     const req = syncBuiltinLoader();
     if (!req) return false;
-    const nodeFs = req("node:fs") as Omit<FsAdapter, "cwd" | "exists" | "stat" | "lstat">;
+    const nodeFs = req("node:fs") as NodeSyncFs;
+    const syncFs = Object.fromEntries(
+      NODE_SYNC_VERBS.map((verb) => [verb, nodeFs[verb]]),
+    ) as NodeSyncFs;
     const fsPromises = req("node:fs/promises") as {
       access(p: string): Promise<void>;
       stat(p: string): Promise<FsStatResult>;
@@ -253,6 +290,7 @@ function tryAutoRegisterNode(): boolean {
       readFile(p: string, enc?: string): Promise<Bytes | string>;
       writeFile(p: string, c: string | Uint8Array, opts?: unknown): Promise<void>;
       unlink(p: string): Promise<void>;
+      rm(p: string, opts?: { recursive?: boolean; force?: boolean }): Promise<void>;
       rename(src: string, dest: string): Promise<void>;
       mkdtemp(prefix: string): Promise<string>;
       realpath(path: string): Promise<string>;
@@ -268,7 +306,7 @@ function tryAutoRegisterNode(): boolean {
         isExecutable: () => (stat.mode & 0o111) !== 0,
         mtime: new Date(Math.trunc((stat as FsStatResult & { mtimeMs: number }).mtimeMs)),
       });
-    const fs: FsAdapter = Object.assign({}, nodeFs, {
+    const fs: FsAdapter = Object.assign(syncFs, {
       statSync: (p: string) => withExecutable(nodeFs.statSync(p)),
       fstatSync: (fd: number) => withExecutable(nodeFs.fstatSync!(fd)),
       lstatSync: (p: string) => withExecutable(nodeFs.lstatSync(p)),
@@ -289,6 +327,7 @@ function tryAutoRegisterNode(): boolean {
       writeFile: (p: string, c: string | Uint8Array, opts?: { mode?: number }) =>
         fsPromises.writeFile(p, c, opts),
       unlink: (p: string) => fsPromises.unlink(p),
+      rm: (p: string, opts?: { recursive?: boolean; force?: boolean }) => fsPromises.rm(p, opts),
       rename: (src: string, dest: string) => fsPromises.rename(src, dest),
       mkdtemp: (prefix: string) => fsPromises.mkdtemp(prefix),
       realpath: (p: string) => fsPromises.realpath(p),

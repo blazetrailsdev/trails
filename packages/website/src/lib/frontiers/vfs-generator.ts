@@ -155,6 +155,25 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     mkdirSync(posixPath.dirname(path));
   }
 
+  function rm(path: string, options?: { recursive?: boolean; force?: boolean }): void {
+    if (!existsSync(path)) {
+      if (options?.force) return;
+      throw errno("ENOENT", "rm", path);
+    }
+    if (Object.hasOwn(TEMPLATES, path)) throw errno("EROFS", "rm", path);
+    if (content(path) === null) {
+      if (!options?.recursive) throw errno("ERR_FS_EISDIR", "rm", path);
+      const entries = beneath(path);
+      const template = entries.find((entry) => Object.hasOwn(TEMPLATES, entry));
+      if (template !== undefined) throw errno("EROFS", "rm", template);
+      for (const entry of entries) if (!made.delete(entry)) vfs.delete(entry);
+      made.delete(trim(path));
+    } else {
+      vfs.delete(path);
+    }
+    mkdirSync(posixPath.dirname(trim(path)));
+  }
+
   function writeFileSync(path: string, data: string | Uint8Array): void {
     vfs.write(
       path,
@@ -187,6 +206,8 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     },
     unlinkSync,
     unlink: (path: string) => settle(() => unlinkSync(path)),
+    rm: (path: string, options?: { recursive?: boolean; force?: boolean }) =>
+      settle(() => rm(path, options)),
     readdirSync,
     readdir: (path: string) => settle(() => readdirSync(path)),
     rmdirSync,
