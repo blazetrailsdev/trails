@@ -10,16 +10,16 @@ language feature, and the second one cannot be fixed from this repo at all.**
 
 ## The ladder
 
-| Rung                                                                    | Node | Perry        |                            |
-| ----------------------------------------------------------------------- | ---- | ------------ | -------------------------- |
-| `02-class` — classes, `#private` fields, accessors, static blocks       | ok   | **ok**       | 2s, 17MB                   |
-| `03-proxy` — `Proxy` `get` trap + `methodMissing`                       | ok   | **ok**       | 2s, 17MB                   |
-| `04-activesupport` — one named import from `@blazetrails/activesupport` | ok   | **MEM**      | killed at 12GB after 86s   |
-| `05-model` — an `ActiveRecord` model class, no connection               | ok   | **MEM**      | killed at 12GB after 261s  |
-| `06-sqlite` — `better-sqlite3`                                          | ok   | **ok\***     | 8s, 30MB — but see below   |
-| `04a-local-modules` — control: multi-file graph, no package import      | ok   | **ok**       | 17MB                       |
-| `04b-deep-import` — control: bypasses the package barrel                | ok   | not measured | needs wall 2 cleared first |
-| `07-boot` — full framework boot                                         | ok   | **MEM**      | killed at 12GB after 689s  |
+| Rung                                                                    | Node | Perry    |                                 |
+| ----------------------------------------------------------------------- | ---- | -------- | ------------------------------- |
+| `02-class` — classes, `#private` fields, accessors, static blocks       | ok   | **ok**   | 2s, 17MB                        |
+| `03-proxy` — `Proxy` `get` trap + `methodMissing`                       | ok   | **ok**   | 2s, 17MB                        |
+| `04-activesupport` — one named import from `@blazetrails/activesupport` | ok   | **MEM**  | killed at 12GB after 86s        |
+| `05-model` — an `ActiveRecord` model class, no connection               | ok   | **MEM**  | killed at 12GB after 261s       |
+| `06-sqlite` — `better-sqlite3`                                          | ok   | **ok\*** | 8s, 30MB — but see below        |
+| `04a-local-modules` — control: multi-file graph, no package import      | ok   | **ok**   | 17MB                            |
+| `04b-deep-import` — control: bypasses the package barrel                | ok   | **MEM**  | 364 modules vs the barrel's 429 |
+| `07-boot` — full framework boot                                         | ok   | **MEM**  | killed at 12GB after 689s       |
 
 Every rung runs correctly under Node, so each `MEM` is Perry's ceiling and not
 a broken program.
@@ -166,23 +166,45 @@ Its own last line says why. Treat only `perry compile` as a result.
 
 ## If someone picks this up
 
-1. **Wall 2 first, because it is upstream and absolute.** Either get a
-   `libperry_wasm_host.a` (build Perry from source, or ask the project to ship
-   it in the npm package), or confirm from Perry's side whether the eager
-   collection of a const-folded dynamic `import()` is intended. Until one of
-   those moves, the memory work buys nothing — a graph that compiles still
-   will not link.
-2. **Do not spend more time on the parallelism knobs.** Measured: serial is
-   worse, and a bigger cap is not better.
-3. **If Wall 2 clears, attack the 429.** `04b-deep-import` imports the
-   defining module instead of the barrel and measures how much of that graph
-   the barrel is responsible for. If most of it is, the lever is subpath
-   exports for the hot leaves on the trails side, which would cut compile cost
-   for every AOT consumer and not just Perry. Measure before touching any
-   package's `exports` map.
-4. **Do not trust a green rung that imports a shimmed package** until
-   `perry.compilePackages` has compiled the real one and that adapter's own
-   tests have run against it.
-5. **Nothing here asks trails to change.** No framework defect was found by
-   this work. The barrel-export question in (3) is an unmeasured performance
-   lever, not a bug, and the nokogiri chain is explicitly Perry's to fix.
+1.  **Wall 2 first, because it is upstream and absolute.** Either get a
+    `libperry_wasm_host.a` (build Perry from source, or ask the project to ship
+    it in the npm package), or confirm from Perry's side whether the eager
+    collection of a const-folded dynamic `import()` is intended. Until one of
+    those moves, the memory work buys nothing — a graph that compiles still
+    will not link.
+2.  **Do not spend more time on the parallelism knobs.** Measured: serial is
+    worse, and a bigger cap is not better.
+3.  **The barrel is not the lever — measured, do not spend time on it.**
+    `04b-deep-import` bypasses `@blazetrails/activesupport`'s entry point
+    completely and still collects **364 modules against the barrel's 429**: 15%.
+    The graph does not come from the public re-exports, it comes from an
+    internal hub:
+
+        inflector.ts → i18n.ts → namespaces.ts (the `TopLevel` hub)
+                                   ├─ cache/index.js
+                                   ├─ dependencies/autoload.js
+                                   ├─ logger.js, broadcast-logger.js
+                                   ├─ message-pack.js  → @msgpack/msgpack
+                                   └─ hash-with-indifferent-access.js
+
+    `camelize` needs none of it, but `inflector.ts:4` imports `I18n`
+    statically and `transliterate.ts:3` does it again, and `i18n.ts` imports
+    `TopLevel` from `namespaces.ts`, which imports the cache, the autoloader,
+    the logger and msgpack. The deep path still reaches `libxml2-wasm`, so it
+    hits wall 2 as well.
+
+    **Adding subpath exports to activesupport would therefore not help.** An
+    `exports` map cannot change internal import edges; it would buy 15% of a
+    number that has to fall by about 100x, in exchange for permanent public API
+    surface to keep stable. If anyone wants a real lever here it is breaking the
+    `inflector → i18n → namespaces` edge so that string inflection does not
+    depend on the cache and the autoloader — a genuine architectural question
+    about activesupport's internal layering, worth asking on its own merits and
+    not as a favour to one compiler. It is also still gated behind wall 2.
+
+4.  **Do not trust a green rung that imports a shimmed package** until
+    `perry.compilePackages` has compiled the real one and that adapter's own
+    tests have run against it.
+5.  **Nothing here asks trails to change.** No framework defect was found by
+    this work. The barrel-export idea is measured in (3) and is
+    not worth doing, and the nokogiri chain is explicitly Perry's to fix.
