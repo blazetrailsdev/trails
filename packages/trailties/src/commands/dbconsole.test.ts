@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdapterNotSpecified, HashConfig } from "@blazetrails/activerecord";
+import { assertRaises } from "@blazetrails/activesupport";
 import { SystemExit, stderr } from "@blazetrails/ruby-compat";
 import { DBConsole } from "./dbconsole.js";
 
@@ -73,25 +74,25 @@ describe("Rails::DBConsoleTest", () => {
 
   it("unknown command line client", async () => {
     await start({ adapter: "unknown", database: "db" });
-    expect(aborted).toBe(true);
+    expect(aborted).toBeTruthy();
     expect(output).toMatch(/Database configuration specifies nonexistent 'unknown' adapter/);
   });
 
   it("specifying a missing database", async () => {
     await appDbConfig({}, async () => {
-      await expect(
-        new DBConsole({ environment: "test", database: "i_do_not_exist" }).dbConfig(),
-      ).rejects.toThrow(
-        /'i_do_not_exist' database is not configured for 'test'\. Available configuration: /,
+      const e = await assertRaises([AdapterNotSpecified], {}, () =>
+        new DBConsole({ database: "i_do_not_exist" }).dbConfig(),
       );
+
+      expect(e.message).toContain("'i_do_not_exist' database is not configured for 'test'.");
     });
   });
 
   it("specifying a missing environment", async () => {
     await appDbConfig({}, async () => {
-      await expect(new DBConsole({ environment: "i_do_not_exist" }).dbConfig()).rejects.toThrow(
-        /No databases are configured for 'i_do_not_exist'\. Available configuration: /,
-      );
+      const e = await assertRaises([AdapterNotSpecified], {}, () => new DBConsole().dbConfig());
+
+      expect(e.message).toContain("No databases are configured for 'test'.");
     });
   });
 });
