@@ -1785,12 +1785,14 @@ export class Mapper {
       throw new RuntimeError("The resolve method can't be used inside a routes scope block");
     }
 
-    const block = args.pop() as Parameters<RouteSet["addPolymorphicMapping"]>[2];
+    const block = (typeof args.at(-1) === "function" ? args.pop() : undefined) as Parameters<
+      RouteSet["addPolymorphicMapping"]
+    >[2];
     const options = extractOptionsBang(args);
     args = args.flat(1);
 
-    for (const klass of args) {
-      this._set.addPolymorphicMapping(klass as string, options, block);
+    for (const klass of args as Parameters<RouteSet["addPolymorphicMapping"]>[0][]) {
+      this._set.addPolymorphicMapping(klass, options, block);
     }
   }
 
