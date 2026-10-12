@@ -214,12 +214,7 @@ export class FileBody {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
-export class Response<
-  Stream extends ResponseBuffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string } =
-    | ResponseBuffer<{ push(obj: unknown): unknown }>
-    | FileBody
-    | { toPath(): string },
-> {
+export class Response {
   declare static defaultCharset: string | null;
   declare defaultCharset: string | null;
   declare static defaultHeaders: Record<string, string> | undefined;
@@ -236,7 +231,7 @@ export class Response<
   private cv: Array<() => void> = [];
   private _sending = false;
   private _sent = false;
-  stream: Stream;
+  stream: ResponseBuffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
   request: Request | null = null;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
@@ -339,7 +334,7 @@ export class Response<
 
   set body(value: string | Buffer | { toPath(): string }) {
     if (typeof (value as { toPath?: unknown }).toPath === "function") {
-      this.stream = value as Stream;
+      this.stream = value as { toPath(): string };
       return;
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
@@ -462,7 +457,7 @@ export class Response<
 
   sendFile(path: string): void {
     this.commitBang();
-    this.stream = new FileBody(path) as Stream;
+    this.stream = new FileBody(path);
   }
 
   resetBodyBang(): void {
@@ -593,11 +588,8 @@ export class Response<
   }
 
   /** @internal */
-  buildBuffer(response: unknown, body: unknown[]): Stream {
-    return new ResponseBuffer<{ push(obj: unknown): unknown }>(
-      response as Response,
-      body,
-    ) as Stream;
+  buildBuffer(response: unknown, body: unknown[]): ResponseBuffer<{ push(obj: unknown): unknown }> {
+    return new ResponseBuffer(response as Response, body);
   }
 
   /** @internal */
@@ -666,14 +658,7 @@ export class Response<
     return `#<ActionDispatch::Response ${this._status} ${this.message}>`;
   }
 
-  static create<
-    T extends (new (
-      status?: number,
-      headers?: Record<string, string>,
-      body?: string[],
-    ) => unknown) &
-      Pick<typeof Response, "mergeDefaultHeaders" | "defaultHeaders">,
-  >(
+  static create<T extends typeof Response>(
     this: T,
     status = 200,
     headers: Record<string, string> = {},
@@ -753,13 +738,8 @@ Object.defineProperty(Response.prototype, "cacheControl", {
   get: Object.getOwnPropertyDescriptor(CacheResponse.prototype, "cacheControl")!.get,
   configurable: true,
 });
-
-export interface Response<
-  Stream extends ResponseBuffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string } =
-    | ResponseBuffer<{ push(obj: unknown): unknown }>
-    | FileBody
-    | { toPath(): string },
-> extends Omit<
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Response extends Omit<
   RackResponseHelpers,
   "status" | "headers" | "mediaType" | "contentLength" | "cacheControl" | "contentType"
 > {

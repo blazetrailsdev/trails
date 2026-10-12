@@ -268,17 +268,17 @@ describe("ActionController::Live::Response", () => {
 
   it("stream writes flow through the live Buffer", async () => {
     const res = makeResponse();
-    res.stream.write("a");
-    res.stream.write("b");
-    res.stream.close();
-    expect(await drain(res.stream)).toEqual(["a", "b"]);
+    (res.stream as Buffer).write("a");
+    (res.stream as Buffer).write("b");
+    (res.stream as Buffer).close();
+    expect(await drain(res.stream as Buffer)).toEqual(["a", "b"]);
   });
 
   it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
     const res = new Response(201, { "x-test": "1" }, []);
     res.request = makeResponse().request;
-    res.stream.write("seed");
-    res.stream.close();
+    (res.stream as Buffer).write("seed");
+    (res.stream as Buffer).close();
     expect(res.status).toBe(201);
     expect(res.headers.get("x-test")).toBe("1");
     expect(res.body).toBe("seed");
@@ -288,8 +288,8 @@ describe("ActionController::Live::Response", () => {
   it("before_committed writes the request's cookie jar onto the response", () => {
     const res = makeResponse();
     res.request!.cookieJar().set("hello", "world");
-    res.stream.write("a");
-    res.stream.close();
+    (res.stream as Buffer).write("a");
+    (res.stream as Buffer).close();
     expect(res.committed).toBe(true);
     expect(res.cookies).toEqual({ hello: "world" });
   });
@@ -339,7 +339,7 @@ describe("ActionController::Live#process", () => {
     const seen: string[] = [];
     host.action = async (n) => {
       seen.push(n);
-      host.response.stream.write("hi");
+      (host.response.stream as Buffer).write("hi");
     };
     await host.process("show");
     expect(seen).toEqual(["show"]);
@@ -355,9 +355,9 @@ describe("ActionController::Live#process", () => {
 
     const host = new LiveHost();
     const fired = vi.fn();
-    host.response.stream.onError(fired);
+    (host.response.stream as Buffer).onError(fired);
     host.action = async () => {
-      host.response.stream.write("partial");
+      (host.response.stream as Buffer).write("partial");
       host.response.close();
       throw new Error("post");
     };
@@ -455,7 +455,7 @@ describe("ActionController::Live#send_stream", () => {
         throw new Error("write failed");
       }),
     ).rejects.toThrow("write failed");
-    expect(host.response.stream.isClosed).toBe(true);
+    expect((host.response.stream as Buffer).isClosed).toBe(true);
   });
 });
 
