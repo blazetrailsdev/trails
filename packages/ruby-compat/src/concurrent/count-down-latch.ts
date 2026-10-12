@@ -39,13 +39,12 @@ export class CountDownLatch {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  countDown(): boolean {
+  countDown(): void {
     if (this.count > 0) this.count -= 1;
     if (this.count === 0) {
       for (const wake of this.waiters) wake();
       this.waiters.clear();
     }
-    return true;
   }
 }
 

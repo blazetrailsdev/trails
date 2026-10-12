@@ -1088,7 +1088,12 @@ describe("AdapterThreadSafetyTest", () => {
   });
 
   async function join(): Promise<void> {
-    for (const thread of [...threadList].sort(() => Math.random() - 0.5)) await thread.join();
+    const shuffled = [...threadList];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    for (const thread of shuffled) await thread.join();
   }
 
   function threads(count: number, times: number, block: () => unknown): void {

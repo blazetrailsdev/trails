@@ -287,14 +287,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "connection_pool_test.rb",
-    tests: ["checkout fairness", "checkout fairness by group"],
-    reason:
-      "connection_pool_test.rb:427-531 port onto `Concurrent::Event` and `Thread.pass` as they " +
-      "are; held out of the PR that ported their siblings for size. Tracked by story " +
-      "activerecord-port-pool-tests-blocked-on-enumerator-interlock-and-sync-new-connection.",
-  },
-  {
-    testFile: "connection_pool_test.rb",
     tests: ["concurrent connection establishment"],
     reason:
       "connection_pool_test.rb:631-666 parks every thread inside an overridden `new_connection` " +

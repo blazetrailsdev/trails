@@ -66,11 +66,6 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.report_on_exception` (`vendor/ruby/v3.3.11/thread.c:3124`).
-   */
-  static reportOnException = true;
-
-  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.current` (`vendor/ruby/v3.3.11/thread.c:2943`).
    */
   static current(): Thread {
@@ -171,6 +166,10 @@ export class Thread<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#exit` / `#kill`
    * (`vendor/ruby/v3.3.11/thread.c:2710`), which terminates the thread and returns it.
+   * MRI interrupts the thread wherever it is. JS cannot stop a running async
+   * body from outside, so this marks the thread dead and settles a pending
+   * `join`; a body parked in `Thread.stop` never resumes, and a body awaiting
+   * anything else runs on to its end.
    */
   exit(): this {
     if (this.status === "dead") return this;

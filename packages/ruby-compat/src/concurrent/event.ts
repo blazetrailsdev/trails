@@ -22,7 +22,8 @@ export class Event {
   /** @noRailsEquivalent PERMANENT */
   set(): boolean {
     this.flag = true;
-    return this.latch.countDown();
+    this.latch.countDown();
+    return true;
   }
 
   /** @noRailsEquivalent PERMANENT */

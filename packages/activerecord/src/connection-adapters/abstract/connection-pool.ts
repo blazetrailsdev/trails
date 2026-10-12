@@ -318,7 +318,7 @@ export class ConnectionPool implements ReapablePool {
    * @inventedArm if — PERMANENT
    * @inventedArm synchronize — CONVERGEABLE pin-connection-runs-verify-and-begin-under-an-invented-adapter-lock
    */
-  async pinConnectionBang(lockThread = false): Promise<void> {
+  async pinConnectionBang(lockThread: boolean | Thread | Fiber = false): Promise<void> {
     const connection =
       this._pinnedConnection || this.connectionLease()?.connection || (await this.checkout());
     if (this._pinnedConnection != null && this._pinnedConnection !== connection) {
