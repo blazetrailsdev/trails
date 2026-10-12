@@ -342,6 +342,7 @@ export {
   rbConstMissing,
   rbModConstMissing,
   rbPathToClass,
+  rbFBinding,
   registerConstant,
   registeredConstant,
   rbModRemoveConst,

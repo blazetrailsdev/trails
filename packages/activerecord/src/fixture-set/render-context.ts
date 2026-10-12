@@ -1,4 +1,4 @@
-import { Base64, File } from "@blazetrails/ruby-compat";
+import { Base64, File, rbFBinding } from "@blazetrails/ruby-compat";
 
 import { FixtureSet } from "../fixtures.js";
 
@@ -9,7 +9,7 @@ export class RenderContext {
   } {
     return class extends FixtureSet.contextClass {
       getBinding(): this {
-        return this;
+        return rbFBinding(this);
       }
 
       binary(path: string): string {

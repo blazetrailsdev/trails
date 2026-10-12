@@ -105,6 +105,24 @@ export function registeredConstant(name: string): unknown {
 }
 
 /**
+ * `Kernel#binding` (`vendor/ruby/v3.3.11/proc.c:376` `rb_f_binding`): the scope
+ * a template is evaluated in. JS cannot capture a scope, so the binding is
+ * `self` with the top-level constants behind it, which is where a constant
+ * named in a binding resolves once its cref misses.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbFBinding<T extends object>(self: T): T {
+  return new Proxy(self, {
+    has: (target, key) => key in target || (typeof key === "string" && _constants.has(key)),
+    get: (target, key, receiver) =>
+      key in target || typeof key !== "string"
+        ? Reflect.get(target, key, receiver)
+        : _constants.get(key),
+  });
+}
+
+/**
  * Empties the table `registerConstant` (`vendor/ruby/v3.3.11/variable.c:3674`
  * `rb_const_set` on `rb_cObject`) fills.
  *

@@ -169,17 +169,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "ruby-compat-pathname-join-and-file-join-to-path.",
   },
   {
-    testFile: "fixture_set/file_test.rb",
-    tests: ["render context lookup scope"],
-    reason:
-      "Asserts Ruby constant-lookup scope inside the rendering context — " +
-      "`defined? ActiveRecord`, `defined? ActiveRecord::FixtureSet::File`, `File.name` " +
-      "(file_test.rb:97-116). Constants are resolved lexically against the enclosing " +
-      "Ruby module nesting; an ESM module has no nesting to resolve against and no " +
-      "`defined?`, so there is nothing to assert. The other 13 cases are ported in " +
-      "fixture-set/file.test.ts.",
-  },
-  {
     pattern: "destroy_association_async_job.rb", // no test counterpart
     reason:
       "ActiveJob subclass that backs `dependent: :destroy_async`. Trails has not " +
