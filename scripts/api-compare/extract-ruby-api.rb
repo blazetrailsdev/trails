@@ -745,7 +745,8 @@ class ApiExtractor
     name = const_name(node[1])
     return unless name
 
-    superclass = qualified_const_name(delegate_class_target(node[2]) || node[2]) if node[2]
+    delegated = delegate_class_target(node[2])
+    superclass = qualified_const_name(delegated || node[2]) if node[2]
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
@@ -754,6 +755,7 @@ class ApiExtractor
     fqn = current_fqn
     @classes[fqn] ||= new_class_info(name, fqn)
     @classes[fqn][:superclass] = superclass if superclass
+    @classes[fqn][:delegateClass] = true if delegated && superclass
     synthesize_struct_members(fqn, node[2]) if superclass == "Struct"
 
     body = node[3] || node[2]
@@ -5013,6 +5015,7 @@ def normalize_class_info(info)
     instanceMethods: tag_internal(info[:instanceMethods]),
     classMethods: tag_internal(info[:classMethods]),
   }.tap do |out|
+    out[:delegateClass] = true if info[:delegateClass]
     out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods]
     out[:prepends] = info[:prepends].uniq if info[:prepends]&.any?
     out[:mixinOrder] = info[:mixinOrder] if info[:mixinOrder]&.any?
