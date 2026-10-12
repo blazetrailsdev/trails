@@ -11,7 +11,7 @@ import {
 import { quoteTableName } from "./support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { currentAdapter } from "./support/adapter-helper.js";
-import { isPresent } from "@blazetrails/activesupport";
+import { assertEqual, isPresent } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import {
   Post,
@@ -1261,70 +1261,60 @@ describe("EachTest", () => {
   });
 
   it(".find_each with multiple column ordering and using composite primary key", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [2, 1] });
-    await CpkBook.create({ id: [2, 2] });
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 2, id: 1 },
+      { author_id: 2, id: 2 },
+    ]);
     const books = await CpkBook.order({ author_id: "asc", id: "desc" });
-    const bookIds = books.map((b: any) => JSON.stringify(b.id));
+
     let index = 0;
-    for await (const book of CpkBook.findEach({ batchSize: 1, order: [":asc", ":desc"] as any })) {
-      expect(JSON.stringify((book as any).id)).toBe(bookIds[index]);
-      index++;
+    for await (const book of CpkBook.findEach({ batchSize: 1, order: [":asc", ":desc"] })) {
+      assertEqual(books[index], book);
+      index += 1;
     }
-    expect(index).toBe(books.length);
+    assertEqual(books.length, index);
   });
 
   it(".in_batches should start from the start option when using composite primary key with multiple column ordering", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [1, 2] });
-    await CpkBook.create({ id: [1, 3] });
-    const secondBook = await CpkBook.order({ author_id: "asc", id: "desc" }).offset(1).first();
-    let firstRelation: any = null;
-    for await (const rel of CpkBook.inBatches({
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 1, id: 2 },
+      { author_id: 1, id: 3 },
+    ]);
+    const secondBook = (await CpkBook.order({ author_id: "asc", id: "desc" }).second())!;
+    const relation = (await CpkBook.inBatches({
       of: 1,
-      start: (secondBook as any).id,
-      order: [":asc", ":desc"] as any,
-    })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((secondBook as any).id));
+      start: secondBook.id,
+      order: [":asc", ":desc"],
+    }).first())!;
+    assertEqual(secondBook, await relation.first());
   });
 
   it(".in_batches should end at the finish option when using composite primary key with multiple column ordering", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [1, 2] });
-    await CpkBook.create({ id: [1, 3] });
-    const secondBook = await CpkBook.order({ author_id: "asc", id: "desc" }).offset(1).first();
-    const batches: any[] = [];
-    for await (const rel of CpkBook.inBatches({
-      of: 1,
-      finish: (secondBook as any).id,
-      order: [":asc", ":desc"] as any,
-    })) {
-      batches.push(rel);
-    }
-    const lastBatch = batches[batches.length - 1];
-    const first = await lastBatch.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((secondBook as any).id));
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 1, id: 2 },
+      { author_id: 1, id: 3 },
+    ]);
+    const secondBook = (await CpkBook.order({ author_id: "asc", id: "desc" }).second())!;
+    const relation = (
+      await CpkBook.inBatches({ of: 1, finish: secondBook.id, order: [":asc", ":desc"] }).toA()
+    ).at(-1)!;
+    assertEqual(secondBook, await relation.first());
   });
 
   it(".in_batches with scope and multiple column ordering and using composite primary key", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [1, 2] });
-    await CpkBook.create({ id: [1, 3] });
-    const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).limit(2);
-    const [authorId, id] = (book1 as any).id as [number, number];
-    let firstRelation: any = null;
-    for await (const rel of CpkBook.where("author_id >= ? AND id < ?", authorId, id).inBatches({
-      of: 1,
-      order: [":asc", ":desc"] as any,
-    })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((book2 as any).id));
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 1, id: 2 },
+      { author_id: 1, id: 3 },
+    ]);
+    const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).first(2);
+    const [authorId, id] = book1.id as [number, number];
+    const relation = (await CpkBook.where("author_id >= ? AND id < ?", authorId, id)
+      .inBatches({ of: 1, order: [":asc", ":desc"] })
+      .first())!;
+    assertEqual(book2, await relation.first());
   });
 });

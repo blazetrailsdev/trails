@@ -589,6 +589,7 @@ describe("fixtureTable", () => {
   });
   it("falls back to default_fixture_table_name when no class resolves", () => {
     expect(table("namespaced/accounts")).toEqual({ table: "namespaced_accounts", modelClass: null, declared: false }); // prettier-ignore
+    expect(table("to_be_linked/users")).toEqual({ table: "to_be_linked_users", modelClass: null, declared: false }); // prettier-ignore
   });
 });
 

@@ -1,4 +1,4 @@
 {
-  "tables": ["to_be_linked_accounts", "to_be_linked_users"],
+  "tables": [],
   "columns": []
 }

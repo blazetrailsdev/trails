@@ -214,6 +214,14 @@ describe("AsyncEnumerable", () => {
     );
   });
 
+  it("first breaks out of each after the elements it takes", async () => {
+    const first = AsyncEnumerable.first as (this: object, n?: number) => Promise<unknown>;
+    const bag = new AsyncBag([1, 2, 3]);
+    expect(await first.call(bag)).toBe(1);
+    expect(await first.call(bag, 2)).toEqual([1, 2]);
+    expect(await first.call(new AsyncBag([]))).toBeNull();
+  });
+
   it("sum rejects a second initial value", async () => {
     await expect(AsyncEnumerable.sum.call(new AsyncBag([1]), 1, 2)).rejects.toThrow(
       "wrong number of arguments (given 2, expected 0..1)",

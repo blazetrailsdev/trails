@@ -252,7 +252,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it.skip("marshal dump", async () => {
-    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+    // BLOCKED: ruby-compat-marshal-dumps-and-loads-a-set
     const preloaded = await Post.includes(":firstBlueTags").first();
     expect((Marshal.load(Marshal.dump(preloaded)) as Post).equals(preloaded)).toBe(true);
   });

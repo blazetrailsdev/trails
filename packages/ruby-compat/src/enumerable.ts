@@ -611,6 +611,8 @@ export const AsyncEnumerable = {
     return enumSumValue(memo);
   },
 
+  first,
+
   /** @noRailsEquivalent PERMANENT */
   [Symbol.asyncIterator]<T>(this: AsyncEach<T>): AsyncIterator<T> {
     return this.each()[Symbol.asyncIterator]();

@@ -62,6 +62,7 @@ import type { IrreversibleMigration, Migration } from "./migration.js";
 import type * as ModelSchema from "./model-schema.js";
 import type * as Reflection from "./reflection.js";
 import type { Relation } from "./relation.js";
+import type { Result } from "./result.js";
 import type { Default } from "./scoping/default.js";
 import type * as Named from "./scoping/named.js";
 import type { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -104,6 +105,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/disable_joins_association_relation": () =>
     import("./disable-joins-association-relation.js"),
   "active_record/relation": () => import("./relation.js"),
+  "active_record/result": () => import("./result.js"),
   "active_record/associations/collection_proxy": () => import("./associations/collection-proxy.js"),
   "active_record/associations/belongs_to_association": () =>
     import("./associations/belongs-to-association.js"),
@@ -203,6 +205,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
   Locking: typeof Locking;
   Relation: typeof Relation;
+  Result: typeof Result;
   Scoping: typeof Scoping;
   Tasks: typeof Tasks;
   Point: new (x: number, y: number) => { x: number; y: number };
@@ -224,6 +227,7 @@ ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("ConnectionAdapters");
   ActiveRecord.autoload("DisableJoinsAssociationRelation");
   ActiveRecord.autoload("Relation");
+  ActiveRecord.autoload("Result");
 });
 
 export const Associations = Object.assign(new Module(), { loadPath }) as Module &

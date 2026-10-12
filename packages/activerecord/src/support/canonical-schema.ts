@@ -1706,16 +1706,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.references("professor");
   });
 
-  await define("to_be_linked_accounts", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("to_be_linked_users", {}, (t) => {
-    t.string("name");
-    t.integer("account_id");
-    t.text("settings");
-  });
-
   _registry = tables;
   return tables;
 }

@@ -104,7 +104,7 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it.skip("marshalling extensions", async () => {
-    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+    // BLOCKED: activerecord-relation-round-trips-marshal
     type Extended = CollectionProxy & { findMostRecent: () => Promise<Base | null> };
     const david = developers("david");
     expect(
@@ -126,7 +126,7 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it.skip("marshalling named extensions", async () => {
-    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+    // BLOCKED: activerecord-relation-round-trips-marshal
     type Extended = CollectionProxy & { findMostRecent: () => Promise<Base | null> };
     let david = developers("david");
     expect(

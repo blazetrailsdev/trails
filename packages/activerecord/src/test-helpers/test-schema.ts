@@ -1703,15 +1703,6 @@ export const TEST_SCHEMA: Schema = {
     toooooooo_long_a_id: { type: "big_integer", null: false },
     toooooooo_long_b_id: { type: "big_integer", null: false },
   },
-
-  to_be_linked_accounts: {
-    name: "string",
-  },
-  to_be_linked_users: {
-    name: "string",
-    account_id: "integer",
-    settings: "text",
-  },
 };
 
 export const ARUNIT2_SCHEMA: Schema = {

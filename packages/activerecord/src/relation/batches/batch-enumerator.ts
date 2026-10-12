@@ -122,6 +122,8 @@ export class BatchEnumerator<T extends BatchRelation> {
 export interface BatchEnumerator<T extends BatchRelation> {
   sum(block: (relation: T) => number | Promise<number>): Promise<number>;
   toA(): Promise<T[]>;
+  first(): Promise<T | null>;
+  first(n: number): Promise<T[]>;
   [Symbol.asyncIterator](): AsyncIterator<T>;
 }
 

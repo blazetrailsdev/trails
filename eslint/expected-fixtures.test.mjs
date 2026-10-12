@@ -253,6 +253,16 @@ function runCases(tester) {
         filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
         code: `useHandlerFixtures(["customers"]); useFixtures({ "warehouse-things": [W, {}] });\n`,
       },
+      {
+        name: "fixtures array form under `as const` satisfies required keys",
+        filename: path.join(ROOT, "packages/activerecord/src/partial-reference.test.ts"),
+        code: `fixtures(["posts"] as const);\n`,
+      },
+      {
+        name: "fixtures argument under `satisfies` and `!` satisfies required keys",
+        filename: path.join(ROOT, "packages/activerecord/src/partial-reference.test.ts"),
+        code: `fixtures((["posts"] satisfies string[])!);\n`,
+      },
     ],
     invalid: [
       {

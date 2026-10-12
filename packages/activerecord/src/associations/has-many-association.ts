@@ -7,6 +7,7 @@ import {
   kernelThrow,
   rbEqual,
   toI,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
@@ -276,4 +277,4 @@ Object.assign(HasManyAssociation.prototype, {
 
 include(HasManyAssociation, ForeignAssociation);
 
-Associations.HasManyAssociation = HasManyAssociation;
+rbModConstSet(Associations, "HasManyAssociation", HasManyAssociation);

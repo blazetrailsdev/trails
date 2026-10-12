@@ -1,4 +1,4 @@
-import { Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Module, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { camelize, classAttribute, kernelArray, singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
 
@@ -38,7 +38,7 @@ export class CollectionAssociation extends Association {
     if (block) {
       const extensionModuleName = `${camelize(name)}AssociationExtension`;
       const extension = new Module(block);
-      model[extensionModuleName] = extension;
+      rbModConstSet(model, extensionModuleName, extension);
       return extension;
     }
     return undefined;

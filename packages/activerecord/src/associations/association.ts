@@ -12,6 +12,7 @@ import {
   rbEqual,
   rbInspect,
   rbObjClass,
+  rbDeclareIvar,
   rbObjClassname,
   rbObjId,
   rbObjInstanceVariables,
@@ -68,7 +69,6 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   protected _skipStrictLoading = false;
 
   private _staleState: unknown = undefined;
-  private _staleStateSnapshotted = false;
   private _cachedScope: unknown = undefined;
 
   constructor(owner: Base, reflection: AssociationDefinition) {
@@ -90,12 +90,6 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   loadedBang(): void {
     this.loaded = true;
     this._staleState = this.staleState();
-    this._staleStateSnapshotted = true;
-  }
-
-  /** @internal */
-  get _staleStateIsSnapshotted(): boolean {
-    return this._staleStateSnapshotted;
   }
 
   isStaleTarget(): boolean {
@@ -105,7 +99,6 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   reset(): void {
     this.loaded = false;
     this._staleState = undefined;
-    this._staleStateSnapshotted = false;
   }
 
   resetNegativeCache(): void {
@@ -511,3 +504,9 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     }
   }
 }
+
+rbDeclareIvar(Association, "@target", "_targetStore");
+rbDeclareIvar(Association, "@loaded", "_loadedStore");
+rbDeclareIvar(Association, "@skip_strict_loading", "_skipStrictLoading");
+rbDeclareIvar(Association, "@stale_state", "_staleState");
+rbDeclareIvar(Association, "@association_scope", "_cachedScope");

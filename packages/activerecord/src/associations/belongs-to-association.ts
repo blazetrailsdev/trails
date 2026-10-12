@@ -1,4 +1,11 @@
-import { fetch, rbEqual, rbFCaller, rbFPublicSend, rbObjAsString } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  rbEqual,
+  rbFCaller,
+  rbFPublicSend,
+  rbObjAsString,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { kernelArray } from "@blazetrails/activesupport";
@@ -221,4 +228,4 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 }
 
-Associations.BelongsToAssociation = BelongsToAssociation;
+rbModConstSet(Associations, "BelongsToAssociation", BelongsToAssociation);
