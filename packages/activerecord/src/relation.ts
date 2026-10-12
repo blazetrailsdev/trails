@@ -568,7 +568,6 @@ export class Relation<T extends Base, G extends boolean = false> {
     return await this.scoping(() => this._createBang(attributes, restoring));
   }
 
-  /** @missingRailsCall records — PERMANENT */
   encodeWith(coder: { representSeq(tag: string | null, list: unknown[]): void }): void {
     coder.representSeq(null, this._records);
   }

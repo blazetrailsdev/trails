@@ -103,7 +103,10 @@ export class DBConsole {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall application — CONVERGEABLE database-configuration-reads-config-database-yml
+   */
   protected async configurations(): Promise<DatabaseConfigurations> {
     await requireApplicationBang();
     ActiveRecordBase.configurations(
