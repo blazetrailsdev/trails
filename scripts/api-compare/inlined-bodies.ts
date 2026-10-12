@@ -39,7 +39,7 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
     if (cited !== actual) {
       throw new Error(
         `${TAG} citation is stale: ${where} — \`${name}\` is cited at ${cited}, and the ` +
-          `manifest has it at ${actual}.`,
+          `manifest has it at ${actual}. Rewrite it with \`pnpm parity:api:inlined:fix\`.`,
       );
     }
     return body;

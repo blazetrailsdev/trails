@@ -498,6 +498,26 @@ step — `parity:*` is the only name to write.
    reds on a stale receipt and on one sitting on a declaration no skeleton row
    was written for.
 
+   **Did you touch a constructor that inlines a Rails body?** Its
+   `@inlinedFrom` tags are gated both ways (RFC 0188; see § "A module's
+   `initialize` is inlined into the constructor"):
+
+   ```bash
+   pnpm parity:api:inlined       # the inlined-from staleness gate
+   pnpm parity:api:inlined:fix   # rewrite a stale citation from the manifest
+   ```
+
+   It reds on a tag naming a module with no `initialize` (or a `ClassMethods`
+   with no `new`), a module the Rails class does not include, prepend or
+   extend, a `def` in the constructor's own mirrored Ruby file, a tag written
+   twice or out of Ruby's chain order, or a citation that differs from the
+   `def` span in `rails-api.json`. Only the last has an autofix. A nested
+   `ClassMethods` counts as extended only through an explicit `extend` or a
+   module that extends `ActiveSupport::Concern`. The reverse arm, a constructor missing the tag for a cross-file
+   body its Rails class reaches, gates the packages in `MISSING_TAG_PACKAGES`
+   of `scripts/api-compare/lint-inlined-from.ts`. That set is **only-grow**: a
+   package joins in the PR that converts its constructors.
+
 3. **Did you touch a signature?** Parameter NAMES are gated too (RFC 0126) —
    `parity:api` prints a `params N/M` figure beside `arity`, `--params` lists
    every differing position, and
@@ -656,6 +676,82 @@ Ruby `extend SomeModule` — reach for it instead of hand-assigning
 is `classAttribute()` from `@blazetrails/activesupport`, which already gives
 Rails' semantics (reads walk the constructor chain, writes are local to the
 class); do not hand-roll copy-on-first-write per call site.
+
+## A module's `initialize` is inlined into the constructor (`@inlinedFrom`)
+
+Ruby lets a module define `initialize` and reach the next one up the ancestor
+chain through `super`. A JS constructor has no such chain through a mixin.
+**trails has no `initialize` methods**: Ruby's `new` / `initialize` chain is
+written as JS constructors, by two rules.
+
+- **A Rails class that inherits from a class uses JS `super()`.** Statements
+  that only compute arguments stay ahead of it. Where Ruby does work on `self`
+  and then calls `super`, and the parent's body does not read that work,
+  `super()` is hoisted to the first line. JS forbids `this` before `super()`,
+  so that reorder is forced by the language and is the sanctioned spelling.
+- **A module's `initialize`, or a parent's that reads the child's setup, is
+  inlined.** The body is written into the constructor at the position Ruby's
+  `super` occupies, line for line, in the constructor of each class that
+  includes or prepends the module. A `new` that arrives through a
+  `ClassMethods` module the class extends is inlined at the head of the
+  constructor the same way. A class's own `def self.new` is not an inlining:
+  `Klass.new` and `new Klass` are one operation, so it is the first part of
+  the constructor and takes no tag (see § "A record is built with `new Klass`
+  only").
+
+A parent constructor never calls an overridable hook to let a subclass run
+early. JS runs a subclass's field initializers after `super()` returns, so a
+field such as `history = []` overwrites whatever the hook set.
+
+The worked example is `Base`. `ActiveModel::API#initialize`
+(`activemodel/lib/active_model/api.rb:80-84`) is
+`assign_attributes(attributes) if attributes`, then `super()`.
+`ActiveRecord::Core#initialize`
+(`activerecord/lib/active_record/core.rb:471-477`) sets `@new_record` and
+`@attributes`, calls `init_internals` and `initialize_internals_callback`, and
+only then calls `super`, which lands in `API#initialize` because
+`ActiveRecord::Base` includes `ActiveModel::API` directly
+(`activerecord/lib/active_record/base.rb:283`). So `Base`'s constructor is
+`Core#initialize`'s body with `API#initialize`'s line at the `super` position:
+
+```ts
+/**
+ * @inlinedFrom ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78
+ * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482
+ * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
+ */
+constructor(attributes = null) { … }
+```
+
+`@inlinedFrom` names the Ruby body a segment of a constructor came from:
+
+- **Where.** On a class constructor's JSDoc and nowhere else, one tag per
+  inlined segment, in chain order.
+- **Value.** Exactly one shape: a Ruby `Module#initialize` or
+  `Mod::ClassMethods#new`, then its citation
+  `<source>/<version>/<file>:<first>-<last>`, the span of the `def`, relative
+  to `vendor/` and not spelling it. No prose, no story id, no `PERMANENT`.
+- **The tag follows the file.** Only a body whose `def` lives in a different
+  Ruby file from the one the constructor's file mirrors is tagged. A module
+  defined in the same `.rb` as the class that includes it is inlined the same
+  way and carries no tag, and a tag on one is an error.
+- **The citation is derived, never hand-edited.** It comes from
+  `rails-api.json`: `pnpm parity:api:inlined:fix` rewrites the path and line
+  span, and `pnpm vendor:recite` rewrites a stale version. It is there for the
+  reader. It does not detect a changed Rails body; the body pins
+  (`pnpm parity:api:pins`) do.
+- **It is not a licence for arel's `inlined-from` bucket.** That bucket is the
+  general case, a module member whose body sits on an including class's file,
+  and it is pinned at 0. The tag admits a constructor segment from the closed
+  list of hooks in `eslint/inlined-from-only-on-constructors.mjs` and nothing
+  else.
+
+`parity:api` credits a tagged module hook to the constructor, both call gates
+compare the constructor against the tagged bodies in chain order, and
+`pnpm parity:api:inlined` reds on a stale or unfounded tag (see "Before you
+open the PR"). `initialize_copy` / `initialize_dup` / `initialize_clone` are
+the `rbObjDup` / `rbObjClone` protocol and stay methods. This rule was set by
+the repo owner on 2026-10-08 (RFC 0188).
 
 ## Generated attribute readers are properties (`define_method_attribute`)
 

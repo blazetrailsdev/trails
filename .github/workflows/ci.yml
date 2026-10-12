@@ -1897,6 +1897,14 @@ jobs:
         # scripts/api-compare/predicate-kind-mark.json. Only-shrink; narrow with
         # `pnpm parity:api:predicates:tighten` — there is no reseed.
         run: pnpm exec tsx scripts/api-compare/lint-predicate-kinds.ts
+      - name: Inlined-from staleness gate
+        # RFC 0188. An `@inlinedFrom` tag naming a `def` the Rails manifest
+        # does not hold, citing it at another path or span, naming a module the
+        # Rails class does not mix in, or naming a body from the constructor's
+        # own mirrored file is red. A stale citation is rewritten by
+        # `pnpm parity:api:inlined:fix`. The missing-tag arm gates the packages
+        # in MISSING_TAG_PACKAGES (lint-inlined-from.ts), an only-grow set.
+        run: pnpm exec tsx scripts/api-compare/lint-inlined-from.ts
       - name: Ambiguous-parent ratchet
         # RFC 0126. An inheritance edge whose parent name resolves to several
         # same-named candidates, none sharing a leading path segment with the

@@ -31,6 +31,7 @@ arms-report after compare: $api/report-arms.ts --report --package=thor
 arm-throws after compare: $api/lint-arm-throws.ts --package thor
 predicates after compare: $api/lint-predicate-kinds.ts --package thor
 parents after compare: $api/lint-ambiguous-parents.ts --package thor
+inlined after compare: $api/lint-inlined-from.ts
 privates-manifest after ruby-api: pnpm exec tsx scripts/build-rails-privates-manifest.ts --package thor
 rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages/trailties/src/thor
 detached-jsdoc: $api/lint-detached-jsdoc-tags.ts --package thor

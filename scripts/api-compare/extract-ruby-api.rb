@@ -1228,6 +1228,7 @@ class ApiExtractor
     names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "include", names: names } if names.any?
   end
 
   def maybe_record_module_list(lhs, rhs)
@@ -1269,6 +1270,7 @@ class ApiExtractor
     names.each do |mod_name|
       target[:includes] << mod_name
       (@include_groups[[fqn, :includes]] ||= []) << [mod_name]
+      (target[:mixinOrder] ||= []) << { kind: "include", names: [mod_name] }
     end
   end
 
@@ -1281,12 +1283,15 @@ class ApiExtractor
     names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "include", names: names } if names.any?
   end
 
   def process_prepend(names)
     return if @in_on_load.positive?
     target = @classes[current_fqn] || @modules[current_fqn]
-    target[:prepends].concat(names) if target
+    return unless target
+    target[:prepends].concat(names)
+    (target[:mixinOrder] ||= []) << { kind: "prepend", names: names } if names.any?
   end
 
   def process_extend(args)
@@ -1298,6 +1303,7 @@ class ApiExtractor
     names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:extends] << mod_name }
     (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "extend", names: names } if names.any?
   end
 
   def process_extend_from_arg_paren(args)
@@ -1308,6 +1314,7 @@ class ApiExtractor
     names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:extends] << mod_name }
     (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "extend", names: names } if names.any?
   end
 
   # Is `recv` a `singleton_class` receiver — either the bare
@@ -4997,6 +5004,7 @@ def normalize_class_info(info)
   }.tap do |out|
     out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods]
     out[:prepends] = info[:prepends].uniq if info[:prepends]&.any?
+    out[:mixinOrder] = info[:mixinOrder] if info[:mixinOrder]&.any?
   end
 end
 

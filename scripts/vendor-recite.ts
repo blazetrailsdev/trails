@@ -58,17 +58,34 @@ function citationPattern(): RegExp {
   return new RegExp(`\\bvendor\\/(${names.join("|")})\\/([\\w.+-]+)(\\/?)`, "g");
 }
 
-/** `text` with every citation naming its source's version in `versions`. */
+function inlinedFromPattern(): RegExp {
+  const names = SOURCES.map((s) => s.name.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&"));
+  return new RegExp(`(@inlinedFrom[ \\t]+\\S+[ \\t]+)((?:${names.join("|")})\\/\\S+)`, "g");
+}
+
+/**
+ * `text` with every citation naming its source's version in `versions`. An
+ * `@inlinedFrom` citation is resolved with `vendor/` prepended and written
+ * back without it.
+ */
 export function reciteText(
   text: string,
   versions: Readonly<Record<string, string>> = activeVersions(),
 ): string {
-  return text.replace(citationPattern(), (_match, name: string, segment: string, slash: string) => {
-    const version = versions[name];
-    if (version === undefined) throw new Error(`no active version for vendor source "${name}"`);
-    if (VERSION_SEGMENT.test(segment)) return `vendor/${name}/${version}${slash}`;
-    return `vendor/${name}/${version}/${segment}${slash}`;
-  });
+  const tagged = text.replace(
+    inlinedFromPattern(),
+    (_match, head: string, citation: string) =>
+      head + reciteText(`vendor/${citation}`, versions).slice("vendor/".length),
+  );
+  return tagged.replace(
+    citationPattern(),
+    (_match, name: string, segment: string, slash: string) => {
+      const version = versions[name];
+      if (version === undefined) throw new Error(`no active version for vendor source "${name}"`);
+      if (VERSION_SEGMENT.test(segment)) return `vendor/${name}/${version}${slash}`;
+      return `vendor/${name}/${version}/${segment}${slash}`;
+    },
+  );
 }
 
 /**

@@ -190,6 +190,35 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(prepends["ActiveRecord::ConnectionAdapters::QueryCache"]).toEqual(["Dirties"]);
   });
 
+  it("records include, prepend and extend statements in source order, arguments as written", () => {
+    const order = rubyIncludes(
+      {
+        "base.rb": `
+          module ActiveRecord
+            class Base
+              include ActiveModel::API
+              extend ConnectionHandling
+              include Core, Persistence
+              prepend Suppressor
+              extend Querying
+            end
+            class Relation
+            end
+          end
+        `,
+      },
+      "mixinOrder",
+    );
+    expect(order["ActiveRecord::Base"]).toEqual([
+      { kind: "include", names: ["ActiveModel::API"] },
+      { kind: "extend", names: ["ConnectionHandling"] },
+      { kind: "include", names: ["Core", "Persistence"] },
+      { kind: "prepend", names: ["Suppressor"] },
+      { kind: "extend", names: ["Querying"] },
+    ]);
+    expect(order["ActiveRecord::Relation"]).toBeNull();
+  });
+
   it("unrolls an include loop over a constant list of modules", () => {
     const includes = rubyIncludes({
       "api.rb": `

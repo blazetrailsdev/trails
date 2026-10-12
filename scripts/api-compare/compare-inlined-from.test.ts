@@ -16,6 +16,8 @@ import { main } from "./compare.js";
 
 const PKG = "activemodel";
 const API_RB = "rails/v8.0.2/activemodel/lib/active_model/api.rb";
+const NAMING_FILE = "activemodel/lib/active_model/naming.rb";
+const NAMING_RB = `rails/v8.0.2/${NAMING_FILE}`;
 
 function method(name: string, calls: string[], extra: Partial<MethodInfo> = {}): MethodInfo {
   return {
@@ -64,6 +66,7 @@ function compare({
   moduleFile = "api.rb",
   rubyNew = false,
   classMethodsNew = false,
+  namingInitialize = false,
 }: {
   tsCalls?: string[];
   inlinedFrom?: InlinedFrom[];
@@ -73,11 +76,16 @@ function compare({
   moduleFile?: string;
   rubyNew?: boolean;
   classMethodsNew?: boolean;
+  namingInitialize?: boolean;
 } = {}): { calls: string[]; args: string[] } {
   const write = (name: string, packages: unknown) =>
     fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
   const helpers = (names: string[]) => names.map((name) => method(name, [], { params: PARAMS }));
-  const cited = (line: number, endLine: number) => ({ vendorFile: API_RB, line, endLine });
+  const cited = (line: number, endLine: number, vendorFile = API_RB) => ({
+    vendorFile,
+    line,
+    endLine,
+  });
   const local = entity("ActiveModel::Thing::Local", "thing.rb", [
     method("initialize", ["super"], cited(1, 2)),
   ]);
@@ -112,11 +120,15 @@ function compare({
         ...(sameFileModule ? { "ActiveModel::Thing::Local": local } : {}),
         ...(classMethodsNew
           ? {
-              "ActiveModel::Naming": entity("ActiveModel::Naming", "naming.rb", []),
+              "ActiveModel::Naming": entity(
+                "ActiveModel::Naming",
+                "naming.rb",
+                namingInitialize ? [method("initialize", ["super"], cited(5, 7, NAMING_RB))] : [],
+              ),
               "ActiveModel::Naming::ClassMethods": entity(
                 "ActiveModel::Naming::ClassMethods",
                 "naming.rb",
-                [method("new", ["lookup_reflection", "super"], cited(13, 15))],
+                [method("new", ["lookup_reflection", "super"], cited(13, 15, NAMING_RB))],
               ),
             }
           : {}),
@@ -193,9 +205,14 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     });
   });
 
-  const naming = tag({ module: "ActiveModel::Naming::ClassMethods", hook: "new", firstLine: 13 });
-  const namingRow = (inlinedFrom: InlinedFrom[]) => {
-    compare({ classMethodsNew: true, inlinedFrom });
+  const naming = tag({
+    module: "ActiveModel::Naming::ClassMethods",
+    hook: "new",
+    file: NAMING_FILE,
+    firstLine: 13,
+  });
+  const namingRow = (inlinedFrom: InlinedFrom[], namingInitialize = false) => {
+    compare({ classMethodsNew: true, inlinedFrom, namingInitialize });
     const report = JSON.parse(
       fs.readFileSync(path.join(output.dir, "api-comparison.json"), "utf-8"),
     );
@@ -215,6 +232,28 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
   it("still reports an untagged ClassMethods#new on the includer's constructor as one to relocate", () => {
     expect(namingRow([tag()])).toMatchObject({
       matched: 1,
+      moves: [{ rubyName: "new", actualFile: "thing.ts" }],
+    });
+  });
+
+  const namingInitialize = tag({
+    module: "ActiveModel::Naming",
+    file: NAMING_FILE,
+    firstLine: 5,
+    lastLine: 7,
+  });
+
+  it("keeps a ClassMethods#new row beside the module's own initialize, matched through its tag", () => {
+    expect(namingRow([tag(), namingInitialize, { ...naming, lastLine: 15 }], true)).toMatchObject({
+      matched: 2,
+      missing: 0,
+      moves: [],
+    });
+  });
+
+  it("keeps an untagged ClassMethods#new row beside the module's own initialize as one to relocate", () => {
+    expect(namingRow([tag(), namingInitialize], true)).toMatchObject({
+      matched: 2,
       moves: [{ rubyName: "new", actualFile: "thing.ts" }],
     });
   });

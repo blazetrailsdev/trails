@@ -6233,7 +6233,12 @@ export function main() {
             ? scopedSkipMirrorCandidates(tsMirrorNames, tsMethods)
             : ownNew
               ? [...(tsMethods.has("new") ? ["new"] : []), ...OWN_NEW_TS_CANDIDATES]
-              : rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg);
+              : rubyMethodToTsForFqn(
+                  rubyModule,
+                  rubyName,
+                  classMethodsNew ? undefined : siblingRubyNames,
+                  pkg,
+                );
         if (mirrorCandidates === null) continue;
         const besideInitialize =
           ownNew &&

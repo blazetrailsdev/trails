@@ -25,6 +25,9 @@ describe("vendor citations", () => {
         "// ok\n// vendor/rails/activerecord/lib/active_record.rb:1\n",
       "docs/stale.md": "See `vendor/ruby/v3.3.0/re.c:4144`.\n",
       "packages/a/src/current.ts": "// vendor/rails/v8.0.2/activerecord/lib/active_record.rb:1\n",
+      "packages/a/src/tagged.ts":
+        "/**\n * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84\n" +
+        " * @inlinedFrom ActiveRecord::Core#initialize rails/v7.1.0/activerecord/lib/active_record/core.rb:471-482\n */\n",
     };
     try {
       for (const [path, text] of Object.entries(files)) {
@@ -34,7 +37,11 @@ describe("vendor citations", () => {
       const fixtureVersions = await lockedVersions(root);
       expect(fixtureVersions).toEqual({ rails: "v8.0.2", ruby: "v3.3.11" });
       const found = await unrecitedCitations(root, Object.keys(files), fixtureVersions);
-      expect(found).toEqual(["packages/a/src/unversioned.ts:2", "docs/stale.md:1"]);
+      expect(found).toEqual([
+        "packages/a/src/unversioned.ts:2",
+        "docs/stale.md:1",
+        "packages/a/src/tagged.ts:3",
+      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
