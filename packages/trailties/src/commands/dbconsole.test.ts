@@ -6,7 +6,10 @@ import { DBConsole, DbconsoleCommand } from "./dbconsole.js";
 
 const database = vi.hoisted(() => ({ results: {} as Record<string, unknown> }));
 
-vi.mock("../database.js", () => ({ databaseConfiguration: async () => database.results }));
+vi.mock("../database.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../database.js")>()),
+  databaseConfiguration: async () => database.results,
+}));
 
 describe("Rails::DBConsoleTest", () => {
   let aborted = false;

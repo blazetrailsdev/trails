@@ -2,7 +2,7 @@ import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { MigrationGenerator } from "../generators/migration-generator.js";
 import { Generators } from "../generators.js";
-import { Actions, loadGenerators } from "../command/actions.js";
+import { Actions } from "../command/actions.js";
 import { APP_PATH } from "../app-path.js";
 
 export function generateCommand(): Command {
@@ -18,7 +18,7 @@ export function generateCommand(): Command {
     .action(async (name: string, columns: string[]) => {
       if (APP_PATH != null) {
         await Actions.bootApplicationBang();
-        await loadGenerators();
+        await Actions.loadGenerators();
       }
       const gen = new MigrationGenerator({ cwd: Dir.pwd(), output: console.log });
       await gen.run(name, columns);
@@ -27,7 +27,7 @@ export function generateCommand(): Command {
   const help = async (): Promise<void> => {
     if (APP_PATH != null) {
       await Actions.bootApplicationBang();
-      await loadGenerators();
+      await Actions.loadGenerators();
     }
     await Generators.help("generate", console.log);
   };
@@ -42,7 +42,7 @@ export function generateCommand(): Command {
 
       if (APP_PATH != null) {
         await Actions.bootApplicationBang();
-        await loadGenerators();
+        await Actions.loadGenerators();
       }
 
       await Generators.invoke(generator, args, {
