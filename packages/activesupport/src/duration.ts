@@ -34,7 +34,7 @@ import { current as timeCurrent } from "./core-ext/time/calculations.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./array-utils.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty, rbHash } from "@blazetrails/ruby-compat";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";
@@ -416,6 +416,10 @@ export class Duration {
 
   eql(other: unknown): boolean {
     return other instanceof Duration && rbEql(other.value, this.value);
+  }
+
+  hash(): number {
+    return rbHash(this.value);
   }
 
   compareTo(other: Duration | number | unknown): number {

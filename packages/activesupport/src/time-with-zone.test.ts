@@ -5,6 +5,7 @@ import { Duration } from "./duration.js";
 import { instantFromDate } from "./testing/temporal-helpers.js";
 import { Time } from "@blazetrails/date";
 import { Temporal } from "@blazetrails/date";
+import { rbHash } from "@blazetrails/ruby-compat";
 import { inTimeZone } from "./core-ext/string/zones.js";
 import { setZone, zone as timeZone } from "./time-zone-config.js";
 
@@ -525,6 +526,14 @@ describe("TimeWithZoneTest", () => {
     const twz = eastern.local(2024, 1, 15, 12, 0, 0);
     const date = twz.utc().toZonedDateTime().toInstant();
     expect(twz.equals(date)).toBe(true);
+  });
+
+  it("hash", () => {
+    const twz = new TimeWithZone(Time.utc(2000), eastern);
+    expect(twz.hash()).toBe(rbHash(Time.utc(2000)));
+    expect(new TimeWithZone(Time.utc(2000), TimeZone.find("Hawaii")!).hash()).toBe(
+      rbHash(Time.utc(2000)),
+    );
   });
 
   it("eql() requires same timezone", () => {

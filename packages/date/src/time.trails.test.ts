@@ -833,3 +833,15 @@ describe("Time", () => {
     expect(Time.new(2000, 1, 1, 12, 0, 0, new Rational(19800, 1)).utcOffset).toBe(19800);
   });
 });
+
+describe("Time#hash", () => {
+  it("answers alike for two Times that are eql?", () => {
+    expect(Time.utc(2000).hash()).toBe(Time.utc(2000).hash());
+    expect(Time.utc(2000).hash()).toBe(Time.utc(2000).getlocal(3600).hash());
+  });
+
+  it("differs for a different instant", () => {
+    expect(Time.utc(2000).hash()).not.toBe(Time.utc(2000, 1, 1, 0, 0, 1).hash());
+    expect(Time.at(0).hash()).not.toBe(Time.at(new Rational(1, 3_000_000_000)).hash());
+  });
+});

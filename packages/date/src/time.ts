@@ -22,6 +22,7 @@ import {
   kernelInteger,
   rbCTime,
   rbDefineAllocFunc,
+  rbHash,
   rbObjDup,
   rbObjRespondTo,
   registerConstant,
@@ -1550,6 +1551,14 @@ export class Time extends rbCTime {
       this.#instant.epochNanoseconds === other.#instant.epochNanoseconds &&
       this.#subnano.cmp(other.#subnano) === 0
     );
+  }
+
+  /**
+   * Mirrors: `time_hash` (`vendor/ruby/v3.3.11/time.c:4036`), which hashes
+   * `timew`, the instant `time_eql` compares.
+   */
+  hash(): number {
+    return rbHash([this.#instant.epochNanoseconds, this.#subnano]);
   }
 
   isUtc(): boolean {

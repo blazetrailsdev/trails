@@ -15,7 +15,7 @@ import {
   extend,
   type Extended,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbHash } from "@blazetrails/ruby-compat";
 
 let _deprecator: Deprecation | undefined;
 
@@ -129,6 +129,12 @@ export class GlobalID {
     return other instanceof GlobalID && this.uri.equals(other.uri);
   }
 
+  declare eql: GlobalID["equals"];
+
+  hash(): number {
+    return rbHash(this.constructor) | rbHash(this.uri);
+  }
+
   static deprecator(): Deprecation {
     return (_deprecator ??= new Deprecation("2.1", "GlobalID"));
   }
@@ -170,6 +176,8 @@ Object.assign(GlobalID, {
   },
 });
 extend(GlobalID, Autoload);
+
+GlobalID.prototype.eql = GlobalID.prototype.equals;
 
 GlobalID.eagerAutoload(() => {
   GlobalID.autoload("Locator");

@@ -48,6 +48,10 @@ type Accessors = {
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
 export class DetailsKey {
+  eql(other: unknown): boolean {
+    return this === other;
+  }
+
   /** @internal */
   static _detailsKeys = new Map<string, Requested>();
   /** @internal */

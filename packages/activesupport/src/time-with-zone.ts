@@ -25,6 +25,7 @@ import {
   rational,
   rbDefineAllocFunc,
   rbEqual,
+  rbHash,
   rbInspect,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
@@ -721,6 +722,10 @@ export class TimeWithZone {
       return this._zoned.epochNanoseconds === other.toZonedDateTime().epochNanoseconds;
     }
     return false;
+  }
+
+  hash(): number {
+    return rbHash(this.utc());
   }
 
   isBetween = isBetween;
