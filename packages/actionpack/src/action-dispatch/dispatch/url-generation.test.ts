@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
-   Ruby `include Routes.url_helpers`; the class/interface merge is how
-   `include()` surfaces those members on the type side. */
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
 import { include } from "@blazetrails/ruby-compat";
@@ -18,6 +15,10 @@ describe("WithMountPoint", () => {
   const Routes = new RouteSet();
 
   class MyRouteGeneratingController extends Base {
+    declare fooPath: Helper;
+    declare trailingSlashDefaultUrl: Helper;
+    declare trailingSlashDefaultPath: Helper;
+
     async index(): Promise<void> {
       await this.render({ plain: this.fooPath() });
     }
@@ -44,11 +45,6 @@ describe("WithMountPoint", () => {
       }
     }
   }
-  interface MyRouteGeneratingController {
-    fooPath: Helper;
-    trailingSlashDefaultUrl: Helper;
-    trailingSlashDefaultPath: Helper;
-  }
   include(MyRouteGeneratingController, Routes.urlHelpers());
   controllerConstants.set("my_route_generating", MyRouteGeneratingController);
 
@@ -73,6 +69,12 @@ describe("WithMountPoint", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class WithMountPoint extends IntegrationTest {
+    declare fooPath: Helper;
+    declare fooUrl: Helper;
+    declare bazUrl: Helper;
+    declare barsPath: Helper;
+    declare barPath: Helper;
+
     override get _routes(): UrlForRoutes {
       return Routes;
     }
@@ -80,13 +82,6 @@ describe("WithMountPoint", () => {
     override get app(): unknown {
       return APP;
     }
-  }
-  interface WithMountPoint {
-    fooPath: Helper;
-    fooUrl: Helper;
-    bazUrl: Helper;
-    barsPath: Helper;
-    barPath: Helper;
   }
   include(WithMountPoint, Routes.urlHelpers());
 

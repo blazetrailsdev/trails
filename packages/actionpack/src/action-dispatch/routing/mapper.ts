@@ -1781,11 +1781,11 @@ export class Mapper {
   }
 
   resolve(...args: unknown[]): void {
-    const block = args.pop() as Parameters<RouteSet["addPolymorphicMapping"]>[2];
     if (!this._scope.isRoot()) {
       throw new RuntimeError("The resolve method can't be used inside a routes scope block");
     }
 
+    const block = args.pop() as Parameters<RouteSet["addPolymorphicMapping"]>[2];
     const options = extractOptionsBang(args);
     args = args.flat(1);
 

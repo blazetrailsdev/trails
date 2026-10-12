@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Ruby `include Routes.url_helpers` / `include ActiveModel::Conversion`; the
-   class/interface merge is how `include()` surfaces those members on the type side. */
 import { beforeEach, describe, it } from "vitest";
 import { Conversion, ModelName, Naming } from "@blazetrails/activemodel";
 import { assertEqual, assertRaises, Concern, extend, underscore } from "@blazetrails/activesupport";
-import { include, merge, Module, RuntimeError } from "@blazetrails/ruby-compat";
+import { include, merge, Module, NameError, rbFSend, RuntimeError } from "@blazetrails/ruby-compat";
 import {
   Parameters,
   UnfilteredParameters,
@@ -53,6 +50,8 @@ class Manufacturer extends Linkable {}
 
 class Model {
   declare _modelName?: ModelName;
+  declare readonly modelName: ModelName;
+  declare toModel: Conversion["toModel"];
   readonly id: string | null;
 
   constructor(id: string | null = null) {
@@ -62,9 +61,6 @@ class Model {
   isPersisted(): boolean {
     return false;
   }
-}
-interface Model extends Conversion {
-  readonly modelName: ModelName;
 }
 extend(Model, Naming);
 include(Model, Conversion);
@@ -142,7 +138,7 @@ Routes.draw(function () {
       ":products",
       merge(
         options as Record<string, unknown>,
-        (this.params as () => Parameters)().permit("page", "size").toH(),
+        (rbFSend(this, "params") as Parameters).permit("page", "size").toH(),
       ),
     ];
   });
@@ -205,13 +201,12 @@ class TestCustomUrlHelpers extends IntegrationTest {
     return new Parameters({ page: 2, size: 25 });
   }
 }
-interface TestCustomUrlHelpers extends Helpers {}
 include(TestCustomUrlHelpers, Routes.urlHelpers());
 
 describe("TestCustomUrlHelpers", () => {
-  let t: TestCustomUrlHelpers & PolymorphicHost;
+  let t: TestCustomUrlHelpers & PolymorphicHost & Helpers;
   beforeEach(({ task }) => {
-    t = new TestCustomUrlHelpers(task.name) as TestCustomUrlHelpers & PolymorphicHost;
+    t = new TestCustomUrlHelpers(task.name) as TestCustomUrlHelpers & PolymorphicHost & Helpers;
     t.setup();
   });
 
@@ -257,7 +252,7 @@ describe("TestCustomUrlHelpers", () => {
     assertEqual("/products?size=20", Routes.urlHelpers().defaultsPath({ size: 20 }));
 
     assertEqual("/products?page=2&size=25", t.browsePath());
-    await assertRaises([TypeError], {}, () => Routes.urlHelpers().browsePath());
+    await assertRaises([NameError], {}, () => Routes.urlHelpers().browsePath());
   });
 
   it("direct urls", async () => {
@@ -311,7 +306,7 @@ describe("TestCustomUrlHelpers", () => {
     );
 
     assertEqual("http://www.example.com/products?page=2&size=25", t.browseUrl());
-    await assertRaises([TypeError], {}, () => Routes.urlHelpers().browseUrl());
+    await assertRaises([NameError], {}, () => Routes.urlHelpers().browseUrl());
   });
 
   it("resolve paths", () => {
