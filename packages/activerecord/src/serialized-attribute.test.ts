@@ -8,7 +8,12 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
-import { setUseYamlUnsafeLoad } from "./active-record.js";
+import {
+  setUseYamlUnsafeLoad,
+  setYamlColumnPermittedClasses,
+  useYamlUnsafeLoad,
+  yamlColumnPermittedClasses,
+} from "./active-record.js";
 
 class HashObject {
   constructor() {
@@ -49,9 +54,15 @@ registerModel(ImportantTopic);
 describe("SerializedAttributeTest", () => {
   const { topics, posts } = fixtures(["topics", "posts"]);
 
-  beforeEach(() => setUseYamlUnsafeLoad(true));
+  let yamlColumnPermittedClassesDefault: unknown[];
+
+  beforeEach(() => {
+    setUseYamlUnsafeLoad(true);
+    yamlColumnPermittedClassesDefault = yamlColumnPermittedClasses();
+  });
   afterEach(() => {
     Topic.serialize("content");
+    setYamlColumnPermittedClasses(yamlColumnPermittedClassesDefault);
   });
   afterAll(() => setUseYamlUnsafeLoad(false));
 
@@ -481,8 +492,18 @@ describe("SerializedAttributeTest", () => {
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   fixtures(["topics"]);
 
+  let useYamlUnsafeLoadWas: boolean;
+  let yamlColumnPermittedClassesDefault: unknown[];
+
+  beforeEach(() => {
+    useYamlUnsafeLoadWas = useYamlUnsafeLoad();
+    yamlColumnPermittedClassesDefault = yamlColumnPermittedClasses();
+    setUseYamlUnsafeLoad(false);
+  });
   afterEach(() => {
     Topic.serialize("content");
+    setYamlColumnPermittedClasses(yamlColumnPermittedClassesDefault);
+    setUseYamlUnsafeLoad(useYamlUnsafeLoadWas);
   });
 
   it("serialized attribute", async () => {

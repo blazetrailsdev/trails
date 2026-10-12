@@ -21,9 +21,6 @@ import {
 } from "@blazetrails/activesupport";
 import { stdout, stderr, setEnv, getProcessAdapter, RuntimeError } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
-import { MySQLDatabaseTasks } from "./mysql-database-tasks.js";
-import { PostgreSQLDatabaseTasks } from "./postgresql-database-tasks.js";
-import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import {
@@ -99,25 +96,20 @@ const tasks = { mysqlTasks, postgresqlTasks, sqliteTasks } as Record<
 >;
 
 async function withStubbedNew(block: () => void | Promise<void>): Promise<void> {
-  const stubs = new Map<unknown, object>([
-    [MySQLDatabaseTasks, mysqlTasks],
-    [PostgreSQLDatabaseTasks, postgresqlTasks],
-    [SQLiteDatabaseTasks, sqliteTasks],
-  ]);
-  const registry = DatabaseTasks as unknown as {
-    _registeredTasks: { pattern: unknown; handler: object }[];
-  };
-  const registeredTasks = registry._registeredTasks;
-  registry._registeredTasks = registeredTasks.map(({ pattern, handler }) => ({
-    pattern,
-    handler: stubs.has(handler)
-      ? new Proxy(handler, { construct: () => stubs.get(handler)! })
-      : handler,
-  }));
+  const stubbedNew = (instance: object) =>
+    class {
+      constructor() {
+        return instance;
+      }
+    };
+  DatabaseTasks.registerTask(/mysql/, stubbedNew(mysqlTasks));
+  DatabaseTasks.registerTask(/trilogy/, stubbedNew(mysqlTasks));
+  DatabaseTasks.registerTask(/postgresql/, stubbedNew(postgresqlTasks));
+  DatabaseTasks.registerTask(/sqlite/, stubbedNew(sqliteTasks));
   try {
     await block();
   } finally {
-    registry._registeredTasks = registeredTasks;
+    resetRegisteredTasks();
   }
 }
 
