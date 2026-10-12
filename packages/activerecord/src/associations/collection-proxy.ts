@@ -11,7 +11,7 @@ import {
   callbacksFor as assocCallbacksFor,
   type CallbackHost,
 } from "./collection-association.js";
-import type { PP } from "@blazetrails/ruby-compat";
+import type { PP, Set } from "@blazetrails/ruby-compat";
 import { relationClassFor } from "../relation/delegation.js";
 
 import { stripThenable } from "@blazetrails/activesupport";

@@ -273,7 +273,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     tests: [
       "is shared between fibers",
       "is not shared between fibers if isolation level is fiber",
-      "default value is accessible from other threads",
       "values should not bleed between threads",
     ],
     reason:
@@ -285,16 +284,15 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "core_ext/class/attribute_test.rb",
     tests: [
-      "works well with singleton classes",
       "when defined in a class's singleton",
       "works well with module singleton classes",
       "allow to prepend accessors",
     ],
     reason:
-      "The first three declare or read `class_attribute` through an object's singleton " +
-      "class (`object.singleton_class.setting=`, `class << self`), whose lookup chain is " +
-      "what core_ext/class/attribute.rb:86-120 walks; the fourth asserts `singleton_class.prepend` " +
-      "wraps the generated reader and writer. JS has no per-object singleton class and no " +
+      "The first two declare `class_attribute` inside a class's or module's own singleton " +
+      "class (`class << self`), whose lookup chain is what core_ext/class/attribute.rb:86-120 " +
+      "walks; the third asserts `singleton_class.prepend` wraps the generated reader and " +
+      "writer. A JS class has no metaclass apart from its own statics and no " +
       "`Module#prepend`, so there is no receiver for either shape.",
   },
   {

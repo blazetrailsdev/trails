@@ -377,13 +377,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "no JS YAML AR-record (un)safe-load equivalent.",
   },
   {
-    testFile: "core_test.rb",
-    tests: ["inspect singleton instance"],
-    reason:
-      "Ruby per-object singleton class rendering (`#<Class:#<Topic:0x...>>`); JS has " +
-      "no singleton-class concept and no AR code participates in that rendering.",
-  },
-  {
     testFile: "inherited_test.rb",
     tests: ["super before filter attributes", "super after filter attributes"],
     reason:

@@ -6,6 +6,7 @@ import {
   rbEqual,
   rbObjRespondTo,
   rbDeclareIvar,
+  Set,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import {
@@ -53,7 +54,7 @@ export abstract class CollectionAssociation extends Association {
   }
 
   /** @internal */
-  _replacedOrAddedTargets = new Set<Base>();
+  _replacedOrAddedTargets = new Set<Base>().compareByIdentity();
 
   /** @internal */
   _wasLoaded: boolean | null = null;
@@ -140,7 +141,7 @@ export abstract class CollectionAssociation extends Association {
     super.reset();
     this.#loadingTarget = null;
     this._targetStore = [];
-    this._replacedOrAddedTargets = new Set<Base>();
+    this._replacedOrAddedTargets = new Set<Base>().compareByIdentity();
     this._associationIds = null;
   }
 
