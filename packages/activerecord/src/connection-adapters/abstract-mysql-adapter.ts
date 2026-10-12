@@ -161,7 +161,7 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
 export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   protected abstract isTextType(type: string): boolean;
 
-  protected abstract fullVersion(): Promise<string | null>;
+  protected abstract fullVersion(): string | null | Promise<string | null>;
 
   protected abstract getFullVersion(): Promise<string | null>;
 
@@ -210,8 +210,15 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return new Version(versionString, fullVersionString);
   }
 
-  async isMariadb(): Promise<boolean> {
-    const fullVersion = await this.fullVersion();
+  /**
+   * @inventedArm if — CONVERGEABLE mysql-mariadb-and-full-version-answer-a-value-or-a-promise
+   * @inventedArm then — CONVERGEABLE mysql-mariadb-and-full-version-answer-a-value-or-a-promise
+   */
+  isMariadb(): boolean | Promise<boolean> {
+    const fullVersion = this.fullVersion();
+    if (fullVersion instanceof Promise) {
+      return fullVersion.then((v) => v != null && /mariadb/i.test(v));
+    }
     return fullVersion != null && /mariadb/i.test(fullVersion);
   }
 
@@ -292,12 +299,14 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  async supportsInsertReturning(): Promise<boolean> {
-    return (await this.isMariadb()) && (await this.databaseVersion).compare("10.5.0") >= 0;
+  supportsInsertReturning(): boolean {
+    return (
+      (this.isMariadb() as boolean) && (this.databaseVersion as Version).compare("10.5.0") >= 0
+    );
   }
 
   async returnValueAfterInsert(column: Column): Promise<boolean> {
-    return (await this.supportsInsertReturning())
+    return this.supportsInsertReturning()
       ? column.isAutoPopulated()
       : column.isAutoIncrementedByDb();
   }

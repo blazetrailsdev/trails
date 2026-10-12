@@ -35,7 +35,7 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationConn {
   supportsCheckConstraints(): Promise<boolean>;
   supportsIndexesInCreate(): boolean;
-  isMariadb(): Promise<boolean>;
+  isMariadb(): boolean | Promise<boolean>;
   quote(value: unknown): string;
   addIndexOptions(
     tableName: string,

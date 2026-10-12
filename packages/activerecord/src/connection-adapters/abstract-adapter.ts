@@ -674,7 +674,7 @@ export interface AbstractAdapter
     pk: string | false | null | undefined,
     binds: unknown[],
     returning: string[] | null | undefined,
-  ): Promise<[string, unknown[]]>;
+  ): [string, unknown[]];
   /** @internal */
   rawExecute(
     sql: string,
@@ -1289,7 +1289,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  async supportsInsertReturning(): Promise<boolean> {
+  supportsInsertReturning(): boolean {
     return false;
   }
 

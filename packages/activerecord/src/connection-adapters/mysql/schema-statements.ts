@@ -286,7 +286,7 @@ const CHARSETS_OF_4BYTES_MAXLEN = ["utf8mb4", "utf16", "utf16le", "utf32"];
 
 /** @internal */
 export interface RowFormatHost {
-  isMariadb(): Promise<boolean>;
+  isMariadb(): boolean | Promise<boolean>;
   readonly databaseVersion: Version | number | Promise<Version | number>;
   queryValue(sql: string, name?: string): Promise<unknown>;
   _defaultRowFormat?: string | null;

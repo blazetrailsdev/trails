@@ -227,11 +227,16 @@ export interface DatabaseStatementsHost {
   /** @internal */
   checkIfWriteQuery?(sql: string | null): void;
   /** @internal */
-  supportsInsertReturning?(): boolean | Promise<boolean>;
+  supportsInsertReturning?(): boolean;
   /** @internal */
   quoteColumnName?(col: string): string;
   /** @internal */
-  primaryKey?(table: string): string | null | Promise<string | null>;
+  databaseVersion?: unknown;
+  /** @internal */
+  schemaCache?: {
+    primaryKeys?(tableName: string): Promise<string | string[] | null>;
+    getCachedPrimaryKeys?(tableName: string): string | string[] | null | undefined;
+  };
   /** @internal */
   preprocessQuery?(sql: string | null): string | null;
   /** @internal */
@@ -774,7 +779,13 @@ interface DatabaseStatementsDefaultsHost {
     pk: string | false | null | undefined,
     binds: unknown[],
     returning: string[] | null | undefined,
-  ): Promise<[string, unknown[]]>;
+  ): [string, unknown[]];
+  /** @internal */
+  databaseVersion: unknown;
+  /** @internal */
+  supportsInsertReturning(): boolean;
+  /** @internal */
+  schemaCache: { primaryKeys(tableName: string): Promise<string | string[] | null> };
 }
 
 /** @internal */
@@ -881,6 +892,10 @@ export const DatabaseStatements = new Module((mod) => {
     return this.internalExecQuery(sql, name, binds, { prepare });
   },
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm primaryKeys — PERMANENT
+   */
   async execInsert(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
@@ -890,7 +905,12 @@ export const DatabaseStatements = new Module((mod) => {
     _sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result> {
-    [sql, binds] = await this.sqlForInsert(sql, pk, binds, returning);
+    await this.databaseVersion;
+    if (pk == null && this.supportsInsertReturning()) {
+      const tableRef = extractTableRefFromInsertSql.call(this, sql);
+      if (tableRef) await this.schemaCache.primaryKeys(tableRef);
+    }
+    [sql, binds] = this.sqlForInsert(sql, pk, binds, returning);
     return this.internalExecQuery(sql, name, binds);
   },
 
@@ -1244,21 +1264,24 @@ export function select(
   }
 }
 
-/** @internal */
-export async function sqlForInsert(
+/**
+ * @internal
+ * @missingRailsCall primary_key — PERMANENT
+ */
+export function sqlForInsert(
   this: DatabaseStatementsHost,
   sql: string,
-  pk: string | false | null | undefined,
+  pk: string | string[] | false | null | undefined,
   binds: unknown[],
   returning: string[] | null | undefined,
-): Promise<[string, unknown[]]> {
-  if (await this.supportsInsertReturning!()) {
+): [string, unknown[]] {
+  if (this.supportsInsertReturning!()) {
     if (pk == null) {
       const tableRef = extractTableRefFromInsertSql.call(this, sql);
-      if (tableRef) pk = await this.primaryKey!(tableRef);
+      if (tableRef) pk = this.schemaCache!.getCachedPrimaryKeys!(tableRef);
     }
 
-    const returningColumns = returning || wrap(pk as string | null);
+    const returningColumns = returning || wrap(pk as string | string[] | null);
 
     const returningColumnsStatement = returningColumns
       .map((c) => this.quoteColumnName!(c))
@@ -1303,10 +1326,7 @@ export function arelFromRelation(relation: unknown): unknown {
 }
 
 /** @internal */
-export function extractTableRefFromInsertSql(
-  this: DatabaseStatementsHost,
-  sql: string,
-): string | null {
+export function extractTableRefFromInsertSql(this: unknown, sql: string): string | null {
   const match = sql.match(/into\s("[ A-Za-z0-9_."[\]]+"|[A-Za-z0-9_.[\]"]+)\s*/im);
   if (!match) return null;
   return match[1].replace(/"/g, "").trim();
