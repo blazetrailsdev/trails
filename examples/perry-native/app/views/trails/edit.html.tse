@@ -1,0 +1,12 @@
+<% contentFor("title", "Editing trail") %>
+
+<h1>Editing trail</h1>
+
+<%= render("form", { trail: this.trail }) %>
+
+<br>
+
+<div>
+  <%= linkTo("Show this trail", this.trail) %> |
+  <%= linkTo("Back to trails", trailsPath()) %>
+</div>

@@ -1,0 +1,10 @@
+<p style="color: green"><%= notice %></p>
+
+<%= render(this.trail) %>
+
+<div>
+  <%= linkTo("Edit this trail", editTrailPath(this.trail)) %> |
+  <%= linkTo("Back to trails", trailsPath()) %>
+
+  <%= buttonTo("Destroy this trail", this.trail, { method: "delete" }) %>
+</div>

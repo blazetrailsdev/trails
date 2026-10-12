@@ -1,0 +1,16 @@
+<p style="color: green"><%= notice %></p>
+
+<% contentFor("title", "Trails") %>
+
+<h1>Trails</h1>
+
+<div id="trails">
+  <% for (const trail of this.trails) { %>
+    <%= render(trail) %>
+    <p>
+      <%= linkTo("Show this trail", trail) %>
+    </p>
+  <% } %>
+</div>
+
+<%= linkTo("New trail", newTrailPath()) %>

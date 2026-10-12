@@ -1,0 +1,27 @@
+<%= formWith({ model: trail }, (form) => { %>
+  <% if (trail.errors.isAny()) { %>
+    <div style="color: red">
+      <h2><%= pluralize(trail.errors.count, "error") %> prohibited this trail from being saved:</h2>
+
+      <ul>
+        <% trail.errors.each((error) => { %>
+          <li><%= error.fullMessage %></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+
+  <div>
+    <%= form.label("name", { style: "display: block" }) %>
+    <%= form.textField("name") %>
+  </div>
+
+  <div>
+    <%= form.label("length", { style: "display: block" }) %>
+    <%= form.numberField("length") %>
+  </div>
+
+  <div>
+    <%= form.submit() %>
+  </div>
+<% }) %>
