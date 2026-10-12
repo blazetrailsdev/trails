@@ -51,6 +51,19 @@ describe("Set", () => {
     );
   });
 
+  it("intersect? stops at the first member it finds, and merge refuses a value that is not enumerable", () => {
+    const set = new Set<unknown>([3]);
+    function* enumerable(): Generator<number> {
+      yield 3;
+      throw new Error("walked past the match");
+    }
+
+    expect(set.isIntersect(enumerable())).toBe(true);
+    expect(set.isDisjointFrom(enumerable())).toBe(false);
+    expect(() => set.merge(1 as never)).toThrow(new ArgumentError("value must be enumerable"));
+    expect(() => set.subtract(1 as never)).toThrow(new ArgumentError("value must be enumerable"));
+  });
+
   it("compare_by_identity makes an equal Array a second member", () => {
     const member = [1, 2];
     const set = new Set<unknown>().compareByIdentity().add(member);

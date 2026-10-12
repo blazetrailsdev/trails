@@ -31,7 +31,8 @@ export class Set<T> extends JsSet<T> {
   constructor(enumerable: Iterable<T> | null = null) {
     super();
     if (enumerable == null) return;
-    for (const o of enumerable) this.add(o);
+
+    this.merge(enumerable);
   }
 
   /**
@@ -55,6 +56,18 @@ export class Set<T> extends JsSet<T> {
    */
   isCompareByIdentity(): boolean {
     return rbObjRespondTo(this._hash, "isCompareByIdentity") && this._hash.isCompareByIdentity();
+  }
+
+  /**
+   * `Set#do_with_enum` (`vendor/ruby/v3.3.11/lib/set.rb:272`).
+   * @noRailsEquivalent PERMANENT
+   */
+  private doWithEnum(enumerable: Iterable<T>, block: (o: T) => void): void {
+    if (typeof (enumerable as Partial<Iterable<T>> | null)?.[Symbol.iterator] === "function") {
+      for (const o of enumerable) block(o);
+    } else {
+      throw new ArgumentError("value must be enumerable");
+    }
   }
 
   /**
@@ -98,7 +111,9 @@ export class Set<T> extends JsSet<T> {
     if (rbObjClass(set) === rbObjClass(this) && rbObjRespondTo(this._hash, "greaterThanOrEqual")) {
       return (this._hash as unknown as HashRelop).greaterThanOrEqual(set._hash);
     } else if (set instanceof Set) {
-      return this.size >= set.size && [...set].every((o) => this.has(o as T));
+      if (this.size < set.size) return false;
+      for (const o of set) if (!this.has(o as T)) return false;
+      return true;
     } else {
       throw new ArgumentError("value must be a set");
     }
@@ -113,7 +128,9 @@ export class Set<T> extends JsSet<T> {
     if (rbObjClass(set) === rbObjClass(this) && rbObjRespondTo(this._hash, "lessThanOrEqual")) {
       return (this._hash as unknown as HashRelop).lessThanOrEqual(set._hash);
     } else if (set instanceof Set) {
-      return this.size <= set.size && [...this].every((o) => set.has(o));
+      if (this.size > set.size) return false;
+      for (const o of this) if (!set.has(o)) return false;
+      return true;
     } else {
       throw new ArgumentError("value must be a set");
     }
@@ -126,14 +143,17 @@ export class Set<T> extends JsSet<T> {
   isIntersect(set: Iterable<unknown>): boolean {
     if (set instanceof Set) {
       if (this.size < set.size) {
-        return [...this].some((o) => set.has(o));
+        for (const o of this) if (set.has(o)) return true;
+        return false;
       } else {
-        return [...set].some((o) => this.has(o as T));
+        for (const o of set) if (this.has(o as T)) return true;
+        return false;
       }
     } else if (
       typeof (set as Partial<Iterable<unknown>> | null)?.[Symbol.iterator] === "function"
     ) {
-      return [...set].some((o) => this.has(o as T));
+      for (const o of set) if (this.has(o as T)) return true;
+      return false;
     } else {
       throw new ArgumentError("value must be enumerable");
     }
@@ -223,7 +243,7 @@ export class Set<T> extends JsSet<T> {
           (enumerable as Set<T>)._hash as unknown as Map<string, boolean>,
         );
       } else {
-        for (const o of enumerable) this.add(o);
+        this.doWithEnum(enumerable, (o) => this.add(o));
       }
     }
 
@@ -235,7 +255,7 @@ export class Set<T> extends JsSet<T> {
    * @noRailsEquivalent PERMANENT
    */
   subtract(enumerable: Iterable<T>): this {
-    for (const o of enumerable) this.delete(o);
+    this.doWithEnum(enumerable, (o) => this.delete(o));
     return this;
   }
 
@@ -268,7 +288,9 @@ export class Set<T> extends JsSet<T> {
         for (const o of enumerable) if (this.has(o)) n.add(o);
       }
     } else {
-      for (const o of enumerable) if (this.has(o)) n.add(o);
+      this.doWithEnum(enumerable, (o) => {
+        if (this.has(o)) n.add(o);
+      });
     }
     return n;
   }
