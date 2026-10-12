@@ -83,6 +83,9 @@ export class DelegateCache {
       const delegate = class extends (klass as new (...args: never[]) => object) {} as FamilyCtor;
       include(delegate, ClassSpecificRelation);
       DelegateCache.includeRelationMethods.call(this, delegate);
+      const mangledName = rbModName(klass)!.replaceAll("::", "_");
+      rbModConstSet(this, mangledName, delegate);
+
       cache.set(klass, delegate);
     }
   }

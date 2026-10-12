@@ -73,7 +73,9 @@ describe("rb_path_to_class", () => {
   });
 
   it("does not read a JS global as a top-level constant", () => {
-    expect(() => rbPathToClass("Array")).toThrow(new ArgumentError("undefined class/module Array"));
+    expect(() => rbPathToClass("Promise")).toThrow(
+      new ArgumentError("undefined class/module Promise"),
+    );
     expect(() => rbPathToClass("PathShop::Widget::name")).toThrow(
       new ArgumentError("undefined class/module PathShop::Widget::name"),
     );

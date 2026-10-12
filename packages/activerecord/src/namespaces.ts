@@ -314,6 +314,9 @@ Scoping.eagerAutoload(() => {
   Scoping.autoload("Named");
 });
 
+export const TypeCaster = { name: "ActiveRecord::TypeCaster" };
+rbModConstSet(ActiveRecord, "TypeCaster", TypeCaster);
+
 export const Tasks = { name: "ActiveRecord::Tasks", loadPath } as AutoloadModule & {
   DatabaseTasks: typeof DatabaseTasks;
   MySQLDatabaseTasks: typeof MySQLDatabaseTasks;

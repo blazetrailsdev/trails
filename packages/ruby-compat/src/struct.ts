@@ -42,6 +42,30 @@ function structValues(s: StructInstance): unknown[] {
   return [...(s as unknown as { [RSTRUCT]: unknown[] })[RSTRUCT]];
 }
 
+/**
+ * `RSTRUCT_GET` (`vendor/ruby/v3.3.11/internal/struct.h:115`): the value in
+ * slot `k`, read past any reader the class overrides.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rstructGet(st: StructInstance, k: number): unknown {
+  return (st as unknown as { [RSTRUCT]: unknown[] })[RSTRUCT][k];
+}
+
+/**
+ * `rb_struct_initialize` (`vendor/ruby/v3.3.11/struct.c:795`), over
+ * `rb_struct_initialize_m` (`struct.c:742`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStructInitialize(self: StructInstance, values: unknown[]): void {
+  const members = self.members();
+  if (members.length < values.length) throw new ArgumentError("struct size differs");
+  (self as unknown as { [RSTRUCT]: unknown[] })[RSTRUCT] = members.map(
+    (_member, i) => values[i] ?? null,
+  );
+}
+
 const pairedRecursion: [object, object][] = [];
 
 function rbExecRecursivePaired(
@@ -91,12 +115,11 @@ export const Struct = {
     ...memberNames: M[]
   ): new (...values: unknown[]) => StructInstance & Record<M, unknown> {
     const klass = class {
-      [RSTRUCT]: unknown[];
+      [RSTRUCT]!: unknown[];
 
       /** `rb_struct_initialize_m` (`vendor/ruby/v3.3.11/struct.c:742`). */
       constructor(...values: unknown[]) {
-        if (memberNames.length < values.length) throw new ArgumentError("struct size differs");
-        this[RSTRUCT] = memberNames.map((_member, i) => values[i] ?? null);
+        rbStructInitialize(this as unknown as StructInstance, values);
       }
 
       /**

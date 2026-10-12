@@ -6,6 +6,7 @@ import { Hash } from "./hash.js";
 import { Module, extend, rbDefineAllocFunc, rbModConstSet } from "./include.js";
 import { Marshal, rbMarshalDefineCompat } from "./marshal.js";
 import {
+  rbCBasicObject,
   rbModName,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -15,6 +16,7 @@ import {
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { RuntimeError } from "./runtime-error.js";
 import { Set as RbSet } from "./set.js";
+import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
 import { registerConstant, unregisterConstant } from "./variable.js";
 
@@ -38,6 +40,19 @@ class Shape {
 const Geo = { name: "Geo", Shape };
 rbSetClassPathString(Shape, Geo, "Shape");
 const Kind = rbModConstSet(Geo, "Kind", new Module());
+class Pair extends Struct.new("a", "b") {}
+rbModConstSet(Geo, "Pair", Pair);
+class Shadow extends Struct.new("a") {
+  override get a(): unknown {
+    return 99;
+  }
+}
+rbModConstSet(Geo, "Shadow", Shadow);
+const STRUCT = "0408533a0e47656f3a3a50616972073a066169063a06625b063a0678";
+const EXTENDED =
+  "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65";
+const unhex = (str: string): string =>
+  str.replace(/../g, (byte) => String.fromCharCode(Number.parseInt(byte, 16)));
 
 class Cache {
   declare version: unknown;
@@ -240,6 +255,17 @@ describe("Marshal.dump", () => {
     expect(() => Marshal.dump(anonymous)).toThrow(/^can't dump anonymous class #<Module:0x/);
   });
 
+  it("dumps a Struct under TYPE_STRUCT, member by member", () => {
+    expect(hex(Marshal.dump(new Pair(1, [":x"])))).toBe(STRUCT);
+    expect(hex(Marshal.dump(new Shadow(1)))).toBe("0408533a1047656f3a3a536861646f77063a06616906");
+  });
+
+  it("dumps a core class under its path", () => {
+    expect(hex(Marshal.dump([RbSet, Array, rbCBasicObject, Hash]))).toBe(
+      "04085b096308536574630a4172726179631042617369634f626a656374630948617368",
+    );
+  });
+
   it("dumps marshal_dump's value without the singleton check", () => {
     const obj = new Cache(1, new Map([["posts", [shared]]]));
     Object.assign(rbObjSingletonClass(obj).prototype, { area: () => 1 });
@@ -436,6 +462,32 @@ describe("Marshal.load", () => {
         () => null,
       ),
     ).toThrow(new TypeError("no allocator"));
+  });
+
+  it("loads TYPE_EXTENDED as the object extended with the module", () => {
+    const shape = Marshal.load(unhex(EXTENDED)) as Shape;
+    expect(shape).toBeInstanceOf(Shape);
+    expect(shape.kind).toBe(":circle");
+    expect(hex(Marshal.dump(shape))).toBe(EXTENDED);
+    expect(Marshal.load("\x04\be:\x0bColumno:\x0bColumn\x00")).toBeInstanceOf(Column);
+    expect(() => Marshal.load("\x04\be:\x0bColumno:\x0fGeo::Shape\x00")).toThrow(
+      new ArgumentError("prepended class Column differs from class Geo::Shape"),
+    );
+  });
+
+  it("loads TYPE_STRUCT through rb_struct_initialize, and checks its members", () => {
+    const pair = Marshal.load(unhex(STRUCT)) as Pair;
+    expect(pair).toBeInstanceOf(Pair);
+    expect([pair.a, pair.b]).toEqual([1, [":x"]]);
+    expect(() => Marshal.load("\x04\bS:\x0eGeo::Pair\x06:\x06ai\x06")).toThrow(
+      new TypeError("struct Geo::Pair not compatible (struct size differs)"),
+    );
+    expect(() => Marshal.load("\x04\bS:\x0eGeo::Pair\x07:\x06ai\x06:\x06ci\x06")).toThrow(
+      new TypeError("struct Geo::Pair not compatible (:c for :b)"),
+    );
+    expect(() => Marshal.load("\x04\bS:\x0bColumn\x00")).toThrow(
+      new TypeError("class Column not a struct"),
+    );
   });
 
   it("loads a Class and a Module as the constants their paths name", () => {

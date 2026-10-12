@@ -1,7 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
-import { Module, rbGetAllocFunc } from "./include.js";
+import { Module, prepend, rbGetAllocFunc } from "./include.js";
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import { Rational, nuratDumper, nuratLoader } from "./rational.js";
@@ -21,12 +21,14 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
+  rbObjSingletonClass,
   rtest,
 } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
 import { Set } from "./set.js";
 import { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
+import { type StructInstance, isStruct, rbStructInitialize, rstructGet } from "./struct.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { temporalTag } from "./temporal-tag.js";
 import { TypeError } from "./type-error.js";
@@ -42,6 +44,7 @@ const TYPE_FALSE = 0x46;
 const TYPE_FIXNUM = 0x69;
 
 const TYPE_UCLASS = 0x43;
+const TYPE_STRUCT = 0x53;
 const TYPE_OBJECT = 0x6f;
 const TYPE_EXTENDED = 0x65;
 const TYPE_USRMARSHAL = 0x55;
@@ -636,6 +639,18 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       if (ifnone != null) {
         wObject(ifnone, arg, limit);
       }
+    } else if (isStruct(obj)) {
+      wClass(TYPE_STRUCT, obj, arg, true);
+      {
+        const mem = obj.members();
+        const len = mem.length;
+
+        wLong(len, arg);
+        for (let i = 0; i < len; i++) {
+          wSymbol(`:${mem[i]}`, arg);
+          wObject(rstructGet(obj, i), arg, limit);
+        }
+      }
     } else if (tObjectP(obj)) {
       wClass(TYPE_OBJECT, obj, arg, true);
       wObjivar(obj, arg, limit);
@@ -996,16 +1011,18 @@ function rbObjAlloc(klass: AnyClass): object {
   return Object.create(klass.prototype as object) as object;
 }
 
-/**
- * `obj_alloc_by_klass` (`vendor/ruby/v3.3.11/marshal.c:1812`). `oldclass` is
- * read by `append_extmod` only, which `TYPE_EXTENDED` would call.
- */
-function objAllocByKlass(klass: AnyClass, arg: LoadArg): object {
+/** `obj_alloc_by_klass` (`vendor/ruby/v3.3.11/marshal.c:1812`). */
+function objAllocByKlass(
+  klass: AnyClass,
+  arg: LoadArg,
+  oldclass: { value: AnyClass | null } | null,
+): object {
   const allocator = rbGetAllocFunc(klass);
   const compat = allocator === undefined ? undefined : compatAllocatorTbl.get(allocator);
   if (compat !== undefined) {
     const realObj = rbObjAlloc(klass);
     const obj = rbObjAlloc(compat.oldclass);
+    if (oldclass) oldclass.value = compat.oldclass;
 
     if (!arg.compatTbl) {
       arg.compatTbl = new Map();
@@ -1019,7 +1036,17 @@ function objAllocByKlass(klass: AnyClass, arg: LoadArg): object {
 
 /** `obj_alloc_by_path` (`vendor/ruby/v3.3.11/marshal.c:1835`). */
 function objAllocByPath(path: string, arg: LoadArg): object {
-  return objAllocByKlass(path2class(path), arg);
+  return objAllocByKlass(path2class(path), arg, null);
+}
+
+/** `append_extmod` (`vendor/ruby/v3.3.11/marshal.c:1841`). */
+function appendExtmod(obj: object, extmod: Module[]): object {
+  let i = extmod.length;
+  while (i > 0) {
+    const m = extmod[--i];
+    m.extendObject(obj);
+  }
+  return obj;
 }
 
 /** `prohibit_ivar` (`vendor/ruby/v3.3.11/marshal.c:1852`). */
@@ -1029,9 +1056,9 @@ function prohibitIvar(type: string, str: string, ivp: { value: boolean } | null)
 }
 
 /** `r_object0` (`vendor/ruby/v3.3.11/marshal.c:1861`). */
-function rObject0(arg: LoadArg, ivp: { value: boolean } | null): unknown {
+function rObject0(arg: LoadArg, ivp: { value: boolean } | null, extmod: Module[] | null): unknown {
   const type = rByte(arg);
-  return rObjectFor(arg, ivp, type);
+  return rObjectFor(arg, ivp, extmod, type);
 }
 
 /**
@@ -1049,7 +1076,12 @@ function rObject0(arg: LoadArg, ivp: { value: boolean } | null): unknown {
  *
  * @inventedArm rEntry0 — PERMANENT
  */
-function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number): unknown {
+function rObjectFor(
+  arg: LoadArg,
+  ivp: { value: boolean } | null,
+  extmod: Module[] | null,
+  type: number,
+): unknown {
   let v: unknown;
   let hashNewWithSize = (): Hash<unknown, unknown> => new Hash();
 
@@ -1067,11 +1099,43 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
       case TYPE_IVAR: {
         const ivar = { value: true };
         const idx = arg.data.size;
-        v = rObject0(arg, ivar);
+        v = rObject0(arg, ivar, extmod);
         if (ivar.value) {
           const obj = rIvar(v, null, arg);
           if (obj !== v && arg.data.get(idx) === v) v = rEntry0(obj, idx, arg);
         }
+        break;
+      }
+
+      case TYPE_EXTENDED: {
+        const path = rUnique(arg);
+        let m = rbPathToClass(path);
+        if (extmod === null) extmod = [];
+
+        if (typeof m === "function" && rbObjClassname(m) === "Class") {
+          v = rObject0(arg, null, null);
+          const c = Object.getPrototypeOf(v) as object | null;
+          if (c !== (m as AnyClass).prototype) {
+            throw new ArgumentError(
+              `prepended class ${path} differs from class ${rbObjClassname(v)}`,
+            );
+          }
+          const singleton = rbObjSingletonClass(v as object);
+          while (extmod.length > 0) {
+            m = extmod.pop();
+            prepend(singleton, m as Module);
+          }
+        } else {
+          mustBeModule(m, path);
+          extmod.push(m as Module);
+
+          v = rObject0(arg, null, extmod);
+          while (extmod.length > 0) {
+            m = extmod.pop();
+            (m as Module).extendObject(v as object);
+          }
+        }
+        v = rLeave(v, arg);
         break;
       }
 
@@ -1086,14 +1150,14 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
           hashNewWithSize = () => new Hash().compareByIdentity();
           continue;
         }
-        v = rObjectFor(arg, null, type);
+        v = rObjectFor(arg, null, extmod, type);
         if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
           throw new ArgumentError("dump format error (user class)");
         }
         const klass = rbObjClass(v) as AnyClass;
         const proto = c.prototype as object;
         if (v instanceof Module || !(c === klass || proto instanceof klass)) {
-          const tmp = objAllocByKlass(c, arg);
+          const tmp = objAllocByKlass(c, arg, null);
 
           if (
             v instanceof Module ||
@@ -1207,11 +1271,46 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
         break;
       }
 
+      case TYPE_STRUCT: {
+        const idx = rPrepare(arg);
+        const klass = path2class(rUnique(arg));
+        const len = rLong(arg);
+
+        v = rbObjAlloc(klass);
+        if (!isStruct(v)) {
+          throw new TypeError(`class ${rbModToS(klass)} not a struct`);
+        }
+        const mem = v.members();
+        if (mem.length !== len) {
+          throw new TypeError(`struct ${rbModToS(klass)} not compatible (struct size differs)`);
+        }
+
+        v = rEntry0(v, idx, arg);
+        const values: unknown[] = [];
+        for (let i = 0; i < len; i++) {
+          const n = mem[i];
+          const slot = rSymbol(arg);
+
+          if (n !== slot) {
+            throw new TypeError(`struct ${rbModToS(klass)} not compatible (:${slot} for :${n})`);
+          }
+          values.push(rObject(arg));
+        }
+        rbStructInitialize(v as StructInstance, values);
+        v = rLeave(v, arg);
+        break;
+      }
+
       case TYPE_USRMARSHAL: {
         const name = rUnique(arg);
         const klass = path2class(name);
 
-        v = objAllocByKlass(klass, arg);
+        const oldclass: { value: AnyClass | null } = { value: null };
+
+        v = objAllocByKlass(klass, arg, oldclass);
+        if (extmod !== null) {
+          appendExtmod(v as object, extmod);
+        }
         if (!rbObjRespondTo(v, "marshalLoad", true)) {
           throw new TypeError(`instance of ${name} needs to have method \`marshal_load'`);
         }
@@ -1220,6 +1319,10 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
         rbFSend(v, "marshalLoad", data);
         v = rFixupCompat(v, arg);
         v = rCopyIvar(v as object, data);
+        if (extmod !== null) {
+          if (oldclass.value) appendExtmod(v as object, extmod);
+          extmod.length = 0;
+        }
         break;
       }
 
@@ -1288,7 +1391,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
 
 /** `r_object` (`vendor/ruby/v3.3.11/marshal.c:2349`). */
 function rObject(arg: LoadArg): unknown {
-  return rObject0(arg, null);
+  return rObject0(arg, null, null);
 }
 
 /** `rb_marshal_load_with_proc` (`vendor/ruby/v3.3.11/marshal.c:2378`), for a String `port`. */
@@ -1353,8 +1456,8 @@ export const Marshal = {
    *  internal slots, a Temporal value, or an instance of a class carrying
    *  `Symbol.toStringTag` is `T_DATA` and takes its `TypeError`.
    *
-   * Not ported: the `anIO` argument; and the `_dump`, Regexp and Struct arms,
-   * which nothing calls.
+   * Not ported: the `anIO` argument; and the `_dump` and Regexp arms, which
+   * nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
@@ -1378,13 +1481,11 @@ export const Marshal = {
    *  loads through it. `TYPE_UCLASS` re-classes an Array or Hash with `Object.setPrototypeOf`;
    *  a JS string has no class to set, so a String subclass is a format error,
    *  and no ivar table, so a String, Float or Bignum dumped with an ivar of its
-   *  own raises `FrozenError`. A class path resolves through `rbPathToClass`,
-   *  whose table holds no core class, so a `compare_by_identity` Hash loads
-   *  only once `Hash` is seated.
+   *  own raises `FrozenError`. A class path resolves through `rbPathToClass`.
    *
    * Not ported: the `proc` and `freeze:` arguments and an IO source; and
-   * `TYPE_USERDEF`, `TYPE_DATA`, `TYPE_EXTENDED`, Regexp and Struct, which
-   * nothing calls.
+   * `TYPE_USERDEF`, `TYPE_DATA` and Regexp, which nothing calls. A Struct has
+   * no `keyword_init`, so `TYPE_STRUCT` reads positional values only.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.load` (`vendor/ruby/v3.3.11/marshal.c:2434`).
    */

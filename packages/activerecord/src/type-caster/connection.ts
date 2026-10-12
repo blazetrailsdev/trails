@@ -1,5 +1,6 @@
 import type { ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbModConstSet, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { TypeCaster } from "../namespaces.js";
 import { defaultValue } from "../type.js";
 
 export class Connection {
@@ -37,3 +38,4 @@ export class Connection {
 export function tableName(connection: Connection): string {
   return (connection as any)._tableName as string;
 }
+rbModConstSet(TypeCaster, "Connection", Connection);

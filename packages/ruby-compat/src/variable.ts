@@ -1,8 +1,9 @@
 import { ArgumentError } from "./argument-error.js";
 import { Exception } from "./exception.js";
+import { Hash } from "./hash.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
-import { classpaths, rbCSymbol, rbModName } from "./object.js";
+import { classpaths, rbCBasicObject, rbCSymbol, rbModName } from "./object.js";
 import { Range } from "./range.js";
 import { Rational } from "./rational.js";
 import { TypeError } from "./type-error.js";
@@ -311,7 +312,10 @@ export function rbModConstGet(mod: object, name: string): unknown {
   return c;
 }
 
+registerConstant("BasicObject", rbCBasicObject);
 registerConstant("Object", Object);
+registerConstant("Array", Array);
+registerConstant("Hash", Hash);
 registerConstant("Exception", Exception);
 registerConstant("Range", Range);
 registerConstant("Regexp", RegExp);

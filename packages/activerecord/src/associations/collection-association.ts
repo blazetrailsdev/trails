@@ -139,7 +139,7 @@ export abstract class CollectionAssociation extends Association {
 
   override reset(): void {
     super.reset();
-    this.#loadingTarget = null;
+    loadingTarget.delete(this);
     this._targetStore = [];
     this._replacedOrAddedTargets = new Set<Base>().compareByIdentity();
     this._associationIds = null;
@@ -462,7 +462,8 @@ export abstract class CollectionAssociation extends Association {
       this.loadedBang();
       return this.target;
     };
-    if (this.#loadingTarget) return this.#loadingTarget;
+    const inFlight = loadingTarget.get(this);
+    if (inFlight) return inFlight;
     if (this.isFindTarget()) {
       const loading = Promise.resolve(this.findTarget())
         .then((findTarget) => {
@@ -472,15 +473,14 @@ export abstract class CollectionAssociation extends Association {
           return loaded();
         })
         .finally(() => {
-          if (this.#loadingTarget === loading) this.#loadingTarget = null;
+          if (loadingTarget.get(this) === loading) loadingTarget.delete(this);
         });
-      return (this.#loadingTarget = loading);
+      loadingTarget.set(this, loading);
+      return loading;
     }
 
     return loaded();
   }
-
-  #loadingTarget: Promise<Base[]> | null = null;
 
   addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
   addToTarget(
@@ -742,6 +742,8 @@ export function isThenable<T>(value: Promise<T> | T): value is Promise<T> {
 }
 
 /** @internal */
+const loadingTarget = new WeakMap<CollectionAssociation, Promise<Base[]>>();
+
 function diffHooks(assoc: CollectionAssociation): {
   difference(a: Base[], b: Base[]): Base[];
   intersection(a: Base[], b: Base[]): Base[];

@@ -81,6 +81,7 @@ export {
   rbModPublicMethodDefined,
   rtest,
   isNil,
+  rbCBasicObject,
 } from "./object.js";
 export {
   Hash,
@@ -390,7 +391,7 @@ export {
   type StringReceiver,
   type StringInstance,
 } from "./string/method-table.js";
-export { Struct, isStruct, type StructInstance } from "./struct.js";
+export { Struct, isStruct, rbStructInitialize, rstructGet, type StructInstance } from "./struct.js";
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
