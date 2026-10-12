@@ -737,7 +737,8 @@ describe("execInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => supportsReturning,
       quoteColumnName: (c) => `"${c}"`,
-      schemaCache: { primaryKeys: async () => null, getCachedPrimaryKeys: () => null },
+      primaryKey: async () => null,
+      schemaCache: { getCachedPrimaryKeys: () => null },
     };
     return host;
   }
@@ -849,7 +850,8 @@ describe("sqlForInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
-      schemaCache: { primaryKeys: async () => null, getCachedPrimaryKeys: () => null },
+      primaryKey: async () => null,
+      schemaCache: { getCachedPrimaryKeys: () => null },
     };
     const [sql] = sqlForInsert.call(
       host,
@@ -870,7 +872,6 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
       schemaCache: {
-        primaryKeys: async () => null,
         getCachedPrimaryKeys: () => {
           throw new Error("primary keys must not be read when pk=false");
         },

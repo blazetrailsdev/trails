@@ -233,8 +233,9 @@ export interface DatabaseStatementsHost {
   /** @internal */
   databaseVersion?: unknown;
   /** @internal */
+  primaryKey?(table: string): Promise<string | string[] | null>;
+  /** @internal */
   schemaCache?: {
-    primaryKeys?(tableName: string): Promise<string | string[] | null>;
     getCachedPrimaryKeys?(tableName: string): string | string[] | null | undefined;
   };
   /** @internal */
@@ -776,7 +777,7 @@ interface DatabaseStatementsDefaultsHost {
   /** @internal */
   sqlForInsert(
     sql: string,
-    pk: string | false | null | undefined,
+    pk: string | string[] | false | null | undefined,
     binds: unknown[],
     returning: string[] | null | undefined,
   ): [string, unknown[]];
@@ -785,7 +786,7 @@ interface DatabaseStatementsDefaultsHost {
   /** @internal */
   supportsInsertReturning(): boolean;
   /** @internal */
-  schemaCache: { primaryKeys(tableName: string): Promise<string | string[] | null> };
+  primaryKey(tableName: string): Promise<string | string[] | null>;
 }
 
 /** @internal */
@@ -894,21 +895,21 @@ export const DatabaseStatements = new Module((mod) => {
 
   /**
    * @inventedArm if — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
-   * @inventedArm primaryKeys — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
+   * @inventedArm primaryKey — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
    */
   async execInsert(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name: string | null = null,
     binds: unknown[] = [],
-    pk?: string | false | null,
+    pk?: string | string[] | false | null,
     _sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result> {
     await this.databaseVersion;
     if (pk == null && this.supportsInsertReturning()) {
       const tableRef = extractTableRefFromInsertSql.call(this, sql);
-      if (tableRef) await this.schemaCache.primaryKeys(tableRef);
+      if (tableRef) pk = await this.primaryKey(tableRef);
     }
     [sql, binds] = this.sqlForInsert(sql, pk, binds, returning);
     return this.internalExecQuery(sql, name, binds);
