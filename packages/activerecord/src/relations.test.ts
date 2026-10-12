@@ -2510,12 +2510,12 @@ describe("RelationTest", () => {
 
   it("find_by doesn't have implicit ordering", async () => {
     await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
-      await Post.all().findByBang({ author_id: 2 });
+      await Post.all().findBy({ author_id: 2 });
     });
   });
 
   it("find_by requires at least one argument", async () => {
-    await expect((Post.all() as any).findByBang()).rejects.toThrow(ArgumentError);
+    await expect((Post.all() as any).findBy()).rejects.toThrow(ArgumentError);
   });
 
   it("find_by! with hash conditions returns the first matching record", async () => {
@@ -2534,12 +2534,18 @@ describe("RelationTest", () => {
     );
   });
 
+  it("find_by! doesn't have implicit ordering", async () => {
+    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+      await Post.all().findByBang({ author_id: 2 });
+    });
+  });
+
   it("find_by! raises RecordNotFound if the record is missing", async () => {
     await expect((Post.all() as any).findByBang("1 = 0")).rejects.toThrow(RecordNotFound);
   });
 
   it("find_by! requires at least one argument", async () => {
-    await expect(Post.findByBang({ title: "NonExistentXYZTitle" })).rejects.toThrow();
+    await expect((Post.all() as any).findByBang()).rejects.toThrow(ArgumentError);
   });
 
   it("loaded relations cannot be mutated by multi value methods", async () => {
