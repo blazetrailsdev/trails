@@ -149,7 +149,15 @@ function harvestUseFixturesCall(node, keys) {
   ) {
     return false;
   }
-  const arg = node.arguments && node.arguments[0];
+  let arg = node.arguments && node.arguments[0];
+  while (
+    arg &&
+    (arg.type === "TSAsExpression" ||
+      arg.type === "TSSatisfiesExpression" ||
+      arg.type === "TSNonNullExpression")
+  ) {
+    arg = arg.expression;
+  }
   if (arg && arg.type === "ObjectExpression") {
     for (const p of arg.properties) {
       if (p.type !== "Property") continue;
