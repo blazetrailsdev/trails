@@ -33,15 +33,13 @@ export class Body {
   }
 
   /** @internal */
-  private logError(exception: Error): void {
+  private logError(exception: Error & { annotatedSourceCode?(): unknown }): void {
     const logger = ActionView.Base.logger as { fatal(message: string): unknown } | null;
     if (logger == null) return;
 
     let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;
     if (rbObjRespondTo(exception, "annotatedSourceCode")) {
-      message += toS(
-        (exception as Error & { annotatedSourceCode(): unknown }).annotatedSourceCode(),
-      );
+      message += toS(exception.annotatedSourceCode!());
     }
     message += "  " + excBacktrace(exception)!.join("\n  ");
     logger.fatal(`${message}\n\n`);

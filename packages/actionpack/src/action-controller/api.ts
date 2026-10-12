@@ -64,7 +64,6 @@ export class API extends Metal {
   }
 
   declare static render: Renderer["render"];
-
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
     return this;
   }
