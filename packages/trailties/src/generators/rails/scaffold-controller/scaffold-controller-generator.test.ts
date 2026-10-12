@@ -151,6 +151,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
     );
   });
 
+  it("exports the functional test class", async () => {
+    await runGenerator("User", ["name:string"]);
+
+    const content = read("test/controllers/users-controller.test.ts");
+    assertMatch(/^export class UsersControllerTest extends IntegrationTest \{$/m, content);
+  });
+
   it("functional tests without attributes", async () => {
     await runGenerator("User");
 
