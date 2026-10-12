@@ -480,17 +480,24 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.isLoaded && !this.isScheduled && !this._loadResult;
   }
 
-  /** @inventedArm synchronize — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock */
+  /**
+   * @inventedArm synchronize — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock
+   * @inventedArm if — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock
+   */
   loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
       if (!c.asyncEnabled()) {
         const token = this._loadToken;
         void c.lock
-          .synchronize(() => this.load())
+          .synchronize(() => {
+            if (this._loadResult) return;
+            const loaded = this.load();
+            this._loaded = true;
+            return loaded;
+          })
           .catch(() => {
             if (token === this._loadToken) this._loaded = false;
           });
-        this._loaded = true;
         return;
       }
 
