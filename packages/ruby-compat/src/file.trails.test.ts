@@ -11,7 +11,6 @@ import {
   utimesSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File } from "./file.js";
@@ -158,7 +157,7 @@ describe("File", () => {
   it("mtime truncates toward the epoch on both sides of it, through every stat entry point", async () => {
     const root = fixture();
     const path = join(root, "a.rb");
-    execFileSync("touch", ["-d", "1969-12-31 23:59:59.9993 UTC", path]);
+    utimesSync(path, "-0.0007", "-0.0007");
     expect(File.mtime(path).getTime()).toBe(0);
     utimesSync(path, 1000.0007, 1000.0007);
     const fs = getFs();
