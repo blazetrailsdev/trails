@@ -989,16 +989,18 @@ export class Mapper {
         if (options.concerns) this.concerns(options.concerns);
 
         this.collection(() => {
-          names.index = this.nameForAction(undefined, "index");
+          if (allowed.has("index")) names.index = this.nameForAction(undefined, "index");
         });
 
-        this.new(() => {
-          names.new = this.nameForAction(undefined, "new");
-        });
+        if (allowed.has("new")) {
+          this.new(() => {
+            names.new = this.nameForAction(undefined, "new");
+          });
+        }
 
         this.member(() => {
-          names.edit = this.nameForAction(undefined, "edit");
-          names.show = this.nameForAction(undefined, "show");
+          if (allowed.has("edit")) names.edit = this.nameForAction(undefined, "edit");
+          if (allowed.has("show")) names.show = this.nameForAction(undefined, "show");
         });
       }),
     );
