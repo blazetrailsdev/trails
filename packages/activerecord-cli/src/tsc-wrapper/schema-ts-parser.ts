@@ -80,7 +80,10 @@ function synthesizePk(
   return {
     name: strLiteral(pkVal) ?? "id",
     col: {
-      type: idType !== undefined && idType in ATTRIBUTE_TYPE_MAP ? idType : DEFAULT_PK_TYPE,
+      type:
+        idType !== undefined && Object.hasOwn(ATTRIBUTE_TYPE_MAP, idType)
+          ? idType
+          : DEFAULT_PK_TYPE,
       null: false,
     },
   };
