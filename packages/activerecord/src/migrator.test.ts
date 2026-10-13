@@ -18,8 +18,7 @@ import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import "./test-helpers/migration-helper.js";
-
-const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
+import { MIGRATIONS_ROOT } from "./config.js";
 
 function migration(name: string, version?: number): MigrationProxy {
   return migrationProxy({

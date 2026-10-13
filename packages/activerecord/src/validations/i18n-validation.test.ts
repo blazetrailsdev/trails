@@ -64,7 +64,7 @@ describe("I18nValidationTest", () => {
       const spy = vi.spyOn(ActiveModelError, "generateMessage");
       await topic.isValid();
       void topic.errors.messages;
-      expect(spy).toHaveBeenCalledExactlyOnceWith("title", ":taken", topic, {
+      expect(spy).toHaveBeenCalledExactlyOnceWith(":title", ":taken", topic, {
         ...generateMessageOptions,
         value: "unique!",
       });
@@ -79,7 +79,7 @@ describe("I18nValidationTest", () => {
       const spy = vi.spyOn(ActiveModelError, "generateMessage");
       await (await repliedTopic()).save();
       void (await repliedTopic()).errors.messages;
-      expect(spy).toHaveBeenCalledExactlyOnceWith("replies", ":invalid", await repliedTopic(), {
+      expect(spy).toHaveBeenCalledExactlyOnceWith(":replies", ":invalid", await repliedTopic(), {
         ...generateMessageOptions,
         value: replies,
       });

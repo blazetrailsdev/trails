@@ -7,8 +7,7 @@ import { DatabaseTasks } from "./database-tasks.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { Base } from "../base.js";
 import { schemaFormat, setSchemaFormat } from "../active-record.js";
-
-const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
+import { MIGRATIONS_ROOT } from "../config.js";
 
 describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   const dirs: string[] = [];

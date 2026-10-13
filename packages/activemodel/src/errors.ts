@@ -17,7 +17,6 @@ import {
   rbModConstSet,
   rbModName,
   rbObjDup,
-  symbolToS,
   toSym,
   transformValues,
 } from "@blazetrails/ruby-compat";
@@ -121,7 +120,7 @@ export class Errors<TBase extends object = object> {
   }
 
   isInclude(attribute: string): boolean {
-    return this._errors.some((e) => e.match(symbolToS(toSym(attribute))));
+    return this._errors.some((e) => e.match(toSym(attribute)));
   }
 
   hasKey(attribute: string): boolean {
@@ -282,7 +281,7 @@ export class Errors<TBase extends object = object> {
   ): [string, string | null | undefined, Record<string, unknown>] {
     const opts = { ...(options ?? {}) };
     const resolvedType = typeof type === "function" ? type(this._base, opts) : type;
-    return [symbolToS(toSym(attribute)), resolvedType, opts];
+    return [toSym(attribute), resolvedType, opts];
   }
 
   dup(): this {

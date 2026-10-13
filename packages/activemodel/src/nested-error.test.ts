@@ -7,7 +7,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 describe("NestedErrorTest", () => {
   it("initialize", () => {
     const topic = new Topic();
-    const innerError = new ActiveModelError(topic, "title", ":not_enough", { count: 2 });
+    const innerError = new ActiveModelError(topic, ":title", ":not_enough", { count: 2 });
     const reply = new Reply();
     const error = new NestedError(reply, innerError);
 
@@ -19,19 +19,19 @@ describe("NestedErrorTest", () => {
 
   it("initialize with overriding attribute and type", () => {
     const topic = new Topic();
-    const innerError = new ActiveModelError(topic, "title", ":not_enough", { count: 2 });
+    const innerError = new ActiveModelError(topic, ":title", ":not_enough", { count: 2 });
     const reply = new Reply();
-    const error = new NestedError(reply, innerError, { attribute: "parent", type: ":foo" });
+    const error = new NestedError(reply, innerError, { attribute: ":parent", type: ":foo" });
 
     expect(error.base).toEqual(reply);
-    expect(error.attribute).toEqual("parent");
+    expect(error.attribute).toEqual(":parent");
     expect(error.type).toEqual(":foo");
     expect(error.options).toEqual(innerError.options);
   });
 
   it("message", () => {
     const topic = new Topic({ authorName: "Bruce" });
-    const innerError = new ActiveModelError(topic, "title", ":not_enough", {
+    const innerError = new ActiveModelError(topic, ":title", ":not_enough", {
       message: (model: Topic) => `not good enough for ${model.authorName}`,
     });
     const reply = new Reply({ authorName: "Mark" });
@@ -42,7 +42,7 @@ describe("NestedErrorTest", () => {
 
   it("full message", () => {
     const topic = new Topic({ authorName: "Bruce" });
-    const innerError = new ActiveModelError(topic, "title", ":not_enough", {
+    const innerError = new ActiveModelError(topic, ":title", ":not_enough", {
       message: (model: Topic) => `not good enough for ${model.authorName}`,
     });
     const reply = new Reply({ authorName: "Mark" });

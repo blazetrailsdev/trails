@@ -237,7 +237,7 @@ export interface DatabaseStatementsHost {
   /** @internal */
   preprocessQuery?(sql: string | null): string | null;
   /** @internal */
-  asyncEnabled?(): boolean;
+  isAsyncEnabled?(): boolean;
   /** @internal */
   rawExecQuery?(...args: unknown[]): Promise<Result>;
   supportsConcurrentConnections?(): boolean;
@@ -1227,7 +1227,7 @@ export function select(
   options?: { prepare?: boolean; async?: unknown; allowRetry?: boolean },
 ): Promise<Result> | FutureResult | FutureResultComplete {
   const async = options?.async;
-  if (async != null && async !== false && this.asyncEnabled?.()) {
+  if (async != null && async !== false && this.isAsyncEnabled?.()) {
     if (this.currentTransaction().joinable) {
       throw new AsynchronousQueryInsideTransactionError(
         "Asynchronous queries are not allowed inside transactions",

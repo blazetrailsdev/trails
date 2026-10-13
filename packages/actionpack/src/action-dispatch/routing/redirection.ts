@@ -50,7 +50,6 @@ export class Redirect extends Endpoint {
     return true;
   }
 
-  /** @missingRailsArgs instrument — CONVERGEABLE call-args-padding-resolves-a-cross-package-callee-signature */
   call(env: RackEnv): [number, Record<string, string>, unknown] {
     return Notifications.instrument("redirect.action_dispatch", undefined, (payload) => {
       const request = new Request(env);

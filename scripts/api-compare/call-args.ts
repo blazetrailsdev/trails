@@ -1458,6 +1458,18 @@ function kwargValue(tsArg: string, rubyKey: string): string | undefined {
   return undefined;
 }
 
+/** The TS signatures of a called method: the calling package's own
+ *  declarations, else the ones a dependency package declares under that name.
+ *  `ActiveSupport::Notifications.instrument` is declared in activesupport and
+ *  called from actiondispatch, and without the fallback its skipped `payload`
+ *  positional reads as a value (redirection.rb:22). */
+export function resolveCalleeSigs(
+  inPkg: ParamInfo[][],
+  inDeps: ParamInfo[][] | undefined,
+): ParamInfo[][] {
+  return inPkg.length > 0 ? inPkg : (inDeps ?? []);
+}
+
 export function compareCallArgs(
   ruby: CallSite,
   ts: CallSite,

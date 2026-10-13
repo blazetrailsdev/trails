@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   assertCalled,
   assertCalledWith as assertCalledWithArgs,
@@ -7,6 +7,7 @@ import {
   assertNotCalled,
   assertNothingRaised,
   assertRaises,
+  capture,
   EnvironmentInquirer,
   getEnv,
   Mock,
@@ -51,6 +52,7 @@ import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { Course } from "../test-helpers/models/course.js";
 import { College } from "../test-helpers/models/college.js";
 import type { InternalMetadata } from "../internal-metadata.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 function configFor(envName: string, name: string): HashConfig | undefined {
   return Base.configurations().configsFor({ envName, name });
@@ -302,16 +304,10 @@ describe("DatabaseTasksRegisterTask", () => {
     };
     const instance = new klazz();
 
-    await assertCalledWithArgs(
-      instance,
-      "structureDump",
-      ["awesome-file.sql", null],
-      {},
-      async () => {
-        DatabaseTasks.registerTask(/abstract/, stubbedNew(instance));
-        await DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
-      },
-    );
+    await assertCalledWithArgs(instance, "structureDump", ["awesome-file.sql", null], {}, () => {
+      DatabaseTasks.registerTask(/abstract/, stubbedNew(instance));
+      return DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
+    });
   });
 
   it("register task precedence", async () => {
@@ -321,21 +317,15 @@ describe("DatabaseTasksRegisterTask", () => {
     };
     const instance = new klazz();
 
-    await assertCalledWithArgs(
-      instance,
-      "structureDump",
-      ["awesome-file.sql", null],
-      {},
-      async () => {
-        ConnectionAdapters.register(
-          "custom_mysql",
-          "ActiveRecord::ConnectionAdapters::Mysql2Adapter",
-          "active_record/connection_adapters/mysql2_adapter",
-        );
-        DatabaseTasks.registerTask(/custom_mysql/, stubbedNew(instance));
-        await DatabaseTasks.structureDump({ adapter: "custom_mysql" }, "awesome-file.sql");
-      },
-    );
+    await assertCalledWithArgs(instance, "structureDump", ["awesome-file.sql", null], {}, () => {
+      ConnectionAdapters.register(
+        "custom_mysql",
+        "ActiveRecord::ConnectionAdapters::Mysql2Adapter",
+        "active_record/connection_adapters/mysql2_adapter",
+      );
+      DatabaseTasks.registerTask(/custom_mysql/, stubbedNew(instance));
+      return DatabaseTasks.structureDump({ adapter: "custom_mysql" }, "awesome-file.sql");
+    });
   });
 
   it("unregistered task", async () => {
@@ -483,23 +473,16 @@ describe("DatabaseTasksDumpSchemaTest", () => {
 
 function captureStdoutAndStderr(): { stdout: StringIO; stderr: StringIO } {
   const io = { stdout: new StringIO(), stderr: new StringIO() };
-  let stdoutSpy: MockInstance;
-  let stderrSpy: MockInstance;
+  let originalStdout: typeof stdout.write;
+  let originalStderr: typeof stderr.write;
   beforeEach(() => {
-    io.stdout = new StringIO();
-    io.stderr = new StringIO();
-    stdoutSpy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
-      io.stdout.write(chunk);
-      return true;
-    });
-    stderrSpy = vi.spyOn(stderr, "write").mockImplementation((chunk) => {
-      io.stderr.write(chunk);
-      return true;
-    });
+    [io.stdout, originalStdout] = [new StringIO(), stdout.write];
+    [io.stderr, originalStderr] = [new StringIO(), stderr.write];
+    stdout.write = (chunk) => (io.stdout.write(chunk), true);
+    stderr.write = (chunk) => (io.stderr.write(chunk), true);
   });
   afterEach(() => {
-    stdoutSpy.mockRestore();
-    stderrSpy.mockRestore();
+    [stdout.write, stderr.write] = [originalStdout, originalStderr];
   });
   return io;
 }
@@ -1085,25 +1068,13 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
 
 const skipMigrationTestCase = adapterType !== "sqlite" || inMemoryDb();
 
-interface MigrationTestCase {
+function databaseTasksMigrationTestCase(folderName = "valid"): {
   captureMigrationOutput(): Promise<string>;
-  captureStdout(fn: () => Promise<void>): Promise<string>;
-}
-
-const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
-
-function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase {
-  let stdoutChunks: string[] = [];
-  let stdoutSpy: MockInstance | undefined;
+} {
   let conn: Awaited<ReturnType<typeof Base.establishConnection>> | undefined;
 
   beforeEach(async () => {
     if (skipMigrationTestCase) return;
-    stdoutChunks = [];
-    stdoutSpy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
-      stdoutChunks.push(chunk);
-      return true;
-    });
     const migrationsPath = [MIGRATIONS_ROOT, folderName].join("/");
     const file = await (await (
       (await Base.leaseConnection()) as SQLite3Adapter
@@ -1121,143 +1092,156 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
   });
 
   afterEach(async () => {
-    stdoutSpy?.mockRestore();
-    stdoutSpy = undefined;
     if (skipMigrationTestCase) return;
     if (conn) conn.releaseConnection();
     await Base.establishConnection(":arunit");
   });
 
-  const captureStdout = async (fn: () => Promise<void>): Promise<string> => {
-    stdoutChunks = [];
-    await fn();
-    return stdoutChunks.join("");
-  };
+  const captureMigrationOutput = (): Promise<string> =>
+    capture("stdout", async () => {
+      await DatabaseTasks.migrate();
+    });
 
-  return {
-    captureStdout,
-    captureMigrationOutput: () => captureStdout(() => DatabaseTasks.migrate()),
-  };
+  return { captureMigrationOutput };
 }
 
 describe("DatabaseTasksMigrateTest", () => {
-  let originalVerbose: string | undefined;
-  let originalVersion: string | undefined;
-  const testCase = databaseTasksMigrationTestCase();
-
-  beforeEach(() => {
-    originalVerbose = getEnv("VERBOSE");
-    originalVersion = getEnv("VERSION");
-  });
-  afterEach(() => {
-    setEnv("VERBOSE", originalVerbose);
-    setEnv("VERSION", originalVersion);
-  });
+  const { captureMigrationOutput } = databaseTasksMigrationTestCase();
 
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset empty values for verbose and version env vars",
     async () => {
-      setEnv("VERSION", "2");
-      setEnv("VERBOSE", "false");
+      const [verbose, version] = [getEnv("VERBOSE"), getEnv("VERSION")];
 
-      assertEmpty(await testCase.captureMigrationOutput());
+      try {
+        setEnv("VERSION", "2");
+        setEnv("VERBOSE", "false");
 
-      setEnv("VERBOSE", "");
-      setEnv("VERSION", "");
+        assertEmpty(await captureMigrationOutput());
 
-      expect(await testCase.captureMigrationOutput()).toContain("migrating");
+        setEnv("VERBOSE", "");
+        setEnv("VERSION", "");
+
+        expect(await captureMigrationOutput()).toContain("migrating");
+      } finally {
+        setEnv("VERBOSE", verbose);
+        setEnv("VERSION", version);
+      }
     },
   );
 
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset nonsense values for verbose and version env vars",
     async () => {
-      setEnv("VERSION", "2");
-      setEnv("VERBOSE", "false");
+      const [verbose, version] = [getEnv("VERBOSE"), getEnv("VERSION")];
 
-      assertEmpty(await testCase.captureMigrationOutput());
+      try {
+        setEnv("VERSION", "2");
+        setEnv("VERBOSE", "false");
 
-      setEnv("VERBOSE", "yes");
-      setEnv("VERSION", "2");
+        assertEmpty(await captureMigrationOutput());
 
-      assertEmpty(await testCase.captureMigrationOutput());
+        setEnv("VERBOSE", "yes");
+        setEnv("VERSION", "2");
+
+        assertEmpty(await captureMigrationOutput());
+      } finally {
+        setEnv("VERBOSE", verbose);
+        setEnv("VERSION", version);
+      }
     },
   );
 });
 
 describe("DatabaseTasksMigrateScopeTest", () => {
-  let originalVerbose: string | undefined;
-  let originalVersion: string | undefined;
-  let originalScope: string | undefined;
-  const testCase = databaseTasksMigrationTestCase("scope");
-
-  beforeEach(() => {
-    if (skipMigrationTestCase) return;
-    originalVerbose = getEnv("VERBOSE");
-    originalVersion = getEnv("VERSION");
-    originalScope = getEnv("SCOPE");
-  });
-
-  afterEach(() => {
-    setEnv("VERBOSE", originalVerbose);
-    setEnv("VERSION", originalVersion);
-    setEnv("SCOPE", originalScope);
-  });
+  const { captureMigrationOutput } = databaseTasksMigrationTestCase("scope");
 
   it.skipIf(skipMigrationTestCase)("migrate using scope and verbose mode", async () => {
-    setEnv("VERSION", "2");
-    setEnv("VERBOSE", "true");
-    setEnv("SCOPE", "mysql");
+    const [verbose, version, scope] = [getEnv("VERBOSE"), getEnv("VERSION"), getEnv("SCOPE")];
 
-    const output1 = await testCase.captureMigrationOutput();
-    expect(output1).toContain("migrating");
-    expect(output1).not.toContain("No migrations ran. (using mysql scope)");
+    try {
+      setEnv("VERSION", "2");
+      setEnv("VERBOSE", "true");
+      setEnv("SCOPE", "mysql");
 
-    const output2 = await testCase.captureMigrationOutput();
-    expect(output2).toContain("No migrations ran. (using mysql scope)");
-    expect(output2).not.toContain("migrating");
+      let output = await captureMigrationOutput();
+      expect(output).toContain("migrating");
+      expect(output).not.toContain("No migrations ran. (using mysql scope)");
+
+      output = await captureMigrationOutput();
+      expect(output).toContain("No migrations ran. (using mysql scope)");
+      expect(output).not.toContain("migrating");
+    } finally {
+      setEnv("VERBOSE", verbose);
+      setEnv("VERSION", version);
+      setEnv("SCOPE", scope);
+    }
   });
 
   it.skipIf(skipMigrationTestCase)("migrate using scope and non verbose mode", async () => {
-    setEnv("VERSION", "2");
-    setEnv("VERBOSE", "false");
-    setEnv("SCOPE", "mysql");
+    const [verbose, version, scope] = [getEnv("VERBOSE"), getEnv("VERSION"), getEnv("SCOPE")];
 
-    assertEmpty(await testCase.captureMigrationOutput());
-    assertEmpty(await testCase.captureMigrationOutput());
+    try {
+      setEnv("VERSION", "2");
+      setEnv("VERBOSE", "false");
+      setEnv("SCOPE", "mysql");
+
+      assertEmpty(await captureMigrationOutput());
+
+      assertEmpty(await captureMigrationOutput());
+    } finally {
+      setEnv("VERBOSE", verbose);
+      setEnv("VERSION", version);
+      setEnv("SCOPE", scope);
+    }
   });
 
   it.skipIf(skipMigrationTestCase)("migrate using empty scope and verbose mode", async () => {
-    setEnv("VERSION", "2");
-    setEnv("VERBOSE", "true");
-    setEnv("SCOPE", "");
+    const [verbose, version, scope] = [getEnv("VERBOSE"), getEnv("VERSION"), getEnv("SCOPE")];
 
-    const output1 = await testCase.captureMigrationOutput();
-    expect(output1).toContain("migrating");
-    expect(output1).not.toContain("No migrations ran. (using mysql scope)");
+    try {
+      setEnv("VERSION", "2");
+      setEnv("VERBOSE", "true");
+      setEnv("SCOPE", "");
 
-    const output2 = await testCase.captureMigrationOutput();
-    assertEmpty(output2);
-    expect(output2).not.toContain("No migrations ran. (using mysql scope)");
+      let output = await captureMigrationOutput();
+      expect(output).toContain("migrating");
+      expect(output).not.toContain("No migrations ran. (using mysql scope)");
+
+      output = await captureMigrationOutput();
+      assertEmpty(output);
+      expect(output).not.toContain("No migrations ran. (using mysql scope)");
+    } finally {
+      setEnv("VERBOSE", verbose);
+      setEnv("VERSION", version);
+      setEnv("SCOPE", scope);
+    }
   });
 });
 
 describe("DatabaseTasksMigrateStatusTest", () => {
-  const testCase = databaseTasksMigrationTestCase();
+  databaseTasksMigrationTestCase();
 
-  beforeEach(async () => {
+  let schemaMigration: SchemaMigration;
+  beforeEach(() => {
     if (skipMigrationTestCase) return;
-    const pool = Base.connectionPool();
-    await new SchemaMigration(pool).createTable();
+    schemaMigration = Base.connectionPool().schemaMigration;
   });
 
   it.skipIf(skipMigrationTestCase)("migrate status table", async () => {
-    const output = await testCase.captureStdout(() => DatabaseTasks.migrateStatus());
+    await schemaMigration.createTable();
+    const output = await captureMigrationStatus();
     expect(output).toMatch(/database: :memory:/);
-    expect(output).toMatch(/down\s+001\s+Valid people have last names/);
-    expect(output).toMatch(/down\s+002\s+We need reminders/);
-    expect(output).toMatch(/down\s+003\s+Innocent jointable/);
+    expect(output).toMatch(/down {4}001 {13}Valid people have last names/);
+    expect(output).toMatch(/down {4}002 {13}We need reminders/);
+    expect(output).toMatch(/down {4}003 {13}Innocent jointable/);
+    await schemaMigration.deleteAllVersions();
   });
+
+  const captureMigrationStatus = (): Promise<string> =>
+    capture("stdout", async () => {
+      await DatabaseTasks.migrateStatus();
+    });
 });
 
 describe("DatabaseTasksMigrateErrorTest", () => {
@@ -1662,105 +1646,130 @@ describe("DatabaseTasksStructureLoadTest", () => {
 });
 
 describe("DatabaseTaskTargetVersionTest", () => {
-  let originalVersion: string | undefined;
-  beforeEach(() => {
-    originalVersion = getEnv("VERSION");
-  });
-  afterEach(() => {
-    setEnv("VERSION", originalVersion);
-  });
-
   it("target version returns nil if version does not exist", () => {
+    const version = getEnv("VERSION");
     setEnv("VERSION", undefined);
-    expect(DatabaseTasks.targetVersion()).toBeNull();
+
+    try {
+      expect(DatabaseTasks.targetVersion()).toBeNull();
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("target version returns nil if version is empty", () => {
-    setEnv("VERSION", "");
-    expect(DatabaseTasks.targetVersion()).toBeNull();
+    const version = getEnv("VERSION");
+
+    try {
+      setEnv("VERSION", "");
+      expect(DatabaseTasks.targetVersion()).toBeNull();
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("target version returns converted to integer env version if version exists", () => {
-    setEnv("VERSION", "0");
-    expect(DatabaseTasks.targetVersion()).toBe(0);
+    const version = getEnv("VERSION");
 
-    setEnv("VERSION", "42");
-    expect(DatabaseTasks.targetVersion()).toBe(42);
+    try {
+      setEnv("VERSION", "0");
+      expect(DatabaseTasks.targetVersion()).toBe(0);
 
-    setEnv("VERSION", "042");
-    expect(DatabaseTasks.targetVersion()).toBe(42);
+      setEnv("VERSION", "42");
+      expect(DatabaseTasks.targetVersion()).toBe(42);
 
-    setEnv("VERSION", "2000_01_01_000042");
-    expect(DatabaseTasks.targetVersion()).toBe(20000101000042);
+      setEnv("VERSION", "042");
+      expect(DatabaseTasks.targetVersion()).toBe(42);
+
+      setEnv("VERSION", "2000_01_01_000042");
+      expect(DatabaseTasks.targetVersion()).toBe(20000101000042);
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 });
 
 describe("DatabaseTaskCheckTargetVersionTest", () => {
-  let originalVersion: string | undefined;
-  beforeEach(() => {
-    originalVersion = getEnv("VERSION");
-  });
-  afterEach(() => {
-    setEnv("VERSION", originalVersion);
+  it("check target version does not raise error on empty version", async () => {
+    const version = getEnv("VERSION");
+
+    try {
+      setEnv("VERSION", "");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
-  it("check target version does not raise error on empty version", () => {
-    setEnv("VERSION", "");
-    expect(() => DatabaseTasks.checkTargetVersion()).not.toThrow();
-  });
-
-  it("check target version does not raise error if version is not set", () => {
+  it("check target version does not raise error if version is not set", async () => {
+    const version = getEnv("VERSION");
     setEnv("VERSION", undefined);
-    expect(() => DatabaseTasks.checkTargetVersion()).not.toThrow();
+
+    try {
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("check target version raises error on invalid version format", async () => {
     let e: Error;
+    const version = getEnv("VERSION");
 
-    setEnv("VERSION", "unknown");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+    try {
+      setEnv("VERSION", "unknown");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "0.1.11");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "0.1.11");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1.1.11");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1.1.11");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "0 ");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "0 ");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1.");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1.");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1_");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1_");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1_name");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1_name");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("check target version does not raise error on valid version format", async () => {
-    setEnv("VERSION", "0");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    const version = getEnv("VERSION");
 
-    setEnv("VERSION", "1");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    try {
+      setEnv("VERSION", "0");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    setEnv("VERSION", "001");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+      setEnv("VERSION", "1");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    setEnv("VERSION", "1_001");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+      setEnv("VERSION", "001");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    setEnv("VERSION", "001_name.ts");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+      setEnv("VERSION", "1_001");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+
+      setEnv("VERSION", "001_name.ts");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 });
 

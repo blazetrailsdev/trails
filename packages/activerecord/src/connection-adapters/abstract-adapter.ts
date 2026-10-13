@@ -1322,10 +1322,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   isAsyncEnabled(): boolean {
-    return false;
-  }
-
-  asyncEnabled(): boolean {
     return (
       this.supportsConcurrentConnections() &&
       asyncQueryExecutor() != null &&

@@ -144,7 +144,7 @@ export async function waitForAsyncQuery(
   { timeout = 5 }: { timeout?: number } = {},
 ): Promise<void> {
   connection ??= await Base.leaseConnection();
-  if (!connection.asyncEnabled()) return;
+  if (!connection.isAsyncEnabled()) return;
 
   const executor = (connection.pool as ConnectionPool).asyncExecutor!;
   for (let i = 0; i < timeout * 100; i++) {
