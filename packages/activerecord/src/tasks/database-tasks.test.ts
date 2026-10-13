@@ -1387,7 +1387,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
   });
 });
 
-describe("DatabaseTasksTruncateAllTest", () => {
+function databaseTasksTruncateAllTest(): void {
   fixtures(["courses", "colleges"], { useTransactionalTests: false });
 
   let schemaMigration: SchemaMigration;
@@ -1433,6 +1433,34 @@ describe("DatabaseTasksTruncateAllTest", () => {
     expect(await internalMetadata.count()).toBeGreaterThan(0);
     expect(await Course.count()).toBe(0);
     expect(await College.count()).toBe(0);
+  });
+}
+
+describe("DatabaseTasksTruncateAllTest", () => {
+  databaseTasksTruncateAllTest();
+
+  describe("DatabaseTasksTruncateAllWithPrefixTest", () => {
+    beforeEach(() => {
+      Base.tableNamePrefix = "p_";
+    });
+
+    afterEach(() => {
+      Base.tableNamePrefix = "";
+    });
+
+    databaseTasksTruncateAllTest();
+  });
+
+  describe("DatabaseTasksTruncateAllWithSuffixTest", () => {
+    beforeEach(() => {
+      Base.tableNameSuffix = "_s";
+    });
+
+    afterEach(() => {
+      Base.tableNameSuffix = "";
+    });
+
+    databaseTasksTruncateAllTest();
   });
 });
 
