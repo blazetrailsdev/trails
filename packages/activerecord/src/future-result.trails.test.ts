@@ -173,7 +173,7 @@ describe("DatabaseStatements#select", () => {
 
   it("raises AsynchronousQueryInsideTransactionError inside a joinable transaction", () => {
     const host = {
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
       preprocessQuery: (sql: string) => sql,
       currentTransaction: () => ({ open: true, joinable: true }),
     };
@@ -186,7 +186,7 @@ describe("DatabaseStatements#select", () => {
   it("resolves to the Result when async is set but no executor is enabled", async () => {
     const result = new Result(["id"], [[1]]);
     const host = {
-      asyncEnabled: () => false,
+      isAsyncEnabled: () => false,
       internalExecQuery: async () => result,
     };
 
@@ -200,7 +200,7 @@ describe("DatabaseStatements#select", () => {
     const pool = fakePool(result);
     const host = {
       pool,
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
       preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
@@ -224,7 +224,7 @@ describe("DatabaseStatements#select", () => {
     const pool = fakePool(result);
     const host = {
       pool,
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
       preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
@@ -244,7 +244,7 @@ describe("DatabaseStatements#select", () => {
     const pool = deferredPool(result);
     const host = {
       pool,
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
       preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
@@ -267,7 +267,7 @@ describe("DatabaseStatements#select", () => {
     const gate = new Promise<void>((resolve) => (release = resolve));
     const host = {
       pool: {},
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
       preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => false,
       currentTransaction: () => ({ open: false, joinable: false }),
@@ -297,7 +297,7 @@ describe("DatabaseStatements#select", () => {
 
   it("returns a bare Result when async is not set", async () => {
     const result = new Result(["id"], [[1]]);
-    const host = { asyncEnabled: () => false, internalExecQuery: async () => result };
+    const host = { isAsyncEnabled: () => false, internalExecQuery: async () => result };
     expect(await select.call(host as never, "SELECT 1", null, [])).toBe(result);
   });
 });

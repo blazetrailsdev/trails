@@ -40,6 +40,16 @@ tester.run("require-table-teardown", rule, {
       '    async up() { await this.createTable("widgets", () => {}); }\n' +
       "    async down() { await this.revert(); }\n  })();\n" +
       '  await migration.migrate("up");\n});',
+    // A named class is followed to the instance its revert names.
+    "class CreateWidgets extends Migration.Current {\n" +
+      '  async change() { await this.createTable("widgets", () => {}); }\n}\n' +
+      "const migration = new CreateWidgets();\n" +
+      'afterEach(async () => { await migration.migrate("down"); });',
+    "const CreateWidgets = class extends Migration.Current {\n" +
+      '  async change() { await this.createTable("widgets", () => {}); }\n};\n' +
+      "let migration;\n" +
+      'afterEach(async () => { await migration.migrate("down"); });\n' +
+      'it("x", async () => { migration = new CreateWidgets(); });',
     // ── failureSafe ──
     // A drop in an afterAll/afterEach hook survives a failing assertion.
     'it("x", async () => { await ctx.createTable("widgets", () => {}); });\n' +
@@ -649,6 +659,27 @@ tester.run("require-table-teardown", rule, {
         '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
         '  await migration.migrate("up");\n});',
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 5 }],
+    },
+    // Reverting an instance of a different named class tears nothing down.
+    {
+      code:
+        "class CreateWidgets extends Migration.Current {\n" +
+        '  async change() { await this.createTable("widgets", () => {}); }\n}\n' +
+        "class CreateGadgets extends Migration.Current {}\n" +
+        "const migration = new CreateWidgets();\n" +
+        "const other = new CreateGadgets();\n" +
+        'afterEach(async () => { await other.migrate("down"); });',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 2 }],
+    },
+    // Every instance of the named class has to be reverted.
+    {
+      code:
+        "class CreateWidgets extends Migration.Current {\n" +
+        '  async change() { await this.createTable("widgets", () => {}); }\n}\n' +
+        "const migration = new CreateWidgets();\n" +
+        "const second = new CreateWidgets();\n" +
+        'afterEach(async () => { await migration.migrate("down"); });',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 2 }],
     },
     // migrate("up") in a hook is not a revert.
     {
