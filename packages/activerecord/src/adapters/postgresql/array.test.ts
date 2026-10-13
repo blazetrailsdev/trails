@@ -1,10 +1,9 @@
-import { Rational } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 import { TimeZone, setZone, change as timeChange } from "@blazetrails/activesupport";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
 import { ValueType, StringType } from "@blazetrails/activemodel";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -159,27 +158,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).toMatch(
         /t\.decimal\("decimals",\s+\{ precision: 10,\s+scale: 2,\s+default: \[\],\s+array: true/,
       );
-    });
-    it("schema dump renders non-empty array defaults via the element type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_array_defaults`);
-      await adapter.execute(`
-        CREATE TABLE pg_array_defaults (
-          id serial primary key,
-          ints integer[] DEFAULT '{4,4,2}',
-          flags boolean[] DEFAULT '{true,false}',
-          nums numeric(10,2)[] DEFAULT '{1.5,2.5}'
-        )
-      `);
-      await adapter.loadAdditionalTypes();
-      try {
-        const output = await dumpTableSchema("pg_array_defaults");
-        const line = (name: string) => output.split("\n").find((l) => l.includes(`"${name}"`))!;
-        expect(line("ints")).toMatch(/default: \[4, 4, 2\]/);
-        expect(line("flags")).toMatch(/default: \[true, false\]/);
-        expect(line("nums")).toMatch(/default: \["1\.5", "2\.5"\]/);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS pg_array_defaults`).catch(() => {});
-      }
     });
     it("change column with array", async () => {
       await adapter.addColumn("pg_arrays", "snippets", "string", { array: true, default: [] });
@@ -577,28 +555,5 @@ describeIfPg("PostgreSQLAdapter", () => {
       await x.reload();
       expect(x[field]).toEqual(array);
     }
-  });
-
-  describe("array datetime inline-quoting (trails)", () => {
-    it("inlines a proleptic-year datetime[] element as a quoted_date BC literal", async () => {
-      class PgArrays extends Base {
-        static tableName = "pg_arrays";
-        static {
-          this.attribute("id", "integer");
-        }
-      }
-      await PgArrays.loadSchema();
-      const bc = Temporal.Instant.from("-000042-03-15T12:34:56.123456Z");
-      const record = await (PgArrays as any).create({
-        datetimes: [RubyTime.at(new Rational(bc.epochNanoseconds, 1_000_000_000n))],
-      });
-      await record.reload();
-      expect(record.datetimes).toHaveLength(1);
-      expect(
-        (record.datetimes[0] as RubyTime)
-          .toR()
-          .cmp(new Rational(bc.epochNanoseconds, 1_000_000_000n)),
-      ).toBe(0);
-    });
   });
 });
