@@ -1,8 +1,10 @@
 import {
   ArgumentError,
+  NameError,
   NilClass,
   NoMethodError,
   rbModName,
+  rbModToS,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
@@ -21,9 +23,14 @@ export class DelegationError extends Error {
 }
 
 export interface DelegateOptions {
-  to: string | object;
-  prefix?: boolean | string;
-  allowNil?: boolean;
+  location?: unknown;
+  to?: string | object | null;
+  prefix?: boolean | string | null;
+  allowNil?: boolean | null;
+  nilable?: boolean | null;
+  private?: boolean | null;
+  as?: Module | (abstract new (...args: never[]) => object) | null;
+  signature?: string | null;
 }
 
 function receiverValue(self: Record<string, unknown>, receiver: string): unknown {
@@ -60,12 +67,13 @@ export namespace Delegation {
   export function generate<T extends object>(
     owner: T,
     methods: string[],
-    options: DelegateOptions,
+    options: DelegateOptions = {},
   ): string[] {
     if (owner instanceof Module) {
       return owner.moduleEval((mod) => generate(mod, methods, options));
     }
-    const { to, prefix, allowNil } = options;
+    const { to = null, prefix = null, allowNil = null, as = null, signature = null } = options;
+    let nilable = "nilable" in options ? options.nilable : true;
 
     if (!to) {
       throw new ArgumentError(
@@ -102,9 +110,12 @@ export namespace Delegation {
 
     const methodNames: string[] = [];
 
-    let nilable = true;
+    let explicitReceiver = false;
     let receiverClass: unknown;
-    if (typeof to !== "string") {
+    if (as != null) {
+      explicitReceiver = true;
+      receiverClass = as instanceof Module ? as.moduleEval((mod) => mod) : as.prototype;
+    } else if (typeof to !== "string") {
       receiverClass = to;
     } else if (receiver === "self.class") {
       nilable = false;
@@ -136,7 +147,11 @@ export namespace Delegation {
           enumerable: false,
           set(this: Record<string, unknown>, arg: unknown) {
             const _ = resolve(this);
-            if (_ != null) (_ as Record<string, unknown>)[attr] = arg;
+            if (_ == null) {
+              if (nilable !== false) return;
+              throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+            }
+            (_ as Record<string, unknown>)[attr] = arg;
           },
         });
         continue;
@@ -144,7 +159,7 @@ export namespace Delegation {
 
       const value = function (this: Record<string, unknown>, ...args: unknown[]) {
         const _ = resolve(this);
-        if (_ == null)
+        if (_ == null && nilable !== false)
           return Object.hasOwn(NilClass, method) ? NilClass[method].apply(null, args) : undefined;
         if (!(method in Object(_))) {
           throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
@@ -153,9 +168,17 @@ export namespace Delegation {
         return typeof member === "function" ? member.apply(_, args) : member;
       };
       let descriptor: PropertyDescriptor | undefined;
-      for (let o = receiverClass as object | null | undefined; o != null && !descriptor; ) {
-        descriptor = Object.getOwnPropertyDescriptor(o, method);
-        o = Object.getPrototypeOf(o);
+      if (signature == null && receiverClass != null) {
+        for (let o = receiverClass as object | null; o != null && !descriptor; ) {
+          descriptor = Object.getOwnPropertyDescriptor(o, method);
+          o = Object.getPrototypeOf(o);
+        }
+        if (!descriptor && explicitReceiver) {
+          throw new NameError(
+            `undefined method '${method}' for class '${rbModToS(as as new () => unknown)}'`,
+            method,
+          );
+        }
       }
       if (descriptor?.get) {
         Object.defineProperty(owner, methodName, {
@@ -163,7 +186,7 @@ export namespace Delegation {
           enumerable: false,
           get(this: Record<string, unknown>) {
             const _ = resolve(this);
-            if (_ == null) return undefined;
+            if (_ == null && nilable !== false) return undefined;
             if (!(method in Object(_))) {
               throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
             }
@@ -173,7 +196,14 @@ export namespace Delegation {
         continue;
       }
       const methodObject = descriptor?.value;
-      if (typeof methodObject === "function") {
+      if (signature != null) {
+        Object.defineProperty(value, "length", {
+          value: signature
+            .split(",")
+            .map((arg) => arg.trim())
+            .filter((arg) => /^\w+$/.test(arg)).length,
+        });
+      } else if (typeof methodObject === "function") {
         Object.defineProperty(value, "length", { value: methodObject.length });
       }
       Object.defineProperty(owner, methodName, {
