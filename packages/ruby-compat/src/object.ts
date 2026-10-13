@@ -550,7 +550,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   }
   if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
   if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
-  if (Array.isArray(obj) && typeof enumerableModule()[mid] === "function") return true;
+  if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
   if (temporalMethod(obj, mid) !== undefined) return true;
   if (enumerableMethod(obj, mid) !== undefined) return true;
   if (
@@ -1026,7 +1026,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
     return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
   }
-  if (Array.isArray(recv) && typeof enumerableModule()[mid] === "function") {
+  if (Array.isArray(recv) && Object.hasOwn(enumerableModule(), mid)) {
     const each = (block: (i: unknown) => void): void => recv.forEach((i) => block(i));
     return enumerableModule()[mid].call({ each }, ...args);
   }
