@@ -12,7 +12,7 @@ import {
   assertRaises,
   stub,
 } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
+import { include, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { deprecator } from "../deprecator.js";
 import { IntegrationTest } from "../testing/integration.js";
@@ -136,10 +136,12 @@ class EchoParamsController {
 }
 
 describe("TestRoutingMapper", () => {
-  let t: IntegrationTest & Record<string, (...args: unknown[]) => string>;
+  class TestRoutingMapper extends IntegrationTest {}
+  registerConstant("TestRoutingMapper", TestRoutingMapper);
 
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name) as typeof t;
+  let t: TestRoutingMapper & Record<string, (...args: unknown[]) => string>;
+  beforeEach(({ testCase }) => {
+    t = testCase as typeof t;
   });
 
   function draw(block: DrawCallback): void {
@@ -2695,10 +2697,16 @@ describe("TestAltApp", () => {
   });
 
   const APP = IntegrationTest.buildApp(AltRoutes);
-  let t: IntegrationTest;
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
-    t.app = APP;
+  class TestAltApp extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestAltApp", TestAltApp);
+
+  let t: TestAltApp;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestAltApp;
   });
 
   it("alt request without header", async () => {
@@ -2744,10 +2752,16 @@ describe("TestGlobRoutingMapper", () => {
   });
 
   const APP = IntegrationTest.buildApp(Routes);
-  let t: IntegrationTest;
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
-    t.app = APP;
+  class TestGlobRoutingMapper extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestGlobRoutingMapper", TestGlobRoutingMapper);
+
+  let t: TestGlobRoutingMapper;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestGlobRoutingMapper;
   });
 
   it("glob constraint", async () => {
@@ -2867,16 +2881,20 @@ describe("TestNamedRouteUrlHelpers", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestNamedRouteUrlHelpers extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+
     declare productPath: (...args: unknown[]) => string;
   }
   include(TestNamedRouteUrlHelpers, Routes.urlHelpers());
+  registerConstant("TestNamedRouteUrlHelpers", TestNamedRouteUrlHelpers);
 
   let t: TestNamedRouteUrlHelpers;
-  beforeEach(({ task }) => {
+  beforeEach(({ testCase }) => {
     controllerConstants.set("test_named_route_url_helpers/categories", CategoriesController);
     controllerConstants.set("test_named_route_url_helpers/products", ProductsController);
-    t = new TestNamedRouteUrlHelpers(task.name);
-    t.app = APP;
+    t = testCase as TestNamedRouteUrlHelpers;
   });
 
   const assertResponse = (type: string): void => t.assertResponse(type);
@@ -2914,44 +2932,45 @@ describe("TestUrlConstraints", () => {
     this.get("/logs", { to: ok, constraints: { subdomain: true } });
   });
 
-  let t: IntegrationTest;
-  const urlHelper = (name: string) => (): string =>
-    (Routes.namedRoutes.urlHelpersModule.instanceMethod(name)!.value as NamedRouteHelper).call({
-      _routes: Routes,
-      urlOptions: () => t.urlOptions(),
-      optimizeRoutesGeneration: () => Routes.isOptimizeRoutesGeneration(),
-    });
-  const adminRootUrl = urlHelper("adminRootUrl");
-  const secureRootUrl = urlHelper("secureRootUrl");
-  const alternateRootUrl = urlHelper("alternateRootUrl");
-  const searchUrl = urlHelper("searchUrl");
-  const logsUrl = urlHelper("logsUrl");
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestUrlConstraints extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
 
+    declare adminRootUrl: () => string;
+    declare secureRootUrl: () => string;
+    declare alternateRootUrl: () => string;
+    declare searchUrl: () => string;
+    declare logsUrl: () => string;
+  }
+  include(TestUrlConstraints, Routes.urlHelpers());
+  registerConstant("TestUrlConstraints", TestUrlConstraints);
+
+  let t: TestUrlConstraints;
   const get = (path: string): Promise<void> => t.get(path);
   const assertResponse = (type: string): void => t.assertResponse(type);
 
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
-    t.routes = Routes;
-    t.app = (env: Record<string, unknown>) => Routes.call(env);
+  beforeEach(({ testCase }) => {
+    t = testCase as TestUrlConstraints;
   });
 
   it("constraints are copied to defaults when using constraints method", async () => {
-    expect(adminRootUrl()).toBe("http://admin.example.com/");
+    expect(t.adminRootUrl()).toBe("http://admin.example.com/");
 
     await get("http://admin.example.com/");
     assertResponse("success");
   });
 
   it("constraints are copied to defaults when using scope constraints hash", async () => {
-    expect(secureRootUrl()).toBe("https://www.example.com/");
+    expect(t.secureRootUrl()).toBe("https://www.example.com/");
 
     await get("https://www.example.com/");
     assertResponse("success");
   });
 
   it("constraints are copied to defaults when using route constraints hash", async () => {
-    expect(alternateRootUrl()).toBe("http://www.example.com:8080/");
+    expect(t.alternateRootUrl()).toBe("http://www.example.com:8080/");
 
     await get("http://www.example.com:8080/");
     assertResponse("success");
@@ -2960,7 +2979,7 @@ describe("TestUrlConstraints", () => {
   it("false constraint expressions check for absence of values", async () => {
     await get("http://example.com/search");
     assertResponse("success");
-    expect(searchUrl()).toBe("http://example.com/search");
+    expect(t.searchUrl()).toBe("http://example.com/search");
 
     await get("http://api.example.com/search");
     assertResponse("not_found");
@@ -2969,7 +2988,7 @@ describe("TestUrlConstraints", () => {
   it("true constraint expressions check for presence of values", async () => {
     await get("http://api.example.com/logs");
     assertResponse("success");
-    expect(logsUrl()).toBe("http://api.example.com/logs");
+    expect(t.logsUrl()).toBe("http://api.example.com/logs");
 
     await get("http://example.com/logs");
     assertResponse("not_found");
@@ -2993,14 +3012,18 @@ describe("TestOptionalRootSegments", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestOptionalRootSegments extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+
     declare rootPath: (...args: unknown[]) => string;
   }
   include(TestOptionalRootSegments, Routes.urlHelpers());
+  registerConstant("TestOptionalRootSegments", TestOptionalRootSegments);
 
   let t: TestOptionalRootSegments;
-  beforeEach(({ task }) => {
-    t = new TestOptionalRootSegments(task.name);
-    t.app = APP;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestOptionalRootSegments;
   });
 
   it("optional root segments", async () => {
@@ -3032,10 +3055,16 @@ describe("TestPortConstraints", () => {
   });
 
   const APP = IntegrationTest.buildApp(Routes);
-  let t: IntegrationTest;
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
-    t.app = APP;
+  class TestPortConstraints extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestPortConstraints", TestPortConstraints);
+
+  let t: TestPortConstraints;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestPortConstraints;
   });
 
   const assertResponse = (type: string): void => t.assertResponse(type);
@@ -3092,10 +3121,16 @@ describe("TestFormatConstraints", () => {
   });
 
   const APP = IntegrationTest.buildApp(Routes);
-  let t: IntegrationTest;
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
-    t.app = APP;
+  class TestFormatConstraints extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestFormatConstraints", TestFormatConstraints);
+
+  let t: TestFormatConstraints;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestFormatConstraints;
   });
 
   const assertResponse = (type: string): void => t.assertResponse(type);
@@ -3167,13 +3202,17 @@ describe("TestRouteDefaults", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
 
-  class TestRouteDefaults extends IntegrationTest {}
+  class TestRouteDefaults extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
   include(TestRouteDefaults, Routes.urlHelpers());
+  registerConstant("TestRouteDefaults", TestRouteDefaults);
 
   let t: TestRouteDefaults;
-  beforeEach(({ task }) => {
-    t = new TestRouteDefaults(task.name);
-    t.app = APP;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestRouteDefaults;
   });
 
   it("route options are required for url for", async () => {
@@ -3321,10 +3360,16 @@ describe("TestRedirectInterpolation", () => {
   });
 
   const APP = IntegrationTest.buildApp(Routes);
-  let t: IntegrationTest;
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
-    t.app = APP;
+  class TestRedirectInterpolation extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestRedirectInterpolation", TestRedirectInterpolation);
+
+  let t: TestRedirectInterpolation;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestRedirectInterpolation;
   });
 
   function verifyRedirect(url: string, status = 301): void {
@@ -3366,10 +3411,16 @@ describe("TestConstraintsAccessingParameters", () => {
   });
 
   const APP = IntegrationTest.buildApp(Routes);
-  let t: IntegrationTest;
-  beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
-    t.app = APP;
+  class TestConstraintsAccessingParameters extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestConstraintsAccessingParameters", TestConstraintsAccessingParameters);
+
+  let t: TestConstraintsAccessingParameters;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestConstraintsAccessingParameters;
   });
 
   it("parameters are reset between constraint checks", async () => {

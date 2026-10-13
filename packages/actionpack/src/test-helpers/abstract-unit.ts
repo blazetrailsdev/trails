@@ -1,3 +1,4 @@
+import "@blazetrails/activesupport/testing/autorun";
 import {
   assert,
   assertEqual,
