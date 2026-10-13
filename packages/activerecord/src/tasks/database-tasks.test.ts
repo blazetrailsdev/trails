@@ -1095,6 +1095,7 @@ const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).p
 function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase {
   let stdoutChunks: string[] = [];
   let stdoutSpy: MockInstance | undefined;
+  let conn: Awaited<ReturnType<typeof Base.establishConnection>> | undefined;
 
   beforeEach(async () => {
     if (skipMigrationTestCase) return;
@@ -1107,7 +1108,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
     const file = await (await (
       (await Base.leaseConnection()) as SQLite3Adapter
     ).rawConnection())!.filename();
-    await Base.establishConnection({
+    conn = await Base.establishConnection({
       adapter: "sqlite3",
       database: ":memory:",
       migrationsPaths: migrationsPath,
@@ -1122,10 +1123,9 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
   afterEach(async () => {
     stdoutSpy?.mockRestore();
     stdoutSpy = undefined;
-    try {
-      await Base.removeConnection();
-    } catch {}
-    if (!skipMigrationTestCase) await Base.establishConnection(":arunit");
+    if (skipMigrationTestCase) return;
+    if (conn) conn.releaseConnection();
+    await Base.establishConnection(":arunit");
   });
 
   const captureStdout = async (fn: () => Promise<void>): Promise<string> => {

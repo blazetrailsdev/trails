@@ -20,7 +20,7 @@ export class Backup {
     this.#p = { dstdb, srcdb, srcname };
   }
 
-  async step(_nPage: number): Promise<number> {
+  async step(nPage: number): Promise<number> {
     if (!this.#p) throw new Exception("cannot use a closed backup");
     const { dstdb, srcdb, srcname } = this.#p;
     const file = await srcdb.filename(srcname);
