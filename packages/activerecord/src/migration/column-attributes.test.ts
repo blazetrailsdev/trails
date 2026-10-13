@@ -1,4 +1,4 @@
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    The test class spells `include ActiveRecord::Migration::TestHelper` (migration/helper.rb:10); the
    empty class/interface merge carries the mixed-in methods onto its type. */

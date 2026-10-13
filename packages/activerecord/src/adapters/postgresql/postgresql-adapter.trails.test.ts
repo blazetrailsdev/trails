@@ -1,5 +1,5 @@
 import { stub } from "@blazetrails/activesupport";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { StringIO, Thread } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import { Socket } from "net";
