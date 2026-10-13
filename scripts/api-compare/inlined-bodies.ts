@@ -308,23 +308,25 @@ export function inlinedRubySkeleton(segments: readonly MethodInfo[]): string[] {
 }
 
 /**
- * Whether a Rails class reaches no `initialize` of its own or through a
- * same-package `include`, and its constructor is tagged and not yet compared.
- * The ordinary pairing has no `initialize` row for such a class, so its only
- * Rails body is the one a tag cites from another package. Asked one class at a
- * time, so a class the previous answer just had compared is refused.
+ * Whether a Rails class defines no `initialize` of its own, and its
+ * constructor is tagged and not yet compared. The ordinary pairing has no
+ * `initialize` row of the class's own to read, so its Rails bodies are the
+ * ones its tags cite: from another package (`I18n::Config`), or through an
+ * `include` whose row the pairing credits without reading a body
+ * (`ActionController::API`). Asked one class at a time, and after the ordinary
+ * pairing, so a class already compared is refused.
  */
 export function isInitializeLessTaggedClass(
   fqn: string,
   classes: Record<string, unknown>,
-  reachingInitialize: ReadonlySet<string>,
+  definingInitialize: ReadonlySet<string>,
   tagged: ReadonlyMap<string, unknown> | undefined,
   compared: ReadonlySet<string>,
   tsFile: string,
   tsOwnerOf: (fqn: string) => string | undefined,
 ): boolean {
   if (tagged === undefined) return false;
-  if (!Object.hasOwn(classes, fqn) || reachingInitialize.has(fqn)) return false;
+  if (!Object.hasOwn(classes, fqn) || definingInitialize.has(fqn)) return false;
   const owner = tsOwnerOf(fqn);
   return owner !== undefined && tagged.has(owner) && !compared.has(`${tsFile} ${owner}`);
 }

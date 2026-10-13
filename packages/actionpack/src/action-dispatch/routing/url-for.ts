@@ -11,7 +11,6 @@ import {
   type Hash,
   hashDelete,
   include,
-  initialize as moduleInitialize,
   isSymbol,
   Module,
   rbFPublicSend,
@@ -187,11 +186,6 @@ export const UrlFor = new Module((mod) => {
 
     if (rbObjRespondTo(this, "_urlForModules")) include(this, this._urlForModules!());
   });
-
-  /** @inventedArm if — CONVERGEABLE url-for-routes-ivar-shares-the-routes-reader-property */
-  (mod as unknown as Record<symbol, unknown>)[moduleInitialize] = function (this: UrlForHost) {
-    if ("_routes" in this) this._routes = null;
-  };
 
   mod.moduleEval((m) => {
     Object.assign(m, {

@@ -220,10 +220,30 @@ export class Request {
 
   #method?: string;
   #requestMethod?: string;
-  #port?: number;
+  #protocol: string | null;
+  #port: number | null;
+  /** @internal */
+  declare _filteredParameters: Record<string, unknown> | null;
+  /** @internal */
+  declare _filteredEnv: Record<string, unknown> | null;
+  /** @internal */
+  declare _filteredPath: string | null;
+  /** @internal */
+  declare _parameterFilter: ParameterFilter | null;
 
+  /**
+   * @inlinedFrom Rack::Request::Env#initialize rack/v3.1.14/lib/rack/request.rb:86-91
+   * @inlinedFrom ActionDispatch::Http::URL#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/url.rb:181-185
+   * @inlinedFrom ActionDispatch::Http::FilterParameters#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/filter_parameters.rb:24-30
+   */
   constructor(env: RackEnv = {}) {
     this.env = env;
+    this._filteredParameters = null;
+    this._filteredEnv = null;
+    this._filteredPath = null;
+    this._parameterFilter = null;
+    this.#protocol = null;
+    this.#port = null;
   }
 
   get method(): string {
@@ -258,7 +278,7 @@ export class Request {
   }
 
   get protocol(): string {
-    return this.ssl ? "https://" : "http://";
+    return (this.#protocol ??= this.ssl ? "https://" : "http://");
   }
 
   get rawHostWithPort(): string {
@@ -274,7 +294,7 @@ export class Request {
   }
 
   get port(): number {
-    if (this.#port === undefined) {
+    if (this.#port == null) {
       const match = this.rawHostWithPort.match(/:(\d+)$/);
       this.#port = match ? parseInt(match[1], 10) : this.standardPort;
     }

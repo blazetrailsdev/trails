@@ -71,8 +71,10 @@ export class IntegrationTest extends TestCase {
   /** @internal */
   _defaultUrlOptions: Record<string, unknown> = {};
 
+  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
   constructor(...args: ConstructorParameters<typeof TestCase>) {
     super(...args);
+    this._routes = null;
     this._integrationSession = null;
   }
 

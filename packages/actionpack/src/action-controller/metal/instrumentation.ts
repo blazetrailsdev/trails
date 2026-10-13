@@ -5,7 +5,6 @@ import {
   ExecutionContext,
   extend,
   include,
-  initialize,
   Module,
   Notifications,
   toF,
@@ -25,12 +24,6 @@ export const Instrumentation = new Module((mod) => {
   extend(mod, Concern);
 
   include(mod, Logger);
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: {
-    viewRuntime: number | null;
-  }): void {
-    this.viewRuntime = null;
-  };
 
   mod.moduleEval((carrier) => attrInternal.call(carrier, "viewRuntime"));
 

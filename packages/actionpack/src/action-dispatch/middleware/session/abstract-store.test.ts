@@ -19,13 +19,13 @@ describe("ActionDispatch::Session::AbstractStore", () => {
   describe("Compatibility", () => {
     it("defaults the cookie key to _session_id", () => {
       const opts: Record<string, unknown> = {};
-      Compatibility.initialize.call(new Persisted(), () => {}, opts);
+      new AbstractStore(undefined, opts);
       expect(opts.key).toBe("_session_id");
     });
 
     it("does not override an explicit key", () => {
       const opts: Record<string, unknown> = { key: "_app_sid" };
-      Compatibility.initialize.call(new Persisted(), () => {}, opts);
+      new AbstractStore(undefined, opts);
       expect(opts.key).toBe("_app_sid");
     });
 
@@ -87,7 +87,6 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     it("includes the three Rails mixins on its prototype", () => {
       const proto = AbstractStore.prototype as unknown as Record<string, unknown>;
       for (const name of [
-        "initialize",
         "generateSid",
         "initializeSid",
         "makeRequest",

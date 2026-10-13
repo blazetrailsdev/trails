@@ -21,10 +21,6 @@ export class SessionRestoreError extends Error {
 }
 
 export const Compatibility = {
-  initialize(this: Persisted, _app: unknown, options: Record<string, unknown> = {}): void {
-    options.key ??= "_session_id";
-  },
-
   generateSid(this: unknown): string {
     return SecureRandom.hex(16);
   },
@@ -94,7 +90,7 @@ export const SessionObject = {
 
 export class AbstractStore extends Persisted {
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    Compatibility.initialize.call(undefined as never, app, options);
+    options.key ??= "_session_id";
     super(app, options);
   }
 
@@ -113,7 +109,7 @@ includeMixin(AbstractStore, SessionObject);
 
 export class AbstractSecureStore extends PersistedSecure {
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    Compatibility.initialize.call(undefined as never, app, options);
+    options.key ??= "_session_id";
     super(app, options);
   }
 

@@ -122,6 +122,25 @@ export class API extends Metal {
   /** @internal */
   declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
+
+  /** @internal */
+  declare _urlOptions: Readonly<Record<string, unknown>> | null;
+  /** @internal */
+  declare _routes: unknown;
+  declare viewRuntime: number | null;
+
+  /**
+   * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
+   * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
+   * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114
+   * @inventedArm if — CONVERGEABLE url-for-routes-ivar-shares-the-routes-reader-property
+   */
+  constructor() {
+    super();
+    if ("_routes" in this) this._routes = null;
+    this._urlOptions = null;
+    this.viewRuntime = null;
+  }
 }
 
 for (const mod of API.MODULES) {
