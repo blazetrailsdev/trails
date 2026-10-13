@@ -153,6 +153,16 @@ describe("TestRoutingMapper", () => {
   }
   const assertResponse = (type: string): void => t.assertResponse(type);
 
+  async function withHttps(block: () => Promise<void>): Promise<void> {
+    const oldHttps = t.isHttps();
+    t.httpsBang();
+    try {
+      await block();
+    } finally {
+      t.httpsBang(oldHttps);
+    }
+  }
+
   function verifyRedirect(url: string, status = 301): void {
     expect(t.response.status).toBe(status);
     expect(t.response.headers.get("Location")).toBe(url);
@@ -2319,12 +2329,218 @@ describe("TestRoutingMapper", () => {
   it.skip("multiple namespaced roots", () => {});
 
   it.skip("resource new actions", () => {});
-  it.skip("shallow false inside nested shallow resource", () => {});
-  it.skip("shallow deeply nested resources", () => {});
-  it.skip("direct children of shallow resources", () => {});
-  it.skip("shallow nested resources within scope", () => {});
-  it.skip("shallow option nested resources within scope", () => {});
-  it.skip("shallow nested routes ignore module", () => {});
+
+  it("shallow false inside nested shallow resource", async () => {
+    draw(function () {
+      this.resources("blogs", { shallow: true }, () => {
+        this.resources("posts", () => {
+          this.resources("comments", { shallow: false });
+          this.resources("tags");
+        });
+      });
+    });
+
+    await t.get("/posts/1/comments");
+    expect(t.response.body).toBe("comments#index");
+    expect(t.postCommentsPath("1")).toBe("/posts/1/comments");
+
+    await t.get("/posts/1/comments/new");
+    expect(t.response.body).toBe("comments#new");
+    expect(t.newPostCommentPath("1")).toBe("/posts/1/comments/new");
+
+    await t.get("/posts/1/comments/2");
+    expect(t.response.body).toBe("comments#show");
+    expect(t.postCommentPath("1", "2")).toBe("/posts/1/comments/2");
+
+    await t.get("/posts/1/comments/2/edit");
+    expect(t.response.body).toBe("comments#edit");
+    expect(t.editPostCommentPath("1", "2")).toBe("/posts/1/comments/2/edit");
+
+    await t.get("/tags/3");
+    expect(t.response.body).toBe("tags#show");
+    expect(t.tagPath("3")).toBe("/tags/3");
+  });
+
+  it("shallow deeply nested resources", async () => {
+    draw(function () {
+      this.resources("blogs", () => {
+        this.resources("posts", () => {
+          this.resources("comments", { shallow: true });
+        });
+      });
+    });
+
+    await t.get("/comments/1");
+    expect(t.response.body).toBe("comments#show");
+
+    expect(t.commentPath("1")).toBe("/comments/1");
+    expect(t.newBlogPath()).toBe("/blogs/new");
+    expect(t.newBlogPostPath({ blog_id: 1 })).toBe("/blogs/1/posts/new");
+    expect(t.newBlogPostCommentPath({ blog_id: 1, post_id: 2 })).toBe(
+      "/blogs/1/posts/2/comments/new",
+    );
+  });
+
+  it("direct children of shallow resources", async () => {
+    draw(function () {
+      this.resources("blogs", () => {
+        this.resources("posts", { shallow: true }, () => {
+          this.resources("comments");
+        });
+      });
+    });
+
+    await t.post("/posts/1/comments");
+    expect(t.response.body).toBe("comments#create");
+    expect(t.postCommentsPath("1")).toBe("/posts/1/comments");
+
+    await t.get("/posts/2/comments/new");
+    expect(t.response.body).toBe("comments#new");
+    expect(t.newPostCommentPath("2")).toBe("/posts/2/comments/new");
+
+    await t.get("/posts/1/comments");
+    expect(t.response.body).toBe("comments#index");
+    expect(t.postCommentsPath("1")).toBe("/posts/1/comments");
+  });
+
+  it("shallow nested resources within scope", async () => {
+    draw(function () {
+      this.scope("/hello", () => {
+        this.shallow(() => {
+          this.resources("notes", () => {
+            this.resources("trackbacks");
+          });
+        });
+      });
+    });
+
+    await t.get("/hello/notes/1/trackbacks");
+    expect(t.response.body).toBe("trackbacks#index");
+    expect(t.noteTrackbacksPath({ note_id: 1 })).toBe("/hello/notes/1/trackbacks");
+
+    await t.get("/hello/notes/1/edit");
+    expect(t.response.body).toBe("notes#edit");
+    expect(t.editNotePath({ id: "1" })).toBe("/hello/notes/1/edit");
+
+    await t.get("/hello/notes/1/trackbacks/new");
+    expect(t.response.body).toBe("trackbacks#new");
+    expect(t.newNoteTrackbackPath({ note_id: 1 })).toBe("/hello/notes/1/trackbacks/new");
+
+    await t.get("/hello/trackbacks/1");
+    expect(t.response.body).toBe("trackbacks#show");
+    expect(t.trackbackPath({ id: "1" })).toBe("/hello/trackbacks/1");
+
+    await t.get("/hello/trackbacks/1/edit");
+    expect(t.response.body).toBe("trackbacks#edit");
+    expect(t.editTrackbackPath({ id: "1" })).toBe("/hello/trackbacks/1/edit");
+
+    await t.put("/hello/trackbacks/1");
+    expect(t.response.body).toBe("trackbacks#update");
+
+    await t.post("/hello/notes/1/trackbacks");
+    expect(t.response.body).toBe("trackbacks#create");
+
+    await t.delete("/hello/trackbacks/1");
+    expect(t.response.body).toBe("trackbacks#destroy");
+
+    await t.get("/hello/notes");
+    expect(t.response.body).toBe("notes#index");
+
+    await t.post("/hello/notes");
+    expect(t.response.body).toBe("notes#create");
+
+    await t.get("/hello/notes/new");
+    expect(t.response.body).toBe("notes#new");
+    expect(t.newNotePath()).toBe("/hello/notes/new");
+
+    await t.get("/hello/notes/1");
+    expect(t.response.body).toBe("notes#show");
+    expect(t.notePath({ id: 1 })).toBe("/hello/notes/1");
+
+    await t.put("/hello/notes/1");
+    expect(t.response.body).toBe("notes#update");
+
+    await t.delete("/hello/notes/1");
+    expect(t.response.body).toBe("notes#destroy");
+  });
+
+  it("shallow option nested resources within scope", async () => {
+    draw(function () {
+      this.scope("/hello", () => {
+        this.resources("notes", { shallow: true }, () => {
+          this.resources("trackbacks");
+        });
+      });
+    });
+
+    await t.get("/hello/notes/1/trackbacks");
+    expect(t.response.body).toBe("trackbacks#index");
+    expect(t.noteTrackbacksPath({ note_id: 1 })).toBe("/hello/notes/1/trackbacks");
+
+    await t.get("/hello/notes/1/edit");
+    expect(t.response.body).toBe("notes#edit");
+    expect(t.editNotePath({ id: "1" })).toBe("/hello/notes/1/edit");
+
+    await t.get("/hello/notes/1/trackbacks/new");
+    expect(t.response.body).toBe("trackbacks#new");
+    expect(t.newNoteTrackbackPath({ note_id: 1 })).toBe("/hello/notes/1/trackbacks/new");
+
+    await t.get("/hello/trackbacks/1");
+    expect(t.response.body).toBe("trackbacks#show");
+    expect(t.trackbackPath({ id: "1" })).toBe("/hello/trackbacks/1");
+
+    await t.get("/hello/trackbacks/1/edit");
+    expect(t.response.body).toBe("trackbacks#edit");
+    expect(t.editTrackbackPath({ id: "1" })).toBe("/hello/trackbacks/1/edit");
+
+    await t.put("/hello/trackbacks/1");
+    expect(t.response.body).toBe("trackbacks#update");
+
+    await t.post("/hello/notes/1/trackbacks");
+    expect(t.response.body).toBe("trackbacks#create");
+
+    await t.delete("/hello/trackbacks/1");
+    expect(t.response.body).toBe("trackbacks#destroy");
+
+    await t.get("/hello/notes");
+    expect(t.response.body).toBe("notes#index");
+
+    await t.post("/hello/notes");
+    expect(t.response.body).toBe("notes#create");
+
+    await t.get("/hello/notes/new");
+    expect(t.response.body).toBe("notes#new");
+    expect(t.newNotePath()).toBe("/hello/notes/new");
+
+    await t.get("/hello/notes/1");
+    expect(t.response.body).toBe("notes#show");
+    expect(t.notePath({ id: 1 })).toBe("/hello/notes/1");
+
+    await t.put("/hello/notes/1");
+    expect(t.response.body).toBe("notes#update");
+
+    await t.delete("/hello/notes/1");
+    expect(t.response.body).toBe("notes#destroy");
+  });
+
+  it("shallow nested routes ignore module", async () => {
+    draw(function () {
+      this.scope({ module: "api" }, () => {
+        this.resources("errors", { shallow: true }, () => {
+          this.resources("notices");
+        });
+      });
+    });
+
+    await t.get("/errors/1/notices");
+    expect(t.response.body).toBe("api/notices#index");
+    expect(t.errorNoticesPath({ error_id: "1" })).toBe("/errors/1/notices");
+
+    await t.get("/notices/1");
+    expect(t.response.body).toBe("api/notices#show");
+    expect(t.noticePath({ id: "1" })).toBe("/notices/1");
+  });
+
   it.skip("shallow custom param", () => {});
   it.skip("shallow path inside namespace is not added twice", () => {});
   it.skip("shallow path and prefix are not added to non shallow routes", () => {});
@@ -2333,15 +2549,216 @@ describe("TestRoutingMapper", () => {
   it.skip("scope shallow prefix is not overwritten by as", () => {});
   it.skip("scope shallow path is not overwritten by path", () => {});
 
-  it.skip("url generator for optional prefix static and dynamic segment", () => {});
-  it.skip("url recognition for optional static segments", () => {});
-  it.skip("except option should override scoped only", () => {});
-  it.skip("only option should override scoped except", () => {});
-  it.skip("only scope should override parent scope", () => {});
-  it.skip("except scope should override parent scope", () => {});
-  it.skip("except scope should override parent only scope", () => {});
-  it.skip("only scope should override parent except scope", () => {});
+  it("url generator for optional prefix static and dynamic segment", async () => {
+    draw(function () {
+      this.get("(/user/:username)/photos", { to: "photos#index" });
+    });
+
+    await t.get("/user/bob/photos");
+    expect(t.response.body).toBe("photos#index");
+    expect(t.urlFor({ controller: "photos", action: "index", username: "bob" })).toBe(
+      "http://www.example.com/user/bob/photos",
+    );
+
+    await t.get("/photos");
+    expect(t.response.body).toBe("photos#index");
+    expect(t.urlFor({ controller: "photos", action: "index", username: null })).toBe(
+      "http://www.example.com/photos",
+    );
+  });
+
+  it("url recognition for optional static segments", async () => {
+    draw(function () {
+      this.scope("(groups)", () => {
+        this.scope("(discussions)", () => {
+          this.resources("messages");
+        });
+      });
+    });
+
+    await t.get("/groups/discussions/messages");
+    expect(t.response.body).toBe("messages#index");
+
+    await t.get("/groups/discussions/messages/1");
+    expect(t.response.body).toBe("messages#show");
+
+    await t.get("/groups/messages");
+    expect(t.response.body).toBe("messages#index");
+
+    await t.get("/groups/messages/1");
+    expect(t.response.body).toBe("messages#show");
+
+    await t.get("/discussions/messages");
+    expect(t.response.body).toBe("messages#index");
+
+    await t.get("/discussions/messages/1");
+    expect(t.response.body).toBe("messages#show");
+
+    await t.get("/messages");
+    expect(t.response.body).toBe("messages#index");
+
+    await t.get("/messages/1");
+    expect(t.response.body).toBe("messages#show");
+  });
+
+  it("except option should override scoped only", async () => {
+    draw(function () {
+      this.scope({ only: "show" }, () => {
+        this.namespace("only", () => {
+          this.resources("sectors", { only: "index" }, () => {
+            this.resources("managers", { except: ["show", "update", "destroy"] });
+          });
+        });
+      });
+    });
+
+    await t.get("/only/sectors/1/managers");
+    expect(t.response.body).toBe("only/managers#index");
+    expect(t.onlySectorManagersPath({ sector_id: "1" })).toBe("/only/sectors/1/managers");
+
+    await t.get("/only/sectors/1/managers/2");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([TypeError], {}, () => {
+      t.onlySectorManagerPath({ sector_id: "1", id: "2" });
+    });
+  });
+
+  it("only option should override scoped except", async () => {
+    draw(function () {
+      this.scope({ except: "index" }, () => {
+        this.namespace("except", () => {
+          this.resources("sectors", { except: ["show", "update", "destroy"] }, () => {
+            this.resources("managers", { only: "index" });
+          });
+        });
+      });
+    });
+
+    await t.get("/except/sectors/1/managers");
+    expect(t.response.body).toBe("except/managers#index");
+    expect(t.exceptSectorManagersPath({ sector_id: "1" })).toBe("/except/sectors/1/managers");
+
+    await t.get("/except/sectors/1/managers/2");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([TypeError], {}, () => {
+      t.exceptSectorManagerPath({ sector_id: "1", id: "2" });
+    });
+  });
+
+  it("only scope should override parent scope", async () => {
+    draw(function () {
+      this.scope({ only: "show" }, () => {
+        this.namespace("only", () => {
+          this.resources("sectors", { only: "index" }, () => {
+            this.resources("companies", () => {
+              this.scope({ only: "index" }, () => {
+                this.resources("divisions");
+              });
+            });
+          });
+        });
+      });
+    });
+
+    await t.get("/only/sectors/1/companies/2/divisions");
+    expect(t.response.body).toBe("only/divisions#index");
+    expect(t.onlySectorCompanyDivisionsPath({ sector_id: "1", company_id: "2" })).toBe(
+      "/only/sectors/1/companies/2/divisions",
+    );
+
+    await t.get("/only/sectors/1/companies/2/divisions/3");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([TypeError], {}, () => {
+      t.onlySectorCompanyDivisionPath({ sector_id: "1", company_id: "2", id: "3" });
+    });
+  });
+
+  it("except scope should override parent scope", async () => {
+    draw(function () {
+      this.scope({ except: "index" }, () => {
+        this.namespace("except", () => {
+          this.resources("sectors", { except: ["show", "update", "destroy"] }, () => {
+            this.resources("companies", () => {
+              this.scope({ except: ["show", "update", "destroy"] }, () => {
+                this.resources("divisions");
+              });
+            });
+          });
+        });
+      });
+    });
+
+    await t.get("/except/sectors/1/companies/2/divisions");
+    expect(t.response.body).toBe("except/divisions#index");
+    expect(t.exceptSectorCompanyDivisionsPath({ sector_id: "1", company_id: "2" })).toBe(
+      "/except/sectors/1/companies/2/divisions",
+    );
+
+    await t.get("/except/sectors/1/companies/2/divisions/3");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([TypeError], {}, () => {
+      t.exceptSectorCompanyDivisionPath({ sector_id: "1", company_id: "2", id: "3" });
+    });
+  });
+
+  it("except scope should override parent only scope", async () => {
+    draw(function () {
+      this.scope({ only: "show" }, () => {
+        this.namespace("only", () => {
+          this.resources("sectors", { only: "index" }, () => {
+            this.resources("companies", () => {
+              this.scope({ except: ["show", "update", "destroy"] }, () => {
+                this.resources("departments");
+              });
+            });
+          });
+        });
+      });
+    });
+
+    await t.get("/only/sectors/1/companies/2/departments");
+    expect(t.response.body).toBe("only/departments#index");
+    expect(t.onlySectorCompanyDepartmentsPath({ sector_id: "1", company_id: "2" })).toBe(
+      "/only/sectors/1/companies/2/departments",
+    );
+
+    await t.get("/only/sectors/1/companies/2/departments/3");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([TypeError], {}, () => {
+      t.onlySectorCompanyDepartmentPath({ sector_id: "1", company_id: "2", id: "3" });
+    });
+  });
+
+  it("only scope should override parent except scope", async () => {
+    draw(function () {
+      this.scope({ except: "index" }, () => {
+        this.namespace("except", () => {
+          this.resources("sectors", { except: ["show", "update", "destroy"] }, () => {
+            this.resources("companies", () => {
+              this.scope({ only: "index" }, () => {
+                this.resources("departments");
+              });
+            });
+          });
+        });
+      });
+    });
+
+    await t.get("/except/sectors/1/companies/2/departments");
+    expect(t.response.body).toBe("except/departments#index");
+    expect(t.exceptSectorCompanyDepartmentsPath({ sector_id: "1", company_id: "2" })).toBe(
+      "/except/sectors/1/companies/2/departments",
+    );
+
+    await t.get("/except/sectors/1/companies/2/departments/3");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([TypeError], {}, () => {
+      t.exceptSectorCompanyDepartmentPath({ sector_id: "1", company_id: "2", id: "3" });
+    });
+  });
+
   it.skip("resource constraints are pushed to scope", () => {});
+
   it("custom resource actions defined using string", () => {
     const routes = new RouteSet();
     routes.draw(function () {
@@ -2399,7 +2816,17 @@ describe("TestRoutingMapper", () => {
   it.skip("passing action parameters to url helpers raises error if parameters are not permitted", () => {});
   it.skip("passing action parameters to url helpers is allowed if parameters are permitted", () => {});
 
-  it.skip("redirect https", () => {});
+  it("redirect https", async () => {
+    draw(function () {
+      this.get("secure", { to: this.redirect("/secure/login") });
+    });
+
+    await withHttps(async () => {
+      await t.get("/secure");
+      verifyRedirect("https://www.example.com/secure/login");
+    });
+  });
+
   it.skip("redirect argument error", () => {});
 
   it("greedy resource id regexp doesnt match edit and custom action", () => {
@@ -2418,7 +2845,40 @@ describe("TestRoutingMapper", () => {
     expect(`${params.controller}#${params.action}`).toBe("sections#preview");
     expect(routes.pathFor({ id: "1" }, "preview_section")).toBe("/sections/1/preview");
   });
-  it.skip("path parameters is not stale", () => {});
+  it("path parameters is not stale", async () => {
+    draw(function () {
+      this.scope(
+        "/countries/:country",
+        {
+          constraints: (params: Record<string, string>, _req: Request) =>
+            ["all", "France"].includes(params.country),
+        },
+        () => {
+          this.get("/", { to: "countries#index" });
+          this.get("/cities", { to: "countries#cities" });
+        },
+      );
+
+      this.get("/countries/:country/(*other)", {
+        to: this.redirect((params, _req) =>
+          params.other != null ? `/countries/all/${params.other}` : "/countries/all",
+        ),
+      });
+    });
+
+    await t.get("/countries/France");
+    expect(t.response.body).toBe("countries#index");
+
+    await t.get("/countries/France/cities");
+    expect(t.response.body).toBe("countries#cities");
+
+    await t.get("/countries/UK");
+    verifyRedirect("http://www.example.com/countries/all");
+
+    await t.get("/countries/UK/cities");
+    verifyRedirect("http://www.example.com/countries/all/cities");
+  });
+
   it.skip("action from path is frozen", () => {});
   it.skip("absolute controller namespace", () => {});
   it.skip("namespace as controller", () => {});

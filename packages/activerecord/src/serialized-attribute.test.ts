@@ -1,11 +1,23 @@
-import { rbInspect } from "@blazetrails/ruby-compat";
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  Hash,
+  Module,
+  hashAref,
+  hashAset,
+  rbCClass,
+  rbCString,
+  rbInspect,
+  rbModConstSet,
+  rbObjClass,
+  rbStrSNew,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertRaises } from "@blazetrails/activesupport";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, SerializationTypeMismatch, registerModel } from "./index.js";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { Topic } from "./test-helpers/models/topic.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
 import {
@@ -15,16 +27,8 @@ import {
   yamlColumnPermittedClasses,
 } from "./active-record.js";
 
-class HashObject {
-  constructor() {
-    return {};
-  }
-  static [Symbol.hasInstance](value: unknown): boolean {
-    return value != null && typeof value === "object" && !Array.isArray(value);
-  }
-}
-
-vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+const SerializedAttributeTest = new Module();
+registerConstant("SerializedAttributeTest", SerializedAttributeTest);
 
 class MyObject {
   attribute1: string;
@@ -44,12 +48,28 @@ class MyObject {
   }
 }
 
-class ImportantTopic extends Topic {
+class Topic extends Base {
+  declare content: any;
+
   static {
-    this.serialize("important", { type: HashObject });
+    registerModel(rbModConstSet(SerializedAttributeTest, "Topic", this));
+    this.serialize("content");
   }
 }
-registerModel(ImportantTopic);
+
+class ImportantTopic extends Topic {
+  static {
+    registerModel(rbModConstSet(SerializedAttributeTest, "ImportantTopic", this));
+    this.serialize("important", { type: Hash });
+  }
+}
+
+class ClassifiedTopic extends Topic {
+  static {
+    registerModel(rbModConstSet(SerializedAttributeTest, "ClassifiedTopic", this));
+    this.serialize("important", { type: rbCClass });
+  }
+}
 
 describe("SerializedAttributeTest", () => {
   const { topics, posts } = fixtures(["topics", "posts"]);
@@ -64,7 +84,6 @@ describe("SerializedAttributeTest", () => {
     Topic.serialize("content");
     setYamlColumnPermittedClasses(yamlColumnPermittedClassesDefault);
   });
-  afterAll(() => setUseYamlUnsafeLoad(false));
 
   it("serialize does not eagerly load columns", async () => {
     Topic.resetColumnInformation();
@@ -101,7 +120,7 @@ describe("SerializedAttributeTest", () => {
     const klass = class extends Base {
       static {
         this.tableName = Topic.tableName;
-        this.serialize("content", { type: HashObject, default: { key: "value" } });
+        this.serialize("content", { type: Hash, default: { key: "value" } });
       }
     };
     const t = new klass();
@@ -113,7 +132,7 @@ describe("SerializedAttributeTest", () => {
       static {
         this.tableName = Topic.tableName;
         this.attribute("content", "text", { default: { key: "value" } });
-        this.serialize("content", { type: HashObject });
+        this.serialize("content", { type: Hash });
       }
     };
     const t = new klass();
@@ -121,7 +140,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute in base class", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const hash = { content1: "value1", content2: "value2" };
     const topic = await ImportantTopic.create({ content: hash as any });
     expect((topic as any).content).toEqual(hash);
@@ -130,7 +149,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attributes from database on subclass", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const t = new ImportantTopic({ content: { foo: "bar" } } as any);
     expect((t as any).content).toEqual({ foo: "bar" });
     await t.save();
@@ -156,26 +175,28 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content.title).toEqual(myPost.title);
   });
 
-  // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; test verifies raw "null" string decoding via raw SQL update
+  // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; the row is inserted by raw SQL
   it("json read legacy null", async () => {
     Topic.serialize("content", { coder: JSON });
-    const t = await Topic.create({ title: "test" } as any);
-    await ((await Base.leaseConnection()) as any).execute(
-      `UPDATE topics SET content = 'null' WHERE id = ${(t as any).id}`,
-    );
-    const reloaded = await Topic.find((t as any).id as number);
-    expect((reloaded as any).content).toBeNull();
+
+    const id = await (
+      await Topic.leaseConnection()
+    ).insert("INSERT INTO topics (content) VALUES('null')");
+    const t = await Topic.find(id);
+
+    expect(t.content).toBeNull();
   });
 
-  // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; test verifies SQL NULL decoding via raw SQL update
+  // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; the row is inserted by raw SQL
   it("json read db null", async () => {
     Topic.serialize("content", { coder: JSON });
-    const t = await Topic.create({ title: "test", content: "placeholder" as any });
-    await ((await Base.leaseConnection()) as any).execute(
-      `UPDATE topics SET content = NULL WHERE id = ${(t as any).id}`,
-    );
-    const reloaded = await Topic.find((t as any).id as number);
-    expect((reloaded as any).content).toBeNull();
+
+    const id = await (
+      await Topic.leaseConnection()
+    ).insert("INSERT INTO topics (content) VALUES(NULL)");
+    const t = await Topic.find(id);
+
+    expect(t.content).toBeNull();
   });
 
   it("serialized attribute declared in subclass", async () => {
@@ -218,15 +239,17 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("nil not serialized with class constraint", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     expect(await new Topic({ content: null } as any).save()).toBeTruthy();
     expect(await Topic.where({ content: null }).count()).toEqual(1);
   });
 
-  it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
-    // PERMANENT-SKIP: trails accepts raw strings as pre-serialized payloads on assignment
+  it("serialized attribute should raise exception on assignment with wrong type", async () => {
+    Topic.serialize("content", { type: Hash });
+    await assertRaises([SerializationTypeMismatch], {}, () => {
+      new Topic({ content: "string" });
+    });
   });
-
   it("should raise exception on serialized attribute with type mismatch", async () => {
     const topic = new Topic({ content: { zomg: true } } as any);
     expect(await topic.save()).toBeTruthy();
@@ -236,7 +259,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute with class constraint", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const settings = { color: "blue" };
     const topic = new Topic({ content: settings } as any);
     expect(await topic.save()).toBeTruthy();
@@ -253,7 +276,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("where by serialized attribute with hash", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const settings = { color: "green" };
     const topic = await Topic.create({ content: settings as any });
     const found = await Topic.where({ content: settings }).take();
@@ -261,7 +284,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("where by serialized attribute with hash in array", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const settings = { color: "green" };
     const topic = await Topic.create({ content: settings as any });
     const found = await Topic.where({ content: [settings, { herring: "red" }] }).take();
@@ -269,15 +292,15 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized default class", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const topic = new Topic();
-    expect((topic as any).content.constructor).toEqual(Object);
-    expect((topic as any).readAttribute("content").constructor).toEqual(Object);
-    (topic as any).content["beer"] = "MadridRb";
+    expect(rbObjClass(topic.content)).toEqual(Hash);
+    expect(rbObjClass(topic.readAttribute("content"))).toEqual(Hash);
+    hashAset(topic.content, "beer", "MadridRb");
     expect(await topic.save()).toBeTruthy();
-    const reloaded = await topic.reload();
-    expect((reloaded as any).content.constructor).toEqual(Object);
-    expect((reloaded as any).content["beer"]).toBe("MadridRb");
+    await topic.reload();
+    expect(rbObjClass(topic.content)).toEqual(Hash);
+    expect(hashAref(topic.content, "beer")).toEqual("MadridRb");
   });
 
   it("serialized no default class for object", () => {
@@ -337,7 +360,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("unexpected serialized type", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const topic = await Topic.create({ content: { zomg: true } as any });
     Topic.serialize("content", { type: Array });
     const reloaded = await Topic.find(topic.id as number);
@@ -383,13 +406,13 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("newly emptied serialized hash is changed", async () => {
-    Topic.serialize("content", { type: HashObject });
-    const topic = await Topic.create({ content: { things: "stuff" } as any });
-    const reloaded = await Topic.find(topic.id as number);
-    delete (reloaded as any).content["things"];
-    await reloaded.save();
-    const found = await Topic.find(topic.id as number);
-    expect((found as any).content).toEqual({});
+    Topic.serialize("content", { type: Hash });
+    const topic = await Topic.create({ content: { things: "stuff" } });
+    delete topic.content["things"];
+    await topic.saveBang();
+    await topic.reload();
+
+    expect(topic.content).toEqual({});
   });
 
   it.skip("is not changed when stored blob", () => {
@@ -401,7 +424,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("values cast from nil are persisted as nil", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const topic = await Topic.create({ content: {} as any });
     const topic2 = await Topic.create({ content: null as any });
     const found = await Topic.where({ content: null });
@@ -416,7 +439,7 @@ describe("SerializedAttributeTest", () => {
       static {
         this.abstractClass = true;
         this.tableName = null as any;
-        this.serialize("content", { type: HashObject });
+        this.serialize("content", { type: Hash });
       }
     }
     class Subclass extends AbstractBase {
@@ -430,7 +453,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("nil is always persisted as null", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const topic = await Topic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
     const found = await Topic.where({ content: null });
@@ -507,12 +530,14 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("serialized attribute", async () => {
-    Topic.serialize("content", { type: Array });
-    const myobj = ["value1"];
-    const topic = await Topic.create({ content: myobj as any });
-    expect((topic as any).content).toEqual(myobj);
-    const reloaded = await Topic.find(topic.id as number);
-    expect((reloaded as any).content).toEqual(myobj);
+    Topic.serialize("content", { type: rbCString });
+
+    const myobj = rbStrSNew("value1");
+    const topic = await Topic.create({ content: myobj });
+    expect(topic.content).toEqual(myobj);
+
+    await topic.reload();
+    expect(topic.content).toEqual(myobj);
   });
 
   it("serialized attribute on custom attribute with default", () => {
@@ -520,7 +545,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.tableName = Topic.tableName;
         this.attribute("content", "text", { default: { key: "value" } });
-        this.serialize("content", { type: HashObject });
+        this.serialize("content", { type: Hash });
       }
     };
     const t = new klass();
@@ -528,7 +553,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("nil is always persisted as null", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const topic = await Topic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
     const found = await Topic.where({ content: null });
@@ -540,7 +565,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.tableName = Topic.tableName;
         this.attribute("content", "text", { default: { key: "value" } });
-        this.serialize("content", { type: HashObject });
+        this.serialize("content", { type: Hash });
       }
     };
     const t = new klass();
@@ -548,7 +573,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("serialized attributes from database on subclass", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const t = new ImportantTopic({ content: { foo: "bar" } } as any);
     expect((t as any).content).toEqual({ foo: "bar" });
     await t.save();
@@ -561,7 +586,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.tableName = Topic.tableName;
         this.aliasAttribute("object", "content");
-        this.serialize("object", { type: HashObject });
+        this.serialize("object", { type: Hash });
       }
     };
     const myobj = { somevalue: "thevalue" };
@@ -572,7 +597,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("unexpected serialized type", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const topic = await Topic.create({ content: { zomg: true } as any });
     Topic.serialize("content", { type: Array });
     const reloaded = await Topic.find(topic.id as number);
@@ -590,7 +615,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("serialize attribute via select method when time zone available", async () => {
-    Topic.serialize("content", { type: HashObject });
+    Topic.serialize("content", { type: Hash });
     const myobj = { somevalue: "thevalue" };
     const topic = await Topic.create({ content: myobj as any });
     const found = await Topic.select("id", "content").find(topic.id as number);
@@ -600,11 +625,12 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("should raise exception on serialized attribute with type mismatch", async () => {
-    const topic = new Topic({ content: { somevalue: "thevalue" } } as any);
+    const myobj = { somevalue: "thevalue" };
+    const topic = new Topic({ content: myobj });
     expect(await topic.save()).toBeTruthy();
-    Topic.serialize("content", { type: Array });
-    const found = await Topic.find(topic.id as number);
-    expect(() => (found as any).content).toThrow(SerializationTypeMismatch);
+    Topic.serialize("content", { type: rbCString });
+    const found = await Topic.find(topic.id);
+    expect(() => found.content).toThrow(SerializationTypeMismatch);
   });
 
   it.skip("serialized time attribute", () => {});

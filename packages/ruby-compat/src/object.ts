@@ -76,6 +76,20 @@ export function rbObjClass(obj: unknown): Klass {
 }
 
 /**
+ * `rb_class_new_instance` (`vendor/ruby/v3.3.11/object.c:2158`), `Class#new`
+ * with no arguments. A Hash is a plain object and a String a primitive, so
+ * `empty_hash_alloc` (`vendor/ruby/v3.3.11/hash.c:1488`) is `{}` and
+ * `empty_str_alloc` (`vendor/ruby/v3.3.11/string.c:858`) is `""`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassNewInstance(klass: Klass): unknown {
+  if (klass === Hash) return {};
+  if (klass === rbCString) return "";
+  return new (klass as new () => unknown)();
+}
+
+/**
  * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
  * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
  * interpolates `obj.class`, or the {@link rubyClass} brand.

@@ -48,6 +48,8 @@ export {
   rbObjIvarGet,
   rbObjIvarSet,
   classpaths,
+  rbCClass,
+  rbClassNewInstance,
   rbClassOf,
   rbClassSuperclass,
   rbCDate,

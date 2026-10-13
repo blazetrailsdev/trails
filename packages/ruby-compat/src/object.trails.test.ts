@@ -9,6 +9,7 @@ import {
   rbCString,
   rbCSymbol,
   rbCTrueClass,
+  rbClassNewInstance,
   rbClassOf,
   rbObjSingletonClass,
   rbCDate,
@@ -1191,5 +1192,13 @@ describe("Kernel#send to a method on a core class seat", () => {
     }
     unseat(rbCString);
     unseat(Hash);
+  });
+});
+
+describe("rbClassNewInstance", () => {
+  it("answers the value trails carries for a Hash and a String, and constructs any other class", () => {
+    expect(rbClassNewInstance(Hash)).toEqual({});
+    expect(rbClassNewInstance(rbCString)).toBe("");
+    expect(rbClassNewInstance(Array)).toEqual([]);
   });
 });
