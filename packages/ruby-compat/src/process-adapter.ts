@@ -417,23 +417,22 @@ export function exec(...argv: [exePath: string, ...args: string[]]): never {
 let rubyTzUptodateP = false;
 
 /**
- * MRI's `ruby_reset_timezone` (`vendor/ruby/v3.3.11/time.c:743-750`).
+ * MRI's `ruby_tz_uptodate_p` (`vendor/ruby/v3.3.11/time.c:702`), which
+ * `update_tz` (`time.c:753-758`) reads.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rubyResetTimezone(_val: string | undefined): void {
-  rubyTzUptodateP = false;
+export function isRubyTzUptodate(): boolean {
+  return rubyTzUptodateP;
 }
 
-/**
- * MRI's `update_tz` (`vendor/ruby/v3.3.11/time.c:753-758`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function updateTz(tzset: () => void): void {
-  if (rubyTzUptodateP) return;
-  rubyTzUptodateP = true;
-  tzset();
+/** @noRailsEquivalent PERMANENT */
+export function setRubyTzUptodate(val: boolean): void {
+  rubyTzUptodateP = val;
+}
+
+function rubyResetTimezone(_val: string | undefined): void {
+  rubyTzUptodateP = false;
 }
 
 function resetByModifiedEnv(nam: string, val: string | undefined): void {

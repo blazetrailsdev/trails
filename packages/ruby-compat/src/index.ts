@@ -295,14 +295,14 @@ export {
   rbArgv,
   rbProgname,
   setArg0,
+  isRubyTzUptodate,
   registerProcessAdapter,
-  rubyResetTimezone,
   setEnv,
   setExitCode,
   stderr,
   stdin,
+  setRubyTzUptodate,
   stdout,
-  updateTz,
 } from "./process-adapter.js";
 export type {
   ProcessAdapter,

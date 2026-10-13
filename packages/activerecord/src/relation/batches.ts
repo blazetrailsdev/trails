@@ -56,7 +56,9 @@ export function findEach<T extends Base>(
     })() as AsyncGenerator<T> & { size(): Promise<number> };
     enumerator.size = async (): Promise<number> => {
       cursor = Array(cursor);
-      return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
+      return applyLimits
+        .call(this, relation, cursor, start, finish, buildBatchOrders.call(this, cursor, order))
+        .size();
     };
     return enumerator;
   }
@@ -88,13 +90,9 @@ export function findInBatches<T extends Base>(
   if (!block) {
     const size = async (): Promise<number> => {
       cursor = Array(cursor);
-      const total = await applyLimits(
-        relation,
-        cursor,
-        start,
-        finish,
-        buildBatchOrders(cursor, order),
-      ).size();
+      const total = await applyLimits
+        .call(this, relation, cursor, start, finish, buildBatchOrders.call(this, cursor, order))
+        .size();
       return Math.floor((total - 1) / batchSize) + 1;
     };
     const enumerator = (async function* () {
@@ -164,7 +162,8 @@ export function inBatches<T extends Base>(
     }
 
     if (self.loaded) {
-      return batchOnLoadedRelation(
+      return batchOnLoadedRelation.call(
+        this,
         {
           relation: self,
           start,
@@ -328,6 +327,7 @@ export function ensureValidOptionsForBatchingBang(
 
 /** @internal */
 export function applyLimits(
+  this: any,
   relation: any,
   cursor: string[],
   start: unknown,
@@ -335,38 +335,41 @@ export function applyLimits(
   batchOrders: [string, ":asc" | ":desc"][],
 ): any {
   if (start !== undefined && start !== null) {
-    relation = applyStartLimit(relation, cursor, start, batchOrders);
+    relation = applyStartLimit.call(this, relation, cursor, start, batchOrders);
   }
   if (finish !== undefined && finish !== null) {
-    relation = applyFinishLimit(relation, cursor, finish, batchOrders);
+    relation = applyFinishLimit.call(this, relation, cursor, finish, batchOrders);
   }
   return relation;
 }
 
 /** @internal */
 export function applyStartLimit(
+  this: any,
   relation: any,
   cursor: string[],
   start: unknown,
   batchOrders: [string, ":asc" | ":desc"][],
 ): any {
   const operators = batchOrders.map(([, order]) => (order === ":desc" ? "lteq" : "gteq"));
-  return batchCondition(relation, cursor, start, operators);
+  return batchCondition.call(this, relation, cursor, start, operators);
 }
 
 /** @internal */
 export function applyFinishLimit(
+  this: any,
   relation: any,
   cursor: string[],
   finish: unknown,
   batchOrders: [string, ":asc" | ":desc"][],
 ): any {
   const operators = batchOrders.map(([, order]) => (order === ":desc" ? "gteq" : "lteq"));
-  return batchCondition(relation, cursor, finish, operators);
+  return batchCondition.call(this, relation, cursor, finish, operators);
 }
 
 /** @internal */
 export function batchCondition(
+  this: any,
   relation: any,
   cursor: string[],
   values: unknown,
@@ -389,6 +392,7 @@ export function batchCondition(
 
 /** @internal */
 export function buildBatchOrders(
+  this: any,
   cursor: string[],
   order: ":asc" | ":desc" | (":asc" | ":desc")[],
 ): [string, ":asc" | ":desc"][] {
@@ -407,6 +411,7 @@ export function actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined)
 
 /** @internal */
 export async function batchOnLoadedRelation(
+  this: any,
   {
     relation,
     start,
@@ -425,23 +430,23 @@ export async function batchOnLoadedRelation(
   block: (subrelation: any) => unknown,
 ): Promise<null> {
   let records: any[] = await relation.toArray();
-  order = buildBatchOrders(cursor, order).map(([, second]) => second);
+  order = buildBatchOrders.call(this, cursor, order).map(([, second]) => second);
 
   if (rtest(start) || rtest(finish)) {
     records = records.filter((record) => {
-      const values = recordCursorValues(record, cursor);
+      const values = recordCursorValues.call(this, record, cursor);
 
       return (
-        (start == null || compareValuesForOrder(values, Array(start), order) >= 0) &&
-        (finish == null || compareValuesForOrder(values, Array(finish), order) <= 0)
+        (start == null || compareValuesForOrder.call(this, values, Array(start), order) >= 0) &&
+        (finish == null || compareValuesForOrder.call(this, values, Array(finish), order) <= 0)
       );
     });
   }
 
   records.sort((record1, record2) => {
-    const values1 = recordCursorValues(record1, cursor);
-    const values2 = recordCursorValues(record2, cursor);
-    return compareValuesForOrder(values1, values2, order);
+    const values1 = recordCursorValues.call(this, record1, cursor);
+    const values2 = recordCursorValues.call(this, record2, cursor);
+    return compareValuesForOrder.call(this, values1, values2, order);
   });
 
   for (const subrecords of eachSlice(records, batchLimit)) {
@@ -455,12 +460,13 @@ export async function batchOnLoadedRelation(
 }
 
 /** @internal */
-export function recordCursorValues(record: any, cursor: string[]): unknown[] {
+export function recordCursorValues(this: any, record: any, cursor: string[]): unknown[] {
   return Object.values(slice(record.attributes, ...cursor));
 }
 
 /** @internal */
 export function compareValuesForOrder(
+  this: any,
   values1: unknown[],
   values2: unknown[],
   order: (":asc" | ":desc")[],
@@ -494,9 +500,9 @@ export async function batchOnUnloadedRelation(
 ): Promise<null> {
   const { start, load, cursor, order, useRanges, batchLimit } = opts;
   let { relation, finish, remaining } = opts;
-  const batchOrders = buildBatchOrders(cursor, order);
+  const batchOrders = buildBatchOrders.call(this, cursor, order);
   relation = relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
-  relation = applyLimits(relation, cursor, start, finish, batchOrders);
+  relation = applyLimits.call(this, relation, cursor, start, finish, batchOrders);
   relation.skipQueryCacheBang();
   let batchRelation = relation;
   const emptyScope = this.toSql() === this.model.unscoped().all().toSql();
@@ -514,7 +520,7 @@ export async function batchOnUnloadedRelation(
 
       finish = values[values.length - 1];
       if (rtest(finish)) {
-        yieldedRelation = applyFinishLimit(batchRelation, cursor, finish, batchOrders);
+        yieldedRelation = applyFinishLimit.call(this, batchRelation, cursor, finish, batchOrders);
         yieldedRelation = yieldedRelation.except("limit", "order");
         yieldedRelation.skipQueryCacheBang(false);
       }
@@ -554,7 +560,7 @@ export async function batchOnUnloadedRelation(
     operators.push(lastOrder === ":desc" ? "lt" : "gt");
 
     const cursorValue = values[values.length - 1];
-    batchRelation = batchCondition(relation, cursor, cursorValue, operators);
+    batchRelation = batchCondition.call(this, relation, cursor, cursorValue, operators);
   }
 
   return null;
