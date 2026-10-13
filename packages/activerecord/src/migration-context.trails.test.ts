@@ -16,8 +16,7 @@ import {
   setValidateMigrationTimestamps,
   timestampedMigrations,
 } from "./active-record.js";
-
-const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
+import { MIGRATIONS_ROOT } from "./config.js";
 
 describe("MigrationContext", () => {
   afterEach(() => {

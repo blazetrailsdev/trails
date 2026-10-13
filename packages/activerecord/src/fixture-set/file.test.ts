@@ -4,7 +4,7 @@ import { File as RubyFile, Tempfile } from "@blazetrails/ruby-compat";
 import { File } from "./file.js";
 import { FixtureSet, FormatError } from "../fixtures.js";
 
-const FIXTURES_ROOT = new URL("./test-data", import.meta.url).pathname;
+const YAML_FIXTURES_ROOT = new URL("./test-data", import.meta.url).pathname;
 
 function tmpYaml<T>(name: [string, string], contents: string, block: (t: Tempfile) => T): T {
   const t = Tempfile.new(name);
@@ -21,13 +21,13 @@ function tmpYaml<T>(name: [string, string], contents: string, block: (t: Tempfil
 describe("FixtureSet", () => {
   describe("FileTest", () => {
     it("open", () => {
-      const fh = File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"));
+      const fh = File.open(RubyFile.join(YAML_FIXTURES_ROOT, "accounts.yml"));
       expect([...fh].length).toBe(6);
     });
 
     it("open with block", () => {
       let called = false;
-      File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
+      File.open(RubyFile.join(YAML_FIXTURES_ROOT, "accounts.yml"), (fh) => {
         called = true;
         expect([...fh].length).toBe(6);
       });
@@ -35,7 +35,7 @@ describe("FixtureSet", () => {
     });
 
     it("names", () => {
-      File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
+      File.open(RubyFile.join(YAML_FIXTURES_ROOT, "accounts.yml"), (fh) => {
         expect([...fh].map(([name]) => name).sort()).toEqual(
           [
             "signals37",
@@ -50,7 +50,7 @@ describe("FixtureSet", () => {
     });
 
     it("values", () => {
-      File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
+      File.open(RubyFile.join(YAML_FIXTURES_ROOT, "accounts.yml"), (fh) => {
         expect([...fh].map(([, row]) => (row as Record<string, unknown>)["id"]).sort()).toEqual([
           1, 2, 3, 4, 5, 6,
         ]);
@@ -58,7 +58,7 @@ describe("FixtureSet", () => {
     });
 
     it("tse processing", () => {
-      File.open(RubyFile.join(FIXTURES_ROOT, "developers.yml"), (fh) => {
+      File.open(RubyFile.join(YAML_FIXTURES_ROOT, "developers.yml"), (fh) => {
         const devs = Array.from({ length: 8 }, (_, i) => `dev_${i + 3}`);
         const names = [...fh].map(([name]) => name);
         expect(devs.filter((dev) => !names.includes(dev))).toEqual([]);
@@ -153,13 +153,13 @@ describe("FixtureSet", () => {
     });
 
     it("removes fixture config row", () => {
-      File.open(RubyFile.join(FIXTURES_ROOT, "other_posts.yml"), (fh) => {
+      File.open(RubyFile.join(YAML_FIXTURES_ROOT, "other_posts.yml"), (fh) => {
         expect([...fh].map(([name]) => name)).toEqual(["second_welcome"]);
       });
     });
 
     it("extracts model class from config row", () => {
-      File.open(RubyFile.join(FIXTURES_ROOT, "other_posts.yml"), (fh) => {
+      File.open(RubyFile.join(YAML_FIXTURES_ROOT, "other_posts.yml"), (fh) => {
         expect(fh.modelClass).toEqual("Post");
       });
     });

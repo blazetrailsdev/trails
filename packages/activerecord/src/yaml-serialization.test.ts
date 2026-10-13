@@ -3,13 +3,12 @@ import { describe, it, expect } from "vitest";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { DateTime } from "@blazetrails/date";
 import { assertRaises } from "@blazetrails/activesupport";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { File as RubyFile, RuntimeError } from "@blazetrails/ruby-compat";
+import { TEST_ROOT } from "./config.js";
 import { fixtures } from "./test-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
-
-const TEST_ROOT = new URL("./test-helpers/", import.meta.url);
 
 describe("YamlSerializationTest", () => {
   fixtures(["topics", "authors", "posts"]);
@@ -19,8 +18,11 @@ describe("YamlSerializationTest", () => {
   }
 
   async function yamlFixture(fileName: string): Promise<string> {
-    const path = `support/yaml_compatibility_fixtures/${fileName}.yml`;
-    return readFile(new URL(path, TEST_ROOT), "utf8");
+    const path = RubyFile.expandPath(
+      `support/yaml_compatibility_fixtures/${fileName}.yml`,
+      TEST_ROOT,
+    );
+    return readFile(path, "utf8");
   }
 
   it("to yaml with time with zone should not raise exception", async () => {

@@ -73,8 +73,7 @@ import {
   setValidateMigrationTimestamps,
   validateMigrationTimestamps,
 } from "./active-record.js";
-
-const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
+import { MIGRATIONS_ROOT } from "./config.js";
 
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
   return await Base.leaseConnection();

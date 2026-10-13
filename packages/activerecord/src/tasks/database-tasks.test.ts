@@ -44,6 +44,7 @@ import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { Course } from "../test-helpers/models/course.js";
 import { College } from "../test-helpers/models/college.js";
 import type { InternalMetadata } from "../internal-metadata.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 function configFor(envName: string, name: string): HashConfig | undefined {
   return Base.configurations().configsFor({ envName, name });
@@ -1096,8 +1097,6 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
     await adapter.execute("DETACH DATABASE backupSource");
   }
 }
-
-const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
 
 function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase {
   let stdoutChunks: string[] = [];

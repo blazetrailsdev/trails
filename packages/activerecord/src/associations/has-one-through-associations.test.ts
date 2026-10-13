@@ -97,7 +97,6 @@ describe("HasOneThroughAssociationsTest", () => {
 
   registerModel(Member);
   registerModel(Club);
-  Membership.inheritanceColumn = "type";
   registerModel(Membership);
   registerModel(CurrentMembership);
   registerModel(SuperMembership);
