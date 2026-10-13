@@ -66,8 +66,6 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["collect_concat", ["flatMap"]],
   ["flatten", ["flat"]],
   ["each", ["forEach"]],
-  // `reverse_each` is `reverse.each` without the copy; a JS array has no
-  // reverse iterator, so the port iterates `[...xs].reverse()`.
   ["reverse_each", ["reverse"]],
   ["inject", ["reduce"]],
   ["index", ["indexOf", "findIndex"]],

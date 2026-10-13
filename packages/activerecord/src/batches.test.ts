@@ -1195,35 +1195,20 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should start from the start option when using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[1];
+    const order = (await CpkOrder.second())!;
     const relation = (await CpkOrder.inBatches({ of: 1, start: order.id }).first())!;
     assertEqual(order, await relation.first());
   });
 
   it(".in_batches should end at the finish option when using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[allOrders.length - 2];
+    const order = (await CpkOrder.secondToLast())!;
     const relation = (await CpkOrder.inBatches({ of: 1, finish: order.id }).reverseEach().first())!;
     assertEqual(order, await relation.last());
   });
 
   it(".in_batches with scope and using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const [order1, order2] = allOrders;
-    const [shopId, id] = (order1 as any).id as [number, number];
+    const [order1, order2] = await CpkOrder.first(2);
+    const [shopId, id] = order1.id as [number, number];
     const relation = (await CpkOrder.where(
       "shop_id > ? OR shop_id = ? AND id > ?",
       shopId,

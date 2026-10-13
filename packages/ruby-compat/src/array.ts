@@ -1090,10 +1090,6 @@ function aryShuffle(ary: readonly unknown[]): unknown[] {
 const aryMatch = (val: unknown) => (e: unknown) =>
   typeof val === "function" ? rtest(val(e)) : rbEqual(e, val);
 
-function arySortBy(ary: readonly unknown[], compare: (a: unknown, b: unknown) => number) {
-  return [...ary].sort(compare);
-}
-
 /**
  * The public methods an Array answers, keyed by the camelCased Ruby name as
  * `STRING_METHOD_TABLE` keys String's: those `Init_Array`
@@ -1177,12 +1173,12 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   sample: (self, ...args: [number?]) =>
     args.length ? aryShuffle(self).slice(0, args[0]) : (aryShuffle(self)[0] ?? null),
   sort: (self, block?: Block) =>
-    block ? arySortBy(self, (a, b) => rbCmpint(block(a, b) as number | null, a, b)) : sort(self),
+    block ? [...self].sort((a, b) => rbCmpint(block(a, b) as number | null, a, b)) : sort(self),
   sortBy: (self, block: Block) =>
-    arySortBy(
-      self.map((v) => [block(v), v]),
-      (a, b) => rbCmpint(cmp((a as unknown[])[0], (b as unknown[])[0]), a, b),
-    ).map((pair) => (pair as unknown[])[1]),
+    self
+      .map((v) => [block(v), v])
+      .sort((a, b) => rbCmpint(cmp(a[0], b[0]), a, b))
+      .map((pair) => pair[1]),
   join: (self, sep: string | null = null) => aryJoin(self, sep),
   toA: (self) => self,
   toAry: (self) => self,
