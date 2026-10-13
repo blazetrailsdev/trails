@@ -227,11 +227,13 @@ export interface DatabaseStatementsHost {
   /** @internal */
   checkIfWriteQuery?(sql: string | null): void;
   /** @internal */
-  supportsInsertReturning?(): boolean | Promise<boolean>;
+  supportsInsertReturning?(): boolean;
   /** @internal */
   quoteColumnName?(col: string): string;
   /** @internal */
-  primaryKey?(table: string): string | null | Promise<string | null>;
+  schemaCache?: {
+    getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined;
+  };
   /** @internal */
   preprocessQuery?(sql: string | null): string | null;
   /** @internal */
@@ -719,6 +721,9 @@ export function performQuery(
 
 interface DatabaseStatementsDefaultsHost {
   pool: ConnectionPool | NullPool;
+  databaseVersion: unknown;
+  supportsInsertReturning(): boolean;
+  primaryKey(tableName: string): Promise<string | string[] | null>;
   typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined;
   execute(
     sql: string,
@@ -771,10 +776,10 @@ interface DatabaseStatementsDefaultsHost {
   /** @internal */
   sqlForInsert(
     sql: string,
-    pk: string | false | null | undefined,
+    pk: string | string[] | false | null | undefined,
     binds: unknown[],
     returning: string[] | null | undefined,
-  ): Promise<[string, unknown[]]>;
+  ): [string, unknown[]];
 }
 
 /** @internal */
@@ -881,16 +886,27 @@ export const DatabaseStatements = new Module((mod) => {
     return this.internalExecQuery(sql, name, binds, { prepare });
   },
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm databaseVersion — PERMANENT
+   * @inventedArm supportsInsertReturning — PERMANENT
+   * @inventedArm primaryKey — PERMANENT
+   */
   async execInsert(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name: string | null = null,
     binds: unknown[] = [],
-    pk?: string | false | null,
+    pk?: string | string[] | false | null,
     _sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result> {
-    [sql, binds] = await this.sqlForInsert(sql, pk, binds, returning);
+    await this.databaseVersion;
+    if (this.supportsInsertReturning() && pk == null) {
+      const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
+      if (tableRef) pk = await this.primaryKey(tableRef);
+    }
+    [sql, binds] = this.sqlForInsert(sql, pk, binds, returning);
     return this.internalExecQuery(sql, name, binds);
   },
 
@@ -1174,7 +1190,7 @@ export function buildTruncateStatement(
 }
 
 /** @internal */
-type BuildFixtureHost = DatabaseStatementsHost &
+type BuildFixtureHost = Omit<DatabaseStatementsHost, "schemaCache"> &
   Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
     schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
     supportsVirtualColumns(): Promise<boolean>;
@@ -1244,21 +1260,24 @@ export function select(
   }
 }
 
-/** @internal */
-export async function sqlForInsert(
+/**
+ * @internal
+ * @missingRailsCall primary_key — PERMANENT
+ */
+export function sqlForInsert(
   this: DatabaseStatementsHost,
   sql: string,
-  pk: string | false | null | undefined,
+  pk: string | string[] | false | null | undefined,
   binds: unknown[],
   returning: string[] | null | undefined,
-): Promise<[string, unknown[]]> {
-  if (await this.supportsInsertReturning!()) {
+): [string, unknown[]] {
+  if (this.supportsInsertReturning!()) {
     if (pk == null) {
       const tableRef = extractTableRefFromInsertSql.call(this, sql);
-      if (tableRef) pk = await this.primaryKey!(tableRef);
+      if (tableRef) pk = this.schemaCache!.getCachedPrimaryKeys(tableRef);
     }
 
-    const returningColumns = returning || wrap(pk as string | null);
+    const returningColumns = returning || wrap(pk as string | string[] | null);
 
     const returningColumnsStatement = returningColumns
       .map((c) => this.quoteColumnName!(c))

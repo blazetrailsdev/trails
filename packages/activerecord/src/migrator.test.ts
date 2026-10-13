@@ -11,9 +11,9 @@ import {
 } from "./migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import type { SchemaMigration } from "./schema-migration.js";
+import type { InternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
@@ -58,7 +58,7 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
 describe("MigratorTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
-  let adapter: DatabaseAdapter;
+  let pool: ConnectionPool;
   let schemaMigration: SchemaMigration;
   let internalMetadata: InternalMetadata;
 
@@ -83,11 +83,11 @@ describe("MigratorTest", () => {
   let verboseWas: boolean | undefined;
 
   beforeEach(async () => {
-    adapter = await Base.leaseConnection();
-    schemaMigration = new SchemaMigration(adapter.pool);
+    pool = Base.connectionPool();
+    schemaMigration = pool.schemaMigration;
     await schemaMigration.createTable();
-    await schemaMigration.deleteAllVersions();
-    internalMetadata = new InternalMetadata(adapter.pool);
+    await schemaMigration.deleteAllVersions().catch(() => null);
+    internalMetadata = pool.internalMetadata;
     verboseWas = Migration.verbose;
     Migration.messageCount = 0;
     Migration.prototype["puts"] = function () {

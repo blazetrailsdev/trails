@@ -737,7 +737,7 @@ describe("execInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => supportsReturning,
       quoteColumnName: (c) => `"${c}"`,
-      primaryKey: () => null,
+      schemaCache: { getCachedPrimaryKeys: () => null },
     };
     return host;
   }
@@ -855,7 +855,7 @@ describe("sqlForInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
-      primaryKey: () => null,
+      schemaCache: { getCachedPrimaryKeys: () => null },
     };
     const [sql] = await sqlForInsert.call(
       host,
@@ -867,6 +867,20 @@ describe("sqlForInsert", () => {
     expect(sql).toContain('RETURNING "id", "created_at"');
   });
 
+  it("infers a composite primary key from the warm schema cache when pk is nil", () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      log,
+      pool,
+      typeCastedBinds,
+      supportsInsertReturning: () => true,
+      quoteColumnName: (c) => `"${c}"`,
+      schemaCache: { getCachedPrimaryKeys: (t) => (t === "t" ? ["shop_id", "id"] : null) },
+    };
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], null);
+    expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "shop_id", "id"`);
+  });
+
   it("does NOT append pk-derived RETURNING when pk is false (Rails opt-out)", async () => {
     const host: DatabaseStatementsHost = {
       ...hostDefaults,
@@ -875,8 +889,10 @@ describe("sqlForInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
-      primaryKey: () => {
-        throw new Error("primaryKey() must not be called when pk=false");
+      schemaCache: {
+        getCachedPrimaryKeys: () => {
+          throw new Error("getCachedPrimaryKeys() must not be called when pk=false");
+        },
       },
     };
     const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
@@ -987,7 +1003,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     isAutoIncrement?: () => boolean;
   } & Record<string, unknown>;
 
-  type FixtureHost = DatabaseStatementsHost &
+  type FixtureHost = Omit<DatabaseStatementsHost, "schemaCache"> &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
       supportsVirtualColumns(): Promise<boolean>;

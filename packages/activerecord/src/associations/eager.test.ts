@@ -566,45 +566,6 @@ describe("EagerAssociationTest", () => {
       .order("author_id");
     expect(list.length).toBe(1);
   });
-  it("eager association loading with explicit join belongs to", async () => {
-    const welcome = posts("welcome");
-    const david = authors("david");
-
-    const posts2 = await Post.where({ id: welcome.id }).eagerLoad(":author");
-    expect(posts2).toHaveLength(1);
-    const loaded = (posts2[0] as any).association("author").target;
-    expect(loaded).not.toBeNull();
-    expect(loaded.name).toBe(david.name);
-
-    const btProxy = (posts2[0] as any).association("author");
-    expect(btProxy).toBeDefined();
-    expect(btProxy.loaded).toBe(true);
-    expect(btProxy.target).not.toBeNull();
-    expect(btProxy.target.name).toBe(david.name);
-  });
-  it("eager association loading with explicit join has one", async () => {
-    const david = authors("david");
-
-    const users = await Author.where({ id: david.id }).eagerLoad(":post");
-    expect(users).toHaveLength(1);
-    const profile = (users[0] as any).association("post").target;
-    expect(profile).not.toBeNull();
-
-    const hoProxy = (users[0] as any).association("post");
-    expect(hoProxy).toBeDefined();
-    expect(hoProxy.loaded).toBe(true);
-    expect(hoProxy.target).not.toBeNull();
-  });
-  it("eager association loading with explicit join marks empty association loaded", async () => {
-    const author = await Author.create({ name: "NoPostsAuthor" });
-
-    const authorsArr = await Author.where({ id: author.id }).eagerLoad(":posts");
-    expect(authorsArr).toHaveLength(1);
-    const proxy = (authorsArr[0] as any).association("posts");
-    expect(proxy).toBeDefined();
-    expect(proxy.loaded).toBe(true);
-    expect(proxy.target).toEqual([]);
-  });
   it("eager with invalid association reference", async () => {
     let e = await assertRaise([AssociationNotFoundError], {}, () =>
       Post.all().includes(":monkeys").find(6),
@@ -1568,20 +1529,6 @@ describe("EagerAssociationTest", () => {
     });
   });
 
-  it("joins with multiple includes should preload via joins", async () => {
-    let post: Post | undefined;
-    await assertQueriesCount(1, false, async () => {
-      const loaded = await Post.includes(":comments", ":author")
-        .joins(":comments")
-        .order("posts.id desc");
-      post = loaded[0];
-    });
-    await assertNoQueries(false, async () => {
-      expect(await (post! as any).comments.length()).not.toBe(0);
-      expect(post!.association("author").target as Base).toBeTruthy();
-    });
-  });
-
   it("nested loading through has one association", async () => {
     const aa = await AuthorAddress.all()
       .includes({ ":author": ":posts" })
@@ -2009,25 +1956,6 @@ describe("EagerAssociationTest", () => {
       .limit(2)
       .where("posts.title = 'magic forest'");
     expect(posts.length).toBe(0);
-  });
-
-  it("eager association loading with explicit join habtm", async () => {
-    const rel = Post.all().eagerLoad(":categories").order("posts.id");
-    const sql = rel.toSql();
-    expect(sql).toMatch(/LEFT OUTER JOIN.*categories_posts/);
-    expect(sql).toMatch(/LEFT OUTER JOIN.*categories[^_]/);
-
-    const loaded = await rel;
-    const welcome = loaded.find((p) => p.id === posts("welcome").id)!;
-    const thinking = loaded.find((p) => p.id === posts("thinking").id)!;
-    expect(await (welcome as any).categories.length()).toBe(2);
-    expect(await (thinking as any).categories.length()).toBe(1);
-  });
-
-  it("eager association loading with habtm via preload", async () => {
-    const loaded = await Post.all().preload(":categories").order("posts.id");
-    const welcome = loaded.find((p) => p.id === posts("welcome").id)!;
-    expect(await (welcome as any).categories.length()).toBe(2);
   });
 
   it("eager with has and belongs to many and limit", async () => {

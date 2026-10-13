@@ -275,7 +275,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     ifNotExists: true,
   });
 
-  if (await adapter.supportsInsertReturning()) {
+  if (adapter.supportsInsertReturning()) {
     await adapter.createTable(
       "pk_autopopulated_by_a_trigger_records",
       { force: true, id: false },
@@ -389,7 +389,7 @@ async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<
     "CREATE PROCEDURE topics(IN num INT) SQL SECURITY INVOKER\nBEGIN\n  SELECT * FROM topics LIMIT num;\nEND\n",
   );
 
-  if (await adapter.supportsInsertReturning()) {
+  if (adapter.supportsInsertReturning()) {
     await adapter.createTable(
       "pk_autopopulated_by_a_trigger_records",
       { force: true, id: false },

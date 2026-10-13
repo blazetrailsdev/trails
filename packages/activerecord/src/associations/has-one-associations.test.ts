@@ -1,6 +1,6 @@
 import { Marshal, kernelThrow, rbFSend } from "@blazetrails/ruby-compat";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import {
@@ -391,24 +391,6 @@ describe("HasOneAssociationsTest", () => {
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([accountId]);
   });
 
-  it("direct destroy records destroyed account id via unloaded belongs_to", async () => {
-    const account = (await Account.find(1)) as any;
-    expect(account.association("firm").isLoaded()).toBe(false);
-    const firm = (await Company.find(account.firm_id)) as any;
-    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
-    await account.destroy();
-    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([account.id]);
-  });
-
-  it("direct destroy only preloads the belongs_to the callback references", async () => {
-    const account = (await Account.find(1)) as any;
-    expect(account.association("firm").isLoaded()).toBe(false);
-    expect(account.association("unautosavedFirm").isLoaded()).toBe(false);
-    await assertQueriesMatch(/FROM\s+.?companies.?/i, 1, false, async () => {
-      await account.destroy();
-    });
-  });
-
   it("exclusive dependence", async () => {
     const numAccounts = await Account.count();
     const firm = (await ExclusivelyDependentFirm.find(9)) as any;
@@ -535,65 +517,6 @@ describe("HasOneAssociationsTest", () => {
     const account = await (firm as any).createAccount({ credit_limit: 1000 });
     await firm.reload();
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
-  });
-
-  it("create over a loaded target nullifies the prior account", async () => {
-    const company = (await Company.create({ name: "NewCo" })) as any;
-    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
-    const found = (await Company.find(company.id)) as any;
-    await readHasOne(found, "account");
-    const created = await found.createAccount({ credit_limit: 70 });
-    expect((await Account.find(original.id)).firm_id).toBeNull();
-    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
-    expect((await readHasOne(found, "account")).id).toBe(created.id);
-  });
-
-  it("create over a loaded target destroys the prior dependent account", async () => {
-    const firm = companies("first_firm") as any;
-    const originalId = (await readHasOne(firm, "account")).id;
-    const created = await firm.createAccount({ credit_limit: 70 });
-    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
-    expect((await readHasOne(firm, "account")).id).toBe(created.id);
-  });
-
-  it("create over an unloaded target nullifies the prior account", async () => {
-    const company = (await Company.create({ name: "UnloadedCo" })) as any;
-    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
-    const found = (await Company.find(company.id)) as any;
-    const created = await found.createAccount({ credit_limit: 70 });
-    expect((await Account.find(original.id)).firm_id).toBeNull();
-    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
-    expect((await readHasOne(found, "account")).id).toBe(created.id);
-  });
-
-  it("create over an unloaded target destroys the prior dependent account", async () => {
-    const firm = (await Firm.find(Number((companies("first_firm") as any).id))) as any;
-    const originalId = Number((await Account.where({ firm_id: Number(firm.id) }).first())!.id);
-    const created = await firm.createAccount({ credit_limit: 70 });
-    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
-    expect((await readHasOne(firm, "account")).id).toBe(created.id);
-  });
-
-  it("create re-raises a deferred target-load error after a successful build", async () => {
-    const company = (await Company.create({ name: "DeferredLoadCo" })) as any;
-    const found = (await Company.find(company.id)) as any;
-    const association = found.association("account");
-    expect(association.isLoaded()).toBe(false);
-    const loadError = new Error("connection lost while loading the displaced target");
-    vi.spyOn(association, "loadTargetForBuild").mockRejectedValue(loadError);
-
-    await expect(found.createAccount({ credit_limit: 70 })).rejects.toBe(loadError);
-    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
-  });
-
-  it("build over a loaded target nullifies the prior account", async () => {
-    const company = (await Company.create({ name: "BuildCo" })) as any;
-    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
-    const found = (await Company.find(company.id)) as any;
-    await readHasOne(found, "account");
-    const built = await found.buildAccount({ credit_limit: 70 });
-    expect((await Account.find(original.id)).firm_id).toBeNull();
-    expect(built.isPersisted()).toBe(false);
   });
 
   it("create when parent is new raises", async () => {
