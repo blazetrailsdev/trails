@@ -16,6 +16,7 @@ export class Mock {
   #expectedCalls = new Map<string, MockCall[]>();
   #actualCalls = new Map<string, MockCall[]>();
 
+  /** @noRailsEquivalent PERMANENT */
   expect(name: string, retval: unknown, args: unknown[] = []): this {
     if (!Array.isArray(args)) throw new ArgumentError("args must be an array");
     const expected = this.#expectedCalls.get(name) ?? [];
@@ -30,6 +31,7 @@ export class Mock {
     return `${name}(${args}) => ${rbInspect(data.retval)}`;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   verify(): true {
     for (const [name, expected] of this.#expectedCalls) {
       const actual = this.#actualCalls.get(name) ?? null;
@@ -43,6 +45,7 @@ export class Mock {
     return true;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   call(...args: unknown[]): unknown {
     const sym = ":call";
     const actualCalls = this.#actualCalls.get("call") ?? [];
