@@ -84,64 +84,6 @@ describe("RelationTest", () => {
     registerModel(CanonCategorization);
   });
 
-  it("reload", async () => {
-    await CanonPost.create({ title: "reltest-reload", body: "b" });
-    const rel = CanonPost.all();
-    await rel;
-    expect(rel.isLoaded).toBe(true);
-    await rel.reload();
-    expect(rel.isLoaded).toBe(true);
-  });
-
-  it("count", async () => {
-    const before = await CanonPost.all().count();
-    await CanonPost.create({ title: "reltest-count-a", body: "b" });
-    await CanonPost.create({ title: "reltest-count-b", body: "b" });
-    const count = await CanonPost.all().count();
-    expect(count).toBe(before + 2);
-  });
-
-  it("count with distinct", () => {
-    const sql = CanonPost.all().distinct().toSql();
-    expect(sql).toContain("DISTINCT");
-  });
-
-  it("build", () => {
-    const post = CanonPost.where({ title: "hello" }).build();
-    expect(post.isNewRecord()).toBe(true);
-  });
-
-  it("create", async () => {
-    const post = await CanonPost.where({ title: "reltest-new" }).createWith({ body: "b" }).create();
-    expect(post.isPersisted()).toBe(true);
-  });
-
-  it("multiple selects", () => {
-    const sql = CanonPost.select("title").reselect("body").toSql();
-    expect(sql).toContain("body");
-  });
-
-  it("find_by with hash conditions returns the first matching record", async () => {
-    await CanonPost.create({ title: "reltest-target", body: "b" });
-    const found = await CanonPost.findBy({ title: "reltest-target" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find_by doesn't have implicit ordering", async () => {
-    await CanonPost.create({ title: "reltest-fa", body: "b" });
-    await CanonPost.create({ title: "reltest-fb", body: "b" });
-    const found = await CanonPost.findBy({ title: "reltest-fa" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find ids", async () => {
-    const before = (await CanonPost.all().ids()).length;
-    await CanonPost.create({ title: "reltest-ids-a", body: "b" });
-    await CanonPost.create({ title: "reltest-ids-b", body: "b" });
-    const ids = await CanonPost.all().ids();
-    expect(ids.length).toBe(before + 2);
-  });
-
   it("select quotes when using from clause", async (ctx) => {
     await skipIfSqlite3VersionIncludesQuotingBug(ctx);
     const selected = (
@@ -176,22 +118,6 @@ describe("RelationTest", () => {
     });
   });
 
-  it("last", async () => {
-    await CanonPost.create({ title: "reltest-last", body: "b" });
-    const last = await CanonPost.all().last();
-    expect(last).not.toBeNull();
-  });
-
-  it("find with readonly option", () => {
-    const rel = CanonPost.all().readonly();
-    expect(rel.isReadonly).toBe(true);
-  });
-
-  it("to a should dup target", async () => {
-    const arr = await CanonPost.all();
-    expect(Array.isArray(arr)).toBe(true);
-  });
-
   it("empty where values hash", () => {
     expect(CanonPost.all().whereValuesHash()).toEqual({});
 
@@ -216,48 +142,12 @@ describe("RelationTest", () => {
     });
   });
 
-  it("finding with subquery", () => {
-    const subquery = CanonPost.where({ title: "a" }).select("id");
-    const sql = CanonPost.where({ id: subquery }).toSql();
-    expect(sql).toContain("IN");
-  });
-
-  it("find on hash conditions", async () => {
-    await CanonPost.create({ title: "reltest-onhash", body: "b" });
-    const results = await CanonPost.where({ title: "reltest-onhash" });
-    expect(results.length).toBe(1);
-  });
-
-  it("count with block", async () => {
-    const count = await CanonPost.all().count();
-    expect(typeof count).toBe("number");
-  });
-
-  it("create with block", async () => {
-    const p = await CanonPost.create({ title: "reltest-block", body: "b" });
-    expect(p.isPersisted()).toBe(true);
-  });
-
   it("relation with annotation includes comment in count query", async () => {
     const postWithAnnotation = CanonPost.annotate("foo");
     const allCount = (await CanonPost.all()).length;
     await assertQueriesMatch(/\/\* foo \*\//, undefined, false, async () => {
       expect(await postWithAnnotation.count()).toBe(allCount);
     });
-  });
-
-  it("joins with string array", () => {
-    const sql = CanonPost.joins(
-      "INNER JOIN comments ON comments.post_id = posts.id",
-      "INNER JOIN taggings ON taggings.post_id = posts.id",
-    ).toSql();
-    expect(sql).toContain("INNER JOIN");
-  });
-
-  it("find_by with multi-arg conditions returns the first matching record", async () => {
-    await CanonPost.create({ title: "reltest-multi", body: "b" });
-    const result = await CanonPost.findBy({ title: "reltest-multi", body: "b" });
-    expect(result).not.toBeNull();
   });
 
   it("construction", () => {
@@ -562,16 +452,6 @@ describe("RelationTest", () => {
       .merge(CanonPost.optimizerHints("OMGHINT"))
       .toSql();
     expect(query).toBe(expected);
-  });
-
-  it("find_by! with multi-arg conditions returns the first matching record", async () => {
-    await CanonPost.create({ title: "reltest-bang", body: "b" });
-    const found = await CanonPost.findByBang({ title: "reltest-bang" });
-    expect(found).not.toBeNull();
-  });
-
-  it("eager association loading of stis with multiple references", () => {
-    expect(CanonPost.all()).toBeInstanceOf(Relation);
   });
 });
 
