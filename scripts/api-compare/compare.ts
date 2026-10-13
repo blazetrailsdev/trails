@@ -153,6 +153,7 @@ import {
   compareCallArgs,
   comparableRubySites,
   pairCallSites,
+  resolveCalleeSigs,
   type CallArgClass,
   type CallArgSkipReason,
 } from "./call-args.js";
@@ -4606,6 +4607,10 @@ export function main() {
     // The package-only signature populations the calls-parity ported-with-args
     // gate reads — see TsPortedWithArgsMaps for what each one is scoped to.
     const portedWithArgsMaps = newTsPortedWithArgsMaps();
+    // Dependency-package signatures by name: the callee signatures the padding
+    // rules fall back to when the calling package declares none (see
+    // resolveCalleeSigs).
+    const tsParamsByNameInDeps = new Map<string, ParamInfo[][]>();
     const {
       paramsByNameInPkg: tsParamsByNameInPkg,
       paramsByFileNameInPkg: tsParamsByFileNameInPkg,
@@ -4772,6 +4777,9 @@ export function main() {
       sigs.push(arityParams(m));
       tsParamsByName.set(m.name, sigs);
       if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
+      if (scope === "dep" && !isTestHelperFile(file)) {
+        tsParamsByNameInDeps.set(m.name, [...(tsParamsByNameInDeps.get(m.name) ?? []), m.params]);
+      }
       if (scope === "package") {
         const byName = tsBlockSigsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
         const blockSigs = byName.get(m.name) ?? [];
@@ -5946,7 +5954,10 @@ export function main() {
             ruby,
             ts,
             rubyName,
-            portedWithArgsSigs(tsFile, ts.name),
+            resolveCalleeSigs(
+              portedWithArgsSigs(tsFile, ts.name),
+              tsParamsByNameInDeps.get(ts.name),
+            ),
             rubyParamsByName.get(ruby.name),
           );
           if (result.verdict === "skip") {

@@ -6,6 +6,7 @@ import {
   normalizeArg,
   normalizeArgs,
   pairCallSites,
+  resolveCalleeSigs,
 } from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
@@ -594,6 +595,23 @@ describe("compareCallArgs block-tail nil padding", () => {
 
   it("does not fire without a callee signature to prove the padding inert", () => {
     expect(compareCallArgs(rubyCall, tsCall).verdict).toBe("mismatch");
+  });
+
+  it("resolves a callee the calling package does not declare from a dependency package", () => {
+    // redirection.rb:22 `ActiveSupport::Notifications.instrument("redirect.action_dispatch") do |payload|`
+    const ruby = site("instrument", ["str:redirect.action_dispatch"], ["block"]);
+    const ts = site("instrument", ["str:redirect.action_dispatch", "nil"], ["block"]);
+    const inDeps = [[required("name"), optional("payload"), optional("block")]];
+    expect(compareCallArgs(ruby, ts, undefined, resolveCalleeSigs([], inDeps)).verdict).toBe(
+      "match",
+    );
+    expect(compareCallArgs(ruby, ts, undefined, resolveCalleeSigs([], undefined)).verdict).toBe(
+      "mismatch",
+    );
+    const inPkg = [[required("name"), required("payload"), optional("block")]];
+    expect(compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(inPkg, inDeps)).verdict).toBe(
+      "mismatch",
+    );
   });
 
   it("does not fire when neither side carries a block", () => {
