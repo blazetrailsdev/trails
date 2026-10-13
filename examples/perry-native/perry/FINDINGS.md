@@ -25,7 +25,7 @@ Status of each wall after re-verification:
 | 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                          |
 | 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                 |
 | 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship. |
-| 3c — init-time hang at 362 modules | Live; **minimized to 2 files** — a module namespace's `[[Prototype]]` is not `null`.                            |
+| 3c — init-time hang at 362 modules | **Fix written and verified** (12 lines) — a module namespace's `[[Prototype]]` was not `null`.                  |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -289,7 +289,26 @@ chain of the module handed to it. Node finishes instantly; Perry does not
 finish.
 
 The reduction ran 362-module app → `namespaces.js` → `extend(target,
-namespace)` (59 modules) → two files, zero dependencies. Ready to file.
+namespace)` (59 modules) → two files, zero dependencies.
+
+**A fix is written, and it works** — [upstream/namespace-prototype/fix.patch](upstream/namespace-prototype/fix.patch),
+12 added lines in `js_finalize_namespace`, the one chokepoint both namespace
+paths pass through. It marks the namespace `OBJ_FLAG_NULL_PROTO`, which is
+already the proof `Object.getPrototypeOf` reads to answer `null`; no other
+change was needed. With it, built from source at `main` `d74498b2`:
+
+| Case                                       | Before                        | After                                 |
+| ------------------------------------------ | ----------------------------- | ------------------------------------- |
+| the 2-file reproducer                      | never terminates              | **1 step, `null`, identical to Node** |
+| `extend(target, namespace)`, 59 modules    | hangs                         | **runs**                              |
+| `activesupport/namespaces.js`, 359 modules | hangs                         | **runs**                              |
+| the 362-module WebAssembly probe           | hangs at 172/362 initializers | **runs**                              |
+| 54-module `ruby-compat` rung (control)     | ran                           | **still runs**                        |
+
+No regressions: `cargo test -p perry-runtime` serially, patched vs pristine,
+gives identical results on the `namespace`, `prototype` and `shape` filters
+(29/0, 244/1, 557/4), and every failure is a pre-existing
+`object::shape_store::tests::function_*` unrelated to namespaces.
 
 ## The SQLite result is weaker than it looks
 

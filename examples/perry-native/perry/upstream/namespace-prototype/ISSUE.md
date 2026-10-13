@@ -1,5 +1,9 @@
 # A module namespace object's `[[Prototype]]` is not `null`, so prototype walks never terminate
 
+> **A fix is written and verified: [`fix.patch`](fix.patch)** — 12 added lines in
+> one function, `js_finalize_namespace`. See "Proposed fix" below for what it
+> does and how it was tested.
+
 **Perry `main` @ `d74498b2` (0.5.1659)**, built from source, Linux x86_64,
 LLVM 22.1.8. Also present in the published 0.5.1520.
 
@@ -66,3 +70,65 @@ So the surface is not exotic: `import * as X` passed to anything that
 traverses prototypes. Reducing it took the chain
 362-module app → `namespaces.js` → `extend(target, namespace)` (59 modules)
 → these two files.
+
+## Proposed fix
+
+[`fix.patch`](fix.patch) — 12 added lines in
+`crates/perry-runtime/src/object/namespace_create.rs`.
+
+`js_finalize_namespace` is the one chokepoint for both namespace paths (the
+static `import * as` populator reaches it directly; `js_create_namespace`, the
+dynamic-`import()` builder, ends by calling it). It already stamps
+`MODULE_NAMESPACE_CLASS_ID` and prevents extensions. The patch additionally
+marks the object `OBJ_FLAG_NULL_PROTO`:
+
+    let gc = crate::gc::header_from_trusted_user_ptr(obj.cast()).cast_mut();
+    (*gc)._reserved |= crate::gc::OBJ_FLAG_NULL_PROTO;
+
+Nothing else is needed, because that flag is already the proof
+`Object.getPrototypeOf` reads to answer `null` — its own definition says so
+("object was created with a null prototype … `Object.getPrototypeOf` returns
+null for these"), and `object_ops/prototype.rs` honours it in both of its
+resolution paths. The flag-setting idiom is copied from
+`native_payload_birth.rs`.
+
+This also explains the shape of the bug: `getPrototypeOf` has a
+`NATIVE_MODULE_CLASS_ID` arm that exists precisely to stop this
+non-termination for `require("path")` namespaces (the comment there cites a
+turbopack `interopEsm` proto-walk runaway). A static ESM namespace carries a
+different class id and never had the equivalent guard.
+
+### Verification
+
+Built from source at `main` `d74498b2` with LLVM 22.1.8.
+
+| Case                                                 | Before                                                | After                                       |
+| ---------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------- |
+| this reproducer                                      | walk never ends; `getPrototypeOf` → `[object Module]` | **1 step, `null` — byte-identical to Node** |
+| `extend(target, namespace)`, 59 modules              | hangs                                                 | **runs**                                    |
+| `activesupport/namespaces.js`, 359 modules           | hangs                                                 | **runs**                                    |
+| the original trails probe, 362 modules + WebAssembly | hangs at 172/362 initializers                         | **runs**                                    |
+| `ruby-compat` rung, 54 modules (control)             | ran                                                   | **still runs**                              |
+
+Regressions: none found. `cargo test -p perry-runtime` run serially, patched
+versus pristine, same filters:
+
+| Filter      | Pristine             | Patched              |
+| ----------- | -------------------- | -------------------- |
+| `namespace` | —                    | 29 passed, 0 failed  |
+| `prototype` | 244 passed, 1 failed | 244 passed, 1 failed |
+| `shape`     | 557 passed, 4 failed | 557 passed, 4 failed |
+
+The failures are identical in both and are all
+`object::shape_store::tests::function_*`, i.e. pre-existing on `main` and
+unrelated to namespaces. One `json::stringify_flat` test failed in a _parallel_
+patched run and passes serially and in isolation both patched and pristine —
+the suite's known parallel flakiness, not this change.
+
+### Caveat worth a maintainer's eye
+
+A null-prototype namespace no longer inherits from `Object.prototype`, so
+`ns.hasOwnProperty(...)` and `ns.toString()` now throw. That is what Node does
+too, so it is the spec-correct direction, but if any Perry interop shim calls
+an `Object.prototype` method directly on a namespace it would need
+`Object.prototype.x.call(ns)`. Nothing in the suites above tripped on it.
