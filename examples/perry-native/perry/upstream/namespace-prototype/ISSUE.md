@@ -1,8 +1,13 @@
 # A module namespace object's `[[Prototype]]` is not `null`, so prototype walks never terminate
 
-> **A fix is written and verified: [`fix.patch`](fix.patch)** — 12 added lines in
-> one function, `js_finalize_namespace`. See "Proposed fix" below for what it
-> does and how it was tested.
+> **FILED upstream, 2026-10-13, with the fix:**
+>
+> - issue: https://github.com/PerryTS/perry/issues/12587
+> - PR: https://github.com/PerryTS/perry/pull/12588 (1 file, +12)
+>
+> The fix is [`fix.patch`](fix.patch) — 12 added lines in one function,
+> `js_finalize_namespace`. See "Proposed fix" below for what it does and how it
+> was tested. This file is kept as the local record and regression probe.
 
 **Perry `main` @ `d74498b2` (0.5.1659)**, built from source, Linux x86_64,
 LLVM 22.1.8. Also present in the published 0.5.1520.
