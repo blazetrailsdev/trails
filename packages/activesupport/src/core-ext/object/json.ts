@@ -7,6 +7,7 @@ import {
   Kernel,
   Range as RangeValue,
   STRING_METHOD_TABLE,
+  toS,
 } from "@blazetrails/ruby-compat";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
@@ -198,7 +199,7 @@ export class Hash {
         if (!globalThis.Object.isFrozen(options))
           options = globalThis.Object.freeze({ ...options });
         for (const [k, v] of subset) {
-          globalThis.Object.defineProperty(result, globalThis.String(k), {
+          globalThis.Object.defineProperty(result, toS(k), {
             value: asJson(v, options),
             writable: true,
             enumerable: true,
@@ -207,7 +208,7 @@ export class Hash {
         }
       } else {
         for (const [k, v] of subset) {
-          globalThis.Object.defineProperty(result, globalThis.String(k), {
+          globalThis.Object.defineProperty(result, toS(k), {
             value: asJson(v),
             writable: true,
             enumerable: true,

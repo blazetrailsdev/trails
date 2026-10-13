@@ -24,7 +24,7 @@ describe("AssociationsNestedErrorInAssociationOrderTest", () => {
 
     expect(error.constructor).toBe(NestedError);
     expect(error.innerError).toBe(peg2.errors.objects[0]);
-    expect(error.attribute).toBe("tuning_pegs[1].pitch");
+    expect(error.attribute).toBe(":tuning_pegs[1].pitch");
     expect(error.type).toBe(":not_a_number");
     expect(error.message).toBe("is not a number");
     expect(error.base).toBe(guitar);
@@ -60,7 +60,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
 
     expect(error.constructor).toBe(NestedError);
     expect(error.innerError).toBe(peg2.errors.objects[0]);
-    expect(error.attribute).toBe("tuning_pegs[0].pitch");
+    expect(error.attribute).toBe(":tuning_pegs[0].pitch");
     expect(error.type).toBe(":not_a_number");
     expect(error.message).toBe("is not a number");
     expect(error.base).toBe(guitar);
@@ -76,7 +76,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     const error = guitar.errors.objects[0] as NestedError;
 
     expect(error.constructor).toBe(NestedError);
-    expect(error.attribute).toBe("tuning_pegs[1].pitch");
+    expect(error.attribute).toBe(":tuning_pegs[1].pitch");
     expect(error.type).toBe(":not_a_number");
     expect(error.message).toBe("is not a number");
     expect(error.base).toBe(guitar);
@@ -123,7 +123,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
 
         expect(error.constructor).toBe(NestedError);
         expect(error.innerError).toStrictEqual(pet.errors.objects[0]);
-        expect(error.attribute).toBe("pet.name");
+        expect(error.attribute).toBe(":pet.name");
         expect(error.type).toBe(":blank");
         expect(error.message).toBe("can't be blank");
         expect(error.base).toBe(owner);

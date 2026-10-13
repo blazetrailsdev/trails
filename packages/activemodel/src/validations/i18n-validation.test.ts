@@ -97,7 +97,7 @@ describe("I18nValidationTest", () => {
     });
 
     const person = new (personClass())();
-    const error = new ModelError(person, "gender", "can't be blank");
+    const error = new ModelError(person, ":gender", "can't be blank");
     person.errors.import(error, { attribute: "person[0].contacts.gender" });
     expect(person.errors.fullMessages).toEqual(["Gender can't be blank"]);
   });
@@ -288,7 +288,7 @@ describe("I18nValidationTest", () => {
       personClass().validatesConfirmationOf("title", validationOptions);
       person.titleConfirmation = "foo";
       const call = [
-        "titleConfirmation",
+        ":titleConfirmation",
         ":confirmation",
         person,
         { ...generateMessageOptions, attribute: "Title" },
@@ -300,7 +300,7 @@ describe("I18nValidationTest", () => {
   for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
     it(`validates_acceptance_of on generated message ${name}`, async () => {
       personClass().validatesAcceptanceOf("title", { ...validationOptions, allowNil: false });
-      const call = ["title", ":accepted", person, generateMessageOptions];
+      const call = [":title", ":accepted", person, generateMessageOptions];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -308,7 +308,7 @@ describe("I18nValidationTest", () => {
   for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
     it(`validates_presence_of on generated message ${name}`, async () => {
       personClass().validatesPresenceOf("title", validationOptions);
-      const call = ["title", ":blank", person, generateMessageOptions];
+      const call = [":title", ":blank", person, generateMessageOptions];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -316,7 +316,7 @@ describe("I18nValidationTest", () => {
   for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
     it(`validates_length_of for :within on generated message when too short ${name}`, async () => {
       personClass().validatesLengthOf("title", { ...validationOptions, within: new Range(3, 5) });
-      const call = ["title", ":too_short", person, { ...generateMessageOptions, count: 3 }];
+      const call = [":title", ":too_short", person, { ...generateMessageOptions, count: 3 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -325,7 +325,7 @@ describe("I18nValidationTest", () => {
     it(`validates_length_of for :too_long generated message ${name}`, async () => {
       personClass().validatesLengthOf("title", { ...validationOptions, within: new Range(3, 5) });
       person.title = "this title is too long";
-      const call = ["title", ":too_long", person, { ...generateMessageOptions, count: 5 }];
+      const call = [":title", ":too_long", person, { ...generateMessageOptions, count: 5 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -333,7 +333,7 @@ describe("I18nValidationTest", () => {
   for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
     it(`validates_length_of for :is on generated message ${name}`, async () => {
       personClass().validatesLengthOf("title", { ...validationOptions, is: 5 });
-      const call = ["title", ":wrong_length", person, { ...generateMessageOptions, count: 5 }];
+      const call = [":title", ":wrong_length", person, { ...generateMessageOptions, count: 5 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -345,7 +345,7 @@ describe("I18nValidationTest", () => {
         with: /^[1-9][0-9]*$/,
       });
       person.title = "72x";
-      const call = ["title", ":invalid", person, { ...generateMessageOptions, value: "72x" }];
+      const call = [":title", ":invalid", person, { ...generateMessageOptions, value: "72x" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -354,7 +354,7 @@ describe("I18nValidationTest", () => {
     it(`validates_inclusion_of on generated message ${name}`, async () => {
       personClass().validatesInclusionOf("title", { ...validationOptions, in: ["a", "b", "c"] });
       person.title = "z";
-      const call = ["title", ":inclusion", person, { ...generateMessageOptions, value: "z" }];
+      const call = [":title", ":inclusion", person, { ...generateMessageOptions, value: "z" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -366,7 +366,7 @@ describe("I18nValidationTest", () => {
         within: ["a", "b", "c"],
       });
       person.title = "z";
-      const call = ["title", ":inclusion", person, { ...generateMessageOptions, value: "z" }];
+      const call = [":title", ":inclusion", person, { ...generateMessageOptions, value: "z" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -375,7 +375,7 @@ describe("I18nValidationTest", () => {
     it(`validates_exclusion_of generated message ${name}`, async () => {
       personClass().validatesExclusionOf("title", { ...validationOptions, in: ["a", "b", "c"] });
       person.title = "a";
-      const call = ["title", ":exclusion", person, { ...generateMessageOptions, value: "a" }];
+      const call = [":title", ":exclusion", person, { ...generateMessageOptions, value: "a" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -387,7 +387,7 @@ describe("I18nValidationTest", () => {
         within: ["a", "b", "c"],
       });
       person.title = "a";
-      const call = ["title", ":exclusion", person, { ...generateMessageOptions, value: "a" }];
+      const call = [":title", ":exclusion", person, { ...generateMessageOptions, value: "a" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -396,7 +396,7 @@ describe("I18nValidationTest", () => {
     it(`validates_numericality_of generated message ${name}`, async () => {
       personClass().validatesNumericalityOf("title", validationOptions);
       person.title = "a";
-      const call = ["title", ":not_a_number", person, { ...generateMessageOptions, value: "a" }];
+      const call = [":title", ":not_a_number", person, { ...generateMessageOptions, value: "a" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -406,7 +406,7 @@ describe("I18nValidationTest", () => {
       personClass().validatesNumericalityOf("title", { ...validationOptions, onlyInteger: true });
       person.title = "0.0";
       const call = [
-        "title",
+        ":title",
         ":not_an_integer",
         person,
         { ...generateMessageOptions, value: "0.0" },
@@ -423,7 +423,7 @@ describe("I18nValidationTest", () => {
         odd: true,
       });
       (person as Record<string, unknown>).title = 0;
-      const call = ["title", ":odd", person, { ...generateMessageOptions, value: 0 }];
+      const call = [":title", ":odd", person, { ...generateMessageOptions, value: 0 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
   }
@@ -437,7 +437,7 @@ describe("I18nValidationTest", () => {
       });
       (person as Record<string, unknown>).title = 1;
       const call = [
-        "title",
+        ":title",
         ":less_than",
         person,
         { ...generateMessageOptions, value: 1, count: 0 },
