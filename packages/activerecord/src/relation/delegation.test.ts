@@ -1,8 +1,17 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport";
+import {
+  assertNotRespondTo,
+  assertRespondTo,
+  publicInstanceMethods,
+} from "@blazetrails/activesupport";
 import { Base, Relation, registerModel } from "../index.js";
 import * as Querying from "../querying.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
+import { Batches } from "./batches.js";
+import { Calculations } from "./calculations.js";
+import { FinderMethods } from "./finder-methods.js";
+import { QueryMethods } from "./query-methods.js";
+import { SpawnMethods } from "./spawn-methods.js";
 import { fixtures } from "../test-fixtures.js";
 import { tsName } from "../test-helpers/array-delegate-spellings.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -98,121 +107,51 @@ describe("DelegationRecordsTest", () => {
 });
 
 describe("QueryingMethodsDelegationTest", () => {
-  const QUERYING_METHODS = [
-    "where",
-    "select",
-    "reselect",
-    "order",
-    "reorder",
-    "group",
-    "regroup",
-    "having",
-    "limit",
-    "offset",
-    "distinct",
-    "joins",
-    "leftJoins",
-    "leftOuterJoins",
-    "includes",
-    "preload",
-    "eagerLoad",
-    "references",
-    "none",
-    "from",
-    "lock",
-    "readonly",
-    "rewhere",
-    "unscope",
-    "extending",
-    "annotate",
-    "optimizerHints",
-    "or",
-    "excluding",
-    "and",
-    "invertWhere",
-    "inOrderOf",
-    "strictLoading",
-    "without",
-    "only",
-    "merge",
-    "with",
-    "withRecursive",
-    "find",
-    "findBy",
-    "findByBang",
-    "first",
-    "firstBang",
-    "last",
-    "lastBang",
-    "take",
-    "takeBang",
-    "second",
-    "secondBang",
-    "third",
-    "thirdBang",
-    "fourth",
-    "fourthBang",
-    "fifth",
-    "fifthBang",
-    "fortyTwo",
-    "fortyTwoBang",
-    "secondToLast",
-    "secondToLastBang",
-    "thirdToLast",
-    "thirdToLastBang",
-    "sole",
-    "isExists",
-    "count",
-    "sum",
-    "average",
-    "minimum",
-    "maximum",
-    "pluck",
-    "pick",
-    "ids",
-    "asyncIds",
-    "findEach",
-    "findInBatches",
-    "inBatches",
-    "findOrCreateBy",
-    "findOrCreateByBang",
-    "findOrInitializeBy",
-    "firstOrCreate",
-    "firstOrCreateBang",
-    "firstOrInitialize",
-    "createOrFindBy",
-    "createOrFindByBang",
-    "destroyAll",
-    "deleteAll",
-    "updateAll",
-    "touchAll",
-    "deleteBy",
-    "destroyBy",
-    "insert",
-    "insertBang",
-    "insertAll",
-    "insertAllBang",
-    "upsert",
-    "upsertAll",
-    "isAny",
-    "isMany",
-    "isOne",
-    "isNone",
-    "findSoleBy",
-    "destroy",
-    "delete",
-    "calculate",
-    "createWith",
-    "except",
-    "extractAssociated",
-    "asyncCount",
-    "asyncAverage",
-    "asyncMinimum",
-    "asyncMaximum",
-    "asyncSum",
-    "asyncPluck",
-    "asyncPick",
-  ] as const;
+  const QUERYING_METHODS = publicInstanceMethods(Batches, false)
+    .concat(publicInstanceMethods(Calculations, false))
+    .concat(publicInstanceMethods(FinderMethods, false))
+    .filter(
+      (method) => !["isInclude", "isMember", "raiseRecordNotFoundExceptionBang"].includes(method),
+    )
+    .concat(publicInstanceMethods(SpawnMethods, false))
+    .filter((method) => !["spawn", "mergeBang"].includes(method))
+    .concat(
+      publicInstanceMethods(QueryMethods, false).filter(
+        (method) => !/(=|Bang|Value|Values|Clause)$|^is[A-Z]/.test(method),
+      ),
+    )
+    .filter(
+      (method) =>
+        !["all", "reverseOrder", "arel", "extensions", "constructJoinDependency"].includes(method),
+    )
+    .concat([
+      "isAny",
+      "isMany",
+      "isNone",
+      "isOne",
+      "firstOrCreate",
+      "firstOrCreateBang",
+      "firstOrInitialize",
+      "findOrCreateBy",
+      "findOrCreateByBang",
+      "findOrInitializeBy",
+      "createOrFindBy",
+      "createOrFindByBang",
+      "destroy",
+      "destroyAll",
+      "delete",
+      "deleteAll",
+      "updateAll",
+      "touchAll",
+      "deleteBy",
+      "destroyBy",
+      "insert",
+      "insertAll",
+      "insertBang",
+      "insertAllBang",
+      "upsert",
+      "upsertAll",
+    ]);
 
   it("delegate querying methods", () => {
     const klass = class extends Base {

@@ -13,6 +13,7 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   any,
+  defineModule,
   isPresent,
   kernelArray,
   many,
@@ -641,7 +642,8 @@ function withDeferredDistinctPkPredicates<
   } as unknown as F;
 }
 
-export const Calculations = {
+/** @internal */
+export const CalculationsPublicInstanceMethods = {
   count: inQueryConnection(count),
   asyncCount,
   average: inQueryConnection(average),
@@ -660,6 +662,8 @@ export const Calculations = {
   ids: withDeferredDistinctPkPredicates(ids),
   asyncIds,
 } as const;
+
+export const Calculations = defineModule(CalculationsPublicInstanceMethods);
 
 /** @internal */
 export function aggregateColumn(

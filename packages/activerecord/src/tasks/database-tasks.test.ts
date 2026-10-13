@@ -1069,7 +1069,6 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
       migrationsPaths: migrationsPath,
     });
     await backupIntoConnection(sourceFile);
-    await Base.connectionPool().schemaMigration.createTable();
   });
 
   afterEach(async () => {
@@ -1274,37 +1273,9 @@ describe("DatabaseTasksMigrateErrorTest", () => {
   });
 
   it("migrate clears schema cache afterward", async () => {
-    const { SchemaReflection } = await import("../connection-adapters/schema-cache.js");
-    const originalVersion = process.env.VERSION;
-    delete process.env.VERSION;
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-cache-"));
-    const dbFile = path.join(tmp, "arunit.sqlite3");
-    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
-    await Base.connectionPool().schemaMigration.createTable();
-    DatabaseTasks.registerTask(
-      "sqlite",
-      class {
-        async create(): Promise<void> {}
-      },
-    );
-    Base.configurations({
-      [DEFAULT_ENV()]: { adapter: "sqlite3", database: dbFile },
-    });
-    const clearSpy = vi.spyOn(SchemaReflection.prototype, "clearBang");
-    try {
+    await assertCalled(Base.schemaCache(), "clearBang", null, {}, async () => {
       await DatabaseTasks.migrate();
-      expect(clearSpy).toHaveBeenCalled();
-    } finally {
-      clearSpy.mockRestore();
-      if (originalVersion === undefined) delete process.env.VERSION;
-      else process.env.VERSION = originalVersion;
-      try {
-        await Base.removeConnection();
-      } catch {}
-      Base.configurations(originalConfigurations);
-      resetRegisteredTasks();
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
+    });
   });
 });
 

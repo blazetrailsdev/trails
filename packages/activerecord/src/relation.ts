@@ -1965,7 +1965,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   where(args: unknown[]): Relation<T, G>;
   rewhere(conditions: Record<string, unknown> | Map<string, unknown> | null): Relation<T, G>;
   invertWhere(): Relation<T, G>;
-  structurallyCompatible(other: Relation<T, boolean>): boolean;
+  isStructurallyCompatible(other: Relation<T, boolean>): boolean;
   and(other: Relation<T, boolean>): Relation<T, G>;
   or(other: Relation<T, boolean>): Relation<T, G>;
   excluding(...records: unknown[]): Relation<T, G>;
@@ -2032,8 +2032,6 @@ export interface Relation<T extends Base, G extends boolean = false>
   orderedRelation(): Relation<T, G>;
   /** @internal */
   _orderColumns(): string[];
-  /** @internal */
-  actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void;
   findEach(opts: FindEachOptions, block: (record: T) => void | Promise<void>): Promise<null>;
   findEach(opts?: FindEachOptions): AsyncGenerator<T> & { size(): Promise<number> };
   findInBatches(opts: FindEachOptions, block: (batch: T[]) => void | Promise<void>): Promise<null>;
