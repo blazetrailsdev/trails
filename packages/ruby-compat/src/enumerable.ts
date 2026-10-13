@@ -10,6 +10,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { each } from "./array.js";
+import { Hash } from "./hash.js";
 import {
   numericPlus,
   rbBigNorm,
@@ -51,6 +52,28 @@ function rbBlockCall<T, E, R>(
   }
   if (each instanceof Promise) return each.then(result, rescue) as Enumerated<E, R>;
   return result() as Enumerated<E, R>;
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#group_by — `vendor/ruby/v3.3.11/enum.c:1157` `enum_group_by`,
+ * pushing each element onto the Array under its block result (`group_by_i`, `:1115`).
+ * @noRailsEquivalent PERMANENT
+ */
+function groupBy<T, K, E = unknown>(
+  this: Each<T, E>,
+  block: (i: T) => K,
+): Enumerated<E, Hash<K, T[]>> {
+  const hash = new Hash<K, T[]>();
+  return rbBlockCall(
+    this,
+    (i) => {
+      const group = block(i);
+      const values = hash.get(group);
+      if (values === undefined) hash.set(group, [i]);
+      else values.push(i);
+    },
+    () => hash,
+  );
 }
 
 /**
@@ -563,6 +586,7 @@ export const Enumerable = {
   findAll,
   select: findAll,
   map,
+  groupBy,
   first,
   drop,
   isAny,

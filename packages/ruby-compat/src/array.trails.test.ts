@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { IndexError } from "./index-error.js";
-import { block } from "./hash.js";
+import { Hash, block } from "./hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
@@ -768,7 +768,11 @@ describe("ARRAY_METHOD_TABLE", () => {
     expect(rbFSend(a, "union", [5])).toEqual([3, 1, 2, 5]);
     expect(rbFSend(a, "sortBy", (i: number) => -i)).toEqual([3, 2, 1, 1]);
     expect(rbFSend([], "sample")).toBeNull();
-    expect(rbFSend(a, "detect", (i: number) => i < 3)).toBe(1);
+    expect(rbFSend(a, "detect", undefined, (i: number) => i < 3)).toBe(1);
+    expect(rbFSend(a, "detect", () => 0)).toEqual(a);
+    expect((rbFSend(a, "groupBy", (i: number) => i % 2) as Hash<number, number[]>).get(1)).toEqual([
+      3, 1, 1,
+    ]);
     expect(rbFSend(a, "isOne", 3)).toBe(true);
     expect(rbFSend(a, "isAll", (i: number) => i > 0)).toBe(true);
     expect(rbFSend(a, "isAll", Number)).toBe(true);

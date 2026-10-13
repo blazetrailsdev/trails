@@ -1154,17 +1154,13 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   isAll: (self, ...argv: unknown[]) =>
     self.every((v) => (argv.length ? rbEqq(argv[0], v) : rtest(v))),
   /** `enum_find` (`vendor/ruby/v3.3.11/enum.c:361`). */
-  detect: (self, ...argv: unknown[]) => {
-    if (!rbObjIsProc(argv.at(-1))) return [...self];
-    return Enumerable.find.call(
-      { each: (block: (i: unknown) => void) => each(self, block) },
-      ...argv,
-    );
+  detect: (self, ifNone?: unknown, block?: Block) => {
+    if (!block) return [...self];
+    const obj = { each: (block: (i: unknown) => void) => each(self, block) };
+    return Enumerable.find.call(obj, ...(ifNone === undefined ? [block] : [ifNone, block]));
   },
   /** `enum_partition` (`vendor/ruby/v3.3.11/enum.c:1102`). */
   partition: (self, block?: Block) => (block ? partition(self, block) : [...self]),
-  /** `enum_group_by` (`vendor/ruby/v3.3.11/enum.c:1157`). */
-  groupBy: (self, block?: Block) => (block ? groupBy(self, block) : [...self]),
   /** `enum_sort_by` (`vendor/ruby/v3.3.11/enum.c:1651`). */
   sortBy: (self, block?: Block) =>
     !block

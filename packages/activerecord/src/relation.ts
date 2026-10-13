@@ -239,7 +239,7 @@ export class ExplainProxy<T extends Base> {
 }
 
 const ENUMERABLE_DELEGATES = {
-  detect: fetch<<T>(records: T[], fn: (record: T) => unknown) => T | undefined>(
+  detect: fetch<<T>(records: T[], ifNone: undefined, fn: (record: T) => unknown) => T | undefined>(
     ARRAY_METHOD_TABLE,
     "detect",
   ),
@@ -624,7 +624,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async detect(fn: (record: T) => unknown): Promise<T | undefined> {
-    return ENUMERABLE_DELEGATES.detect(await this.toArray(), fn);
+    return ENUMERABLE_DELEGATES.detect(await this.toArray(), undefined, fn);
   }
 
   async reject(fn: (record: T) => boolean): Promise<T[]> {
