@@ -24,7 +24,6 @@ it("SQLite3::Backup backup all", async () => {
   expect(await ddb.getFirstValue("SELECT seq FROM sqlite_sequence")).toBe(3);
   expect(await ddb.pragma("index_list(foo)")).toHaveLength(1);
   expect(await ddb.pragma("foreign_keys", { simple: true })).toBe(1);
-  await sdb.close();
-  await ddb.close();
+  await Promise.all([sdb.close(), ddb.close()]);
   File.delete(file);
 });

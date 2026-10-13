@@ -46,7 +46,6 @@ export class Backup {
         const columns = (
           (await dstdb.pragma(`sqlite3_backup.table_info(${table})`)) as { name: string }[]
         ).map((column) => quoteColumnName(column.name));
-        if (columns.length === 0) continue;
         await dstdb.exec(
           `INSERT INTO main.${table} (${columns.join(", ")}) ` +
             `SELECT ${columns.join(", ")} FROM sqlite3_backup.${table}`,
