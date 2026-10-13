@@ -54,7 +54,16 @@ import {
 } from "./test-helpers/models/company.js";
 import { PreparedStatementInvalid, StatementInvalid, UnknownPrimaryKey } from "./index.js";
 import { ForbiddenAttributesError, MissingAttributeError } from "@blazetrails/activemodel";
-import { assertRespondTo, assertNotEmpty, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertKindOf,
+  assertNothingRaised,
+  assertRaise,
+  assertRespondTo,
+  assertNotEmpty,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { Dog } from "./test-helpers/models/dog.js";
 
 function assertNotCalledFlag(called: boolean): void {
   if (called) throw new Error("Expected instantiate not to be called");
@@ -1585,7 +1594,7 @@ describe("FinderTest", () => {
   const rid = (r: unknown) => (r as { id: number }).id;
 
   it("find_by with non-hash conditions returns the first matching record", async () => {
-    expect(rid(await CanonicalPost.findBy(`id = ${rid(posts("eager_other"))}` as never))).toBe(
+    expect(rid(await CanonicalPost.findBy(`id = ${rid(posts("eager_other"))}`))).toBe(
       rid(posts("eager_other")),
     );
   });
@@ -2465,5 +2474,117 @@ describe("FinderTest", () => {
       (Developer as any).instantiate = original;
     }
     assertNotCalledFlag(called);
+  });
+});
+
+describe("FinderTest", () => {
+  const { topics, posts, accounts } = fixtures(["topics", "posts", "accounts"]);
+  const Topic = CanonicalTopic;
+  const Post = CanonicalPost;
+  registerModel("Topic", Topic);
+  registerModel(Post);
+  registerModel(Account);
+  registerModel(Dog);
+
+  it("find by id with hash", async () => {
+    await assertNothingRaised(async () => {
+      await (Post as any).findById({ limit: 1 });
+    });
+  });
+
+  it("find by title and id with hash", async () => {
+    await assertNothingRaised(async () => {
+      await (Post as any).findByTitleAndId("foo", { limit: 1 });
+    });
+  });
+
+  it("find by array of one id", async () => {
+    assertKindOf(Array, await Topic.find([1]));
+    assertEqual(1, ((await Topic.find([1])) as CanonicalTopic[]).length);
+  });
+
+  it("find by ids", async () => {
+    assertEqual(2, (await Topic.find(1, 2)).length);
+    assertEqual(topics("second").title, ((await Topic.find([2])) as CanonicalTopic[])[0].title);
+  });
+
+  it("find by on attribute that is a reserved word", async () => {
+    const dogAlias = "Dog";
+    const dog = await Dog.create({ alias: dogAlias });
+
+    assertEqual(dog, await (Dog as any).findByAlias(dogAlias));
+  });
+
+  it("find by one attribute with conditions", async () => {
+    assertEqual(
+      accounts("rails_core_account"),
+      await (Account.where("firm_id = ?", 6) as any).findByCreditLimit(50),
+    );
+  });
+
+  it("find by one missing attribute", async () => {
+    await assertRaise([TypeError], {}, () => (Topic as any).findByUndertitle("The First Topic!"));
+  });
+
+  it("find by two attributes but passing only one", async () => {
+    await assertRaise([ArgumentError], {}, () =>
+      (Topic as any).findByTitleAndAuthorName("The First Topic"),
+    );
+  });
+
+  it("find by id with conditions with or", async () => {
+    const QUOTED_TYPE = (await Post.leaseConnection()).quoteColumnName("type");
+    await assertNothingRaised(async () => {
+      await Post.where(`posts.id <= 3 OR posts.${QUOTED_TYPE} = 'Post'`).find([1, 2, 3]);
+    });
+  });
+
+  it("find by empty ids", async () => {
+    assertEqual([], await Post.find([]));
+  });
+
+  it("find by records", async () => {
+    const [p1, p2] = await Post.limit(2).order("id asc");
+    assertEqual([p1, p2], await Post.where(["id in (?)", [p1, p2]]).order("id asc"));
+    assertEqual([p1, p2], await Post.where(["id in (?)", [p1, p2.id]]).order("id asc"));
+  });
+
+  it("find_by with hash conditions returns the first matching record", async () => {
+    assertEqual(posts("eager_other"), await Post.findBy({ id: posts("eager_other").id }));
+  });
+
+  it("find_by with multi-arg conditions returns the first matching record", async () => {
+    assertEqual(posts("eager_other"), await Post.findBy("id = ?", posts("eager_other").id));
+  });
+
+  it("find_by with range conditions returns the first matching record", async () => {
+    assertEqual(
+      posts("eager_other"),
+      await Post.findBy({ id: new Range(posts("eager_other").id, posts("misc_by_bob").id, true) }),
+    );
+  });
+
+  it("find_by doesn't have implicit ordering", async () => {
+    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+      await Post.findBy({ id: posts("eager_other").id });
+    });
+  });
+
+  it("find_by! with hash conditions returns the first matching record", async () => {
+    assertEqual(posts("eager_other"), await Post.findByBang({ id: posts("eager_other").id }));
+  });
+
+  it("find_by! with non-hash conditions returns the first matching record", async () => {
+    assertEqual(posts("eager_other"), await Post.findByBang(`id = ${posts("eager_other").id}`));
+  });
+
+  it("find_by! with multi-arg conditions returns the first matching record", async () => {
+    assertEqual(posts("eager_other"), await Post.findByBang("id = ?", posts("eager_other").id));
+  });
+
+  it("find_by! doesn't have implicit ordering", async () => {
+    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+      await Post.findByBang({ id: posts("eager_other").id });
+    });
   });
 });
