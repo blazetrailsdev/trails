@@ -6,7 +6,6 @@ import type { AdminUser } from "./user.js";
 import { registerModel } from "../../../associations.js";
 
 export class AdminAccount extends Base {
-  static _tableName = "admin_accounts";
   static {
     registerModel(rbModConstSet(Admin, "Account", this));
   }
