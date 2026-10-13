@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { NameError, NoMethodError } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
 import { Delegation, DelegationError } from "./delegation.js";
 import { delegate } from "./module-ext.js";
 
@@ -34,6 +35,63 @@ describe("Delegation.generate", () => {
     });
 
     expect(() => new Order().name()).toThrow(NoMethodError);
+  });
+
+  it("assigns to a nil target bare when nilable is false", () => {
+    class Order {
+      customer: { name: string } | null = null;
+      declare name: string;
+    }
+    Delegation.generate(Order.prototype, ["name="], { to: "customer", nilable: false });
+
+    expect(() => {
+      new Order().name = "Ada";
+    }).toThrow(NoMethodError);
+  });
+
+  it("reads an accessor off a nil target bare when nilable is false", () => {
+    class Customer {
+      get name() {
+        return "Ada";
+      }
+    }
+    class Order {
+      customer: Customer | null = null;
+      declare name: string;
+    }
+    Delegation.generate(Order.prototype, ["name"], {
+      to: "customer",
+      as: Customer,
+      nilable: false,
+    });
+
+    expect(() => new Order().name).toThrow(NoMethodError);
+  });
+
+  it("looks the method up on a module named by as", () => {
+    const Nameable = new Module((mod) => {
+      mod.moduleEval((m) => {
+        Object.assign(m, {
+          rename(first: string, last: string) {
+            return `${first} ${last}`;
+          },
+        });
+      });
+    });
+    class Order {
+      customer = {
+        rename(first: string, last: string) {
+          return `${first} ${last}`;
+        },
+      };
+      declare rename: (first: string, last: string) => string;
+    }
+    Delegation.generate(Order.prototype, ["rename"], { to: "customer", as: Nameable });
+
+    expect(Order.prototype.rename.length).toBe(2);
+    expect(() =>
+      Delegation.generate(Order.prototype, ["missing"], { to: "customer", as: Nameable }),
+    ).toThrow(NameError);
   });
 
   it("treats an explicit nil nilable as nilable", () => {
@@ -101,6 +159,15 @@ describe("Delegation.generate", () => {
 
     expect(Order.prototype.rename.length).toBe(1);
     expect(Order.prototype.name.length).toBe(0);
+
+    for (const [signature, length] of [
+      ["...", 0],
+      ["a, &", 1],
+      ["a, b = 1, *rest, key:, &block", 1],
+    ] as const) {
+      Delegation.generate(Order.prototype, ["rename"], { to: "customer", signature });
+      expect(Order.prototype.rename.length).toBe(length);
+    }
   });
 });
 

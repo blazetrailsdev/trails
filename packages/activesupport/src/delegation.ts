@@ -29,7 +29,7 @@ export interface DelegateOptions {
   allowNil?: boolean | null;
   nilable?: boolean | null;
   private?: boolean | null;
-  as?: (abstract new (...args: never[]) => object) | null;
+  as?: Module | (abstract new (...args: never[]) => object) | null;
   signature?: string | null;
 }
 
@@ -114,7 +114,7 @@ export namespace Delegation {
     let receiverClass: unknown;
     if (as != null) {
       explicitReceiver = true;
-      receiverClass = as.prototype;
+      receiverClass = as instanceof Module ? as.moduleEval((mod) => mod) : as.prototype;
     } else if (typeof to !== "string") {
       receiverClass = to;
     } else if (receiver === "self.class") {
@@ -147,7 +147,11 @@ export namespace Delegation {
           enumerable: false,
           set(this: Record<string, unknown>, arg: unknown) {
             const _ = resolve(this);
-            if (_ != null) (_ as Record<string, unknown>)[attr] = arg;
+            if (_ == null) {
+              if (nilable !== false) return;
+              throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+            }
+            (_ as Record<string, unknown>)[attr] = arg;
           },
         });
         continue;
@@ -182,7 +186,7 @@ export namespace Delegation {
           enumerable: false,
           get(this: Record<string, unknown>) {
             const _ = resolve(this);
-            if (_ == null) return undefined;
+            if (_ == null && nilable !== false) return undefined;
             if (!(method in Object(_))) {
               throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
             }
@@ -194,7 +198,10 @@ export namespace Delegation {
       const methodObject = descriptor?.value;
       if (signature != null) {
         Object.defineProperty(value, "length", {
-          value: signature === "" ? 0 : signature.split(",").length,
+          value: signature
+            .split(",")
+            .map((arg) => arg.trim())
+            .filter((arg) => /^\w+$/.test(arg)).length,
         });
       } else if (typeof methodObject === "function") {
         Object.defineProperty(value, "length", { value: methodObject.length });
