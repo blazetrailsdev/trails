@@ -1680,83 +1680,129 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     ruby: ["ts", "schema.ts"],
     sql: ["sql", "structure.sql"],
   };
-  let originalSchema: string | undefined;
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    originalSchema = getEnv("SCHEMA");
-    setEnv("SCHEMA", undefined);
-    vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue("/tmp");
-    Base.configurations({
-      development: { adapter: "abstract", database: "my-db" },
-    });
-  });
-  afterEach(() => {
-    setEnv("SCHEMA", originalSchema);
-    vi.restoreAllMocks();
-    Base.configurations(originalConfigurations);
+    configurations = { development: { adapter: "abstract", database: "my-db" } };
   });
 
   it("check dump filename defaults", () => {
-    const expected = "/tmp/schema.ts";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe(expected);
+    stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+      withStubbedConfigurations(undefined, () => {
+        expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe(
+          "/tmp/schema.ts",
+        );
+      });
+    });
   });
 
   it("check dump filename with schema env", () => {
+    const schema = getEnv("SCHEMA");
     setEnv("SCHEMA", "schema_path");
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe("schema_path");
+    try {
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        withStubbedConfigurations(undefined, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe(
+            "schema_path",
+          );
+        });
+      });
+    } finally {
+      setEnv("SCHEMA", schema);
+    }
   });
 
   for (const [fmt, [format, filename]] of Object.entries(FORMATS)) {
     it(`check dump filename for ${fmt} format`, () => {
-      expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!, format)).toBe(
-        `/tmp/${filename}`,
-      );
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        withStubbedConfigurations(undefined, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!, format)).toBe(
+            `/tmp/${filename}`,
+          );
+        });
+      });
     });
   }
 
   it("check dump filename defaults for non primary databases", () => {
-    Base.configurations({
-      development: {
-        primary: { adapter: "abstract", database: "dev-db" },
-        secondary: { adapter: "abstract", database: "secondary-dev-db" },
-      },
-    });
-    const expected = "/tmp/secondary_schema.ts";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(expected);
-  });
-
-  it("setting schema dump to nil", () => {
-    Base.configurations({
-      development: {
-        primary: { adapter: "abstract", database: "dev-db", schemaDump: false },
-      },
-    });
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBeNull();
-  });
-
-  it("check dump filename with schema env with non primary databases", () => {
-    setEnv("SCHEMA", "schema_path");
-    Base.configurations({
-      development: {
-        primary: { adapter: "abstract", database: "dev-db" },
-        secondary: { adapter: "abstract", database: "secondary-dev-db" },
-      },
-    });
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(
-      "schema_path",
-    );
-  });
-
-  for (const [fmt, [format, filename]] of Object.entries(FORMATS)) {
-    it(`check dump filename for ${fmt} format with non primary databases`, () => {
-      Base.configurations({
+    stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+      const configurations = {
         development: {
           primary: { adapter: "abstract", database: "dev-db" },
           secondary: { adapter: "abstract", database: "secondary-dev-db" },
         },
+      };
+      withStubbedConfigurations(configurations, () => {
+        expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(
+          "/tmp/secondary_schema.ts",
+        );
       });
-      expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!, format)).toBe(
-        `/tmp/secondary_${filename}`,
-      );
+    });
+  });
+
+  it("setting schema dump to nil", () => {
+    stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+      const configurations = {
+        development: {
+          primary: { adapter: "abstract", database: "dev-db", schemaDump: false },
+        },
+      };
+      withStubbedConfigurations(configurations, () => {
+        expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBeNull();
+      });
+    });
+  });
+
+  it("check dump filename with schema env with non primary databases", () => {
+    const schema = getEnv("SCHEMA");
+    setEnv("SCHEMA", "schema_path");
+    try {
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        const configurations = {
+          development: {
+            primary: { adapter: "abstract", database: "dev-db" },
+            secondary: { adapter: "abstract", database: "secondary-dev-db" },
+          },
+        };
+        withStubbedConfigurations(configurations, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(
+            "schema_path",
+          );
+        });
+      });
+    } finally {
+      setEnv("SCHEMA", schema);
+    }
+  });
+
+  for (const [fmt, [format, filename]] of Object.entries(FORMATS)) {
+    it(`check dump filename for ${fmt} format with non primary databases`, () => {
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        const configurations = {
+          development: {
+            primary: { adapter: "abstract", database: "dev-db" },
+            secondary: { adapter: "abstract", database: "secondary-dev-db" },
+          },
+        };
+        withStubbedConfigurations(configurations, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!, format)).toBe(
+            `/tmp/secondary_${filename}`,
+          );
+        });
+      });
     });
   }
+
+  const withStubbedConfigurations = (
+    stubbed: Record<string, Record<string, unknown>> = configurations,
+    block: () => void,
+  ): void => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(stubbed);
+
+    try {
+      block();
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });
