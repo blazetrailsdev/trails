@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
+import { isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
@@ -22,7 +22,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
-import { first } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, fetch, first } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
@@ -239,20 +239,14 @@ export class ExplainProxy<T extends Base> {
 }
 
 const ENUMERABLE_DELEGATES = {
-  detect: <T>(records: T[], fn: (record: T, index: number, all: T[]) => unknown): T | undefined =>
-    records.find(fn),
+  detect: fetch<<T>(records: T[], ifNone: undefined, fn: (record: T) => unknown) => T | undefined>(
+    ARRAY_METHOD_TABLE,
+    "detect",
+  ),
 
-  reject: <T>(records: T[], fn: (record: T) => boolean): T[] => records.filter((r) => !fn(r)),
+  reject: fetch<<T>(records: T[], fn: (record: T) => boolean) => T[]>(ARRAY_METHOD_TABLE, "reject"),
 
-  sortBy: <T>(records: T[], key: (record: T) => any): T[] =>
-    records
-      .map((record, index) => ({ record, index, sortKey: key(record) }))
-      .sort((a, b) => {
-        if (a.sortKey < b.sortKey) return -1;
-        if (a.sortKey > b.sortKey) return 1;
-        return a.index - b.index;
-      })
-      .map((entry) => entry.record),
+  sortBy: fetch<<T>(records: T[], key: (record: T) => any) => T[]>(ARRAY_METHOD_TABLE, "sortBy"),
 
   groupBy,
 
@@ -629,8 +623,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return isBlank(await this.records());
   }
 
-  async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
-    return ENUMERABLE_DELEGATES.detect(await this.toArray(), fn);
+  async detect(fn: (record: T) => unknown): Promise<T | undefined> {
+    return ENUMERABLE_DELEGATES.detect(await this.toArray(), undefined, fn);
   }
 
   async reject(fn: (record: T) => boolean): Promise<T[]> {
@@ -2100,27 +2094,19 @@ export interface Relation<T extends Base, G extends boolean = false> {
   unscoped(): Relation<T>;
 }
 
-const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
-  partition: (records, [fn]) => {
-    const matched: unknown[] = [];
-    const unmatched: unknown[] = [];
-    records.forEach((record, index) => (fn(record, index) ? matched : unmatched).push(record));
-    return [matched, unmatched];
-  },
-  isAll: (records, [fn]) => records.every(fn ?? ((record) => record != null && record !== false)),
-  eachCons: (records, [n, fn]) => {
-    const slices = eachCons(records, n);
-    if (fn === undefined) return slices;
-    slices.forEach(fn);
-    return records;
-  },
-  eachWithIndex: (records, [fn]) => {
-    records.forEach(fn);
-    return records;
-  },
-  toSet: (records) => new Set(records),
+const arrayMethod = (name: string) => {
+  const method = fetch<(records: any[], ...args: any[]) => unknown>(ARRAY_METHOD_TABLE, name);
+  return (records: any[], args: any[]) => method(records, ...args);
 };
-ENUMERABLE_METHODS.collect = (records, args) => records.map(...(args as [any]));
+
+const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
+  partition: arrayMethod("partition"),
+  isAll: arrayMethod("isAll"),
+  eachCons: arrayMethod("eachCons"),
+  eachWithIndex: arrayMethod("eachWithIndex"),
+  toSet: arrayMethod("toSet"),
+  collect: arrayMethod("collect"),
+};
 for (const name of [
   "forEach",
   "at",

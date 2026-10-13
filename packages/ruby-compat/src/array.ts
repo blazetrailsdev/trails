@@ -1,13 +1,21 @@
-import { rbEql, rbEqual } from "./rb-equal.js";
+import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash, rbBlockGivenP } from "./hash.js";
 import { IndexError } from "./index-error.js";
 import { warn } from "./kernel-warn.js";
-import { rbBigNorm } from "./numeric.js";
+import { Enumerable } from "./enumerable.js";
+import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
-import { conversionMismatch, rbBuiltinClassName, rbObjClassname, toS } from "./object.js";
+import {
+  conversionMismatch,
+  rbBuiltinClassName,
+  rbObjClassname,
+  rbObjIsProc,
+  rtest,
+  toS,
+} from "./object.js";
 import { Range } from "./range.js";
 import { checkArity, num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
@@ -1064,3 +1072,117 @@ function aryJoin1(obj: readonly unknown[], ary: readonly unknown[], sep: string)
     })
     .join(sep);
 }
+
+type ArrayMethod = (self: unknown[], ...args: never[]) => unknown;
+type Block = (...args: unknown[]) => unknown;
+
+/**
+ * The Array methods `rbFSend` dispatches and `basicObjRespondTo` answers for
+ * that a JS array has no member for, keyed by the camelCased Ruby name as
+ * `STRING_METHOD_TABLE` keys String's. They are the ones `Init_Array`
+ * (`vendor/ruby/v3.3.11/array.c:8606`) and `Enumerable`
+ * (`vendor/ruby/v3.3.11/enum.c:5047`) define that a Relation sends its
+ * records: by `delegate ..., to: :records`
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation/delegation.rb:98-103`)
+ * and by `include Enumerable`
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation.rb:67`).
+ * A name the ported `Enumerable` module answers is not repeated here. `-`, `|` and `&` go by the method Ruby
+ * also names them (`difference`, `union`, `intersection`) and `+` is `plus`;
+ * a block is a trailing `rbObjIsProc` function, and with no block an
+ * entry answers a copy of the Array its enumerator would yield. A package
+ * that reopens Array, as ActiveSupport's `core_ext/array` does, assigns an
+ * entry.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Object.create(null), {
+  /** `rb_ary_plus` (`vendor/ruby/v3.3.11/array.c:4879`). */
+  plus: (self, y: unknown) => rbPlus(self, y),
+  /** `rb_ary_difference_multi` (`vendor/ruby/v3.3.11/array.c:5430`), over `rb_ary_diff` (`:5384`). */
+  difference: (self, ...argv: unknown[][]) =>
+    argv.reduce((ary1, ary2) => ary1.filter((elt) => !ary2.some((e) => rbEql(e, elt))), [...self]),
+  /** `rb_ary_union_multi` (`vendor/ruby/v3.3.11/array.c:5635`). */
+  union: (self, ...argv: unknown[][]) => argv.reduce(union, uniq(self)),
+  /** `rb_ary_intersection_multi` (`vendor/ruby/v3.3.11/array.c:5541`), over `rb_ary_and` (`:5486`). */
+  intersection: (self, ...argv: unknown[][]) =>
+    argv.reduce((ary1, ary2) => uniq(ary1.filter((v) => ary2.some((e) => rbEql(e, v)))), [...self]),
+  /** `rb_ary_intersect_p` (`vendor/ruby/v3.3.11/array.c:5680`). */
+  isIntersect: (self, ary2: unknown[]) => isIntersect(self, ary2),
+  /** `rb_ary_index` (`vendor/ruby/v3.3.11/array.c:2026`). */
+  index: (self, ...argv: unknown[]) => {
+    if (argv.length === 0) return [...self];
+    const [val] = argv;
+    const i = self.findIndex((e) => (rbObjIsProc(val) ? rtest(val(e)) : rbEqual(e, val)));
+    return i < 0 ? null : i;
+  },
+  /** `rb_ary_rindex` (`vendor/ruby/v3.3.11/array.c:2087`). */
+  rindex: (self, ...argv: unknown[]) => {
+    if (argv.length === 0) return [...self].reverse();
+    const [val] = argv;
+    for (let i = self.length; i--; ) {
+      if (rbObjIsProc(val) ? rtest(val(self[i])) : rbEqual(self[i], val)) return i;
+    }
+    return null;
+  },
+  /** `rb_ary_collect` (`vendor/ruby/v3.3.11/array.c:3625`). */
+  collect: (self, block?: Block) => (block ? self.map((v) => block(v)) : [...self]),
+  /** `rb_ary_compact` (`vendor/ruby/v3.3.11/array.c:6240`). */
+  compact: (self) => compact(self),
+  /** `rb_ary_reject` (`vendor/ruby/v3.3.11/array.c:4301`). */
+  reject: (self, block?: Block) => (block ? self.filter((v) => !rtest(block(v))) : [...self]),
+  /** `rb_ary_rotate_m` (`vendor/ruby/v3.3.11/array.c:3240`). */
+  rotate: (self, cnt: number = 1) => {
+    const n = self.length === 0 ? 0 : ((cnt % self.length) + self.length) % self.length;
+    return [...self.slice(n), ...self.slice(0, n)];
+  },
+  /** `Array#shuffle` (`vendor/ruby/v3.3.11/array.rb:26`), over `rb_ary_shuffle_bang` (`array.c:6497`). */
+  shuffle: (self) => {
+    const ary = [...self];
+    for (let i = ary.length; i > 1; ) {
+      const j = Math.floor(Math.random() * i--);
+      [ary[i], ary[j]] = [ary[j], ary[i]];
+    }
+    return ary;
+  },
+  /** `Array#sample` (`vendor/ruby/v3.3.11/array.rb:60`). */
+  sample: (self, ...args: [number?]) => {
+    if (args.length && args[0]! < 0) throw new ArgumentError("negative sample number");
+    const ary = ARRAY_METHOD_TABLE.shuffle(self) as unknown[];
+    return args.length ? ary.slice(0, args[0]) : (ary[0] ?? null);
+  },
+  /** `rb_ary_all_p` (`vendor/ruby/v3.3.11/array.c:7740`). */
+  isAll: (self, ...argv: unknown[]) =>
+    self.every((v) => (argv.length ? rbEqq(argv[0], v) : rtest(v))),
+  /** `enum_find` (`vendor/ruby/v3.3.11/enum.c:361`). */
+  detect: (self, ifNone?: unknown, block?: Block) => {
+    if (!block) return [...self];
+    const obj = { each: (block: (i: unknown) => void) => each(self, block) };
+    return Enumerable.find.call(obj, ...(ifNone === undefined ? [block] : [ifNone, block]));
+  },
+  /** `enum_partition` (`vendor/ruby/v3.3.11/enum.c:1102`). */
+  partition: (self, block?: Block) => (block ? partition(self, block) : [...self]),
+  /** `enum_sort_by` (`vendor/ruby/v3.3.11/enum.c:1651`). */
+  sortBy: (self, block?: Block) =>
+    !block
+      ? [...self]
+      : self
+          .map((v) => [block(v), v])
+          .sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]))
+          .map((pair) => pair[1]),
+  /** `enum_each_with_index` (`vendor/ruby/v3.3.11/enum.c:2967`). */
+  eachWithIndex: (self, block?: Block) => {
+    if (!block) return self.map((v, i) => [v, i]);
+    self.forEach((v, i) => block(v, i));
+    return self;
+  },
+  /** `enum_each_cons` (`vendor/ruby/v3.3.11/enum.c:3244`). */
+  eachCons: (self, n: number, block?: Block) => {
+    if (n <= 0) throw new ArgumentError("invalid size");
+    const ary = self.slice(n - 1).map((_, i) => self.slice(i, i + n));
+    if (!block) return ary;
+    ary.forEach((v) => block(v));
+    return self;
+  },
+  /** `Enumerable#to_set` (`vendor/ruby/v3.3.11/prelude.rb:28`). */
+  toSet: (self) => new Set(self),
+} satisfies Record<string, ArrayMethod>);

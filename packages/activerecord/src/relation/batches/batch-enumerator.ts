@@ -1,4 +1,4 @@
-import { AsyncEnumerable, aryCount, include } from "@blazetrails/ruby-compat";
+import { AsyncEnumerable, type AsyncEnumerator, aryCount, include } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "../../timestamp.js";
 
 interface BatchRelation {
@@ -124,6 +124,8 @@ export interface BatchEnumerator<T extends BatchRelation> {
   toA(): Promise<T[]>;
   first(): Promise<T | null>;
   first(n: number): Promise<T[]>;
+  reverseEach(): AsyncEnumerator<T>;
+  reverseEach(block: (relation: T) => unknown): Promise<this>;
   [Symbol.asyncIterator](): AsyncIterator<T>;
 }
 

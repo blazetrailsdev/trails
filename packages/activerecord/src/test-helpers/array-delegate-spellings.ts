@@ -6,7 +6,6 @@ const OPERATOR_SPELLINGS: Readonly<Record<string, string>> = {
   "|": "union",
   "&": "intersection",
   "[]": "at",
-  to_ary: "toArray",
 };
 
 export function tsName(method: string): string {

@@ -222,6 +222,24 @@ describe("AsyncEnumerable", () => {
     expect(await first.call(new AsyncBag([]))).toBeNull();
   });
 
+  it("reverseEach yields to_a from the last element, and answers an enumerator with no block", async () => {
+    const reverseEach = AsyncEnumerable.reverseEach as (
+      this: object,
+      block?: (i: unknown) => unknown,
+    ) => unknown;
+    const bag = new AsyncBag([1, 2, 3]);
+    const yielded: unknown[] = [];
+    expect(await reverseEach.call(bag, (i) => yielded.push(i))).toBe(bag);
+    expect(yielded).toEqual([3, 2, 1]);
+    const enumerator = reverseEach.call(bag) as {
+      first(n?: number): Promise<unknown>;
+      toA(): Promise<unknown[]>;
+    };
+    expect(await enumerator.first()).toBe(3);
+    expect(await enumerator.first(2)).toEqual([3, 2]);
+    expect(await enumerator.toA()).toEqual([3, 2, 1]);
+  });
+
   it("sum rejects a second initial value", async () => {
     await expect(AsyncEnumerable.sum.call(new AsyncBag([1]), 1, 2)).rejects.toThrow(
       "wrong number of arguments (given 2, expected 0..1)",

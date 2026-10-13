@@ -697,25 +697,18 @@ describe("EachTest", () => {
   it("in batches should start from the start option", async () => {
     const post = await Post.order("id ASC").where("id >= ?", 2).first();
     await assertQueriesCount(2, false, async () => {
-      let firstRelation: any = null;
-      for await (const rel of Post.inBatches({ of: 1, start: 2 })) {
-        firstRelation = rel;
-        break;
-      }
-      expect(await firstRelation.first()).toEqual(post);
+      const relation = (await Post.inBatches({ of: 1, start: 2 }).first())!;
+      assertEqual(post, await relation.first());
     });
   });
 
   it("in batches should end at the finish option", async () => {
     const post = await Post.order("id DESC").where("id <= ?", 5).first();
     await assertQueriesCount(7, false, async () => {
-      const batches: any[] = [];
-      for await (const rel of Post.inBatches({ of: 1, finish: 5, load: true })) {
-        batches.push(rel);
-      }
-      const lastBatch = batches[batches.length - 1];
-      const records = await lastBatch.toArray();
-      expect(records[records.length - 1].id).toBe((post as any).id);
+      const relation = (await Post.inBatches({ of: 1, finish: 5, load: true })
+        .reverseEach()
+        .first())!;
+      assertEqual(post, await relation.last());
     });
   });
 
@@ -843,13 +836,9 @@ describe("EachTest", () => {
       undefined,
       false,
       async () => {
-        let first: any = null;
-        for await (const rel of Post.inBatches({ of: 1, order: ":desc" })) {
-          first = rel;
-          break;
-        }
-        expect(first).toBeInstanceOf(Relation);
-        expect(await first.first()).toBeInstanceOf(Post);
+        const relation = (await Post.inBatches({ of: 1, order: ":desc" }).first())!;
+        expect(relation).toBeInstanceOf(Relation);
+        expect(await relation.first()).toBeInstanceOf(Post);
       },
     );
   });
@@ -1206,58 +1195,29 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should start from the start option when using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[1];
-    let firstRelation: any = null;
-    for await (const rel of CpkOrder.inBatches({ of: 1, start: (order as any).id })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(String(first.id)).toBe(String((order as any).id));
+    const order = (await CpkOrder.second())!;
+    const relation = (await CpkOrder.inBatches({ of: 1, start: order.id }).first())!;
+    assertEqual(order, await relation.first());
   });
 
   it(".in_batches should end at the finish option when using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[allOrders.length - 2];
-    const batches: any[] = [];
-    for await (const rel of CpkOrder.inBatches({ of: 1, finish: (order as any).id })) {
-      batches.push(rel);
-    }
-    const lastBatch = batches[batches.length - 1];
-    const records = await lastBatch.toArray();
-    const last = records[records.length - 1];
-    expect(String(last.id)).toBe(String((order as any).id));
+    const order = (await CpkOrder.secondToLast())!;
+    const relation = (await CpkOrder.inBatches({ of: 1, finish: order.id }).reverseEach().first())!;
+    assertEqual(order, await relation.last());
   });
 
   it(".in_batches with scope and using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const [order1, order2] = allOrders;
-    const [shopId, id] = (order1 as any).id as [number, number];
-    let firstRelation: any;
-    for await (const rel of CpkOrder.where(
+    const [order1, order2] = await CpkOrder.first(2);
+    const [shopId, id] = order1.id as [number, number];
+    const relation = (await CpkOrder.where(
       "shop_id > ? OR shop_id = ? AND id > ?",
       shopId,
       shopId,
       id,
-    ).inBatches({ of: 1 })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(String(first.id)).toBe(String((order2 as any).id));
+    )
+      .inBatches({ of: 1 })
+      .first())!;
+    assertEqual(order2, await relation.first());
   });
 
   it(".find_each with multiple column ordering and using composite primary key", async () => {

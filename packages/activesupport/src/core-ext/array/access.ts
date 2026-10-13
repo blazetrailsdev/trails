@@ -1,3 +1,4 @@
+import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { isBlank } from "../object/blank.js";
 
 export class Array {
@@ -64,6 +65,21 @@ export class Array {
     return self;
   }
 }
+
+Object.assign(ARRAY_METHOD_TABLE, {
+  from: Array.from,
+  to: Array.to,
+  including: Array.including,
+  excluding: Array.excluding,
+  without: Array.without,
+  second: Array.second,
+  third: Array.third,
+  fourth: Array.fourth,
+  fifth: Array.fifth,
+  fortyTwo: Array.fortyTwo,
+  thirdToLast: Array.thirdToLast,
+  secondToLast: Array.secondToLast,
+});
 
 function eql(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;

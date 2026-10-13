@@ -10,6 +10,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { each } from "./array.js";
+import { Hash } from "./hash.js";
 import {
   numericPlus,
   rbBigNorm,
@@ -54,11 +55,50 @@ function rbBlockCall<T, E, R>(
 }
 
 /**
+ * `enum_to_a` (`vendor/ruby/v3.3.11/enum.c:711`): the elements `each` yields,
+ * which is what a block-less member's enumerator (`RETURN_ENUMERATOR`) holds.
+ */
+function enumToA<T, E>(obj: Each<T, E>): Enumerated<E, T[]> {
+  const ary: T[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      ary.push(i);
+    },
+    () => ary,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#group_by — `vendor/ruby/v3.3.11/enum.c:1157` `enum_group_by`,
+ * pushing each element onto the Array under its block result (`group_by_i`, `:1115`).
+ * @noRailsEquivalent PERMANENT
+ */
+function groupBy<T, K, E = unknown>(
+  this: Each<T, E>,
+  block?: (i: T) => K,
+): Enumerated<E, Hash<K, T[]> | T[]> {
+  if (!block) return enumToA(this);
+  const hash = new Hash<K, T[]>();
+  return rbBlockCall(
+    this,
+    (i) => {
+      const group = block(i);
+      const values = hash.get(group);
+      if (values === undefined) hash.set(group, [i]);
+      else values.push(i);
+    },
+    () => hash,
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#find_all — `vendor/ruby/v3.3.11/enum.c:509` `enum_find_all`,
  * pushing each element whose block result `RTEST`s (`find_all_i`, `:456`).
  * @noRailsEquivalent PERMANENT
  */
-function findAll<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown): Enumerated<E, T[]> {
+function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
+  if (!block) return enumToA(this);
   const ary: T[] = [];
   return rbBlockCall(
     this,
@@ -103,7 +143,8 @@ function find<T, E = unknown>(this: Each<T, E>, ...argv: unknown[]): Enumerated<
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
-function map<T, R, E = unknown>(this: Each<T, E>, block: (i: T) => R): Enumerated<E, R[]> {
+function map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R): Enumerated<E, R[] | T[]> {
+  if (!block) return enumToA(this);
   const ary: R[] = [];
   return rbBlockCall(
     this,
@@ -563,6 +604,7 @@ export const Enumerable = {
   findAll,
   select: findAll,
   map,
+  groupBy,
   first,
   drop,
   isAny,
@@ -577,6 +619,13 @@ export const Enumerable = {
 export interface AsyncEach<T> {
   each(): AsyncIterable<T>;
   each(block: (i: T) => unknown): PromiseLike<unknown>;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface AsyncEnumerator<T> extends AsyncEach<T> {
+  toA(): Promise<T[]>;
+  first(): Promise<T | null>;
+  first(n: number): Promise<T[]>;
 }
 
 /**
@@ -612,6 +661,34 @@ export const AsyncEnumerable = {
   },
 
   first,
+
+  /**
+   * Mirrors: Ruby's Enumerable#reverse_each — `vendor/ruby/v3.3.11/enum.c:3006`
+   * `enum_reverse_each`: `to_a`, then the block over it from the last element.
+   * With no block it answers the enumerator `RETURN_SIZED_ENUMERATOR` builds.
+   * @noRailsEquivalent PERMANENT
+   */
+  reverseEach<T>(
+    this: AsyncEach<T>,
+    block?: (i: T) => unknown,
+  ): AsyncEnumerator<T> | Promise<unknown> {
+    const toA = (): Promise<T[]> => AsyncEnumerable.toA.call(this) as Promise<T[]>;
+    async function* reverseEach(): AsyncGenerator<T> {
+      const ary = await toA();
+      let len = ary.length;
+      while (len--) yield ary[len];
+    }
+    const each = async (block: (i: T) => unknown): Promise<unknown> => {
+      for await (const i of reverseEach()) await block(i);
+      return this;
+    };
+    if (!block) {
+      return Object.assign(Object.create(AsyncEnumerable), {
+        each: (block?: (i: T) => unknown) => (block ? each(block) : reverseEach()),
+      });
+    }
+    return each(block);
+  },
 
   /** @noRailsEquivalent PERMANENT */
   [Symbol.asyncIterator]<T>(this: AsyncEach<T>): AsyncIterator<T> {

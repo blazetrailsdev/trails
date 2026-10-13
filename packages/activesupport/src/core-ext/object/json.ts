@@ -2,7 +2,12 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
-import { Kernel, Range as RangeValue, STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import {
+  ARRAY_METHOD_TABLE,
+  Kernel,
+  Range as RangeValue,
+  STRING_METHOD_TABLE,
+} from "@blazetrails/ruby-compat";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 import { formattedOffset } from "../time/conversions.js";
@@ -155,6 +160,9 @@ export class Array {
     return result;
   }
 }
+
+ARRAY_METHOD_TABLE.asJson = (self, options: EncodeOptions | null = null) =>
+  Array.asJson(self, options);
 
 export class Hash {
   static asJson(

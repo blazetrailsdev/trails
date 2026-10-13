@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport";
 import { Base, Relation, registerModel } from "../index.js";
 import * as Querying from "../querying.js";
@@ -86,6 +86,15 @@ describe("DelegationAssociationTest", () => {
 
 describe("DelegationRelationTest", () => {
   DelegationTests(() => Comment.all());
+});
+
+describe("DelegationRecordsTest", () => {
+  let records: Comment[];
+  beforeEach(async () => {
+    records = await Comment.all().records();
+  });
+
+  DelegationTests(() => records);
 });
 
 describe("QueryingMethodsDelegationTest", () => {
