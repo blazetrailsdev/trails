@@ -77,15 +77,19 @@ export function rbObjClass(obj: unknown): Klass {
 
 /**
  * `rb_class_new_instance` (`vendor/ruby/v3.3.11/object.c:2158`), `Class#new`
- * with no arguments. A Hash is a plain object and a String a primitive, so
- * `empty_hash_alloc` (`vendor/ruby/v3.3.11/hash.c:1488`) is `{}` and
- * `empty_str_alloc` (`vendor/ruby/v3.3.11/string.c:858`) is `""`.
+ * with no arguments. A Hash is a plain object (CLAUDE.md, "Ruby idioms that
+ * do not translate literally") and a String a primitive (CLAUDE.md, "Ruby
+ * Strings are JS string primitives"), so `empty_hash_alloc`
+ * (`vendor/ruby/v3.3.11/hash.c:1488`) is `{}` and `empty_str_alloc`
+ * (`vendor/ruby/v3.3.11/string.c:858`) is `""`. `Class.new` is an anonymous
+ * class (`rb_class_initialize`, `vendor/ruby/v3.3.11/object.c:2007`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbClassNewInstance(klass: Klass): unknown {
   if (klass === Hash) return {};
   if (klass === rbCString) return "";
+  if (klass === rbCClass) return class {};
   return new (klass as new () => unknown)();
 }
 

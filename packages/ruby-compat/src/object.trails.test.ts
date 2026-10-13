@@ -9,7 +9,9 @@ import {
   rbCString,
   rbCSymbol,
   rbCTrueClass,
+  rbCClass,
   rbClassNewInstance,
+  rbObjClass,
   rbClassOf,
   rbObjSingletonClass,
   rbCDate,
@@ -1200,5 +1202,6 @@ describe("rbClassNewInstance", () => {
     expect(rbClassNewInstance(Hash)).toEqual({});
     expect(rbClassNewInstance(rbCString)).toBe("");
     expect(rbClassNewInstance(Array)).toEqual([]);
+    expect(rbObjClass(rbClassNewInstance(rbCClass))).toBe(rbCClass);
   });
 });

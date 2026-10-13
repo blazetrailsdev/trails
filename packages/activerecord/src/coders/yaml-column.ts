@@ -17,11 +17,13 @@ class SafeCoder {
   ) {}
 
   dump(object: unknown): string {
-    if (!(this.unsafeLoad ?? useYamlUnsafeLoad())) this.assertDumpable(object);
+    if (this.unsafeLoad ?? useYamlUnsafeLoad()) return Psych.dump(object);
+    this.assertDumpable(object);
     return yamlStringify(object, { directives: true });
   }
 
   load(payload: unknown): unknown {
+    if (this.unsafeLoad ?? useYamlUnsafeLoad()) return Psych.unsafeLoad(payload as string);
     return yamlParse(payload as string);
   }
 

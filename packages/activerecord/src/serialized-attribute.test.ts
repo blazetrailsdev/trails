@@ -5,9 +5,11 @@ import {
   hashAset,
   rbCClass,
   rbCString,
+  rbCSymbol,
   rbInspect,
   rbModConstSet,
   rbObjClass,
+  rbObjFrozenP,
   rbStrSNew,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -65,6 +67,8 @@ class ImportantTopic extends Topic {
 }
 
 class ClassifiedTopic extends Topic {
+  declare important: any;
+
   static {
     registerModel(rbModConstSet(SerializedAttributeTest, "ClassifiedTopic", this));
     this.serialize("important", { type: rbCClass });
@@ -220,12 +224,21 @@ describe("SerializedAttributeTest", () => {
     expect((topic as any).content).toEqual(myobj);
   });
 
-  it.skip("serialized class attribute", () => {
-    // PERMANENT-SKIP: Ruby-only — YAML class serialization (Struct.new, Symbol class) has no JS equivalent.
+  it("serialized class attribute", async () => {
+    setYamlColumnPermittedClasses([...yamlColumnPermittedClasses(), rbCClass]);
+
+    const topic = await (await ClassifiedTopic.create({ important: rbCSymbol })).reload();
+    expect(topic.important).toEqual(rbCSymbol);
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
   });
 
-  it.skip("serialized class does not become frozen", () => {
-    // PERMANENT-SKIP: Ruby-only — frozen? concept has no JS equivalent.
+  it("serialized class does not become frozen", async () => {
+    setYamlColumnPermittedClasses([...yamlColumnPermittedClasses(), rbCClass]);
+
+    expect(rbObjFrozenP(rbCSymbol)).toBe(false);
+    await ClassifiedTopic.create({ important: rbCSymbol });
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
+    expect(rbObjFrozenP(rbCSymbol)).toBe(false);
   });
 
   it("nil serialized attribute without class constraint", () => {
@@ -250,6 +263,7 @@ describe("SerializedAttributeTest", () => {
       new Topic({ content: "string" });
     });
   });
+
   it("should raise exception on serialized attribute with type mismatch", async () => {
     const topic = new Topic({ content: { zomg: true } } as any);
     expect(await topic.save()).toBeTruthy();
