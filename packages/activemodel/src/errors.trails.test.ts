@@ -711,6 +711,24 @@ describe("Errors frozen readers", () => {
 });
 
 describe("Errors holding a Symbol-attribute Error", () => {
+  it("reads an attribute by its String or its Symbol spelling", () => {
+    const errors = new Errors(new Person());
+    errors.add("name", ":blank");
+
+    expect(errors.get(":name")).toEqual(["can't be blank"]);
+    expect(errors.get("name")).toEqual(errors.get(":name"));
+    expect(errors.messagesFor("name")).toEqual(errors.messagesFor(":name"));
+    expect(errors.isInclude("name")).toBe(errors.isInclude(":name"));
+    expect(errors.added("name", ":blank")).toBe(errors.added(":name", ":blank"));
+  });
+
+  it("full_message returns the message alone for :base and not for the String", () => {
+    const errors = new Errors(new Person());
+
+    expect(errors.fullMessage(":base", "is invalid")).toBe("is invalid");
+    expect(errors.fullMessage("base", "is invalid")).toBe("Base is invalid");
+  });
+
   it("an Error whose @attribute is a Symbol is the attribute Errors#add stores", () => {
     const person = new Person();
     const errors = new Errors(person);

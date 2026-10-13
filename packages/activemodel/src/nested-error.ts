@@ -28,7 +28,7 @@ export class NestedError extends ActiveModelError {
       "type",
       block(() => innerError.type),
     );
-    super(base, attribute, type, innerError.options ?? {}, innerError.rawType);
+    super(base, attribute, type, innerError.options, innerError.rawType);
     this.innerError = innerError;
   }
 
