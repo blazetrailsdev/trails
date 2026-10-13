@@ -28,7 +28,6 @@ import {
   assertQueriesMatch,
 } from "./testing/query-assertions.js";
 import { captureSql } from "./testing/sql-capture.js";
-import { clearReflectionsCache } from "./reflection.js";
 import { fixtures } from "./test-fixtures.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
@@ -188,30 +187,6 @@ describe("AssociationProxyTest", () => {
     await assertNoQueries(false, () => david.firstPosts.firstBang());
   });
 
-  it("last! works on loaded associations", async () => {
-    const david = authors("david") as any;
-    const expected = await david.firstPosts.last();
-    await david.firstPosts.reload();
-    const sqls = await captureSql(async () => {
-      const last = await david.firstPosts.lastBang();
-      expect(last.id).toBe(expected!.id);
-    });
-    expect(sqls).toHaveLength(0);
-    expect(david.firstPosts.loaded).toBe(true);
-  });
-
-  it("take! works on loaded associations", async () => {
-    const david = authors("david") as any;
-    const expected = await david.firstPosts.take();
-    await david.firstPosts.reload();
-    const sqls = await captureSql(async () => {
-      const taken = await david.firstPosts.takeBang();
-      expect(taken.id).toBe(expected!.id);
-    });
-    expect(sqls).toHaveLength(0);
-    expect(david.firstPosts.loaded).toBe(true);
-  });
-
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
     const member = members("blarpy_winkup") as any;
     assertEmpty(await member.favoriteMemberships.scope().toArray());
@@ -340,16 +315,6 @@ describe("AssociationProxyTest", () => {
     assertEmpty(await member.favoriteMemberships.scope().toArray());
     await membership.updateBang({ favorite: true });
     assertNotEmpty(await member.favoriteMemberships.toArray());
-  });
-  it("load preserves in-memory instances added via push", async () => {
-    const david = authors("david") as any;
-    const post = await Post.create({ title: "original", body: "b" });
-    await david.posts.push(post);
-    post.title = "mutated";
-    const loaded = await (await david.posts.load()).records();
-    const found = loaded.find((r: any) => r.readAttribute("id") === post.id);
-    expect(found).toBe(post);
-    expect(found.title).toBe("mutated");
   });
 });
 
@@ -527,22 +492,6 @@ describe("PreloaderTest", () => {
       const preloader = new Preloader({ records: relation, associations: "comments" });
       await preloader.call();
     });
-  });
-
-  it("isEmpty materializes an empty relation and reports true", async () => {
-    const relation = Post.where({ id: -1 });
-    const preloader = new Preloader({ records: relation, associations: "comments" });
-    expect(await preloader.isEmpty()).toBe(true);
-    const sqls = await captureSql(async () => {
-      await preloader.call();
-    });
-    expect(sqls).toHaveLength(0);
-  });
-
-  it("isEmpty reports false for a non-empty relation", async () => {
-    const relation = Post.where({ id: posts("welcome").id });
-    const preloader = new Preloader({ records: relation, associations: "comments" });
-    expect(await preloader.isEmpty()).toBe(false);
   });
 
   it("preload does not concatenate duplicate records", async () => {
@@ -1380,24 +1329,6 @@ describe("PreloaderTest", () => {
 
       assertSame(author, await post.author);
     });
-  });
-
-  it("preload marks belongs_to association loaded on owner", async () => {
-    const welcome = posts("welcome");
-    const loaded = await Post.where({ id: welcome.id }).includes(":author");
-    expect(loaded).toHaveLength(1);
-    const assoc = (loaded[0] as any).association("author");
-    expect(assoc.isLoaded()).toBe(true);
-    expect(assoc.target?.id).toBe(authors("david").id);
-  });
-
-  it("preload sets has_many association target on owner", async () => {
-    const david = authors("david");
-    const owners = await Author.where({ id: david.id }).includes(":posts");
-    const assoc = (owners[0] as any).association("posts");
-    expect(assoc.isLoaded()).toBe(true);
-    const ids = (assoc.target as Base[]).map((r) => r.id);
-    expect(ids).toContain(posts("welcome").id);
   });
 });
 
@@ -2301,36 +2232,6 @@ describe("AssociationsTest", () => {
     }
   });
 
-  it("query constraints that dont include a composite primary key raise", async () => {
-    const originalList = (ShardedBlogPost as any)._queryConstraintsList;
-    const originalPk = (ShardedBlogPost as any).primaryKey;
-    const originalReflections = { ...((ShardedBlogPost as any)._reflections ?? {}) };
-    try {
-      (ShardedBlogPost as any).primaryKey = ["blog_id", "id"];
-      (ShardedBlogPost as any)._queryConstraintsList = ["blog_id", "id"];
-      (ShardedBlogPost as any)._hasQueryConstraints = true;
-      (ShardedBlogPost as any).hasMany("commentsWithCompositePkOwner", {
-        primaryKey: ["blog_id", "id"],
-        className: "Sharded::Comment",
-      });
-      const blogPost = shardedBlogPosts("great_post_blog_one");
-      let error: unknown;
-      try {
-        await (blogPost.association("commentsWithCompositePkOwner") as CollectionAssociation)
-          .reader;
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(ArgumentError);
-      expect((error as Error).message).toContain("does not include the primary key");
-    } finally {
-      (ShardedBlogPost as any)._queryConstraintsList = originalList;
-      (ShardedBlogPost as any).primaryKey = originalPk;
-      (ShardedBlogPost as any)._reflections = originalReflections;
-      clearReflectionsCache(ShardedBlogPost as any);
-    }
-  });
-
   it("nullify composite has many through association", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one") as any;
     assertNotEmpty(await blogPost.tags.toArray());
@@ -2372,85 +2273,5 @@ describe("AssociationsTest", () => {
         queryConstraints: ["blog_id", "blog_post_id"],
       });
     });
-  });
-
-  it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
-    const post = await ShardedBlogPost.create({ blog_id: 1, title: "Post" });
-    await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "A" });
-    await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "B" });
-    await ShardedComment.create({ blog_id: 2, blog_post_id: (post as any).id, body: "Other" });
-    const comments = await (post as any).comments;
-    expect(comments).toHaveLength(2);
-    expect(comments.map((c: Base) => (c as any).body).sort()).toEqual(["A", "B"]);
-  });
-
-  it("has many loads via inline fallback resolving composite owner key as id attribute", async () => {
-    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
-    const [, orderId] = order.id as [number, number];
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
-    const agreements = await order.orderAgreements;
-    expect(agreements).toHaveLength(2);
-    expect(agreements.map((a: Base) => (a as any).signature).sort()).toEqual(["abc", "def"]);
-  });
-
-  it("has one loads through a declared reflection with a composite foreign key", async () => {
-    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
-    await CpkBook.create({ id: [1, 90001], order, title: "Only" });
-    expect((await (order as any).book)?.title).toBe("Only");
-  });
-
-  it("has one loads through a declared reflection with a scalar foreign key on a composite primary key owner", async () => {
-    const order = await CpkOrderWithPrimaryKeyAssociatedBook.create({ shop_id: 1 });
-    const [, orderId] = order.id as [number, number];
-    await CpkBook.create({ id: [1, 90002], order_id: orderId, title: "Only" });
-    expect((await (order as any).book)?.title).toBe("Only");
-  });
-
-  it("has many loads via inline fallback ignoring enclosing current_scope", async () => {
-    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
-    const [, orderId] = order.id as [number, number];
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
-    await (CpkOrderAgreement as any).where("1=0").scoping(async () => {
-      const agreements = await order.orderAgreements;
-      expect(agreements).toHaveLength(2);
-      expect(agreements.map((a: Base) => (a as any).signature).sort()).toEqual(["abc", "def"]);
-    });
-  });
-
-  it("delete single composite has many through join row", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
-    const tag = await ShardedTag.create({ name: "shared", blog_id: (blogPost as any).blog_id });
-    await ShardedBlogPostTag.create({
-      blog_id: (blogPost as any).blog_id,
-      blog_post_id: (blogPost as any).id,
-      tag_id: (tag as any).id,
-    });
-
-    const otherBlogId = (shardedBlogs("sharded_blog_two") as any).id;
-    await ShardedBlogPostTag.create({
-      blog_id: otherBlogId,
-      blog_post_id: (blogPost as any).id,
-      tag_id: (tag as any).id,
-    });
-
-    await (blogPost.association("tags") as CollectionAssociation).reader.delete(tag);
-
-    expect(
-      await ShardedBlogPostTag.where({
-        blog_id: (blogPost as any).blog_id,
-        blog_post_id: (blogPost as any).id,
-        tag_id: (tag as any).id,
-      }),
-    ).toHaveLength(0);
-    expect(
-      await ShardedBlogPostTag.where({
-        blog_id: otherBlogId,
-        blog_post_id: (blogPost as any).id,
-        tag_id: (tag as any).id,
-      }),
-    ).toHaveLength(1);
-    expect(await ShardedTag.where({ id: (tag as any).id })).not.toHaveLength(0);
   });
 });

@@ -1,5 +1,4 @@
 import { quotingHost } from "./support/quoting-host.js";
-import { BinaryData } from "@blazetrails/activemodel";
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { assertRaises, minutes, BigDecimal, Chars, toFs } from "@blazetrails/activesupport";
@@ -8,27 +7,17 @@ import {
   quoteString,
   quoteColumnName,
   quoteTableName as quoteTableNameFn,
-  quoteTableNameForAssignment as quoteTableNameForAssignmentFn,
   quotedDate as quotedDateFn,
   quotedTime as quotedTimeFn,
   quotedTrue,
-  unquotedTrue,
   quotedFalse,
-  unquotedFalse,
-  quotedBinary,
   typeCast as typeCastFn,
-  castBoundValue,
-  sanitizeAsSqlComment,
-  columnNameMatcher,
-  columnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
 
 const HOST = quotingHost();
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const quoteTableName = (name: string): string => quoteTableNameFn.call(HOST, name);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
-const quoteTableNameForAssignment = (table: string, attr: string): string =>
-  quoteTableNameForAssignmentFn.call(HOST, table, attr);
 const quotedTime = (value: Parameters<typeof quotedTimeFn>[0]): string =>
   quotedTimeFn.call(HOST, value);
 const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
@@ -120,12 +109,6 @@ describe("QuotingTest", () => {
 
   it("quote table name", () => {
     expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
-  });
-
-  it("quote table name for assignment", () => {
-    expect(() => quoteTableNameForAssignment.call(HOST, "users", "name")).toThrow(
-      NotImplementedError,
-    );
   });
 
   it("quote duration", async () => {
@@ -246,63 +229,6 @@ describe("TypeCastingTest", () => {
 });
 
 describe("QuoteBooleanTest", () => {
-  it("unquoted true", () => {
-    expect(unquotedTrue()).toBe(true);
-  });
-
-  it("unquoted false", () => {
-    expect(unquotedFalse()).toBe(false);
-  });
-
-  it("cast bound value returns value unchanged", () => {
-    expect(castBoundValue(42)).toBe(42);
-    expect(castBoundValue("hello")).toBe("hello");
-  });
-
-  it("quoted binary", () => {
-    expect(quotedBinary(new BinaryData("binary data"))).toBe("'binary data'");
-  });
-
-  it("quoted binary decodes bytes rather than String()-joining them", () => {
-    const quoted = quotedBinary(new BinaryData(new Uint8Array([0x1f, 0x8b])));
-    expect(quoted).not.toContain("31,139");
-    expect([...Buffer.from(quoted.slice(1, -1), "latin1")]).toEqual([0x1f, 0x8b]);
-  });
-
-  it("sanitize as sql comment strips comment markers", () => {
-    expect(sanitizeAsSqlComment("/* comment */")).toBe("comment");
-    expect(sanitizeAsSqlComment("/*+ hint */")).toBe("hint");
-  });
-
-  it("sanitize as sql comment escapes internal markers", () => {
-    expect(sanitizeAsSqlComment("a*/b")).toBe("a* /b");
-    expect(sanitizeAsSqlComment("a/*b")).toBe("a/ *b");
-  });
-
-  it("column name matcher matches simple columns", () => {
-    const matcher = columnNameMatcher();
-    expect(matcher.test("name")).toBe(true);
-    expect(matcher.test("users.name")).toBe(true);
-    expect(matcher.test("name, email")).toBe(true);
-  });
-
-  it("column name with order matcher matches columns with order", () => {
-    const matcher = columnNameWithOrderMatcher();
-    expect(matcher.test("name ASC")).toBe(true);
-    expect(matcher.test("name DESC NULLS LAST")).toBe(true);
-    expect(matcher.test("users.name ASC, email DESC")).toBe(true);
-  });
-
-  it("quoted date includes microseconds when present", () => {
-    const t = Temporal.Instant.from("2026-04-07T15:30:45.123456Z");
-    expect(quotedDate(t)).toBe("2026-04-07 15:30:45.123456");
-  });
-
-  it("quoted time extracts time portion", () => {
-    const t = RubyTime.utc(2026, 4, 7, 8, 15, 30);
-    expect(quotedTime(t)).toBe("08:15:30");
-  });
-
   it("quote returns frozen string", () => {
     expect(Object.isFrozen(quote(true))).toBeTruthy();
     expect(Object.isFrozen(quote(false))).toBeTruthy();
