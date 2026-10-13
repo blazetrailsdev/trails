@@ -8,7 +8,14 @@ import { warn } from "./kernel-warn.js";
 import { Enumerable } from "./enumerable.js";
 import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
-import { conversionMismatch, rbBuiltinClassName, rbObjClassname, rtest, toS } from "./object.js";
+import {
+  conversionMismatch,
+  rbBuiltinClassName,
+  rbObjClassname,
+  rbObjIsProc,
+  rtest,
+  toS,
+} from "./object.js";
 import { Range } from "./range.js";
 import { checkArity, num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
@@ -1069,11 +1076,6 @@ function aryJoin1(obj: readonly unknown[], ary: readonly unknown[], sep: string)
 type ArrayMethod = (self: unknown[], ...args: never[]) => unknown;
 type Block = (...args: unknown[]) => unknown;
 
-const blockGiven = (v: unknown): v is Block =>
-  typeof v === "function" && rbObjClassname(v) === "Proc";
-
-const enumOf = (ary: unknown[]) => ({ each: (block: (i: unknown) => void) => each(ary, block) });
-
 /**
  * The Array methods `rbFSend` dispatches and `basicObjRespondTo` answers for
  * that a JS array has no member for, keyed by the camelCased Ruby name as
@@ -1084,10 +1086,9 @@ const enumOf = (ary: unknown[]) => ({ each: (block: (i: unknown) => void) => eac
  * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation/delegation.rb:98-103`)
  * and by `include Enumerable`
  * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation.rb:67`).
- * `detect`, `findAll`, `groupBy`, `isNone` and `isOne` only adapt an Array to
- * the ported function of that name. `-`, `|` and `&` go by the method Ruby
+ * A name the ported `Enumerable` module answers is not repeated here. `-`, `|` and `&` go by the method Ruby
  * also names them (`difference`, `union`, `intersection`) and `+` is `plus`;
- * a block is a trailing function that is not a class, and with no block an
+ * a block is a trailing `rbObjIsProc` function, and with no block an
  * entry answers a copy of the Array its enumerator would yield. A package
  * that reopens Array, as ActiveSupport's `core_ext/array` does, assigns an
  * entry.
@@ -1108,16 +1109,18 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   /** `rb_ary_intersect_p` (`vendor/ruby/v3.3.11/array.c:5680`). */
   isIntersect: (self, ary2: unknown[]) => isIntersect(self, ary2),
   /** `rb_ary_index` (`vendor/ruby/v3.3.11/array.c:2026`). */
-  index: (self, ...[val]: unknown[]) => {
-    if (val === undefined) return [...self];
-    const i = self.findIndex((e) => (blockGiven(val) ? rtest(val(e)) : rbEqual(e, val)));
+  index: (self, ...argv: unknown[]) => {
+    if (argv.length === 0) return [...self];
+    const [val] = argv;
+    const i = self.findIndex((e) => (rbObjIsProc(val) ? rtest(val(e)) : rbEqual(e, val)));
     return i < 0 ? null : i;
   },
   /** `rb_ary_rindex` (`vendor/ruby/v3.3.11/array.c:2087`). */
-  rindex: (self, ...[val]: unknown[]) => {
-    if (val === undefined) return [...self].reverse();
+  rindex: (self, ...argv: unknown[]) => {
+    if (argv.length === 0) return [...self].reverse();
+    const [val] = argv;
     for (let i = self.length; i--; ) {
-      if (blockGiven(val) ? rtest(val(self[i])) : rbEqual(self[i], val)) return i;
+      if (rbObjIsProc(val) ? rtest(val(self[i])) : rbEqual(self[i], val)) return i;
     }
     return null;
   },
@@ -1150,16 +1153,14 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   /** `rb_ary_all_p` (`vendor/ruby/v3.3.11/array.c:7740`). */
   isAll: (self, ...argv: unknown[]) =>
     self.every((v) => (argv.length ? rbEqq(argv[0], v) : rtest(v))),
-  /** `rb_ary_none_p` (`vendor/ruby/v3.3.11/array.c:7800`). */
-  isNone: (self, ...argv: unknown[]) => Enumerable.isNone.call(enumOf(self), ...argv),
-  /** `rb_ary_one_p` (`vendor/ruby/v3.3.11/array.c:7864`). */
-  isOne: (self, ...argv: unknown[]) => Enumerable.isOne.call(enumOf(self), ...argv),
   /** `enum_find` (`vendor/ruby/v3.3.11/enum.c:361`). */
-  detect: (self, ...argv: unknown[]) =>
-    blockGiven(argv.at(-1)) ? Enumerable.find.call(enumOf(self), ...argv) : [...self],
-  /** `enum_find_all` (`vendor/ruby/v3.3.11/enum.c:509`). */
-  findAll: (self, block?: Block) =>
-    block ? Enumerable.findAll.call(enumOf(self), block) : [...self],
+  detect: (self, ...argv: unknown[]) => {
+    if (!rbObjIsProc(argv.at(-1))) return [...self];
+    return Enumerable.find.call(
+      { each: (block: (i: unknown) => void) => each(self, block) },
+      ...argv,
+    );
+  },
   /** `enum_partition` (`vendor/ruby/v3.3.11/enum.c:1102`). */
   partition: (self, block?: Block) => (block ? partition(self, block) : [...self]),
   /** `enum_group_by` (`vendor/ruby/v3.3.11/enum.c:1157`). */

@@ -222,7 +222,18 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   join: (records, separator?: string) => records.join(separator),
   at: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
+  intersection: fetch(ARRAY_METHOD_TABLE, "intersection"),
+  union: fetch(ARRAY_METHOD_TABLE, "union"),
+  plus: fetch(ARRAY_METHOD_TABLE, "plus"),
+  difference: fetch(ARRAY_METHOD_TABLE, "difference"),
+  isIntersect: fetch(ARRAY_METHOD_TABLE, "isIntersect"),
   reverse: (records) => [...records].reverse(),
+  compact: fetch(ARRAY_METHOD_TABLE, "compact"),
+  index: fetch(ARRAY_METHOD_TABLE, "index"),
+  rindex: fetch(ARRAY_METHOD_TABLE, "rindex"),
+  sample: fetch(ARRAY_METHOD_TABLE, "sample"),
+  rotate: fetch(ARRAY_METHOD_TABLE, "rotate"),
+  shuffle: fetch(ARRAY_METHOD_TABLE, "shuffle"),
   slice: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
   split: (records, valueOrFn: Base | ((record: Base) => boolean)) => split(records, valueOrFn),
@@ -243,21 +254,6 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     toXmlArray(records, options, block),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
-for (const name of [
-  "intersection",
-  "union",
-  "plus",
-  "difference",
-  "isIntersect",
-  "compact",
-  "index",
-  "rindex",
-  "sample",
-  "rotate",
-  "shuffle",
-]) {
-  RECORD_DELEGATES[name] = fetch(ARRAY_METHOD_TABLE, name);
-}
 
 class ImplicitCountError extends globalThis.TypeError {}
 

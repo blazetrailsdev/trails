@@ -1,4 +1,4 @@
-import { rbCString, rbObjRespondTo, rtest } from "./object.js";
+import { rbCString, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
 import { rbRegEqual } from "./regexp.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
@@ -227,10 +227,8 @@ export function rbEqq(pattern: unknown, target: unknown): boolean {
   }
   if (pattern instanceof Set) return pattern.has(target);
   if (typeof pattern === "function") {
-    if (Object.getOwnPropertyDescriptor(pattern, "prototype")?.writable === false) {
-      return Object(target) instanceof pattern;
-    }
-    return rtest((pattern as (arg: unknown) => unknown)(target));
+    if (!rbObjIsProc(pattern)) return Object(target) instanceof pattern;
+    return rtest(pattern(target));
   }
   return rbEqual(pattern, target);
 }

@@ -239,8 +239,10 @@ export class ExplainProxy<T extends Base> {
 }
 
 const ENUMERABLE_DELEGATES = {
-  detect: <T>(records: T[], fn: (record: T, index: number, all: T[]) => unknown): T | undefined =>
-    records.find(fn),
+  detect: fetch<<T>(records: T[], fn: (record: T) => unknown) => T | undefined>(
+    ARRAY_METHOD_TABLE,
+    "detect",
+  ),
 
   reject: fetch<<T>(records: T[], fn: (record: T) => boolean) => T[]>(ARRAY_METHOD_TABLE, "reject"),
 
@@ -621,7 +623,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return isBlank(await this.records());
   }
 
-  async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
+  async detect(fn: (record: T) => unknown): Promise<T | undefined> {
     return ENUMERABLE_DELEGATES.detect(await this.toArray(), fn);
   }
 
@@ -2092,11 +2094,19 @@ export interface Relation<T extends Base, G extends boolean = false> {
   unscoped(): Relation<T>;
 }
 
-const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {};
-for (const name of ["partition", "isAll", "eachCons", "eachWithIndex", "toSet", "collect"]) {
+const arrayMethod = (name: string) => {
   const method = fetch<(records: any[], ...args: any[]) => unknown>(ARRAY_METHOD_TABLE, name);
-  ENUMERABLE_METHODS[name] = (records, args) => method(records, ...args);
-}
+  return (records: any[], args: any[]) => method(records, ...args);
+};
+
+const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
+  partition: arrayMethod("partition"),
+  isAll: arrayMethod("isAll"),
+  eachCons: arrayMethod("eachCons"),
+  eachWithIndex: arrayMethod("eachWithIndex"),
+  toSet: arrayMethod("toSet"),
+  collect: arrayMethod("collect"),
+};
 for (const name of [
   "forEach",
   "at",
