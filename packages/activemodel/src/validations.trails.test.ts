@@ -631,15 +631,15 @@ describe("ValidationsTest (trails)", () => {
 
       const a = new Scoped({});
       expect(await a.isValid("create")).toBe(false);
-      expect(a.errors.attributeNames).toEqual(["name"]);
+      expect(a.errors.attributeNames).toEqual([":name"]);
 
       const b = new Scoped({});
       expect(await b.isValid(["create", "publish"])).toBe(false);
-      expect([...b.errors.attributeNames].sort()).toEqual(["name", "title"]);
+      expect([...b.errors.attributeNames].sort()).toEqual([":name", ":title"]);
 
       const c = new Scoped({});
       expect(await c.isValid(["publish"])).toBe(false);
-      expect(c.errors.attributeNames).toEqual(["title"]);
+      expect(c.errors.attributeNames).toEqual([":title"]);
     });
 
     it("on: [array] validator fires when current context is a single symbol in the set", async () => {
@@ -1861,7 +1861,7 @@ describe("ValidationsTest (trails)", () => {
       u.errors.add("email", ":invalid");
       const collected: string[] = [];
       u.errors.each((e) => collected.push(`${e.attribute}:${e.type}`));
-      expect(collected).toEqual(["name::blank", "email::invalid"]);
+      expect(collected).toEqual([":name::blank", ":email::invalid"]);
     });
 
     it("merge errors", () => {
@@ -1900,8 +1900,8 @@ describe("ValidationsTest (trails)", () => {
       u.errors.add("name", ":too_short");
       u.errors.add("email", ":invalid");
       const hash = u.errors.toHash();
-      expect(hash.get("name")!.length).toBe(2);
-      expect(hash.get("email")!.length).toBe(1);
+      expect(hash.get(":name")!.length).toBe(2);
+      expect(hash.get(":email")!.length).toBe(1);
     });
 
     it("include?", () => {
@@ -1934,7 +1934,7 @@ describe("ValidationsTest (trails)", () => {
 
       const u = new User({});
       u.errors.add("name", ":blank");
-      expect(u.errors.messages.get("name")).toEqual(["can't be blank"]);
+      expect(u.errors.messages.get(":name")).toEqual(["can't be blank"]);
     });
 
     it("full_messages creates a list of error messages with the attribute name included", () => {
@@ -1950,7 +1950,7 @@ describe("ValidationsTest (trails)", () => {
 
       const u = new User({});
       expect(u.errors.fullMessage("name", "is required")).toBe("Name is required");
-      expect(u.errors.fullMessage("base", "Something went wrong")).toBe("Something went wrong");
+      expect(u.errors.fullMessage(":base", "Something went wrong")).toBe("Something went wrong");
     });
   });
 
@@ -2327,7 +2327,7 @@ describe("ValidationsTest (trails)", () => {
     it("gives the includer the class macros and the runner", async () => {
       const host = new Host();
       expect(await host.isValid()).toBe(false);
-      expect(host.errors.messages.get("title")).toEqual(["can't be blank"]);
+      expect(host.errors.messages.get(":title")).toEqual(["can't be blank"]);
 
       host.title = "hello";
       expect(await host.isValid()).toBe(true);

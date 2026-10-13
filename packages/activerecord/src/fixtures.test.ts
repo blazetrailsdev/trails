@@ -252,7 +252,7 @@ describe("FixturesTest", () => {
     { useInstantiatedFixtures: true, useTransactionalTests: false },
   );
 
-  const FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+  const YAML_FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
 
   it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
     "bulk insert",
@@ -653,13 +653,13 @@ describe("FixturesTest", () => {
 
   it("empty yaml fixture", () => {
     expect(
-      new FixtureSet(null, "accounts", Account, FIXTURES_ROOT + "/naked/yml/accounts"),
+      new FixtureSet(null, "accounts", Account, YAML_FIXTURES_ROOT + "/naked/yml/accounts"),
     ).not.toBeNull();
   });
 
   it("empty yaml fixture with a comment in it", () => {
     expect(
-      new FixtureSet(null, "companies", Company, FIXTURES_ROOT + "/naked/yml/companies"),
+      new FixtureSet(null, "companies", Company, YAML_FIXTURES_ROOT + "/naked/yml/companies"),
     ).not.toBeNull();
   });
 
@@ -1588,7 +1588,7 @@ describe("MultipleFixtureConnectionsTest", () => {
 describe("HasManyThroughFixture", () => {
   fixtures([]);
 
-  const FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+  const YAML_FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
 
   function makeModel(name: string): typeof Base {
     const klass = class extends Base {};
@@ -1600,7 +1600,7 @@ describe("HasManyThroughFixture", () => {
     const parrot = makeModel("Parrot");
     parrot.hasAndBelongsToMany("treasures");
 
-    const parrots = `${FIXTURES_ROOT}/parrots`;
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     return fs.tableRows();
@@ -1618,7 +1618,7 @@ describe("HasManyThroughFixture", () => {
     parrot.hasMany("parrot_treasures", { anonymousClass: pt });
     parrot.hasMany("treasures", { through: "parrot_treasures" });
 
-    const parrots = `${FIXTURES_ROOT}/parrots`;
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     const rows = fs.tableRows();
@@ -1638,7 +1638,7 @@ describe("HasManyThroughFixture", () => {
     parrot.hasMany("parrot_treasures", { anonymousClass: pt });
     parrot.hasMany("treasures", { through: "parrot_treasures" });
 
-    const parrots = `${FIXTURES_ROOT}/parrots`;
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     const rows = fs.tableRows();

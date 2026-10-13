@@ -100,7 +100,7 @@ describe("LengthValidator (trails)", () => {
     const value = (a: unknown, b: unknown) => [a, b];
     const person = new Person();
     new LengthValidator({ attributes: ["title"], is: 2 }).validateEach(person, "title", value);
-    expect(person.errors.details.get("title")).toEqual([{ error: ":wrong_length", count: 2 }]);
+    expect(person.errors.details.get(":title")).toEqual([{ error: ":wrong_length", count: 2 }]);
 
     person.errors.clear();
     new LengthValidator({ attributes: ["title"], is: String(value).length }).validateEach(

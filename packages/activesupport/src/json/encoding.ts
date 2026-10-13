@@ -1,4 +1,4 @@
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, toS } from "@blazetrails/ruby-compat";
 import { asJson, Float, isPlainObject } from "../core-ext/object/json.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
@@ -52,7 +52,7 @@ export class JSONGemEncoder {
       const result: Record<string, unknown> = {};
       const entries = value instanceof Map ? value.entries() : Object.entries(value as object);
       for (const [k, v] of entries) {
-        result[String(k)] = this.jsonify(v);
+        result[toS(k)] = this.jsonify(v);
       }
       return result;
     } else if (Array.isArray(value)) {

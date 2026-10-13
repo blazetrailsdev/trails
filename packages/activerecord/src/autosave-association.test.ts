@@ -1942,7 +1942,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertNotPredicate(await invalidElectron.isValid(), (v) => v);
     assertPredicate(await validElectron.isValid(), (v) => v);
     assertNotPredicate(await molecule.isValid(), (v) => v);
-    expect(molecule.errors.details.get("electrons.name")).toEqual([{ error: ":blank" }]);
+    expect(molecule.errors.details.get(":electrons.name")).toEqual([{ error: ":blank" }]);
   });
 
   it("errors should be indexed when passed as array", async () => {
@@ -2018,10 +2018,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertNotPredicate(await tuningPegInvalid.isValid(), (v) => v);
     assertPredicate(await tuningPegValid.isValid(), (v) => v);
     assertNotPredicate(await guitar.isValid(), (v) => v);
-    expect(guitar.errors.details.get("tuning_pegs[1].pitch")).toEqual([
+    expect(guitar.errors.details.get(":tuning_pegs[1].pitch")).toEqual([
       { error: ":not_a_number", value: null },
     ]);
-    expect(guitar.errors.details.get("tuning_pegs.pitch") ?? []).toEqual([]);
+    expect(guitar.errors.details.get(":tuning_pegs.pitch") ?? []).toEqual([]);
   });
   it("errors details with error on base should be indexed when passed as array", async () => {
     const reference = class extends Base {
@@ -2052,7 +2052,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertPredicate(await referenceValid.isValid(), (v) => v);
     assertNotPredicate(await referenceInvalid.isValid(), (v) => v);
     assertNotPredicate(await p.isValid(), (v) => v);
-    expect(p.errors.details.get("references[1].base")).toEqual([{ error: "should be favorite" }]);
+    expect(p.errors.details.get(":references[1].base")).toEqual([{ error: "should be favorite" }]);
     expect(p.errors.get("references[1].base")[0]).toEqual("should be favorite");
     expect(p.errors.fullMessages).toEqual(["References[1] should be favorite"]);
   });
@@ -2176,8 +2176,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       assertNotPredicate(await invalidElectron.isValid(), (v) => v);
       assertPredicate(await validElectron.isValid(), (v) => v);
       assertNotPredicate(await molecule.isValid(), (v) => v);
-      expect(molecule.errors.details.get("electrons[1].name")).toEqual([{ error: ":blank" }]);
-      expect(molecule.errors.details.get("electrons.name") ?? []).toEqual([]);
+      expect(molecule.errors.details.get(":electrons[1].name")).toEqual([{ error: ":blank" }]);
+      expect(molecule.errors.details.get(":electrons.name") ?? []).toEqual([]);
     } finally {
       setIndexNestedAttributeErrors(oldAttributeConfig);
     }

@@ -11,8 +11,8 @@ import { Base } from "./base.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import "./test-helpers/migration-helper.js";
+import { MIGRATIONS_ROOT } from "./config.js";
 
-const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 const PATH_A = [`${MIGRATIONS_ROOT}/valid`];
 const PATH_B = [`${MIGRATIONS_ROOT}/to_copy`];
 

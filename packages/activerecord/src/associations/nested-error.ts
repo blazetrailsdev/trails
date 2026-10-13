@@ -1,6 +1,6 @@
 import { underscore } from "@blazetrails/activesupport";
 import { NestedError as ActiveModelNestedError } from "@blazetrails/activemodel";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rtest, stringToSym, toS } from "@blazetrails/ruby-compat";
 import { indexNestedAttributeErrors } from "../active-record.js";
 
 interface AssociationLike {
@@ -50,9 +50,9 @@ export class NestedError extends ActiveModelNestedError {
       rtest(indexErrorsSetting.call(self)) &&
       index.call(self) != null
     ) {
-      return `${associationName}[${index.call(self)}].${innerError.attribute}`;
+      return stringToSym(`${associationName}[${index.call(self)}].${toS(innerError.attribute)}`);
     } else {
-      return `${associationName}.${innerError.attribute}`;
+      return stringToSym(`${associationName}.${toS(innerError.attribute)}`);
     }
   }
 }

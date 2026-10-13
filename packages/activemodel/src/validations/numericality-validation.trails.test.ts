@@ -31,7 +31,7 @@ describe("NumericalityValidator (trails-only)", () => {
     const user = new User({ approved: 4 });
     expect(await user.isValid()).toBe(false);
     expect(user.errors.get("approved")).toEqual(["must be in 1..3"]);
-    expect(user.errors.details.get("approved")![0].count).toBeInstanceOf(Range);
+    expect(user.errors.details.get(":approved")![0].count).toBeInstanceOf(Range);
   });
 
   it("rejects blank and whitespace-only strings", async () => {

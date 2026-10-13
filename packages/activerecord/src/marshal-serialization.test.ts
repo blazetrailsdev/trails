@@ -1,13 +1,12 @@
 import { readFile } from "fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Marshal } from "@blazetrails/ruby-compat";
+import { File as RubyFile, Marshal } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
+import { TEST_ROOT } from "./config.js";
 import { formatVersion, setFormatVersion } from "./marshalling.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import "./test-helpers/models/reply.js";
-
-const TEST_ROOT = new URL("./test-helpers/", import.meta.url);
 
 describe("MarshalSerializationTest", () => {
   fixtures(["topics"]);
@@ -26,8 +25,8 @@ describe("MarshalSerializationTest", () => {
     return readFile(await marshalFixturePath(fileName), "latin1");
   }
 
-  async function marshalFixturePath(fileName: string): Promise<URL> {
-    return new URL(
+  async function marshalFixturePath(fileName: string): Promise<string> {
+    return RubyFile.expandPath(
       `support/marshal_compatibility_fixtures/${(await Base.leaseConnection()).adapterName}/${fileName}.dump`,
       TEST_ROOT,
     );

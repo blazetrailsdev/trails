@@ -1562,14 +1562,14 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
     expect(await guitar.isValid()).toBeTruthy();
     await guitar.update({ tuningPegsAttributes: [{ id: peg2.id, pitch: null }] });
     expect(await guitar.isValid()).toBeFalsy();
-    expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuning_pegs[0].pitch"]);
+    expect([...(guitar as any).errors.messages.keys()]).toEqual([":tuning_pegs[0].pitch"]);
   });
 
   it("index unaffected by reject_if", async () => {
     const guitar = await IndexedGuitar.createBang({});
     await guitar.update({ tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }] });
     expect(await guitar.isValid()).toBeFalsy();
-    expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuning_pegs[1].pitch"]);
+    expect([...(guitar as any).errors.messages.keys()]).toEqual([":tuning_pegs[1].pitch"]);
   });
 });
 

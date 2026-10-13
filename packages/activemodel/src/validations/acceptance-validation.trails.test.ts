@@ -151,6 +151,6 @@ describe("acceptance options pass-through", () => {
     const t = new Terms({ terms: "no" });
     await t.isValid();
     expect(t.errors.count).toBeGreaterThan(0);
-    expect(t.errors.objects.find((d) => d.attribute === "terms")?.options?.accept).toBeUndefined();
+    expect(t.errors.objects.find((d) => d.attribute === ":terms")?.options?.accept).toBeUndefined();
   });
 });

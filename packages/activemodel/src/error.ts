@@ -1,16 +1,14 @@
 import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
 import {
   except,
-  isSymbol,
   kernelCatch,
   rbHash,
   rbInspect,
-  rbDeclareIvar,
   rbModConstSet,
   rbModName,
   rbObjDup,
   rbObjRespondTo,
-  symbolToS,
+  toS,
 } from "@blazetrails/ruby-compat";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
@@ -80,7 +78,7 @@ export class Error {
   }
 
   base: ModelBase;
-  private _attribute: string;
+  attribute: string;
   type: string;
   rawType: string | null;
   options: Record<string, unknown>;
@@ -91,9 +89,10 @@ export class Error {
     message: string | null,
     base: ValidatableBase,
   ): string | null {
-    if (attribute === "base") return message;
+    if (attribute === ":base") return message;
 
     const baseClass = base.constructor;
+    attribute = toS(attribute);
 
     let defaults: unknown[];
     if (this.i18nCustomizeFullMessage && rbObjRespondTo(baseClass, "i18nScope")) {
@@ -160,7 +159,7 @@ export class Error {
     }
     const typeName = type.slice(1);
 
-    const value = attribute !== "base" ? base.readAttributeForValidation(attribute) : null;
+    const value = attribute !== ":base" ? base.readAttributeForValidation(attribute) : null;
 
     options = {
       model: base.modelName.human(),
@@ -173,7 +172,7 @@ export class Error {
     let defaults: unknown[];
     if (rbObjRespondTo(base.constructor, "i18nScope")) {
       const i18nScope = base.constructor.i18nScope;
-      attribute = attribute.replace(/\[\d+\]/g, "");
+      attribute = toS(attribute).replace(/\[\d+\]/g, "");
 
       defaults = base.constructor
         .lookupAncestors()
@@ -199,7 +198,7 @@ export class Error {
       defaults = [];
     }
 
-    defaults.push(`:errors.attributes.${attribute}.${typeName}`);
+    defaults.push(`:errors.attributes.${toS(attribute)}.${typeName}`);
     defaults.push(`:errors.messages.${typeName}`);
 
     const key = defaults.shift();
@@ -220,21 +219,17 @@ export class Error {
     rawType?: string | null,
   ) {
     this.base = base;
-    this._attribute = attribute;
+    this.attribute = attribute;
     this.rawType = rawType !== undefined ? rawType : type;
     this.type = type ?? ":invalid";
     this.options = options;
   }
 
   initializeDup(_other: Error): void {
-    this._attribute = rbObjDup(this._attribute);
+    this.attribute = rbObjDup(this.attribute);
     this.rawType = rbObjDup(this.rawType);
     this.type = rbObjDup(this.type);
     this.options = deepDup(this.options);
-  }
-
-  get attribute(): string {
-    return isSymbol(this._attribute) ? symbolToS(this._attribute) : this._attribute;
   }
 
   get message(): string | null {
@@ -309,13 +304,11 @@ export class Error {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
   }
 
-  /** @inventedArm if — PERMANENT */
   inspect(): string {
-    return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
+    return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${toS(this.attribute)}, type=${toS(this.type)}, options=${rbInspect(this.options)}>`;
   }
 }
 
 Error.prototype.eql = Error.prototype.equals;
 
 rbModConstSet(ActiveModel, "Error", Error);
-rbDeclareIvar(Error, "@attribute", "_attribute");
