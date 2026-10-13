@@ -251,8 +251,8 @@ export class Response {
     this._status = statusCode(status);
   }
 
-  get code(): number {
-    return this._status;
+  get code(): string {
+    return String(this._status);
   }
   get statusCode(): number {
     return this._status;

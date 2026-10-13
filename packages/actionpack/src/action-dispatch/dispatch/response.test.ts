@@ -33,7 +33,7 @@ describe("ResponseTest", () => {
 
   it("response code", () => {
     const res = new Response(200);
-    expect(res.code).toBe(200);
+    expect(res.code).toBe("200");
     expect(res.statusCode).toBe(200);
   });
 
