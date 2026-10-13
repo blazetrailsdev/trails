@@ -3,7 +3,7 @@ import { NoMethodError, include } from "@blazetrails/ruby-compat";
 import { Minitest } from "@blazetrails/activesupport";
 import "./relation.js";
 import { TestCase } from "./cases/test-case.js";
-import { FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT } from "./config.js";
 import { fixtures, TestFixtures } from "./test-fixtures.js";
 import {
   configureEncryption,

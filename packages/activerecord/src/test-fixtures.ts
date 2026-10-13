@@ -408,10 +408,7 @@ async function loadFixtures(
     await FixtureSet.createFixtures(
       (this.constructor as TestCaseClass).fixturePaths,
       (this.constructor as TestCaseClass).fixtureTableNames,
-      (this.constructor as TestCaseClass).fixtureClassNames as Record<
-        string,
-        BaseClass | string | null
-      >,
+      (this.constructor as TestCaseClass).fixtureClassNames,
       config,
     ),
     (fixtureSet) => fixtureSet.name,
@@ -594,9 +591,7 @@ type FixturesOptions = WithTransactionalFixturesOptions & {
 
 type FixturesResult = {
   readonly fixtureTableNames: string[];
-  readonly self: () => TestFixtures & {
-    createFixtures(...fixtureSetNames: string[]): Promise<FixtureSet[]>;
-  } & Record<string, unknown>;
+  readonly self: () => TestCase & Record<string, unknown>;
   readonly canonicalTables: (
     adapter: Parameters<typeof ensureCanonicalTables>[0],
     names: readonly string[],
@@ -604,13 +599,8 @@ type FixturesResult = {
 };
 
 type SuiteScope = { suite?: SuiteScope };
-type TestCase = TestFixtures & { name: string };
-type TestCaseClass = (new () => TestCase) &
-  TestFixturesClassHost &
-  typeof ClassMethods & {
-    useTransactionalTests: boolean;
-    useInstantiatedFixtures: boolean | string;
-  };
+type TestCaseClass = typeof ActiveRecord.TestCase;
+type TestCase = InstanceType<TestCaseClass>;
 
 const USE_FIXTURES_ROOT = "use-fixtures";
 
@@ -622,22 +612,22 @@ const testCaseClasses = new WeakMap<SuiteScope, TestCaseClass>();
 
 const fixtureRegistrations = new WeakMap<TestCaseClass, { count: number }>();
 
-const testCases = new WeakMap<object, { testCase: TestFixtures; pending: number }>();
+const testCases = new WeakMap<object, { testCase: TestCase; pending: number }>();
 
-let currentTestCase: TestFixtures | null = null;
+let currentTestCase: TestCase | null = null;
 
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
   if (suite === undefined) {
     if (rootTestCaseClass === undefined) {
-      const { TestCase } = ActiveRecord as unknown as { TestCase: TestCaseClass };
-      rootTestCaseClass = class extends TestCase {} as TestCaseClass;
+      const { TestCase } = ActiveRecord;
+      rootTestCaseClass = class extends TestCase {};
       rootTestCaseClass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
     }
     return rootTestCaseClass;
   }
   let klass = testCaseClasses.get(suite);
   if (klass === undefined) {
-    klass = class extends testCaseClassFor(suite.suite) {} as TestCaseClass;
+    klass = class extends testCaseClassFor(suite.suite) {};
     testCaseClasses.set(suite, klass);
   }
   return klass;
@@ -673,7 +663,7 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
   if (Object.keys(classNames).length > 0) klass.setFixtureClass(classNames);
   for (const model of Object.values(klass.fixtureClassNames)) {
     if (typeof model === "function" && rbClassInheritedP(model, Base) === true) {
-      registerModel(model as BaseClass);
+      registerModel(model);
     }
   }
 }
@@ -685,8 +675,7 @@ function registerFixtureHooks(klass: TestCaseClass): void {
   beforeEach(async (ctx: TaskContext) => {
     if (testCases.has(ctx.task)) return;
     const testKlass = testCaseClassFor(ctx.task.suite as SuiteScope | undefined);
-    const testCase = new testKlass();
-    testCase.name = ctx.task.name;
+    const testCase = new testKlass(ctx.task.name);
     testCase._fixtureConnectionPools = [];
     testCase._pendingPins = [];
     testCase._savedPoolConfigs = new Hash();
