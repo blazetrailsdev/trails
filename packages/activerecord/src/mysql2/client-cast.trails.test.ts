@@ -312,4 +312,15 @@ describe("mysql2Client cast", () => {
       );
     });
   });
+
+  describe("JSON", () => {
+    it("answers the document as a UTF-8 String, not the object the driver parses", () => {
+      const json = { type: "JSON", name: "field", string: (encoding?: string) => encoding! };
+      expect(typeCast(json, () => ({ resolution: "320×480" }))).toBe("utf8");
+    });
+
+    it("returns null for NULL", () => {
+      expect(typeCast(field("JSON", null), next)).toBeNull();
+    });
+  });
 });

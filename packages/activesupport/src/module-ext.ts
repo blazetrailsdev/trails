@@ -2,9 +2,9 @@ import { classpaths, NameError, rbModName } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
+import { callerLocations } from "./deprecation.js";
 import { extractOptionsBang } from "./hash-utils.js";
 
-/** @missingRailsArgs generate — PERMANENT */
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
   const options = extractOptionsBang(methods);
   const names = methods;
@@ -15,7 +15,13 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
     private: priv = null,
   } = options as unknown as DelegateOptions;
 
-  return Delegation.generate(this, names as string[], { to, prefix, allowNil, private: priv });
+  return Delegation.generate(this, names as string[], {
+    location: callerLocations(1, 1)[0],
+    to,
+    prefix,
+    allowNil,
+    private: priv,
+  });
 }
 
 export function delegateMissingTo<T extends object>(

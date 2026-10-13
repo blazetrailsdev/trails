@@ -207,6 +207,43 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'type/string_test.rb:41 `assert_not_same s, type.deserialize(s)` — the same missing identity (CLAUDE.md, "Ruby Strings are JS string primitives")',
     },
   ],
+  "activesupport:core_ext/module_test.rb › ModuleTest › delegation arity to self class": [
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:662 `assert_equal(-1, d.instance_method(:opt).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:663 `assert_equal(-1, d.instance_method(:kwargs).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:664 `assert_equal(-1, d.instance_method(:kwargs_with_block).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:665 `assert_equal(-1, d.instance_method(:opt_kwargs).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:666 `assert_equal(-1, d.instance_method(:opt_kwargs_with_block).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+  ],
   "activesupport:core_ext/duration_test.rb › DurationTest › is a": [
     {
       kind: "assert_kind_of",

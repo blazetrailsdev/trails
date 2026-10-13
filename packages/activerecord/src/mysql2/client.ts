@@ -239,7 +239,7 @@ type Field = {
   type: string;
   name: string;
   length?: number;
-  string: () => string | null;
+  string: (encoding?: string) => string | null;
   buffer: () => Uint8Array | null;
 };
 type TypeCast = (field: Field, next: () => unknown) => unknown;
@@ -380,6 +380,8 @@ function cast(
       }
       return new RubyDate(year, month, day).toDate();
     }
+    case "JSON":
+      return field.string("utf8");
     default:
       return next();
   }
