@@ -257,46 +257,24 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   );
 
   it("raises an error if no migrations have been made", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-env-"));
-    const dbFile = path.join(tmp, "test.sqlite3");
-    Base.configurations({
-      arunit: { adapter: "sqlite3", database: dbFile },
-    });
-    DatabaseTasks.registerTask(
-      "sqlite",
-      class {
-        async create(): Promise<void> {}
-      },
-    );
-    const { BetterSQLite3Adapter } =
-      await import("../connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter({ database: dbFile });
+    const pool = Base.connectionPool();
+    const internalMetadata = pool.internalMetadata;
+    const schemaMigration = pool.schemaMigration;
     try {
-      await adapter.execute(
-        "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
-      );
-      await adapter.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
+      await schemaMigration.createTable();
+      await schemaMigration.createVersion("1");
 
-      await adapter.execute(
-        "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
-      );
-      expect(await adapter.tableExists("ar_internal_metadata")).toBeTruthy();
-      await adapter.execute("DROP TABLE IF EXISTS ar_internal_metadata");
-      expect(await adapter.tableExists("ar_internal_metadata")).toBeFalsy();
-    } finally {
-      await adapter.disconnectBang();
-    }
-    try {
+      expect(await internalMetadata.tableExists()).toBeTruthy();
+      await internalMetadata.dropTable();
+      expect(await internalMetadata.tableExists()).toBeFalsy();
+
       await expect(DatabaseTasks.checkProtectedEnvironmentsBang("arunit")).rejects.toThrow(
         NoEnvironmentInSchemaError,
       );
     } finally {
-      const cleanup = new BetterSQLite3Adapter({ database: dbFile });
-      await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
-      await cleanup.disconnectBang();
-      Base.configurations(originalConfigurations);
-      resetRegisteredTasks();
-      fs.rmSync(tmp, { recursive: true, force: true });
+      pool.automaticReconnect = true;
+      await schemaMigration.deleteVersion("1");
+      await internalMetadata.createTable();
     }
   });
 });
@@ -486,55 +464,50 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
 
 describe("DatabaseTasksDumpSchemaTest", () => {
   it("ensure db dir", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-"));
-    const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-db-"));
-    const dbFile = path.join(dbTmp, "arunit.sqlite3");
-    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-"));
     try {
-      vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue(tmp);
-      const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
-      const config = new HashConfig("arunit", "primary", {
-        adapter: "sqlite3",
-        database: dbFile,
+      vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue(dir);
+      const updatedHash = {
+        ...configFor("arunit", "primary")!.configurationHash,
         schemaDump: "fake_db_config_schema.ts",
-      });
-      fs.rmSync(tmp, { recursive: true, force: true });
+      };
+      const dbConfig = new HashConfig("arunit", "primary", updatedHash);
+      const schemaPath = `${dir}/fake_db_config_schema.ts`;
+
+      fs.rmSync(dir, { recursive: true, force: true });
       expect(fs.existsSync(schemaPath)).toBeFalsy();
-      await DatabaseTasks.dumpSchema(config);
+
+      await DatabaseTasks.dumpSchema(dbConfig);
+
       expect(fs.existsSync(schemaPath)).toBeTruthy();
     } finally {
       vi.restoreAllMocks();
-      try {
-        await Base.removeConnection();
-      } catch {}
-      fs.rmSync(tmp, { recursive: true, force: true });
-      fs.rmSync(dbTmp, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
+      await Base.clearCacheBang();
     }
   });
+
   it("db dir ignored if included in schema dump", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-"));
-    const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-db-"));
-    const dbFile = path.join(dbTmp, "arunit.sqlite3");
-    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-"));
     try {
-      vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue(tmp);
-      const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
-      const config = new HashConfig("arunit", "primary", {
-        adapter: "sqlite3",
-        database: dbFile,
-        schemaDump: schemaPath,
-      });
-      fs.rmSync(tmp, { recursive: true, force: true });
+      vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue(dir);
+      const updatedHash = {
+        ...configFor("arunit", "primary")!.configurationHash,
+        schemaDump: `${dir}/fake_db_config_schema.ts`,
+      };
+      const dbConfig = new HashConfig("arunit", "primary", updatedHash);
+      const schemaPath = `${dir}/fake_db_config_schema.ts`;
+
+      fs.rmSync(dir, { recursive: true, force: true });
       expect(fs.existsSync(schemaPath)).toBeFalsy();
-      await DatabaseTasks.dumpSchema(config);
+
+      await DatabaseTasks.dumpSchema(dbConfig);
+
       expect(fs.existsSync(schemaPath)).toBeTruthy();
     } finally {
       vi.restoreAllMocks();
-      try {
-        await Base.removeConnection();
-      } catch {}
-      fs.rmSync(tmp, { recursive: true, force: true });
-      fs.rmSync(dbTmp, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
+      await Base.clearCacheBang();
     }
   });
 });
@@ -570,8 +543,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   captureStdoutAndStderr();
 
   let createSpy: MockInstance<any>;
-  beforeEach(async () => {
-    await Base.establishConnection(ambientPoolConfiguration());
+  beforeEach(() => {
     vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
   });
