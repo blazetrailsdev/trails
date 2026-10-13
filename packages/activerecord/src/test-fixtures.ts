@@ -626,15 +626,12 @@ const testCases = new WeakMap<object, { testCase: TestFixtures; pending: number 
 
 let currentTestCase: TestFixtures | null = null;
 
-function activeRecordTestCase(): TestCaseClass {
-  return (ActiveRecord as unknown as { TestCase: TestCaseClass }).TestCase;
-}
-
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
   if (suite === undefined) {
     if (rootTestCaseClass === undefined) {
-      rootTestCaseClass = class extends activeRecordTestCase() {} as TestCaseClass;
-      rootTestCaseClass.fixturePaths = [...activeRecordTestCase().fixturePaths, USE_FIXTURES_ROOT];
+      const { TestCase } = ActiveRecord as unknown as { TestCase: TestCaseClass };
+      rootTestCaseClass = class extends TestCase {} as TestCaseClass;
+      rootTestCaseClass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
     }
     return rootTestCaseClass;
   }
