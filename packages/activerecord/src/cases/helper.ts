@@ -164,11 +164,7 @@ export function cleanUpConnectionHandler(): void {
   };
   handler._connectionNameToPoolManager.eachPair((owner, poolManager) => {
     for (const roleName of [...poolManager.roleNames]) {
-      if (
-        roleName === Base.defaultRole &&
-        ["ActiveRecord::Base", "ARUnit2Model", "Contact", "ContactSti"].includes(owner)
-      )
-        continue;
+      if (roleName === Base.defaultRole && CLEAN_UP_KEPT_OWNERS.includes(owner)) continue;
       poolManager.removeRole(roleName);
     }
   });
