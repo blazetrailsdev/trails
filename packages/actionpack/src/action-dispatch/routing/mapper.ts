@@ -897,7 +897,7 @@ export class Mapper {
     return this.mapMethod("DELETE", args);
   }
 
-  root(path: string | RouteOptions, options: RouteOptions = {}): void {
+  root(path: string | RouteOptions | null, options: RouteOptions = {}): void {
     if (typeof path === "string") {
       options.to = path;
     } else if (isPlainObject(path) && Object.keys(options).length === 0) {

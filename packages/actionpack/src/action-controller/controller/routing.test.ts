@@ -1,32 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Ruby `include RoutingTestHelpers` / `include ActionDispatch::RoutingVerbs`; the class/interface
    merge is how `include()` surfaces those members on the type side. */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 import { ActiveSupportJSON, include, isPresent, type Included } from "@blazetrails/activesupport";
-import { bodyFromString } from "@blazetrails/rack";
-import { URI, type Module } from "@blazetrails/ruby-compat";
+import { Utils, bodyFromString } from "@blazetrails/rack";
+import { URI, first, type Module } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UrlGenerationError } from "../metal/exceptions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { controllerConstants } from "../../action-dispatch/http/request.js";
-import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
 import { RoutingTestHelpers, RoutingVerbs } from "../../test-helpers/abstract-unit.js";
 import "../../test-helpers/lib/controller/fake-controllers.js";
-
-class StubController {}
-
-beforeAll(() => {
-  controllerConstants.set("not_a", StubController as unknown as DispatchableControllerClass);
-});
-
-function urlFor(rs: RouteSet, options: Record<string, unknown>): string {
-  const opts = { ...options };
-  return rs.generateExtras(opts)[0];
-}
 
 type NamedRoutes = Record<string, (...args: unknown[]) => string>;
 
@@ -127,6 +114,12 @@ class LegacyRouteSetTests {
 
   setupForNamedRoute(options: Record<string, unknown> = {}): NamedRoutes {
     return new (MockController.build(this.rs.urlHelpers(), options))() as unknown as NamedRoutes;
+  }
+
+  setupRequestMethodRoutesFor(method: string): void {
+    this.rs.draw(function () {
+      this.match({ "/match": `books#${method}`, via: method });
+    });
   }
 }
 interface LegacyRouteSetTests
@@ -669,140 +662,799 @@ describe("LegacyRouteSetTests", () => {
     expect(routes.pagesUrl()).toBe("http://foo.com/page");
   });
 
-  it("paths escaped", () => {
-    rs.draw(function () {
-      this.get("file/*path", { to: "content#show_file", as: "path" });
-      this.get(":controller/:action/:id", {});
-    });
-
-    const results = rs.recognizePath("/file/hello+world/how+are+you%3F");
-    expect(results).toBeTruthy();
-    expect(results["path"]).toBe("hello+world/how+are+you?");
-
-    const results2 = rs.recognizePath("/file/hello%20world/how%20are%20you%3F");
-    expect(results2).toBeTruthy();
-    expect(results2["path"]).toBe("hello world/how are you?");
+  it("named route without hash", () => {
+    expect(() => {
+      rs.draw(function () {
+        deprecator().silence(() => {
+          this.get(":controller/:action/:id", { as: "normal" });
+        });
+      });
+    }).not.toThrow();
   });
 
-  it.skip("non controllers cannot be matched", () => {
+  it("named route root", () => {
     rs.draw(function () {
-      this.get(":controller/:action/:id", {});
+      this.root({ to: "hello#index" });
+    });
+    const routes = tc.setupForNamedRoute();
+    expect(routes.rootUrl()).toBe("http://test.host/");
+    expect(routes.rootPath()).toBe("/");
+  });
+
+  it("named route root without hash", () => {
+    rs.draw(function () {
+      this.root("hello#index");
+    });
+    const routes = tc.setupForNamedRoute();
+    expect(routes.rootUrl()).toBe("http://test.host/");
+    expect(routes.rootPath()).toBe("/");
+  });
+
+  it("named route root with hash", () => {
+    rs.draw(function () {
+      this.root("hello#index", { as: "index" });
     });
 
+    const routes = tc.setupForNamedRoute();
+    expect(routes.indexUrl()).toBe("http://test.host/");
+    expect(routes.indexPath()).toBe("/");
+  });
+
+  it("root without path raises argument error", () => {
+    expect(() => {
+      rs.draw(function () {
+        this.root(null);
+      });
+    }).toThrow(ArgumentError);
+  });
+
+  it("named route root with trailing slash", () => {
+    rs.draw(function () {
+      this.root("hello#index");
+    });
+
+    const routes = tc.setupForNamedRoute({ trailingSlash: true });
+    expect(routes.rootUrl()).toBe("http://test.host/");
+    expect(routes.rootUrl({ foo: "bar" })).toBe("http://test.host/?foo=bar");
+  });
+
+  it("named route with regexps", () => {
+    rs.draw(function () {
+      this.get({
+        "page/:year/:month/:day/:title": "page#show",
+        as: "article",
+        year: /\d+/,
+        month: /\d+/,
+        day: /\d+/,
+      });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
+
+    const routes = tc.setupForNamedRoute();
+
+    expect(routes.articleUrl({ title: "hi", day: 10, year: 2005, month: 6 })).toBe(
+      "http://test.host/page/2005/6/10/hi",
+    );
+  });
+
+  it("changing controller", async () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
+
+    await tc.get(URI.parse("http://test.host/admin/user/index/10"));
+
+    expect(
+      tc.controller!.urlFor({ controller: "stuff", action: "show", id: 10, onlyPath: true }),
+    ).toBe("/admin/stuff/show/10");
+  });
+
+  it("paths escaped", () => {
+    rs.draw(function () {
+      this.get({ "file/*path": "content#show_file", as: "path" });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
+
+    let results = rs.recognizePath("/file/hello+world/how+are+you%3F");
+    expect(results, "Recognition should have succeeded").toBeTruthy();
+    expect(results["path"]).toBe("hello+world/how+are+you?");
+
+    results = rs.recognizePath("/file/hello%20world/how%20are%20you%3F");
+    expect(results, "Recognition should have succeeded").toBeTruthy();
+    expect(results["path"]).toBe("hello world/how are you?");
+  });
+
+  it("paths slashes unescaped with ordered parameters", () => {
+    rs.draw(function () {
+      this.get({ "/file/*path": "content#index", as: "path" });
+    });
+
+    expect(tc.setupForNamedRoute().pathPath(["hello", "world"])).toBe("/file/hello/world");
+  });
+
+  it("non controllers cannot be matched", () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
     expect(() => rs.recognizePath("/not_a/show/10")).toThrow(RoutingError);
   });
 
-  it.skip("should list options diff when routing constraints dont match", () => {
+  it("should list options diff when routing constraints dont match", () => {
     rs.draw(function () {
-      this.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
+      this.get({ "post/:id": "post#show", constraints: { id: /\d+/ }, as: "post" });
     });
-
     expect(() =>
-      urlFor(rs, { controller: "post", action: "show", bad_param: "foo", useRoute: "post" }),
+      tc.urlFor(rs, { controller: "post", action: "show", bad_param: "foo", useRoute: "post" }),
     ).toThrow(UrlGenerationError);
   });
 
-  it.skip("dynamic path allowed", () => {
+  it("dynamic path allowed", () => {
     rs.draw(function () {
-      this.get("*path", { to: "content#show_file" });
+      this.get({ "*path": "content#show_file" });
     });
 
-    expect(urlFor(rs, { controller: "content", action: "show_file", path: ["pages", "boo"] })).toBe(
-      "/pages/boo",
-    );
+    expect(
+      tc.urlFor(rs, { controller: "content", action: "show_file", path: ["pages", "boo"] }),
+    ).toBe("/pages/boo");
   });
 
   it("escapes newline character for dynamic path", () => {
     rs.draw(function () {
-      this.get("/dynamic/:dynamic_segment", { to: "subpath_books#show", as: "dynamic" });
-      this.get(":controller/:action/:id", {});
+      this.get({ "/dynamic/:dynamic_segment": "subpath_books#show", as: "dynamic" });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
     });
 
     const results = rs.recognizePath("/dynamic/a%0Anewline");
-    expect(results).toBeTruthy();
+    expect(results, "Recognition should have succeeded").toBeTruthy();
     expect(results["dynamic_segment"]).toBe("a\nnewline");
   });
 
   it("escapes newline character for wildcard path", () => {
     rs.draw(function () {
-      this.get("/wildcard/*wildcard_segment", { to: "subpath_books#show", as: "wildcard" });
-      this.get(":controller/:action/:id", {});
+      this.get({ "/wildcard/*wildcard_segment": "subpath_books#show", as: "wildcard" });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
     });
 
     const results = rs.recognizePath("/wildcard/a%0Anewline");
-    expect(results).toBeTruthy();
+    expect(results, "Recognition should have succeeded").toBeTruthy();
     expect(results["wildcard_segment"]).toBe("a\nnewline");
   });
 
-  it.skip("route with integer default", () => {
+  it("dynamic recall paths allowed", async () => {
     rs.draw(function () {
-      this.get("page(/:id)", { to: "content#show_page", id: 1 } as any);
+      this.get({ "*path": "content#show_file" });
     });
 
-    expect(urlFor(rs, { controller: "content", action: "show_page" })).toBe("/page");
-    expect(urlFor(rs, { controller: "content", action: "show_page", id: 1 })).toBe("/page");
-    expect(urlFor(rs, { controller: "content", action: "show_page", id: "1" })).toBe("/page");
-    expect(urlFor(rs, { controller: "content", action: "show_page", id: 10 })).toBe("/page/10");
+    await tc.get(URI.parse("http://test.host/pages/boo"));
+    expect(tc.controller!.request.pathParameters).toEqual({
+      controller: "content",
+      action: "show_file",
+      path: "pages/boo",
+    });
 
-    expect(rs.recognizePath("/page")).toMatchObject({
+    expect(tc.controller!.urlFor({ onlyPath: true })).toBe("/pages/boo");
+  });
+
+  it("backwards", async () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get({ "page/:id(/:action)": "pages#show" });
+        this.get(":controller(/:action(/:id))");
+      });
+    });
+
+    await tc.get(URI.parse("http://test.host/pages/show"));
+    expect(tc.controller!.urlFor({ id: 20, onlyPath: true })).toBe("/page/20");
+    expect(tc.urlFor(rs, { controller: "pages", id: 20, action: "show" })).toBe("/page/20");
+    expect(tc.urlFor(rs, { controller: "pages", action: "boo" })).toBe("/pages/boo");
+  });
+
+  it("route with integer default", () => {
+    rs.draw(function () {
+      this.get({ "page(/:id)": "content#show_page", id: 1 });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
+
+    expect(tc.urlFor(rs, { controller: "content", action: "show_page" })).toBe("/page");
+    expect(tc.urlFor(rs, { controller: "content", action: "show_page", id: 1 })).toBe("/page");
+    expect(tc.urlFor(rs, { controller: "content", action: "show_page", id: "1" })).toBe("/page");
+    expect(tc.urlFor(rs, { controller: "content", action: "show_page", id: 10 })).toBe("/page/10");
+
+    expect(rs.recognizePath("/page")).toEqual({
       controller: "content",
       action: "show_page",
       id: 1,
     });
-    expect(rs.recognizePath("/page/1")).toMatchObject({
+    expect(rs.recognizePath("/page/1")).toEqual({
       controller: "content",
       action: "show_page",
       id: "1",
     });
-    expect(rs.recognizePath("/page/10")).toMatchObject({
+    expect(rs.recognizePath("/page/10")).toEqual({
       controller: "content",
       action: "show_page",
       id: "10",
     });
   });
 
-  it.skip("requirement should prevent optional id", () => {
+  it("route with text default", () => {
     rs.draw(function () {
-      this.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
+      this.get({ "page/:id": "content#show_page", id: 1 });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
     });
 
-    expect(urlFor(rs, { controller: "post", action: "show", id: 10 })).toBe("/post/10");
+    expect(tc.urlFor(rs, { controller: "content", action: "show_page", id: "foo" })).toBe(
+      "/page/foo",
+    );
+    expect(rs.recognizePath("/page/foo")).toEqual({
+      controller: "content",
+      action: "show_page",
+      id: "foo",
+    });
 
-    expect(() => urlFor(rs, { controller: "post", action: "show" })).toThrow(UrlGenerationError);
+    const token = "текст";
+    const escapedToken = Utils.escape(token);
+
+    expect(tc.urlFor(rs, { controller: "content", action: "show_page", id: token })).toBe(
+      "/page/" + escapedToken,
+    );
+    expect(rs.recognizePath(`/page/${escapedToken}`)).toEqual({
+      controller: "content",
+      action: "show_page",
+      id: token,
+    });
   });
 
-  it.skip("named route without hash", () => {});
+  it("action expiry", async () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id))");
+      });
+    });
+    await tc.get(URI.parse("http://test.host/content/show"));
+    expect(tc.controller!.urlFor({ controller: "content", onlyPath: true })).toBe("/content");
+  });
 
-  it.skip("named route root", () => {});
+  it("requirement should prevent optional id", () => {
+    rs.draw(function () {
+      this.get({ "post/:id": "post#show", constraints: { id: /\d+/ }, as: "post" });
+    });
 
-  it.skip("named route root without hash", () => {});
+    expect(tc.urlFor(rs, { controller: "post", action: "show", id: 10 })).toBe("/post/10");
 
-  it.skip("named route root with hash", () => {});
+    expect(() => tc.urlFor(rs, { controller: "post", action: "show" })).toThrow(UrlGenerationError);
+  });
 
-  it.skip("root without path raises argument error", () => {});
+  it("both requirement and optional", () => {
+    rs.draw(function () {
+      this.get({
+        "test(/:year)": "post#show",
+        as: "blog",
+        defaults: { year: null },
+        constraints: { year: /\d{4}/ },
+      });
 
-  it.skip("named route root with trailing slash", () => {});
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
 
-  it.skip("named route with regexps", () => {});
+    expect(tc.urlFor(rs, { controller: "post", action: "show" })).toBe("/test");
+    expect(tc.urlFor(rs, { controller: "post", action: "show", year: null })).toBe("/test");
 
-  it.skip("changing controller", () => {});
+    expect(tc.setupForNamedRoute().blogUrl()).toBe("http://test.host/test");
+  });
 
-  it.skip("dynamic recall paths allowed", () => {});
+  it("set to nil forgets", async () => {
+    rs.draw(function () {
+      this.get({
+        "pages(/:year(/:month(/:day)))": "content#list_pages",
+        month: null,
+        day: null,
+      });
 
-  it.skip("backwards", () => {});
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
 
-  it.skip("route with text default", () => {});
+    expect(tc.urlFor(rs, { controller: "content", action: "list_pages", year: 2005 })).toBe(
+      "/pages/2005",
+    );
+    expect(
+      tc.urlFor(rs, { controller: "content", action: "list_pages", year: 2005, month: 6 }),
+    ).toBe("/pages/2005/6");
+    expect(
+      tc.urlFor(rs, { controller: "content", action: "list_pages", year: 2005, month: 6, day: 12 }),
+    ).toBe("/pages/2005/6/12");
 
-  it.skip("action expiry", () => {});
+    await tc.get(URI.parse("http://test.host/pages/2005/6/12"));
+    expect(tc.controller!.request.pathParameters).toEqual({
+      controller: "content",
+      action: "list_pages",
+      year: "2005",
+      month: "6",
+      day: "12",
+    });
 
-  it.skip("set to nil forgets", () => {});
+    expect(tc.controller!.urlFor({ day: 4, onlyPath: true })).toBe("/pages/2005/6/4");
+
+    expect(tc.controller!.urlFor({ day: null, onlyPath: true })).toBe("/pages/2005/6");
+
+    expect(tc.controller!.urlFor({ day: null, month: null, onlyPath: true })).toBe("/pages/2005");
+  });
+
+  it("root url generation with controller and action", () => {
+    rs.draw(function () {
+      this.root({ to: "content#index" });
+    });
+
+    expect(tc.urlFor(rs, { controller: "content", action: "index" })).toBe("/");
+    expect(tc.urlFor(rs, { controller: "content" })).toBe("/");
+  });
+
+  it("named root url generation with controller and action", () => {
+    rs.draw(function () {
+      this.root({ to: "content#index", as: "home" });
+    });
+
+    expect(tc.urlFor(rs, { controller: "content", action: "index" })).toBe("/");
+    expect(tc.urlFor(rs, { controller: "content" })).toBe("/");
+
+    expect(tc.setupForNamedRoute().homeUrl()).toBe("http://test.host/");
+  });
+
+  const testNamedRouteMethod = () => {
+    rs.draw(function () {
+      this.get({ categories: "content#categories", as: "categories" });
+
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id))");
+      });
+    });
+
+    expect(tc.urlFor(rs, { controller: "content", action: "categories" })).toBe("/categories");
+    expect(tc.urlFor(rs, { controller: "content", action: "hi" })).toBe("/content/hi");
+  };
+
+  it("named route method", () => {
+    testNamedRouteMethod();
+  });
+
+  it("named routes array", () => {
+    testNamedRouteMethod();
+    expect(rs.namedRoutes.names()).toEqual(["categories"]);
+  });
+
+  it("nil defaults", () => {
+    rs.draw(function () {
+      this.get({ journal: "content#list_journal", date: null, user_id: null });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
+
+    expect(
+      tc.urlFor(rs, { controller: "content", action: "list_journal", date: null, user_id: null }),
+    ).toBe("/journal");
+  });
+
+  for (const requestMethod of ["GET", "PATCH", "POST", "PUT", "DELETE"]) {
+    it(`request method recognized with ${requestMethod}`, () => {
+      tc.setupRequestMethodRoutesFor(requestMethod.toLowerCase());
+      const params = rs.recognizePath("/match", { method: requestMethod });
+      expect(params["action"]).toBe(requestMethod.toLowerCase());
+    });
+  }
+
+  it("recognize array of methods", () => {
+    rs.draw(function () {
+      this.match({ "/match": "books#get_or_post", via: ["get", "post"] });
+      this.put({ "/match": "books#not_get_or_post" });
+    });
+
+    let params = rs.recognizePath("/match", { method: "post" });
+    expect(params["action"]).toBe("get_or_post");
+
+    params = rs.recognizePath("/match", { method: "put" });
+    expect(params["action"]).toBe("not_get_or_post");
+  });
+
+  it("subpath recognized", () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get({ "/books/:id/edit": "subpath_books#edit" });
+        this.get({ "/items/:id/:action": "subpath_books" });
+        this.get({ "/posts/new/:action": "subpath_books" });
+        this.get({ "/posts/:id": "subpath_books#show" });
+      });
+    });
+
+    let hash = rs.recognizePath("/books/17/edit");
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["id"], hash["action"]]).toEqual([
+      "subpath_books",
+      "17",
+      "edit",
+    ]);
+
+    hash = rs.recognizePath("/items/3/complete");
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["id"], hash["action"]]).toEqual([
+      "subpath_books",
+      "3",
+      "complete",
+    ]);
+
+    hash = rs.recognizePath("/posts/new/preview");
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["action"]]).toEqual(["subpath_books", "preview"]);
+
+    hash = rs.recognizePath("/posts/7");
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["action"], hash["id"]]).toEqual([
+      "subpath_books",
+      "show",
+      "7",
+    ]);
+  });
+
+  it("subpath generated", () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get({ "/books/:id/edit": "subpath_books#edit" });
+        this.get({ "/items/:id/:action": "subpath_books" });
+        this.get({ "/posts/new/:action": "subpath_books" });
+      });
+    });
+
+    expect(tc.urlFor(rs, { controller: "subpath_books", id: 7, action: "edit" })).toBe(
+      "/books/7/edit",
+    );
+    expect(tc.urlFor(rs, { controller: "subpath_books", id: 15, action: "complete" })).toBe(
+      "/items/15/complete",
+    );
+    expect(tc.urlFor(rs, { controller: "subpath_books", action: "preview" })).toBe(
+      "/posts/new/preview",
+    );
+  });
+
+  it("failed constraints raises exception with violated constraints", () => {
+    rs.draw(function () {
+      this.get({
+        "foos/:id": "foos#show",
+        as: "foo_with_requirement",
+        constraints: { id: /\d+/ },
+      });
+    });
+
+    expect(() => {
+      tc.setupForNamedRoute().fooWithRequirementUrl("I am Against the constraints");
+    }).toThrow(UrlGenerationError);
+  });
+
+  it("routes changed correctly after clear", () => {
+    const rs = new RouteSet();
+    rs.draw(function () {
+      this.get({ ca: "ca#aa" });
+      this.get({ cb: "cb#ab" });
+      this.get({ cc: "cc#ac" });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+        this.get(":controller/:action/:id.:format");
+      });
+    });
+
+    let hash = rs.recognizePath("/cc");
+
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["action"]]).toEqual(["cc", "ac"]);
+
+    rs.draw(function () {
+      this.get({ cb: "cb#ab" });
+      this.get({ cc: "cc#ac" });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+        this.get(":controller/:action/:id.:format");
+      });
+    });
+
+    hash = rs.recognizePath("/cc");
+
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["action"]]).toEqual(["cc", "ac"]);
+  });
+
+  it("drawing more routes after eager loading", () => {
+    const rs = new RouteSet();
+    rs.disableClearAndFinalize = true;
+
+    rs.draw(function () {
+      this.get({ "/plain": "c#plain" });
+      this.get({ "/:symbol": "c#symbol" });
+      this.get({ "/glob/*": "c#glob" });
+      this.get({ "/with#anchor": "c#with_anchor" });
+    });
+
+    let hash = rs.recognizePath("/symbol");
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["action"]]).toEqual(["c", "symbol"]);
+
+    rs.eagerLoadBang();
+
+    rs.draw(function () {
+      this.get({ "/more/plain": "c#plain" });
+      this.get({ "/more/:symbol": "c#symbol" });
+      this.get({ "/more/glob/*": "c#glob" });
+      this.get({ "/more/with#anchor": "c#with_anchor" });
+    });
+
+    hash = rs.recognizePath("/symbol");
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["action"]]).toEqual(["c", "symbol"]);
+
+    hash = rs.recognizePath("/more/symbol");
+    expect(hash).not.toBeNull();
+    expect([hash["controller"], hash["action"]]).toEqual(["c", "symbol"]);
+  });
 });
 
+class RouteSetTest {
+  set!: RouteSet;
+  controller: Base | null = null;
+
+  get routes(): RouteSet {
+    return this.set;
+  }
+
+  async setupNamedRouteTest(): Promise<NamedRoutes> {
+    this.set.draw(function () {
+      this.get({ "/people(/:id)": "people#show", as: "show" });
+      this.get({ "/people": "people#index", as: "index" });
+      this.get({ "/people/go/:foo/:bar/joe(/:id)": "people#multi", as: "multi" });
+      this.get({ "/admin/users": "admin/users#index", as: "users" });
+    });
+
+    await this.get(URI.parse("http://test.host/people"));
+    return this.controller as unknown as NamedRoutes;
+  }
+}
+interface RouteSetTest extends Included<typeof RoutingTestHelpers>, Included<typeof RoutingVerbs> {}
+include(RouteSetTest, RoutingTestHelpers);
+include(RouteSetTest, RoutingVerbs);
+
 describe("RouteSetTest", () => {
+  let tc: RouteSetTest;
   let set: RouteSet;
 
   beforeEach(() => {
-    set = new RouteSet();
+    tc = new RouteSetTest();
+    tc.set = tc.makeSet();
+    set = tc.set;
+  });
+
+  it("generate extras", () => {
+    set.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/(:action(/:id))");
+      });
+    });
+    const [path, extras] = set.generateExtras({
+      controller: "foo",
+      action: "bar",
+      id: 15,
+      this: "hello",
+      that: "world",
+    });
+    expect(path).toBe("/foo/bar/15");
+    expect(extras.map(String).sort()).toEqual(["that", "this"]);
+  });
+
+  it("extra keys", () => {
+    set.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
+    const extras = set.extraKeys({
+      controller: "foo",
+      action: "bar",
+      id: 15,
+      this: "hello",
+      that: "world",
+    });
+    expect(extras.map(String).sort()).toEqual(["that", "this"]);
+  });
+
+  it("generate extras not first", () => {
+    set.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id.:format");
+        this.get(":controller/:action/:id");
+      });
+    });
+    const [path, extras] = set.generateExtras({
+      controller: "foo",
+      action: "bar",
+      id: 15,
+      this: "hello",
+      that: "world",
+    });
+    expect(path).toBe("/foo/bar/15");
+    expect(extras.map(String).sort()).toEqual(["that", "this"]);
+  });
+
+  it("generate not first", () => {
+    set.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id.:format");
+        this.get(":controller/:action/:id");
+      });
+    });
+    expect(tc.urlFor(set, { controller: "foo", action: "bar", id: 15, this: "hello" })).toBe(
+      "/foo/bar/15?this=hello",
+    );
+  });
+
+  it("extra keys not first", () => {
+    set.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id.:format");
+        this.get(":controller/:action/:id");
+      });
+    });
+    const extras = set.extraKeys({
+      controller: "foo",
+      action: "bar",
+      id: 15,
+      this: "hello",
+      that: "world",
+    });
+    expect(extras.map(String).sort()).toEqual(["that", "this"]);
+  });
+
+  it("draw", () => {
+    expect(set.routes.size).toBe(0);
+    set.draw(function () {
+      this.get({ "/hello/world": "a#b" });
+    });
+    expect(set.routes.size).toBe(1);
+  });
+
+  it("draw symbol controller name", () => {
+    expect(set.routes.size).toBe(0);
+    set.draw(function () {
+      this.get({ "/users/index": "users#index" });
+    });
+    set.recognizePath("/users/index", { method: "get" });
+    expect(set.routes.size).toBe(1);
+  });
+
+  it("named draw", () => {
+    expect(set.routes.size).toBe(0);
+    set.draw(function () {
+      this.get({ "/hello/world": "a#b", as: "hello" });
+    });
+    expect(set.routes.size).toBe(1);
+    expect(set.namedRoutes.get("hello")).toBe(first(set.routes));
+  });
+
+  it("duplicate named route raises rather than pick precedence", () => {
+    expect(() => {
+      set.draw(function () {
+        this.get({ "/hello/world": "a#b", as: "hello" });
+        this.get({ "/hello": "a#b", as: "hello" });
+      });
+    }).toThrow(ArgumentError);
+  });
+
+  it("named route url method", async () => {
+    const controller = await tc.setupNamedRouteTest();
+
+    expect(controller.showUrl({ id: 5 })).toBe("http://test.host/people/5");
+    expect(controller.showPath({ id: 5 })).toBe("/people/5");
+
+    expect(controller.indexUrl()).toBe("http://test.host/people");
+    expect(controller.indexPath()).toBe("/people");
+
+    expect(controller.usersUrl()).toBe("http://test.host/admin/users");
+    expect(controller.usersPath()).toBe("/admin/users");
+  });
+
+  it("named route url method with anchor", async () => {
+    const controller = await tc.setupNamedRouteTest();
+
+    expect(controller.showUrl({ id: 5, anchor: "location" })).toBe(
+      "http://test.host/people/5#location",
+    );
+    expect(controller.showPath({ id: 5, anchor: "location" })).toBe("/people/5#location");
+
+    expect(controller.indexUrl({ anchor: "location" })).toBe("http://test.host/people#location");
+    expect(controller.indexPath({ anchor: "location" })).toBe("/people#location");
+
+    expect(controller.usersUrl({ anchor: "location" })).toBe(
+      "http://test.host/admin/users#location",
+    );
+    expect(controller.usersPath({ anchor: "location" })).toBe("/admin/users#location");
+
+    expect(controller.multiUrl(7, "hello", 5, { anchor: "location" })).toBe(
+      "http://test.host/people/go/7/hello/joe/5#location",
+    );
+
+    expect(controller.multiUrl(7, "hello", 5, { baz: "bar", anchor: "location" })).toBe(
+      "http://test.host/people/go/7/hello/joe/5?baz=bar#location",
+    );
+
+    expect(controller.indexUrl({ baz: "bar", anchor: "location" })).toBe(
+      "http://test.host/people?baz=bar#location",
+    );
+
+    expect(controller.indexUrl({ anchor: null })).toBe("http://test.host/people");
+    expect(controller.indexUrl({ anchor: false })).toBe("http://test.host/people");
+  });
+
+  it("named route url method with port", async () => {
+    const controller = await tc.setupNamedRouteTest();
+    expect(controller.showUrl(5, { port: 8080 })).toBe("http://test.host:8080/people/5");
+  });
+
+  it("named route url method with host", async () => {
+    const controller = await tc.setupNamedRouteTest();
+    expect(controller.showUrl(5, { host: "some.example.com" })).toBe(
+      "http://some.example.com/people/5",
+    );
+  });
+
+  it("named route url method with protocol", async () => {
+    const controller = await tc.setupNamedRouteTest();
+    expect(controller.showUrl(5, { protocol: "https" })).toBe("https://test.host/people/5");
+  });
+
+  it("named route url method with ordered parameters", async () => {
+    const controller = await tc.setupNamedRouteTest();
+    expect(controller.multiUrl(7, "hello", 5)).toBe("http://test.host/people/go/7/hello/joe/5");
+  });
+
+  it("named route url method with ordered parameters and hash", async () => {
+    const controller = await tc.setupNamedRouteTest();
+    expect(controller.multiUrl(7, "hello", 5, { baz: "bar" })).toBe(
+      "http://test.host/people/go/7/hello/joe/5?baz=bar",
+    );
+  });
+
+  it("named route url method with ordered parameters and empty hash", async () => {
+    const controller = await tc.setupNamedRouteTest();
+    expect(controller.multiUrl(7, "hello", 5, {})).toBe("http://test.host/people/go/7/hello/joe/5");
+  });
+
+  it("named route url method with no positional arguments", async () => {
+    const controller = await tc.setupNamedRouteTest();
+    expect(controller.indexUrl({ baz: "bar" })).toBe("http://test.host/people?baz=bar");
   });
 
   it("route constraints on request object with anchors are valid", () => {
