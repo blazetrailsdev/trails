@@ -2994,7 +2994,9 @@ class ApiExtractor
 
   # The iterators that return their receiver whatever the block answers
   # (`rb_ary_each`, `rb_hash_each_pair`, `enum_each_with_index`, `int_dotimes`),
-  # so the block's last statement is one whose value nothing reads.
+  # so the block's last statement is one whose value nothing reads. Matched by
+  # name on an explicit receiver: a receiverless `each { }` is the class's own
+  # `each`, which may read the block's value, and is left as it was.
   VALUE_DISCARDING_ITERATORS = %w[each each_pair each_key each_value each_with_index times].freeze
 
   def value_discarding_iterator?(call)
@@ -3002,19 +3004,27 @@ class ApiExtractor
     call.is_a?(Array) && call[0] == :call && VALUE_DISCARDING_ITERATORS.include?(ident_name(call[3]))
   end
 
-  # Marks the last statement of a block, or of a branch, and where that
-  # statement is itself an `if` / `unless`, the last statement of each arm.
+  # Node kind => the slot holding the next arm of its chain.
+  ARM_CHAIN_SLOTS = { if: 3, unless: 3, elsif: 3, when: 3 }.freeze
+
+  # Marks the last statement of a block or of a branch, the statement a
+  # modifier on it wraps, and where it is an `if` / `unless` / `case` /
+  # `begin`, the last statement of each arm.
   def void_block_tail(node, found)
     return unless node.is_a?(Array)
 
     node = node[2] if node[0] == :do_block
     stmts = node[STATEMENT_SLOTS[node[0]] || node.length]
-    stmt = stmts.is_a?(Array) && stmts.last
-    return unless stmt.is_a?(Array)
-
-    found << stmt
-    void_block_tail(stmt, found) if %i[if unless elsif else].include?(stmt[0])
-    void_block_tail(node[3], found) if %i[if unless elsif].include?(node[0])
+    tail = stmts.is_a?(Array) && stmts.last
+    if tail.is_a?(Array)
+      stmt = tail
+      found << stmt
+      found << stmt while stmt.is_a?(Array) && (stmt = stmt[MODIFIER_SLOTS[stmt[0]] || stmt.length])
+      void_block_tail(tail, found) if ARM_CHAIN_SLOTS.key?(tail[0])
+      void_block_tail(tail[2], found) if tail[0] == :case
+      void_block_tail(tail[1], found) if tail[0] == :begin
+    end
+    void_block_tail(node[ARM_CHAIN_SLOTS[node[0]] || node.length], found)
   end
 
   # `module_eval` / `class_eval` given a String (`module_eval <<-RUBY … RUBY`,

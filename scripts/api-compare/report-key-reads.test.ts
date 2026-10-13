@@ -21,7 +21,9 @@ const buckets = (body: string, ruby: [string, string | null][]) =>
     (r) => `${r.receiver}[:${r.key}] ${r.bucket}`,
   );
 
-describe("report-key-reads", () => {
+const RUBY_SUBPROCESS_TIMEOUT_MS = 30_000;
+
+describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   it("extract-key-reads.rb records a named-receiver [] per def, and no []= write", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "key-reads-"));
     try {

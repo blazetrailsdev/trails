@@ -21,6 +21,12 @@
  * is a renamed local or a destructured parameter far more often than a dropped
  * read, so it is counted and listed only under `--all`.
  *
+ * Both halves key a body by file and bare name, so same-named methods in one
+ * file (two classes' `call`, `def self.x` beside `def x`) pool their reads, and
+ * a TS body's reads include its nested functions'. That only ever credits a
+ * read, so `matched` is an upper bound and a listed row is never one the
+ * pooling invented.
+ *
  * The population is the skeleton artifact's pairs. There is no gate and no
  * baseline. Run `pnpm parity:api --calls` first so call-skeletons.json is fresh.
  */
