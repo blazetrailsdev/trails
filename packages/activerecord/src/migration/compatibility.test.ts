@@ -32,6 +32,9 @@ class Testing extends Base {
 }
 TestModel.tableName = "testings";
 
+const precisionImplicitDefault = () =>
+  currentAdapter("Mysql2Adapter", "TrilogyAdapter") ? { precision: 0 } : { precision: null };
+
 describe("Migration", () => {
   describe("CompatibilityTest", () => {
     fixtures({}, { useTransactionalTests: false });
@@ -40,9 +43,6 @@ describe("Migration", () => {
     let schemaMigration: SchemaMigration;
     let internalMetadata: InternalMetadata;
     let verboseWas: boolean | undefined;
-
-    const precisionImplicitDefault = () =>
-      currentAdapter("Mysql2Adapter", "TrilogyAdapter") ? { precision: 0 } : { precision: null };
 
     const migrate = async (migration: Migration) => {
       await new Migrator(
@@ -413,6 +413,30 @@ describe("Migration", () => {
         await connection.dropTable("more_testings").catch(() => null);
       }
     });
+
+    it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+      "change table collation not unset 7 0",
+      async () => {
+        const migration = new (class extends Migration.get(7.0) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.addColumn("testings", "txt_collated", "string", {
+              charset: "utf8mb4",
+              collation: "utf8mb4_general_ci",
+            });
+            await this.changeColumn("testings", "txt_collated", "string", {
+              default: "hi",
+              collation: "utf8mb4_esperanto_ci",
+            });
+          }
+        })();
+        await migrate(migration);
+        const column = (await connection.columns("testings")).find(
+          (c) => c.name === "txt_collated",
+        )!;
+        expect(column.default).toBe("hi");
+        expect(column.collation).toBe("utf8mb4_esperanto_ci");
+      },
+    );
 
     it("add reference on 6 0", async () => {
       try {
@@ -806,6 +830,484 @@ describe("Migration", () => {
         }
       },
     );
+
+    it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+      "change column on 7 0",
+      async () => {
+        const migration = class extends Migration.get(7.0) {
+          async up(): Promise<void> {
+            await this.execute("ALTER TABLE testings CONVERT TO CHARACTER SET utf32");
+            await this.changeColumn("testings", "foo", "varchar(255) CHARACTER SET ascii");
+          }
+        };
+        await assertNothingRaised(async () => {
+          await new Migrator(
+            "up",
+            [migration as unknown as MigrationProxy],
+            schemaMigration,
+            internalMetadata,
+          ).migrate();
+        });
+      },
+    );
+  });
+});
+
+type MigrationClass = () => ReturnType<typeof Migration.get>;
+
+interface BaseCompatibilityTest {
+  connection: AbstractAdapter;
+  schemaMigration: SchemaMigration;
+  internalMetadata: InternalMetadata;
+  migrationClass: MigrationClass;
+}
+
+function baseCompatibilityTest(migrationClass: MigrationClass): BaseCompatibilityTest {
+  fixtures({});
+  const state = { migrationClass } as BaseCompatibilityTest;
+  let verboseWas: boolean | undefined;
+
+  beforeEach(async () => {
+    state.connection = await ambientConnection();
+    const pool = Base.connectionPool();
+    state.schemaMigration = pool.schemaMigration;
+    state.internalMetadata = pool.internalMetadata;
+
+    verboseWas = Migration.verbose;
+    Migration.verbose = false;
+  });
+
+  afterEach(async () => {
+    Migration.verbose = verboseWas;
+    await state.schemaMigration.deleteAllVersions().catch(() => null);
+  });
+
+  return state;
+}
+
+function noOptionValidationTestCases(test: BaseCompatibilityTest): void {
+  it("options are not validated", async () => {
+    try {
+      const migration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("tests", { wrongId: false } as never, (t) => {
+            t.references("some_table", { wrongPrimaryKey: true } as never);
+            t.integer("some_id", { wrongUnique: true } as never);
+            t.string("some_string_column", { wrongNull: false } as never);
+          });
+
+          await this.addColumn("tests", "last_name", "string", { wrongPrecision: true } as never);
+
+          await this.changeColumn("tests", "some_id", "float", { wrongIndex: true } as never);
+
+          await this.addReference("tests", "another_table", {
+            invalidOption: "something",
+          } as never);
+
+          await this.changeTable("tests", {}, async (t) => {
+            await t.change("some_id", "float", { null: false, wrongIndex: true } as never);
+            await t.integer("another_id", { wrongUnique: true } as never);
+            await t.references("yet_another_table", { bad: "option" } as never);
+          });
+        }
+      })();
+
+      await new Migrator(
+        "up",
+        [migration as unknown as MigrationProxy],
+        test.schemaMigration,
+        test.internalMetadata,
+      ).migrate();
+
+      expect(await test.connection.tableExists("tests")).toBeTruthy();
+    } finally {
+      await test.connection.dropTable("tests", { ifExists: true });
+    }
+  });
+}
+
+function defaultPrecisionImplicitTestCases(test: BaseCompatibilityTest): void {
+  const migrate = async (...migrations: Migration[]) => {
+    await new Migrator(
+      "up",
+      migrations as unknown as MigrationProxy[],
+      test.schemaMigration,
+      test.internalMetadata,
+    ).migrate();
+  };
+
+  it("datetime doesnt set precision on change table", async () => {
+    try {
+      const createMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.datetime("published_at");
+          });
+        }
+      })(null, 1);
+
+      const changeMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.changeTable("more_testings", {}, async (t) => {
+            await t.change("published_at", "datetime", { default: RubyTime.now() });
+          });
+        }
+      })(null, 2);
+
+      await migrate(createMigration, changeMigration);
+
+      expect(
+        await test.connection.columnExists(
+          "more_testings",
+          "published_at",
+          null,
+          precisionImplicitDefault(),
+        ),
+      ).toBeTruthy();
+    } finally {
+      await test.connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("datetime doesnt set precision on create table", async () => {
+    try {
+      const migration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.datetime("published_at");
+          });
+        }
+      })();
+
+      await migrate(migration);
+
+      expect(
+        await test.connection.columnExists(
+          "more_testings",
+          "published_at",
+          null,
+          precisionImplicitDefault(),
+        ),
+      ).toBeTruthy();
+    } finally {
+      await test.connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("datetime doesnt set precision on change column", async () => {
+    try {
+      const createMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.date("published_at");
+          });
+        }
+      })(null, 0);
+
+      const changeMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.changeColumn("more_testings", "published_at", "datetime");
+        }
+      })(null, 1);
+
+      await migrate(createMigration, changeMigration);
+
+      expect(
+        await test.connection.columnExists(
+          "more_testings",
+          "published_at",
+          null,
+          precisionImplicitDefault(),
+        ),
+      ).toBeTruthy();
+    } finally {
+      await test.connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+}
+
+function defaultPrecisionSixTestCases(test: BaseCompatibilityTest): void {
+  const migrate = async (...migrations: Migration[]) => {
+    await new Migrator(
+      "up",
+      migrations as unknown as MigrationProxy[],
+      test.schemaMigration,
+      test.internalMetadata,
+    ).migrate();
+  };
+
+  it("datetime sets precision 6 on change table", async () => {
+    try {
+      const createMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.datetime("published_at");
+          });
+        }
+      })(null, 1);
+
+      const changeMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.changeTable("more_testings", {}, async (t) => {
+            await t.change("published_at", "datetime", { default: RubyTime.now() });
+          });
+        }
+      })(null, 2);
+
+      await migrate(createMigration, changeMigration);
+
+      expect(
+        await test.connection.columnExists("more_testings", "published_at", null, { precision: 6 }),
+      ).toBeTruthy();
+    } finally {
+      await test.connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("datetime sets precision 6 on create table", async () => {
+    try {
+      const migration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.datetime("published_at");
+          });
+        }
+      })();
+
+      await migrate(migration);
+
+      expect(
+        await test.connection.columnExists("more_testings", "published_at", null, { precision: 6 }),
+      ).toBeTruthy();
+    } finally {
+      await test.connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("datetime sets precision 6 on change column", async () => {
+    try {
+      const createMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.date("published_at");
+          });
+        }
+      })(null, 0);
+
+      const changeMigration = new (class extends test.migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.changeColumn("more_testings", "published_at", "datetime");
+        }
+      })(null, 1);
+
+      await migrate(createMigration, changeMigration);
+
+      expect(
+        await test.connection.columnExists("more_testings", "published_at", null, { precision: 6 }),
+      ).toBeTruthy();
+    } finally {
+      await test.connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+}
+
+describe("CompatibilityTest7_0", () => {
+  const test = baseCompatibilityTest(() => Migration.get(7.0));
+  defaultPrecisionSixTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest6_1", () => {
+  const test = baseCompatibilityTest(() => Migration.get(6.1));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest6_0", () => {
+  const test = baseCompatibilityTest(() => Migration.get(6.0));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest5_2", () => {
+  const test = baseCompatibilityTest(() => Migration.get(5.2));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest5_1", () => {
+  const test = baseCompatibilityTest(() => Migration.get(5.1));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest5_0", () => {
+  const test = baseCompatibilityTest(() => Migration.get(5.0));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest4_2", () => {
+  const test = baseCompatibilityTest(() => Migration.get(4.2));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+function legacyPolymorphicReferenceIndexTestCases(migrationClass: MigrationClass): void {
+  fixtures({}, { useTransactionalTests: false });
+  let connection: AbstractAdapter;
+  let schemaMigration: SchemaMigration;
+  let internalMetadata: InternalMetadata;
+  let verboseWas: boolean | undefined;
+
+  const migrate = async (migration: Migration) => {
+    await new Migrator(
+      "up",
+      [migration as unknown as MigrationProxy],
+      schemaMigration,
+      internalMetadata,
+    ).migrate();
+  };
+
+  beforeEach(async () => {
+    connection = await ambientConnection();
+    const pool = Base.connectionPool();
+    schemaMigration = pool.schemaMigration;
+    internalMetadata = pool.internalMetadata;
+    verboseWas = Migration.verbose;
+    Migration.verbose = false;
+
+    await connection.createTable("testings", { ifNotExists: true });
+  });
+
+  afterEach(async () => {
+    Migration.verbose = verboseWas;
+    await schemaMigration.deleteAllVersions().catch(() => null);
+    await connection.dropTable("testings").catch(() => null);
+  });
+
+  it("create table with polymorphic reference uses all column names in index", async () => {
+    try {
+      const migration = new (class extends migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.references("widget", { polymorphic: true, index: true });
+            t.belongsTo("gizmo", { polymorphic: true, index: true });
+          });
+        }
+      })();
+
+      await migrate(migration);
+
+      expect(
+        await connection.indexExists("more_testings", ["widget_type", "widget_id"], {
+          name: "index_more_testings_on_widget_type_and_widget_id",
+        }),
+      ).toBeTruthy();
+      expect(
+        await connection.indexExists("more_testings", ["gizmo_type", "gizmo_id"], {
+          name: "index_more_testings_on_gizmo_type_and_gizmo_id",
+        }),
+      ).toBeTruthy();
+    } finally {
+      await connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("change table with polymorphic reference uses all column names in index", async () => {
+    const migration = new (class extends migrationClass() {
+      override async migrate(_x: unknown): Promise<void> {
+        await this.changeTable("testings", {}, async (t) => {
+          await t.references("widget", { polymorphic: true, index: true });
+          await t.belongsTo("gizmo", { polymorphic: true, index: true });
+        });
+      }
+    })();
+
+    await migrate(migration);
+
+    expect(
+      await connection.indexExists("testings", ["widget_type", "widget_id"], {
+        name: "index_testings_on_widget_type_and_widget_id",
+      }),
+    ).toBeTruthy();
+    expect(
+      await connection.indexExists("testings", ["gizmo_type", "gizmo_id"], {
+        name: "index_testings_on_gizmo_type_and_gizmo_id",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("create join table with polymorphic reference uses all column names in index", async () => {
+    try {
+      const migration = new (class extends migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createJoinTable("more", "testings", (t) => {
+            t.references("widget", { polymorphic: true, index: true });
+            t.belongsTo("gizmo", { polymorphic: true, index: true });
+          });
+        }
+      })();
+
+      await migrate(migration);
+
+      expect(
+        await connection.indexExists("more_testings", ["widget_type", "widget_id"], {
+          name: "index_more_testings_on_widget_type_and_widget_id",
+        }),
+      ).toBeTruthy();
+      expect(
+        await connection.indexExists("more_testings", ["gizmo_type", "gizmo_id"], {
+          name: "index_more_testings_on_gizmo_type_and_gizmo_id",
+        }),
+      ).toBeTruthy();
+    } finally {
+      await connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("polymorphic add reference uses all column names in index", async () => {
+    const migration = new (class extends migrationClass() {
+      override async migrate(_x: unknown): Promise<void> {
+        await this.addReference("testings", "widget", { polymorphic: true, index: true });
+        await this.addBelongsTo("testings", "gizmo", { polymorphic: true, index: true });
+      }
+    })();
+
+    await migrate(migration);
+
+    expect(
+      await connection.indexExists("testings", ["widget_type", "widget_id"], {
+        name: "index_testings_on_widget_type_and_widget_id",
+      }),
+    ).toBeTruthy();
+    expect(
+      await connection.indexExists("testings", ["gizmo_type", "gizmo_id"], {
+        name: "index_testings_on_gizmo_type_and_gizmo_id",
+      }),
+    ).toBeTruthy();
+  });
+}
+
+describe("LegacyPolymorphicReferenceIndexTest", () => {
+  describe("V6_0", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(6.0));
+  });
+
+  describe("V5_2", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.2));
+  });
+
+  describe("V5_1", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.1));
+  });
+
+  describe("V5_0", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.0));
+  });
+
+  describe("V4_2", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(4.2));
   });
 });
 
