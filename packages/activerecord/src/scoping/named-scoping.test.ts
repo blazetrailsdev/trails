@@ -1,3 +1,4 @@
+import { Enumerable } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -473,8 +474,12 @@ describe("NamedScopingTest", () => {
   });
 
   it("find all should behave like select", async () => {
+    const toA = await Topic.base();
     expect((await Topic.base()).filter((t) => t.approved)).toEqual(
-      (await Topic.base()).filter((t) => t.approved),
+      Enumerable.findAll.call(
+        { each: (block) => toA.forEach(block) },
+        (t) => (t as Topic).approved,
+      ),
     );
   });
 

@@ -481,7 +481,7 @@ describe("TransactionTest", () => {
       });
     });
 
-    expect(((await Topic.find(1)) as any).approved).toBeTruthy();
+    expect((await Topic.find(1)).approved, "First should have been approved").toBeTruthy();
   });
 
   it("break from transaction commits", async () => {
@@ -511,8 +511,8 @@ describe("TransactionTest", () => {
         await first.updateBang({ approved: false });
       });
     });
-    expect(((await Topic.find(1)) as any).approved).toBeTruthy();
-    expect(((await Topic.find(2)) as any).approved).toBeTruthy();
+    expect((await Topic.find(1)).approved, "First should have been approved").toBeTruthy();
+    expect((await Topic.find(2)).approved, "Second should have been approved").toBeTruthy();
   });
 
   async function _testReturnFromTransaction71Behavior() {
