@@ -3,7 +3,15 @@ import type { ApiManifest, ClassInfo, InlinedFrom, MethodInfo } from "@blazetrai
 import { MISSING_TAG_PACKAGES, fixCitations, inlinedFromFindings } from "./lint-inlined-from.js";
 
 const def = (name: string, vendorFile: string, line: number, endLine: number): MethodInfo =>
-  ({ name, visibility: "public", params: [], vendorFile, line, endLine }) as MethodInfo;
+  ({
+    name,
+    visibility: "public",
+    params: [],
+    calls: ["super"],
+    vendorFile,
+    line,
+    endLine,
+  }) as MethodInfo;
 
 function entity(
   file: string,
@@ -41,6 +49,23 @@ const ruby = {
           ],
         }),
         "ActiveRecord::Relation": entity("relation.rb"),
+        "ActiveRecord::Proxy": entity(
+          "proxy.rb",
+          [{ ...def("initialize", `${AR}/proxy.rb`, 2, 4), calls: [] }],
+          { includes: ["Core"] },
+        ),
+        "ActiveRecord::Spanless": entity(
+          "spanless.rb",
+          [{ name: "initialize", visibility: "public", params: [] } as MethodInfo],
+          { includes: ["Core"] },
+        ),
+        "ActiveRecord::Session": entity(
+          "session.rb",
+          [def("initialize", `${AR}/session.rb`, 2, 4)],
+          {
+            includes: ["Core"],
+          },
+        ),
         "ActiveRecord::Batch": entity("batch.rb", [], {
           prepends: ["Inheritance"],
           extends: ["First::ClassMethods"],
@@ -101,12 +126,16 @@ const API = tag("ActiveModel::API#initialize", `${AM}/api.rb:80-84`);
 
 function messages(
   inlinedFrom: InlinedFrom[],
-  { owner = "Base", file = "base.ts", enrolled = [] as string[] } = {},
+  { owner = "Base", file = "base.ts", enrolled = [] as string[], reexport = false } = {},
 ): string[] {
   const ctor = { ...def("constructor", "", 1, 1), file, inlinedFrom };
-  const ts = {
-    packages: { activerecord: { classes: { [owner]: entity(file, [ctor]) }, modules: {} } },
-  } as unknown as ApiManifest;
+  const classes = reexport
+    ? {
+        [`${file}:${owner}`]: { ...entity(file, [ctor]), name: owner },
+        [`index.ts:${owner}`]: { ...entity("index.ts", [ctor]), name: owner },
+      }
+    : { [owner]: entity(file, [ctor]) };
+  const ts = { packages: { activerecord: { classes, modules: {} } } } as unknown as ApiManifest;
   return inlinedFromFindings(ruby, ts, enrolled).map((f) => `${f.hook} ${f.message}`);
 }
 
@@ -216,6 +245,28 @@ describe("inlinedFromFindings", () => {
 
   it("leaves the missing-tag arm off for a package that is not enrolled", () => {
     expect(messages([])).toEqual([]);
-    expect(MISSING_TAG_PACKAGES).toEqual([]);
+    expect(MISSING_TAG_PACKAGES).toEqual(["actioncontroller", "actiondispatch"]);
+  });
+
+  it("pairs a class by its name under a file-qualified key, and once when an index re-exports it", () => {
+    const enrolled = ["activerecord"];
+    expect(messages([LAST, NEW, FIRST, CORE, API], { enrolled, reexport: true })).toEqual([]);
+    expect(messages([LAST, NEW, FIRST, CORE], { enrolled, reexport: true })).toEqual([
+      "ActiveModel::API#initialize is inlined untagged: ActiveRecord::Base reaches it from another Ruby file",
+    ]);
+  });
+
+  it("ends the chain at an initialize that calls no super", () => {
+    const enrolled = ["activerecord"];
+    expect(messages([], { owner: "Proxy", file: "proxy.ts", enrolled })).toEqual([]);
+    expect(messages([CORE], { owner: "Proxy", file: "proxy.ts" })).toEqual([
+      "ActiveRecord::Core#initialize names a module ActiveRecord::Proxy does not include or prepend",
+    ]);
+    expect(messages([], { owner: "Spanless", file: "spanless.ts", enrolled })).toEqual([
+      "ActiveRecord::Core#initialize is inlined untagged: ActiveRecord::Spanless reaches it from another Ruby file",
+    ]);
+    expect(messages([], { owner: "Session", file: "session.ts", enrolled })).toEqual([
+      "ActiveRecord::Core#initialize is inlined untagged: ActiveRecord::Session reaches it from another Ruby file",
+    ]);
   });
 });

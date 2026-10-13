@@ -433,3 +433,20 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
     expect("leaked" in extend({}, klass._helpers)).toBe(false);
   });
 });
+
+describe("module initialize bodies inlined into the constructor", () => {
+  it("Base sets every ivar its modules' initialize sets", () => {
+    const controller = new Base();
+    expect(controller._actionHasLayout).toBe(true);
+    expect(controller._renderedFormat).toBeNull();
+    expect(controller._urlOptions).toBeNull();
+    expect(controller._markedForSameOriginVerification).toBeNull();
+    expect(controller.viewRuntime).toBeNull();
+  });
+
+  it("API sets every ivar its modules' initialize sets", () => {
+    const controller = new API();
+    expect(controller._urlOptions).toBeNull();
+    expect(controller.viewRuntime).toBeNull();
+  });
+});

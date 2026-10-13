@@ -393,7 +393,7 @@ export interface CsrfController {
   perFormCsrfTokens?: boolean;
   requestForgeryProtectionToken?: string;
   csrfTokenStorageStrategy?: CsrfTokenStorage;
-  _markedForSameOriginVerification?: boolean;
+  _markedForSameOriginVerification?: boolean | null;
   logger?: { warn(msg: string): void } | null;
   logWarningOnCsrfFailure?: boolean;
   forgeryProtectionStrategy?: new (controller: CsrfController) => ProtectionMethods;

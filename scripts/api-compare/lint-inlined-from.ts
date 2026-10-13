@@ -11,7 +11,12 @@
  *
  * The reverse arm, a Rails class that reaches a module `initialize` or a
  * `ClassMethods#new` in ANOTHER Ruby file and whose constructor carries no tag
- * for it, gates the packages in {@link MISSING_TAG_PACKAGES} only.
+ * for it, gates the packages in {@link MISSING_TAG_PACKAGES} only. An
+ * `initialize` that calls no `super` ends the chain: `RoutesProxy#initialize`
+ * (`action_dispatch/routing/routes_proxy.rb:15-19`) never reaches
+ * `Routing::UrlFor#initialize`. The Ruby extractor writes `calls` only when a
+ * body makes one, so a `def` read with a line span and no `calls` calls
+ * nothing; an entry with no line span is taken to call `super`.
  *
  * Usage:
  *   pnpm parity:api:inlined          # gate (CI)
@@ -25,7 +30,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import type { ApiManifest, ClassInfo, InlinedFrom } from "@blazetrails/parity/types";
+import type { ApiManifest, ClassInfo, InlinedFrom, MethodInfo } from "@blazetrails/parity/types";
 import { rubyFileToTs } from "@blazetrails/parity/conventions";
 import { resolveModuleName } from "./compare.js";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
@@ -36,7 +41,7 @@ import { TAG } from "./inlined-from-tags.js";
  * The packages whose missing-tag arm gates. Only-grow: a package joins in the
  * PR that converts its constructors, and none leaves to turn a red run green.
  */
-export const MISSING_TAG_PACKAGES: readonly string[] = [];
+export const MISSING_TAG_PACKAGES: readonly string[] = ["actioncontroller", "actiondispatch"];
 
 export interface InlinedFromFinding {
   package: string;
@@ -88,7 +93,18 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const resolve = (name: string, context: string) => resolveModuleName(name, context, byShort);
   const infos = Object.fromEntries([...modules].map(([fqn, mod]) => [fqn, mod.info]));
   const ancestors = moduleAncestors(entity.info, entity.fqn, infos, resolve);
-  const mixed = [...ancestors.prepended, ...ancestors.included];
+  const callsSuper = (body: MethodInfo | undefined) =>
+    body?.line === undefined || (body.calls ?? []).includes("super");
+  const behind = (fqns: readonly string[]) => {
+    const at = fqns.findIndex((fqn) => !callsSuper(defines(modules.get(fqn), "initialize")));
+    return at === -1 ? undefined : fqns.slice(0, at + 1);
+  };
+  const prepended = behind(ancestors.prepended);
+  const mixed =
+    prepended ??
+    (callsSuper(defines(entity, "initialize"))
+      ? [...ancestors.prepended, ...(behind(ancestors.included) ?? ancestors.included)]
+      : ancestors.prepended);
   const concerns = (name: string): string[] => {
     const own = moduleAncestors({ includes: [name] } as ClassInfo, entity.fqn, infos, resolve);
     return [...own.prepended, ...own.included]
@@ -128,6 +144,7 @@ export function inlinedFromFindings(
   const modules = new Map(entities(ruby, "modules").map((mod) => [mod.fqn, mod]));
   const rubyEntities = [...entities(ruby, "classes"), ...modules.values()];
   const findings: InlinedFromFinding[] = [];
+  const visited = new Set<string>();
   for (const [name, pkg] of Object.entries(ts.packages)) {
     for (const [owner, klass] of Object.entries(pkg.classes) as unknown as [string, ClassInfo][]) {
       const ctor = klass.instanceMethods.find((m) => m.name === "constructor");
@@ -135,7 +152,10 @@ export function inlinedFromFindings(
       if (tags.length === 0 && !enrolled.includes(name)) continue;
       const tsFile = ctor?.file ?? klass.file;
       if (tsFile === undefined) continue;
-      const short = owner.split(".").pop()!;
+      const short = (klass.name ?? owner).split(".").pop()!;
+      const seat = `${name} ${tsFile} ${klass.name ?? owner}`;
+      if (visited.has(seat)) continue;
+      visited.add(seat);
       const counterpart = rubyEntities.find(
         (entity) =>
           entity.package === name &&

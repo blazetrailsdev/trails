@@ -4831,7 +4831,13 @@ export function main() {
           scope,
         );
       }
-      if (m.inlinedFrom !== undefined && m.name === "constructor" && scope === "package") {
+      const declaredHere = m.file === undefined || m.file === file;
+      if (
+        m.inlinedFrom !== undefined &&
+        m.name === "constructor" &&
+        scope === "package" &&
+        declaredHere
+      ) {
         const byOwner = tsInlinedFromByFileOwner.get(file) ?? new Map<string, InlinedFrom[]>();
         byOwner.set(owner, m.inlinedFrom);
         tsInlinedFromByFileOwner.set(file, byOwner);
@@ -5295,7 +5301,7 @@ export function main() {
       const rubyReaderNames = new Set<string>();
       const rubyOwnerShortNames = new Set<string>();
       const rubyOwnersDefiningInitialize = new Set<string>();
-      const rubyFqnsReachingInitialize = new Set<string>();
+      const rubyFqnsDefiningInitialize = new Set<string>();
       // See rubyCallToTsForReceivers.
       let rubyFileDefinesInstanceNew = false;
       // (owner, name) pairs the extractor bucketed as CLASS methods — the
@@ -5315,7 +5321,9 @@ export function main() {
         rubyOwnerShortNames.add(itemShort);
         if (rubyMethods.some((rm) => rm.name === "initialize")) {
           rubyOwnersDefiningInitialize.add(itemShort);
-          rubyFqnsReachingInitialize.add(item.fqn);
+        }
+        if (item.info.instanceMethods.some((rm) => rm.name === "initialize")) {
+          rubyFqnsDefiningInitialize.add(item.fqn);
         }
         if (f.instance.some((rm) => rm.name === "new")) rubyFileDefinesInstanceNew = true;
         for (const rm of rubyMethods) {
@@ -6373,18 +6381,18 @@ export function main() {
           continue;
         }
 
-        if (
-          ownerIsModule &&
-          mixinFile === undefined &&
-          (rubyName === "initialize" || classMethodsNew) &&
-          inlinedHookCreditedBy(
-            classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
-            classMethodsNew ? "new" : "initialize",
-            pkg,
-            moduleIncluderFiles.get(rubyModule) ?? new Set(),
-            tsInlinedHookTags,
-          ) !== undefined
-        ) {
+        const creditedBy =
+          ownerIsModule && mixinFile === undefined && (rubyName === "initialize" || classMethodsNew)
+            ? inlinedHookCreditedBy(
+                classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
+                classMethodsNew ? "new" : "initialize",
+                pkg,
+                moduleIncluderFiles.get(rubyModule) ?? new Set(),
+                tsInlinedHookTags,
+              )
+            : undefined;
+        if (creditedBy !== undefined) {
+          checkBody(rubyName, "constructor", creditedBy.tsFile);
           fileMatched++;
           continue;
         }
@@ -6558,7 +6566,7 @@ export function main() {
           !isInitializeLessTaggedClass(
             fqn,
             rubyPkg.classes,
-            rubyFqnsReachingInitialize,
+            rubyFqnsDefiningInitialize,
             tsInlinedFromByFileOwner.get(expectedTs),
             inlinedTagsCompared,
             expectedTs,
