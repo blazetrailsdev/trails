@@ -532,6 +532,26 @@ describe("main cross-package and parked-stub credit", () => {
     );
     expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 1]);
   });
+
+  it("consumes a pending stub for an unported case Rails defines in a module", async () => {
+    const name = "after current transaction commit multidb nested transactions";
+    const result = await compare(
+      "transactions_test.rb",
+      {
+        activerecord: {
+          files: [
+            {
+              file: `${PKG_SRC_DIRS.activerecord}transactions.test.ts`,
+              testCases: [tc(["TransactionTest"], name, true)],
+            },
+          ],
+        },
+      },
+      [tc([], name)],
+      "activerecord",
+    );
+    expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 0]);
+  });
 });
 
 describe("matchesInterpolatedPath", () => {

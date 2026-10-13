@@ -1,5 +1,6 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "@blazetrails/activemodel";
 import { Builder } from "./insert-all.js";
 import { fixtures } from "./test-fixtures.js";
@@ -7,8 +8,10 @@ import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { adapterType } from "./test-adapter.js";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
-import { itIfSupports } from "./support/supports.js";
+import { Speedometer } from "./test-helpers/models/speedometer.js";
+import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
+import { quoteTableName } from "./support/quote-regex.js";
+import { adapterSupports, itIfSupports } from "./support/supports.js";
 import type { Base } from "./base.js";
 
 async function withRecordTimestamps(
@@ -153,4 +156,50 @@ describe("InsertAll extract_types_from_columns_on", () => {
     expect(record.isNewRecord()).toBe(true);
     expect(attribute).toBe("unknown_attribute");
   });
+});
+
+class DivergentPrimaryKeyBook extends Book {
+  static {
+    this.primaryKey = "isbn";
+  }
+}
+
+describe("InsertAllTest (trails)", () => {
+  fixtures(["authors", "books"]);
+
+  beforeAll(async () => {
+    await Speedometer.loadSchema();
+  });
+
+  it.skipIf(adapterType !== "mysql")(
+    "upsert all on a table without a database primary key treats the configured primary key as updatable",
+    async () => {
+      await assertQueriesMatch(
+        /ON DUPLICATE KEY UPDATE[\s\S]*speedometer_id/,
+        undefined,
+        false,
+        async () => {
+          await Speedometer.upsertAll([{ speedometer_id: "s9", name: "Fast" }]);
+        },
+      );
+    },
+  );
+
+  it.skipIf(!adapterSupports("insert_returning"))(
+    "insert all returning uses schema-cache primary keys not the model primary key",
+    async () => {
+      const returningId = new RegExp(`RETURNING ${regexpEscape(quoteTableName("id"))}`);
+      await assertQueriesMatch(returningId, undefined, false, async () => {
+        await DivergentPrimaryKeyBook.insertAll([
+          { name: "Divergent", isbn: "9990000000001", author_id: 1 },
+        ]);
+      });
+      const returningIsbn = new RegExp(`RETURNING ${regexpEscape(quoteTableName("isbn"))}`);
+      await assertNoQueriesMatch(returningIsbn, false, async () => {
+        await DivergentPrimaryKeyBook.insertAll([
+          { name: "Divergent II", isbn: "9990000000002", author_id: 1 },
+        ]);
+      });
+    },
+  );
 });
