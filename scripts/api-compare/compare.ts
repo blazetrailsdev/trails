@@ -4831,9 +4831,6 @@ export function main() {
           scope,
         );
       }
-      // A class re-exported through an `index.ts` is harvested again under
-      // that file, its members still carrying the declaring file. The tag
-      // sits on the declaration, which is the one row the pairing reads.
       const declaredHere = m.file === undefined || m.file === file;
       if (
         m.inlinedFrom !== undefined &&

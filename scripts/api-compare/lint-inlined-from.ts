@@ -11,7 +11,10 @@
  *
  * The reverse arm, a Rails class that reaches a module `initialize` or a
  * `ClassMethods#new` in ANOTHER Ruby file and whose constructor carries no tag
- * for it, gates the packages in {@link MISSING_TAG_PACKAGES} only.
+ * for it, gates the packages in {@link MISSING_TAG_PACKAGES} only. An
+ * `initialize` that calls no `super` ends the chain: `RoutesProxy#initialize`
+ * (`action_dispatch/routing/routes_proxy.rb:15-19`) never reaches
+ * `Routing::UrlFor#initialize`.
  *
  * Usage:
  *   pnpm parity:api:inlined          # gate (CI)
@@ -88,9 +91,6 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const resolve = (name: string, context: string) => resolveModuleName(name, context, byShort);
   const infos = Object.fromEntries([...modules].map(([fqn, mod]) => [fqn, mod.info]));
   const ancestors = moduleAncestors(entity.info, entity.fqn, infos, resolve);
-  // A body with no `super` ends the chain: `RoutesProxy#initialize`
-  // (`action_dispatch/routing/routes_proxy.rb:15-19`) never reaches
-  // `Routing::UrlFor#initialize`.
   const callsSuper = (body: MethodInfo | undefined) =>
     body === undefined || (body.calls ?? []).includes("super");
   const behind = (fqns: readonly string[]) => {
