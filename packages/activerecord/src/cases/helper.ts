@@ -66,11 +66,14 @@ Encryption.config.extendQueries = true;
 ExtendedDeterministicQueries.installSupport();
 ExtendedDeterministicUniquenessValidator.installSupport();
 
+const CLEAN_UP_KEPT_OWNERS = ["ActiveRecord::Base", "ARUnit2Model", "Contact", "ContactSti"];
+
 function writingPoolCensus(): Map<string, Map<string, number>> {
   const census = new Map<string, Map<string, number>>();
   for (const pool of Base.connectionHandler.connectionPoolList("writing")) {
     if (pool.dbConfig?.adapter === "fake") continue;
     const name = String(pool.connectionDescriptor?.name);
+    if (pool.shard !== Base.defaultShard && CLEAN_UP_KEPT_OWNERS.includes(name)) continue;
     const signature = `${pool.dbConfig?.adapter}:${pool.dbConfig?.database}`;
     let bySignature = census.get(name);
     if (!bySignature) {
