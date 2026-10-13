@@ -229,9 +229,5 @@ export function toXml(
   return builder.target();
 }
 
-ARRAY_METHOD_TABLE.inGroupsOf = inGroupsOf;
-ARRAY_METHOD_TABLE.inGroups = inGroups;
-ARRAY_METHOD_TABLE.toSentence = toSentence;
-ARRAY_METHOD_TABLE.toFs = toFs;
-ARRAY_METHOD_TABLE.toFormattedS = toFs;
-ARRAY_METHOD_TABLE.toXml = toXml;
+const toFormattedS = toFs;
+Object.assign(ARRAY_METHOD_TABLE, { inGroupsOf, inGroups, toSentence, toFs, toFormattedS, toXml });

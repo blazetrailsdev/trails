@@ -242,19 +242,9 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     toXmlArray(records, options, block),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
-for (const name of [
-  "intersection",
-  "union",
-  "plus",
-  "difference",
-  "isIntersect",
-  "compact",
-  "index",
-  "rindex",
-  "sample",
-  "rotate",
-  "shuffle",
-]) {
+const ARRAY_METHODS =
+  "intersection union plus difference isIntersect compact index rindex sample rotate shuffle";
+for (const name of ARRAY_METHODS.split(" ")) {
   RECORD_DELEGATES[name] = ARRAY_METHOD_TABLE[name] as RecordDelegate;
 }
 
