@@ -1234,20 +1234,6 @@ class RouteSetTest {
     return this.set;
   }
 
-  private _defaultRouteSet?: RouteSet;
-
-  get defaultRouteSet(): RouteSet {
-    return (this._defaultRouteSet ??= (() => {
-      const set = new RouteSet();
-      set.draw(function () {
-        deprecator().silence(() => {
-          this.get("/:controller(/:action(/:id))");
-        });
-      });
-      return set;
-    })());
-  }
-
   async setupNamedRouteTest(): Promise<NamedRoutes> {
     this.set.draw(function () {
       this.get({ "/people(/:id)": "people#show", as: "show" });
