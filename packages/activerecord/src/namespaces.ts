@@ -188,7 +188,6 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/abstract/connection-pool.js"),
 };
 
-/** @noRailsEquivalent CONVERGEABLE activerecord-test-fixtures-vitest-surface-leaves-rails-file */
 export interface TestConstants {} // eslint-disable-line @typescript-eslint/no-empty-object-type
 
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
