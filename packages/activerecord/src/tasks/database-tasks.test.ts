@@ -1387,7 +1387,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
   });
 });
 
-function databaseTasksTruncateAllTest(): void {
+function databaseTasksTruncateAllTest(): () => Promise<void> {
   fixtures(["courses", "colleges"], { useTransactionalTests: false });
 
   let schemaMigration: SchemaMigration;
@@ -1415,7 +1415,7 @@ function databaseTasksTruncateAllTest(): void {
     Base.configurations(oldConfigurations);
   });
 
-  it.skipIf(inMemoryDb())("truncate tables", async () => {
+  return async () => {
     expect(await schemaMigration.count()).toBeGreaterThan(0);
     expect(await internalMetadata.count()).toBeGreaterThan(0);
     expect(await Course.count()).toBeGreaterThan(0);
@@ -1433,35 +1433,35 @@ function databaseTasksTruncateAllTest(): void {
     expect(await internalMetadata.count()).toBeGreaterThan(0);
     expect(await Course.count()).toBe(0);
     expect(await College.count()).toBe(0);
-  });
+  };
 }
 
 describe("DatabaseTasksTruncateAllTest", () => {
-  databaseTasksTruncateAllTest();
+  it.skipIf(inMemoryDb())("truncate tables", databaseTasksTruncateAllTest());
+});
 
-  describe("DatabaseTasksTruncateAllWithPrefixTest", () => {
-    beforeEach(() => {
-      Base.tableNamePrefix = "p_";
-    });
-
-    afterEach(() => {
-      Base.tableNamePrefix = "";
-    });
-
-    databaseTasksTruncateAllTest();
+describe("DatabaseTasksTruncateAllWithPrefixTest", () => {
+  beforeEach(() => {
+    Base.tableNamePrefix = "p_";
   });
 
-  describe("DatabaseTasksTruncateAllWithSuffixTest", () => {
-    beforeEach(() => {
-      Base.tableNameSuffix = "_s";
-    });
-
-    afterEach(() => {
-      Base.tableNameSuffix = "";
-    });
-
-    databaseTasksTruncateAllTest();
+  afterEach(() => {
+    Base.tableNamePrefix = "";
   });
+
+  it.skipIf(inMemoryDb())("truncate tables", databaseTasksTruncateAllTest());
+});
+
+describe("DatabaseTasksTruncateAllWithSuffixTest", () => {
+  beforeEach(() => {
+    Base.tableNameSuffix = "_s";
+  });
+
+  afterEach(() => {
+    Base.tableNameSuffix = "";
+  });
+
+  it.skipIf(inMemoryDb())("truncate tables", databaseTasksTruncateAllTest());
 });
 
 describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
