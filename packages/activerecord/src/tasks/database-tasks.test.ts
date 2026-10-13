@@ -34,6 +34,7 @@ import {
 } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
+import { ConnectionAdapters } from "../namespaces.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
@@ -302,14 +303,20 @@ describe("DatabaseTasksRegisterTask", () => {
     const instance = new klazz();
 
     await assertCalledWithArgs(instance, "structureDump", ["awesome-file.sql", null], {}, () => {
-      DatabaseTasks.registerTask(/abstract/, class {});
-      DatabaseTasks.registerTask(/abstract/, stubbedNew(instance));
-      return DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
+      ConnectionAdapters.register(
+        "custom_mysql",
+        "ActiveRecord::ConnectionAdapters::Mysql2Adapter",
+        "active_record/connection_adapters/mysql2_adapter",
+      );
+      DatabaseTasks.registerTask(/custom_mysql/, stubbedNew(instance));
+      return DatabaseTasks.structureDump({ adapter: "custom_mysql" }, "awesome-file.sql");
     });
   });
 
-  it("unregistered task", () => {
-    expect(() => DatabaseTasks["classForAdapter"]("nonexistent")).toThrow(DatabaseNotSupported);
+  it("unregistered task", async () => {
+    await assertRaises([DatabaseNotSupported], {}, () =>
+      DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql"),
+    );
   });
 });
 

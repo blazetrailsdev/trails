@@ -4607,9 +4607,6 @@ export function main() {
     // The package-only signature populations the calls-parity ported-with-args
     // gate reads — see TsPortedWithArgsMaps for what each one is scoped to.
     const portedWithArgsMaps = newTsPortedWithArgsMaps();
-    // Dependency-package signatures by name: the callee signatures the padding
-    // rules fall back to when the calling package declares none (see
-    // resolveCalleeSigs).
     const tsParamsByNameInDeps = new Map<string, ParamInfo[][]>();
     const {
       paramsByNameInPkg: tsParamsByNameInPkg,
