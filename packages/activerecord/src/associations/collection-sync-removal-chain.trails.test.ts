@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface PostsAssociation {
   target: Post[];

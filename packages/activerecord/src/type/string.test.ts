@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
 import { Author } from "../test-helpers/models/author.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 class StringTestAuthor extends Author {
   static override _tableName = "authors";

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Nodes, Table } from "@blazetrails/arel";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { columnReferences, preprocessOrderArgs, processWithArgs } from "./query-methods.js";
 

@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import type { Base as BaseRecord } from "../base.js";
 
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 

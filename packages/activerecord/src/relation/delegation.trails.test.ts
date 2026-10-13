@@ -4,7 +4,7 @@ import { NotImplementedError } from "../errors.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { registerModel } from "../index.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { Relation } from "../relation.js";

@@ -8,7 +8,7 @@ import { captureSql } from "../testing/sql-capture.js";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 import { quoteTableName } from "../support/quote-regex.js";
 import { ActiveRecordError } from "../errors.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Developer } from "../test-helpers/models/developer.js";

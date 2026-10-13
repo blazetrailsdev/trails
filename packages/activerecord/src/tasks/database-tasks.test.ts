@@ -45,7 +45,7 @@ import { Backup } from "../sqlite/backup.js";
 import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
 import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";

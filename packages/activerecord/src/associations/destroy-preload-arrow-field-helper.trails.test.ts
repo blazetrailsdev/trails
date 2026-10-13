@@ -9,7 +9,7 @@ import {
   RestrictedWithErrorFirm,
   Client,
 } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { captureSql } from "../testing/sql-capture.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

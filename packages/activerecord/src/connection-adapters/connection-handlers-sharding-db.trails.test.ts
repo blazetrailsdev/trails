@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { connectedToStack } from "../core.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { cleanUpConnectionHandler } from "../cases/helper.js";
 
 describe("ConnectionHandlersShardingDbTest (trails-only)", () => {

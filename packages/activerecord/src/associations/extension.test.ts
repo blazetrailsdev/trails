@@ -4,7 +4,7 @@ import { Marshal } from "@blazetrails/ruby-compat";
 import { Base, CollectionProxy, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment, OopsError } from "../test-helpers/models/comment.js";
 import { Developer } from "../test-helpers/models/developer.js";

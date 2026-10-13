@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 

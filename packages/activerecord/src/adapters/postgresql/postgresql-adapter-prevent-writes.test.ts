@@ -4,7 +4,7 @@ import { Base } from "../../base.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 import { withExampleTable as withDdlHelperTable } from "../../support/ddl-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgreSQLAdapterPreventWritesTest", () => {

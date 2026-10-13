@@ -1,7 +1,7 @@
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertDifference } from "@blazetrails/activesupport";
 import { captureSql } from "../testing/sql-capture.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";

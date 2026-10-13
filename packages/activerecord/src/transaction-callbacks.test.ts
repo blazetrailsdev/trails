@@ -8,7 +8,7 @@ import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { ArgumentError, assertEmpty, assertRaise } from "@blazetrails/activesupport";
 
 import { kernelThrow } from "@blazetrails/ruby-compat";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { setRunAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
 function defineBehaviourTopic() {

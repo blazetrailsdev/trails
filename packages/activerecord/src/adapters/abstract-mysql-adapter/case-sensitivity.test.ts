@@ -3,7 +3,7 @@ import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport"
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { captureSql } from "../../testing/sql-capture.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures({});

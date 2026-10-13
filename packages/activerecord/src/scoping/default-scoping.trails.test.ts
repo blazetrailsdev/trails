@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import type { HasManyAssociation } from "../associations/has-many-association.js";
 import type { HasOneAssociation } from "../associations/has-one-association.js";
 import { Comment, SpecialComment, VerySpecialComment } from "../test-helpers/models/comment.js";

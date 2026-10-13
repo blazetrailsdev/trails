@@ -4,7 +4,7 @@ import { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Tag } from "../test-helpers/models/tag.js";

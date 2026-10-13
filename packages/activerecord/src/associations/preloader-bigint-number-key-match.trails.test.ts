@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { Preloader } from "./preloader.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 

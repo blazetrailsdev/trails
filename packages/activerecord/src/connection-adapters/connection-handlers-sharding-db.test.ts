@@ -1,41 +1,21 @@
-import { describe, it, expect, afterEach, afterAll } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
-import { type RawConfigurations } from "../database-configurations.js";
 import { currentRole } from "../core.js";
 import { ConnectionNotDefined } from "../errors.js";
 import { ArgumentError, setEnv } from "@blazetrails/ruby-compat";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Person } from "../test-helpers/models/person.js";
 import { assertNothingRaised, getEnv } from "@blazetrails/activesupport";
 
-async function withBaseConfigs(config: RawConfigurations, fn: () => Promise<void>): Promise<void> {
-  const previousEnv = getEnv("TRAILS_ENV");
-  setEnv("TRAILS_ENV", "default_env");
-  const prevConfigs = Base.configurations();
-  Base.configurations(config);
-  try {
-    await fn();
-  } finally {
-    Base.configurations(prevConfigs);
-    await Base.establishConnection(":arunit");
-    setEnv("TRAILS_ENV", previousEnv);
-  }
-}
-
 describe("ConnectionHandlersShardingDbTest", () => {
+  let prevConfigs: ReturnType<typeof Base.configurations>;
+
   fixtures(["people"], { useTransactionalTests: false });
 
   afterEach(() => {
     cleanUpConnectionHandler();
-  });
-
-  afterAll(async () => {
-    await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base", {
-      role: "writing",
-      shard: "shard_one",
-    });
   });
 
   it.skipIf(inMemoryDb())(
@@ -55,233 +35,260 @@ describe("ConnectionHandlersShardingDbTest", () => {
     },
   );
   it.skipIf(inMemoryDb())("establish connection using 3 levels config", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
-          primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
+
+    const config = {
+      default_env: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+        primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
+      },
+    };
+    prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await Base.connectsTo({
+        shards: {
+          default: { writing: ":primary", reading: ":primary" },
+          shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one" },
         },
-      },
-      async () => {
-        await Base.connectsTo({
-          shards: {
-            default: { writing: ":primary", reading: ":primary" },
-            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one" },
-          },
-        });
+      });
 
-        const basePool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-        const defaultPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
-          shard: "default",
-        });
+      const basePool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
+      const defaultPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
+        shard: "default",
+      });
 
-        expect(
-          (Base.connectionHandler as any).getPoolManager("ActiveRecord::Base")!.shardNames,
-        ).toEqual(["default", "shard_one"]);
-        expect(basePool).toBe(defaultPool);
-        expect(defaultPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
-        expect(defaultPool!.dbConfig.name).toBe("primary");
+      expect(
+        (Base.connectionHandler as any).getPoolManager("ActiveRecord::Base")!.shardNames,
+      ).toEqual(["default", "shard_one"]);
+      expect(basePool).toBe(defaultPool);
+      expect(defaultPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
+      expect(defaultPool!.dbConfig.name).toBe("primary");
 
-        const shardOnePool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
-          shard: "shard_one",
-        });
-        expect(shardOnePool).not.toBeUndefined();
-        expect(shardOnePool!.dbConfig.database).toBe("test/db/primary_shard_one.sqlite3");
-        expect(shardOnePool!.dbConfig.name).toBe("primary_shard_one");
-      },
-    );
+      const shardOnePool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
+        shard: "shard_one",
+      });
+      expect(shardOnePool).not.toBeUndefined();
+      expect(shardOnePool!.dbConfig.database).toBe("test/db/primary_shard_one.sqlite3");
+      expect(shardOnePool!.dbConfig.name).toBe("primary_shard_one");
+    } finally {
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
+    }
   });
   it.skipIf(inMemoryDb())(
     "establish connection using 3 levels config with shards and replica",
     async () => {
-      await withBaseConfigs(
-        {
-          default_env: {
-            primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
-            primary_replica: {
-              adapter: "sqlite3",
-              database: "test/db/primary.sqlite3",
-              replica: true,
-            },
-            primary_shard_one: {
-              adapter: "sqlite3",
-              database: "test/db/primary_shard_one.sqlite3",
-            },
-            primary_shard_one_replica: {
-              adapter: "sqlite3",
-              database: "test/db/primary_shard_one.sqlite3",
-              replica: true,
-            },
+      const previousEnv = getEnv("TRAILS_ENV");
+      setEnv("TRAILS_ENV", "default_env");
+
+      const config = {
+        default_env: {
+          primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+          primary_replica: {
+            adapter: "sqlite3",
+            database: "test/db/primary.sqlite3",
+            replica: true,
+          },
+          primary_shard_one: {
+            adapter: "sqlite3",
+            database: "test/db/primary_shard_one.sqlite3",
+          },
+          primary_shard_one_replica: {
+            adapter: "sqlite3",
+            database: "test/db/primary_shard_one.sqlite3",
+            replica: true,
           },
         },
-        async () => {
-          await Base.connectsTo({
-            shards: {
-              default: { writing: ":primary", reading: ":primary_replica" },
-              shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
-            },
-          });
+      };
+      prevConfigs = Base.configurations();
+      Base.configurations(config);
+      try {
+        await Base.connectsTo({
+          shards: {
+            default: { writing: ":primary", reading: ":primary_replica" },
+            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
+          },
+        });
 
-          const defaultWritingPool = Base.connectionHandler.retrieveConnectionPool(
-            "ActiveRecord::Base",
-            {
-              shard: "default",
-            },
-          );
-          const baseWritingPool =
-            Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-          expect(baseWritingPool).toBe(defaultWritingPool);
-          expect(defaultWritingPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
-          expect(defaultWritingPool!.dbConfig.name).toBe("primary");
+        const defaultWritingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            shard: "default",
+          },
+        );
+        const baseWritingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
+        expect(baseWritingPool).toBe(defaultWritingPool);
+        expect(defaultWritingPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
+        expect(defaultWritingPool!.dbConfig.name).toBe("primary");
 
-          const defaultReadingPool = Base.connectionHandler.retrieveConnectionPool(
-            "ActiveRecord::Base",
-            {
-              role: "reading",
-              shard: "default",
-            },
-          );
-          const baseReadingPool = Base.connectionHandler.retrieveConnectionPool(
-            "ActiveRecord::Base",
-            {
-              role: "reading",
-            },
-          );
-          expect(baseReadingPool).toBe(defaultReadingPool);
-          expect(defaultReadingPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
-          expect(defaultReadingPool!.dbConfig.name).toBe("primary_replica");
+        const defaultReadingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            role: "reading",
+            shard: "default",
+          },
+        );
+        const baseReadingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            role: "reading",
+          },
+        );
+        expect(baseReadingPool).toBe(defaultReadingPool);
+        expect(defaultReadingPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
+        expect(defaultReadingPool!.dbConfig.name).toBe("primary_replica");
 
-          const shardOneWritingPool = Base.connectionHandler.retrieveConnectionPool(
-            "ActiveRecord::Base",
-            {
-              shard: "shard_one",
-            },
-          );
-          expect(shardOneWritingPool).not.toBeUndefined();
-          expect(shardOneWritingPool!.dbConfig.database).toBe("test/db/primary_shard_one.sqlite3");
-          expect(shardOneWritingPool!.dbConfig.name).toBe("primary_shard_one");
+        const shardOneWritingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            shard: "shard_one",
+          },
+        );
+        expect(shardOneWritingPool).not.toBeUndefined();
+        expect(shardOneWritingPool!.dbConfig.database).toBe("test/db/primary_shard_one.sqlite3");
+        expect(shardOneWritingPool!.dbConfig.name).toBe("primary_shard_one");
 
-          const shardOneReadingPool = Base.connectionHandler.retrieveConnectionPool(
-            "ActiveRecord::Base",
-            {
-              role: "reading",
-              shard: "shard_one",
-            },
-          );
-          expect(shardOneReadingPool).not.toBeUndefined();
-          expect(shardOneReadingPool!.dbConfig.database).toBe("test/db/primary_shard_one.sqlite3");
-          expect(shardOneReadingPool!.dbConfig.name).toBe("primary_shard_one_replica");
-        },
-      );
+        const shardOneReadingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            role: "reading",
+            shard: "shard_one",
+          },
+        );
+        expect(shardOneReadingPool).not.toBeUndefined();
+        expect(shardOneReadingPool!.dbConfig.database).toBe("test/db/primary_shard_one.sqlite3");
+        expect(shardOneReadingPool!.dbConfig.name).toBe("primary_shard_one_replica");
+      } finally {
+        Base.configurations(prevConfigs);
+        await Base.establishConnection(":arunit");
+        setEnv("TRAILS_ENV", previousEnv);
+      }
     },
   );
 
   it.skipIf(inMemoryDb())("switching connections via handler", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
-          primary_replica: {
-            adapter: "sqlite3",
-            database: "test/db/primary.sqlite3",
-            replica: true,
-          },
-          primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
-          primary_shard_one_replica: {
-            adapter: "sqlite3",
-            database: "test/db/primary_shard_one.sqlite3",
-            replica: true,
-          },
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
+
+    const config = {
+      default_env: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+        primary_replica: {
+          adapter: "sqlite3",
+          database: "test/db/primary.sqlite3",
+          replica: true,
+        },
+        primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
+        primary_shard_one_replica: {
+          adapter: "sqlite3",
+          database: "test/db/primary_shard_one.sqlite3",
+          replica: true,
         },
       },
-      async () => {
-        await Base.connectsTo({
-          shards: {
-            default: { writing: ":primary", reading: ":primary_replica" },
-            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
-          },
-        });
+    };
+    prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await Base.connectsTo({
+        shards: {
+          default: { writing: ":primary", reading: ":primary_replica" },
+          shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
+        },
+      });
 
-        await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
-          expect(currentRole.call(Base as any)).toBe("reading");
-          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeTruthy();
-          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
-          expect((await Base.leaseConnection()).isPreventingWrites()).toBeTruthy();
-        });
+      await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
+        expect(currentRole.call(Base as any)).toBe("reading");
+        expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeTruthy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
+        expect((await Base.leaseConnection()).isPreventingWrites()).toBeTruthy();
+      });
 
-        await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
-          expect(currentRole.call(Base as any)).toBe("writing");
-          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeTruthy();
-          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
-          expect((await Base.leaseConnection()).isPreventingWrites()).toBeFalsy();
-        });
+      await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
+        expect(currentRole.call(Base as any)).toBe("writing");
+        expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeTruthy();
+        expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
+        expect((await Base.leaseConnection()).isPreventingWrites()).toBeFalsy();
+      });
 
-        await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
-          expect(currentRole.call(Base as any)).toBe("reading");
-          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeTruthy();
-          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
-          expect((await Base.leaseConnection()).isPreventingWrites()).toBeTruthy();
-        });
+      await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
+        expect(currentRole.call(Base as any)).toBe("reading");
+        expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeTruthy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
+        expect((await Base.leaseConnection()).isPreventingWrites()).toBeTruthy();
+      });
 
-        await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
-          expect(currentRole.call(Base as any)).toBe("writing");
-          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeTruthy();
-          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
-          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
-          expect((await Base.leaseConnection()).isPreventingWrites()).toBeFalsy();
-        });
-      },
-    );
+      await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+        expect(currentRole.call(Base as any)).toBe("writing");
+        expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeTruthy();
+        expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
+        expect((await Base.leaseConnection()).isPreventingWrites()).toBeFalsy();
+      });
+    } finally {
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
+    }
   });
 
   it.skipIf(inMemoryDb())("retrieves proper connection with nested connected to", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
-          primary_replica: {
-            adapter: "sqlite3",
-            database: "test/db/primary.sqlite3",
-            replica: true,
-          },
-          primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
-          primary_shard_one_replica: {
-            adapter: "sqlite3",
-            database: "test/db/primary_shard_one.sqlite3",
-            replica: true,
-          },
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
+
+    const config = {
+      default_env: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+        primary_replica: {
+          adapter: "sqlite3",
+          database: "test/db/primary.sqlite3",
+          replica: true,
+        },
+        primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
+        primary_shard_one_replica: {
+          adapter: "sqlite3",
+          database: "test/db/primary_shard_one.sqlite3",
+          replica: true,
         },
       },
-      async () => {
-        await Base.connectsTo({
-          shards: {
-            default: { writing: ":primary", reading: ":primary_replica" },
-            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
-          },
+    };
+    prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await Base.connectsTo({
+        shards: {
+          default: { writing: ":primary", reading: ":primary_replica" },
+          shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
+        },
+      });
+
+      await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
+        expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+
+        await Base.connectedTo({ role: "writing" }, async () => {
+          expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one");
         });
 
-        await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
-          expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
-
-          await Base.connectedTo({ role: "writing" }, async () => {
-            expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one");
-          });
-
-          await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
-            expect(Base.connectionPool().dbConfig.name).toBe("primary_replica");
-          });
-
-          expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+        await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
+          expect(Base.connectionPool().dbConfig.name).toBe("primary_replica");
         });
-      },
-    );
+
+        expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+      });
+    } finally {
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
+    }
   });
 
   it.skipIf(inMemoryDb())("connected to raises without a shard or role", async () => {
@@ -385,54 +392,68 @@ describe("ConnectionHandlersShardingDbTest", () => {
   );
 
   it.skipIf(inMemoryDb())("cannot swap shards while prohibited", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
-          primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
-        },
-      },
-      async () => {
-        await Base.connectsTo({
-          shards: {
-            default: { writing: ":primary" },
-            shard_one: { writing: ":primary_shard_one" },
-          },
-        });
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
 
-        expect(() => {
-          Base.prohibitShardSwapping(() => {
-            Base.connectedTo({ role: "reading", shard: "default" }, () => {});
-          });
-        }).toThrow(/cannot swap `shard` while shard swapping is prohibited/);
+    const config = {
+      default_env: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+        primary_shard_one: { adapter: "sqlite3", database: "test/db/primary_shard_one.sqlite3" },
       },
-    );
+    };
+    prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await Base.connectsTo({
+        shards: {
+          default: { writing: ":primary" },
+          shard_one: { writing: ":primary_shard_one" },
+        },
+      });
+
+      expect(() => {
+        Base.prohibitShardSwapping(() => {
+          Base.connectedTo({ role: "reading", shard: "default" }, () => {});
+        });
+      }).toThrow(/cannot swap `shard` while shard swapping is prohibited/);
+    } finally {
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
+    }
   });
 
   it.skipIf(inMemoryDb())("can swap roles while shard swapping is prohibited", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
-          primary_replica: {
-            adapter: "sqlite3",
-            database: "test/db/primary.sqlite3",
-            replica: true,
-          },
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
+
+    const config = {
+      default_env: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+        primary_replica: {
+          adapter: "sqlite3",
+          database: "test/db/primary.sqlite3",
+          replica: true,
         },
       },
-      async () => {
-        await Base.connectsTo({
-          shards: { default: { writing: ":primary", reading: ":primary_replica" } },
-        });
+    };
+    prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await Base.connectsTo({
+        shards: { default: { writing: ":primary", reading: ":primary_replica" } },
+      });
 
-        expect(() => {
-          Base.prohibitShardSwapping(() => {
-            Base.connectedTo({ role: "reading" }, () => {});
-          });
-        }).not.toThrow();
-      },
-    );
+      expect(() => {
+        Base.prohibitShardSwapping(() => {
+          Base.connectedTo({ role: "reading" }, () => {});
+        });
+      }).not.toThrow();
+    } finally {
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
+    }
   });
 
   it("default shard is chosen by first key or default", async () => {

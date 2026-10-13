@@ -5,7 +5,7 @@ import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
 import { assertRespondTo, assertRaises, assertEmpty, Logger } from "@blazetrails/activesupport";
 import { Book, PublishedBook } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class MockLogger extends Logger {
   private _logged: Record<string, string[]> = { warn: [] };

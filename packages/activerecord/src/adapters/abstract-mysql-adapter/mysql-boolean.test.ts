@@ -2,7 +2,7 @@ import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 class BooleanType extends Base {
   static tableName = "mysql_booleans";

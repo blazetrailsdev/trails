@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { include, initialize } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { loadSchema } from "./model-schema.js";
 import { Firm } from "./test-helpers/models/company.js";
 

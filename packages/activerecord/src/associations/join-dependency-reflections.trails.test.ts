@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";

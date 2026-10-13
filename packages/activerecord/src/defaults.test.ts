@@ -9,7 +9,7 @@ import { isMariaDb } from "./support/mysql-server-version.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { describeIfSqlite } from "./support/describe-if-sqlite.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 

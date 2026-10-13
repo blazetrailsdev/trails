@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Person } from "./test-helpers/models/person.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 

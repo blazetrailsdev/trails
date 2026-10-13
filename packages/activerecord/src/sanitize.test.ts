@@ -3,7 +3,7 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { assertNothingRaised, assertRaises, isPlainObject } from "@blazetrails/activesupport";
 import { Base, Range, PreparedStatementInvalid, UnknownAttributeReference } from "./index.js";
 import type { Relation } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Binary } from "./test-helpers/models/binary.js";

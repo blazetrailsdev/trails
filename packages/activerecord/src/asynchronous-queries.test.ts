@@ -19,7 +19,7 @@ import { FutureResult } from "./future-result.js";
 import { Result } from "./result.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { cleanUpConnectionHandler } from "./cases/helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
 function asynchronousQueriesSharedTests(connection: () => AbstractAdapter): void {

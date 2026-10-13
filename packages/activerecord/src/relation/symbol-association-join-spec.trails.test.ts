@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { Post } from "../test-helpers/models/post.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("a leading-colon association spec", () => {
   fixtures(["posts", "comments"]);

@@ -4,7 +4,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import "../test-helpers/models/company.js";

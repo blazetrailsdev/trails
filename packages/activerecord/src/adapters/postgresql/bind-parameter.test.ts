@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { describeIfPg } from "./test-helper.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
 describeIfPg("PostgreSQLAdapter", () => {

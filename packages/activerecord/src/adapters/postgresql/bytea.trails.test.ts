@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import pg from "pg";
 import { pgConnection } from "../../pg/connection.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 
 class ByteaDataType extends Base {

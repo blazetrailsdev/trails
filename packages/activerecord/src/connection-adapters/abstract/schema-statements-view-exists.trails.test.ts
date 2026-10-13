@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../../index.js";
 import type { AbstractAdapter } from "../abstract-adapter.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { assertNoQueries } from "../../testing/query-assertions.js";
 
 describe("SchemaStatements#viewExists", () => {

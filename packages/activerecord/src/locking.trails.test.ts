@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { RecordNotFound } from "./errors.js";
 import { LockingType } from "./locking/optimistic.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Person } from "./test-helpers/models/person.js";
 
 describe("OptimisticLockingTrailsTest", () => {

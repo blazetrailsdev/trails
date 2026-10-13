@@ -3,7 +3,7 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Marshal } from "@blazetrails/ruby-compat";
 import { Base, registerModel, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   assertDeprecated,
   assertDifference,

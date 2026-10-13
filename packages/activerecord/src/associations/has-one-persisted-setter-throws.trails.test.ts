@@ -5,7 +5,7 @@ import { Account } from "../test-helpers/models/account.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Membership } from "../test-helpers/models/membership.js";
 import { Club } from "../test-helpers/models/club.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 interface HasOneOwner {

@@ -12,7 +12,7 @@ import { Calculations } from "./calculations.js";
 import { FinderMethods } from "./finder-methods.js";
 import { QueryMethods } from "./query-methods.js";
 import { SpawnMethods } from "./spawn-methods.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { tsName } from "../test-helpers/array-delegate-spellings.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";

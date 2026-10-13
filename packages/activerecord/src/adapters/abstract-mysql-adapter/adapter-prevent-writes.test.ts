@@ -3,7 +3,7 @@ import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, Mysql2Adapter, ARUNIT_DATABASE } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { Mysql2Result } from "../../mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

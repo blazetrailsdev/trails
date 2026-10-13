@@ -8,7 +8,7 @@ import {
   TooManyRecords,
 } from "./index.js";
 import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";

@@ -2,7 +2,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { Toy } from "./test-helpers/models/toy.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("timestamp reload_schema_from_cache", () => {
   fixtures(["toys", "books"]);

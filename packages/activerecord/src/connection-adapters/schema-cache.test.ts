@@ -11,7 +11,7 @@ import { StatementInvalid } from "../errors.js";
 import { assertRaises } from "@blazetrails/activesupport";
 import { File, FileUtils, Marshal, Tempfile } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";

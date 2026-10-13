@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { registerModel, RecordNotFound } from "../index.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 
 type AccountAttributes = { credit_limit: number };

@@ -11,7 +11,7 @@ import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   aroundSaveCollectionAssociation,
   build,

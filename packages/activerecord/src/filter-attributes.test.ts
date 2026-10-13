@@ -3,7 +3,7 @@ import { Base } from "./index.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 import { User } from "./test-helpers/models/user.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { PP } from "@blazetrails/ruby-compat";
 
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);

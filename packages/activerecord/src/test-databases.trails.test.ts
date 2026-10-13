@@ -7,7 +7,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as connectionHandling from "./connection-handling.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 const stubConfigurations = (configs: UrlConfig[]): DatabaseConfigurations => {
   const dc = new DatabaseConfigurations({});

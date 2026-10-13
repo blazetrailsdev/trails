@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import { Concern, assertEqual } from "@blazetrails/activesupport";
 import { Module, extend, include } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 type SchemaLoadCounted = typeof Base & { loadSchemaCalls?: number };
 

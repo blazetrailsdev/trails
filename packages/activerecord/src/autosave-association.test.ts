@@ -67,7 +67,7 @@ import { Order as CanonicalOrder } from "./test-helpers/models/order.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { DrinkDesigner } from "./test-helpers/models/drink-designer.js";
 import { Chef, ChefWithPolymorphicInverseOf } from "./test-helpers/models/chef.js";

@@ -6,7 +6,7 @@ import {
 } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Table } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
 import { Author } from "../test-helpers/models/author.js";

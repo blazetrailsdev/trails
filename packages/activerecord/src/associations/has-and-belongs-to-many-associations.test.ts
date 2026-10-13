@@ -15,7 +15,7 @@ import {
   assertNothingRaised,
   assertRespondTo,
 } from "@blazetrails/activesupport";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Project, SpecialProject } from "../test-helpers/models/project.js";
 import {
   Developer,

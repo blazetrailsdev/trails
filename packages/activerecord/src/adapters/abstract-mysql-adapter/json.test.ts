@@ -1,7 +1,7 @@
 import { beforeEach } from "vitest";
 import "../../index.js";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, supportsJson } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { jsonSharedTestCases } from "../../cases/json-shared-test-cases.js";
 import type { TableDefinition } from "../../connection-adapters/abstract/schema-definitions.js";
 

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { assertEqual, assertRaises, assertInDelta } from "@blazetrails/activesupport";
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { inTimeZone } from "./cases/helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { withEnvTz, withTimezoneConfig } from "./test-helper.js";

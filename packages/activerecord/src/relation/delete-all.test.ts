@@ -4,7 +4,7 @@ import { regexpEscape } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { quoteTableName } from "../support/quote-regex.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Post } from "../test-helpers/models/post.js";

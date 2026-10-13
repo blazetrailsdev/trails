@@ -9,7 +9,7 @@ import {
 } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Client } from "./test-helpers/models/company.js";
 import "./support/canonical-model-index.js";

@@ -4,7 +4,7 @@ import { Base } from "./base.js";
 import { Relation } from "./relation.js";
 import { RelationMethods } from "./token-for.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class TokenUser extends User {
   static {

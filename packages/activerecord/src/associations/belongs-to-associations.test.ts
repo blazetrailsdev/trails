@@ -28,7 +28,7 @@ import { Treasure } from "../test-helpers/models/treasure.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { captureSqlAndBinds } from "../test-helpers/test-case.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { Account } from "../test-helpers/models/account.js";

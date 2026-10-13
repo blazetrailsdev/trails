@@ -23,6 +23,7 @@ import type { Serialization } from "./attribute-methods/serialization.js";
 import type { TimeZoneConversion } from "./attribute-methods/time-zone-conversion.js";
 import type { Write } from "./attribute-methods/write.js";
 import type { Base } from "./base.js";
+import type { TestCase } from "./cases/test-case.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { load, register, resolve } from "./connection-adapters.js";
@@ -188,8 +189,6 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/abstract/connection-pool.js"),
 };
 
-export interface TestConstants {} // eslint-disable-line @typescript-eslint/no-empty-object-type
-
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
   Validations: typeof Validations;
   Base: typeof Base;
@@ -212,7 +211,8 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Scoping: typeof Scoping;
   Tasks: typeof Tasks;
   Point: new (x: number, y: number) => { x: number; y: number };
-} & TestConstants;
+  TestCase: typeof TestCase;
+};
 registerConstant("ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");

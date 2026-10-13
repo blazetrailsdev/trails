@@ -1,6 +1,6 @@
 import { afterEach, it, expect } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { describeIfSupports } from "../support/supports.js";
 import { Notifications } from "@blazetrails/activesupport";

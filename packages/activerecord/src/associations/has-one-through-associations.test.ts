@@ -3,7 +3,7 @@ import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Base, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   assertQueriesMatch,
   assertQueriesCount,

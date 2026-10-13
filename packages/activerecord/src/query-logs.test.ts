@@ -5,7 +5,7 @@ import { Base } from "./base.js";
 import { QueryLogs } from "./query-logs.js";
 import type { QueryTransformer } from "./query-transformers.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { adapterType } from "./test-adapter.js";
 import { queryTransformers } from "./active-record.js";

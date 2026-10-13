@@ -6,7 +6,7 @@ import { UrlConfig } from "../../database-configurations/url-config.js";
 import { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,

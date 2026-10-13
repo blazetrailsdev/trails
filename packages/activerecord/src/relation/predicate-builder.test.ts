@@ -3,7 +3,7 @@ import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js
 import { Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { quoteTableName } from "../support/quote-regex.js";

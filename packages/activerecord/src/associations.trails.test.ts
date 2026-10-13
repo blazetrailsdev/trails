@@ -3,7 +3,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, registerModel } from "./index.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { Preloader } from "./associations/preloader.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { captureSql } from "./testing/sql-capture.js";
 import {

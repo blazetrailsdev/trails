@@ -4,7 +4,7 @@ import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../config.js";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { FixtureSet } from "../../fixtures.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { Base } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";

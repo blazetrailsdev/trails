@@ -8,7 +8,7 @@ import { CategoryPost, Post } from "../test-helpers/models/post.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { cleanUpConnectionHandler, waitForAsyncQuery } from "../cases/helper.js";
 import { Base } from "../base.js";

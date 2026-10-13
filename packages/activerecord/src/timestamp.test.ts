@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { assertInDelta, assertNothingRaised, travel, travelBack } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   Developer,
   DeveloperCalledJamis,

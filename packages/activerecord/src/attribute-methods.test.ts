@@ -31,7 +31,7 @@ import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./in
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 import { inTimeZone } from "./cases/helper.js";
 import { deprecator } from "./deprecator.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
 import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "@blazetrails/activemodel";
 import { Builder } from "./insert-all.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Ship } from "./test-helpers/models/ship.js";

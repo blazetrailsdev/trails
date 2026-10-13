@@ -8,7 +8,7 @@ import { leaseConnection, withConnection, connection } from "./connection-handli
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./active-record.js";
 import { Relation } from "./relation.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { connectedToStack, currentRole, currentShard, currentPreventingWrites } from "./core.js";

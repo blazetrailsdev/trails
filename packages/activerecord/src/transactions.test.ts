@@ -6,7 +6,7 @@ import { afterAllTransactionsCommit } from "./active-record.js";
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./support/supports.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Movie } from "./test-helpers/models/movie.js";

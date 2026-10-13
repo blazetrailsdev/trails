@@ -7,7 +7,7 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { inTimeZone } from "../../cases/helper.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, setZone, zone, BigDecimal } from "@blazetrails/activesupport";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

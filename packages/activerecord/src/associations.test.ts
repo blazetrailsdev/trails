@@ -28,7 +28,7 @@ import {
   assertQueriesMatch,
 } from "./testing/query-assertions.js";
 import { captureSql } from "./testing/sql-capture.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import type { Firm as FirmT } from "./test-helpers/models/company.js";

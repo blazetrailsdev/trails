@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Relation, Base } from "./index.js";
 import { Batches } from "./relation/batches.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   assertNoQueries,
   assertQueriesCount,

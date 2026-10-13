@@ -4,7 +4,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("DisableJoinsAssociationScope", () => {
   fixtures([]);

@@ -6,7 +6,7 @@ import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { NotImplementedError } from "../../errors.js";
 import { ambientConnection, withRocketTables } from "../../support/rocket-tables.js";
 import { adapterType } from "../../test-adapter.js";

@@ -19,7 +19,7 @@ import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Subscription } from "./test-helpers/models/subscription.js";
 import { Book } from "./test-helpers/models/book.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";

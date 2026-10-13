@@ -5,7 +5,7 @@ import { DateTime } from "@blazetrails/date";
 import { assertRaises } from "@blazetrails/activesupport";
 import { File as RubyFile, RuntimeError } from "@blazetrails/ruby-compat";
 import { TEST_ROOT } from "./config.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";

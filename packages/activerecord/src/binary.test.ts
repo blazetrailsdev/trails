@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFile } from "fs/promises";
 import type { BinaryData } from "@blazetrails/activemodel";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 
 describe("BinaryTest", () => {

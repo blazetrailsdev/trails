@@ -7,7 +7,7 @@ import { encrypts } from "./encryptable-record.js";
 import type { SchemeOptions } from "./scheme.js";
 import { Base } from "../index.js";
 import { Encryption } from "./test-helpers.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 fixtures([]);
 

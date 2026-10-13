@@ -9,7 +9,7 @@ import {
 } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-methods.js";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";

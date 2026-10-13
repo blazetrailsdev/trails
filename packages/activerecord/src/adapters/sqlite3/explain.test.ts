@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Author } from "../../test-helpers/models/author.js";
 import "../../support/canonical-model-index.js";
 

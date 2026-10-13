@@ -26,7 +26,7 @@ import {
 } from "./test-helpers.js";
 import { assertNoChanges } from "@blazetrails/activesupport";
 import { itIfSupports } from "../support/supports.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 import {
   EncryptedBook,

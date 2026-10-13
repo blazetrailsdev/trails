@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { StringType, ValueType } from "@blazetrails/activemodel";
 import { NormalizedValueType } from "./normalization.js";

@@ -8,7 +8,7 @@ import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class Horse extends Base {
   static {

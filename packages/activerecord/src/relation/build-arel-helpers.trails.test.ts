@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Base, Relation, UnmodifiableRelation, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 fixtures({});
 

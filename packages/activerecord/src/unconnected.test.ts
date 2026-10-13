@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { ConnectionNotDefined } from "./errors.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class TestRecord extends Base {}
 

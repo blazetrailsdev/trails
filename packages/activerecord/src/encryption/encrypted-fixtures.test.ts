@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import "../relation.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   let restoreEncryption: (() => void) | undefined;

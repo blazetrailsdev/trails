@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { recordCursorValues } from "./relation/batches.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Book } from "./test-helpers/models/book.js";

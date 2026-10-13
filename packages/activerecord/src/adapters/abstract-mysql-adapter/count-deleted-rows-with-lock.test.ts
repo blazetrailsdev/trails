@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Thread } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Bulb } from "../../test-helpers/models/bulb.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Car } from "../../test-helpers/models/car.js";

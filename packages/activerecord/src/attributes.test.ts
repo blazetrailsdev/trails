@@ -11,7 +11,7 @@ import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { adapterType } from "./test-adapter.js";
 

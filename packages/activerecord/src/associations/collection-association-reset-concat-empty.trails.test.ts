@@ -6,7 +6,7 @@ import { Post } from "../test-helpers/models/post.js";
 import { Car } from "../test-helpers/models/car.js";
 import { Tyre } from "../test-helpers/models/tyre.js";
 import { Person } from "../test-helpers/models/person.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface CollectionAssociationLike {
   target: Post[];

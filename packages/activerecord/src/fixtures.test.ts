@@ -32,7 +32,8 @@ import { TestCase } from "./cases/test-case.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
-import { fixtures, TestFixtures } from "./test-fixtures.js";
+import { TestFixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Organization } from "./test-helpers/models/organization.js";
 import { ClassNameThatDoesNotFollowCONVENTIONS } from "./test-helpers/models/randomly-named-c1.js";
 import {

@@ -3,7 +3,7 @@ import * as Types from "@blazetrails/activemodel";
 import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
 import { Array as ArrayType } from "../connection-adapters/postgresql/oid/array.js";
 import { RangeType } from "../connection-adapters/postgresql/oid/range.js";

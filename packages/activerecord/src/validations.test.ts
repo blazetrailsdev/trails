@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { BigDecimal, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Topic } from "./test-helpers/models/topic.js";

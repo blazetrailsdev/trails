@@ -8,7 +8,7 @@ import {
   assertEncryptedAttribute,
 } from "./test-helpers.js";
 import { Encryption } from "../encryption.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   EncryptedBookWithSerializedFirstBinary,
   EncryptedBookWithSerializedSecondBinary,

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { rbModConstSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 class DestroyAsyncTestJob {
   static performLater(_jobArguments: Record<string, unknown>): void {}

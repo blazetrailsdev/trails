@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { Club } from "../test-helpers/models/club.js";
 import { Member } from "../test-helpers/models/member.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface ForeignAssociationLike {
   setOwnerAttributes(record: unknown): void;

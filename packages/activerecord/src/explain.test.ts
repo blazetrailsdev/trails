@@ -5,7 +5,7 @@ import { QueryAttribute } from "./relation/query-attribute.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { itIfSupports } from "./support/supports.js";
 import { captureSql } from "./testing/sql-capture.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
 

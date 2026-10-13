@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "../../index.js";
 import type { AbstractAdapter } from "../abstract-adapter.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describe("DatabaseStatements select async kwarg", () => {
   fixtures({});

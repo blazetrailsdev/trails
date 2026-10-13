@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { SpecialComment } from "../test-helpers/models/comment.js";
 
 describe("defaultScoped on an STI subclass", () => {

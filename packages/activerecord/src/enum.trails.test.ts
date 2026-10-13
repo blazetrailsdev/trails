@@ -9,7 +9,7 @@ import {
 import { ArgumentError, DecimalType, IntegerType } from "@blazetrails/activemodel";
 import { Base, registerModel } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Lion } from "./test-helpers/models/cat.js";
 

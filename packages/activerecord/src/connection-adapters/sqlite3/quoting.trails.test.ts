@@ -4,7 +4,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational, TypeError } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { DateTime as ARDateTimeType } from "../../type/date-time.js";

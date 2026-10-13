@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../base.js";
 import { Migrator } from "../../migration.js";
 import { SchemaMigration } from "../../schema-migration.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 const migrationsDir = (name: string) =>
   new URL(`../../test-helpers/migrations/${name}`, import.meta.url).pathname;

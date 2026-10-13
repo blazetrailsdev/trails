@@ -8,7 +8,7 @@ import { WhereClause } from "./relation/where-clause.js";
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { quoteTableName as canonicalQuoteTableName } from "./support/quote-regex.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HashMerger } from "./relation/merger.js";

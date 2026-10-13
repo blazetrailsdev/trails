@@ -15,7 +15,7 @@ import {
   isPresent,
 } from "@blazetrails/activesupport";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";
 import {
   Post,

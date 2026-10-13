@@ -3,7 +3,7 @@ import { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import { deprecator } from "./deprecator.js";
 import { assertDeprecated, assertNotDeprecated } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { connectedToStack } from "./core.js";
 import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./active-record.js";

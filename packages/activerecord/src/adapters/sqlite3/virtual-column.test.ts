@@ -4,7 +4,7 @@ import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../config.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../index.js";
 import { FixtureSet } from "../../fixtures.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../support/supports.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";

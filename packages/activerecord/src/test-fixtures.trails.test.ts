@@ -4,7 +4,8 @@ import { Minitest } from "@blazetrails/activesupport";
 import "./relation.js";
 import { TestCase } from "./cases/test-case.js";
 import { FIXTURES_ROOT } from "./config.js";
-import { fixtures, TestFixtures } from "./test-fixtures.js";
+import { TestFixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
