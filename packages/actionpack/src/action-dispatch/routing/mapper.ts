@@ -1448,7 +1448,7 @@ export class Mapper {
         options[":to"] = to;
       }
 
-      hashDelete(options, path);
+      delete options[path];
       options = transformKeys(options, (name) =>
         isSymbol(name) ? camelize(symbolToS(name), false) : name,
       );

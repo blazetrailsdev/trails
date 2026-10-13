@@ -437,7 +437,7 @@ export const ClassMethods = {
 
   removeClassOption(this: BaseClass, ...names: string[]): void {
     names.forEach((name) => {
-      hashDelete(this.classOptions(), name);
+      delete this.classOptions()[name];
     });
   },
 
@@ -472,8 +472,8 @@ export const ClassMethods = {
     };
 
     names.forEach((name) => {
-      hashDelete(this.commands(), rbObjAsString(name));
-      hashDelete(this.allCommands(), rbObjAsString(name));
+      delete this.commands()[rbObjAsString(name)];
+      delete this.allCommands()[rbObjAsString(name)];
       if (rtest(options.undefine)) {
         Object.defineProperty(this.prototype, rbObjAsString(name), {
           value: undefined,

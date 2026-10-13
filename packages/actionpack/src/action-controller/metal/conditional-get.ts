@@ -44,7 +44,7 @@ export async function freshWhen(
     template = null,
   }: FreshWhenOptions = {},
 ): Promise<void> {
-  hashDelete(this.response.cacheControl, "noStore");
+  delete this.response.cacheControl.noStore;
   if (strongEtag == null || strongEtag === false) {
     if (weakEtag == null || weakEtag === false) {
       weakEtag = etag != null && etag !== false ? etag : object;
@@ -90,7 +90,7 @@ export function expiresIn(
   seconds: number | Duration,
   options: Record<string, unknown> = {},
 ): void {
-  hashDelete(this.response.cacheControl, "noStore");
+  delete this.response.cacheControl.noStore;
   Object.assign(this.response.cacheControl, {
     maxAge: seconds,
     public: hashDelete(options, "public"),
@@ -99,7 +99,7 @@ export function expiresIn(
     staleIfError: hashDelete(options, "staleIfError"),
     immutable: hashDelete(options, "immutable"),
   });
-  hashDelete(options, "private");
+  delete options.private;
 
   this.response.cacheControl.extras = Object.entries(options).map(([k, v]) => `${k}=${v}`);
   if (!this.response.isDate) this.response.date = Time.now();

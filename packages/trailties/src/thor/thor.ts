@@ -6,7 +6,6 @@ import {
   compact,
   eachPair,
   first,
-  hashDelete,
   include,
   initializeIncludedModules,
   isEmpty,
@@ -353,7 +352,7 @@ export class Thor {
       if (rtest(value)) {
         (this._checkUnknownOptions as CheckUnknownOptions)[key] = rbFArray(value);
       } else {
-        hashDelete(this._checkUnknownOptions as CheckUnknownOptions, key);
+        delete (this._checkUnknownOptions as CheckUnknownOptions)[key];
       }
     });
     return this._checkUnknownOptions;

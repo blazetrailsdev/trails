@@ -85,12 +85,12 @@ export class Label extends Base {
     if (nameAndId["for"] != null && nameAndId["for"] !== false) {
       nameAndId["id"] = nameAndId["for"];
     } else {
-      hashDelete(nameAndId, "id");
+      delete nameAndId["id"];
     }
 
     this.addDefaultNameAndIdForValue(tagValue, nameAndId);
-    hashDelete(options, "index");
-    hashDelete(options, "namespace");
+    delete options["index"];
+    delete options["namespace"];
     if (!Object.hasOwn(options, "for")) options["for"] = nameAndId["id"];
 
     const builder = new LabelBuilder(
