@@ -14,6 +14,7 @@ import { temporalTag } from "./temporal-tag.js";
 import { rbRegToS } from "./regexp.js";
 import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
+import { registeredConstant } from "./variable.js";
 
 type Klass = abstract new (...args: never) => unknown;
 
@@ -58,14 +59,18 @@ export function rbObjClass(obj: unknown): Klass {
       ? rbCClass
       : rbCProc;
   }
-  if (hasEpochNanoseconds(obj)) return rbCTime;
+  if (hasEpochNanoseconds(obj)) {
+    return reopened(
+      (obj as { [rubyClass]?: string })[rubyClass] === "DateTime" ? rbCDateTime : rbCTime,
+    ) as Klass;
+  }
   const tag = temporalTag(obj);
-  if (tag === "Temporal.PlainDate") return rbCDate;
-  if (tag === "Temporal.PlainDateTime") return rbCDateTime;
-  if (tag === "Temporal.PlainTime") return rbCTime;
+  if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;
+  if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime) as Klass;
+  if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
   if (isPlainHash(obj)) return Hash;
   const klass = (obj as object).constructor as Klass | undefined;
-  if (klass === Date) return rbCTime;
+  if (klass === Date) return reopened(rbCTime) as Klass;
   return typeof klass === "function" ? klass : Object;
 }
 
@@ -112,6 +117,20 @@ export function rbSetClassPathString(
       ? rbModToS(under as abstract new (...args: never) => unknown)
       : (under.name ?? rbAnyToS(under));
   classpaths.set(klass, { path: `${str}::${name}`, permanent });
+}
+
+/**
+ * The one class object a core class has once a gem reopens it
+ * (`class Date extends rbCDate`, seated by `registerConstant`): MRI has one
+ * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`), so the seat and
+ * the class reopening it are the same class. A class nothing reopens is
+ * answered as it is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function reopened(klass: object): object {
+  const path = classpaths.get(klass)?.path;
+  return path === undefined ? klass : (registeredConstant(path) ?? klass);
 }
 
 function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {

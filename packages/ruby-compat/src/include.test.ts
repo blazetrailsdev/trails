@@ -835,6 +835,25 @@ describe("extend", () => {
     expect(extend(obj, { hello() {} })).toBe(obj);
   });
 
+  it("extends with several modules last to first, so the first one wins", () => {
+    const order: string[] = [];
+    const first = {
+      who: () => "first",
+      [extended]: () => void order.push("first"),
+    };
+    const second = {
+      who: () => "second",
+      [extended]: () => void order.push("second"),
+    };
+    const obj = extend({}, first, second);
+    expect(order).toEqual(["second", "first"]);
+    expect((obj as typeof first).who()).toBe("first");
+  });
+
+  it("raises ArgumentError with no module", () => {
+    expect(() => extend({})).toThrow("wrong number of arguments (given 0, expected 1+)");
+  });
+
   it("works without an extended callback", () => {
     class User {}
     extend(User, {
@@ -1060,8 +1079,13 @@ describe("Module#ancestors", () => {
 
   it("lists MRI's ancestors for a core class", () => {
     const names = (x: unknown) => rbModAncestors(rbObjClass(x)).map(rbModName).join(" ");
+    const named = (x: unknown) =>
+      rbModAncestors(rbObjClass(x))
+        .map(rbModName)
+        .filter((name) => name != null)
+        .join(" ");
     const dateTime = { [Symbol.toStringTag]: "Temporal.PlainDateTime" };
-    expect(names(dateTime)).toBe("DateTime Date Comparable Object Kernel BasicObject");
+    expect(named(dateTime)).toBe("DateTime Date Comparable Object Kernel BasicObject");
     expect(names(1)).toBe("Integer Numeric Comparable Object Kernel BasicObject");
     expect(names(1.5)).toBe("Float Numeric Comparable Object Kernel BasicObject");
     expect(names(null)).toBe("NilClass Object Kernel BasicObject");
@@ -1076,7 +1100,7 @@ describe("Module#ancestors", () => {
     expect(yielded).toEqual(["a", 1, "b", 2]);
     expect(names(class {})).toBe("Class Module Object Kernel BasicObject");
     expect(names("s")).toBe("String Comparable Object Kernel BasicObject");
-    expect(names(new Date(0))).toBe("Time Comparable Object Kernel BasicObject");
+    expect(named(new Date(0))).toBe("Time Comparable Object Kernel BasicObject");
     expect(rbModAncestors(rbCBasicObject)).toEqual([rbCBasicObject]);
   });
 

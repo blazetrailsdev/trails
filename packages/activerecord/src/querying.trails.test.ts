@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { block, type Module } from "@blazetrails/ruby-compat";
 import { Base, Relation } from "./index.js";
 import { _queryBySql, _loadFromSql } from "./querying.js";
 import { Result } from "./result.js";
@@ -29,6 +30,31 @@ describe("QueryingTest — static forwarders on Base", () => {
 
   it("extending() returns a Relation", () => {
     expect(Topic.extending()).toBeInstanceOf(Relation);
+  });
+
+  it("extending() builds a Module from its block, after the modules it is given", () => {
+    const all = Topic.all() as unknown as {
+      extending(...modules: unknown[]): {
+        first(): string;
+        only(): string;
+        extendingValues: object[];
+      };
+    };
+    const relation = all.extending(
+      { first: () => "module", only: () => "module" },
+      block((mod: Module) => mod.defineMethod("first", () => "block")),
+    );
+
+    expect(relation.extendingValues).toHaveLength(2);
+    expect(relation.first()).toBe("module");
+    expect(relation.only()).toBe("module");
+    expect(
+      (
+        Topic.extending(block((mod: Module) => mod.defineMethod("page", () => 1))) as unknown as {
+          page(): number;
+        }
+      ).page(),
+    ).toBe(1);
   });
 
   it("unscope() static forwarder returns a Relation", () => {

@@ -1912,7 +1912,7 @@ export interface Relation<T extends Base, G extends boolean = false>
     mod: M | undefined,
   ): Relation<T, G> & Partial<M>;
   extending(...modules: Module[]): Relation<T, G>;
-  extending(fn: (rel: Relation<T, G>) => void): Relation<T, G>;
+  extending(block: (mod: Module) => void): Relation<T, G>;
   extending(): Relation<T, G>;
   optimizerHints(...args: string[]): Relation<T, G>;
   annotate(...args: string[]): Relation<T, G>;

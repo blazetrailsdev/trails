@@ -23,11 +23,12 @@ import {
 } from "../../testing/query-assertions.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
+import * as DdlHelper from "../../support/ddl-helper.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Name } from "../../connection-adapters/postgresql/utils.js";
 import { ConnectionBad } from "../../pg/exceptions.js";
 
-const EX_DEFAULT = "id serial primary key, number integer, data character varying(255)";
+let adapter: PostgreSQLAdapter;
 
 async function withPostgresqlApdaterDecodeDates(fn: () => Promise<void>): Promise<void> {
   PostgreSQLAdapter.decodeDates = true;
@@ -39,16 +40,10 @@ async function withPostgresqlApdaterDecodeDates(fn: () => Promise<void>): Promis
 }
 
 async function withExampleTable(
-  adapter: PostgreSQLAdapter,
-  fn: () => Promise<void>,
-  definition: string = EX_DEFAULT,
+  definition = "id serial primary key, number integer, data character varying(255)",
+  block: () => Promise<void>,
 ): Promise<void> {
-  await adapter.execute(`CREATE TABLE ex (${definition})`);
-  try {
-    await fn();
-  } finally {
-    await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);
-  }
+  await DdlHelper.withExampleTable(adapter, "ex", definition, block);
 }
 
 function connectionWithoutInsertReturning(): PostgreSQLAdapter {
@@ -56,8 +51,6 @@ function connectionWithoutInsertReturning(): PostgreSQLAdapter {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
-
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
@@ -176,7 +169,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("primary key", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         expect(await adapter.primaryKey("ex")).toBe("id");
       });
     });
@@ -186,27 +179,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("non standard primary key", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.primaryKey("ex")).toBe("data");
-        },
-        "data character varying(255) primary key",
-      );
+      await withExampleTable("data character varying(255) primary key", async () => {
+        expect(await adapter.primaryKey("ex")).toBe("data");
+      });
     });
 
     it("primary key returns nil for no pk", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.primaryKey("ex")).toBeNull();
-        },
-        "id integer",
-      );
+      await withExampleTable("id integer", async () => {
+        expect(await adapter.primaryKey("ex")).toBeNull();
+      });
     });
 
     it("exec insert with returning disabled", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -226,7 +211,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec insert with returning disabled and no sequence name given", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -245,7 +230,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec insert default values with returning disabled and no sequence name given", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -264,7 +249,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -303,7 +288,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("pk and sequence for", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
         expect(pk).toBe("id");
         expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "id"));
@@ -311,35 +296,23 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("pk and sequence for with non standard primary key", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
-          expect(pk).toBe("code");
-          expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "code"));
-        },
-        "code serial primary key",
-      );
+      await withExampleTable("code serial primary key", async () => {
+        const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
+        expect(pk).toBe("code");
+        expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "code"));
+      });
     });
 
     it("pk and sequence for returns nil if no seq", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
-        },
-        "id integer primary key",
-      );
+      await withExampleTable("id integer primary key", async () => {
+        expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
+      });
     });
 
     it("pk and sequence for returns nil if no pk", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
-        },
-        "id integer",
-      );
+      await withExampleTable("id integer", async () => {
+        expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
+      });
     });
 
     it("pk and sequence for returns nil if table not found", async () => {
@@ -394,7 +367,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec no binds", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         let result = await adapter.execQuery("SELECT id, data FROM ex");
         expect(result.rows.length).toBe(0);
         expect(result.columns.length).toBe(2);
@@ -411,7 +384,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec with binds", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const string = adapter.quote("foo");
         await adapter.execQuery(`INSERT INTO ex (id, data) VALUES (1, ${string})`);
 
@@ -428,7 +401,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec typecasts bind vals", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const string = adapter.quote("foo");
         await adapter.execQuery(`INSERT INTO ex (id, data) VALUES (1, ${string})`);
 
@@ -445,7 +418,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("partial index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", ["id", "number"], { name: "partial", where: "number > 100" });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "partial");
         expect(index!.where).toBe("(number > 100)");
@@ -454,18 +427,17 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("partial index on column named like keyword", async () => {
       await withExampleTable(
-        adapter,
+        'id serial primary key, number integer, "primary" boolean',
         async () => {
           await adapter.addIndex("ex", "id", { name: "partial", where: "primary" });
           const index = (await adapter.indexes("ex")).find((idx) => idx.name === "partial");
           expect(index!.where).toBe('"primary"');
         },
-        'id serial primary key, number integer, "primary" boolean',
       );
     });
 
     itIfSupports("index_include", "include index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", ["id"], { name: "include", include: ["number"] });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
         expect(index!.include).toEqual(["number"]);
@@ -473,7 +445,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("index_include", "include multiple columns index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", ["id"], { name: "include", include: ["number", "data"] });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
         expect(index!.include).toEqual(["number", "data"]);
@@ -481,31 +453,23 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("index_include", "include keyword column name", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          await adapter.addIndex("ex", "id", { name: "include", include: ["timestamp"] });
-          const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
-          expect(index!.include).toEqual(["timestamp"]);
-        },
-        "id integer, timestamp integer",
-      );
+      await withExampleTable("id integer, timestamp integer", async () => {
+        await adapter.addIndex("ex", "id", { name: "include", include: ["timestamp"] });
+        const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
+        expect(index!.include).toEqual(["timestamp"]);
+      });
     });
 
     itIfSupports("index_include", "include escaped quotes column name", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          await adapter.addIndex("ex", "id", { name: "include", include: ['I"like"quotes'] });
-          const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
-          expect(index!.include).toEqual(['I"like"quotes']);
-        },
-        'id integer, "I""like""quotes" integer',
-      );
+      await withExampleTable('id integer, "I""like""quotes" integer', async () => {
+        await adapter.addIndex("ex", "id", { name: "include", include: ['I"like"quotes'] });
+        const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
+        expect(index!.include).toEqual(['I"like"quotes']);
+      });
     });
 
     it("expression index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const expr = "mod(id, 10), abs(number)";
         await adapter.addIndex("ex", expr, { name: "expression" });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "expression");
@@ -515,7 +479,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("index with opclass", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", "data", { opclass: { data: "varchar_pattern_ops" } });
         let index = (await adapter.indexes("ex")).find((idx) => idx.name === "index_ex_on_data");
         expect(index!.columns).toEqual(["data"]);
@@ -527,7 +491,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("invalid index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
         const error = await assertRaises([RecordNotUnique], {}, () =>
           adapter.addIndex("ex", "number", {
@@ -550,7 +514,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("nulls_not_distinct", "index with not distinct nulls", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.execute(
           `CREATE UNIQUE INDEX index_ex_on_data ON ex (data) NULLS NOT DISTINCT WHERE number > 0`,
         );
@@ -686,7 +650,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("unparsed defaults are at least set when saving", async () => {
       await withExampleTable(
-        adapter,
+        "id SERIAL PRIMARY KEY, number INTEGER NOT NULL DEFAULT (4 + 4) * 2 / 4",
         async () => {
           class NumberKlass extends Base {
             declare number: number | null;
@@ -703,29 +667,24 @@ describeIfPg("PostgreSQLAdapter", () => {
           await firstNumber.saveBang();
           expect((await firstNumber.reload()).number).toBe(4);
         },
-        "id SERIAL PRIMARY KEY, number INTEGER NOT NULL DEFAULT (4 + 4) * 2 / 4",
       );
     });
 
     it("only check for insensitive comparison capability once", async () => {
       await adapter.execute("CREATE DOMAIN example_type AS integer");
       try {
-        await withExampleTable(
-          adapter,
-          async () => {
-            class NumberKlass extends Base {
-              static tableName = "ex";
-            }
-            const attribute = NumberKlass.arelTable.get("number");
-            await assertQueriesCount(undefined, true, async () => {
-              await adapter.caseInsensitiveComparison(attribute, "foo");
-            });
-            await assertNoQueries(false, async () => {
-              await adapter.caseInsensitiveComparison(attribute, "foo");
-            });
-          },
-          "id SERIAL PRIMARY KEY, number example_type",
-        );
+        await withExampleTable("id SERIAL PRIMARY KEY, number example_type", async () => {
+          class NumberKlass extends Base {
+            static tableName = "ex";
+          }
+          const attribute = NumberKlass.arelTable.get("number");
+          await assertQueriesCount(undefined, true, async () => {
+            await adapter.caseInsensitiveComparison(attribute, "foo");
+          });
+          await assertNoQueries(false, async () => {
+            await adapter.caseInsensitiveComparison(attribute, "foo");
+          });
+        });
       } finally {
         await adapter.execute("DROP DOMAIN example_type");
       }

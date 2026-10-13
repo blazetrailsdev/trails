@@ -10,6 +10,8 @@ import {
   isModuleIncluded,
   isSymbol,
   merge,
+  Module,
+  rbBlockGivenP,
   partition,
   rbFPublicSend,
   rbFSend,
@@ -990,26 +992,27 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function extending(this: QueryMethodsHost, ...modules: Array<object | ((rel: any) => void)>): any {
-  if (modules.some((mod) => mod != null && (mod as unknown) !== false)) {
-    return extendingBang.call(this.spawn(), ...modules);
+function extending(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extending(this: QueryMethodsHost, ...modules: object[]): any;
+function extending(this: QueryMethodsHost, ...modules: object[]): any {
+  const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
+  if (any(modules) || block) {
+    return extendingBang.call(this.spawn(), ...modules, ...(block ? [block] : []));
   } else {
     return this;
   }
 }
 
-function extendingBang(
-  this: QueryMethodsHost,
-  ...modules: Array<object | ((rel: any) => void)>
-): any {
-  for (const mod of modules) {
-    if (typeof mod === "function") {
-      mod(this);
-    } else {
-      this.extendingValues = [...this.extendingValues, mod];
-    }
-  }
-  for (const mod of [...this.extendingValues].reverse()) extend(this, mod);
+function extendingBang(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extendingBang(this: QueryMethodsHost, ...modules: object[]): any;
+function extendingBang(this: QueryMethodsHost, ...modules: object[]): any {
+  const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
+  if (block) modules.push(new Module(block as (mod: Module) => void));
+  modules.splice(0, modules.length, ...(flatten(modules) as object[]));
+
+  this.extendingValues = [...this.extendingValues, ...modules];
+  if (any(this.extendingValues)) extend(this, ...this.extendingValues);
+
   return this;
 }
 
