@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { ActiveSupportJSON, include, isPresent, type Included } from "@blazetrails/activesupport";
-import { bodyFromString } from "@blazetrails/rack";
+import { Utils, bodyFromString } from "@blazetrails/rack";
 import { URI, first, type Module } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
@@ -114,6 +114,21 @@ class LegacyRouteSetTests {
 
   setupForNamedRoute(options: Record<string, unknown> = {}): NamedRoutes {
     return new (MockController.build(this.rs.urlHelpers(), options))() as unknown as NamedRoutes;
+  }
+
+  testNamedRouteMethod(): void {
+    this.rs.draw(function () {
+      this.get({ categories: "content#categories", as: "categories" });
+
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id))");
+      });
+    });
+
+    expect(this.urlFor(this.rs, { controller: "content", action: "categories" })).toBe(
+      "/categories",
+    );
+    expect(this.urlFor(this.rs, { controller: "content", action: "hi" })).toBe("/content/hi");
   }
 
   setupRequestMethodRoutesFor(method: string): void {
@@ -703,7 +718,7 @@ describe("LegacyRouteSetTests", () => {
   it("root without path raises argument error", () => {
     expect(() => {
       rs.draw(function () {
-        this.root(null as never);
+        this.root(null);
       });
     }).toThrow(ArgumentError);
   });
@@ -915,7 +930,7 @@ describe("LegacyRouteSetTests", () => {
     });
 
     const token = "текст";
-    const escapedToken = encodeURIComponent(token);
+    const escapedToken = Utils.escape(token);
 
     expect(tc.urlFor(rs, { controller: "content", action: "show_page", id: token })).toBe(
       "/page/" + escapedToken,
@@ -1026,25 +1041,12 @@ describe("LegacyRouteSetTests", () => {
     expect(tc.setupForNamedRoute().homeUrl()).toBe("http://test.host/");
   });
 
-  const testNamedRouteMethod = () => {
-    rs.draw(function () {
-      this.get({ categories: "content#categories", as: "categories" });
-
-      deprecator().silence(() => {
-        this.get(":controller(/:action(/:id))");
-      });
-    });
-
-    expect(tc.urlFor(rs, { controller: "content", action: "categories" })).toBe("/categories");
-    expect(tc.urlFor(rs, { controller: "content", action: "hi" })).toBe("/content/hi");
-  };
-
   it("named route method", () => {
-    testNamedRouteMethod();
+    tc.testNamedRouteMethod();
   });
 
   it("named routes array", () => {
-    testNamedRouteMethod();
+    tc.testNamedRouteMethod();
     expect(rs.namedRoutes.names()).toEqual(["categories"]);
   });
 
@@ -1230,6 +1232,20 @@ class RouteSetTest {
 
   get routes(): RouteSet {
     return this.set;
+  }
+
+  private _defaultRouteSet?: RouteSet;
+
+  get defaultRouteSet(): RouteSet {
+    return (this._defaultRouteSet ??= (() => {
+      const set = new RouteSet();
+      set.draw(function () {
+        deprecator().silence(() => {
+          this.get("/:controller(/:action(/:id))");
+        });
+      });
+      return set;
+    })());
   }
 
   async setupNamedRouteTest(): Promise<NamedRoutes> {
