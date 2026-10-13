@@ -4,7 +4,7 @@ import type { Base } from "../base.js";
 import { FixtureSet } from "../fixtures.js";
 import { ActiveRecord } from "../namespaces.js";
 import { TestFixtures, type ClassMethods } from "../test-fixtures.js";
-import { FIXTURES_ROOT } from "../test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT } from "../config.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TestCase extends ActiveSupportTestCase {
@@ -37,5 +37,11 @@ export class TestCase extends ActiveSupportTestCase {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface TestCase extends Omit<TestFixtures, "beforeSetup" | "afterTeardown"> {}
+
+declare module "../namespaces.js" {
+  interface TestConstants {
+    TestCase: typeof TestCase;
+  }
+}
 
 rbModConstSet(ActiveRecord, "TestCase", TestCase);

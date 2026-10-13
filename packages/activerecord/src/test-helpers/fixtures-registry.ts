@@ -1,10 +1,9 @@
 import type { Base } from "../base.js";
 
 import { underscore } from "@blazetrails/activesupport";
+import { FIXTURES_ROOT } from "../config.js";
 import { File } from "../fixture-set/file.js";
 import * as FixtureData from "./fixtures/index.js";
-
-export const FIXTURES_ROOT = new URL("./fixtures", import.meta.url).pathname;
 
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;

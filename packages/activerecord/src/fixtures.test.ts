@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import {

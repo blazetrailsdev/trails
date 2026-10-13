@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { FixtureSet } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
 import { Account } from "./test-helpers/models/account.js";

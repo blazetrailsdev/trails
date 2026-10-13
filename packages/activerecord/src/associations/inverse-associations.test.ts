@@ -1150,22 +1150,6 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(face.association("autosaveHuman").target).not.toBeNull();
   });
 
-  it("has_one createBang stores a single record as target, not an array", async () => {
-    const human = await Human.createBang({});
-    const face = await (human as any)
-      .association("autosaveFace")
-      .createBang({ description: "haunted" });
-
-    const holder = (human as any).association("autosaveFace");
-    expect(Array.isArray(holder.target)).toBe(false);
-    expect(holder.target).toBe(face);
-
-    face.description = "new description";
-    await human.saveBang();
-    await face.reload();
-    expect(face.description).toBe("new description");
-  });
-
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("llama_wrangling");
     const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;

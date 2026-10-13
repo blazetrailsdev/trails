@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
 import { Associations } from "./associations.js";

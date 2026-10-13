@@ -188,6 +188,8 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/abstract/connection-pool.js"),
 };
 
+export interface TestConstants {} // eslint-disable-line @typescript-eslint/no-empty-object-type
+
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
   Validations: typeof Validations;
   Base: typeof Base;
@@ -210,7 +212,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Scoping: typeof Scoping;
   Tasks: typeof Tasks;
   Point: new (x: number, y: number) => { x: number; y: number };
-};
+} & TestConstants;
 registerConstant("ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
