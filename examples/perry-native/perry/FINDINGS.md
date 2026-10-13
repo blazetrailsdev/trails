@@ -9,23 +9,27 @@ Measured against **Perry 0.5.1520** (the published npm build) and re-verified
 against **`main` @ `d74498b2` (0.5.1659)** built from source, clang 23.1.3 /
 LLVM 22.1.8, on a 60GB x86_64 Linux box.
 
-**Short answer: not yet — but the two walls that looked structural are not.**
+**Short answer: no. Three of the five walls are down — one of them by a patch
+written here — and the one left standing is memory at application scale.**
 
 Real trails framework code compiles and runs natively: a 54-module slice of
-`@blazetrails/ruby-compat` gives a working 21MB executable with correct
-output. With a from-source Perry, a 362-module activesupport subgraph —
-WebAssembly and all — compiles and **links** into a 69MB executable. It then
-hangs in module initialization, which is where this stops today.
+`@blazetrails/ruby-compat` gives a working 21MB executable, and with the 3c
+fix a **362-module** activesupport subgraph — WebAssembly and all — compiles,
+links and **runs** as a 69MB executable.
+
+The application itself does not. Node loads 1,283 modules to boot it; Perry
+exhausts a 32GB cap after ~50 minutes while still _collecting_ those modules,
+before codegen begins.
 
 Status of each wall after re-verification:
 
-| Wall                               | Status                                                                                                          |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| 1 — codegen memory                 | **Softer than first recorded.** 362 modules fit in a 20GB cap.                                                  |
-| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                          |
-| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                 |
-| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship. |
-| 3c — init-time hang at 362 modules | **Fix written and verified** (12 lines) — a module namespace's `[[Prototype]]` was not `null`.                  |
+| Wall                               | Status                                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 — codegen memory                 | **The live blocker at app scale.** 362 modules fit in 20GB, but the 1,283-module app exhausts 32GB while still _collecting_ modules. |
+| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                               |
+| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                      |
+| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                      |
+| 3c — init-time hang at 362 modules | **Fix written and verified** (12 lines) — a module namespace's `[[Prototype]]` was not `null`.                                       |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -309,6 +313,35 @@ No regressions: `cargo test -p perry-runtime` serially, patched vs pristine,
 gives identical results on the `namespace`, `prototype` and `shape` filters
 (29/0, 244/1, 557/4), and every failure is a pre-existing
 `object::shape_store::tests::function_*` unrelated to namespaces.
+
+## The full application: 1,283 modules, and it does not compile
+
+Tested 2026-10-12 with the from-source Perry carrying the 3c fix, against a
+**dist-only** install of this app — the shape a real trails app has, built by
+[dist-tree.sh](dist-tree.sh) and verified booting under Node first
+(`[07] booted env=development routes=4`). Dist-only matters: it is what
+published trails packages ship, and it side-steps 3b, which only fires when
+Perry compiles a package's TypeScript `src/`.
+
+Node loads **1,283 modules** to boot the app. Perry never got past collecting
+them:
+
+|                |                                                   |
+| -------------- | ------------------------------------------------- |
+| cap            | `MemoryMax=32G`, swap off                         |
+| outcome        | killed at the cap after ~50 minutes               |
+| stage reached  | **`Collecting modules…`** — codegen never started |
+| RSS trajectory | 11GB @ 20min → 16.6 @ 30 → 22.2 @ 39 → 27.8 @ 49  |
+
+So Wall 1 returns at application scale, and in a worse place than before: the
+earlier memory failures were inside codegen, where the parallelism knobs at
+least exist. This one exhausts 32GB in module _collection_, single-threaded,
+before any code is generated. Nothing measured here suggests a knob for it.
+
+For scale, the largest graph that does work is the 362-module activesupport
+subgraph — a 69MB binary that runs correctly. The app is roughly 3.5x that in
+module count before Perry's eager collection of dynamic-import targets
+inflates it further.
 
 ## The SQLite result is weaker than it looks
 
