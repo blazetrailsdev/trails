@@ -365,6 +365,12 @@ describe("SchemaDumper types its dump against the connected adapter", () => {
     expect(output).not.toContain("import type");
     expect(output).toMatch(/^await Schema\.get\([\d.]+\)\.define\(async \(ctx\) => \{/m);
   });
+
+  it("schema dump does not emit id false for normal tables", async () => {
+    const output = await dumpTableSchema("authors");
+    expect(output).not.toContain("id: false");
+    expect(output).not.toContain('t.integer("id"');
+  });
 });
 
 describe("SchemaDumperAdapterTest", () => {

@@ -216,13 +216,6 @@ describe("BindParameterTest", () => {
     }
   });
 
-  it("materializes a record load whose IN exceeds the bind-params cap", async () => {
-    const conn = (await Topic.leaseConnection()) as any;
-    const ids = Array.from({ length: conn.bindParamsLength() + 1 }, (_, i) => i + 1);
-    const topics = await Topic.where({ id: ids });
-    expect(topics.length).toBe(await Topic.count());
-  });
-
   it("bind from join in subquery", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);

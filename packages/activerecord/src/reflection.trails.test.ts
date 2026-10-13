@@ -10,7 +10,8 @@ import {
 import { EncryptedBookWithSerializedFirstBinary } from "./test-helpers/models/book-encrypted.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Associations } from "./associations.js";
-import { ThroughReflection, create } from "./reflection.js";
+import { AggregateReflection, ThroughReflection, create } from "./reflection.js";
+import { NameError } from "./errors.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
@@ -220,6 +221,19 @@ describe("ReflectionTest", () => {
     expect(() => ref.sourceReflectionName()).toThrow(
       "Missing model class NeMembership for the NeMember#neMemberships association.",
     );
+  });
+
+  it("aggregate reflection computes class raises NameError for missing class", () => {
+    class Buyer extends Base {
+      declare balance: number | null;
+
+      static {
+        this.attribute("balance", "integer");
+      }
+    }
+    const ref = new AggregateReflection("balance", null, { className: "NoSuchMoney" }, Buyer);
+    expect(() => ref.klass).toThrow(NameError);
+    expect(() => ref.klass).toThrow(/uninitialized constant NoSuchMoney/);
   });
 });
 

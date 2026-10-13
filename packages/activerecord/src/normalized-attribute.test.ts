@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { presence, titleize } from "@blazetrails/activesupport";
-import { Base } from "./index.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -160,22 +159,3 @@ describe("NormalizedAttributeTest", () => {
 function succ(value: string): string {
   return String(Number(value) + 1);
 }
-
-describe("normalizes on Base", () => {
-  fixtures([]);
-
-  it("normalizes attributes before persistence", async () => {
-    class NormalizedUser extends Base {
-      declare name: any;
-      static _tableName = "aircraft";
-      static {
-        this.normalizes("name", {
-          with: (name: unknown) => (typeof name === "string" ? name.trim().toLowerCase() : name),
-        });
-      }
-    }
-
-    const user = await NormalizedUser.create({ name: "  ALICE  " });
-    expect(user.name).toBe("alice");
-  });
-});

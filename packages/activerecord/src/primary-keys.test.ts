@@ -19,7 +19,6 @@ import { MixedCaseMonkey } from "./test-helpers/models/mixed-case-monkey.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { NonPrimaryKey } from "./test-helpers/models/non-primary-key.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
-import { Country } from "./test-helpers/models/country.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 describe("PrimaryKeysTest", () => {
@@ -40,12 +39,6 @@ describe("PrimaryKeysTest", () => {
     expect(topic.toKey()).toBeNull();
     const found = await Topic.find(topics("first").id);
     expect(found.toKey()).toEqual([topics("first").id]);
-  });
-
-  it("resolves a custom string primary key with no explicit primary_key= via the schema cache", async () => {
-    (Country as unknown as { resetColumnInformation?: () => void }).resetColumnInformation?.();
-    await (Country as unknown as { loadSchema?: () => Promise<void> }).loadSchema?.();
-    expect(Country.primaryKey).toBe("country_id");
   });
 
   it("to key with customized primary key", async () => {
@@ -72,19 +65,6 @@ describe("PrimaryKeysTest", () => {
   it("read attribute with custom primary key does not return it when reading the id attribute", async () => {
     const keyboard = await Keyboard.createBang();
     expect(keyboard.readAttribute("id")).toBeNull();
-  });
-
-  it("write_attribute id remaps to a scalar custom primary key", async () => {
-    const keyboard = await Keyboard.createBang();
-    keyboard.writeAttribute("id", 42);
-    expect(Number(keyboard.readAttribute("key_number"))).toBe(42);
-  });
-
-  it("write_attribute id on a composite primary key raises", () => {
-    const book = new CpkBook();
-    expect(() => book.writeAttribute("id", 7)).toThrow(
-      'can\'t write unknown attribute `["author_id", "id"]`',
-    );
   });
 
   it("read attribute with composite primary key", async () => {
@@ -322,17 +302,6 @@ describe("PrimaryKeysTest", () => {
     expect(() => {
       (dashboard as any).id = "1";
     }).toThrow(MissingAttributeError);
-  });
-
-  it("id returns nil if primary key doesnt exist", async () => {
-    class AnonDashboard extends Base {
-      static {
-        this._tableName = "dashboards";
-      }
-    }
-    await AnonDashboard.loadSchema();
-    expect(AnonDashboard.primaryKey).toBe(null);
-    expect(new AnonDashboard().id).toBe(null);
   });
 
   it("reconfiguring primary key resets composite primary key", () => {

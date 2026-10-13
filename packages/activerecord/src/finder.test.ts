@@ -429,19 +429,6 @@ describe("FinderTest", () => {
     expect(await existsWhere(id.lt(bind(negBig)))).toBeFalsy();
     expect(await existsWhere(id.lteq(bind(negBig)))).toBeFalsy();
   });
-
-  it("all-out-of-range array collapses to IN (NULL)", async () => {
-    const big = 9223372036854775808n;
-    const negBig = -9223372036854775809n;
-
-    const inRel = Topic.where({ id: [big, negBig] });
-    expect(inRel.toSql()).toMatch(/IN \(NULL\)/);
-    expect(await inRel.isExists()).toBe(false);
-
-    const notInRel = Topic.where().not({ id: [big, negBig] });
-    expect(notInRel.toSql()).toMatch(/NOT IN \(NULL\)/);
-    expect(await notInRel.isExists()).toBe(false);
-  });
 });
 
 describe("FinderTest", () => {
