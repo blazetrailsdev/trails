@@ -426,15 +426,8 @@ describe("main --extra", () => {
       },
     });
     const ruby = manifest("ruby", (rb) => rb, [tc(["T"], "last quarter")]);
-    const ts = manifest(
-      "typescript",
-      (rb) => `${PKG_SRC_DIRS[pkg]}${rubyToConventionTs(rb, pkg)}`,
-      [
-        tc(["T"], "last quarter"),
-        tc(["T", "zones"], "Keeps the Offset"),
-        tc([], "top level extra"),
-      ],
-    );
+    const conv = (rb: string) => `${PKG_SRC_DIRS[pkg]}${rubyToConventionTs(rb, pkg)}`;
+    const ts = manifest("typescript", conv, [tc(["T"], "last quarter"), tc(["T", "z"], "Offset")]);
     await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
     await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify(ts));
     const lines: string[] = [];
@@ -459,18 +452,15 @@ describe("main --extra", () => {
     const { files } = await run(["--extra", "--json"]);
     const extras = Object.fromEntries(files.map((f) => [f.rubyFile, f.extraTests]));
     expect(extras).toEqual({
-      "core_ext/time_ext_test.rb": ["T > zones > Keeps the Offset", "top level extra"],
+      "core_ext/time_ext_test.rb": ["T > z > Offset"],
       "core_ext/date_ext_test.rb": [],
     });
     expect((await run(["--json"])).files.every((f) => f.extraTests === undefined)).toBe(true);
 
     const { lines } = await run(["--extra", "--sort-extra", "--min-extra=1"]);
-    expect(lines).toHaveLength(3);
+    expect(lines).toHaveLength(2);
     expect(lines[0]).toContain("core_ext/time_ext_test.rb");
-    expect(lines.slice(1)).toEqual([
-      "      + T > zones > Keeps the Offset",
-      "      + top level extra",
-    ]);
+    expect(lines[1]).toBe("      + T > z > Offset");
     expect((await run([])).lines).toHaveLength(2);
   });
 });

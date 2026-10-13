@@ -241,6 +241,17 @@ describe("ConnectionHandling", () => {
     expect(Base.connectionDbConfig().adapter).toBeTruthy();
   });
 
+  it("connectsTo rejects both database and shards", async () => {
+    await expect(
+      Base.connectsTo({
+        database: { writing: ":primary" },
+        shards: { default: { writing: ":primary" } },
+      }),
+    ).rejects.toThrow(
+      "`connects_to` can only accept a `database` or `shards` argument, but not both arguments.",
+    );
+  });
+
   it("establish_connection with a url stores a UrlConfig with discrete fields", async () => {
     await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
     const config = Base.connectionDbConfig();
