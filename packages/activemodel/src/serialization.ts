@@ -1,5 +1,5 @@
 import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
-import { hashAset, rbCheckArrayType, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashAset, rbCheckArrayType, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
@@ -50,16 +50,7 @@ export function serializableHash(
   const result = this.serializableAttributes(attributeNames);
 
   for (const method of rubyArray(options.methods)) {
-    const value = (this as unknown as Record<string, unknown>)[method];
-    if (typeof value === "function") {
-      hashAset(result, method, (value as () => unknown).call(this));
-    } else if (method in this) {
-      hashAset(result, method, value);
-    } else {
-      throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${this.constructor.name}`,
-      );
-    }
+    hashAset(result, method, rbFSend(this, method));
   }
 
   this.serializableAddIncludes(options, (assocName, records, opts) => {
@@ -128,30 +119,7 @@ export interface SerializeOptions {
 }
 
 export function readAttributeForSerialization(this: SerializationRecord, key: string): unknown {
-  const attrStore = this._attributes as AttributeStore;
-  const hasStore =
-    (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") ||
-    attrStore instanceof Map;
-
-  const inRecord = key in (this as object);
-  const reader = inRecord ? (this as unknown as Record<string, unknown>)[key] : undefined;
-
-  if (inRecord && typeof reader !== "function") return reader;
-
-  const storeHasKey =
-    attrStore instanceof Map
-      ? attrStore.has(key)
-      : attrStore && typeof (attrStore as { keys?: unknown }).keys === "function"
-        ? (attrStore as { keys(): string[] }).keys().includes(key)
-        : false;
-  if (hasStore && storeHasKey) {
-    return attrStore instanceof Map
-      ? attrStore.get(key)
-      : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
-  }
-
-  if (inRecord) return (reader as () => unknown).call(this);
-  throw new NoMethodError(`undefined method '${key}' for an instance of ${this.constructor.name}`);
+  return rbFSend(this, key);
 }
 
 /** @internal */
@@ -186,9 +154,14 @@ export function serializableAttributes(
   this: SerializationRecord,
   attributeNames: readonly string[],
 ): Record<string, unknown> {
-  return Object.fromEntries(
-    indexWith(attributeNames, (n) => this.readAttributeForSerialization(n)),
-  );
+  const readable = attributeNames.filter((n) => {
+    if (Object.hasOwn(this, n)) return true;
+    let link = Object.getPrototypeOf(this) as object | null;
+    while (link && !Object.hasOwn(link, n)) link = Object.getPrototypeOf(link) as object | null;
+    if (!link || !Object.hasOwn(link, "constructor")) return true;
+    return typeof Object.getOwnPropertyDescriptor(link, n)?.value !== "function";
+  });
+  return Object.fromEntries(indexWith(readable, (n) => this.readAttributeForSerialization(n)));
 }
 
 /** @internal */

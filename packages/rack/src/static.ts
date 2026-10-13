@@ -1,4 +1,4 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir, File, Hash, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
@@ -43,12 +43,16 @@ export class Static {
 
   overwriteFilePath(path: string): boolean {
     return (
-      (!Array.isArray(this.urls) && Object.hasOwn(this.urls, path)) || this.isAddIndexRoot(path)
+      (rbObjIsKindOf(this.urls, Hash) && Object.hasOwn(this.urls, path)) ||
+      this.isAddIndexRoot(path)
     );
   }
 
   routeFile(path: string): boolean {
-    return Array.isArray(this.urls) && this.urls.some((url) => path.indexOf(url) === 0);
+    return (
+      rbObjIsKindOf(this.urls, Array) &&
+      (this.urls as string[]).some((url) => path.indexOf(url) === 0)
+    );
   }
 
   canServe(path: string): boolean {
