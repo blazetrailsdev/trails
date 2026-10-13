@@ -32,6 +32,9 @@ class Testing extends Base {
 }
 TestModel.tableName = "testings";
 
+const precisionImplicitDefault = () =>
+  currentAdapter("Mysql2Adapter", "TrilogyAdapter") ? { precision: 0 } : { precision: null };
+
 describe("Migration", () => {
   describe("CompatibilityTest", () => {
     fixtures({}, { useTransactionalTests: false });
@@ -40,9 +43,6 @@ describe("Migration", () => {
     let schemaMigration: SchemaMigration;
     let internalMetadata: InternalMetadata;
     let verboseWas: boolean | undefined;
-
-    const precisionImplicitDefault = () =>
-      currentAdapter("Mysql2Adapter", "TrilogyAdapter") ? { precision: 0 } : { precision: null };
 
     const migrate = async (migration: Migration) => {
       await new Migrator(
@@ -927,9 +927,6 @@ function noOptionValidationTestCases(test: BaseCompatibilityTest): void {
 }
 
 function defaultPrecisionImplicitTestCases(test: BaseCompatibilityTest): void {
-  const precisionImplicitDefault = () =>
-    currentAdapter("Mysql2Adapter", "TrilogyAdapter") ? { precision: 0 } : { precision: null };
-
   const migrate = async (...migrations: Migration[]) => {
     await new Migrator(
       "up",
@@ -1113,6 +1110,206 @@ function defaultPrecisionSixTestCases(test: BaseCompatibilityTest): void {
     }
   });
 }
+
+describe("CompatibilityTest7_0", () => {
+  const test = baseCompatibilityTest(() => Migration.get(7.0));
+  defaultPrecisionSixTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest6_1", () => {
+  const test = baseCompatibilityTest(() => Migration.get(6.1));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest6_0", () => {
+  const test = baseCompatibilityTest(() => Migration.get(6.0));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest5_2", () => {
+  const test = baseCompatibilityTest(() => Migration.get(5.2));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest5_1", () => {
+  const test = baseCompatibilityTest(() => Migration.get(5.1));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest5_0", () => {
+  const test = baseCompatibilityTest(() => Migration.get(5.0));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+describe("CompatibilityTest4_2", () => {
+  const test = baseCompatibilityTest(() => Migration.get(4.2));
+  defaultPrecisionImplicitTestCases(test);
+  noOptionValidationTestCases(test);
+});
+
+function legacyPolymorphicReferenceIndexTestCases(migrationClass: MigrationClass): void {
+  fixtures({}, { useTransactionalTests: false });
+  let connection: AbstractAdapter;
+  let schemaMigration: SchemaMigration;
+  let internalMetadata: InternalMetadata;
+  let verboseWas: boolean | undefined;
+
+  const migrate = async (migration: Migration) => {
+    await new Migrator(
+      "up",
+      [migration as unknown as MigrationProxy],
+      schemaMigration,
+      internalMetadata,
+    ).migrate();
+  };
+
+  beforeEach(async () => {
+    connection = await ambientConnection();
+    const pool = Base.connectionPool();
+    schemaMigration = pool.schemaMigration;
+    internalMetadata = pool.internalMetadata;
+    verboseWas = Migration.verbose;
+    Migration.verbose = false;
+
+    await connection.createTable("testings", { ifNotExists: true });
+  });
+
+  afterEach(async () => {
+    Migration.verbose = verboseWas;
+    await schemaMigration.deleteAllVersions().catch(() => null);
+    await connection.dropTable("testings").catch(() => null);
+  });
+
+  it("create table with polymorphic reference uses all column names in index", async () => {
+    try {
+      const migration = new (class extends migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.references("widget", { polymorphic: true, index: true });
+            t.belongsTo("gizmo", { polymorphic: true, index: true });
+          });
+        }
+      })();
+
+      await migrate(migration);
+
+      expect(
+        await connection.indexExists("more_testings", ["widget_type", "widget_id"], {
+          name: "index_more_testings_on_widget_type_and_widget_id",
+        }),
+      ).toBeTruthy();
+      expect(
+        await connection.indexExists("more_testings", ["gizmo_type", "gizmo_id"], {
+          name: "index_more_testings_on_gizmo_type_and_gizmo_id",
+        }),
+      ).toBeTruthy();
+    } finally {
+      await connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("change table with polymorphic reference uses all column names in index", async () => {
+    const migration = new (class extends migrationClass() {
+      override async migrate(_x: unknown): Promise<void> {
+        await this.changeTable("testings", {}, async (t) => {
+          await t.references("widget", { polymorphic: true, index: true });
+          await t.belongsTo("gizmo", { polymorphic: true, index: true });
+        });
+      }
+    })();
+
+    await migrate(migration);
+
+    expect(
+      await connection.indexExists("testings", ["widget_type", "widget_id"], {
+        name: "index_testings_on_widget_type_and_widget_id",
+      }),
+    ).toBeTruthy();
+    expect(
+      await connection.indexExists("testings", ["gizmo_type", "gizmo_id"], {
+        name: "index_testings_on_gizmo_type_and_gizmo_id",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("create join table with polymorphic reference uses all column names in index", async () => {
+    try {
+      const migration = new (class extends migrationClass() {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createJoinTable("more", "testings", (t) => {
+            t.references("widget", { polymorphic: true, index: true });
+            t.belongsTo("gizmo", { polymorphic: true, index: true });
+          });
+        }
+      })();
+
+      await migrate(migration);
+
+      expect(
+        await connection.indexExists("more_testings", ["widget_type", "widget_id"], {
+          name: "index_more_testings_on_widget_type_and_widget_id",
+        }),
+      ).toBeTruthy();
+      expect(
+        await connection.indexExists("more_testings", ["gizmo_type", "gizmo_id"], {
+          name: "index_more_testings_on_gizmo_type_and_gizmo_id",
+        }),
+      ).toBeTruthy();
+    } finally {
+      await connection.dropTable("more_testings").catch(() => null);
+    }
+  });
+
+  it("polymorphic add reference uses all column names in index", async () => {
+    const migration = new (class extends migrationClass() {
+      override async migrate(_x: unknown): Promise<void> {
+        await this.addReference("testings", "widget", { polymorphic: true, index: true });
+        await this.addBelongsTo("testings", "gizmo", { polymorphic: true, index: true });
+      }
+    })();
+
+    await migrate(migration);
+
+    expect(
+      await connection.indexExists("testings", ["widget_type", "widget_id"], {
+        name: "index_testings_on_widget_type_and_widget_id",
+      }),
+    ).toBeTruthy();
+    expect(
+      await connection.indexExists("testings", ["gizmo_type", "gizmo_id"], {
+        name: "index_testings_on_gizmo_type_and_gizmo_id",
+      }),
+    ).toBeTruthy();
+  });
+}
+
+describe("LegacyPolymorphicReferenceIndexTest", () => {
+  describe("V6_0", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(6.0));
+  });
+
+  describe("V5_2", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.2));
+  });
+
+  describe("V5_1", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.1));
+  });
+
+  describe("V5_0", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.0));
+  });
+
+  describe("V4_2", () => {
+    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(4.2));
+  });
+});
 
 class LegacyPrimaryKey extends Base {}
 
@@ -1312,205 +1509,5 @@ describe("LegacyPrimaryKeyTest", () => {
 
   describe("V4_2", () => {
     legacyPrimaryKeyTestCases(() => Migration.get(4.2));
-  });
-});
-
-describe("CompatibilityTest7_0", () => {
-  const test = baseCompatibilityTest(() => Migration.get(7.0));
-  defaultPrecisionSixTestCases(test);
-  noOptionValidationTestCases(test);
-});
-
-describe("CompatibilityTest6_1", () => {
-  const test = baseCompatibilityTest(() => Migration.get(6.1));
-  defaultPrecisionImplicitTestCases(test);
-  noOptionValidationTestCases(test);
-});
-
-describe("CompatibilityTest6_0", () => {
-  const test = baseCompatibilityTest(() => Migration.get(6.0));
-  defaultPrecisionImplicitTestCases(test);
-  noOptionValidationTestCases(test);
-});
-
-describe("CompatibilityTest5_2", () => {
-  const test = baseCompatibilityTest(() => Migration.get(5.2));
-  defaultPrecisionImplicitTestCases(test);
-  noOptionValidationTestCases(test);
-});
-
-describe("CompatibilityTest5_1", () => {
-  const test = baseCompatibilityTest(() => Migration.get(5.1));
-  defaultPrecisionImplicitTestCases(test);
-  noOptionValidationTestCases(test);
-});
-
-describe("CompatibilityTest5_0", () => {
-  const test = baseCompatibilityTest(() => Migration.get(5.0));
-  defaultPrecisionImplicitTestCases(test);
-  noOptionValidationTestCases(test);
-});
-
-describe("CompatibilityTest4_2", () => {
-  const test = baseCompatibilityTest(() => Migration.get(4.2));
-  defaultPrecisionImplicitTestCases(test);
-  noOptionValidationTestCases(test);
-});
-
-function legacyPolymorphicReferenceIndexTestCases(migrationClass: MigrationClass): void {
-  fixtures({}, { useTransactionalTests: false });
-  let connection: AbstractAdapter;
-  let schemaMigration: SchemaMigration;
-  let internalMetadata: InternalMetadata;
-  let verboseWas: boolean | undefined;
-
-  const migrate = async (migration: Migration) => {
-    await new Migrator(
-      "up",
-      [migration as unknown as MigrationProxy],
-      schemaMigration,
-      internalMetadata,
-    ).migrate();
-  };
-
-  beforeEach(async () => {
-    connection = await ambientConnection();
-    const pool = Base.connectionPool();
-    schemaMigration = pool.schemaMigration;
-    internalMetadata = pool.internalMetadata;
-    verboseWas = Migration.verbose;
-    Migration.verbose = false;
-
-    await connection.createTable("testings", { ifNotExists: true });
-  });
-
-  afterEach(async () => {
-    Migration.verbose = verboseWas;
-    await schemaMigration.deleteAllVersions().catch(() => null);
-    await connection.dropTable("testings").catch(() => null);
-  });
-
-  it("create table with polymorphic reference uses all column names in index", async () => {
-    try {
-      const migration = new (class extends migrationClass() {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createTable("more_testings", (t) => {
-            t.references("widget", { polymorphic: true, index: true });
-            t.belongsTo("gizmo", { polymorphic: true, index: true });
-          });
-        }
-      })();
-
-      await migrate(migration);
-
-      expect(
-        await connection.indexExists("more_testings", ["widget_type", "widget_id"], {
-          name: "index_more_testings_on_widget_type_and_widget_id",
-        }),
-      ).toBeTruthy();
-      expect(
-        await connection.indexExists("more_testings", ["gizmo_type", "gizmo_id"], {
-          name: "index_more_testings_on_gizmo_type_and_gizmo_id",
-        }),
-      ).toBeTruthy();
-    } finally {
-      await connection.dropTable("more_testings").catch(() => null);
-    }
-  });
-
-  it("change table with polymorphic reference uses all column names in index", async () => {
-    const migration = new (class extends migrationClass() {
-      override async migrate(_x: unknown): Promise<void> {
-        await this.changeTable("testings", {}, async (t) => {
-          await t.references("widget", { polymorphic: true, index: true });
-          await t.belongsTo("gizmo", { polymorphic: true, index: true });
-        });
-      }
-    })();
-
-    await migrate(migration);
-
-    expect(
-      await connection.indexExists("testings", ["widget_type", "widget_id"], {
-        name: "index_testings_on_widget_type_and_widget_id",
-      }),
-    ).toBeTruthy();
-    expect(
-      await connection.indexExists("testings", ["gizmo_type", "gizmo_id"], {
-        name: "index_testings_on_gizmo_type_and_gizmo_id",
-      }),
-    ).toBeTruthy();
-  });
-
-  it("create join table with polymorphic reference uses all column names in index", async () => {
-    try {
-      const migration = new (class extends migrationClass() {
-        override async migrate(_x: unknown): Promise<void> {
-          await this.createJoinTable("more", "testings", (t) => {
-            t.references("widget", { polymorphic: true, index: true });
-            t.belongsTo("gizmo", { polymorphic: true, index: true });
-          });
-        }
-      })();
-
-      await migrate(migration);
-
-      expect(
-        await connection.indexExists("more_testings", ["widget_type", "widget_id"], {
-          name: "index_more_testings_on_widget_type_and_widget_id",
-        }),
-      ).toBeTruthy();
-      expect(
-        await connection.indexExists("more_testings", ["gizmo_type", "gizmo_id"], {
-          name: "index_more_testings_on_gizmo_type_and_gizmo_id",
-        }),
-      ).toBeTruthy();
-    } finally {
-      await connection.dropTable("more_testings").catch(() => null);
-    }
-  });
-
-  it("polymorphic add reference uses all column names in index", async () => {
-    const migration = new (class extends migrationClass() {
-      override async migrate(_x: unknown): Promise<void> {
-        await this.addReference("testings", "widget", { polymorphic: true, index: true });
-        await this.addBelongsTo("testings", "gizmo", { polymorphic: true, index: true });
-      }
-    })();
-
-    await migrate(migration);
-
-    expect(
-      await connection.indexExists("testings", ["widget_type", "widget_id"], {
-        name: "index_testings_on_widget_type_and_widget_id",
-      }),
-    ).toBeTruthy();
-    expect(
-      await connection.indexExists("testings", ["gizmo_type", "gizmo_id"], {
-        name: "index_testings_on_gizmo_type_and_gizmo_id",
-      }),
-    ).toBeTruthy();
-  });
-}
-
-describe("LegacyPolymorphicReferenceIndexTest", () => {
-  describe("V6_0", () => {
-    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(6.0));
-  });
-
-  describe("V5_2", () => {
-    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.2));
-  });
-
-  describe("V5_1", () => {
-    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.1));
-  });
-
-  describe("V5_0", () => {
-    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(5.0));
-  });
-
-  describe("V4_2", () => {
-    legacyPolymorphicReferenceIndexTestCases(() => Migration.get(4.2));
   });
 });
