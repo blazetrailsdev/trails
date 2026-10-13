@@ -1,13 +1,18 @@
 # A module namespace object's `[[Prototype]]` is not `null`, so prototype walks never terminate
 
-> **FILED upstream, 2026-10-13, with the fix:**
+> **MERGED upstream, 2026-10-13.**
 >
-> - issue: https://github.com/PerryTS/perry/issues/12587
-> - PR: https://github.com/PerryTS/perry/pull/12588 (1 file, +12)
+> - issue: https://github.com/PerryTS/perry/issues/12587 — closed as completed
+> - PR: https://github.com/PerryTS/perry/pull/12588 — merged into `main` as
+>   `39bea98d`, **verbatim**: the merged file is byte-identical to what was
+>   submitted.
 >
-> The fix is [`fix.patch`](fix.patch) — 12 added lines in one function,
-> `js_finalize_namespace`. See "Proposed fix" below for what it does and how it
-> was tested. This file is kept as the local record and regression probe.
+> Re-verified against a build of pristine upstream `main` at `39bea98d` with no
+> local patch — the reproducer below answers `null` in one step, matching Node,
+> and the 59-module `extend(target, namespace)` case runs to completion.
+>
+> Kept as the local record and as a regression probe: `./run.sh` should now
+> agree between Node and Perry.
 
 **Perry `main` @ `d74498b2` (0.5.1659)**, built from source, Linux x86_64,
 LLVM 22.1.8. Also present in the published 0.5.1520.
