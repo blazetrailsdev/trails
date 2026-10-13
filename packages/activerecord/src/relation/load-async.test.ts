@@ -541,7 +541,18 @@ describe.skipIf(inMemoryDb())("LoadAsyncMixedThreadPoolExecutorTest", () => {
     cleanUpConnectionHandler();
   });
 
-  it.skip("scheduled?", () => {});
+  // BLOCKED: load-async-mixed-pool-scheduled-test-needs-a-synchronous-null-executor-load
+  it.skip("scheduled?", async () => {
+    const deferredPosts = Post.where({ author_id: 1 }).loadAsync();
+    expect(deferredPosts.isScheduled).toBeTruthy();
+    expect(deferredPosts.isLoaded).toBeTruthy();
+    await deferredPosts;
+    expect(deferredPosts.isScheduled).toBeFalsy();
+
+    const deferredDogs = OtherDog.where({ id: 1 }).loadAsync();
+    expect(deferredDogs.isScheduled).toBeFalsy();
+    expect(deferredDogs.isLoaded).toBeTruthy();
+  });
   it("simple query", async () => {
     const expectedRecords = await Post.where({ author_id: 1 });
     const expectedDogs = await OtherDog.where({ id: 1 });
