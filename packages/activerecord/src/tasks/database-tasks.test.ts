@@ -15,6 +15,7 @@ import {
   assertNotCalled,
   assertNothingRaised,
   assertRaises,
+  EnvironmentInquirer,
   getEnv,
   stub,
 } from "@blazetrails/activesupport";
@@ -613,7 +614,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
         [configFor("test", "primary")],
         {},
         async () => {
-          await DatabaseTasks.createCurrent("test");
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("test"));
         },
       ),
     );
@@ -627,7 +628,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
         [configFor("production", "primary")],
         {},
         async () => {
-          await DatabaseTasks.createCurrent("production");
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("production"));
         },
       ),
     );
@@ -639,7 +640,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
         "create",
         [[configFor("development", "primary")], [configFor("test", "primary")]],
         async () => {
-          await DatabaseTasks.createCurrent("development");
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
         },
       ),
     );
@@ -655,7 +656,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
           "create",
           [[configFor("development", "primary")], [configFor("test", "primary")]],
           async () => {
-            await DatabaseTasks.createCurrent("development");
+            await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
           },
         ),
       );
@@ -672,7 +673,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     try {
       await withStubbedConfigurationsEstablishConnection(() =>
         assertCalledForConfigs("create", [[configFor("development", "primary")]], async () => {
-          await DatabaseTasks.createCurrent("development");
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
         }),
       );
     } finally {
@@ -684,7 +685,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   it("establishes connection for the given environments", async () => {
     await stub(DatabaseTasks, "create", null, undefined, () =>
       assertCalledWithArgs(Base, "establishConnection", [":development"], {}, async () => {
-        await DatabaseTasks.createCurrent("development");
+        await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
       }),
     );
   });
@@ -1343,9 +1344,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     const seed = new BetterSQLite3Adapter({ database: dbPath });
     await seed.execute("CREATE TABLE courses (id INTEGER PRIMARY KEY, name TEXT)");
     await seed.execute("CREATE TABLE colleges (id INTEGER PRIMARY KEY, name TEXT)");
-    // eslint-disable-next-line blazetrails/require-table-teardown -- raw SQL in a throwaway SQLite file under Dir.mktmpdir, removed in the finally; database_tasks_test.rb:1300-1347 has fixtures over ARUnit2Model, ported by database-tasks-test-remaining-bodies-match-rails
     await seed.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
-    // eslint-disable-next-line blazetrails/require-table-teardown -- raw SQL in a throwaway SQLite file under Dir.mktmpdir, removed in the finally; database_tasks_test.rb:1300-1347 has fixtures over ARUnit2Model, ported by database-tasks-test-remaining-bodies-match-rails
     await seed.execute("CREATE TABLE ar_internal_metadata (key TEXT PRIMARY KEY, value TEXT)");
     await seed.execute("INSERT INTO courses (name) VALUES ('ruby')");
     await seed.execute("INSERT INTO colleges (name) VALUES ('trails')");
@@ -1380,6 +1379,8 @@ describe("DatabaseTasksTruncateAllTest", () => {
     } finally {
       await reader.execute("DROP TABLE IF EXISTS courses");
       await reader.execute("DROP TABLE IF EXISTS colleges");
+      await reader.execute("DROP TABLE IF EXISTS schema_migrations");
+      await reader.execute("DROP TABLE IF EXISTS ar_internal_metadata");
       await reader.disconnectBang();
       FileUtils.rmRf(tmp);
     }
