@@ -173,7 +173,6 @@ export class TestCase extends ActiveSupportTestCase {
     });
   }
 
-  /** @missingRailsCall assert_operator — CONVERGEABLE activerecord-describes-are-named-test-case-constants */
   async assertQueriesMatch<T>(
     match: RegExp | string,
     {
