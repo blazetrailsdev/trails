@@ -7,7 +7,7 @@ import {
   EnumType,
 } from "./enum.js";
 import { ArgumentError, DecimalType, IntegerType } from "@blazetrails/activemodel";
-import { Base } from "./index.js";
+import { Base, registerModel } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-fixtures.js";
 import { Book } from "./test-helpers/models/book.js";
@@ -519,5 +519,83 @@ describe("EnumType reads its mapping at call time", () => {
     expect(type.deserialize(0)).toBe("proposed");
     expect(() => type.assertValidValue(1)).not.toThrow();
     expect(() => type.assertValidValue(2)).toThrow(ArgumentError);
+  });
+});
+
+describe("Enum declared on an attribute with no column type", () => {
+  fixtures(["books"]);
+
+  it("enum declared before alias_attribute raises on first use", async () => {
+    class Klass extends Base {
+      declare isProposed: () => boolean;
+      static _tableName = "books";
+      static {
+        this.enum("aliased_status", ["proposed", "written", "published"]);
+        this.aliasAttribute("aliased_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    await expect(Klass.create({ status: "written" })).rejects.toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+    expect(() => Klass.typeForAttribute("aliased_status")).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+    expect(() => new Klass().isProposed()).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+  });
+
+  it("column-backed enum whose name is later aliased does not raise", () => {
+    class Klass extends Base {
+      declare isSingle: () => boolean;
+      static _tableName = "books";
+      static {
+        this.enum("nullable_status", ["single", "married"]);
+        this.aliasAttribute("nullable_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    expect(() => Klass.typeForAttribute("nullable_status")).not.toThrow();
+    expect(() => new Klass().isSingle()).not.toThrow();
+  });
+
+  it("enum on abstract parent resolves against concrete subclass columns", () => {
+    class AbstractParent extends Base {
+      static {
+        this.abstractClass = true;
+        this.enum("typeless_genre", ["adventure", "comic"]);
+      }
+    }
+    class Concrete extends AbstractParent {
+      static _tableName = "books";
+    }
+    registerModel(Concrete);
+
+    expect(() => Concrete.typeForAttribute("typeless_genre")).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
+    );
+  });
+
+  it("enum on abstract parent raises through subclass materialization", () => {
+    class AbstractParent extends Base {
+      static {
+        this.abstractClass = true;
+        this.enum("typeless_genre", ["adventure", "comic"]);
+      }
+    }
+    class Concrete extends AbstractParent {
+      static _tableName = "books";
+    }
+    registerModel(Concrete);
+
+    expect(() => Concrete._defaultAttributes()).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
+    );
+    expect(() => new Concrete({})).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
+    );
   });
 });
