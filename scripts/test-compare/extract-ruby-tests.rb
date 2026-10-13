@@ -901,8 +901,6 @@ class TestExtractor
       sexps = elements.map do |value|
         bindings = loop_bindings(vars, value)
         source = bindings && interpolated_name(heredoc, bindings)
-        # `\"` is an escaped quote inside the heredoc and a bare one in the
-        # source it evaluates (inflector_test.rb:481).
         source && Ripper.sexp(source.gsub('\\"', '"'))
       end
       if sexps.any?(&:nil?)

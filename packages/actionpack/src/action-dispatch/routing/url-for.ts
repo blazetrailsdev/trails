@@ -91,10 +91,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (Array.isArray(options)) {
     const components = [...options];
     const opts = extractOptions(components);
-    if (typeof this.polymorphicUrl !== "function") {
-      throw new Error("urlFor(Array) requires PolymorphicRoutes#polymorphicUrl on the host.");
-    }
-    return this.polymorphicUrl(components, opts);
+    return this.polymorphicUrl!(components, opts);
   }
   if (isModelClass(options)) {
     return HelperMethodBuilder.url().handleClassCall(target, options);
