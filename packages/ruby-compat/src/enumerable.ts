@@ -579,6 +579,13 @@ export interface AsyncEach<T> {
   each(block: (i: T) => unknown): PromiseLike<unknown>;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface AsyncEnumerator<T> extends AsyncEach<T> {
+  toA(): Promise<T[]>;
+  first(): Promise<T | null>;
+  first(n: number): Promise<T[]>;
+}
+
 /**
  * `Enumerable` (`vendor/ruby/v3.3.11/enum.c:5047` `Init_Enumerable`) for a class
  * whose `each` awaits: every member awaits `each`, and `each` awaits the block
@@ -619,7 +626,10 @@ export const AsyncEnumerable = {
    * With no block it answers the enumerator `RETURN_SIZED_ENUMERATOR` builds.
    * @noRailsEquivalent PERMANENT
    */
-  reverseEach<T>(this: AsyncEach<T>, block?: (i: T) => unknown): unknown {
+  reverseEach<T>(
+    this: AsyncEach<T>,
+    block?: (i: T) => unknown,
+  ): AsyncEnumerator<T> | Promise<unknown> {
     const toA = (): Promise<T[]> => AsyncEnumerable.toA.call(this) as Promise<T[]>;
     async function* reverseEach(): AsyncGenerator<T> {
       const ary = await toA();

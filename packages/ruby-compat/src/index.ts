@@ -27,7 +27,7 @@ export {
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
 export { AsyncEnumerable, Enumerable, reduce } from "./enumerable.js";
-export type { AsyncEach, Each } from "./enumerable.js";
+export type { AsyncEach, AsyncEnumerator, Each } from "./enumerable.js";
 export {
   basicObjRespondTo,
   objRespondToMissing,

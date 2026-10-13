@@ -21,12 +21,11 @@ import {
   Module,
   Mutex,
   NoMethodError,
+  ARRAY_METHOD_TABLE,
   Range,
   arySlice,
-  compact,
   extend,
   include,
-  rbEql,
   rbFPublicSend,
   rbModConstSet,
   rbClassSuperclass,
@@ -34,7 +33,6 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
-  uniq,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 
@@ -223,45 +221,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   join: (records, separator?: string) => records.join(separator),
   at: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
-  intersection: (records, other: Base[]) =>
-    uniq(records.filter((record) => other.some((o) => rbEql(o, record)))),
-  union: (records, other: Base[]) => uniq([...records, ...other]),
-  plus: (records, other: Base[]) => [...records, ...other],
-  difference: (records, other: Base[]) =>
-    records.filter((record) => !other.some((o) => rbEql(o, record))),
-  isIntersect: (records, other: Base[]) =>
-    records.some((record) => other.some((o) => rbEql(record, o))),
   reverse: (records) => [...records].reverse(),
-  compact: (records) => compact(records),
-  index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
-    const found =
-      typeof valueOrFn === "function"
-        ? records.findIndex(valueOrFn as (record: Base) => unknown)
-        : records.indexOf(valueOrFn);
-    return found === -1 ? null : found;
-  },
-  rindex: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
-    if (typeof valueOrFn !== "function") {
-      const found = records.lastIndexOf(valueOrFn);
-      return found === -1 ? null : found;
-    }
-    const predicate = valueOrFn as (record: Base) => unknown;
-    for (let i = records.length - 1; i >= 0; i--) {
-      if (predicate(records[i])) return i;
-    }
-    return null;
-  },
-  sample: (records, n?: number) => {
-    const shuffled = shuffleInPlace([...records]);
-    if (n === undefined) return shuffled.length === 0 ? null : shuffled[0];
-    return shuffled.slice(0, Math.max(0, n));
-  },
-  rotate: (records, count = 1) => {
-    if (records.length === 0) return [];
-    const shift = ((count % records.length) + records.length) % records.length;
-    return records.slice(shift).concat(records.slice(0, shift));
-  },
-  shuffle: (records) => shuffleInPlace([...records]),
   slice: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
   split: (records, valueOrFn: Base | ((record: Base) => boolean)) => split(records, valueOrFn),
@@ -282,6 +242,21 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     toXmlArray(records, options, block),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
+for (const name of [
+  "intersection",
+  "union",
+  "plus",
+  "difference",
+  "isIntersect",
+  "compact",
+  "index",
+  "rindex",
+  "sample",
+  "rotate",
+  "shuffle",
+]) {
+  RECORD_DELEGATES[name] = ARRAY_METHOD_TABLE[name] as RecordDelegate;
+}
 
 class ImplicitCountError extends globalThis.TypeError {}
 
@@ -488,12 +463,4 @@ function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | P
   if (!host._isRecordsSynchronous) return host.records().then((records) => fn([...records]));
   if (!host.isLoaded) host.proxyAssociation!.loadTarget();
   return fn([...(host.target ?? host._records ?? [])]);
-}
-
-function shuffleInPlace<T>(array: T[]): T[] {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
 }

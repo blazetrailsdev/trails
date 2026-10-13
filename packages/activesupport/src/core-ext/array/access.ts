@@ -66,10 +66,20 @@ export class Array {
   }
 }
 
-for (const name of Object.getOwnPropertyNames(Array)) {
-  const method = (Array as unknown as Record<string, unknown>)[name];
-  if (typeof method === "function") ARRAY_METHOD_TABLE[name] = method as never;
-}
+Object.assign(ARRAY_METHOD_TABLE, {
+  from: Array.from,
+  to: Array.to,
+  including: Array.including,
+  excluding: Array.excluding,
+  without: Array.without,
+  second: Array.second,
+  third: Array.third,
+  fourth: Array.fourth,
+  fifth: Array.fifth,
+  fortyTwo: Array.fortyTwo,
+  thirdToLast: Array.thirdToLast,
+  secondToLast: Array.secondToLast,
+});
 
 function eql(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;

@@ -1069,6 +1069,9 @@ function aryJoin1(obj: readonly unknown[], ary: readonly unknown[], sep: string)
 type ArrayMethod = (self: unknown[], ...args: never[]) => unknown;
 type Block = (...args: unknown[]) => unknown;
 
+const blockGiven = (v: unknown): v is Block =>
+  typeof v === "function" && Object.getOwnPropertyDescriptor(v, "prototype")?.writable !== false;
+
 const enumOf = (ary: unknown[]) => ({ each: (block: (i: unknown) => void) => each(ary, block) });
 
 /**
@@ -1080,8 +1083,8 @@ const enumOf = (ary: unknown[]) => ({ each: (block: (i: unknown) => void) => eac
  * defined by `Init_Array` (`vendor/ruby/v3.3.11/array.c:8606`) or by
  * `Enumerable` (`vendor/ruby/v3.3.11/enum.c:5047`). `-`, `|` and `&` go by
  * the method Ruby also names them (`difference`, `union`, `intersection`) and
- * `+` is `plus`; a block is a trailing function argument, and the block-less
- * enumerator arm of an entry is not ported: nothing calls it. A package that
+ * `+` is `plus`; a block is a trailing function argument, and with no block an
+ * entry answers the Array its enumerator would yield, as `each` does. A package that
  * reopens Array, as ActiveSupport's `core_ext/array` does, assigns an entry.
  *
  * @noRailsEquivalent PERMANENT
@@ -1101,22 +1104,22 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   isIntersect: (self, ary2: unknown[]) => isIntersect(self, ary2),
   /** `rb_ary_index` (`vendor/ruby/v3.3.11/array.c:2026`). */
   index: (self, val: unknown) => {
-    const i = self.findIndex((e) => (typeof val === "function" ? rtest(val(e)) : rbEqual(e, val)));
+    const i = self.findIndex((e) => (blockGiven(val) ? rtest(val(e)) : rbEqual(e, val)));
     return i < 0 ? null : i;
   },
   /** `rb_ary_rindex` (`vendor/ruby/v3.3.11/array.c:2087`). */
   rindex: (self, val: unknown) => {
     for (let i = self.length; i--; ) {
-      if (typeof val === "function" ? rtest(val(self[i])) : rbEqual(self[i], val)) return i;
+      if (blockGiven(val) ? rtest(val(self[i])) : rbEqual(self[i], val)) return i;
     }
     return null;
   },
   /** `rb_ary_collect` (`vendor/ruby/v3.3.11/array.c:3625`). */
-  collect: (self, block: Block) => self.map((v) => block(v)),
+  collect: (self, block?: Block) => (block ? self.map((v) => block(v)) : self),
   /** `rb_ary_compact` (`vendor/ruby/v3.3.11/array.c:6240`). */
   compact: (self) => compact(self),
   /** `rb_ary_reject` (`vendor/ruby/v3.3.11/array.c:4301`). */
-  reject: (self, block: Block) => self.filter((v) => !rtest(block(v))),
+  reject: (self, block?: Block) => (block ? self.filter((v) => !rtest(block(v))) : self),
   /** `rb_ary_rotate_m` (`vendor/ruby/v3.3.11/array.c:3240`). */
   rotate: (self, cnt: number = 1) => {
     const n = self.length === 0 ? 0 : ((cnt % self.length) + self.length) % self.length;
@@ -1138,36 +1141,40 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   },
   /** `rb_ary_all_p` (`vendor/ruby/v3.3.11/array.c:7740`). */
   isAll: (self, ...argv: unknown[]) =>
-    self.every((v) =>
-      rtest(argv.length === 0 ? v : typeof argv[0] === "function" ? argv[0](v) : rbEqq(argv[0], v)),
-    ),
+    self.every((v) => (argv.length ? rbEqq(argv[0], v) : rtest(v))),
   /** `rb_ary_none_p` (`vendor/ruby/v3.3.11/array.c:7800`). */
   isNone: (self, ...argv: unknown[]) => Enumerable.isNone.call(enumOf(self), ...argv),
   /** `rb_ary_one_p` (`vendor/ruby/v3.3.11/array.c:7864`). */
   isOne: (self, ...argv: unknown[]) => Enumerable.isOne.call(enumOf(self), ...argv),
   /** `enum_find` (`vendor/ruby/v3.3.11/enum.c:361`). */
-  detect: (self, ...argv: unknown[]) => Enumerable.find.call(enumOf(self), ...argv),
+  detect: (self, ...argv: unknown[]) =>
+    blockGiven(argv.at(-1)) ? Enumerable.find.call(enumOf(self), ...argv) : self,
   /** `enum_find_all` (`vendor/ruby/v3.3.11/enum.c:509`). */
-  findAll: (self, block: Block) => Enumerable.findAll.call(enumOf(self), block),
+  findAll: (self, block?: Block) => (block ? Enumerable.findAll.call(enumOf(self), block) : self),
   /** `enum_partition` (`vendor/ruby/v3.3.11/enum.c:1102`). */
-  partition: (self, block: Block) => partition(self, block),
+  partition: (self, block?: Block) => (block ? partition(self, block) : self),
   /** `enum_group_by` (`vendor/ruby/v3.3.11/enum.c:1157`). */
-  groupBy: (self, block: Block) => groupBy(self, block),
+  groupBy: (self, block?: Block) => (block ? groupBy(self, block) : self),
   /** `enum_sort_by` (`vendor/ruby/v3.3.11/enum.c:1651`). */
-  sortBy: (self, block: Block) =>
-    self
-      .map((v) => [block(v), v])
-      .sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]))
-      .map((pair) => pair[1]),
+  sortBy: (self, block?: Block) =>
+    !block
+      ? self
+      : self
+          .map((v) => [block(v), v])
+          .sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]))
+          .map((pair) => pair[1]),
   /** `enum_each_with_index` (`vendor/ruby/v3.3.11/enum.c:2967`). */
-  eachWithIndex: (self, block: Block) => {
+  eachWithIndex: (self, block?: Block) => {
+    if (!block) return self.map((v, i) => [v, i]);
     self.forEach((v, i) => block(v, i));
     return self;
   },
   /** `enum_each_cons` (`vendor/ruby/v3.3.11/enum.c:3244`). */
-  eachCons: (self, n: number, block: Block) => {
+  eachCons: (self, n: number, block?: Block) => {
     if (n <= 0) throw new ArgumentError("invalid size");
-    for (let i = 0; i + n <= self.length; i++) block(self.slice(i, i + n));
+    const ary = self.slice(n - 1).map((_, i) => self.slice(i, i + n));
+    if (!block) return ary;
+    ary.forEach((v) => block(v));
     return self;
   },
   /** `Enumerable#to_set` (`vendor/ruby/v3.3.11/prelude.rb:28`). */
