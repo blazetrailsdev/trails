@@ -1244,9 +1244,9 @@ describe("DatabaseTasksMigrateStatusTest", () => {
     await schemaMigration.createTable();
     const output = await captureMigrationStatus();
     expect(output).toMatch(/database: :memory:/);
-    expect(output).toMatch(/down    001             Valid people have last names/);
-    expect(output).toMatch(/down    002             We need reminders/);
-    expect(output).toMatch(/down    003             Innocent jointable/);
+    expect(output).toMatch(/down {4}001 {13}Valid people have last names/);
+    expect(output).toMatch(/down {4}002 {13}We need reminders/);
+    expect(output).toMatch(/down {4}003 {13}Innocent jointable/);
     await schemaMigration.deleteAllVersions();
   });
 
