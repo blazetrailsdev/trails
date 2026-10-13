@@ -642,6 +642,7 @@ function withDeferredDistinctPkPredicates<
   } as unknown as F;
 }
 
+/** @internal */
 export const CalculationsPublicInstanceMethods = {
   count: inQueryConnection(count),
   asyncCount,

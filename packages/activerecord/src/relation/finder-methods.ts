@@ -388,6 +388,7 @@ export function raiseRecordNotFoundExceptionBang(
   throw new RecordNotFound(error, name, key, ids);
 }
 
+/** @internal */
 export const FinderMethodsPublicInstanceMethods = {
   find,
   findBy,

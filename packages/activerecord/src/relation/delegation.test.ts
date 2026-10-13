@@ -107,50 +107,51 @@ describe("DelegationRecordsTest", () => {
 });
 
 describe("QueryingMethodsDelegationTest", () => {
-  const QUERYING_METHODS = [
-    ...publicInstanceMethods(Batches, false),
-    ...publicInstanceMethods(Calculations, false),
-    ...publicInstanceMethods(FinderMethods, false).filter(
+  const QUERYING_METHODS = publicInstanceMethods(Batches, false)
+    .concat(publicInstanceMethods(Calculations, false))
+    .concat(publicInstanceMethods(FinderMethods, false))
+    .filter(
       (method) => !["isInclude", "isMember", "raiseRecordNotFoundExceptionBang"].includes(method),
-    ),
-    ...publicInstanceMethods(SpawnMethods, false).filter(
-      (method) => !["spawn", "mergeBang"].includes(method),
-    ),
-    ...publicInstanceMethods(QueryMethods, false)
-      .filter((method) => !/(=|Bang|Value|Values|Clause)$|^is[A-Z]/.test(method))
-      .filter(
-        (method) =>
-          !["all", "reverseOrder", "arel", "extensions", "constructJoinDependency"].includes(
-            method,
-          ),
+    )
+    .concat(publicInstanceMethods(SpawnMethods, false))
+    .filter((method) => !["spawn", "mergeBang"].includes(method))
+    .concat(
+      publicInstanceMethods(QueryMethods, false).filter(
+        (method) => !/(=|Bang|Value|Values|Clause)$|^is[A-Z]/.test(method),
       ),
-    "isAny",
-    "isMany",
-    "isNone",
-    "isOne",
-    "firstOrCreate",
-    "firstOrCreateBang",
-    "firstOrInitialize",
-    "findOrCreateBy",
-    "findOrCreateByBang",
-    "findOrInitializeBy",
-    "createOrFindBy",
-    "createOrFindByBang",
-    "destroy",
-    "destroyAll",
-    "delete",
-    "deleteAll",
-    "updateAll",
-    "touchAll",
-    "deleteBy",
-    "destroyBy",
-    "insert",
-    "insertAll",
-    "insertBang",
-    "insertAllBang",
-    "upsert",
-    "upsertAll",
-  ];
+    )
+    .filter(
+      (method) =>
+        !["all", "reverseOrder", "arel", "extensions", "constructJoinDependency"].includes(method),
+    )
+    .concat([
+      "isAny",
+      "isMany",
+      "isNone",
+      "isOne",
+      "firstOrCreate",
+      "firstOrCreateBang",
+      "firstOrInitialize",
+      "findOrCreateBy",
+      "findOrCreateByBang",
+      "findOrInitializeBy",
+      "createOrFindBy",
+      "createOrFindByBang",
+      "destroy",
+      "destroyAll",
+      "delete",
+      "deleteAll",
+      "updateAll",
+      "touchAll",
+      "deleteBy",
+      "destroyBy",
+      "insert",
+      "insertAll",
+      "insertBang",
+      "insertAllBang",
+      "upsert",
+      "upsertAll",
+    ]);
 
   it("delegate querying methods", () => {
     const klass = class extends Base {

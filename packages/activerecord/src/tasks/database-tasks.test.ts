@@ -1272,7 +1272,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
     }
   });
 
-  it.skipIf(skipMigrationTestCase)("migrate clears schema cache afterward", async () => {
+  it("migrate clears schema cache afterward", async () => {
     await assertCalled(Base.schemaCache(), "clearBang", null, {}, async () => {
       await DatabaseTasks.migrate();
     });

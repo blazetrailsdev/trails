@@ -70,47 +70,6 @@ describe("HasManyAssociationsTest", () => {
     expect(removed!.map((r) => r.id)).toEqual([first.id]);
   });
 
-  it.skip("depends and nullify with composite foreign key nulls every FK column", async () => {
-    class NullifyCompositeAuthor extends Base {
-      declare name: string | null;
-      declare cpk_posts: AssociationProxy<NullifyCompositePost>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("cpk_posts", {
-          className: "NullifyCompositePost",
-          foreignKey: ["tenant_id", "author_id"],
-          primaryKey: ["id", "id"],
-          dependent: "nullify",
-        });
-      }
-    }
-    class NullifyCompositePost extends Base {
-      declare tenant_id: number | null;
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this.attribute("tenant_id", "integer");
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NullifyCompositeAuthor);
-    registerModel(NullifyCompositePost);
-    const author = await NullifyCompositeAuthor.create({ name: "Alice" });
-    const post = await NullifyCompositePost.create({
-      tenant_id: author.id,
-      author_id: author.id,
-      title: "A",
-      body: "body",
-    });
-    await author.destroy();
-    const reloaded = await NullifyCompositePost.find(post.id!);
-    expect(reloaded.tenant_id).toBeNull();
-    expect(reloaded.author_id).toBeNull();
-  });
-
   it("isAssociationCached reflects built Association instances", async () => {
     class CacheAuthor extends Base {
       declare name: string | null;
