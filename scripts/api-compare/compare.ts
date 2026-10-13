@@ -6381,18 +6381,18 @@ export function main() {
           continue;
         }
 
-        if (
-          ownerIsModule &&
-          mixinFile === undefined &&
-          (rubyName === "initialize" || classMethodsNew) &&
-          inlinedHookCreditedBy(
-            classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
-            classMethodsNew ? "new" : "initialize",
-            pkg,
-            moduleIncluderFiles.get(rubyModule) ?? new Set(),
-            tsInlinedHookTags,
-          ) !== undefined
-        ) {
+        const creditedBy =
+          ownerIsModule && mixinFile === undefined && (rubyName === "initialize" || classMethodsNew)
+            ? inlinedHookCreditedBy(
+                classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
+                classMethodsNew ? "new" : "initialize",
+                pkg,
+                moduleIncluderFiles.get(rubyModule) ?? new Set(),
+                tsInlinedHookTags,
+              )
+            : undefined;
+        if (creditedBy !== undefined) {
+          checkBody(rubyName, "constructor", creditedBy.tsFile);
           fileMatched++;
           continue;
         }
