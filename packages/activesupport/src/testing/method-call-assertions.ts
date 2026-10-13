@@ -238,7 +238,7 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   object: T,
   name: keyof T & string,
   valOrCallable: unknown,
-  block?: () => R,
+  block?: (object: T) => R,
 ): R extends Promise<void> ? Promise<void> : undefined {
   type Result = R extends Promise<void> ? Promise<void> : undefined;
   const original = Object.getOwnPropertyDescriptor(object, name);
@@ -261,7 +261,7 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   };
   let result: R | undefined;
   try {
-    result = block?.();
+    result = block?.(object);
   } catch (e) {
     restore();
     throw e;
