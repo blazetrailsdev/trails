@@ -1,6 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
-import { type Generic, URI, hashDelete, merge, regexpEscape } from "@blazetrails/ruby-compat";
+import { type Generic, URI, merge, regexpEscape } from "@blazetrails/ruby-compat";
 import { DEFAULT_HOST } from "./test.js";
 
 /** @internal */
@@ -122,7 +122,7 @@ export class Cookie {
       HttpOnly: this.isHttpOnly(),
       secure: this.isSecure(),
     });
-    hashDelete(hash, "httponly");
+    delete hash.httponly;
     return hash;
   }
 

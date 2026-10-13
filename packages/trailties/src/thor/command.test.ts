@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { hashDelete, rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { Command, DynamicCommand } from "./command.js";
 import { Argument } from "./parser/argument.js";
 import { Option } from "./parser/option.js";
@@ -93,7 +93,7 @@ describe("Thor::Command", () => {
         foo: true,
         bar: ":required",
       } as unknown as Record<string, Option>);
-      hashDelete(rbObjDup(command).options, "foo");
+      delete rbObjDup(command).options.foo;
       expect(command.options.foo).toBeTruthy();
     });
   });

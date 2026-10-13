@@ -155,7 +155,7 @@ export function htmlOptionsForForm(
   const multipart = hashDelete(htmlOptions, "multipart");
   if (multipart != null && multipart !== false) htmlOptions["enctype"] = "multipart/form-data";
   if (urlForOptions === false || htmlOptions["action"] === false) {
-    hashDelete(htmlOptions, "action");
+    delete htmlOptions["action"];
   } else {
     htmlOptions["action"] = this.urlFor(urlForOptions);
   }
@@ -254,7 +254,7 @@ export function setDefaultDisableWith(value: unknown, tagOptions: Record<string,
     (data instanceof Hash ? data.get("disable_with") : data["disable_with"]) === false
   ) {
     if (data instanceof Hash) data.delete("disable_with");
-    else hashDelete(data, "disable_with");
+    else delete data["disable_with"];
   } else if (ActionView.Base.automaticallyDisableSubmitTag) {
     let disableWithText = tagOptions["data-disable-with"];
     if (disableWithText == null || disableWithText === false)
@@ -265,7 +265,7 @@ export function setDefaultDisableWith(value: unknown, tagOptions: Record<string,
     deepMergeBang(tagOptions, { data: { disable_with: disableWithText } });
   }
 
-  hashDelete(tagOptions, "data-disable-with");
+  delete tagOptions["data-disable-with"];
 }
 
 export const FormTagHelper = new Module((mod) => {
