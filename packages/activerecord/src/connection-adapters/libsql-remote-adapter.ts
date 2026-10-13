@@ -22,6 +22,9 @@ export class LibSQLRemoteAdapter extends AbstractAdapter {
   constructor(config: SQLite3Config) {
     super(config);
 
+    this._memoryDatabase = false;
+    this._lastAffectedRows = 0;
+    this._previousReadUncommitted = null;
     if (!hasKey(this._config, "strict")) {
       this._config.strict = SQLite3Adapter.strictStringsByDefault;
     }

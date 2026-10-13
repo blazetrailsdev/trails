@@ -635,6 +635,8 @@ describe("SQLite3Adapter connection parameters", () => {
     const adapter = new LibSQLRemoteAdapter({ database: "libsql://trails-remote-probe.invalid" });
     expect(adapter._connectionParameters.database).toBe("libsql://trails-remote-probe.invalid");
     expect(adapter.supportsConcurrentConnections()).toBe(true);
+    expect(adapter._memoryDatabase).toBe(false);
+    expect(adapter._previousReadUncommitted).toBeNull();
     expect(File.isDirectory("libsql:")).toBe(false);
   });
 
