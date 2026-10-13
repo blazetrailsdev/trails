@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import { block as rbBlock, fetch, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch, hashDelete, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
 import { Routing } from "../../namespaces.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
@@ -80,8 +80,7 @@ export function polymorphicUrl(
   if (mapping) return mapping.call(this, [recordOrHashOrArray, options], false);
 
   const opts = { ...options };
-  const action = opts.action;
-  delete opts.action;
+  const action = hashDelete(opts, "action") as string | null;
   const type: "path" | "url" = opts.routingType ?? "url";
   delete opts.routingType;
 
@@ -104,8 +103,7 @@ export function polymorphicPath(
   if (mapping) return mapping.call(this, [recordOrHashOrArray, options], true);
 
   const opts = { ...options };
-  const action = opts.action;
-  delete opts.action;
+  const action = hashDelete(opts, "action") as string | null;
   const type = "path";
 
   return HelperMethodBuilder.polymorphicMethod(this, recordOrHashOrArray, action, type, opts);
@@ -194,7 +192,7 @@ export class HelperMethodBuilder {
     }
   }
 
-  static get(action: string | null | undefined, type: "path" | "url"): HelperMethodBuilder {
+  static get(action: string | null, type: "path" | "url"): HelperMethodBuilder {
     return fetch(
       HelperMethodBuilder.CACHE[type],
       action,
@@ -210,7 +208,7 @@ export class HelperMethodBuilder {
     return HelperMethodBuilder.CACHE.path.get(null)!;
   }
 
-  static build(action: string | null | undefined, type: "path" | "url"): HelperMethodBuilder {
+  static build(action: string | null, type: "path" | "url"): HelperMethodBuilder {
     const prefix = action ? `${action}_` : "";
     const suffix = type;
     return action === "new"
@@ -229,7 +227,7 @@ export class HelperMethodBuilder {
   static polymorphicMethod(
     recipient: PolymorphicHost,
     recordOrHashOrArray: PolymorphicArg,
-    action: string | null | undefined,
+    action: string | null,
     type: "path" | "url",
     options: Record<string, unknown>,
   ): string {

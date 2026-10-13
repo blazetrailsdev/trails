@@ -907,9 +907,12 @@ class TestExtractor
         report_unexpanded_loop(node)
         next
       end
-      @line_offset = extract_line(heredoc) - 1
-      sexps.each { |sexp| walk(sexp) }
-      @line_offset = 0
+      begin
+        @line_offset = extract_line(heredoc) - 1
+        sexps.each { |sexp| walk(sexp) }
+      ensure
+        @line_offset = 0
+      end
     end
     true
   end

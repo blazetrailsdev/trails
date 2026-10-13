@@ -609,16 +609,14 @@ let useFixturesCount = 0;
 
 const warmed = new WeakSet<TestCaseClass>();
 
+let rootTestCaseClass: TestCaseClass | undefined;
+
 let currentTestCase: TestCase | null = null;
 
-const testCaseClasses = new WeakMap<object, TestCaseClass>();
-
-function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
-  let klass = testCaseClasses.get(suite ?? topLevel);
-  if (klass !== undefined) return klass;
-  if (suite === undefined) {
+function rootTestCase(): TestCaseClass {
+  if (rootTestCaseClass === undefined) {
     const { TestCase } = ActiveRecord;
-    klass = class extends TestCase {
+    rootTestCaseClass = class extends TestCase {
       override async beforeSetup(): Promise<void> {
         const testKlass = this.constructor as TestCaseClass;
         currentTestCase = this;
@@ -645,11 +643,24 @@ function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
         }
       }
     };
-    klass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
-  } else {
-    klass = class extends testCaseClassFor(suite.suite) {};
+    rootTestCaseClass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
   }
-  testCaseClasses.set(suite ?? topLevel, klass);
+  return rootTestCaseClass;
+}
+
+function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
+  let klass = describedClasses.get(suite ?? topLevel) as TestCaseClass | undefined;
+  if (klass !== undefined) return klass;
+  if (suite === undefined) {
+    klass = rootTestCase();
+  } else {
+    let parent = suite.suite;
+    while (parent !== undefined && !describedClasses.has(parent)) parent = parent.suite;
+    klass = class extends (
+      ((describedClasses.get(parent ?? topLevel) as TestCaseClass | undefined) ?? rootTestCase())
+    ) {};
+  }
+  describedClasses.set(suite ?? topLevel, klass);
   return klass;
 }
 
@@ -707,9 +718,7 @@ export function fixtures(
 ): Record<string, unknown> {
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
-  const suite = getCurrentSuite().suite as SuiteScope | undefined;
-  const klass = testCaseClassFor(suite);
-  describedClasses.set(suite ?? topLevel, klass);
+  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
   klass.usesTransaction(
     ...(usesTransaction ?? []).map((name) => `test_${name.replace(/\s+/g, "_")}`),
   );

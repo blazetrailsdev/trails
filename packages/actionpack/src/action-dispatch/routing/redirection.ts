@@ -8,7 +8,7 @@ import {
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
-import { URI } from "@blazetrails/ruby-compat";
+import { isEmpty, URI } from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
 
@@ -68,7 +68,7 @@ export class Redirect extends Endpoint {
     if (!uri.host) {
       if (this.relativePath(uri.path)) {
         uri.path = `${scriptName(req)}/${uri.path}`;
-      } else if (uri.path!.length === 0) {
+      } else if (isEmpty(uri.path!)) {
         uri.path = scriptName(req) === "" ? "/" : scriptName(req);
       }
     }
@@ -98,7 +98,7 @@ export class Redirect extends Endpoint {
 
   /** @internal */
   protected relativePath(path: string | null): boolean {
-    return !!path && path !== "" && !path.startsWith("/");
+    return path != null && !isEmpty(path) && !path.startsWith("/");
   }
 
   /** @internal */
