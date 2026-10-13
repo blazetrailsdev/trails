@@ -107,14 +107,14 @@ export class DatabaseTasks {
 
   /** @internal */
   private static classForAdapter(adapter: string | undefined): DatabaseTaskHandler {
-    const task =
+    const [_key, task] =
       adapter === undefined
-        ? undefined
-        : [...this.tasks].reverse().find(([pattern, _task]) => {
+        ? []
+        : ([...this.tasks].reverse().find(([pattern, _task]) => {
             if (typeof pattern === "string") return adapter.includes(pattern);
             pattern.lastIndex = 0;
             return pattern.test(adapter);
-          })?.[1];
+          }) ?? []);
     if (!task) {
       throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
     }

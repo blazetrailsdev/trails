@@ -1,5 +1,6 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { SQLite3Constants, type SqliteConnection } from "../sqlite-adapter.js";
+import { quoteColumnName, quoteTableName } from "../connection-adapters/sqlite3/quoting.js";
 import { Database } from "./database.js";
 import { Exception } from "./errors.js";
 
@@ -28,6 +29,8 @@ export class Backup {
       throw new Exception("SQLite3::Backup needs a file-backed source database");
     }
 
+    const foreignKeys = await dstdb.pragma("foreign_keys", { simple: true });
+    await dstdb.pragma("foreign_keys = OFF");
     await dstdb.exec(`ATTACH DATABASE '${Database.quote(file)}' AS sqlite3_backup`);
     try {
       const objects = (
@@ -39,13 +42,10 @@ export class Backup {
       for (const [, , sql] of objects) await dstdb.exec(sql);
       for (const [type, name] of objects) {
         if (type !== "table") continue;
-        const table = `"${name.replace(/"/g, '""')}"`;
+        const table = quoteTableName(name);
         const columns = (
-          await dstdb.execute(
-            // eslint-disable-next-line blazetrails/no-raw-sql
-            `SELECT name FROM pragma_table_info('${Database.quote(name)}', 'sqlite3_backup')`,
-          )
-        ).map((row) => `"${String(Object.values(row as object)[0]).replace(/"/g, '""')}"`);
+          (await dstdb.pragma(`sqlite3_backup.table_info(${table})`)) as { name: string }[]
+        ).map((column) => quoteColumnName(column.name));
         if (columns.length === 0) continue;
         await dstdb.exec(
           `INSERT INTO main.${table} (${columns.join(", ")}) ` +
@@ -56,7 +56,7 @@ export class Backup {
         "SELECT count(*) FROM sqlite3_backup.sqlite_master WHERE name = 'sqlite_sequence'",
       );
       if (Number(sequences) > 0) {
-        // eslint-disable-next-line blazetrails/no-raw-sql
+        // eslint-disable-next-line blazetrails/no-raw-sql -- a raw driver handle has no Arel connection; the copy is SQLite's own catalog
         await dstdb.exec("DELETE FROM main.sqlite_sequence");
         await dstdb.exec(
           "INSERT INTO main.sqlite_sequence (name, seq) " +
@@ -65,6 +65,7 @@ export class Backup {
       }
     } finally {
       await dstdb.exec("DETACH DATABASE sqlite3_backup");
+      await dstdb.pragma(`foreign_keys = ${Number(foreignKeys)}`);
     }
     return SQLite3Constants.ErrorCode.DONE;
   }
