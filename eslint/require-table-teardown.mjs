@@ -1182,8 +1182,6 @@ const rule = {
     const safelyDropped = new Set();
     const unguardedDrops = new Map();
     const memoryLocal = new Set();
-    // Creates a migration revert tears down, and each guarded
-    // `migrate("down")` with the function its hook or `try` is written in.
     const migrationCreates = [];
     const reverts = [];
 
