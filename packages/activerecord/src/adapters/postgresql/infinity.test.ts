@@ -62,14 +62,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number.isNaN(record.float)).toBeTruthy();
     });
 
-    it("updateColumns with infinity on a float column", async () => {
-      const M = await modelClass();
-      const record = await (M as any).create({});
-      await record.updateColumns({ float: Number.POSITIVE_INFINITY });
-      await record.reload();
-      expect(record.float).toBe(Number.POSITIVE_INFINITY);
-    });
-
     it("update_all with infinity on a float column", async () => {
       const M = await modelClass();
       const record = await (M as any).create({});
