@@ -1129,7 +1129,8 @@ export class Base extends Model {
 
   declare static findBy: <T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown>,
+    conditions: Record<string, unknown> | string,
+    ...rest: unknown[]
   ) => Promise<InstanceType<T> | null>;
 
   declare static initializeFindByCache: typeof _Core.initializeFindByCache;
