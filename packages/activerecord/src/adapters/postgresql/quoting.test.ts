@@ -4,7 +4,7 @@ import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quo
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Bit } from "../../connection-adapters/postgresql/oid/bit.js";
 import { IntegerType } from "@blazetrails/activemodel";
-import { Range as OidRange } from "@blazetrails/ruby-compat";
+import { Range as OidRange, rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit, setRaiseIntWiderThan64bit } from "../../active-record.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -75,6 +75,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote big decimal", async () => {
       expect(adapter.quote(4.2)).toBe("4.2");
+    });
+
+    it("quote rational", () => {
+      expect(adapter.quote(rational(3, 4))).toBe("3/4");
     });
 
     it("quote bit string", () => {

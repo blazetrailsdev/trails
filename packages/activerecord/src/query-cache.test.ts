@@ -459,7 +459,7 @@ describe("QueryCacheTest", () => {
   });
 
   it.skip("query cache does not allow sql key mutation", () => {
-    // BLOCKED: relies on Ruby FrozenError when a subscriber mutates the frozen
+    // PERMANENT-SKIP: CLAUDE.md § "Ruby Strings are JS string primitives"
   });
 
   it("cache is flat", async () => {

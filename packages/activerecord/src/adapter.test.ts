@@ -674,8 +674,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
   const remoteSupported = adapterType !== "sqlite";
 
-  const itBlocked = it.skip;
-
   let connection: DatabaseAdapter;
 
   beforeEach(async () => {
@@ -926,7 +924,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await activePredicate(connection)).toBeFalsy();
   });
 
-  itBlocked("transaction restores after remote disconnection", async () => {
+  it.skipIf(!remoteSupported)("transaction restores after remote disconnection", async () => {
     await remoteDisconnect(connection);
     await Post.transaction(async () => {
       await Post.count();

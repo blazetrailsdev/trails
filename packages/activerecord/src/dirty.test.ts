@@ -412,6 +412,13 @@ describe("DirtyTest", () => {
     expect(topic.attributeChanged("approved")).toBeFalsy();
   });
 
+  it("string attribute should compare with typecast symbol after update", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "foo" });
+    await pirate.updateColumn("catchphrase", "foo");
+    void pirate.catchphrase;
+    expect(pirate.attributeChanged("catchphrase")).toBeFalsy();
+  });
+
   it("partial update", async () => {
     const pirate = new Pirate();
     pirate.catchphrase = "foo";

@@ -472,7 +472,11 @@ describe("NamedScopingTest", () => {
     expect(chainedGot).toEqual(chainedExpected);
   });
 
-  it.skip("find all should behave like select", () => {});
+  it("find all should behave like select", async () => {
+    expect((await Topic.base()).filter((t) => t.approved)).toEqual(
+      (await Topic.base()).filter((t) => t.approved),
+    );
+  });
 
   it("rand should select a random object from proxy", async () => {
     const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";

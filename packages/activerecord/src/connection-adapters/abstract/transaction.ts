@@ -13,7 +13,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Hash, isEmpty, Thread, uniq } from "@blazetrails/ruby-compat";
+import { Hash, isEmpty, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */
@@ -901,15 +901,19 @@ export class TransactionManager {
           joinable: options.joinable,
         });
         let failed = false;
-        let result: T;
+        let throwData: unknown;
+        let result!: T;
         try {
           result = await fn(transaction.userTransaction);
         } catch (error) {
-          failed = true;
-          await this.rollbackTransaction();
-          await this.afterFailureActions(transaction, error);
+          if (throwDataP(error)) throwData = error;
+          else {
+            failed = true;
+            await this.rollbackTransaction();
+            await this.afterFailureActions(transaction, error);
 
-          throw error;
+            throw error;
+          }
         }
         if (!failed) {
           if ((Thread.current().status as string) === "aborting") {
@@ -930,6 +934,7 @@ export class TransactionManager {
             }
           }
         }
+        if (throwData !== undefined) throw throwData;
         return result;
       } finally {
         if (!transaction || !transaction.state.isCompleted()) {

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertRespondTo } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
+import { ProtectedParams } from "../../support/stubs/strong-parameters.js";
 import { Base, Migration } from "../../index.js";
 import {
   stringify as yamlStringify,
@@ -389,6 +390,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("schema dump with shorthand", async () => {
       const output = await dumpTableSchema("hstores");
       expect(output).toMatch(/t\.hstore\("tags",\s+\{?\s*default:\s*\{\}/);
+    });
+
+    it("supports to unsafe h values", () => {
+      expect(type.serialize(new ProtectedParams({ hi: "hi" }))).toBe('"hi"=>"hi"');
     });
   });
 });
