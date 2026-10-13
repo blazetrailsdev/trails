@@ -1129,8 +1129,8 @@ export class Base extends Model {
 
   declare static findBy: <T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown> | string,
-    ...rest: unknown[]
+    arg: Record<string, unknown> | string,
+    ...args: unknown[]
   ) => Promise<InstanceType<T> | null>;
 
   declare static initializeFindByCache: typeof _Core.initializeFindByCache;
@@ -1141,8 +1141,8 @@ export class Base extends Model {
 
   declare static findByBang: <T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown> | string,
-    ...rest: unknown[]
+    arg: Record<string, unknown> | string,
+    ...args: unknown[]
   ) => Promise<InstanceType<T>>;
 
   static async findSoleBy<T extends typeof Base>(
