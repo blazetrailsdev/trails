@@ -1,7 +1,9 @@
 import { Thread } from "@blazetrails/ruby-compat";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stripThenable } from "@blazetrails/activesupport";
 import { Nodes } from "@blazetrails/arel";
 import { Base } from "./base.js";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import { leaseConnection, withConnection, connection } from "./connection-handling.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./active-record.js";
@@ -479,5 +481,242 @@ describe("ConnectionHandling", () => {
 
     const resolved = new DatabaseConfigurations({}).resolve(configurationHash)!;
     expect(resolved.adapter).toBe("sqlite3");
+  });
+});
+
+describe("withRoleAndShard loads Relation return values within scope (Story K gap 5)", () => {
+  it("an overlapping async block removes its own entry when it settles first", async () => {
+    const { withRoleAndShard } = await import("./connection-handling.js");
+    class FakeModel extends Base {}
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const seen: (string | undefined)[] = [];
+
+    const outer = withRoleAndShard.call(FakeModel, "outer", undefined, false, async () => {
+      await Promise.resolve();
+    });
+    const inner = withRoleAndShard.call(FakeModel, "inner", undefined, false, async () => {
+      await gate;
+      seen.push(connectedToStack().at(-1)?.role);
+    });
+    await outer;
+    release();
+    await inner;
+
+    expect(seen).toEqual(["inner"]);
+    expect(connectedToStack().some((entry) => entry.role === "outer")).toBe(false);
+    expect(connectedToStack().some((entry) => entry.role === "inner")).toBe(false);
+  });
+
+  it("connected_to_many raises ArgumentError without a role", () => {
+    class AbstractConn extends Base {}
+    expect(() => Base.connectedToMany([AbstractConn], {} as never, () => {})).toThrow(
+      "missing keyword: :role",
+    );
+  });
+
+  it("calls .load() on a Relation returned from an async block", async () => {
+    const { withRoleAndShard } = await import("./connection-handling.js");
+    let loadCalled = false;
+    const fakeRelation = Object.assign(Object.create(Relation.prototype), {
+      load() {
+        loadCalled = true;
+        return Promise.resolve(stripThenable(this));
+      },
+    });
+
+    class FakeModel extends Base {}
+
+    await withRoleAndShard.call(FakeModel, undefined, undefined, false, async () =>
+      stripThenable(fakeRelation),
+    );
+
+    expect(loadCalled).toBe(true);
+  });
+});
+
+describe("AbstractAdapter#isPreventingWrites stack matching", () => {
+  afterEach(async () => {
+    connectedToStack().length = 0;
+    for (const name of ["UnrelatedAbstract", "AnimalsRecord", "MealsRecord"]) {
+      await Base.connectionHandler.removeConnectionPool(name);
+    }
+  });
+
+  it("Base.connectedTo preventing writes applies globally to unrelated pools", async () => {
+    class UnrelatedAbstract extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    await Base.connectionHandler.establishConnection(
+      new HashConfig("test", "UnrelatedAbstract", { adapter: "sqlite3", database: ":memory:" }),
+      { ownerName: "UnrelatedAbstract", role: "writing" },
+    );
+    const conn = await UnrelatedAbstract.leaseConnection();
+    expect(conn.isPreventingWrites()).toBe(false);
+    Base.connectedTo({ role: "writing", preventWrites: true }, () => {
+      expect(conn.isPreventingWrites()).toBe(true);
+    });
+    expect(conn.isPreventingWrites()).toBe(false);
+  });
+
+  it("abstract-class connectedTo does not leak to unrelated pools", async () => {
+    class AnimalsRecord extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+        this.connectionSpecificationName = "AnimalsRecord";
+      }
+    }
+    class MealsRecord extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+        this.connectionSpecificationName = "MealsRecord";
+      }
+    }
+    await Base.connectionHandler.establishConnection(
+      new HashConfig("test", "AnimalsRecord", { adapter: "sqlite3", database: ":memory:" }),
+      { ownerName: "AnimalsRecord", role: "writing" },
+    );
+    await Base.connectionHandler.establishConnection(
+      new HashConfig("test", "MealsRecord", { adapter: "sqlite3", database: ":memory:" }),
+      { ownerName: "MealsRecord", role: "writing" },
+    );
+    const animals = await AnimalsRecord.leaseConnection();
+    const meals = await MealsRecord.leaseConnection();
+    AnimalsRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
+      expect(animals.isPreventingWrites()).toBe(true);
+      expect(meals.isPreventingWrites()).toBe(false);
+    });
+  });
+
+  it("primary class connectedTo (after connectsTo) targets the Base-normalized pool", async () => {
+    class ApplicationRecord extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+      static override isPrimaryClass(): boolean {
+        return true;
+      }
+    }
+    const handler = new ConnectionHandler();
+    const appPool = await handler.establishConnection(
+      new HashConfig("test", "ApplicationRecord", { adapter: "sqlite3", database: ":memory:" }),
+      { ownerName: ApplicationRecord, role: "writing" },
+    );
+    const otherPool = await handler.establishConnection(
+      new HashConfig("test", "OtherAbstract", { adapter: "sqlite3", database: ":memory:" }),
+      { ownerName: "OtherAbstract", role: "writing" },
+    );
+    try {
+      const appConn = await appPool.leaseConnection();
+      const otherConn = await otherPool.leaseConnection();
+      ApplicationRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
+        expect(appConn.isPreventingWrites()).toBe(true);
+        expect(otherConn.isPreventingWrites()).toBe(false);
+      });
+    } finally {
+      await handler.clearAllConnectionsBang();
+    }
+  });
+});
+
+describe("resolveConfigForConnection / connectsTo with unset configurations", () => {
+  let prevBaseConfigs: DatabaseConfigurations;
+
+  beforeEach(() => {
+    prevBaseConfigs = Base.configurations();
+  });
+
+  afterEach(async () => {
+    Base.configurations(prevBaseConfigs);
+    await Base.connectionHandler.clearAllConnectionsBang();
+    Reflect.deleteProperty(Base, "_connectionSpecificationName");
+    await restoreWorkerConnection();
+  });
+
+  it("unknown string config name raises AdapterNotSpecified with available-configs hint", async () => {
+    const { resolveConfigForConnection } = await import("./connection-handling.js");
+    const { AdapterNotSpecified } = await import("./errors.js");
+    class Untouched extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    expect(() => resolveConfigForConnection.call(Untouched, ":missing_env")).toThrow(
+      AdapterNotSpecified,
+    );
+    expect(() => resolveConfigForConnection.call(Untouched, ":missing_env")).toThrow(
+      /`missing_env` database is not configured/,
+    );
+    expect(() => resolveConfigForConnection.call(Untouched, ":missing_env")).toThrow(
+      /Available database configurations are:/,
+    );
+  });
+
+  it("connectsTo plants _connectionSpecificationName (primary class normalizes to 'Base')", async () => {
+    const { __resetPrimaryAbstractClass, primaryAbstractClass } = await import("./inheritance.js");
+    let priorConfigs: ReturnType<typeof Base.configurations> | undefined;
+    class AppRecord extends Base {}
+    class SecondaryAbstract extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    try {
+      __resetPrimaryAbstractClass();
+      primaryAbstractClass(AppRecord);
+      const env = DEFAULT_ENV();
+      priorConfigs = Base.configurations();
+      Base.configurations({
+        [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },
+      });
+
+      await AppRecord.connectsTo({ database: { writing: ":primary" } });
+      expect(Reflect.get(AppRecord, "_connectionSpecificationName")).toBe("ActiveRecord::Base");
+
+      await SecondaryAbstract.connectsTo({ database: { writing: ":primary" } });
+      expect(Reflect.get(SecondaryAbstract, "_connectionSpecificationName")).toBe(
+        "SecondaryAbstract",
+      );
+    } finally {
+      await SecondaryAbstract.removeConnection();
+      __resetPrimaryAbstractClass();
+      if (priorConfigs) Base.configurations(priorConfigs);
+      await restoreWorkerConnection();
+    }
+  });
+});
+
+describe("establish_connection accepts a DatabaseConfig", () => {
+  class CapturedConfigModel extends Base {}
+
+  afterEach(async () => {
+    await CapturedConfigModel.removeConnection();
+  });
+
+  it("re-establishes the connection from the captured DatabaseConfig object", async () => {
+    const config = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: "db/primary.sqlite3",
+      pool: 5,
+      reapingFrequency: null,
+    });
+    await Base.connectionHandler.establishConnection(config, { ownerName: "CapturedConfigModel" });
+    CapturedConfigModel.connectionSpecificationName = "CapturedConfigModel";
+
+    const captured = (await CapturedConfigModel.removeConnection())!;
+    expect(captured).toBeInstanceOf(HashConfig);
+
+    await CapturedConfigModel.establishConnection(captured);
+
+    const restored = CapturedConfigModel.connectionDbConfig();
+    expect(restored).toBe(captured);
+    expect(restored.adapter).toBe("sqlite3");
+    expect(restored.configurationHash.database).toBe("db/primary.sqlite3");
   });
 });
