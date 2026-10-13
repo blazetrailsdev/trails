@@ -11,7 +11,8 @@ interface MockCall {
   args: unknown[];
 }
 
-class Mock {
+/** @noRailsEquivalent PERMANENT */
+export class Mock {
   #expectedCalls = new Map<string, MockCall[]>();
   #actualCalls = new Map<string, MockCall[]>();
 
@@ -256,6 +257,7 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   }
   const stubbed = (...args: unknown[]) => {
     if (typeof valOrCallable === "function") return valOrCallable(...args);
+    if (valOrCallable instanceof Mock) return valOrCallable.call(...args);
     const blk = args.at(-1);
     if (typeof blk === "function") blk(...blockArgs);
     return valOrCallable;
@@ -285,7 +287,8 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   return undefined as Result;
 }
 
-function assertMock(mock: Mock): void {
+/** @noRailsEquivalent PERMANENT */
+export function assertMock(mock: Mock): void {
   try {
     assert(mock.verify());
   } catch (e) {
