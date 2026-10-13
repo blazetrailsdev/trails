@@ -191,30 +191,29 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TestConstants {}
 
-export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule &
-  TestConstants & {
-    Validations: typeof Validations;
-    Base: typeof Base;
-    ConnectionHandling: typeof ConnectionHandling;
-    Encryption: typeof Encryption;
-    Fixture: typeof Fixture;
-    FixtureSet: typeof FixtureSet;
-    Migration: typeof Migration;
-    IrreversibleMigration: typeof IrreversibleMigration;
-    ModelSchema: typeof ModelSchema;
-    Reflection: typeof Reflection;
-    AssociationRelation: typeof AssociationRelationClass;
-    Associations: typeof Associations;
-    AttributeMethods: typeof AttributeMethods;
-    ConnectionAdapters: typeof ConnectionAdapters;
-    DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
-    Locking: typeof Locking;
-    Relation: typeof Relation;
-    Result: typeof Result;
-    Scoping: typeof Scoping;
-    Tasks: typeof Tasks;
-    Point: new (x: number, y: number) => { x: number; y: number };
-  };
+export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
+  Validations: typeof Validations;
+  Base: typeof Base;
+  ConnectionHandling: typeof ConnectionHandling;
+  Encryption: typeof Encryption;
+  Fixture: typeof Fixture;
+  FixtureSet: typeof FixtureSet;
+  Migration: typeof Migration;
+  IrreversibleMigration: typeof IrreversibleMigration;
+  ModelSchema: typeof ModelSchema;
+  Reflection: typeof Reflection;
+  AssociationRelation: typeof AssociationRelationClass;
+  Associations: typeof Associations;
+  AttributeMethods: typeof AttributeMethods;
+  ConnectionAdapters: typeof ConnectionAdapters;
+  DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
+  Locking: typeof Locking;
+  Relation: typeof Relation;
+  Result: typeof Result;
+  Scoping: typeof Scoping;
+  Tasks: typeof Tasks;
+  Point: new (x: number, y: number) => { x: number; y: number };
+} & TestConstants;
 registerConstant("ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");

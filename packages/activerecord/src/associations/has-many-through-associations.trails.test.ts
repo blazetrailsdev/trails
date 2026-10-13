@@ -3,28 +3,18 @@ import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { quoteTableName } from "../support/quote-regex.js";
 import { Author } from "../test-helpers/models/author.js";
-import { Category } from "../test-helpers/models/category.js";
 import {
-  CpkBook,
   CpkBookWithOrderAgreements,
-  CpkChapter,
   CpkOrder,
   CpkOrderAgreement,
   CpkOrderTag,
   CpkOrderWithSingularBookChapters,
-  CpkTag,
 } from "../test-helpers/models/cpk.js";
-import { Essay } from "../test-helpers/models/essay.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Reader } from "../test-helpers/models/reader.js";
 import { ShardedBlogPost } from "../test-helpers/models/sharded/blog-post.js";
-import { ShardedBlogPostTag } from "../test-helpers/models/sharded/blog-post-tag.js";
-import { ShardedTag } from "../test-helpers/models/sharded/tag.js";
 import { Tag } from "../test-helpers/models/tag.js";
-import { Tagging } from "../test-helpers/models/tagging.js";
 import type { CollectionAssociation } from "./collection-association.js";
-import type { AssociationProxy } from "./collection-proxy.js";
 
 describe("HasManyThroughAssociationsTest", () => {
   const { posts, people, authors, categories, shardedBlogPosts, cpkTags } = fixtures([
@@ -42,28 +32,6 @@ describe("HasManyThroughAssociationsTest", () => {
     "cpkTags",
     "cpkOrders",
     "cpkOrderTags",
-  ]);
-
-  registerModel([
-    Tag,
-    Tagging,
-    Category,
-    Essay,
-    Post,
-    Author,
-    Person,
-    Reader,
-    ShardedBlogPost,
-    ShardedTag,
-    ShardedBlogPostTag,
-    CpkTag,
-    CpkOrder,
-    CpkOrderTag,
-    CpkBook,
-    CpkBookWithOrderAgreements,
-    CpkOrderAgreement,
-    CpkOrderWithSingularBookChapters,
-    CpkChapter,
   ]);
 
   it("associating a persisted record with unsaved changes saves those changes", async () => {
@@ -112,12 +80,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const agreement = await CpkOrderAgreement.create({ order_id: order.readAttribute("id_value") });
 
     const sql = await book.orderAgreements.toSql();
-    const orderAgreementsFk = quoteTableName("cpk_order_agreements.order_id");
     const orderId = quoteTableName("cpk_orders.id");
-    const orderShopId = quoteTableName("cpk_orders.shop_id");
     expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_orders")}`, "i"));
-    expect(sql).toMatch(new RegExp(`${orderAgreementsFk} = ${orderId}`, "i"));
-    expect(sql).toMatch(new RegExp(`${orderShopId} =`, "i"));
+    expect(sql).toMatch(
+      new RegExp(`${quoteTableName("cpk_order_agreements.order_id")} = ${orderId}`, "i"),
+    );
+    expect(sql).toMatch(new RegExp(`${quoteTableName("cpk_orders.shop_id")} =`, "i"));
     expect(sql).toMatch(new RegExp(`${orderId} =`, "i"));
 
     expect(await book.orderAgreements).toEqual([agreement]);
@@ -126,12 +94,10 @@ describe("HasManyThroughAssociationsTest", () => {
   it("composite-pk target and through model has_many through routes via join scope", async () => {
     const tag = cpkTags("cpk_tag_loyal_customer");
     const sql = await tag.orders.toSql();
-    const ordersId = quoteTableName("cpk_orders.id");
-    const orderTagsOrderId = quoteTableName("cpk_order_tags.order_id");
-    const orderTagsTagId = quoteTableName("cpk_order_tags.tag_id");
-    expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_order_tags")}`, "i"));
-    expect(sql).toMatch(new RegExp(`${ordersId} = ${orderTagsOrderId}`, "i"));
-    expect(sql).toMatch(new RegExp(`${orderTagsTagId} =`, "i"));
+    const q = quoteTableName;
+    expect(sql).toMatch(new RegExp(`INNER JOIN ${q("cpk_order_tags")}`, "i"));
+    expect(sql).toMatch(new RegExp(`${q("cpk_orders.id")} = ${q("cpk_order_tags.order_id")}`, "i"));
+    expect(sql).toMatch(new RegExp(`${q("cpk_order_tags.tag_id")} =`, "i"));
 
     expect((await tag.orders).length).toBeGreaterThan(0);
   });
@@ -141,12 +107,11 @@ describe("HasManyThroughAssociationsTest", () => {
     await order.association("book").create({ id: [7, 8] });
 
     const sql = await order.chapters.toSql();
-    const chapAuthorId = quoteTableName("cpk_chapters.author_id");
-    const chapBookId = quoteTableName("cpk_chapters.book_id");
-    const bookAuthorId = quoteTableName("cpk_books.author_id");
-    const bookId = quoteTableName("cpk_books.id");
-    expect(sql).toMatch(new RegExp(`${chapAuthorId} = ${bookAuthorId}`, "i"));
-    expect(sql).toMatch(new RegExp(`${chapBookId} = ${bookId}`, "i"));
+    const q = quoteTableName;
+    expect(sql).toMatch(
+      new RegExp(`${q("cpk_chapters.author_id")} = ${q("cpk_books.author_id")}`, "i"),
+    );
+    expect(sql).toMatch(new RegExp(`${q("cpk_chapters.book_id")} = ${q("cpk_books.id")}`, "i"));
     await expect(order.chapters.toArray()).resolves.toBeInstanceOf(Array);
   });
 
@@ -171,12 +136,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("insertRecord with validate false still raises on invalid join record", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class IrpvTagging extends Base {
-      declare taggable_id: number | null;
-      declare taggable_type: string | null;
-      declare tag_id: number | null;
-
       static {
         this._tableName = "taggings";
         this.attribute("taggable_id", "integer");
@@ -188,22 +148,12 @@ describe("HasManyThroughAssociationsTest", () => {
         this.belongsTo("tag", { className: "Tag", foreignKey: "tag_id" });
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface IrpvTagging {
-      get tag(): Tag | null | Promise<Tag | null>;
-      set tag(value: Tag | null);
-    }
     registerModel("IrpvTagging", IrpvTagging);
 
     const post = await Post.create({ title: "Test", body: "" });
     const tag = await Tag.create({ name: "testjoin" });
 
     class IrpvPost extends Base {
-      declare title: string | null;
-      declare body: string | null;
-      declare irpvTaggings: AssociationProxy<IrpvTagging>;
-      declare irpvTags: AssociationProxy<Base>;
-
       static {
         this._tableName = "posts";
         this.attribute("title", "string");

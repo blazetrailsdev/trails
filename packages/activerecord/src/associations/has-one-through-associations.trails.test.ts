@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { registerModel, RecordInvalid } from "../index.js";
+import { RecordInvalid } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Club } from "../test-helpers/models/club.js";
 import { SpecialComment } from "../test-helpers/models/comment.js";
 import { Member } from "../test-helpers/models/member.js";
-import { Membership, CurrentMembership } from "../test-helpers/models/membership.js";
+import { Membership } from "../test-helpers/models/membership.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { SingularAssociation } from "./singular-association.js";
 
@@ -17,12 +17,13 @@ function currentMembership(member: Member): SingularAssociation {
   return member.association("currentMembership") as SingularAssociation;
 }
 
-async function memberWithClub(): Promise<{ newMember: Member; oldClub: Club }> {
+async function memberWithClub() {
   const newMember = await Member.create({ name: "Joe" });
   const oldClub = await Club.create({ name: "Old Club" });
   await club(newMember).writer(oldClub);
   await newMember.save();
-  return { newMember, oldClub };
+  const membershipId = (await currentMembership(newMember).reader)!.id;
+  return { newMember, oldClub, membershipId };
 }
 
 async function clubIdOf(membershipId: unknown): Promise<number> {
@@ -39,14 +40,7 @@ describe("HasOneThroughAssociationsTest", () => {
     "comments",
   ]);
 
-  registerModel(Member);
-  registerModel(Club);
   Membership.inheritanceColumn = "type";
-  registerModel(Membership);
-  registerModel(CurrentMembership);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(SpecialComment);
 
   it("building with a loaded join row preserves unrelated in-memory changes on it", async () => {
     const newMember = await Member.create({ name: "Joe" });
@@ -60,8 +54,7 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("building works with has one through belongs to with unloaded existing join row", async () => {
-    const { newMember } = await memberWithClub();
-    const membershipId = (await currentMembership(newMember).reader)!.id;
+    const { newMember, membershipId } = await memberWithClub();
 
     const refetched = await Member.find(newMember.id);
     const newClub = (await club(refetched).build()) as Club;
@@ -90,8 +83,7 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("creating works with has one through belongs to with unloaded existing join row", async () => {
-    const { newMember } = await memberWithClub();
-    const membershipId = (await currentMembership(newMember).reader)!.id;
+    const { newMember, membershipId } = await memberWithClub();
 
     const refetched = await Member.find(newMember.id);
     const countForMember = () => Membership.where({ member_id: refetched.id }).count();
@@ -104,8 +96,7 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("creating with unloaded existing join row updates the join row without an owner save", async () => {
-    const { newMember, oldClub } = await memberWithClub();
-    const membershipId = (await currentMembership(newMember).reader)!.id;
+    const { newMember, oldClub, membershipId } = await memberWithClub();
 
     const refetched = await Member.find(newMember.id);
     const countForMember = () => Membership.where({ member_id: refetched.id }).count();
@@ -158,8 +149,7 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("repeated build on unloaded existing join row keeps the last club", async () => {
-    const { newMember } = await memberWithClub();
-    const membershipId = (await currentMembership(newMember).reader)!.id;
+    const { newMember, membershipId } = await memberWithClub();
 
     const refetched = await Member.find(newMember.id);
     await club(refetched).build({ name: "First" });
