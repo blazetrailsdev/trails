@@ -611,8 +611,10 @@ const warmed = new WeakSet<TestCaseClass>();
 
 let currentTestCase: TestCase | null = null;
 
+const testCaseClasses = new WeakMap<object, TestCaseClass>();
+
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
-  let klass = describedClasses.get(suite ?? topLevel) as TestCaseClass | undefined;
+  let klass = testCaseClasses.get(suite ?? topLevel);
   if (klass !== undefined) return klass;
   if (suite === undefined) {
     const { TestCase } = ActiveRecord;
@@ -647,7 +649,7 @@ function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
   } else {
     klass = class extends testCaseClassFor(suite.suite) {};
   }
-  describedClasses.set(suite ?? topLevel, klass);
+  testCaseClasses.set(suite ?? topLevel, klass);
   return klass;
 }
 
@@ -705,7 +707,9 @@ export function fixtures(
 ): Record<string, unknown> {
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
-  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
+  const suite = getCurrentSuite().suite as SuiteScope | undefined;
+  const klass = testCaseClassFor(suite);
+  describedClasses.set(suite ?? topLevel, klass);
   klass.usesTransaction(
     ...(usesTransaction ?? []).map((name) => `test_${name.replace(/\s+/g, "_")}`),
   );
