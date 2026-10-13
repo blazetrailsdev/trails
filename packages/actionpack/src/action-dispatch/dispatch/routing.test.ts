@@ -1741,7 +1741,24 @@ describe("TestRoutingMapper", () => {
     );
   });
 
-  it.skip("path option override", () => {});
+  it("path option override", async () => {
+    draw(function () {
+      this.scope("pt", { as: "pt" }, () => {
+        this.resources("projects", { pathNames: { new: "novo" }, path: "projetos" }, () => {
+          this.put(":close", { on: "member", path: "fechar" });
+          this.get(":open", { on: "new", path: "abrir" });
+        });
+      });
+    });
+
+    await t.get("/pt/projetos/novo/abrir");
+    expect(t.response.body).toBe("projects#open");
+    expect(t.openNewPtProjectPath()).toBe("/pt/projetos/novo/abrir");
+
+    await t.put("/pt/projetos/1/fechar");
+    expect(t.response.body).toBe("projects#close");
+    expect(t.closePtProjectPath(1)).toBe("/pt/projetos/1/fechar");
+  });
 
   it("namespace nested in resources", () => {
     const routes = new RouteSet();
@@ -2068,7 +2085,7 @@ describe("TestRoutingMapper", () => {
       this.resources("replies", () => {
         this.collection(() => {
           this.get("page/:page", { to: "replies#index" });
-          this.get(":page", { to: "replies#index" });
+          this.get("/:page", { to: "replies#index" });
         });
       });
     });
@@ -2117,7 +2134,14 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "sign_in")).toBe("/sign_in");
   });
 
-  it.skip("redirect with complete url and status", () => {});
+  it("redirect with complete url and status", async () => {
+    draw(function () {
+      this.get({ "account/google": this.redirect("http://www.google.com/", { status: 302 }) });
+    });
+
+    await t.get("/account/google");
+    verifyRedirect("http://www.google.com/", 302);
+  });
 
   it("redirect with port", async () => {
     draw(function () {

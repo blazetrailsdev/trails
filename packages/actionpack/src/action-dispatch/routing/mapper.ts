@@ -1,4 +1,4 @@
-import { Redirect, redirect as redirectFactory } from "./redirection.js";
+import { Redirect, redirect } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
 import { Dispatcher, StaticDispatcher, type DrawCallback, type RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
@@ -47,6 +47,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   dup,
   fetch,
+  groupBy,
   hashDelete,
   isSymbol,
   keepIf,
@@ -1408,18 +1409,7 @@ export class Mapper {
     }
   }
 
-  redirect(args: string | RedirectOptions | RedirectFunction): Redirect {
-    let endpoint: Redirect;
-    if (typeof args === "string") {
-      endpoint = redirectFactory(args);
-    } else if (typeof args === "function") {
-      endpoint = redirectFactory(args);
-    } else {
-      const { status, ...opts } = args;
-      endpoint = redirectFactory({ ...opts, status });
-    }
-    return endpoint;
-  }
+  declare redirect: typeof redirect;
 
   match(
     path: string | Record<string, unknown>,
@@ -1666,22 +1656,38 @@ export class Mapper {
     const optionsConstraints = options.constraints ?? {};
     delete options.constraints;
 
-    for (const p of paths) {
+    const pathTypes = groupBy(paths, (path) => (SYMBOL.test(path) ? "Symbol" : "String"));
+    for (const _path of pathTypes.get("String") ?? []) {
       const routeOptions = { ...options };
-      if (p && optionPath) {
-        throw new Error(
+      if (_path && optionPath) {
+        throw new ArgumentError(
           "Ambiguous route definition. Both :path and the route path were specified as strings.",
         );
       }
       to =
         typeof to === "string" || to === undefined
-          ? this.getToFromPath(p, to, routeOptions.action)
+          ? this.getToFromPath(_path, to, routeOptions.action)
           : to;
       this.decomposedMatch(
-        p,
+        _path,
         controller,
         routeOptions,
-        p,
+        _path,
+        to,
+        via,
+        formatted,
+        anchor,
+        optionsConstraints,
+      );
+    }
+
+    for (const action of pathTypes.get("Symbol") ?? []) {
+      const routeOptions = { ...options };
+      this.decomposedMatch(
+        action,
+        controller,
+        routeOptions,
+        optionPath,
         to,
         via,
         formatted,
@@ -1811,7 +1817,7 @@ export class Mapper {
     let path = this.pathForAction(action!, _path);
     if (isBlank(path)) throw new ArgumentError("path is required");
 
-    action = String(action);
+    action = SYMBOL.test(action!) ? symbolToS(action!) : String(action);
 
     let defaultAction: string | undefined =
       options.action != null && (options.action as unknown) !== false
@@ -2019,7 +2025,7 @@ export class Mapper {
 
   /** @internal */
   canonicalAction(action: string): boolean {
-    return CANONICAL_ACTIONS.includes(action);
+    return CANONICAL_ACTIONS.includes(SYMBOL.test(action) ? symbolToS(action) : action);
   }
 
   /** @internal */
@@ -2047,7 +2053,8 @@ export class Mapper {
     if (this.canonicalAction(action)) {
       return prefix;
     } else {
-      return `${prefix}/${this.actionPath(action)}`;
+      const actionPath = this.actionPath(action);
+      return `${prefix}/${SYMBOL.test(actionPath) ? symbolToS(actionPath) : actionPath}`;
     }
   }
 
@@ -2181,7 +2188,7 @@ export class Mapper {
   /** @internal */
   actionPath(name: string): string {
     const pathNames = (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
-    return pathNames[name] ?? name;
+    return pathNames[SYMBOL.test(name) ? symbolToS(name) : name] ?? name;
   }
 
   /** @internal */
@@ -2276,12 +2283,16 @@ const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"
 
 const POISON = {};
 
+const SYMBOL = /^:\w+[?!=]?$/;
+
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
 
 /** @internal */
 function assertValidOnOption(on: string): void {
   if (!VALID_ON_OPTIONS.has(on)) throw new Error(`Unknown scope :${on} given to :on`);
 }
+
+Mapper.prototype.redirect = redirect;
 
 /** @noRailsEquivalent PERMANENT */
 function deleteWithDefault<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {

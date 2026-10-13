@@ -495,7 +495,7 @@ describe("LegacyRouteSetTests", () => {
         this.get("/:controller/:action/:id", { action: "index", id: null });
       });
 
-      this.get(":url", { controller: "content", action: "translate" });
+      this.get("/:url", { controller: "content", action: "translate" });
     });
 
     expect(rs.recognizePath("/example")).toEqual({
