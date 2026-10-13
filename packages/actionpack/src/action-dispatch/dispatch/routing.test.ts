@@ -103,7 +103,7 @@ afterEach(() => {
   controllerConstants.delete("posts");
 });
 
-async function verifyRedirect(
+async function redirectResponse(
   routes: RouteSet,
   url: string,
 ): Promise<{ status: number; location: string | undefined }> {
@@ -144,6 +144,18 @@ describe("TestRoutingMapper", () => {
     });
   }
   const assertResponse = (type: string): void => t.assertResponse(type);
+
+  function verifyRedirect(url: string, status = 301): void {
+    expect(t.response.status).toBe(status);
+    expect(t.response.headers.get("Location")).toBe(url);
+    expect(t.response.body).toBe("");
+  }
+
+  class IpRestrictor {
+    static matches(request: Request): boolean {
+      return /192\.168\.1\.1\d\d/.test(request.ip!);
+    }
+  }
 
   it("logout", () => {
     const routes = new RouteSet();
@@ -1130,7 +1142,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/login", { to: this.redirect("/dashboard"), as: "login" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/login");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/login");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/dashboard");
     expect(status).toBe(301);
@@ -1141,7 +1153,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/logout", { to: this.redirect("/"), as: "logout" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/logout");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/logout");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/");
   });
@@ -1153,7 +1165,7 @@ describe("TestRoutingMapper", () => {
         this.get("/old", { to: this.redirect("/admin/new"), as: "old" });
       });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/admin/old");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/admin/old");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/admin/new");
   });
@@ -1171,7 +1183,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/posts/:id", { to: this.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/posts/123");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/posts/123");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/articles/123");
   });
@@ -1181,7 +1193,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old/:id", { to: this.redirect("/new/%{id}") });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old/42");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old/42");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/new/42");
   });
@@ -1191,7 +1203,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old/:id", { to: this.redirect((params) => `/new/${params.id}`), as: "old" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old/5");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old/5");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/new/5");
   });
@@ -1201,7 +1213,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old", { to: this.redirect((_params, req) => `${req.path}/new`), as: "old" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/old/new");
   });
@@ -1211,7 +1223,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old", { to: this.redirect({ subdomain: "api" }), as: "old" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
     expect(status).toBe(301);
     expect(location).toBe("http://api.example.com/old");
   });
@@ -1221,7 +1233,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old", { to: this.redirect({ domain: "other.com", path: "/new" }), as: "old" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
     expect(status).toBe(301);
     expect(location).toBe("http://www.other.com/new");
   });
@@ -1231,7 +1243,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old", { to: this.redirect({ path: "/new" }), as: "old" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/new");
   });
@@ -1241,7 +1253,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old", { to: this.redirect({ host: "other.com" }), as: "old" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
     expect(status).toBe(301);
     expect(location).toBe("http://other.com/old");
   });
@@ -1251,7 +1263,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/posts/:id", { to: this.redirect({ path: "/articles/%{id}" }), as: "old_post" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://example.com/posts/42");
+    const { status, location } = await redirectResponse(routes, "http://example.com/posts/42");
     expect(status).toBe(301);
     expect(location).toBe("http://example.com/articles/42");
   });
@@ -1261,7 +1273,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old/*path", { to: this.redirect({ path: "/new/%{path}" }) });
     });
-    const { status, location } = await verifyRedirect(routes, "http://example.com/old/a/b/c");
+    const { status, location } = await redirectResponse(routes, "http://example.com/old/a/b/c");
     expect(status).toBe(301);
     expect(location).toBe("http://example.com/new/a/b/c");
   });
@@ -1272,7 +1284,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/old/:id", { to: this.redirect(customRedirect), as: "old" });
     });
-    const { status, location } = await verifyRedirect(routes, "http://www.example.com/old/7");
+    const { status, location } = await redirectResponse(routes, "http://www.example.com/old/7");
     expect(status).toBe(301);
     expect(location).toBe("http://www.example.com/custom/7");
   });
@@ -1523,7 +1535,37 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "pagemark_show")).toBe("/pagemark");
   });
 
-  it.skip("admin", () => {});
+  it("admin", async () => {
+    draw(function () {
+      this.constraints({ ip: /192\.168\.1\.\d\d\d/ }, () => {
+        this.get({ admin: "queenbee#index" });
+      });
+
+      this.constraints(IpRestrictor, () => {
+        this.get({ "admin/accounts": "queenbee#accounts" });
+      });
+
+      this.get({ "admin/passwords": "queenbee#passwords", constraints: IpRestrictor });
+    });
+
+    await t.get("/admin", { headers: { REMOTE_ADDR: "192.168.1.100" } });
+    expect(t.response.body).toBe("queenbee#index");
+
+    await t.get("/admin", { headers: { REMOTE_ADDR: "10.0.0.100" } });
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+
+    await t.get("/admin/accounts", { headers: { REMOTE_ADDR: "192.168.1.100" } });
+    expect(t.response.body).toBe("queenbee#accounts");
+
+    await t.get("/admin/accounts", { headers: { REMOTE_ADDR: "10.0.0.100" } });
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+
+    await t.get("/admin/passwords", { headers: { REMOTE_ADDR: "192.168.1.100" } });
+    expect(t.response.body).toBe("queenbee#passwords");
+
+    await t.get("/admin/passwords", { headers: { REMOTE_ADDR: "10.0.0.100" } });
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+  });
 
   it("global", () => {
     const routes = new RouteSet();
@@ -1637,7 +1679,59 @@ describe("TestRoutingMapper", () => {
 
   it.skip("projects involvements", () => {});
 
-  it.skip("projects posts", () => {});
+  it("projects posts", async () => {
+    draw(function () {
+      this.resources("projects", () => {
+        this.resources("posts", () => {
+          this.get("archive", { on: "collection" });
+          this.get("toggle_view", { on: "collection" });
+          this.post("preview", { on: "member" });
+
+          this.resource("subscription");
+
+          this.resources("comments", () => {
+            this.post("preview", { on: "collection" });
+          });
+        });
+      });
+    });
+
+    await t.get("/projects/1/posts");
+    expect(t.response.body).toBe("posts#index");
+    expect(t.projectPostsPath({ project_id: "1" })).toBe("/projects/1/posts");
+
+    await t.get("/projects/1/posts/archive");
+    expect(t.response.body).toBe("posts#archive");
+    expect(t.archiveProjectPostsPath({ project_id: "1" })).toBe("/projects/1/posts/archive");
+
+    await t.get("/projects/1/posts/toggle_view");
+    expect(t.response.body).toBe("posts#toggle_view");
+    expect(t.toggleViewProjectPostsPath({ project_id: "1" })).toBe("/projects/1/posts/toggle_view");
+
+    await t.post("/projects/1/posts/1/preview");
+    expect(t.response.body).toBe("posts#preview");
+    expect(t.previewProjectPostPath({ project_id: "1", id: "1" })).toBe(
+      "/projects/1/posts/1/preview",
+    );
+
+    await t.get("/projects/1/posts/1/subscription");
+    expect(t.response.body).toBe("subscriptions#show");
+    expect(t.projectPostSubscriptionPath({ project_id: "1", post_id: "1" })).toBe(
+      "/projects/1/posts/1/subscription",
+    );
+
+    await t.get("/projects/1/posts/1/comments");
+    expect(t.response.body).toBe("comments#index");
+    expect(t.projectPostCommentsPath({ project_id: "1", post_id: "1" })).toBe(
+      "/projects/1/posts/1/comments",
+    );
+
+    await t.post("/projects/1/posts/1/comments/preview");
+    expect(t.response.body).toBe("comments#preview");
+    expect(t.previewProjectPostCommentsPath({ project_id: "1", post_id: "1" })).toBe(
+      "/projects/1/posts/1/comments/preview",
+    );
+  });
 
   it.skip("path option override", () => {});
 
@@ -1761,7 +1855,48 @@ describe("TestRoutingMapper", () => {
     expect(routeSpec(routes.recognizePath("/foo/comments/2"))).toBe("foo/comments#show");
   });
 
-  it.skip("optional scoped root multiple choice", () => {});
+  it("optional scoped root multiple choice", async () => {
+    draw(function () {
+      this.scope("(:locale)", () => {
+        this.scope("(p/:platform)", () => {
+          this.scope("(b/:browser)", () => {
+            this.root({ to: "projects#index" });
+          });
+        });
+      });
+    });
+
+    expect(t.rootPath({ locale: "en" })).toBe("/en");
+    expect(t.rootPath({ platform: "osx" })).toBe("/p/osx");
+    expect(t.rootPath({ locale: "en", platform: "osx" })).toBe("/en/p/osx");
+    expect(t.rootPath({ browser: "chrome" })).toBe("/b/chrome");
+    expect(t.rootPath({ locale: "en", browser: "chrome" })).toBe("/en/b/chrome");
+    expect(t.rootPath({ platform: "osx", browser: "chrome" })).toBe("/p/osx/b/chrome");
+    expect(t.rootPath({ locale: "en", platform: "osx", browser: "chrome" })).toBe(
+      "/en/p/osx/b/chrome",
+    );
+
+    await t.get("/en");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/p/osx");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/en/p/osx");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/b/chrome");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/en/b/chrome");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/p/osx/b/chrome");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/en/p/osx/b/chrome");
+    expect(t.response.body).toBe("projects#index");
+  });
 
   it("scope with format option", async () => {
     draw(function () {
@@ -1976,7 +2111,20 @@ describe("TestRoutingMapper", () => {
 
   it.skip("redirect with complete url and status", () => {});
 
-  it.skip("redirect with port", () => {});
+  it("redirect with port", async () => {
+    draw(function () {
+      this.get("account/login", { to: this.redirect("/login") });
+    });
+
+    const previousHost = t.host;
+    t.host = "www.example.com:3000";
+    try {
+      await t.get("/account/login");
+      verifyRedirect("http://www.example.com:3000/login");
+    } finally {
+      t.host = previousHost;
+    }
+  });
 
   it("optional scoped root", () => {
     const routes = new RouteSet();
@@ -2016,7 +2164,32 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("descriptions#show");
   });
 
-  it.skip("nested optional scoped path", () => {});
+  it("nested optional scoped path", async () => {
+    draw(function () {
+      this.namespace("admin", () => {
+        this.scope("(:locale)", { locale: /en|pl/ }, () => {
+          this.resources("descriptions");
+        });
+      });
+    });
+
+    expect(t.adminDescriptionsPath("en")).toBe("/admin/en/descriptions");
+    expect(t.adminDescriptionsPath(null)).toBe("/admin/descriptions");
+    expect(t.adminDescriptionPath("en", 1)).toBe("/admin/en/descriptions/1");
+    expect(t.adminDescriptionPath(null, 1)).toBe("/admin/descriptions/1");
+
+    await t.get("/admin/en/descriptions");
+    expect(t.response.body).toBe("admin/descriptions#index");
+
+    await t.get("/admin/descriptions");
+    expect(t.response.body).toBe("admin/descriptions#index");
+
+    await t.get("/admin/en/descriptions/1");
+    expect(t.response.body).toBe("admin/descriptions#show");
+
+    await t.get("/admin/descriptions/1");
+    expect(t.response.body).toBe("admin/descriptions#show");
+  });
 
   it("nested optional path shorthand", async () => {
     draw(function () {
@@ -2059,7 +2232,14 @@ describe("TestRoutingMapper", () => {
     expect(m.id).toBe("home");
   });
 
-  it.skip("default string params with root", () => {});
+  it("default string params with root", async () => {
+    draw(function () {
+      this.root({ to: "pages#show", id: "home" } as RouteOptions);
+    });
+
+    await t.get("/");
+    expect(t.request.params["id"]).toBe("home");
+  });
 
   it.skip("custom param", () => {});
 
