@@ -60,7 +60,6 @@ import { Subscription } from "../test-helpers/models/subscription.js";
 import { ShardedBlog } from "../test-helpers/models/sharded/blog.js";
 import { ShardedBlogPost } from "../test-helpers/models/sharded/blog-post.js";
 import { ShardedComment } from "../test-helpers/models/sharded/comment.js";
-import { captureSql } from "../testing/sql-capture.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Rating } from "../test-helpers/models/rating.js";
 import { Membership } from "../test-helpers/models/membership.js";
@@ -2567,7 +2566,7 @@ describe("EagerLoadingTooManyIdsTest", () => {
 });
 
 describe("EagerAssociationTest", () => {
-  const { shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
+  const { self, shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
   registerModel("ShardedBlog", ShardedBlog);
   registerModel("ShardedBlogPost", ShardedBlogPost);
   registerModel("ShardedComment", ShardedComment);
@@ -2576,7 +2575,7 @@ describe("EagerAssociationTest", () => {
     const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
     const posts = ShardedBlogPost.where({ blog_id: blogIds }).includes(":comments");
 
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       const loaded = (await posts) as Base[];
       const commentsCollection = await Promise.all(
         loaded.map((p) => (p as any).comments.toArray() as Promise<Base[]>),

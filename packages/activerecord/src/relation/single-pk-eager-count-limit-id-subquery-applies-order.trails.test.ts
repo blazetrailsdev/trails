@@ -3,11 +3,10 @@ import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
-import { captureSql } from "../testing/sql-capture.js";
 import type { Base } from "../index.js";
 
 describe("Post single-PK eager count limit id subquery applies order", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
 
   beforeAll(() => {
     [Post, Comment].forEach((m) => registerModel(m as unknown as typeof Base));
@@ -26,7 +25,7 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
   it("eager_load(:comments).order(:title).limit(n).count(column) counts over the ordered top-n rows", async () => {
     await seedPosts();
     let count = 0;
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       count = await Post.eagerLoad(":comments").order("title").limit(2).count("posts.tags_count");
     });
     expect(count).toBe(1);

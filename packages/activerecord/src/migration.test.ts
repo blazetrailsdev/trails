@@ -32,7 +32,6 @@ import { RenameThings } from "./test-helpers/migrations/rename/2_rename_things.j
 import { WeNeedReminders } from "./test-helpers/migrations/valid/2_we_need_reminders.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { VERSION } from "./gem-version.js";
-import { assertColumn, assertNoColumn } from "./test-helpers/test-case.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -129,7 +128,7 @@ async function personColumnNames(): Promise<string[]> {
   return Person.columnNames();
 }
 
-fixtures(["people"], { useTransactionalTests: false });
+const { self } = fixtures(["people"], { useTransactionalTests: false });
 
 afterEach(async () => {
   Base.tableNamePrefix = "";
@@ -205,7 +204,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertRaises([StandardError], {}, () =>
       new Migrator(
@@ -330,7 +329,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertNothingRaised(() =>
       new Migrator(
@@ -564,7 +563,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await new Migrator(
       "up",
@@ -573,7 +572,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const migrator = new Migrator(
       "up",
@@ -636,7 +635,7 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate();
 
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
   });
 
   it("migration detection without schema migration table", async () => {
@@ -790,7 +789,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await new Migrator(
       "up",
@@ -799,7 +798,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const migrator = new Migrator(
       "up",
@@ -821,7 +820,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertNothingRaised(() =>
       new Migrator(
@@ -843,7 +842,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertNothingRaised(() =>
       new Migrator(
@@ -875,7 +874,7 @@ describe("MigrationTest", () => {
   it("filtering migrations", async () => {
     class Reminder extends Base {}
     const adapter = await Base.leaseConnection();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
     expect(await Reminder.tableExists()).toBeFalsy();
 
     const nameFilter = (migration: MigrationProxy): boolean =>
@@ -887,18 +886,18 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate(null, nameFilter);
 
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
     await assertRaises([StatementInvalid], {}, () => Reminder.first());
 
     await migrator.down(null, nameFilter);
 
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
     await assertRaises([StatementInvalid], {}, () => Reminder.first());
   });
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
     const adapter = await Base.leaseConnection();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const migrator = new Migrator(
       "up",
@@ -919,7 +918,7 @@ describe("MigrationTest", () => {
       "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
     );
 
-    await assertNoColumn(
+    await self().assertNoColumn(
       Person,
       "last_name",
       "On error, the Migrator should revert schema changes but it did not.",
@@ -931,7 +930,7 @@ describe("MigrationTest", () => {
     "migrator one up with exception and rollback using run",
     async () => {
       const adapter = await Base.leaseConnection();
-      await assertNoColumn(Person, "last_name");
+      await self().assertNoColumn(Person, "last_name");
 
       const migrator = new Migrator(
         "up",
@@ -952,7 +951,7 @@ describe("MigrationTest", () => {
         "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
       );
 
-      await assertNoColumn(
+      await self().assertNoColumn(
         Person,
         "last_name",
         "On error, the Migrator should revert schema changes but it did not.",
@@ -962,7 +961,7 @@ describe("MigrationTest", () => {
 
   itIfSupports("ddl_transactions", "migration without transaction", async () => {
     const adapter = await freshAdapter();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     class MigWithoutTx extends Migration.Current {
       static {
@@ -987,7 +986,7 @@ describe("MigrationTest", () => {
       "An error has occurred, all later migrations canceled:\n\nSomething broke",
     );
 
-    await assertColumn(
+    await self().assertColumn(
       Person,
       "last_name",
       "without ddl transactions, the Migrator should not rollback on error but it did.",
@@ -1325,7 +1324,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock", async () => {
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
@@ -1342,7 +1341,7 @@ describe("MigrationTest", () => {
       getSpy.mockRestore();
     }
 
-    await assertNoColumn(
+    await self().assertNoColumn(
       Person,
       "last_name",
       "without an advisory lock, the Migrator should not make any changes, but it did.",
@@ -1350,7 +1349,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock using run", async () => {
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
@@ -1367,7 +1366,7 @@ describe("MigrationTest", () => {
       getSpy.mockRestore();
     }
 
-    await assertNoColumn(
+    await self().assertNoColumn(
       Person,
       "last_name",
       "without an advisory lock, the Migrator should not make any changes, but it did.",
@@ -1764,8 +1763,8 @@ AND query LIKE '%${lockId}%'`;
     it("bulk revert", async () => {
       await connection.addColumn("people", "column1", "string");
       await connection.addColumn("people", "column2", "string");
-      await assertColumn(Person, "column1");
-      await assertColumn(Person, "column2");
+      await self().assertColumn(Person, "column1");
+      await self().assertColumn(Person, "column2");
 
       class BulkRevert extends Migration.Current {
         static {
@@ -1785,8 +1784,8 @@ AND query LIKE '%${lockId}%'`;
 
       await assertQueriesCount(1, false, () => migration.migrate("down"));
 
-      await assertNoColumn(Person, "column1");
-      await assertNoColumn(Person, "column2");
+      await self().assertNoColumn(Person, "column1");
+      await self().assertNoColumn(Person, "column2");
     });
   });
 

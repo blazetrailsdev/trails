@@ -6,7 +6,6 @@ import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
-import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape, registeredConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 
 describe("PredicateBuilderTest", () => {
@@ -18,7 +17,7 @@ describe("PredicateBuilderTest", () => {
       new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
   };
 
-  fixtures(["topics", "posts", "authors", "products"]);
+  const { self } = fixtures(["topics", "posts", "authors", "products"]);
 
   beforeAll(() => {
     registerModel("Topic", Topic);
@@ -35,7 +34,7 @@ describe("PredicateBuilderTest", () => {
     try {
       const sql = Topic.where({ title: new RegexFilter("rails") }).toSql();
       expect(sql).toMatch(
-        new RegExp(`${regexpEscape(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
+        new RegExp(`${regexpEscape(self().quoteTableName("topics.title"))} ~ 'rails'`, "i"),
       );
     } finally {
       (Topic as any)._predicateBuilder = null;
@@ -49,7 +48,7 @@ describe("PredicateBuilderTest", () => {
         .where({ topics: { title: new RegexFilter("rails") } })
         .toSql();
       expect(sql).toMatch(
-        new RegExp(`${regexpEscape(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
+        new RegExp(`${regexpEscape(self().quoteTableName("topics.title"))} ~ 'rails'`, "i"),
       );
     } finally {
       (Topic as any)._predicateBuilder = null;
@@ -78,7 +77,7 @@ describe("PredicateBuilderTest", () => {
         .references(new Nodes.SqlLiteral("regexp_topic") as any)
         .toSql();
       expect(sql).toMatch(
-        new RegExp(`${regexpEscape(quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
+        new RegExp(`${regexpEscape(self().quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
       );
     } finally {
       unregisterConstant("RegexpReply", registeredConstant("RegexpReply"));

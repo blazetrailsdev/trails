@@ -28,7 +28,6 @@ import {
 } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 import { IntegerType, ValueType, ArgumentError, Lint } from "@blazetrails/activemodel";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { Company, Client, AbstractCompany } from "./test-helpers/models/company.js";
@@ -219,7 +218,7 @@ describe("LintTest", () => {
 });
 
 describe("BasicsTest", async () => {
-  const { topics, posts, authors, developers, cpkBooks } = fixtures([
+  const { self, topics, posts, authors, developers, cpkBooks } = fixtures([
     "topics",
     "companies",
     "developers",
@@ -384,8 +383,8 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with local time conversion to default timezone utc", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "utc" }, async () => {
         const time = RubyTime.local(2000);
         const topic = (await Topic.create({ written_on: time })) as any;
         const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -397,9 +396,9 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with time with zone conversion to default timezone utc", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "utc" }, async () => {
-        await withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "utc" }, async () => {
+        await self().withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
           const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
           const topic = (await Topic.create({ written_on: time })) as any;
           const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -412,8 +411,8 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with utc time conversion to default timezone local", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "local" }, async () => {
         const time = RubyTime.utc(2000);
         const topic = (await Topic.create({ written_on: time })) as any;
         const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -425,9 +424,9 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with time with zone conversion to default timezone local", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "local" }, async () => {
-        await withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "local" }, async () => {
+        await self().withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
           const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
           const topic = (await Topic.create({ written_on: time })) as any;
           const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -440,14 +439,17 @@ describe("BasicsTest", async () => {
   });
 
   it("time zone aware attribute with default timezone utc on utc can be created", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ awareAttributes: true, default: "utc", zone: "UTC" }, async () => {
-        const pet = (await Pet.create({ name: "Bidu" })) as any;
-        assertPredicate(pet, (p: any) => p.isPersisted());
-        const savedPet = (await Pet.find(pet.id)) as any;
-        expect(savedPet.created_at).not.toBeNull();
-        expect(savedPet.updated_at).not.toBeNull();
-      });
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig(
+        { awareAttributes: true, default: "utc", zone: "UTC" },
+        async () => {
+          const pet = (await Pet.create({ name: "Bidu" })) as any;
+          assertPredicate(pet, (p: any) => p.isPersisted());
+          const savedPet = (await Pet.find(pet.id)) as any;
+          expect(savedPet.created_at).not.toBeNull();
+          expect(savedPet.updated_at).not.toBeNull();
+        },
+      );
     });
   });
 
@@ -682,7 +684,7 @@ describe("BasicsTest", async () => {
   });
 
   it("utc as time zone", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       const attributes = { bonus_time: "5:42:00AM" };
       const topic = (await Topic.find(1)) as any;
       await topic.assignAttributes(attributes);
@@ -691,7 +693,7 @@ describe("BasicsTest", async () => {
   });
 
   it("utc as time zone and new", async () => {
-    await withTimezoneConfig({ default: "utc" }, () => {
+    await self().withTimezoneConfig({ default: "utc" }, () => {
       const attributes = {
         "bonus_time(1i)": "2000",
         "bonus_time(2i)": "1",
@@ -1095,7 +1097,7 @@ describe("BasicsTest", async () => {
   });
 
   it("attributes on dummy time", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const attributes = { bonus_time: "5:42:00AM" };
       const topic = (await Topic.find(1)) as any;
       await topic.assignAttributes(attributes);
@@ -1310,7 +1312,7 @@ describe("BasicsTest", async () => {
   });
 
   it("default in utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, () => {
+    await self().withTimezoneConfig({ default: "utc" }, () => {
       const defaultRecord = new Default() as any;
 
       expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
@@ -1325,7 +1327,7 @@ describe("BasicsTest", async () => {
   });
 
   it("default in utc with time zone", async () => {
-    await withTimezoneConfig({ default: "utc", zone: "Central Time (US & Canada)" }, () => {
+    await self().withTimezoneConfig({ default: "utc", zone: "Central Time (US & Canada)" }, () => {
       const defaultRecord = new Default() as any;
 
       expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
@@ -2037,13 +2039,14 @@ describe("BasicsTest", async () => {
 });
 
 describe("BasicsTest", () => {
+  const { self } = fixtures([]);
   const cleanupConnections: Array<() => unknown> = [];
   afterEach(async () => {
     while (cleanupConnections.length > 0) await cleanupConnections.pop()!();
   });
 
   it.skipIf(inMemoryDb())("connection in local time", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
         defaultTimezone: "local",
@@ -2070,7 +2073,7 @@ describe("BasicsTest", () => {
   });
 
   it.skipIf(inMemoryDb())("connection in utc time", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
         defaultTimezone: "utc",

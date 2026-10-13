@@ -484,3 +484,5 @@ export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promi
     await adapterSpecificSchema(adapter);
   }
 }
+
+export const LoadSchemaHelper = { loadSchema };

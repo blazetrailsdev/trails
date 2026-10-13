@@ -3,7 +3,6 @@ import { Base } from "./base.js";
 import { __resetPrimaryAbstractClass } from "./inheritance.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { cleanUpConnectionHandler } from "./cases/helper.js";
 
 class PrimaryAppRecord extends Base {}
 PrimaryAppRecord.abstractClass = true;
@@ -21,10 +20,10 @@ class ApplicationRecord extends Base {
 }
 
 describe("PrimaryClassTest", () => {
-  fixtures({}, { useTransactionalTests: false });
+  const { self } = fixtures({}, { useTransactionalTests: false });
 
   afterEach(() => {
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
     __resetPrimaryAbstractClass();
     delete (globalThis as Record<string, unknown>)["ApplicationRecord"];
   });

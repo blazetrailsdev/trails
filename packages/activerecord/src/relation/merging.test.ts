@@ -5,8 +5,7 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { registerModel, Range } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
-import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
-import { quoteTableName } from "../support/quote-regex.js";
+import { assertQueriesCount } from "../testing/query-assertions.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { currentAdapter } from "../support/adapter-helper.js";
@@ -35,7 +34,7 @@ registerModel([
 const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((r: any) => r.id);
 
 describe("RelationMergingTest", () => {
-  const { authors, developers } = fixtures([
+  const { self, authors, developers } = fixtures([
     "developers",
     "comments",
     "authors",
@@ -158,13 +157,12 @@ describe("RelationMergingTest", () => {
 
     const nonMaryAndBob = Author.where().not({ id: [mary, bob] });
 
-    const authorId = quoteTableName("authors.id");
-    await assertQueriesMatch(
+    const authorId = self().quoteTableName("authors.id");
+    await self().assertQueriesMatch(
       new RegExp(
         `WHERE ${regexpEscape(authorId)} NOT IN \\((?:\\?|\\W?\\w?\\d), (?:\\?|\\W?\\w?\\d)\\)$`,
       ),
-      undefined,
-      false,
+      {},
       async () => {
         expect(await ids(nonMaryAndBob.merge(nonMaryAndBob))).toEqual([david.id]);
       },
@@ -181,7 +179,7 @@ describe("RelationMergingTest", () => {
         ? new RegExp(`WHERE \\(${regexpEscape(authorId)} IN \\('1'\\)\\)$`)
         : new RegExp(`WHERE \\(${regexpEscape(authorId)} IN \\(1\\)\\)$`);
 
-    await assertQueriesMatch(matcher, undefined, false, async () => {
+    await self().assertQueriesMatch(matcher, {}, async () => {
       expect(await ids(onlyDavid.merge(onlyDavid))).toEqual([david.id]);
     });
   });
@@ -345,16 +343,15 @@ describe("RelationMergingTest", () => {
   });
 
   it("merging annotations respects merge order", async () => {
-    await assertQueriesMatch(/\/\* foo \*\/ \/\* bar \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* foo \*\/ \/\* bar \*\//, {}, async () => {
       await Post.annotate("foo").merge(Post.annotate("bar")).first();
     });
-    await assertQueriesMatch(/\/\* bar \*\/ \/\* foo \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* bar \*\/ \/\* foo \*\//, {}, async () => {
       await Post.annotate("bar").merge(Post.annotate("foo")).first();
     });
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       /\/\* foo \*\/ \/\* bar \*\/ \/\* baz \*\/ \/\* qux \*\//,
-      undefined,
-      false,
+      {},
       async () => {
         await Post.annotate("foo")
           .annotate("bar")
@@ -367,35 +364,31 @@ describe("RelationMergingTest", () => {
   it("merging duplicated annotations", async () => {
     const posts = Post.annotate("foo");
     const quotedTable = regexpEscape(Post.quotedTableName());
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(`FROM ${quotedTable} \\/\\* foo \\*\\/$`),
-      undefined,
-      false,
+      {},
       async () => {
         await posts.merge(posts).uniqBang("annotate").toArray();
       },
     );
 
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(`FROM ${quotedTable} \\/\\* foo \\*\\/$`),
-      undefined,
-      false,
+      {},
       async () => {
         await posts.merge(posts);
       },
     );
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(`FROM ${quotedTable} \\/\\* foo \\*\\/ \\/\\* bar \\*\\/$`),
-      undefined,
-      false,
+      {},
       async () => {
         await Post.annotate("foo").merge(Post.annotate("bar")).merge(posts);
       },
     );
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(`FROM ${quotedTable} \\/\\* bar \\*\\/ \\/\\* foo \\*\\/$`),
-      undefined,
-      false,
+      {},
       async () => {
         await Post.annotate("bar").merge(Post.annotate("foo")).merge(posts);
       },

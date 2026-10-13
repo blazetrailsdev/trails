@@ -47,7 +47,6 @@ import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
-import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { Course } from "../test-helpers/models/course.js";
 import { College } from "../test-helpers/models/college.js";
@@ -1369,7 +1368,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
 });
 
 function databaseTasksTruncateAllTest(): () => Promise<void> {
-  fixtures(["courses", "colleges"], { useTransactionalTests: false });
+  const { self } = fixtures(["courses", "colleges"], { useTransactionalTests: false });
 
   let schemaMigration: SchemaMigration;
   let internalMetadata: InternalMetadata;
@@ -1392,7 +1391,7 @@ function databaseTasksTruncateAllTest(): () => Promise<void> {
     if (inMemoryDb()) return;
     await schemaMigration.deleteAllVersions();
     await internalMetadata.deleteAllEntries();
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
     Base.configurations(oldConfigurations);
   });
 

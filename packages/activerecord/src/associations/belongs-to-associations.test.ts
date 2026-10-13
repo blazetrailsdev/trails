@@ -18,15 +18,9 @@ import {
   registerModel,
   AssociationTypeMismatch,
 } from "../index.js";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "../testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
-import { captureSql } from "../testing/sql-capture.js";
-import { captureSqlAndBinds } from "../test-helpers/test-case.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -218,16 +212,6 @@ for (const m of [
   registerModel(m as any);
 }
 
-async function withHasManyInversing(fn: () => Promise<void>): Promise<void> {
-  const prev = (Base as any).hasManyInversing;
-  (Base as any).hasManyInversing = true;
-  try {
-    await fn();
-  } finally {
-    (Base as any).hasManyInversing = prev;
-  }
-}
-
 describe("BelongsToWithForeignKeyTest", () => {
   const { authors, authorAddresses } = fixtures(["authors", "authorAddresses"]);
 
@@ -244,6 +228,7 @@ describe("BelongsToWithForeignKeyTest", () => {
 
 describe("BelongsToAssociationsTest", () => {
   const {
+    self,
     accounts,
     companies,
     developers,
@@ -286,7 +271,7 @@ describe("BelongsToAssociationsTest", () => {
   it("belongs to", async () => {
     const client = await Client.find(3);
     const firstFirm = companies("first_firm");
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       expect((await client.firm)!.id).toBe(firstFirm.id);
       expect((await client.firm)!.name).toBe(firstFirm.name);
     });
@@ -348,7 +333,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("belongs to does not use order by", async () => {
-    const sqlLog = await captureSql(async () => {
+    const sqlLog = await self().captureSql({}, async () => {
       const client = await Client.find(3);
       await client.firm;
     });
@@ -568,12 +553,12 @@ describe("BelongsToAssociationsTest", () => {
     expect(counter).toBe(0);
     const comment = (await comments.first()) as any;
     expect(counter).toBe(0);
-    const queries = await captureSqlAndBinds(async () => {
+    const queries = await self().captureSqlAndBinds(async () => {
       await comment.post;
     });
     await comment.reload();
     expect(
-      await captureSqlAndBinds(async () => {
+      await self().captureSqlAndBinds(async () => {
         await comment.post;
       }),
     ).not.toEqual(queries);
@@ -1697,7 +1682,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("assigning nil on an association clears the associations inverse", async () => {
-    await withHasManyInversing(async () => {
+    await self().withHasManyInversing(undefined, async () => {
       const book = await Book.create({});
       const citation = await (book as any).citations.create({});
 
@@ -1724,7 +1709,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("destroying child with unloaded parent and foreign key and touch is possible with has many inversing", async () => {
-    await withHasManyInversing(async () => {
+    await self().withHasManyInversing(undefined, async () => {
       const book = await Book.create({});
       const citation = await (book as any).citations.create({});
 
@@ -2004,7 +1989,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(SponsorWithTouchInverse as any);
 
     try {
-      await withHasManyInversing(async () => {
+      await self().withHasManyInversing(undefined, async () => {
         const toy = await Toy.create({});
         const sponsor = await (toy as any).sponsors.create({});
 

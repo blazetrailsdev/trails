@@ -10,7 +10,6 @@ import {
   Client,
 } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { captureSql } from "../testing/sql-capture.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ArrowFieldAccount extends Base {
@@ -92,7 +91,7 @@ interface ReentrantDestroyAccount {
 }
 
 describe("destroy belongs_to preload through arrow-field helper", () => {
-  const { accounts } = fixtures(["companies", "accounts"]);
+  const { self, accounts } = fixtures(["companies", "accounts"]);
 
   beforeAll(async () => {
     registerModel(Company);
@@ -148,7 +147,7 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
       (accounts("signals37") as { id: number }).id,
     );
 
-    const sqls = await captureSql(() => account.destroy());
+    const sqls = await self().captureSql({}, () => account.destroy());
 
     expect(ReentrantDestroyAccount._reentrantResult).toBe(true);
     expect(sqls.filter((sql) => /^SELECT\b.*\bcompanies\b/i.test(sql))).toHaveLength(1);

@@ -7,7 +7,6 @@ import "./relation.js";
 import { TestFixtures } from "./test-fixtures.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
-import { cleanUpConnectionHandler } from "./cases/helper.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { Zine } from "./test-helpers/models/zine.js";
 
@@ -84,7 +83,7 @@ describe("TestFixturesTest", () => {
       expect(testResult.isPassed()).toBeTruthy();
     } finally {
       Base.connectionHandler = oldHandler!;
-      cleanUpConnectionHandler();
+      self().cleanUpConnectionHandler();
       FileUtils.rmR(tmpDir);
     }
   });

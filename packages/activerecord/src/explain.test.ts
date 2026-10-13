@@ -4,7 +4,6 @@ import { buildExplainClause } from "./explain.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { itIfSupports } from "./support/supports.js";
-import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
@@ -13,7 +12,7 @@ registerModel(Car);
 registerModel(Bulb);
 
 describe("ExplainTest", () => {
-  fixtures(["cars", "bulbs"]);
+  const { self } = fixtures(["cars", "bulbs"]);
 
   itIfSupports("explain", "relation explain", async () => {
     const message = await Car.where({ name: "honda" }).explain().inspect();
@@ -37,7 +36,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with average", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.average("id");
       })
     )[0];
@@ -48,7 +47,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with count", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.count();
       })
     )[0];
@@ -59,7 +58,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with count and argument", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await (Car as any).count("id");
       })
     )[0];
@@ -70,7 +69,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with minimum", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.minimum("id");
       })
     )[0];
@@ -81,7 +80,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with maximum", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.maximum("id");
       })
     )[0];
@@ -92,7 +91,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with sum", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.sum("id");
       })
     )[0];
@@ -103,7 +102,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with first", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.all().first();
       })
     )[0].replace(/LIMIT[\s\S]*/, "");
@@ -114,7 +113,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with last", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.all().last();
       })
     )[0].replace(/LIMIT[\s\S]*/, "");
@@ -125,7 +124,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with pluck", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.all().pluck();
       })
     )[0];
@@ -136,7 +135,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "relation explain with pluck with args", async () => {
     const expectedQuery = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Car.all().pluck("id", "name");
       })
     )[0];

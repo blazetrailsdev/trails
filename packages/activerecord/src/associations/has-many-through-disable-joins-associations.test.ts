@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertDifference } from "@blazetrails/activesupport";
-import { captureSql } from "../testing/sql-capture.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 
@@ -27,7 +26,7 @@ function djasScope(owner: Base, assocName: string): any {
 }
 
 describe("HasManyThroughDisableJoinsAssociationsTest", () => {
-  const { authors } = fixtures(["posts", "authors", "comments", "authorAddresses"]);
+  const { self, authors } = fixtures(["posts", "authors", "comments", "authorAddresses"]);
 
   registerModel([Author, AuthorAddress, Post, Comment, Rating, Member, MemberType]);
 
@@ -334,7 +333,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("first and scope in double join applies order in memory", async () => {
-    const disableJoinsSql = await captureSql(async () => {
+    const disableJoinsSql = await self().captureSql({}, async () => {
       await (author as any).noJoinsMembers.unnamed().first();
     });
     expect(disableJoinsSql[disableJoinsSql.length - 1]).not.toMatch(/ORDER BY/);
@@ -346,7 +345,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("limit and scope in double join applies limit in memory", async () => {
-    const disableJoinsSql = await captureSql(async () => {
+    const disableJoinsSql = await self().captureSql({}, async () => {
       await author.noJoinsMembers.unnamed().first();
     });
     expect(disableJoinsSql[disableJoinsSql.length - 1]).not.toMatch(/LIMIT 1/);

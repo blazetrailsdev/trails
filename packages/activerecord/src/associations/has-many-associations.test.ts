@@ -1,7 +1,6 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach } from "vitest";
-import { resetCallbacks } from "../support/reset-callbacks.js";
 import { ArgumentError, I18n } from "@blazetrails/activemodel";
 import {
   SubclassNotFound,
@@ -100,9 +99,7 @@ import {
   CpkBrokenOrderWithNonCpkBooks,
   CpkNonCpkBook,
 } from "../test-helpers/models/cpk.js";
-import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
-import { captureSql } from "../testing/sql-capture.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
@@ -209,6 +206,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 
 describe("HasManyAssociationsTest", () => {
   const {
+    self,
     accounts,
     authors,
     cars,
@@ -318,11 +316,11 @@ describe("HasManyAssociationsTest", () => {
     expect(counter).toBe(0);
     const post = (await DefaultScopeCounterPost.first()) as any;
     expect(counter).toBe(0);
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await post.comments.toArray();
     });
     post.comments.reset();
-    const queries2 = await captureSql(async () => {
+    const queries2 = await self().captureSql({}, async () => {
       await post.comments.toArray();
     });
     expect(queries2).not.toEqual(queries);
@@ -510,14 +508,14 @@ describe("HasManyAssociationsTest", () => {
     const author = authors("david") as any;
     await author.posts.createBang({ title: "test", body: "body" });
     await author.reload();
-    const expectedSql = await captureSql(async () => {
+    const expectedSql = await self().captureSql({}, async () => {
       await author.posts.deleteAll();
     });
 
     await author.posts.createBang({ title: "test", body: "body" });
     await author.reload();
     await author.posts.toArray();
-    const loadedSql = await captureSql(async () => {
+    const loadedSql = await self().captureSql({}, async () => {
       await author.posts.deleteAll();
     });
     expect(loadedSql).toEqual(expectedSql);
@@ -1876,12 +1874,12 @@ describe("HasManyAssociationsTest", () => {
 
     const commentsToDelete = [await comments.first(), await comments.second()];
 
-    const sql = await captureSql(async () => {
+    const sql = await self().captureSql({}, async () => {
       await blogPost.deleteComments.delete(commentsToDelete);
     });
 
-    const blogId = regexpEscape(quoteTableName("sharded_comments.blog_id"));
-    const id = regexpEscape(quoteTableName("sharded_comments.id"));
+    const blogId = regexpEscape(self().quoteTableName("sharded_comments.blog_id"));
+    const id = regexpEscape(self().quoteTableName("sharded_comments.id"));
 
     const queryConstraints = `${blogId} = .* AND ${id} = .*`;
     const expectation = new RegExp(
@@ -3929,7 +3927,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("prevent double firing the before save callback of new object when the parent association saved in the callback", async () => {
-    await resetCallbacks(HmBulb, "save", async () => {
+    await self().resetCallbacks(HmBulb, "save", async () => {
       let count = 0;
       HmBulb.beforeSave(async (record: any) => {
         if (await (await record.car).save()) count += 1;
@@ -4055,7 +4053,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("loading association in validate callback doesnt affect persistence", async () => {
-    await resetCallbacks(HmBulb, "validation", async () => {
+    await self().resetCallbacks(HmBulb, "validation", async () => {
       HmBulb.afterValidation(async (record: any) => {
         await (await record.car).bulbs.load();
       });

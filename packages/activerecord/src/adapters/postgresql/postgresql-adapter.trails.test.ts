@@ -1,15 +1,12 @@
+import { stub } from "@blazetrails/activesupport";
+import { fixtures } from "../../test-fixtures.js";
 import { StringIO, Thread } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import { Socket } from "net";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-  withPostgresqlDatetimeType,
-} from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
   ConnectionNotEstablished,
   Deadlocked,
@@ -26,7 +23,6 @@ import { PG } from "../../pg/pg.js";
 import { Connection, type PGConnection } from "../../pg/connection.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
-import { captureSql } from "../../testing/sql-capture.js";
 import { itIfSupports } from "../../support/supports.js";
 import {
   dbWarningsAction,
@@ -77,6 +73,8 @@ async function expectedNullsNotDistinctValue(
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
+  const { self } = fixtures([], { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
@@ -1113,7 +1111,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("nativeDatabaseTypes datetime resolves from datetimeType", async () => {
-      await withPostgresqlDatetimeType("timestamptz", () => {
+      await self().withPostgresqlDatetimeType("timestamptz", () => {
         const types = PostgreSQLAdapter.nativeDatabaseTypes();
         expect(types.datetime).toEqual({ name: "timestamptz" });
       });
@@ -1547,15 +1545,20 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("createDatabase option string", () => {
     it("emits the remaining option arms in merged-hash order", async () => {
-      const sqls = await captureSql(
-        () =>
-          adapter.createDatabase("db", {
+      const sqls: string[] = [];
+      await stub(
+        adapter,
+        "execute",
+        (sql: string) => sqls.push(sql),
+        [],
+        async () => {
+          await adapter.createDatabase("db", {
             owner: "alice",
             template: "template0",
             tablespace: "fast",
             connectionLimit: -1,
-          }),
-        { stub: adapter },
+          });
+        },
       );
       expect(sqls[0]).toBe(
         `CREATE DATABASE "db" ENCODING = 'utf8' OWNER = "alice" TEMPLATE = "template0"` +
@@ -1564,9 +1567,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("ignores keys it has no arm for instead of rejecting them", async () => {
-      const sqls = await captureSql(
-        () => adapter.createDatabase("db", { adapter: "postgresql", host: "localhost" }),
-        { stub: adapter },
+      const sqls: string[] = [];
+      await stub(
+        adapter,
+        "execute",
+        (sql: string) => sqls.push(sql),
+        [],
+        async () => {
+          await adapter.createDatabase("db", { adapter: "postgresql", host: "localhost" });
+        },
       );
       expect(sqls[0]).toBe(`CREATE DATABASE "db" ENCODING = 'utf8'`);
     });

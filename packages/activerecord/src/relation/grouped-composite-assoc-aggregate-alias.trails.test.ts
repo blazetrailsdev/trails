@@ -3,12 +3,11 @@ import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor } from "../test-helpers/models/cpk.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { captureSql } from "../testing/sql-capture.js";
 
 const RAISE = 'Expected corresponding value for ["shop_id", "id"] to be an Array';
 
 describe("CpkBook grouped calculation over a composite-key belongs_to aliases the aggregate", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
 
   beforeAll(() => {
     [CpkBook, CpkOrder, CpkAuthor].forEach((m) => registerModel(m));
@@ -40,7 +39,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to aliases th
 
   it("group by a composite-key belongs_to projects the aggregate as count_all", async () => {
     await seedOrders();
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await expect(CpkBook.group("order").count()).rejects.toThrow(RAISE);
     });
 
@@ -58,7 +57,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to aliases th
 
   it("group by a composite-key belongs_to aliases a sum as sum_order_id", async () => {
     await seedOrders();
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await expect(CpkBook.group("order").sum("order_id")).rejects.toThrow(RAISE);
     });
 

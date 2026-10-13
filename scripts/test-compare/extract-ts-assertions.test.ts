@@ -129,6 +129,18 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["helpers"]).toBe(3);
   });
 
+  it("counts an assert helper called on the test object by its bare name", () => {
+    const src = `
+      it("on the test object", ({ testCase }) => {
+        self().assertQueriesMatch(/SELECT/, {}, () => {});
+        testCase.assertColumn(Post, "title");
+        self().captureSql({}, () => {});
+        other().assertColumn(Post, "title");
+      });
+    `;
+    expect(tsAssertionCounts(src)["on the test object"]).toBe(2);
+  });
+
   it("counts trails expect* assertion helpers (twins of Rails assert_* helpers)", () => {
     const src = `
       it("mixed", () => {

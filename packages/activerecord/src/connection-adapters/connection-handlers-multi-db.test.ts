@@ -6,7 +6,6 @@ import { ConnectionNotDefined } from "../errors.js";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { Base } from "../base.js";
 import { currentRole } from "../core.js";
-import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Person } from "../test-helpers/models/person.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -19,7 +18,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
   let roPool: any;
   let prevConfigs: ReturnType<typeof Base.configurations>;
 
-  fixtures(["people"], { useTransactionalTests: false });
+  const { self } = fixtures(["people"], { useTransactionalTests: false });
 
   beforeEach(async () => {
     handler = new ConnectionHandler();
@@ -30,7 +29,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   afterEach(() => {
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
   });
 
   class SecondaryBase extends Base {

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { resetCallbacks } from "../support/reset-callbacks.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -23,7 +22,7 @@ import { Account } from "../test-helpers/models/account.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
-  const { authors, topics, vertices, companies, people } = fixtures([
+  const { self, authors, topics, vertices, companies, people } = fixtures([
     "authors",
     "posts",
     "topics",
@@ -400,7 +399,7 @@ describe("CascadedEagerLoadingTest", () => {
     const authorsRel = Author.where({ id: author.id });
     const retrievedComments: Base[] = [];
 
-    await resetCallbacks(Comment, "initialize", async () => {
+    await self().resetCallbacks(Comment, "initialize", async () => {
       Comment.afterInitialize((record: Comment) => {
         retrievedComments.push(record);
       });
@@ -432,7 +431,7 @@ describe("CascadedEagerLoadingTest", () => {
     const authorsRel = Author.where({ id: author.id });
     const retrievedAuthors: Base[] = [];
 
-    await resetCallbacks(Author, "initialize", async () => {
+    await self().resetCallbacks(Author, "initialize", async () => {
       Author.afterInitialize((record: Author) => {
         retrievedAuthors.push(record);
       });

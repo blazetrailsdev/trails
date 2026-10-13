@@ -578,6 +578,7 @@ export {
 export {
   Mock,
   MockExpectationError,
+  MethodCallAssertions,
   assertMock,
   assertCalled,
   assertCalledWith,
@@ -628,7 +629,7 @@ export {
 } from "./testing/assertions.js";
 export { ConstantLookup } from "./testing/constant-lookup.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
-export { silenceStream, quietly, capture } from "./testing/stream.js";
+export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";
 export * as SetupAndTeardown from "./testing/setup-and-teardown.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";

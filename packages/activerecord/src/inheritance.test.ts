@@ -17,7 +17,6 @@ import {
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
@@ -71,7 +70,7 @@ import { Author } from "./test-helpers/models/author.js";
 import { ShopProduct, ShopProductType } from "./test-helpers/models/shop.js";
 
 describe("InheritanceTest", () => {
-  const { companies } = fixtures([
+  const { self, companies } = fixtures([
     "companies",
     "projects",
     "subscribers",
@@ -515,13 +514,12 @@ describe("InheritanceTest", () => {
 
   it("eager load belongs to primary key quoting", async () => {
     const bindParam = new Nodes.BindParam(null);
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(
         `${regexpEscape((await Base.leaseConnection()).quoteTableName("companies.id"))} = (?:${regexpEscape(bindParam.toSql())}|1)`,
         "i",
       ),
-      undefined,
-      false,
+      {},
       async () => {
         await Account.includes(":firm").find(1);
       },

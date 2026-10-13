@@ -2,16 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  withPostgresqlDatetimeType,
-  withNativeDatabaseTypeOverrides,
-} from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, withNativeDatabaseTypeOverrides } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
 import { Developer, AuditLog, AuditLogRequired } from "../../test-helpers/models/developer.js";
-import { withTimezoneConfig } from "../../test-helper.js";
 import { Base, registerModel } from "../../index.js";
 
 function infinite(value: unknown): number | null {
@@ -22,7 +16,7 @@ function infinite(value: unknown): number | null {
 
 registerModel([Developer, AuditLog, AuditLogRequired]);
 
-fixtures(["topics"], { useTransactionalTests: false });
+const { self } = fixtures(["topics"], { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -36,7 +30,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withTimezoneConfig({ default: "utc", awareAttributes: true }, async () => {
+        await self().withTimezoneConfig({ default: "utc", awareAttributes: true }, async () => {
           await adapter.reconnectBang();
           class PostgresqlTimestampWithZone extends Base {
             static _tableName = "postgresql_timestamp_with_zones";
@@ -59,7 +53,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withTimezoneConfig({ default: "local", awareAttributes: false }, async () => {
+        await self().withTimezoneConfig({ default: "local", awareAttributes: false }, async () => {
           await adapter.reconnectBang();
           await adapter.execute(`SET time zone 'America/Jamaica'`);
           class PostgresqlTimestampWithZone extends Base {
@@ -85,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withTimezoneConfig(
+        await self().withTimezoneConfig(
           {
             default: "utc",
             awareAttributes: true,
@@ -120,8 +114,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withPostgresqlDatetimeType("timestamptz", async () => {
-          await withTimezoneConfig(
+        await self().withPostgresqlDatetimeType("timestamptz", async () => {
+          await self().withTimezoneConfig(
             {
               default: "utc",
               awareAttributes: true,
@@ -151,8 +145,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withPostgresqlDatetimeType("timestamptz", async () => {
-          await withTimezoneConfig(
+        await self().withPostgresqlDatetimeType("timestamptz", async () => {
+          await self().withTimezoneConfig(
             {
               default: "utc",
               awareAttributes: true,
@@ -244,7 +238,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampMigrationTest", () => {
-    fixtures(["topics"], { useTransactionalTests: true });
+    const { self } = fixtures(["topics"], { useTransactionalTests: true });
 
     it("adds column as timestamp", async () => {
       await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
@@ -256,7 +250,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("adds column as timestamptz if datetime type changed", async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
         const rows = await adapter.execute(
           `SELECT data_type FROM information_schema.columns
@@ -271,7 +265,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withNativeDatabaseTypeOverrides(
         { datetimes_as_enum: { name: "custom_time_format" } },
         () =>
-          withPostgresqlDatetimeType("datetimes_as_enum", () =>
+          self().withPostgresqlDatetimeType("datetimes_as_enum", () =>
             adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime", {
               precision: null,
             }),

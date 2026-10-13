@@ -3,7 +3,6 @@ import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
 import { UrlConfig } from "../../database-configurations/url-config.js";
-import { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
@@ -16,11 +15,7 @@ import {
   StatementInvalid,
 } from "../../errors.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
-import {
-  assertQueriesCount,
-  assertNoQueries,
-  assertQueriesMatch,
-} from "../../testing/query-assertions.js";
+import { assertQueriesCount, assertNoQueries } from "../../testing/query-assertions.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
 import * as DdlHelper from "../../support/ddl-helper.js";
@@ -66,7 +61,11 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLAdapterTest", () => {
-    fixtures(["accounts"], { useTransactionalTests: false });
+    const { self } = fixtures(["accounts"], { useTransactionalTests: false });
+
+    beforeEach(() => {
+      self()._originalDbWarningsAction = "ignore";
+    });
 
     it("connection error", async () => {
       const bad = new PostgreSQLAdapter({
@@ -606,7 +605,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(result.columnTypes["feeling"]).toBeInstanceOf(OidEnum);
         });
       } finally {
-        await assertQueriesMatch(/from pg_type/i, undefined, true, () =>
+        await self().assertQueriesMatch(/from pg_type/i, { includeSchema: true }, () =>
           adapter.dropEnum("feeling", { ifExists: true }),
         );
       }
@@ -713,7 +712,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("ignores warnings when behaviour ignore", async () => {
-      await withDbWarningsAction("ignore", async () => {
+      await self().withDbWarningsAction("ignore", undefined, async () => {
         let err = "";
         const listener = (notice: { severity?: string; message?: string }) => {
           err += `${notice.severity}:  ${notice.message}\n`;
@@ -731,7 +730,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("logs warnings when behaviour log", async () => {
-      await withDbWarningsAction("log", async () => {
+      await self().withDbWarningsAction("log", undefined, async () => {
         const sqlWarning = "[ActiveRecord::SQLWarning] PostgreSQL SQL warning (01000)";
         const logger = { warn: vi.fn() };
         const previousLogger = Base.logger;
@@ -746,7 +745,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises warnings when behaviour raise", async () => {
-      await withDbWarningsAction("raise", async () => {
+      await self().withDbWarningsAction("raise", undefined, async () => {
         const error = await assertRaises([SQLWarning], {}, () =>
           adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
         );
@@ -766,7 +765,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       ActiveSupport.errorReporter = reporter;
       try {
-        await withDbWarningsAction("report", async () => {
+        await self().withDbWarningsAction("report", undefined, async () => {
           await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
           const warningEvent = events[0].error;
 
@@ -785,7 +784,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         warningMessage = warning.message;
         warningLevel = warning.level;
       };
-      await withDbWarningsAction(warningAction, async () => {
+      await self().withDbWarningsAction(warningAction, undefined, async () => {
         await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
 
         expect(warningMessage).toBe("PostgreSQL SQL warning");
@@ -794,7 +793,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("allowlist of warnings to ignore", async () => {
-      await withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
+      await self().withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
         const rows = await adapter.execute(
           "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
         );
@@ -803,7 +802,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("allowlist of warning codes to ignore", async () => {
-      await withDbWarningsAction("raise", ["01000"], async () => {
+      await self().withDbWarningsAction("raise", ["01000"], async () => {
         const rows = await adapter.execute(
           "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
         );
@@ -812,7 +811,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("does not raise notice level warnings", async () => {
-      await withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
+      await self().withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
         const result = await adapter.execute("DROP TABLE IF EXISTS non_existent_table");
 
         expect(result).toEqual([]);

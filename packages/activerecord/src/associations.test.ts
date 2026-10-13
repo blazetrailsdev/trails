@@ -22,12 +22,7 @@ import {
   assertSame,
   squish,
 } from "@blazetrails/activesupport";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
-import { captureSql } from "./testing/sql-capture.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
@@ -61,12 +56,6 @@ import "./test-helpers/models/price-estimate.js";
 import { NoMethodError, PP, regexpEscape, StandardError, StringIO } from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
-
-function quoteTableName(name: string): string {
-  return (Base.adapterClass() as unknown as { quoteTableName(n: string): string }).quoteTableName(
-    name,
-  );
-}
 
 describe("AssociationsTest", () => {
   fixtures([]);
@@ -320,6 +309,7 @@ describe("AssociationProxyTest", () => {
 
 describe("PreloaderTest", () => {
   const {
+    self,
     posts,
     comments,
     authors,
@@ -1249,14 +1239,14 @@ describe("PreloaderTest", () => {
     );
 
     let loadedOrder: any = null;
-    const sql = await captureSql(async () => {
+    const sql = await self().captureSql({}, async () => {
       loadedOrder = (await CpkOrderPL.where({ id: orderId }).includes("orderAgreements"))[0];
     });
 
     expect(sql.length).toBe(2);
     const preloadSql = sql[sql.length - 1];
 
-    const orderIdColumn = regexpEscape(quoteTableName("cpk_order_agreements.order_id"));
+    const orderIdColumn = regexpEscape(self().quoteTableName("cpk_order_agreements.order_id"));
     const expectation = new RegExp(`SELECT.*WHERE.* ${orderIdColumn} = (\\?|(\\d+)|\\$\\d)$`);
 
     expect(preloadSql).toMatch(expectation);
@@ -1271,7 +1261,7 @@ describe("PreloaderTest", () => {
     expect(order.equals(await orderAgreement.order)).toBe(true);
 
     let loadedOrderAgreement: any = null;
-    const sql = await captureSql(async () => {
+    const sql = await self().captureSql({}, async () => {
       loadedOrderAgreement = (
         await CpkOrderAgreementPL.where({ id: orderAgreement.id }).includes("order")
       )[0];
@@ -1280,7 +1270,7 @@ describe("PreloaderTest", () => {
     expect(sql.length).toBe(2);
     const preloadSql = sql[sql.length - 1];
 
-    const orderId = regexpEscape(quoteTableName("cpk_orders.id"));
+    const orderId = regexpEscape(self().quoteTableName("cpk_orders.id"));
     const expectation = new RegExp(`SELECT.*WHERE.* ${orderId} = (\\?|(\\d+)|\\$\\d)$`);
 
     expect(preloadSql).toMatch(expectation);
@@ -1460,7 +1450,7 @@ describe("GeneratedMethodsTest", () => {
 });
 
 describe("WithAnnotationsTest", () => {
-  const { pirates } = fixtures([
+  const { self, pirates } = fixtures([
     "pirates",
     "parrots",
     "parrotsPirates",
@@ -1473,7 +1463,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.where().not({ parrot_id: null }).first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.parrot;
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1482,7 +1472,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that tells jokes \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that tells jokes \*\//, {}, async () => {
       await pirate.parrotWithAnnotation;
     });
   });
@@ -1491,7 +1481,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.parrots.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1500,7 +1490,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that are very colorful \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that are very colorful \*\//, {}, async () => {
       await pirate.parrotsWithAnnotation.first();
     });
   });
@@ -1509,7 +1499,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.ship;
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1518,7 +1508,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that is a rocket \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that is a rocket \*\//, {}, async () => {
       await pirate.shipWithAnnotation;
     });
   });
@@ -1527,7 +1517,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.birds.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1536,7 +1526,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that are also parrots \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that are also parrots \*\//, {}, async () => {
       await pirate.birdsWithAnnotation.first();
     });
   });
@@ -1545,7 +1535,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.treasureEstimates.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1554,7 +1544,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* yarrr \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* yarrr \*\//, {}, async () => {
       await pirate.treasureEstimatesWithAnnotation.first();
     });
   });
@@ -1563,7 +1553,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.treasureEstimates.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1572,14 +1562,14 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* yarrr \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* yarrr \*\//, {}, async () => {
       await SpacePirate.includes("treasureEstimatesWithAnnotation", "treasures").first();
     });
   });
 });
 
 describe("AssociationsTest", () => {
-  const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
+  const { self, companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
     fixtures([
       "companies",
       "authors",
@@ -1851,15 +1841,17 @@ describe("AssociationsTest", () => {
     const comment = shardedComments("great_comment_blog_post_one") as any;
 
     const sql = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await comment.blogPost;
       })
     )[0];
 
     expect(sql).toMatch(
-      new RegExp(`${regexpEscape(quoteTableName("sharded_blog_posts.blog_id"))} =`),
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_blog_posts.blog_id"))} =`),
     );
-    expect(sql).toMatch(new RegExp(`${regexpEscape(quoteTableName("sharded_blog_posts.id"))} =`));
+    expect(sql).toMatch(
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_blog_posts.id"))} =`),
+    );
   });
 
   it("querying by whole associated records using query constraints", async () => {
@@ -1929,13 +1921,13 @@ describe("AssociationsTest", () => {
     });
 
     const sql = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         comments = await blogPost.comments.toArray();
       })
     )[0];
 
     expect(sql).toMatch(
-      new RegExp(`WHERE .*${regexpEscape(quoteTableName("sharded_comments.blog_id"))} =`),
+      new RegExp(`WHERE .*${regexpEscape(self().quoteTableName("sharded_comments.blog_id"))} =`),
     );
     assertNotEmpty(comments);
     expect(expectedComments.map((c) => c.id).sort()).toEqual(comments.map((c) => c.id).sort());
@@ -1958,16 +1950,16 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one") as any;
 
     const sql = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await blogPost.comments.toArray();
       })
     )[0];
 
     expect(sql).toMatch(
-      new RegExp(`${regexpEscape(quoteTableName("sharded_comments.blog_post_id"))} =`),
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_comments.blog_post_id"))} =`),
     );
     expect(sql).toMatch(
-      new RegExp(`${regexpEscape(quoteTableName("sharded_comments.blog_id"))} =`),
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_comments.blog_id"))} =`),
     );
   });
 
@@ -2145,12 +2137,14 @@ describe("AssociationsTest", () => {
 
     await review.reload();
 
-    const sql = await captureSql(async () => {
+    const sql = await self().captureSql({}, async () => {
       expect(car.equals(await review.car)).toBe(true);
     });
 
-    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(quoteTableName("cpk_cars.make"))} =`));
-    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(quoteTableName("cpk_cars.model"))} =`));
+    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(self().quoteTableName("cpk_cars.make"))} =`));
+    expect(sql[0]).toMatch(
+      new RegExp(`${regexpEscape(self().quoteTableName("cpk_cars.model"))} =`),
+    );
   });
 
   it("cpk model has many records by id attribute", async () => {

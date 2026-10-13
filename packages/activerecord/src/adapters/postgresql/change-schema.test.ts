@@ -1,13 +1,11 @@
+import { fixtures } from "../../test-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-  withPostgresqlDatetimeType,
-} from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("Migration", () => {
+  const { self } = fixtures([]);
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
@@ -59,7 +57,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change type with symbol using timestamp with timestamptz as default", async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.changeColumn("strings", "somedate", "timestamp", { castAs: "timestamp" });
         const cols = await adapter.columns("strings");
         const col = cols.find((c) => c.name === "somedate");
@@ -68,7 +66,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change type with symbol with timestamptz as default", async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.changeColumn("strings", "somedate", "timestamptz", { castAs: "timestamptz" });
         const cols = await adapter.columns("strings");
         const col = cols.find((c) => c.name === "somedate");
@@ -77,7 +75,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change type with symbol using datetime with timestamptz as default", async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.changeColumn("strings", "somedate", "datetime", { castAs: "datetime" });
         const cols = await adapter.columns("strings");
         const col = cols.find((c) => c.name === "somedate");

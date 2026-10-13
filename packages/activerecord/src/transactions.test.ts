@@ -14,8 +14,7 @@ import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/
 import { Author } from "./test-helpers/models/author.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Base } from "./base.js";
-import { assertQueriesMatch, assertNoQueries } from "./testing/query-assertions.js";
-import { captureSql } from "./testing/sql-capture.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { StatementInvalid, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -1390,7 +1389,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
 });
 
 describe("TransactionTest", () => {
-  fixtures(["topics"], {
+  const { self } = fixtures(["topics"], {
     usesTransaction: [
       "savepoints name",
       "releasing named savepoints",
@@ -1465,7 +1464,7 @@ describe("TransactionTest", () => {
   });
 
   it("unprepared statement materializes transaction", async () => {
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await Topic.where("1=1").first();
       });
@@ -1473,28 +1472,24 @@ describe("TransactionTest", () => {
   });
 
   it("nested transactions skip excess savepoints", async () => {
-    const actualQueries = await captureSql(
-      async () => {
-        await Topic.transaction(
-          async () => {
-            await Topic.transaction(
-              async () => {
-                await Topic.deleteAll();
-                await Topic.transaction(
-                  async () =>
-                    Topic.transaction(async () => Topic.deleteAll(), { requiresNew: true }),
-                  { requiresNew: true },
-                );
-              },
-              { requiresNew: true },
-            );
-            await Topic.deleteAll();
-          },
-          { requiresNew: true },
-        );
-      },
-      { includeSchema: true },
-    );
+    const actualQueries = await self().captureSql({ includeSchema: true }, async () => {
+      await Topic.transaction(
+        async () => {
+          await Topic.transaction(
+            async () => {
+              await Topic.deleteAll();
+              await Topic.transaction(
+                async () => Topic.transaction(async () => Topic.deleteAll(), { requiresNew: true }),
+                { requiresNew: true },
+              );
+            },
+            { requiresNew: true },
+          );
+          await Topic.deleteAll();
+        },
+        { requiresNew: true },
+      );
+    });
 
     const expectedQueries = [
       /BEGIN/i,
@@ -1513,27 +1508,24 @@ describe("TransactionTest", () => {
     const connection = await (Topic as any).leaseConnection();
     await connection.disableLazyTransactionsBang();
 
-    const actualQueries = await captureSql(
-      async () => {
-        await Topic.transaction(
-          async () => {
-            await Topic.transaction(
-              async () => {
-                await Topic.deleteAll();
-                await Topic.transaction(
-                  async () => Topic.transaction(async () => {}, { requiresNew: true }),
-                  { requiresNew: true },
-                );
-              },
-              { requiresNew: true },
-            );
-            await Topic.deleteAll();
-          },
-          { requiresNew: true },
-        );
-      },
-      { includeSchema: true },
-    );
+    const actualQueries = await self().captureSql({ includeSchema: true }, async () => {
+      await Topic.transaction(
+        async () => {
+          await Topic.transaction(
+            async () => {
+              await Topic.deleteAll();
+              await Topic.transaction(
+                async () => Topic.transaction(async () => {}, { requiresNew: true }),
+                { requiresNew: true },
+              );
+            },
+            { requiresNew: true },
+          );
+          await Topic.deleteAll();
+        },
+        { requiresNew: true },
+      );
+    });
 
     const expectedQueries = [/BEGIN/i, /DELETE/i, /^SAVEPOINT/i, /^RELEASE/i, /DELETE/i, /COMMIT/i];
     expect(actualQueries.length).toBe(expectedQueries.length);
@@ -1545,7 +1537,7 @@ describe("TransactionTest", () => {
     ctx.skip(!conn.preparedStatements);
     await Topic.first();
 
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await Topic.first();
       });
@@ -1572,7 +1564,7 @@ describe("TransactionTest", () => {
 
   it("accessing raw connection materializes transaction", async () => {
     const connection = await (Topic as any).leaseConnection();
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await connection.rawConnection();
       });
@@ -1582,7 +1574,7 @@ describe("TransactionTest", () => {
   it("accessing raw connection disables lazy transactions", async () => {
     const connection = await (Topic as any).leaseConnection();
     await connection.rawConnection();
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {});
     });
   });
@@ -1598,7 +1590,7 @@ describe("TransactionTest", () => {
 
   it("transactions can be manually materialized", async () => {
     const connection = await (Topic as any).leaseConnection();
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await connection.materializeTransactions();
       });
@@ -1676,7 +1668,7 @@ describe("TransactionTest", () => {
 
   it.skipIf(adapterType !== "sqlite")("sqlite default transaction mode is immediate", async () => {
     const connection = await (Topic as any).leaseConnection();
-    await assertQueriesMatch(/BEGIN IMMEDIATE TRANSACTION/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/BEGIN IMMEDIATE TRANSACTION/i, {}, async () => {
       await Topic.transaction(async () => {
         await connection.materializeTransactions();
       });

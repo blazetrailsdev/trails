@@ -8,7 +8,6 @@ import {
   zone as timeZone,
 } from "@blazetrails/activesupport";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./index.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Address, Customer } from "./test-helpers/models/customer.js";
@@ -16,7 +15,7 @@ import { Address, Customer } from "./test-helpers/models/customer.js";
 const utc = (v: RubyTime) => v.getutc().toZonedDateTime();
 
 describe("MultiParameterAttributeTest", () => {
-  fixtures(["topics"]);
+  const { self } = fixtures(["topics"]);
 
   beforeAll(async () => {
     await Topic.loadSchema();
@@ -104,7 +103,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const topic = await Topic.find(1);
       await topic.assignAttributes({
         "written_on(1i)": "2004",
@@ -186,7 +185,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time will ignore hour if missing", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const attributes = {
         "written_on(1i)": "2004",
         "written_on(2i)": "12",
@@ -239,7 +238,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       const topic = await Topic.find(1);
       await topic.assignAttributes({
         "written_on(1i)": "2004",
@@ -255,7 +254,7 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time with time zone aware attributes", async () => {
     try {
-      await withTimezoneConfig(
+      await self().withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           void Topic.resetColumnInformation();
@@ -284,7 +283,7 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time with time zone aware attributes and invalid time params", async () => {
     try {
-      await withTimezoneConfig({ awareAttributes: true }, async () => {
+      await self().withTimezoneConfig({ awareAttributes: true }, async () => {
         void Topic.resetColumnInformation();
         await Topic.loadSchema();
         const topic = new Topic();
@@ -302,7 +301,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with time zone aware attributes false", async () => {
-    await withTimezoneConfig(
+    await self().withTimezoneConfig(
       { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
       async () => {
         const attributes = {
@@ -323,7 +322,7 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time with skip time zone conversion for attributes", async () => {
     try {
-      await withTimezoneConfig(
+      await self().withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           Topic.skipTimeZoneConversionForAttributes = ["written_on"];
@@ -354,7 +353,7 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time only column with time zone aware attributes does not do time zone conversion", async () => {
     try {
-      await withTimezoneConfig(
+      await self().withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           void Topic.resetColumnInformation();
@@ -396,7 +395,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with empty seconds", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const attributes = {
         "written_on(1i)": "2004",
         "written_on(2i)": "6",

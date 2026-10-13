@@ -13,7 +13,7 @@ import {
 } from "../test-helpers/models/cpk.js";
 import { registerModel } from "../associations.js";
 import { Base } from "../index.js";
-import { quoteTableName, quoteColumnName } from "../support/quote-regex.js";
+import { quoteColumnName } from "../support/quote-regex.js";
 import {
   Range,
   regexpEscape,
@@ -66,23 +66,23 @@ describe("PredicateBuilder positive-equality bind typing", () => {
 });
 
 describe("PredicateBuilder nested-hash recursion skips dot re-normalization", () => {
-  fixtures(["authors", "posts", "comments"]);
+  const { self } = fixtures(["authors", "posts", "comments"]);
 
   it("treats a dotted key inside a nested hash as a literal column on the associated table", () => {
     const sql = Author.where({ posts: { "comments.body": "hi" } }).toSql();
     expect(sql).toMatch(
       new RegExp(
-        `${regexpEscape(quoteTableName("posts"))}\\.${regexpEscape(quoteColumnName("comments.body"))}`,
+        `${regexpEscape(self().quoteTableName("posts"))}\\.${regexpEscape(quoteColumnName("comments.body"))}`,
       ),
     );
-    expect(sql).not.toContain(quoteTableName("comments.body"));
+    expect(sql).not.toContain(self().quoteTableName("comments.body"));
   });
 });
 
 type HasWhereClause = { whereClause: { predicates: Nodes.Node[] } };
 
 describe("association hash expansion grouping shape", () => {
-  const { treasures, cars, comments } = fixtures([
+  const { self, treasures, cars, comments } = fixtures([
     "authors",
     "authorAddresses",
     "posts",
@@ -150,8 +150,8 @@ describe("association hash expansion grouping shape", () => {
     const preds = rel.whereClause.predicates;
     expect(preds).toHaveLength(3);
     const sql = (rel as unknown as { toSql(): string }).toSql();
-    expect(sql).toContain(`${quoteTableName("comments")}.${quoteColumnName("id")}`);
-    expect(sql).toContain(`${quoteTableName("authors")}.${quoteColumnName("name")}`);
+    expect(sql).toContain(`${self().quoteTableName("comments")}.${quoteColumnName("id")}`);
+    expect(sql).toContain(`${self().quoteTableName("authors")}.${quoteColumnName("name")}`);
   });
 
   it("through-association single query group stays flat, without an And wrapper", () => {

@@ -1,12 +1,11 @@
+import { fixtures } from "../../test-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-  withDbWarningsAction,
 } from "../abstract-mysql-adapter/test-helper.js";
-import { withTimezoneConfig } from "../../test-helper.js";
 import {
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -116,6 +115,12 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
 });
 
 describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
+  const { self } = fixtures([]);
+
+  beforeEach(() => {
+    self()._originalDbWarningsAction = "ignore";
+  });
+
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -212,7 +217,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   it("database timezone changes synced to connection (extended re-sync paths)", async () => {
     await adapter.execute("SELECT 1");
     expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.execQuery("SELECT 1");
       expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
@@ -232,11 +237,11 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
   it("configure connection seeds database timezone from default", async () => {
     adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       await adapter.configureConnection();
       expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
     });
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       await adapter.configureConnection();
       expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
     });
@@ -251,11 +256,11 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       await adapter.execute(
         `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
       );
-      await adapter.execute(`SET SESSION sql_mode=''`);
-      await adapter.execute(`INSERT INTO warn_posts (title) VALUES ('Title')`);
       const logger = { warn: vi.fn() };
       Base.logger = logger as never;
-      await withDbWarningsAction("log", async () => {
+      await self().withDbWarningsAction("log", undefined, async () => {
+        await adapter.execute(`SET SESSION sql_mode=''`);
+        await adapter.execute(`INSERT INTO warn_posts (title) VALUES ('Title')`);
         await adapter.execute(
           `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
         );

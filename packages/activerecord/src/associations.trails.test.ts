@@ -5,7 +5,6 @@ import type { CollectionAssociation } from "./associations/collection-associatio
 import { Preloader } from "./associations/preloader.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
-import { captureSql } from "./testing/sql-capture.js";
 import {
   CpkOrder,
   CpkBook,
@@ -177,13 +176,13 @@ describe("AssociationsTest", () => {
 
 describe("AssociationProxyTest (trails)", () => {
   registerModel([Author, Post, FirstPost]);
-  const { authors } = fixtures(["authorAddresses", "authors", "posts"]);
+  const { self, authors } = fixtures(["authorAddresses", "authors", "posts"]);
 
   it("last! works on loaded associations", async () => {
     const david = authors("david");
     const expected = await david.firstPosts.last();
     await david.firstPosts.reload();
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       const last = await david.firstPosts.lastBang();
       expect(last.id).toBe(expected!.id);
     });
@@ -195,7 +194,7 @@ describe("AssociationProxyTest (trails)", () => {
     const david = authors("david");
     const expected = await david.firstPosts.take();
     await david.firstPosts.reload();
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       const taken = await david.firstPosts.takeBang();
       expect(taken.id).toBe(expected!.id);
     });
@@ -217,13 +216,13 @@ describe("AssociationProxyTest (trails)", () => {
 
 describe("PreloaderTest (trails)", () => {
   registerModel([Author, Post, Comment]);
-  const { posts, authors } = fixtures(["posts", "comments", "authors"]);
+  const { self, posts, authors } = fixtures(["posts", "comments", "authors"]);
 
   it("isEmpty materializes an empty relation and reports true", async () => {
     const relation = (Post as typeof Base).where({ id: -1 });
     const preloader = new Preloader({ records: relation, associations: "comments" });
     expect(await preloader.isEmpty()).toBe(true);
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await preloader.call();
     });
     expect(sqls).toHaveLength(0);

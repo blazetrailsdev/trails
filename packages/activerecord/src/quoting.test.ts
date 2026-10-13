@@ -1,3 +1,4 @@
+import { fixtures } from "./test-fixtures.js";
 import { quotingHost } from "./support/quoting-host.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -25,13 +26,14 @@ const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
 import { rbFSend, TypeError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "./errors.js";
 import { setDefaultTimezone } from "./active-record.js";
-import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 
 afterEach(() => {
   setDefaultTimezone("utc");
 });
 
 describe("QuotingTest", () => {
+  const { self } = fixtures([]);
+
   it("quoted true", () => {
     expect(quotedTrue()).toBe("TRUE");
   });
@@ -143,8 +145,8 @@ describe("QuotingTest", () => {
     expect(quotedTime(t)).toBe(expected);
   });
   it("quoted time dst utc", async () => {
-    await withEnvTz("America/New_York", async () => {
-      await withTimezoneConfig({ default: "utc" }, () => {
+    await self().withEnvTz("America/New_York", async () => {
+      await self().withTimezoneConfig({ default: "utc" }, () => {
         const t = RubyTime.new(2000, 7, 1, 0, 0, 0, "+04:30");
 
         const expected = toFs(t.change({ year: 2000, month: 1, day: 1 }).getutc(), "db").slice(11);
@@ -154,8 +156,8 @@ describe("QuotingTest", () => {
     });
   });
   it("quoted time dst local", async () => {
-    await withEnvTz("America/New_York", async () => {
-      await withTimezoneConfig({ default: "local" }, () => {
+    await self().withEnvTz("America/New_York", async () => {
+      await self().withTimezoneConfig({ default: "local" }, () => {
         const t = RubyTime.new(2000, 7, 1, 0, 0, 0, "+04:30");
 
         const expected = toFs(t.change({ year: 2000, month: 1, day: 1 }).getlocal(), "db").slice(

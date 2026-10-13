@@ -32,28 +32,6 @@ import { Reader } from "../test-helpers/models/reader.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { assert, assertNot, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 
-async function withAutomaticScopeInversing(
-  reflections: any[],
-  fn: () => Promise<void> | void,
-): Promise<void> {
-  const old = reflections.map((r) => r.klass.automaticScopeInversing);
-
-  for (const r of reflections) {
-    r.klass.automaticScopeInversing = true;
-    delete r._inverseNameCache;
-    delete r._inverseOfCache;
-  }
-  try {
-    await fn();
-  } finally {
-    for (const [i, r] of reflections.entries()) {
-      r.klass.automaticScopeInversing = old[i];
-      delete r._inverseNameCache;
-      delete r._inverseOfCache;
-    }
-  }
-}
-
 async function assertIncludesAndJoinsEqual(
   query: any,
   expected: any[],
@@ -125,6 +103,7 @@ registerModel(Reader);
 
 describe("NestedThroughAssociationsTest", () => {
   const {
+    self,
     authors,
     tags,
     taggings,
@@ -196,7 +175,7 @@ describe("NestedThroughAssociationsTest", () => {
     assert(tagReflection.scope);
     assertNot(taggingsReflection.scope);
 
-    await withAutomaticScopeInversing([tagReflection, taggingsReflection], async () => {
+    await self().withAutomaticScopeInversing(tagReflection, taggingsReflection, async () => {
       await assertQueriesCount(4, false, async () => {
         await Author.includes(":tags").order("authors.id").limit(1);
       });
@@ -533,7 +512,7 @@ describe("NestedThroughAssociationsTest", () => {
     assert(tagReflection.scope);
     assertNot(taggingsReflection.scope);
 
-    await withAutomaticScopeInversing([tagReflection, taggingsReflection], async () => {
+    await self().withAutomaticScopeInversing(tagReflection, taggingsReflection, async () => {
       await assertQueriesCount(4, false, async () => {
         await Author.includes(":taggingTags").order("authors.id").limit(1);
       });

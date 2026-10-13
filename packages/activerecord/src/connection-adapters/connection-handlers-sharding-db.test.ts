@@ -4,7 +4,6 @@ import { currentRole } from "../core.js";
 import { ConnectionNotDefined } from "../errors.js";
 import { ArgumentError, setEnv } from "@blazetrails/ruby-compat";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Person } from "../test-helpers/models/person.js";
 import { assertNothingRaised, getEnv } from "@blazetrails/activesupport";
@@ -12,10 +11,11 @@ import { assertNothingRaised, getEnv } from "@blazetrails/activesupport";
 describe("ConnectionHandlersShardingDbTest", () => {
   let prevConfigs: ReturnType<typeof Base.configurations>;
 
-  fixtures(["people"], { useTransactionalTests: false });
+  const { self } = fixtures(["people"], { useTransactionalTests: false });
+
 
   afterEach(() => {
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
   });
 
   it.skipIf(inMemoryDb())(

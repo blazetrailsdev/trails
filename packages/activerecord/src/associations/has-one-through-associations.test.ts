@@ -4,11 +4,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import {
-  assertQueriesMatch,
-  assertQueriesCount,
-  assertNoQueries,
-} from "../testing/query-assertions.js";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import {
   assert,
   assertPredicate,
@@ -65,6 +61,7 @@ function tgt(owner: any, name: string): any {
 
 describe("HasOneThroughAssociationsTest", () => {
   const {
+    self,
     members,
     clubs,
     memberships,
@@ -138,7 +135,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("has one through executes limited query", async () => {
     const member = members("groucho");
     const boringClub = clubs("boring_club");
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       expect((await readHasOne(member, "generalClub"))?.id).toBe(boringClub.id);
     });
   });

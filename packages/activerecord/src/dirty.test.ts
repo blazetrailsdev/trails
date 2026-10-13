@@ -13,7 +13,6 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
@@ -26,7 +25,6 @@ import {
   assertNoQueries,
   assertNoQueriesMatch,
   assertQueriesCount,
-  assertQueriesMatch,
 } from "./testing/query-assertions.js";
 
 async function withPartialWrites(
@@ -63,7 +61,7 @@ function checkPirateAfterSaveFailure(pirate: Pirate): void {
 }
 
 describe("DirtyTest", () => {
-  fixtures([], { usesTransaction: ["field named field"] });
+  const { self } = fixtures([], { usesTransaction: ["field named field"] });
   beforeAll(async () => {
     await Promise.all(
       [Person, Pirate, Parrot, Topic, NumericData, Aircraft, LiveParrot].map((m) =>
@@ -100,7 +98,7 @@ describe("DirtyTest", () => {
   });
 
   it("time attributes changes with time zone", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -136,7 +134,7 @@ describe("DirtyTest", () => {
   });
 
   it("setting time attributes with time zone field to itself should not be marked as a change", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -151,7 +149,7 @@ describe("DirtyTest", () => {
   });
 
   it("time attributes changes without time zone by skip", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: string;
         declare catchphrase: string;
@@ -178,7 +176,7 @@ describe("DirtyTest", () => {
   });
 
   it("time attributes changes without time zone", async () => {
-    await withTimezoneConfig({ awareAttributes: false }, async () => {
+    await self().withTimezoneConfig({ awareAttributes: false }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -275,7 +273,7 @@ describe("DirtyTest", () => {
   });
 
   it("nullable datetime not marked as changed if new value is blank", async () => {
-    await withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare written_on: TimeWithZone | string | null;
 
@@ -697,7 +695,7 @@ describe("DirtyTest", () => {
   });
 
   it("datetime attribute can be updated with fractional seconds", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare written_on: TimeWithZone | string | null;
 
@@ -722,7 +720,7 @@ describe("DirtyTest", () => {
   });
 
   it("datetime attribute doesnt change if zone is modified in string", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -752,7 +750,7 @@ describe("DirtyTest", () => {
     await withPartialWrites(Person, true, async () => {
       let jon!: Person;
       await assertNoQueriesMatch(/followers_count/, false, async () => {
-        await assertQueriesMatch(/first_name/, undefined, false, async () => {
+        await self().assertQueriesMatch(/first_name/, {}, async () => {
           jon = await Person.create({ first_name: "Jon" });
         });
       });

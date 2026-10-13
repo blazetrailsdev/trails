@@ -1,3 +1,4 @@
+import { fixtures } from "../../test-fixtures.js";
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysqlAdapter,
@@ -5,9 +6,7 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-  withDbWarningsAction,
 } from "../abstract-mysql-adapter/test-helper.js";
-import { withTimezoneConfig } from "../../test-helper.js";
 import {
   AdapterTimeout,
   ConnectionNotEstablished,
@@ -30,6 +29,12 @@ import {
 import * as Arel from "@blazetrails/arel";
 
 describeIfMysqlAdapter("Mysql2AdapterTest", () => {
+  const { self } = fixtures([]);
+
+  beforeEach(() => {
+    self()._originalDbWarningsAction = "ignore";
+  });
+
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -303,7 +308,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("database timezone changes synced to connection", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       await assertChanges(
         () => adapter._rawConnection!.queryOptions.databaseTimezone,
         null,
@@ -316,25 +321,22 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("warnings do not change returned value of exec update", async () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
-    await adapter.execute(`DROP TABLE IF EXISTS warn_posts`);
-    await adapter.beginTransaction({ _lazy: false });
+
     try {
-      await adapter.execute(
-        `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
-      );
-      await adapter.execute(`SET SESSION sql_mode=''`);
-      await adapter.execute(`INSERT INTO warn_posts (title) VALUES ('Title')`);
-      await withDbWarningsAction("log", async () => {
+      await self().withDbWarningsAction("log", undefined, async () => {
         Base.logger = new Logger(null);
-        const affected = await adapter.update(
-          `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
+
+        await adapter.execute("SET @@SESSION.sql_mode=''");
+
+        await adapter.execute("INSERT INTO posts (title, body) VALUES('Title', 'Body')");
+        const result = await adapter.update(
+          "UPDATE posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1",
         );
-        expect(affected).toBe(1);
+
+        expect(result).toBe(1);
       });
     } finally {
-      await adapter.execute(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
-      await adapter.rollbackTransaction().catch(() => {});
-      await adapter.execute(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
+      await adapter.execute(`SET @@SESSION.sql_mode='${oldSqlMode}'`);
       Base.logger = previousLogger;
     }
   });
@@ -342,25 +344,20 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("warnings do not change returned value of exec delete", async () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
-    await adapter.execute(`DROP TABLE IF EXISTS warn_posts_d`);
-    await adapter.beginTransaction({ _lazy: false });
+
     try {
-      await adapter.execute(
-        `CREATE TABLE warn_posts_d (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
-      );
-      await adapter.execute(`SET SESSION sql_mode=''`);
-      await adapter.execute(`INSERT INTO warn_posts_d (title) VALUES ('Title')`);
-      await withDbWarningsAction("log", async () => {
+      await self().withDbWarningsAction("log", undefined, async () => {
         Base.logger = new Logger(null);
-        const affected = await adapter.delete(
-          `DELETE FROM warn_posts_d WHERE id > (0+'foo') LIMIT 1`,
-        );
-        expect(affected).toBe(1);
+
+        await adapter.execute("SET @@SESSION.sql_mode=''");
+
+        await adapter.execute("INSERT INTO posts (title, body) VALUES('Title', 'Body')");
+        const result = await adapter.delete("DELETE FROM posts WHERE id > (0+'foo') LIMIT 1");
+
+        expect(result).toBe(1);
       });
     } finally {
-      await adapter.execute(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
-      await adapter.rollbackTransaction().catch(() => {});
-      await adapter.execute(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
+      await adapter.execute(`SET @@SESSION.sql_mode='${oldSqlMode}'`);
       Base.logger = previousLogger;
     }
   });

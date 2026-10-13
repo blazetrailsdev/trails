@@ -9,8 +9,7 @@ import { Book } from "./test-helpers/models/book.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { adapterType } from "./test-adapter.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
-import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
-import { quoteTableName } from "./support/quote-regex.js";
+import { assertNoQueriesMatch } from "./testing/query-assertions.js";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
 import type { Base } from "./base.js";
 
@@ -56,7 +55,7 @@ describe("InsertAll verify_attributes", () => {
 });
 
 describe("InsertAll build_insert_sql raw alias syntax", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
 
   it.skipIf(adapterType !== "mysql")("selects the alias arm on MySQL >= 8.0.19", async () => {
     const connection = (await Ship.leaseConnection()) as unknown as {
@@ -68,7 +67,7 @@ describe("InsertAll build_insert_sql raw alias syntax", () => {
       : /ON DUPLICATE KEY UPDATE updated_at=\(CASE WHEN \(`name`<=>VALUES\(`name`\)\).*`name`=VALUES\(`name`\)/;
 
     await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
-      await assertQueriesMatch(expected, 1, false, async () => {
+      await self().assertQueriesMatch(expected, { count: 1 }, async () => {
         await Ship.upsertAll([{ id: 1, name: "RSS Boaty McBoatface" }]);
       });
     });
@@ -165,7 +164,7 @@ class DivergentPrimaryKeyBook extends Book {
 }
 
 describe("InsertAllTest (trails)", () => {
-  fixtures(["authors", "books"]);
+  const { self } = fixtures(["authors", "books"]);
 
   beforeAll(async () => {
     await Speedometer.loadSchema();
@@ -174,10 +173,9 @@ describe("InsertAllTest (trails)", () => {
   it.skipIf(adapterType !== "mysql")(
     "upsert all on a table without a database primary key treats the configured primary key as updatable",
     async () => {
-      await assertQueriesMatch(
+      await self().assertQueriesMatch(
         /ON DUPLICATE KEY UPDATE[\s\S]*speedometer_id/,
-        undefined,
-        false,
+        {},
         async () => {
           await Speedometer.upsertAll([{ speedometer_id: "s9", name: "Fast" }]);
         },
@@ -188,13 +186,13 @@ describe("InsertAllTest (trails)", () => {
   it.skipIf(!adapterSupports("insert_returning"))(
     "insert all returning uses schema-cache primary keys not the model primary key",
     async () => {
-      const returningId = new RegExp(`RETURNING ${regexpEscape(quoteTableName("id"))}`);
-      await assertQueriesMatch(returningId, undefined, false, async () => {
+      const returningId = new RegExp(`RETURNING ${regexpEscape(self().quoteTableName("id"))}`);
+      await self().assertQueriesMatch(returningId, {}, async () => {
         await DivergentPrimaryKeyBook.insertAll([
           { name: "Divergent", isbn: "9990000000001", author_id: 1 },
         ]);
       });
-      const returningIsbn = new RegExp(`RETURNING ${regexpEscape(quoteTableName("isbn"))}`);
+      const returningIsbn = new RegExp(`RETURNING ${regexpEscape(self().quoteTableName("isbn"))}`);
       await assertNoQueriesMatch(returningIsbn, false, async () => {
         await DivergentPrimaryKeyBook.insertAll([
           { name: "Divergent II", isbn: "9990000000002", author_id: 1 },

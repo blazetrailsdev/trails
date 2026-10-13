@@ -4,7 +4,6 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { StatementInvalid } from "../../errors.js";
-import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { Name } from "../../connection-adapters/postgresql/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
@@ -192,7 +191,7 @@ async function teardownSchemas(adapter: PostgreSQLAdapter) {
   await adapter.dropSchema("music", { ifExists: true });
 }
 
-fixtures({}, { useTransactionalTests: false });
+const { self } = fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -316,14 +315,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("force create schema", async () => {
       try {
         await adapter.createSchema("test_schema3");
-        await assertQueriesMatch(
-          /DROP SCHEMA IF EXISTS "test_schema3"/,
-          undefined,
-          false,
-          async () => {
-            await adapter.createSchema("test_schema3", { force: true });
-          },
-        );
+        await self().assertQueriesMatch(/DROP SCHEMA IF EXISTS "test_schema3"/, {}, async () => {
+          await adapter.createSchema("test_schema3", { force: true });
+        });
         expect((await adapter.schemaNames()).includes("test_schema3")).toBeTruthy();
       } finally {
         await adapter.dropSchema("test_schema3");
@@ -333,10 +327,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("create schema if not exists", async () => {
       try {
         await adapter.createSchema("test_schema3");
-        await assertQueriesMatch(
+        await self().assertQueriesMatch(
           /CREATE SCHEMA IF NOT EXISTS "test_schema3"/,
-          undefined,
-          false,
+          {},
           async () => {
             await adapter.createSchema("test_schema3", { ifNotExists: true });
           },

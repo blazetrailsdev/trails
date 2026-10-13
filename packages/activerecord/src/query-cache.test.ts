@@ -29,7 +29,6 @@ import {
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
-import { cleanUpConnectionHandler } from "./cases/helper.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 
@@ -66,14 +65,14 @@ function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
 }
 
 describe("QueryCacheTest", () => {
-  fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
+  const { self } = fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
     useTransactionalTests: false,
   });
 
   afterEach(async () => {
     Task.connectionPool().clearQueryCache();
     Base.connectionPool().disableQueryCacheBang();
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
   });
 
   it("execute clear cache", async () => {

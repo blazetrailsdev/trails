@@ -9,11 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import "../index.js";
 import { registerModel } from "../index.js";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "../testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { adapterType } from "../test-adapter.js";
 import { Temporal } from "@blazetrails/date";
@@ -37,7 +33,7 @@ const ids = (rows: any[]) => rows.map((r) => r.id);
 const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => Number(a) - Number(b));
 
 describe("NamedScopingTest", () => {
-  const { topics, posts, authors } = fixtures([
+  const { self, topics, posts, authors } = fixtures([
     "topics",
     "posts",
     "authors",
@@ -489,7 +485,7 @@ describe("NamedScopingTest", () => {
   it("size should use count when results are not loaded", async () => {
     const t = Topic.base();
     await assertQueriesCount(1, false, async () => {
-      await assertQueriesMatch(/COUNT/i, undefined, false, () => t.size());
+      await self().assertQueriesMatch(/COUNT/i, {}, () => t.size());
     });
   });
 
@@ -699,7 +695,7 @@ describe("NamedScopingTest", () => {
     Topic.scope("includingAnnotateInScope", function (this: any) {
       return this.annotate("from-scope");
     });
-    await assertQueriesMatch(/\/\* from-scope \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* from-scope \*\//, {}, async () => {
       expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
         sortedIds(await Topic.all()),
       );

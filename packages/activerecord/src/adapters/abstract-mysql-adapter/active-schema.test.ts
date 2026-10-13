@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { resetConnection } from "../../support/connection-helper.js";
-import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { assertNothingRaised, assertRaises, Notifications } from "@blazetrails/activesupport";
 import {
   defaultRowFormat,
@@ -32,7 +31,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await resetConnection();
     });
 
-    fixtures(["people"], {
+    const { self } = fixtures(["people"], {
       usesTransaction: ["add index"],
     });
 
@@ -153,7 +152,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("index in bulk change", async () => {
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
         const expected = `ALTER TABLE \`people\` ADD ${type} INDEX \`index_people_on_last_name\` (\`last_name\`)`;
-        await assertQueriesMatch(expected, undefined, false, () =>
+        await self().assertQueriesMatch(expected, {}, () =>
           adapter.changeTable("people", { bulk: true }, (t) => {
             return t.index("last_name", { type });
           }),
@@ -162,7 +161,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       const expected =
         "ALTER TABLE `people` ADD INDEX `index_people_on_last_name` USING btree (`last_name`(10)), ALGORITHM = COPY";
-      await assertQueriesMatch(expected, undefined, false, () =>
+      await self().assertQueriesMatch(expected, {}, () =>
         adapter.changeTable("people", { bulk: true }, (t) => {
           return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
         }),

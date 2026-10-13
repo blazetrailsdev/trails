@@ -9,7 +9,6 @@ import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { quoteTableName as canonicalQuoteTableName } from "./support/quote-regex.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HashMerger } from "./relation/merger.js";
 import { Post as CanonPost, NullPost, FirstPost } from "./test-helpers/models/post.js";
@@ -20,9 +19,8 @@ import {
 import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
-import { captureSql } from "./testing/sql-capture.js";
 import { currentAdapter } from "./support/adapter-helper.js";
-import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 
 class EnsureRoundTripTypeCasting extends ValueType {
   override type(): string {
@@ -73,7 +71,14 @@ async function sqlite3VersionIncludesQuotingBug(): Promise<boolean | undefined> 
 }
 
 describe("RelationTest", () => {
-  fixtures(["posts", "comments", "authors", "authorAddresses", "ratings", "categorizations"]);
+  const { self } = fixtures([
+    "posts",
+    "comments",
+    "authors",
+    "authorAddresses",
+    "ratings",
+    "categorizations",
+  ]);
 
   beforeAll(() => {
     registerModel(CanonAuthor);
@@ -88,7 +93,7 @@ describe("RelationTest", () => {
     await skipIfSqlite3VersionIncludesQuotingBug(ctx);
     const selected = (
       await CanonPost.select(":join").from(
-        CanonPost.select(`id as ${canonicalQuoteTableName("join")}`),
+        CanonPost.select(`id as ${self().quoteTableName("join")}`),
       )
     ).map((p: any) => p.join);
     expect(selected.sort()).toEqual((await CanonPost.pluck("id")).sort());
@@ -145,7 +150,7 @@ describe("RelationTest", () => {
   it("relation with annotation includes comment in count query", async () => {
     const postWithAnnotation = CanonPost.annotate("foo");
     const allCount = (await CanonPost.all()).length;
-    await assertQueriesMatch(/\/\* foo \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* foo \*\//, {}, async () => {
       expect(await postWithAnnotation.count()).toBe(allCount);
     });
   });
@@ -374,14 +379,14 @@ describe("RelationTest", () => {
 
   it("relation with annotation includes comment in sql", async () => {
     const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo");
-    await assertQueriesMatch(/\/\* foo \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* foo \*\//, {}, async () => {
       assert(await postWithAnnotation.first(), "record should be found");
     });
   });
 
   it("relation with annotation chains sql comments", async () => {
     const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo").annotate("bar");
-    await assertQueriesMatch(/\/\* foo \*\/ \/\* bar \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* foo \*\/ \/\* bar \*\//, {}, async () => {
       assert(await postWithAnnotation.first(), "record should be found");
     });
   });
@@ -392,7 +397,7 @@ describe("RelationTest", () => {
   });
 
   it("relation without annotation does not include an empty comment", async () => {
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await CanonPost.where({ id: 1 }).first();
     });
 
@@ -446,7 +451,7 @@ describe("RelationTest", () => {
   });
 
   it("does not duplicate optimizer hints on merge", () => {
-    const escapedTable = canonicalQuoteTableName("posts");
+    const escapedTable = self().quoteTableName("posts");
     const expected = `SELECT /*+ OMGHINT */ ${escapedTable}.* FROM ${escapedTable}`;
     const query = CanonPost.optimizerHints("OMGHINT")
       .merge(CanonPost.optimizerHints("OMGHINT"))
@@ -456,7 +461,7 @@ describe("RelationTest", () => {
 });
 
 describe("RelationTest", () => {
-  const { authors } = fixtures([
+  const { self, authors } = fixtures([
     "authors",
     "posts",
     "comments",
@@ -475,9 +480,9 @@ describe("RelationTest", () => {
   });
 
   it("relation merging with merged joins as strings", async () => {
-    const joinString = `LEFT OUTER JOIN ${canonicalQuoteTableName("ratings")} ON ${canonicalQuoteTableName(
+    const joinString = `LEFT OUTER JOIN ${self().quoteTableName("ratings")} ON ${self().quoteTableName(
       "comments",
-    )}.id = ${canonicalQuoteTableName("ratings")}.comment_id`;
+    )}.id = ${self().quoteTableName("ratings")}.comment_id`;
     const specialCommentsWithRatings = CanonSpecialComment.joins(joinString);
     const postsWithSpecialCommentsWithRatings = CanonPost.group("posts.id")
       .joins(":specialComments")
@@ -504,7 +509,7 @@ describe("RelationTest", () => {
   });
 
   it("relation merging with merged symbol joins keeps inner joins", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await CanonAuthor.joins(":posts").merge(CanonPost.joins(":comments"));
     });
 
@@ -539,7 +544,7 @@ describe("RelationTest", () => {
 
   it("relation merging with merged symbol joins is aliased", async () => {
     const categorizationsWithAuthors = CanonCategorization.joins(":author");
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await CanonPost.joins(":author", ":categorizations")
         .merge(CanonAuthor.select("id"))
         .merge(categorizationsWithAuthors);
@@ -552,7 +557,7 @@ describe("RelationTest", () => {
     expect(nbInnerJoin).toBe(3);
 
     const aliasPattern = new RegExp(
-      `INNER\\s+JOIN\\s+${canonicalQuoteTableName("authors")}\\s+\\Wauthors_categorizations\\W`,
+      `INNER\\s+JOIN\\s+${self().quoteTableName("authors")}\\s+\\Wauthors_categorizations\\W`,
       "i",
     );
     assert(
