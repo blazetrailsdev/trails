@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/activesupport";
-import { rbEqq, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbEqq, rbObjIvarGet, rbObjIvarSet, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
@@ -28,7 +28,6 @@ let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _writingRole = "writing";
 let _readingRole = "reading";
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
-let _globalThreadPoolAsyncQueryExecutor: ThreadPoolExecutor | undefined;
 let _globalExecutorConcurrency: number | null | undefined;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _indexNestedAttributeErrors = false;
@@ -183,12 +182,17 @@ export function setAsyncQueryExecutor(
 
 export function globalThreadPoolAsyncQueryExecutor(): ThreadPoolExecutor {
   const concurrency = globalExecutorConcurrency() ?? 4;
-  return (_globalThreadPoolAsyncQueryExecutor ??= new ThreadPoolExecutor({
-    minThreads: 0,
-    maxThreads: concurrency,
-    maxQueue: concurrency * 4,
-    fallbackPolicy: "caller_runs",
-  }));
+  return (rbObjIvarGet(ActiveRecord, "@global_thread_pool_async_query_executor") ??
+    rbObjIvarSet(
+      ActiveRecord,
+      "@global_thread_pool_async_query_executor",
+      new ThreadPoolExecutor({
+        minThreads: 0,
+        maxThreads: concurrency,
+        maxQueue: concurrency * 4,
+        fallbackPolicy: "caller_runs",
+      }),
+    )) as ThreadPoolExecutor;
 }
 
 export function setGlobalExecutorConcurrency(globalExecutorConcurrency: number | null): void {

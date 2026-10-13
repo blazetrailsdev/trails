@@ -32,7 +32,6 @@ export class AdminUser extends Base {
   declare params: HashWithIndifferentAccess<unknown>;
   declare settings: HashWithIndifferentAccess<unknown>;
   declare spouse: HashWithIndifferentAccess<unknown>;
-  static _tableName = "admin_users";
   static {
     registerModel(rbModConstSet(Admin, "User", this));
     rbModConstSet(this, "Coder", Coder);

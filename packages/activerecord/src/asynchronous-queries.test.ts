@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
-import { ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbObjIvarGet, rbObjIvarSet, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import {
   asyncQueryExecutor,
+  globalExecutorConcurrency,
   setAsyncQueryExecutor,
   setGlobalExecutorConcurrency,
 } from "./active-record.js";
 import { Base } from "./base.js";
+import { ActiveRecord } from "./namespaces.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
@@ -227,7 +229,53 @@ describe("AsynchronousExecutorTypeTest", () => {
     }
   });
 
-  it.skip("concurrency can be set on global thread pool", () => {});
+  it("concurrency can be set on global thread pool", async () => {
+    const oldValue = asyncQueryExecutor();
+    setAsyncQueryExecutor("global_thread_pool");
+    const oldConcurrency = globalExecutorConcurrency();
+    const oldGlobalThreadPoolAsyncQueryExecutor = rbObjIvarGet(
+      ActiveRecord,
+      "@global_thread_pool_async_query_executor",
+    );
+    try {
+      rbObjIvarSet(ActiveRecord, "@global_thread_pool_async_query_executor", null);
+      setGlobalExecutorConcurrency(8);
+
+      handler = new ConnectionHandler();
+      const dbConfig = Base.configurations().configsFor({ envName: "arunit", name: "primary" })!;
+      const dbConfig2 = Base.configurations().configsFor({ envName: "arunit2", name: "primary" })!;
+      const pool1 = await handler.establishConnection(dbConfig);
+      const pool2 = await handler.establishConnection(dbConfig2, { ownerName: ARUnit2Model });
+
+      const asyncPool1 = asyncExecutor(pool1)!;
+      const asyncPool2 = asyncExecutor(pool2)!;
+
+      expect(asyncPool1 instanceof ThreadPoolExecutor).toBeTruthy();
+      expect(asyncPool2 instanceof ThreadPoolExecutor).toBeTruthy();
+
+      expect(asyncPool1.minLength).toEqual(0);
+      expect(asyncPool1.maxLength).toEqual(8);
+      expect(asyncPool1.maxQueue).toEqual(32);
+      expect(asyncPool1.fallbackPolicy).toEqual("caller_runs");
+
+      expect(asyncPool2.minLength).toEqual(0);
+      expect(asyncPool2.maxLength).toEqual(8);
+      expect(asyncPool2.maxQueue).toEqual(32);
+      expect(asyncPool2.fallbackPolicy).toEqual("caller_runs");
+
+      expect(handler.connectionPoolList("all").length).toEqual(2);
+      expect(asyncPool2).toBe(asyncPool1);
+    } finally {
+      cleanUpConnectionHandler();
+      setGlobalExecutorConcurrency(oldConcurrency);
+      setAsyncQueryExecutor(oldValue);
+      rbObjIvarSet(
+        ActiveRecord,
+        "@global_thread_pool_async_query_executor",
+        oldGlobalThreadPoolAsyncQueryExecutor,
+      );
+    }
+  });
 
   it("concurrency cannot be set with null executor or multi thread pool", () => {
     const oldValue = asyncQueryExecutor();
