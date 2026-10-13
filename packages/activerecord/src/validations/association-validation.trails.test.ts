@@ -82,4 +82,15 @@ describe("AssociationValidationTest", () => {
     expect(value).toBeInstanceOf(Promise);
     expect(((await value) as Topic).id).toBe(topic.id);
   });
+
+  it("validates associated with multiple attributes and array forms", async () => {
+    Topic.validatesAssociated(["replies"], "openReplies");
+    Reply.validatesPresenceOf("content");
+    const t = new Topic();
+    t.replies.build({ title: "A reply" });
+    t.openReplies.build({ title: "A reply" });
+    expect(await t.isValid()).toBeFalsy();
+    expect(t.errors.messagesFor("replies").length > 0).toBeTruthy();
+    expect(t.errors.messagesFor("openReplies").length > 0).toBeTruthy();
+  });
 });

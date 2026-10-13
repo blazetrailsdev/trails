@@ -301,3 +301,43 @@ describe("SQLite3 translateException", () => {
     expect(translated).not.toBeInstanceOf(ValueTooLong);
   });
 });
+
+describe("SQLite3AdapterTest", () => {
+  let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
+
+  beforeEach(async () => {
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await adapter.execute(`DROP TABLE IF EXISTS json_defs`);
+    await pool.disconnect();
+  });
+
+  it("change column default serializes a structured json default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
+    await adapter.changeColumnDefault("json_defs", "options", {});
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual("{}");
+  });
+
+  it("change column default treats a bare to object as a literal default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
+    await adapter.changeColumnDefault("json_defs", "options", { to: 1 });
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual('{"to":1}');
+  });
+
+  it("change column serializes a structured json default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" TEXT)`);
+    await adapter.changeColumn("json_defs", "options", "json", { default: {} });
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual("{}");
+  });
+
+  it("quote default expression serializes a structured json default once", async () => {
+    expect(await adapter.quoteDefaultExpression({}, { sqlType: "json" })).toEqual("'{}'");
+  });
+});

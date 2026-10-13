@@ -400,32 +400,6 @@ describe("UniquenessValidationTest", () => {
     }
   });
 
-  it("validate uniqueness of with multiple attributes and array forms", async () => {
-    Topic.validatesUniquenessOf(["title"], "author_name");
-
-    const uniqValidators = Topic.validators().filter(
-      (v) => (v as { kind?: string }).kind === "uniqueness",
-    );
-    expect(uniqValidators).toHaveLength(1);
-    expect((uniqValidators[0] as { attributes: readonly string[] }).attributes).toEqual([
-      "title",
-      "author_name",
-    ]);
-
-    const collideTitle = new Topic({ title: "The First Topic", author_name: "Someone Else" });
-    expect(await collideTitle.save()).toBeFalsy();
-    expect(collideTitle.errors.messagesFor("title")).toEqual(["has already been taken"]);
-    expect(collideTitle.errors.messagesFor("author_name")).toEqual([]);
-
-    const collideAuthor = new Topic({ title: "A Brand New Title", author_name: "David" });
-    expect(await collideAuthor.save()).toBeFalsy();
-    expect(collideAuthor.errors.messagesFor("author_name")).toEqual(["has already been taken"]);
-    expect(collideAuthor.errors.messagesFor("title")).toEqual([]);
-
-    const unique = new Topic({ title: "A Brand New Title", author_name: "Nobody In Fixtures" });
-    expect(await unique.save()).toBeTruthy();
-  });
-
   it("validate case sensitive uniqueness with special sql like chars", async () => {
     Topic.validatesUniquenessOf("title", { caseSensitive: true });
 

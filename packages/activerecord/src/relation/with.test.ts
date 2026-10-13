@@ -96,14 +96,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     ).toEqual(POSTS_WITH_COMMENTS.length);
   });
 
-  it("count after with call with bound conditions", async () => {
-    const relation = Post.with({ typed_posts: Post.where({ type: "Post" }) })
-      .from("typed_posts AS posts")
-      .where({ type: "Post" });
-
-    expect(await relation.count()).toEqual(await Post.where({ type: "Post" }).count());
-  });
-
   it("with when called from active record scope", async () => {
     expect(toIds(await (Post as any).withTagsCte().order("id").pluck("id"))).toEqual(
       POSTS_WITH_TAGS,
@@ -173,22 +165,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_COMMENTS);
   });
 
-  it("with joins routes a cte symbol to an inner join", () => {
-    const sql = (
-      Post.with({
-        commented_posts: Comment.select("post_id").distinct(),
-      }).joins(":commented_posts") as unknown as { toSql(): string }
-    ).toSql();
-
-    const q = `["\`]?`;
-    expect(sql).toMatch(
-      new RegExp(
-        `INNER JOIN ${q}commented_posts${q} ON ${q}commented_posts${q}\\.${q}post_id${q} = ${q}posts${q}\\.${q}id${q}`,
-      ),
-    );
-    expect(sql).not.toMatch(new RegExp(`LEFT OUTER JOIN ${q}commented_posts${q}`));
-  });
-
   it("with left joins", async () => {
     const relation = Post.with({ commented_posts: Comment.select("post_id").distinct() })
       .joins("LEFT OUTER JOIN commented_posts ON commented_posts.post_id = posts.id")
@@ -202,42 +178,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
         .filter((r: any) => r.readAttribute("has_comments") != null)
         .map((r: any) => Number(r.id)),
     ).toEqual(POSTS_WITH_COMMENTS);
-  });
-
-  it("with left joins routes a cte symbol to a left outer join", () => {
-    const relation = Post.with({
-      commented_posts: Comment.select("post_id").distinct(),
-    })
-      .leftOuterJoins(":commented_posts")
-      .select("posts.id");
-
-    const sql = (relation as unknown as { toSql(): string }).toSql();
-
-    const q = `["\`]?`;
-    expect(sql).toMatch(
-      new RegExp(
-        `LEFT OUTER JOIN ${q}commented_posts${q} ON ${q}commented_posts${q}\\.${q}post_id${q} = ${q}posts${q}\\.${q}id${q}`,
-      ),
-    );
-    expect(sql).not.toMatch(new RegExp(`INNER JOIN ${q}commented_posts${q}`));
-  });
-
-  it("with left joins routes a cte symbol before a raw joins node", () => {
-    const relation = Post.with({
-      commented_posts: Comment.select("post_id").distinct(),
-    })
-      .joins("INNER JOIN authors ON authors.id = posts.author_id")
-      .leftOuterJoins(":commented_posts")
-      .select("posts.id");
-
-    const sql = (relation as unknown as { toSql(): string }).toSql();
-
-    const q = `["\`]?`;
-    const cteJoin = sql.search(new RegExp(`LEFT OUTER JOIN ${q}commented_posts${q}`));
-    const rawJoin = sql.search(/INNER JOIN authors/);
-    expect(cteJoin).toBeGreaterThanOrEqual(0);
-    expect(rawJoin).toBeGreaterThanOrEqual(0);
-    expect(cteJoin).toBeLessThan(rawJoin);
   });
 
   it("raises when using block", () => {

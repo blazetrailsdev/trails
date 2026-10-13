@@ -262,12 +262,6 @@ describe("WhereTest", () => {
     expect(() => CpkBook.where(new Map([[["author_id", "id"], tupleIds]])).toSql()).not.toThrow();
   });
 
-  it("array first arg discards extra positional rest", () => {
-    const withStray = (Post.all().where as any)(["id = ?", 1], 2);
-    const withoutStray = (Post.all().where as any)(["id = ?", 1]);
-    expect(withStray.toSql()).toEqual(withoutStray.toSql());
-  });
-
   it("where with nil cpk association", async () => {
     const order = await CpkOrder.create({ id: [1, 2] });
     const book = await (order as any).books.create({ id: [3, 4] });

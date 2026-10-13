@@ -48,4 +48,19 @@ describe("UrlConfig", () => {
     expect(config.maxThreads).toBe(4);
     expect(config.maxQueue).toBe(16);
   });
+
+  it("derives database from a parseable URL when configuration.database is unset", () => {
+    const cfg = new UrlConfig("test", "primary", "postgres://h/mydb");
+    expect(cfg.database).toBe("mydb");
+  });
+
+  it("treats a bare filesystem path as the database name", () => {
+    const cfg = new UrlConfig("test", "primary", "test/db/primary.sqlite3");
+    expect(cfg.database).toBe("test/db/primary.sqlite3");
+  });
+
+  it("overrides config database with a scheme-less bare name", () => {
+    const cfg = new UrlConfig("test", "primary", "foo-bar", { database: "not_foo" });
+    expect(cfg.database).toBe("foo-bar");
+  });
 });
