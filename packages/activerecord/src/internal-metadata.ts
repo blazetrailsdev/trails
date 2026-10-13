@@ -97,7 +97,7 @@ export class InternalMetadata {
     });
   }
 
-  async set(key: string, value: string): Promise<void> {
+  async set(key: string, value: string | null): Promise<void> {
     if (!this.enabled) return;
     await this._pool.withConnection((connection) =>
       this.updateOrCreateEntry(connection, key, value),
@@ -108,7 +108,7 @@ export class InternalMetadata {
   private async updateOrCreateEntry(
     connection: DatabaseAdapter,
     key: string,
-    value: string,
+    value: string | null,
   ): Promise<void> {
     const entry = await this.selectEntry(connection, key);
     if (entry) {
@@ -161,7 +161,7 @@ export class InternalMetadata {
   private async createEntry(
     connection: DatabaseAdapter,
     key: string,
-    value: string,
+    value: string | null,
   ): Promise<void> {
     const im = new InsertManager(this.arelTable);
     im.insert([
@@ -176,7 +176,7 @@ export class InternalMetadata {
   private async updateEntry(
     connection: DatabaseAdapter,
     key: string,
-    newValue: string,
+    newValue: string | null,
   ): Promise<void> {
     const um = new UpdateManager(this.arelTable);
     um.set([

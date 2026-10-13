@@ -576,7 +576,9 @@ export {
   SimpleStubs,
 } from "./testing/time-helpers.js";
 export {
+  Mock,
   MockExpectationError,
+  assertMock,
   assertCalled,
   assertCalledWith,
   assertNotCalled,

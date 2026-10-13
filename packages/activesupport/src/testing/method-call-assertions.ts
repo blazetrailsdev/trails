@@ -11,10 +11,12 @@ interface MockCall {
   args: unknown[];
 }
 
-class Mock {
+/** @noRailsEquivalent PERMANENT */
+export class Mock {
   #expectedCalls = new Map<string, MockCall[]>();
   #actualCalls = new Map<string, MockCall[]>();
 
+  /** @noRailsEquivalent PERMANENT */
   expect(name: string, retval: unknown, args: unknown[] = []): this {
     if (!Array.isArray(args)) throw new ArgumentError("args must be an array");
     const expected = this.#expectedCalls.get(name) ?? [];
@@ -29,6 +31,7 @@ class Mock {
     return `${name}(${args}) => ${rbInspect(data.retval)}`;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   verify(): true {
     for (const [name, expected] of this.#expectedCalls) {
       const actual = this.#actualCalls.get(name) ?? null;
@@ -42,6 +45,7 @@ class Mock {
     return true;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   call(...args: unknown[]): unknown {
     const sym = ":call";
     const actualCalls = this.#actualCalls.get("call") ?? [];
@@ -256,6 +260,7 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   }
   const stubbed = (...args: unknown[]) => {
     if (typeof valOrCallable === "function") return valOrCallable(...args);
+    if (valOrCallable instanceof Mock) return valOrCallable.call(...args);
     const blk = args.at(-1);
     if (typeof blk === "function") blk(...blockArgs);
     return valOrCallable;
@@ -285,7 +290,8 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   return undefined as Result;
 }
 
-function assertMock(mock: Mock): void {
+/** @noRailsEquivalent PERMANENT */
+export function assertMock(mock: Mock): void {
   try {
     assert(mock.verify());
   } catch (e) {
