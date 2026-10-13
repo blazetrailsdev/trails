@@ -5,7 +5,7 @@ import { Base } from "../../base.js";
 import { RangeError as ActiveRecordRangeError } from "../../errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { deprecator } from "../../deprecator.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

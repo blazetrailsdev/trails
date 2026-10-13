@@ -3,7 +3,7 @@ import { TestDatabases } from "./test-databases.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
   const dc = new DatabaseConfigurations(configs as never);

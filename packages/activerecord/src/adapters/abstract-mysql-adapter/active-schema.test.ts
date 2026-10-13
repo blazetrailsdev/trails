@@ -9,7 +9,7 @@ import {
   defaultRowFormat,
   isRowFormatDynamicByDefault,
 } from "../../connection-adapters/mysql/schema-statements.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

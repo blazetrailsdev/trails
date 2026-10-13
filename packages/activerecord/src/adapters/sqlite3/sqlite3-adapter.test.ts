@@ -3,7 +3,7 @@ import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Owner } from "../../test-helpers/models/owner.js";
 import { ARUnit2Model } from "../../test-helpers/models/arunit2-model.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";

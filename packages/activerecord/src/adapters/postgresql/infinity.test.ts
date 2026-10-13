@@ -3,7 +3,7 @@ import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.j
 import { BigDecimal } from "@blazetrails/ruby-compat";
 import { Range } from "../../index.js";
 import { setZone } from "@blazetrails/activesupport";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

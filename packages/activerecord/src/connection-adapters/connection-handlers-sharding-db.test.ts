@@ -4,7 +4,7 @@ import { type RawConfigurations } from "../database-configurations.js";
 import { currentRole } from "../core.js";
 import { ConnectionNotDefined } from "../errors.js";
 import { ArgumentError, setEnv } from "@blazetrails/ruby-compat";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Person } from "../test-helpers/models/person.js";

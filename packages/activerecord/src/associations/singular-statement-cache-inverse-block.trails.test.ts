@@ -4,7 +4,7 @@ import { Face } from "../test-helpers/models/face.js";
 import { Human } from "../test-helpers/models/human.js";
 import { registerModel } from "../associations.js";
 import { PartialQuery, Substitute } from "../statement-cache.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import type { Base } from "../base.js";
 
 interface AssociationLike {

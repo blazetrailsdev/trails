@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Account } from "../test-helpers/models/account.js";
 import { Firm } from "../test-helpers/models/company.js";

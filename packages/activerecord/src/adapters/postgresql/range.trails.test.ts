@@ -10,7 +10,7 @@ import { Date as OidDate } from "../../connection-adapters/postgresql/oid/date.j
 import { Decimal } from "../../connection-adapters/postgresql/oid/decimal.js";
 import { Timestamp } from "../../connection-adapters/postgresql/oid/timestamp.js";
 import { TimestampWithTimeZone } from "../../connection-adapters/postgresql/oid/timestamp-with-time-zone.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 beforeAll(() => {

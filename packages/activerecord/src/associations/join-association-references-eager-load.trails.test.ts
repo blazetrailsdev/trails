@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Person } from "../test-helpers/models/person.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
 import type { Base } from "../base.js";

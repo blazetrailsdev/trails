@@ -10,7 +10,7 @@ import { registerModel, Rollback } from "./index.js";
 import "./support/canonical-model-index.js";
 import { Lesson, LessonError } from "./test-helpers/models/lesson.js";
 import { Student } from "./test-helpers/models/student.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 fixtures([]);
 

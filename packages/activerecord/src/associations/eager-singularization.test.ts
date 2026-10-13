@@ -2,7 +2,7 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("EagerSingularizationTest", () => {
   fixtures([]);

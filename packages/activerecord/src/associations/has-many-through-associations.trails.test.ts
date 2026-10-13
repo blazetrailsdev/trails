@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { quoteTableName } from "../support/quote-regex.js";
 import { Author } from "../test-helpers/models/author.js";
 import {

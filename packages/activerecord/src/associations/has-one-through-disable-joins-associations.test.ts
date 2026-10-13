@@ -26,7 +26,7 @@ import {
   TenantMembership,
 } from "../test-helpers/models/membership.js";
 import { Contract } from "../test-helpers/models/contract.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 
 registerModel(Member);

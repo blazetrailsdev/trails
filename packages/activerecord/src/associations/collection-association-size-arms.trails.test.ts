@@ -3,7 +3,7 @@ import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Firm, Client } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface SizeableAssociation {
   target: Post[];

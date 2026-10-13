@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   fixtures({}, { useTransactionalTests: false });

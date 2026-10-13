@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { IntegerType, StringType } from "@blazetrails/activemodel";
 import { Enum } from "../../connection-adapters/postgresql/oid/enum.js";
 import { describeIfPg, PG_TEST_URL, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 
 describeIfPg("PostgreSQLAdapter#lookupCastType", () => {

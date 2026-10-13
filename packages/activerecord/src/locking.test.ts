@@ -9,7 +9,7 @@ import {
   RecordNotFound,
 } from "./index.js";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";
 import { Frog } from "./test-helpers/models/frog.js";
 import { Treasure } from "./test-helpers/models/treasure.js";

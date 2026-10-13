@@ -4,7 +4,7 @@ import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 function getPreparedStatementCache(connection: DatabaseAdapter): Map<string, unknown> {
   return (connection as unknown as { _statements: { cache: Map<string, unknown> } })._statements

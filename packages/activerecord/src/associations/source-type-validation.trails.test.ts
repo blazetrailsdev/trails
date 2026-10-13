@@ -2,7 +2,7 @@ import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 class StvAuthor extends Base {
   static {

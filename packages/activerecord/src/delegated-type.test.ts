@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vites
 import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { travel, travelBack, assertRespondTo } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Entry } from "./test-helpers/models/entry.js";
 import { Message } from "./test-helpers/models/message.js";

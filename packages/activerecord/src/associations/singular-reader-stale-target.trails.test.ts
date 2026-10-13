@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 type Rec = Record<string, unknown>;
 

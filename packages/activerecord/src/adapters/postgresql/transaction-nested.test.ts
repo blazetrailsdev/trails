@@ -3,7 +3,7 @@ import { Thread } from "@blazetrails/ruby-compat";
 import { assertRaises } from "@blazetrails/activesupport";
 import { describeIfPg, leasePgAdapter } from "./test-helper.js";
 import type { PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
 import { SerializationFailure, Deadlocked } from "../../errors.js";

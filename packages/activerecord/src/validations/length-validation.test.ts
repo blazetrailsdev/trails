@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Range } from "@blazetrails/ruby-compat";

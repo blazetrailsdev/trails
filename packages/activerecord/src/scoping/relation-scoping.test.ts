@@ -5,7 +5,7 @@ import { isEmpty } from "@blazetrails/ruby-compat";
 import { captureSql } from "../testing/sql-capture.js";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 import { Base, Range, RecordNotFound, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Developer,
   DeveloperFilteredOnJoins,

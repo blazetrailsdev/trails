@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import * as Arel from "@blazetrails/arel";

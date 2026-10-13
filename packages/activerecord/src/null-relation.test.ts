@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { assertAsyncEqual } from "./support/async-helper.js";
 import { registerModel } from "./associations.js";

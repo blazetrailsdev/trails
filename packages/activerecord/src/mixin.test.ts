@@ -3,7 +3,7 @@ import { freezeTime, travel, travelBack } from "@blazetrails/activesupport";
 import { Duration } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Base } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class Mixin extends Base {}
 

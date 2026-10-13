@@ -9,7 +9,7 @@ import { Marshal } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base, registerModel } from "./index.js";
 import { Extensions } from "./message-pack.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import type { Author } from "./test-helpers/models/author.js";
 import { Binary } from "./test-helpers/models/binary.js";

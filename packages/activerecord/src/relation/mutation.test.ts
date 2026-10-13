@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post, FakeKlass } from "../test-helpers/models/post.js";
 import { Relation } from "../relation.js";
 import type { Base } from "../base.js";

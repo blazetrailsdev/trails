@@ -53,7 +53,7 @@ import {
   travelBack,
 } from "@blazetrails/activesupport";
 
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 function setup(): void {
   beforeEach(() => {

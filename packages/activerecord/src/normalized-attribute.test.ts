@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { presence, titleize } from "@blazetrails/activesupport";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 function noon(time: RubyTime): RubyTime {
   const utc = time.getutc();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkOrder, CpkBook } from "../test-helpers/models/cpk.js";
 import type { Base } from "../index.js";
 

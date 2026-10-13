@@ -4,7 +4,7 @@ import { Hash } from "@blazetrails/ruby-compat";
 import { WhereClause } from "./where-clause.js";
 import "../index.js";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 
 registerModel(Topic);

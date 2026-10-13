@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertRaises } from "@blazetrails/activesupport";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface IndexShape {
   readonly name: string;

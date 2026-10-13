@@ -29,7 +29,7 @@ import {
   toXmlArray,
 } from "@blazetrails/activesupport";
 import { PP } from "@blazetrails/ruby-compat";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { captureSql } from "./testing/sql-capture.js";

@@ -14,7 +14,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { itIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";

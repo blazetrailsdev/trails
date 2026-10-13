@@ -4,7 +4,7 @@ import { assertRaises, assertNotEmpty } from "@blazetrails/activesupport";
 import { sql as arelSql } from "@blazetrails/arel";
 import { quoteTableName } from "./support/quote-regex.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 

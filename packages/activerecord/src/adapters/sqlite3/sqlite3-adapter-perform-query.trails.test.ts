@@ -5,7 +5,7 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 import { Result } from "../../result.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 let adapter: SQLite3Adapter;
 
@@ -186,7 +186,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
   it("does not close the handle out from under a statement holding the lock", async () => {
     const closing = new BetterSQLite3Adapter({ database: ":memory:" });
-    // eslint-disable-next-line blazetrails/require-table-teardown
+
     await closing.execute(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
@@ -208,7 +208,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
   it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
     const closing = new BetterSQLite3Adapter({ database: ":memory:" });
-    // eslint-disable-next-line blazetrails/require-table-teardown
+
     await closing.execute(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));

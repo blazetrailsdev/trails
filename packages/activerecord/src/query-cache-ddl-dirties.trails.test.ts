@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { isSqliteRun } from "./support/sqlite-template.js";
 

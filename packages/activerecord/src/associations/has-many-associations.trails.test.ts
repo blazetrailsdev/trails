@@ -2,7 +2,7 @@ import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, RecordNotDestroyed, registerModel } from "../index.js";
 import type { AssociationProxy } from "./collection-proxy.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Client, Firm } from "../test-helpers/models/company.js";
 import { CpkBook, CpkOrder } from "../test-helpers/models/cpk.js";
 

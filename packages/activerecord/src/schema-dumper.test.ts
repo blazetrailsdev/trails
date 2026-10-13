@@ -9,7 +9,7 @@ import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Current, Migration } from "./migration.js";
 import "./migration/compatibility.js";
 import type { TableDefinition as PostgreSQLTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
@@ -766,7 +766,7 @@ describe("SchemaDumperTest", () => {
       const createCatMigration = class extends Current {
         async change(): Promise<void> {
           await this.createTable("cats", {}, () => {});
-          // eslint-disable-next-line blazetrails/require-table-teardown -- migrate("down") reverts #change, dropping both
+
           await this.createTable("omg_cats", {}, () => {});
         }
       };

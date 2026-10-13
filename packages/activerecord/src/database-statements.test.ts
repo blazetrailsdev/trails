@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 async function returnTheInsertedId(method: "insert" | "create"): Promise<unknown> {
   const connection = await Base.leaseConnection();

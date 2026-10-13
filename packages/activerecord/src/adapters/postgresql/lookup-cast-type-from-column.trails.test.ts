@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Uuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 
 const UUID_OID = 2950;

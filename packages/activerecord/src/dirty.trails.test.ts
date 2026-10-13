@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { _touchRow as dirtyTouchRow } from "./attribute-methods/dirty.js";
 

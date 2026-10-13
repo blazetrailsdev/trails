@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Address, Customer } from "./test-helpers/models/customer.js";
 

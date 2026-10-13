@@ -4,7 +4,7 @@ import { File as RubyFile, Marshal } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { TEST_ROOT } from "./config.js";
 import { formatVersion, setFormatVersion } from "./marshalling.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import "./test-helpers/models/reply.js";
 

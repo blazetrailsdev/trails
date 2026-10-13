@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
 import { Range, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 
 registerModel(Topic);

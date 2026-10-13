@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Encryption } from "../encryption.js";

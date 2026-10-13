@@ -9,7 +9,7 @@ import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { DEFAULT_ENV } from "./connection-handling.js";
 import {
   setTimestampedMigrations,

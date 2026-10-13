@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { assertRaises } from "@blazetrails/activesupport";
 import { ReadOnlyError } from "./errors.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Bird } from "./test-helpers/models/bird.js";
 import { Professor } from "./test-helpers/models/professor.js";

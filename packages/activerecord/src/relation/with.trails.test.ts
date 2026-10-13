@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { describeIfSupports } from "../support/supports.js";

@@ -30,7 +30,7 @@ import {
 import { assertAsyncEqual } from "./support/async-helper.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Company, DependentFirm, Client } from "./test-helpers/models/company.js";

@@ -12,7 +12,7 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { Associations } from "./associations.js";
 import { AggregateReflection, ThroughReflection, create } from "./reflection.js";
 import { NameError } from "./errors.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Reply, WebReply } from "./test-helpers/models/reply.js";

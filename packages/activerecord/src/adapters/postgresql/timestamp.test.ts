@@ -8,7 +8,7 @@ import {
   withPostgresqlDatetimeType,
   withNativeDatabaseTypeOverrides,
 } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
 import { Developer, AuditLog, AuditLogRequired } from "../../test-helpers/models/developer.js";
 import { withTimezoneConfig } from "../../test-helper.js";

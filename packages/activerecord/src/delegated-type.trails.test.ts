@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
 import { Module, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Entry } from "./test-helpers/models/entry.js";
 

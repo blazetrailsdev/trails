@@ -3,7 +3,7 @@ import { type LeasedTestAdapter, type TestDatabaseAdapter } from "../test-adapte
 import { Base } from "../base.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 async function primaryAdapter(): Promise<TestDatabaseAdapter> {
   return await Base.leaseConnection();

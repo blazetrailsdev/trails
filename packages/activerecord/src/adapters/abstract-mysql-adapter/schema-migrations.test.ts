@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { Mysql2Result } from "../../mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

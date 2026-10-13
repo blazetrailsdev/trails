@@ -2,7 +2,7 @@ import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   Cpk,
   CpkBook,

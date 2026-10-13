@@ -13,7 +13,7 @@ import {
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import {
   MyAppBusinessCompany,

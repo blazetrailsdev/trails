@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import type { HasOneAssociation } from "./has-one-association.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { DestructivePirate, Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { Developer } from "../test-helpers/models/developer.js";

@@ -16,7 +16,7 @@ import { assertQueriesCount } from "./testing/query-assertions.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Table } from "./connection-adapters/abstract/schema-definitions.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import { migrationStrategy, setMigrationStrategy } from "./active-record.js";

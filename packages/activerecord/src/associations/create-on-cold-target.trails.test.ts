@@ -1,7 +1,7 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 

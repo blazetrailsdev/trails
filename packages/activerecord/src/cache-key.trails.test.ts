@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { setDefaultTimezone } from "./active-record.js";
 
 class CacheMeWithVersion extends Base {

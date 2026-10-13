@@ -27,7 +27,7 @@ import {
   assertDifference,
 } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 import { IntegerType, ValueType, ArgumentError, Lint } from "@blazetrails/activemodel";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";

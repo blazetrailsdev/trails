@@ -14,7 +14,7 @@ import { Base } from "./base.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { SchemaMigration } from "./schema-migration.js";
 import type { InternalMetadata } from "./internal-metadata.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import "./test-helpers/migration-helper.js";

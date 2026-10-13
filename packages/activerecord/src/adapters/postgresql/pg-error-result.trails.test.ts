@@ -9,7 +9,7 @@ import {
 } from "../../errors.js";
 import { pgConnection, type PGConnection } from "../../pg/connection.js";
 import { PG } from "../../pg/pg.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfPg("PG::Error#result (trails)", () => {
   let adapter: PostgreSQLAdapter;

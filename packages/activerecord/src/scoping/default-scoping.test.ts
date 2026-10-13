@@ -6,7 +6,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Developer,
   DeveloperOrderedBySalary,

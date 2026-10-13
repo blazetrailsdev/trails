@@ -3,7 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { AssociationScope } from "./association-scope.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { RuntimeReflection } from "../reflection.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("AssociationScope — AliasTracker aliases repeated tables", () => {
   fixtures([]);

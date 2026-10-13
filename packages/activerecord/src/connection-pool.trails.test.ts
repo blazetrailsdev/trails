@@ -17,7 +17,7 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { lazilyLoadSchemaCache, setLazilyLoadSchemaCache } from "./active-record.js";

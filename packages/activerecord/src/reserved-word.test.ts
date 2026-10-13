@@ -4,7 +4,7 @@ import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
 import { Associations } from "./associations.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { assertNoQueries } from "./testing/query-assertions.js";

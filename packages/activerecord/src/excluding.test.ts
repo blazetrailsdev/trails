@@ -4,7 +4,7 @@ import { assertEmpty, assertNotEmpty, assertRaises } from "@blazetrails/activesu
 import { ArgumentError, regexpEscape } from "@blazetrails/ruby-compat";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 import { quoteTableName } from "./support/quote-regex.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { registerModel } from "./associations.js";
 import type { Relation } from "./relation.js";
 import { Post } from "./test-helpers/models/post.js";

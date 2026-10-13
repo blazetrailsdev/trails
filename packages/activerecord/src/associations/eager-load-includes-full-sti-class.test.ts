@@ -5,7 +5,7 @@ import { Base } from "../base.js";
 import { registerModel } from "../index.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Post } from "../test-helpers/models/post.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 class NamespacedPost extends Base {
   static _tableName = "posts";

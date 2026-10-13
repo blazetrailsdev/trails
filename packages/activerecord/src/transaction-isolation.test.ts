@@ -4,7 +4,7 @@ import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { adapterSupports } from "./support/supports.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { transactionIsolationLevels } from "./connection-adapters/abstract/database-statements.js";
 
 describe("TransactionIsolationUnsupportedTest", () => {

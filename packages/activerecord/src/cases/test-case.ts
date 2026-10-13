@@ -38,10 +38,4 @@ export class TestCase extends ActiveSupportTestCase {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface TestCase extends Omit<TestFixtures, "beforeSetup" | "afterTeardown"> {}
 
-declare module "../namespaces.js" {
-  interface TestConstants {
-    TestCase: typeof TestCase;
-  }
-}
-
 rbModConstSet(ActiveRecord, "TestCase", TestCase);

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";

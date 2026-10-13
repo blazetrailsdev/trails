@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { resetCallbacks } from "../support/reset-callbacks.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";

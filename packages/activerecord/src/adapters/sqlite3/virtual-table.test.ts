@@ -3,7 +3,7 @@ import { StringIO } from "@blazetrails/ruby-compat";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Schema } from "../../schema.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { AssociationQueryValue } from "./association-query-value.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder } from "../../test-helpers/models/cpk.js";
 
 const queriesOf = (av: AssociationQueryValue) =>

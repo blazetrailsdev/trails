@@ -61,7 +61,7 @@ import { CakeDesigner } from "./test-helpers/models/cake-designer.js";
 import { Recipe } from "./test-helpers/models/recipe.js";
 import { FirstPost } from "./test-helpers/models/post.js";
 import { captureSql } from "./testing/sql-capture.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 fixtures(["topics", "customers", "companies", "subscribers", "priceEstimates"]);
 

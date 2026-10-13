@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface ThroughAssociationLike {
   staleState(): unknown;

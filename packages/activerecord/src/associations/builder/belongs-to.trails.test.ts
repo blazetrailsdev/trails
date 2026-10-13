@@ -1,6 +1,6 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Invoice } from "../../test-helpers/models/invoice.js";
 import { LineItem } from "../../test-helpers/models/line-item.js";
 import { registerModel } from "../../associations.js";

@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { newSqlitePool } from "../support/pooled-sqlite-adapter.js";
 import {
   ambientConnection,
@@ -55,10 +55,8 @@ class CreateCitiesAndHousesMigration extends SilentMigration {
 
 class CreateSchoolsAndClassesMigration extends SilentMigration {
   async change(): Promise<void> {
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("schools");
 
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("classes", (t) => {
       t.references("school");
     });

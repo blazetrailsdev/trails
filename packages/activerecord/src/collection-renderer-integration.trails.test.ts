@@ -7,7 +7,7 @@ import {
   TemplateHandlers,
   TseHandler,
 } from "@blazetrails/actionview";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 
 function commentsLoaded(post: Post): boolean {

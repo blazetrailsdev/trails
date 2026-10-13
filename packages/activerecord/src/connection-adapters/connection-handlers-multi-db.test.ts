@@ -9,7 +9,7 @@ import { currentRole } from "../core.js";
 import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Person } from "../test-helpers/models/person.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { readingRole, setReadingRole, setWritingRole, writingRole } from "../active-record.js";
 
 describe("ConnectionHandlersMultiDbTest", () => {

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { IndifferentCoder } from "./store.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 fixtures(["admin/accounts", "admin/users"]);
 

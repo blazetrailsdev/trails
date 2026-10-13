@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface AssociationLike {
   target: unknown;

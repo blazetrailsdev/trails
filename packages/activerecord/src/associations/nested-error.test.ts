@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "../active-record.js";
 import { NestedError } from "./nested-error.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { Guitar } from "../test-helpers/models/guitar.js";
 import { TuningPeg } from "../test-helpers/models/tuning-peg.js";

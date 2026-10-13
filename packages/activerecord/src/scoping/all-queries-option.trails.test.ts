@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { DeveloperwithDefaultMentorScopeNot } from "../test-helpers/models/developer.js";
 
 describe("Base.all all_queries option", () => {

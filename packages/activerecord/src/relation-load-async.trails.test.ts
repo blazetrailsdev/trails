@@ -4,7 +4,7 @@ import { FutureResult } from "./future-result.js";
 import { setAsyncQueryExecutor } from "./active-record.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 

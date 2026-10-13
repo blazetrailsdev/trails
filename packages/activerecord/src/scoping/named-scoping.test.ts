@@ -14,7 +14,7 @@ import {
   assertQueriesCount,
   assertQueriesMatch,
 } from "../testing/query-assertions.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { adapterType } from "../test-adapter.js";
 import { Temporal } from "@blazetrails/date";
 import { Topic } from "../test-helpers/models/topic.js";

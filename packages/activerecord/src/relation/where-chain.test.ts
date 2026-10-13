@@ -5,7 +5,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { isBlank as blank } from "@blazetrails/activesupport";
 import { Nodes } from "@blazetrails/arel";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Author } from "../test-helpers/models/author.js";

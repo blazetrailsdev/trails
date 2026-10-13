@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import "../i18n.js";

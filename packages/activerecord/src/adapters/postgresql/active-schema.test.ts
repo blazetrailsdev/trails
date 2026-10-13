@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 const supportsNullsNotDistinct = pgServerVersion >= 150000;
 

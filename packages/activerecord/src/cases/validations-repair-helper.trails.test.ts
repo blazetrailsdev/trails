@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { repairValidations } from "./validations-repair-helper.js";
 
 fixtures([]);

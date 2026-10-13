@@ -3,7 +3,7 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { respondToMissing } from "./dynamic-matchers.js";
 import { Customer } from "./test-helpers/models/customer.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("FinderRespondToTrailsTest", () => {
   fixtures(["customers"]);

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
 
 import { assertEmpty } from "@blazetrails/activesupport";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Author } from "../test-helpers/models/author.js";

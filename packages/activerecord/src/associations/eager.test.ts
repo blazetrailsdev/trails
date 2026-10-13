@@ -18,7 +18,7 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {
   Post,

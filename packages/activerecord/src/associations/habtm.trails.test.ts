@@ -2,7 +2,7 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Developer as CanonicalDeveloper } from "../test-helpers/models/developer.js";
 import { Project as CanonicalProject } from "../test-helpers/models/project.js";

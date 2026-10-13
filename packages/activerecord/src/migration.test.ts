@@ -30,7 +30,7 @@ import { GiveMeBigNumbers } from "./test-helpers/migrations/decimal/1_give_me_bi
 import { WeNeedThings } from "./test-helpers/migrations/rename/1_we_need_things.js";
 import { RenameThings } from "./test-helpers/migrations/rename/2_rename_things.js";
 import { WeNeedReminders } from "./test-helpers/migrations/valid/2_we_need_reminders.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { VERSION } from "./gem-version.js";
 import { assertColumn, assertNoColumn } from "./test-helpers/test-case.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";

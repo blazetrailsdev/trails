@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Edge } from "../test-helpers/models/edge.js";
 import { CpkBook } from "../test-helpers/models/cpk.js";
 import { JoinDependency } from "./join-dependency.js";

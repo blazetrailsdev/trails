@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { assert, assertEqual, assertNotPredicate } from "@blazetrails/activesupport";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";

@@ -8,7 +8,7 @@ import {
   reload as aggregationsReload,
   initializeDup as aggregationsInitializeDup,
 } from "./aggregations.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Customer as CustomerModel, Money as MoneyClass } from "./test-helpers/models/customer.js";
 
 beforeAll(() => {

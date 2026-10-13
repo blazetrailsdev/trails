@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { activeLane } from "./connection.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { itIfSupports } from "./supports.js";
 import {
   dumpedTables,

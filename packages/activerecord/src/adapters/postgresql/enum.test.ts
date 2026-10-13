@@ -13,7 +13,7 @@ import {
   isBlank,
 } from "@blazetrails/activesupport";
 import { StatementInvalid } from "../../errors.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class PostgresqlEnum extends Base {

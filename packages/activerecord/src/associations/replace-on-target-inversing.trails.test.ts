@@ -1,7 +1,7 @@
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { Interest } from "../test-helpers/models/interest.js";
 

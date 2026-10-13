@@ -10,7 +10,7 @@ import {
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { deprecator } from "./deprecator.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply } from "./test-helpers/models/reply.js";
 import { Keyboard } from "./test-helpers/models/keyboard.js";

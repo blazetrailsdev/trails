@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../../index.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Preloader } from "../preloader.js";
 import { ThroughAssociation } from "./through-association.js";
 import { Member } from "../../test-helpers/models/member.js";

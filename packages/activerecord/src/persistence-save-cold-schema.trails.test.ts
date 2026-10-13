@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, RecordInvalid } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("Persistence#save on a record built against a cold schema cache (trails)", () => {
   fixtures([]);

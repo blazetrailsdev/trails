@@ -18,7 +18,7 @@ import {
   makeKeyProvider,
   Encryption,
 } from "./test-helpers.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 fixtures([]);
 

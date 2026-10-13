@@ -4,7 +4,7 @@ import {
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
 } from "./test-helpers.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Encryption } from "../encryption.js";
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";

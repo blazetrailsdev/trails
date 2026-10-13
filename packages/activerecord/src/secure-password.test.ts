@@ -3,7 +3,7 @@ import { User } from "./test-helpers/models/user.js";
 import { SecurePassword } from "@blazetrails/activemodel";
 import { Assertion, assertCalledWith, assertInDelta } from "@blazetrails/activesupport";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 async function retryFlakyTest(fn: () => Promise<void>, retryCount = 3): Promise<void> {
   for (let attempt = 0; ; attempt++) {

@@ -39,7 +39,7 @@ import { DEFAULT_ENV } from "../connection-handling.js";
 import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
 import { cleanUpConnectionHandler } from "../cases/helper.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";

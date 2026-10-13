@@ -18,7 +18,7 @@ import {
   Encryption,
 } from "./test-helpers.js";
 import { Scheme } from "./scheme.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;

@@ -23,7 +23,7 @@ import {
   enableExtensionBang,
 } from "../support/adapter-helper.js";
 import { itIfSupports } from "../support/supports.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 class TestModel extends Base {}

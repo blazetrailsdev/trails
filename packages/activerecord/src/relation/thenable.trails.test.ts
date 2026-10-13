@@ -1,7 +1,7 @@
 import { presence } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Relation, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";

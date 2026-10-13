@@ -55,7 +55,7 @@ import { Transaction, TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
 import type { QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { queryTransformers } from "../../active-record.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";

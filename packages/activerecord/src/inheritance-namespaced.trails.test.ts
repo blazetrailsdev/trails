@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { moduleParent, moduleParents } from "@blazetrails/activesupport";
 import { rbModName } from "@blazetrails/ruby-compat";
 import { stiName, polymorphicName } from "./inheritance.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   ClothingItem,
   ClothingItemUsed,

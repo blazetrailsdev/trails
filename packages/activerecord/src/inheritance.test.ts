@@ -21,7 +21,7 @@ import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Inheritance, stiName, isBaseClass, baseClass } from "./inheritance.js";
 import { registerModel } from "./associations.js";
 import {

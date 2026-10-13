@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import "./test-helpers/models/bird.js";
 import type { Bird } from "./test-helpers/models/bird.js";

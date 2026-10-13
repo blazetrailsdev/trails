@@ -7,7 +7,7 @@ import { StatementInvalid } from "../../errors.js";
 import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { Name } from "../../connection-adapters/postgresql/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base, registerModel } from "../../index.js";
