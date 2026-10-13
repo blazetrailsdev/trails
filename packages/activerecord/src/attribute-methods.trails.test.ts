@@ -1,4 +1,4 @@
-import { basicObjRespondTo, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, Module, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -606,5 +606,72 @@ describe("attributesForCreate (trails)", () => {
     expect(attributesForCreate.call(minivan as never, minivan.attributeNames())).not.toContain(
       "minivan_id",
     );
+  });
+});
+
+describe("attribute_alias arelTable integration", () => {
+  fixtures([]);
+  it("test_attribute_alias_in_where_references_association_name", () => {
+    class User extends Base {
+      static {
+        this.attribute("username", "string");
+        this.aliasAttribute("login", "username");
+      }
+    }
+    const attr = User.arelTable.get("login");
+    expect(attr.name).toBe("username");
+  });
+});
+
+describe("initialize_generated_modules", () => {
+  fixtures([]);
+
+  it("generated attribute methods ancestors have correct module", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.initializeGeneratedModules();
+    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+  });
+
+  it("runs lazily via defineAttributeMethods without a direct call", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.defineAttributeMethods();
+    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+  });
+
+  it("resets attribute-methods generation flags", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const flags = Topic as unknown as {
+      _attributeMethodsGenerated: boolean;
+      _aliasAttributesMassGenerated: boolean;
+    };
+    flags._attributeMethodsGenerated = true;
+    flags._aliasAttributesMassGenerated = true;
+    Topic.initializeGeneratedModules();
+    expect(flags._attributeMethodsGenerated).toBe(false);
+    expect(flags._aliasAttributesMassGenerated).toBe(false);
+  });
+
+  it("chains to Core#initialize_generated_modules via super", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.initializeGeneratedModules();
+    expect(
+      (Topic as unknown as { _generatedAssociationMethods: unknown })._generatedAssociationMethods,
+    ).toBeInstanceOf(Module);
   });
 });

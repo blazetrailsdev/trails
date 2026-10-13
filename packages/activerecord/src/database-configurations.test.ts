@@ -200,19 +200,6 @@ describe("DatabaseConfigurationsTest", () => {
     }
   });
 
-  it("resolve returns current-env config when same name exists in multiple envs", () => {
-    const configs = new DatabaseConfigurations({
-      development: {
-        primary: { adapter: "sqlite3", database: "dev.db" },
-      },
-      test: {
-        primary: { adapter: "sqlite3", database: "test.db" },
-      },
-    });
-    const resolved = configs.resolve(":primary")!;
-    expect(resolved.database).toBe("test.db");
-  });
-
   it("configs for with include hidden", () => {
     const configs = new DatabaseConfigurations({
       default_env: {

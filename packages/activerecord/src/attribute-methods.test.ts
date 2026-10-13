@@ -22,14 +22,12 @@ import {
 } from "@blazetrails/activemodel";
 import {
   ArgumentError,
-  Module,
   basicObjRespondTo,
   NoMethodError,
   hashAref,
 } from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
-import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 import { inTimeZone } from "./cases/helper.js";
 import { deprecator } from "./deprecator.js";
@@ -1841,66 +1839,5 @@ describe("AttributeMethodsTest", () => {
       AMUnknownAttributeError,
     );
     expect(() => topic.set("no_column_exists", "Hello!")).toThrow(MissingAttributeError);
-  });
-});
-
-describe("attribute_alias arelTable integration", () => {
-  fixtures([]);
-  it("test_attribute_alias_in_where_references_association_name", () => {
-    class User extends Base {
-      static {
-        this.attribute("username", "string");
-        this.aliasAttribute("login", "username");
-      }
-    }
-    const attr = User.arelTable.get("login");
-    expect(attr.name).toBe("username");
-  });
-});
-
-describe("initialize_generated_modules", () => {
-  fixtures([]);
-
-  it("generated attribute methods ancestors have correct module", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Topic.initializeGeneratedModules();
-    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
-  });
-
-  it("runs lazily via defineAttributeMethods without a direct call", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    (Topic as any).defineAttributeMethods();
-    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
-  });
-
-  it("resets attribute-methods generation flags", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    (Topic as any)._attributeMethodsGenerated = true;
-    (Topic as any)._aliasAttributesMassGenerated = true;
-    Topic.initializeGeneratedModules();
-    expect((Topic as any)._attributeMethodsGenerated).toBe(false);
-    expect((Topic as any)._aliasAttributesMassGenerated).toBe(false);
-  });
-
-  it("chains to Core#initialize_generated_modules via super", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Topic.initializeGeneratedModules();
-    expect((Topic as any)._generatedAssociationMethods).toBeInstanceOf(Module);
   });
 });

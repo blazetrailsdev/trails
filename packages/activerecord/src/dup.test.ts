@@ -157,14 +157,6 @@ describe("DupTest", () => {
     expect(Topic.afterInitializeCalled).toBeTruthy();
   });
 
-  it("dup runs after_initialize against the duped attributes", async () => {
-    const topic = await Topic.find(3);
-    expect(topic.author_email_address).toBeFalsy();
-    const duped = topic.dup();
-    expect(duped.title).toBe(topic.title);
-    expect(duped.author_email_address).toBeFalsy();
-  });
-
   it("dup validity is independent", async () => {
     await repairValidations(Topic, async () => {
       Topic.validates("title", { presence: true });

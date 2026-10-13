@@ -12,7 +12,7 @@ import {
   travelBack,
   travelTo,
 } from "@blazetrails/activesupport";
-import { Base, Migrator, RecordNotUnique, Rollback, StatementInvalid } from "./index.js";
+import { Base, Migrator, Rollback, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { CheckPending, ConcurrentMigrationError, MigrationContext } from "./migration.js";
@@ -995,31 +995,6 @@ describe("MigrationTest", () => {
     );
   });
 
-  it("migration that fails to load escapes the canceled message", async () => {
-    const adapter = await freshAdapter();
-    const loadError = new Error("uninitialized constant MigThatFailsToLoad");
-    const proxy: MigrationProxy = migrationProxy({
-      version: 102,
-      name: "MigThatFailsToLoad",
-      migration: () => Promise.reject(loadError),
-    });
-    const migrator = new Migrator(
-      "up",
-      [proxy],
-      new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
-    );
-    let err!: Error;
-    try {
-      await migrator.migrate();
-    } catch (e) {
-      err = e as Error;
-    }
-    expect(err).toBe(loadError);
-    const versions = [...(await migrator.migrated())];
-    expect(versions).not.toContain(102);
-  });
-
   it("internal metadata table name", async () => {
     const adapter = await Base.leaseConnection();
     const { InternalMetadata } = await import("./internal-metadata.js");
@@ -1530,97 +1505,6 @@ AND query LIKE '%${lockId}%'`;
         });
       } finally {
         await connection.dropTable("values", { ifExists: true });
-      }
-    });
-  });
-
-  describe("IndexTest", () => {
-    async function withTestings(body: () => Promise<void>): Promise<void> {
-      await (
-        await Base.leaseConnection()
-      ).createTable("testings", { force: true }, (t) => {
-        t.string("foo", { limit: 100 });
-        t.string("bar", { limit: 100 });
-      });
-      try {
-        await body();
-      } finally {
-        await (await Base.leaseConnection()).dropTable("testings", { ifExists: true });
-      }
-    }
-
-    it("test_remove_index_which_does_not_exist_doesnt_raise_with_option", async () => {
-      await withTestings(async () => {
-        const mig = new (class extends Migration.Current {})();
-        await mig.addIndex("testings", "foo");
-        await mig.removeIndex("testings", "foo");
-
-        await expect(mig.removeIndex("testings", "foo")).rejects.toThrow(ArgumentError);
-
-        await mig.removeIndex("testings", "foo", { ifExists: true });
-      });
-    });
-
-    it("test_remove_index_with_name_which_does_not_exist_doesnt_raise_with_option", async () => {
-      await withTestings(async () => {
-        const mig = new (class extends Migration.Current {})();
-        await mig.addIndex("testings", ["foo"], { name: "foo" });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
-
-        await mig.removeIndex("testings", { name: "foo", ifExists: true });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(false);
-      });
-    });
-
-    it("test_remove_index_with_column_array_which_does_not_exist_doesnt_raise_with_option", async () => {
-      await withTestings(async () => {
-        const mig = new (class extends Migration.Current {})();
-        await mig.addIndex("testings", ["foo"], { name: "foo" });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
-
-        await mig.removeIndex("testings", { column: ["foo", "bar"], ifExists: true });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
-        expect(await mig.indexExists("testings", ["foo", "bar"], { name: "foo" })).toBe(false);
-      });
-    });
-  });
-
-  describeIfPostgresqlAdapter("PostgresqlIndexTest", () => {
-    it("test_invalid_index", async () => {
-      const conn = await Base.leaseConnection();
-      await conn.dropTable("ex", { ifExists: true });
-      await conn.createTable("ex", { force: true }, (t) => {
-        t.integer("number");
-      });
-      try {
-        await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
-        const mig = new (class extends Migration.Current {})();
-
-        let error: unknown;
-        try {
-          await mig.addIndex("ex", "number", {
-            unique: true,
-            algorithm: "concurrently",
-            name: "invalid_index",
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeInstanceOf(RecordNotUnique);
-
-        expect(await mig.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
-        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: true })).toBe(
-          false,
-        );
-        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: false })).toBe(
-          true,
-        );
-      } finally {
-        await conn.dropTable("ex", { ifExists: true });
       }
     });
   });

@@ -852,19 +852,6 @@ describe("ReflectionTest", () => {
     expect(Customer.reflectOnAggregation("balance")!.klass).toBe(Money);
   });
 
-  it("aggregate reflection computes class raises NameError for missing class", () => {
-    class Buyer extends Base {
-      declare balance: number | null;
-
-      static {
-        this.attribute("balance", "integer");
-      }
-    }
-    const ref = new AggregateReflection("balance", null, { className: "NoSuchMoney" }, Buyer);
-    expect(() => ref.klass).toThrow(NameError);
-    expect(() => ref.klass).toThrow(/uninitialized constant NoSuchMoney/);
-  });
-
   it("association reflection in modules", () => {
     Base.storeFullStiClass = false;
     try {

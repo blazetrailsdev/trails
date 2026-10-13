@@ -250,6 +250,31 @@ describe("MigrationTest", () => {
     expect(yielded).toBeInstanceOf(AdapterTable);
     expect(seen).toEqual([["people", connection]]);
   });
+
+  it("migration that fails to load escapes the canceled message", async () => {
+    const adapter = await Base.leaseConnection();
+    const loadError = new Error("uninitialized constant MigThatFailsToLoad");
+    const proxy: MigrationProxy = migrationProxy({
+      version: 102,
+      name: "MigThatFailsToLoad",
+      migration: () => Promise.reject(loadError),
+    });
+    const migrator = new Migrator(
+      "up",
+      [proxy],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+    );
+    let err!: Error;
+    try {
+      await migrator.migrate();
+    } catch (e) {
+      err = e as Error;
+    }
+    expect(err).toBe(loadError);
+    const versions = [...(await migrator.migrated())];
+    expect(versions).not.toContain(102);
+  });
 });
 
 describe("Migration#createTable id option type", () => {

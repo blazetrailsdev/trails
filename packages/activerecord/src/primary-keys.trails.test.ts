@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
+import { Country } from "./test-helpers/models/country.js";
+import { Keyboard } from "./test-helpers/models/keyboard.js";
 import { captureSqlAndBinds } from "./test-helpers/test-case.js";
 
 describe("CompositePrimaryKey#id= — Enumerable acceptance (trails-only)", () => {
@@ -50,5 +52,39 @@ describe("primary_key on a key-less table after a reconnect (trails-only)", () =
       await KeylessEdge.deleteAll();
       await KeylessEdge.removeConnection();
     }
+  });
+});
+
+describe("PrimaryKeysTrailsTest", () => {
+  fixtures([]);
+
+  it("resolves a custom string primary key with no explicit primary_key= via the schema cache", async () => {
+    (Country as unknown as { resetColumnInformation?: () => void }).resetColumnInformation?.();
+    await (Country as unknown as { loadSchema?: () => Promise<void> }).loadSchema?.();
+    expect(Country.primaryKey).toBe("country_id");
+  });
+
+  it("write_attribute id remaps to a scalar custom primary key", async () => {
+    const keyboard = await Keyboard.createBang();
+    keyboard.writeAttribute("id", 42);
+    expect(Number(keyboard.readAttribute("key_number"))).toBe(42);
+  });
+
+  it("write_attribute id on a composite primary key raises", () => {
+    const book = new CpkBook();
+    expect(() => book.writeAttribute("id", 7)).toThrow(
+      'can\'t write unknown attribute `["author_id", "id"]`',
+    );
+  });
+
+  it("id returns nil if primary key doesnt exist", async () => {
+    class AnonDashboard extends Base {
+      static {
+        this._tableName = "dashboards";
+      }
+    }
+    await AnonDashboard.loadSchema();
+    expect(AnonDashboard.primaryKey).toBe(null);
+    expect(new AnonDashboard().id).toBe(null);
   });
 });

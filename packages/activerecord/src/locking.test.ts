@@ -260,19 +260,6 @@ describe("OptimisticLockingTest", () => {
     await assertRaises([RecordNotFound], {}, () => Person.find(1));
   });
 
-  it("touch with dirty primary key", async () => {
-    const before = await Person.find(1);
-    const beforeLockVersion = before.lock_version;
-
-    const person = await Person.find(1);
-    person.id = 42;
-    expect(await person.touch()).toBe(true);
-
-    const persisted = await Person.find(1);
-    expect(persisted.lock_version).toBe(beforeLockVersion + 1);
-    await expect(Person.find(42)).rejects.toBeInstanceOf(RecordNotFound);
-  });
-
   it("explicit update lock column raise error", async () => {
     const person = await Person.find(people("michael").id);
     person.first_name = "Douglas Adams";

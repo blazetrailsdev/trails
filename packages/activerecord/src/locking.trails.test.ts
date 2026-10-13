@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 
 import { Base } from "./base.js";
+import { RecordNotFound } from "./errors.js";
 import { LockingType } from "./locking/optimistic.js";
 import { fixtures } from "./test-fixtures.js";
+import { Person } from "./test-helpers/models/person.js";
 
 describe("OptimisticLockingTrailsTest", () => {
   fixtures([]);
@@ -62,5 +64,22 @@ describe("OptimisticLockingTrailsTest", () => {
 
     untyped.lockingColumn = null;
     expect(LockCoerce.lockingColumn).toBe("");
+  });
+});
+
+describe("OptimisticLockingTrailsTest", () => {
+  fixtures(["people"]);
+
+  it("touch with dirty primary key", async () => {
+    const before = await Person.find(1);
+    const beforeLockVersion = before.lock_version;
+
+    const person = await Person.find(1);
+    person.id = 42;
+    expect(await person.touch()).toBe(true);
+
+    const persisted = await Person.find(1);
+    expect(persisted.lock_version).toBe(beforeLockVersion + 1);
+    await expect(Person.find(42)).rejects.toBeInstanceOf(RecordNotFound);
   });
 });

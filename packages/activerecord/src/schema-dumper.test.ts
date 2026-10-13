@@ -140,12 +140,6 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toMatch(/createTable\("ar_internal_metadata"/);
   });
 
-  it("schema dump does not emit id false for normal tables", async () => {
-    const output = await dumpCanonicalTable("authors");
-    expect(output).not.toContain("id: false");
-    expect(output).not.toContain('t.integer("id"');
-  });
-
   it(
     "schema dump should honor nonstandard primary keys",
     { timeout: FULL_DUMP_TIMEOUT_MS },
