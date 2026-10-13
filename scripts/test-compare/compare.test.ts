@@ -590,7 +590,7 @@ describe("main cross-package and parked-stub credit", () => {
   });
 
   it("consumes a pending stub for an unported case Rails defines in a module", async () => {
-    const name = "after current transaction commit multidb nested transactions";
+    const name = "rollback when thread killed";
     const result = await compare(
       "transactions_test.rb",
       {
