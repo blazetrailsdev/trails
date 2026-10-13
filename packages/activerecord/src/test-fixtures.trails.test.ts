@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { NoMethodError, include } from "@blazetrails/ruby-compat";
 import { Minitest } from "@blazetrails/activesupport";
 import "./relation.js";
+import { ActiveRecord } from "./namespaces.js";
+import { FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
 import { fixtures, TestFixtures } from "./test-fixtures.js";
 import {
   configureEncryption,
@@ -294,6 +296,15 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
     expect(calls).toEqual(["setup_fixtures", "super before_setup"]);
     expect(instance.topics).toBeTypeOf("function");
     expect(instance.developers).toBeUndefined();
+  });
+});
+
+describe("fixtures() leaves ActiveRecord::TestCase as test_case.rb sets it", () => {
+  fixtures([]);
+
+  it("keeps fixture_paths at FIXTURES_ROOT and declares no sets on the root", () => {
+    expect(ActiveRecord.TestCase.fixturePaths).toEqual([FIXTURES_ROOT]);
+    expect(ActiveRecord.TestCase.fixtureTableNames).toEqual([]);
   });
 });
 

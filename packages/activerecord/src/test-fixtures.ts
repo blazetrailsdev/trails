@@ -615,6 +615,8 @@ const USE_FIXTURES_ROOT = "use-fixtures";
 
 let useFixturesCount = 0;
 
+let rootTestCaseClass: TestCaseClass | undefined;
+
 const testCaseClasses = new WeakMap<SuiteScope, TestCaseClass>();
 
 const fixtureRegistrations = new WeakMap<TestCaseClass, { count: number }>();
@@ -624,7 +626,13 @@ const testCases = new WeakMap<object, { testCase: TestFixtures; pending: number 
 let currentTestCase: TestFixtures | null = null;
 
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
-  if (suite === undefined) return ActiveRecord.TestCase as unknown as TestCaseClass;
+  if (suite === undefined) {
+    if (rootTestCaseClass === undefined) {
+      rootTestCaseClass = class extends ActiveRecord.TestCase {} as unknown as TestCaseClass;
+      rootTestCaseClass.fixturePaths = [...ActiveRecord.TestCase.fixturePaths, USE_FIXTURES_ROOT];
+    }
+    return rootTestCaseClass;
+  }
   let klass = testCaseClasses.get(suite);
   if (klass === undefined) {
     klass = class extends testCaseClassFor(suite.suite) {} as TestCaseClass;
@@ -767,9 +775,6 @@ export function fixtures(
     }
   } else {
     const directory = String(++useFixturesCount);
-    if (!klass.fixturePaths.includes(USE_FIXTURES_ROOT)) {
-      klass.fixturePaths = [...klass.fixturePaths, USE_FIXTURES_ROOT];
-    }
     const classNames: Record<string, unknown> = {};
     for (const [key, [model, data]] of Object.entries(fixturesOrNames as FixtureMap)) {
       const fsName = `${directory}/${key}`;
