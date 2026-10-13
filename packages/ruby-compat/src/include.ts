@@ -1848,10 +1848,6 @@ export function extend<T extends AnyClass | object>(
   return klass;
 }
 
-/**
- * One turn of `rb_obj_extend`'s loop (`vendor/ruby/v3.3.11/eval.c:1794-1797`):
- * `extend_object` (`rb_extend_object`, :1713-1716) and then `extended`.
- */
 function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
   const extendedHook = featureHook(mod, "extended");
   if (extendedHook) {

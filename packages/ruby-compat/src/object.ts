@@ -119,12 +119,6 @@ export function rbSetClassPathString(
   classpaths.set(klass, { path: `${str}::${name}`, permanent });
 }
 
-/**
- * The one class object a core class has once `@blazetrails/date` reopens it
- * (`class Date extends rbCDate`, seated by `registerConstant`): MRI has one
- * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`), so a Temporal
- * seat and the package's instance answer the same class.
- */
 function reopened(klass: Klass): Klass {
   return (registeredConstant(classpaths.get(klass)!.path) as Klass | undefined) ?? klass;
 }
