@@ -56,7 +56,6 @@ import type { Properties } from "./encryption/properties.js";
 import type { ReadOnlyNullEncryptor } from "./encryption/read-only-null-encryptor.js";
 import type { Scheme } from "./encryption/scheme.js";
 import type { Fixture, FixtureSet } from "./fixtures.js";
-import type { TestCase } from "./cases/test-case.js";
 import type { Optimistic } from "./locking/optimistic.js";
 import type { Pessimistic } from "./locking/pessimistic.js";
 import type { IrreversibleMigration, Migration } from "./migration.js";
@@ -196,7 +195,6 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Encryption: typeof Encryption;
   Fixture: typeof Fixture;
   FixtureSet: typeof FixtureSet;
-  TestCase: typeof TestCase;
   Migration: typeof Migration;
   IrreversibleMigration: typeof IrreversibleMigration;
   ModelSchema: typeof ModelSchema;

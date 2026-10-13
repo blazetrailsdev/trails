@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { NoMethodError, include } from "@blazetrails/ruby-compat";
 import { Minitest } from "@blazetrails/activesupport";
 import "./relation.js";
-import { ActiveRecord } from "./namespaces.js";
+import { TestCase } from "./cases/test-case.js";
 import { FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
 import { fixtures, TestFixtures } from "./test-fixtures.js";
 import {
@@ -303,8 +303,8 @@ describe("fixtures() leaves ActiveRecord::TestCase as test_case.rb sets it", () 
   fixtures([]);
 
   it("keeps fixture_paths at FIXTURES_ROOT and declares no sets on the root", () => {
-    expect(ActiveRecord.TestCase.fixturePaths).toEqual([FIXTURES_ROOT]);
-    expect(ActiveRecord.TestCase.fixtureTableNames).toEqual([]);
+    expect(TestCase.fixturePaths).toEqual([FIXTURES_ROOT]);
+    expect(TestCase.fixtureTableNames).toEqual([]);
   });
 });
 

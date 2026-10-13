@@ -28,7 +28,7 @@ import {
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
-import { ActiveRecord } from "./namespaces.js";
+import { TestCase } from "./cases/test-case.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
@@ -680,7 +680,7 @@ describe("FixturesTest", () => {
     setEnv("DATABASE_URL", "sqlite3::memory:");
     const configurations = vi.spyOn(Base, "configurations").mockReturnValue({} as never);
     try {
-      const testCase = class extends ActiveRecord.TestCase {
+      const testCase = class extends TestCase {
         declare accounts: (name: string) => Promise<Account>;
 
         static {
@@ -712,7 +712,7 @@ describe("FixturesTest", () => {
 
   it("fixture method does not clash with a test case method", async () => {
     // @ts-expect-error -- fixtures_test.rb:638-641 defines a private #fixture over TestFixtures#fixture
-    const testCase = class extends ActiveRecord.TestCase {
+    const testCase = class extends TestCase {
       declare accounts: (name: string) => Promise<Account>;
 
       static {
@@ -1072,10 +1072,8 @@ describe("LoadAllFixturesTest", () => {
 
   it("all there", () => {
     try {
-      (self().constructor as typeof ActiveRecord.TestCase).fixturePaths = [
-        TS_FIXTURES_ROOT + "/all",
-      ];
-      (self().constructor as typeof ActiveRecord.TestCase).fixtures(":all");
+      (self().constructor as typeof TestCase).fixturePaths = [TS_FIXTURES_ROOT + "/all"];
+      (self().constructor as typeof TestCase).fixtures(":all");
 
       if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
         expect([...self().fixtureTableNames].sort()).toEqual([
@@ -1098,11 +1096,11 @@ describe("LoadAllFixturesWithArrayTest", () => {
 
   it("all there", () => {
     try {
-      (self().constructor as typeof ActiveRecord.TestCase).fixturePaths = [
+      (self().constructor as typeof TestCase).fixturePaths = [
         TS_FIXTURES_ROOT + "/all",
         TS_FIXTURES_ROOT + "/categories",
       ];
-      (self().constructor as typeof ActiveRecord.TestCase).fixtures(":all");
+      (self().constructor as typeof TestCase).fixtures(":all");
 
       if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
         expect([...self().fixtureTableNames].sort()).toEqual([
@@ -1144,7 +1142,7 @@ describe("FasterFixturesTest", () => {
 
     await loadExtraFixture("posts");
     expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "posts")).toBeTruthy();
-    (self().constructor as typeof ActiveRecord.TestCase).setupFixtureAccessors("posts");
+    (self().constructor as typeof TestCase).setupFixtureAccessors("posts");
     expect(
       (await (self() as unknown as { posts(name: string): Promise<Post> }).posts("welcome")).title,
     ).toBe("Welcome to the weblog");

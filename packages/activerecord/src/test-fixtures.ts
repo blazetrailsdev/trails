@@ -44,7 +44,6 @@ import { ensureCanonicalTables } from "./support/canonical-table-rebuild.js";
 export type { FixtureName } from "./test-helpers/fixtures-registry.js";
 import { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
-import type { TestCase as ActiveRecordTestCase } from "./cases/test-case.js";
 import { registerModel } from "./associations.js";
 import type { WithTransactionalFixturesOptions } from "./test-fixtures/with-transactional-fixtures.js";
 import { eagerWarmSchemaCache } from "./support/schema-cache-dump.js";
@@ -595,7 +594,9 @@ type FixturesOptions = WithTransactionalFixturesOptions & {
 
 type FixturesResult = {
   readonly fixtureTableNames: string[];
-  readonly self: () => ActiveRecordTestCase & Record<string, unknown>;
+  readonly self: () => TestFixtures & {
+    createFixtures(...fixtureSetNames: string[]): Promise<FixtureSet[]>;
+  } & Record<string, unknown>;
   readonly canonicalTables: (
     adapter: Parameters<typeof ensureCanonicalTables>[0],
     names: readonly string[],
@@ -625,11 +626,15 @@ const testCases = new WeakMap<object, { testCase: TestFixtures; pending: number 
 
 let currentTestCase: TestFixtures | null = null;
 
+function activeRecordTestCase(): TestCaseClass {
+  return (ActiveRecord as unknown as { TestCase: TestCaseClass }).TestCase;
+}
+
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
   if (suite === undefined) {
     if (rootTestCaseClass === undefined) {
-      rootTestCaseClass = class extends ActiveRecord.TestCase {} as unknown as TestCaseClass;
-      rootTestCaseClass.fixturePaths = [...ActiveRecord.TestCase.fixturePaths, USE_FIXTURES_ROOT];
+      rootTestCaseClass = class extends activeRecordTestCase() {} as TestCaseClass;
+      rootTestCaseClass.fixturePaths = [...activeRecordTestCase().fixturePaths, USE_FIXTURES_ROOT];
     }
     return rootTestCaseClass;
   }
@@ -676,10 +681,6 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
   }
 }
 
-/**
- * @missingRailsCall before_setup — CONVERGEABLE activerecord-test-case-remaining-members-and-one-test-object
- * @missingRailsCall after_teardown — CONVERGEABLE activerecord-test-case-remaining-members-and-one-test-object
- */
 function registerFixtureHooks(klass: TestCaseClass): void {
   const registrations = registrationsFor(klass);
   registrations.count++;

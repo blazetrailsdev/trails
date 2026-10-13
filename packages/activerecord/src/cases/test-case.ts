@@ -28,7 +28,7 @@ export class TestCase extends ActiveSupportTestCase {
 
   createFixtures(...fixtureSetNames: string[]) {
     return FixtureSet.createFixtures(
-      ActiveRecord.TestCase.fixturePaths,
+      TestCase.fixturePaths,
       fixtureSetNames,
       this.fixtureClassNames,
     );
