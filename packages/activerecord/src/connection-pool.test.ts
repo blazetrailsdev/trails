@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import {
   Concurrent,
   Enumerator,
@@ -10,7 +10,6 @@ import {
   rbFPublicSend,
   rbFSend,
   rbObjIvarSet,
-  registerConstant,
   RuntimeError,
   Thread,
   ThreadError,
@@ -41,12 +40,9 @@ import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { load, register } from "./connection-adapters.js";
-import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
 
 interface AmbientPoolOptions {
   role?: string;
@@ -110,70 +106,6 @@ async function withSingleConnectionPool(block: (pool: ConnectionPool) => Promise
   } finally {
     await pool.disconnectBang();
   }
-}
-
-class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
-  constructor() {
-    super({});
-    this._rawConnection = this;
-  }
-  activeFlag = true;
-  override async active(): Promise<boolean> {
-    return this.activeFlag;
-  }
-  isInTransaction(): boolean {
-    return false;
-  }
-
-  async execute(_sql: string, _name?: string | null): Promise<Record<string, unknown>[]> {
-    return [];
-  }
-  async commit(): Promise<void> {}
-  async rollback(): Promise<void> {}
-  async createSavepoint(_name: string): Promise<void> {}
-  async releaseSavepoint(_name: string): Promise<void> {}
-  async rollbackToSavepoint(_name: string): Promise<void> {}
-  async selectAll(sql: string, _n?: string | null, _b?: unknown[]) {
-    return resultFromRowHashes(await this.execute(sql));
-  }
-  async selectOne(sql: string, _n?: string | null, _b?: unknown[]) {
-    return (await this.execute(sql))[0];
-  }
-  async selectValue(_s: string) {
-    return undefined;
-  }
-  async selectValues(_s: string) {
-    return [];
-  }
-  async selectRows(_s: string) {
-    return [];
-  }
-  async execQuery(sql: string, _n?: string | null, _b?: unknown[]) {
-    return resultFromRowHashes(await this.execute(sql));
-  }
-  async execInsert(sql: string, _n?: string | null, _b?: unknown[]) {
-    return resultFromRowHashes(await this.execute(sql));
-  }
-  async execDelete(_sql: string, _n?: string | null, _b?: unknown[]) {
-    return 0;
-  }
-  async execUpdate(_sql: string, _n?: string | null, _b?: unknown[]) {
-    return 0;
-  }
-  isWriteQuery(_sql: string) {
-    return false;
-  }
-  emptyInsertStatementValue() {
-    return "DEFAULT VALUES";
-  }
-}
-
-registerConstant("TransactionAwareTestAdapter", TransactionAwareTestAdapter);
-register("transaction_aware_test", "TransactionAwareTestAdapter");
-await load("transaction_aware_test");
-
-function makeTransactionAwarePool(size: number = 5): ConnectionPool {
-  return makeAmbientPool({ adapter: "transaction_aware_test", pool: size });
 }
 
 it("checkout after close", async () => {
@@ -1006,17 +938,6 @@ it("pin connection synchronize the connection", async () => {
   expect((await pool.leaseConnection()).lock).toBe(NullLock);
 });
 
-it("isConnected probes each pooled connection's connected state", async () => {
-  const pool = makePool();
-  const conn = await pool.checkout();
-  await conn.verifyBang();
-  expect(pool.isConnected()).toBe(true);
-  pool.checkin(conn);
-  await conn.disconnectBang();
-  expect(pool.connections.length).toBe(1);
-  expect(pool.isConnected()).toBe(false);
-});
-
 it("pin connection opens a transaction", async () => {
   const pool = makePool();
   expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(NullTransaction);
@@ -1086,32 +1007,6 @@ it("pin connection nesting lock inverse", async () => {
 
   await pool.unpinConnectionBang();
   expect((await pool.leaseConnection()).lock).toBe(NullLock);
-});
-
-it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang();
-
-  const conn = (await pool.checkout()) as TransactionAwareTestAdapter;
-  const verify = vi.spyOn(conn, "verifyBang");
-  const reconnect = vi.spyOn(conn, "reconnectBang").mockImplementation(async () => {
-    conn.activeFlag = true;
-  });
-
-  expect(await pool.checkout()).toBe(conn);
-  expect(verify).toHaveBeenCalledTimes(1);
-  expect(reconnect).not.toHaveBeenCalled();
-
-  conn.activeFlag = false;
-  const again = (await pool.checkout()) as TransactionAwareTestAdapter;
-  expect(again).toBe(conn);
-  expect(verify).toHaveBeenCalledTimes(2);
-  expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
-  expect(await again.active()).toBe(true);
-
-  verify.mockRestore();
-  reconnect.mockRestore();
-  await pool.unpinConnectionBang();
 });
 
 it("inspect does not show secrets", async () => {

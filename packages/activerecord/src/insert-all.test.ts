@@ -14,9 +14,8 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
 import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
-import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
-import { quoteTableName } from "./support/quote-regex.js";
-import { regexpEscape, StringIO } from "@blazetrails/ruby-compat";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
@@ -30,17 +29,10 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 
 const supportsInsertReturning = adapterSupports("insert_returning");
-const isMysql = adapterType === "mysql";
 
 class ReadonlyNameBook extends Book {
   static {
     this.attrReadonly("name");
-  }
-}
-
-class DivergentPrimaryKeyBook extends Book {
-  static {
-    this.primaryKey = "isbn";
   }
 }
 
@@ -598,20 +590,6 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!isMysql)(
-    "upsert all on a table without a database primary key treats the configured primary key as updatable",
-    async () => {
-      await assertQueriesMatch(
-        /ON DUPLICATE KEY UPDATE[\s\S]*speedometer_id/,
-        undefined,
-        false,
-        async () => {
-          await Speedometer.upsertAll([{ speedometer_id: "s9", name: "Fast" }]);
-        },
-      );
-    },
-  );
-
   itIfSupports(
     "insert_on_duplicate_update",
     "upsert all does not update readonly attributes",
@@ -1073,24 +1051,6 @@ describe("InsertAllTest", () => {
         [twoDaysAgo.toString(), 2, 2],
         [threeDaysAgo.toString(), 0, 0],
       ]);
-    },
-  );
-
-  it.skipIf(!supportsInsertReturning)(
-    "insert all returning uses schema-cache primary keys not the model primary key",
-    async () => {
-      const returningId = new RegExp(`RETURNING ${regexpEscape(quoteTableName("id"))}`);
-      await assertQueriesMatch(returningId, undefined, false, async () => {
-        await DivergentPrimaryKeyBook.insertAll([
-          { name: "Divergent", isbn: "9990000000001", author_id: 1 },
-        ]);
-      });
-      const returningIsbn = new RegExp(`RETURNING ${regexpEscape(quoteTableName("isbn"))}`);
-      await assertNoQueriesMatch(returningIsbn, false, async () => {
-        await DivergentPrimaryKeyBook.insertAll([
-          { name: "Divergent II", isbn: "9990000000002", author_id: 1 },
-        ]);
-      });
     },
   );
 

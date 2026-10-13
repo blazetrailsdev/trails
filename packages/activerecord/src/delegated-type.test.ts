@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
-import { Module, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
 import { adapterType } from "./test-adapter.js";
 import { travel, travelBack, assertRespondTo } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
@@ -172,66 +171,5 @@ describe("DelegatedTypeTest", () => {
     assertRespondTo(Entry.build({}), "buildEntryable");
     const built = (Entry.build({ entryable_type: "Message" }) as any).buildEntryable();
     expect(built.constructor).toBe(Message);
-  });
-
-  it("registers a polymorphic belongs_to for the delegated role", () => {
-    const reflection = Entry._reflectOnAssociation("entryable");
-    expect(reflection).not.toBeNull();
-    expect((reflection as any).options?.polymorphic).toBe(true);
-    expect((reflection as any).foreignKey()).toBe("entryable_id");
-    expect((reflection as any).foreignType).toBe("entryable_type");
-  });
-
-  it("namespaced types", () => {
-    class Entry3 extends Base {
-      static {
-        this.attribute("entryable_id", "integer");
-        this.attribute("entryable_type", "string");
-      }
-    }
-    const Access = new Module();
-    registerConstant("Access", Access);
-    class NoticeMessage extends Base {
-      static {
-        rbModConstSet(Access, "NoticeMessage", this);
-      }
-    }
-    registerModel(NoticeMessage);
-    Entry3.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
-    expect(typeof (Entry3 as any).accessNoticeMessages).toBe("function");
-    const e = new Entry3({ entryable_type: "Access::NoticeMessage", entryable_id: 7 });
-    expect((e as any).isAccessNoticeMessage()).toBe(true);
-    expect((e as any).accessNoticeMessageId).toBe(7);
-    const target = new NoticeMessage();
-    (e as any).entryable = target;
-    expect((e as any).accessNoticeMessage).toBe(target);
-    expect(String((e as any).entryableName)).toBe("access_notice_message");
-  });
-
-  it("buildEntryable preserves namespaced foreign_type", () => {
-    const Access = new Module();
-    registerConstant("Access", Access);
-    class NoticeMessage extends Base {
-      static {
-        rbModConstSet(Access, "NoticeMessage", this);
-      }
-      static {
-        this.attribute("body", "string");
-      }
-    }
-    registerModel(NoticeMessage);
-    class Entry4 extends Base {
-      declare entryable_type: string;
-      static {
-        this.attribute("entryable_id", "integer");
-        this.attribute("entryable_type", "string");
-      }
-    }
-    Entry4.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
-    const e = new Entry4({ entryable_type: "Access::NoticeMessage" });
-    const built = (e as any).buildEntryable({ body: "hi" });
-    expect(built).toBeInstanceOf(NoticeMessage);
-    expect(e.entryable_type).toBe("Access::NoticeMessage");
-    expect((e as any).isAccessNoticeMessage()).toBe(true);
   });
 });

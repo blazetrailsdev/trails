@@ -1169,9 +1169,10 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
       for (const tc of file.testCases) {
         if (!isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
-        const stub = pathIndex
-          .get(normPath(tc.ancestors, tc.description))
-          ?.find((i: number) => !consumedTs.has(i) && tsTests[i].pending);
+        const isStub = (i: number) => !consumedTs.has(i) && tsTests[i].pending;
+        const stub =
+          pathIndex.get(normPath(tc.ancestors, tc.description))?.find(isStub) ??
+          descIndex.get(normalizeErb(tc.description))?.find(isStub);
         if (stub !== undefined) consumedTs.add(stub);
       }
 

@@ -54,6 +54,44 @@ function makePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ pool: size });
 }
 
+it("isConnected probes each pooled connection's connected state", async () => {
+  const pool = makePool();
+  const conn = await pool.checkout();
+  await conn.verifyBang();
+  expect(pool.isConnected()).toBe(true);
+  pool.checkin(conn);
+  await conn.disconnectBang();
+  expect(pool.connections.length).toBe(1);
+  expect(pool.isConnected()).toBe(false);
+});
+
+it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
+  const pool = makePool();
+  await pool.pinConnectionBang(false);
+
+  const conn = await pool.checkout();
+  const verify = vi.spyOn(conn, "verifyBang");
+  const active = vi.spyOn(conn, "active");
+  const reconnect = vi.spyOn(conn, "reconnectBang").mockImplementation(async () => {
+    active.mockRestore();
+  });
+
+  expect(await pool.checkout()).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(1);
+  expect(reconnect).not.toHaveBeenCalled();
+
+  active.mockResolvedValue(false);
+  const again = await pool.checkout();
+  expect(again).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(2);
+  expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
+  expect(await again.active()).toBe(true);
+
+  verify.mockRestore();
+  reconnect.mockRestore();
+  await pool.unpinConnectionBang();
+});
+
 it("verifyBang on a checked-out adapter establishes the raw connection on every lane", async () => {
   const pool = makePool();
   const conn = await pool.checkout();
