@@ -770,6 +770,8 @@ describe("ARRAY_METHOD_TABLE", () => {
     expect(rbFSend([], "sample")).toBeNull();
     expect(rbFSend(a, "detect", undefined, (i: number) => i < 3)).toBe(1);
     expect(rbFSend(a, "detect", () => 0)).toEqual(a);
+    expect(rbFSend(a, "groupBy")).toEqual(a);
+    expect(rbFSend(a, "findAll")).toEqual(a);
     expect((rbFSend(a, "groupBy", (i: number) => i % 2) as Hash<number, number[]>).get(1)).toEqual([
       3, 1, 1,
     ]);

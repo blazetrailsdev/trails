@@ -55,14 +55,30 @@ function rbBlockCall<T, E, R>(
 }
 
 /**
+ * `enum_to_a` (`vendor/ruby/v3.3.11/enum.c:711`): the elements `each` yields,
+ * which is what a block-less member's enumerator (`RETURN_ENUMERATOR`) holds.
+ */
+function enumToA<T, E>(obj: Each<T, E>): Enumerated<E, T[]> {
+  const ary: T[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      ary.push(i);
+    },
+    () => ary,
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#group_by — `vendor/ruby/v3.3.11/enum.c:1157` `enum_group_by`,
  * pushing each element onto the Array under its block result (`group_by_i`, `:1115`).
  * @noRailsEquivalent PERMANENT
  */
 function groupBy<T, K, E = unknown>(
   this: Each<T, E>,
-  block: (i: T) => K,
-): Enumerated<E, Hash<K, T[]>> {
+  block?: (i: T) => K,
+): Enumerated<E, Hash<K, T[]> | T[]> {
+  if (!block) return enumToA(this);
   const hash = new Hash<K, T[]>();
   return rbBlockCall(
     this,
@@ -81,7 +97,8 @@ function groupBy<T, K, E = unknown>(
  * pushing each element whose block result `RTEST`s (`find_all_i`, `:456`).
  * @noRailsEquivalent PERMANENT
  */
-function findAll<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown): Enumerated<E, T[]> {
+function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
+  if (!block) return enumToA(this);
   const ary: T[] = [];
   return rbBlockCall(
     this,
@@ -126,7 +143,8 @@ function find<T, E = unknown>(this: Each<T, E>, ...argv: unknown[]): Enumerated<
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
-function map<T, R, E = unknown>(this: Each<T, E>, block: (i: T) => R): Enumerated<E, R[]> {
+function map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R): Enumerated<E, R[] | T[]> {
+  if (!block) return enumToA(this);
   const ary: R[] = [];
   return rbBlockCall(
     this,
