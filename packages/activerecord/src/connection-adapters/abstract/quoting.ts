@@ -25,6 +25,7 @@ import {
   rbObjAsString,
   rbObjClassname,
   rbObjRespondTo,
+  Rational,
   sprintf,
   TypeError,
 } from "@blazetrails/ruby-compat";
@@ -77,7 +78,12 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (value === false) return this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
   if (value instanceof BigDecimal) return value.toString("F");
-  if (typeof value === "number" || typeof value === "bigint" || value instanceof Number) {
+  if (
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    value instanceof Number ||
+    value instanceof Rational
+  ) {
     return rbObjAsString(value);
   }
   if (value instanceof BinaryData) return this.quotedBinary(value);
@@ -110,6 +116,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     typeof value === "number" ||
     value instanceof Number ||
     typeof value === "bigint" ||
+    value instanceof Rational ||
     typeof value === "string"
   ) {
     return value;

@@ -1107,10 +1107,8 @@ function revertedMigrationClass(node) {
   return hasDown ? classBody.parent : null;
 }
 
-/** The identifier `new (class … {})()` is assigned to, or null. */
-function instanceBinding(classNode) {
-  const instance = classNode.parent;
-  if (instance.type !== "NewExpression" || instance.callee !== classNode) return null;
+/** The identifier a `new` expression's instance is assigned to, or null. */
+function instanceTarget(instance) {
   const holder = instance.parent;
   const target =
     holder.type === "VariableDeclarator" && holder.init === instance
@@ -1119,6 +1117,31 @@ function instanceBinding(classNode) {
         ? holder.left
         : null;
   return target?.type === "Identifier" ? target : null;
+}
+
+function instanceBindings(classNode, sourceCode) {
+  const parent = classNode.parent;
+  if (parent.type === "NewExpression" && parent.callee === classNode) {
+    const target = instanceTarget(parent);
+    return target ? [{ target, site: classNode }] : [];
+  }
+  const named =
+    classNode.type === "ClassDeclaration"
+      ? classNode
+      : parent.type === "VariableDeclarator" && parent.init === classNode
+        ? parent
+        : null;
+  if (!named) return [];
+  const targets = [];
+  for (const variable of sourceCode.getDeclaredVariables(named)) {
+    for (const { identifier } of variable.references) {
+      const instance = identifier.parent;
+      if (instance.type !== "NewExpression" || instance.callee !== identifier) continue;
+      const target = instanceTarget(instance);
+      if (target) targets.push({ target, site: instance });
+    }
+  }
+  return targets;
 }
 
 const rule = {
@@ -1195,8 +1218,12 @@ const rule = {
 
     function recordMigrationCreate(table, node) {
       const classNode = revertedMigrationClass(node);
-      const binding = classNode && instanceBinding(classNode);
-      if (binding) migrationCreates.push({ table, node, variable: variableOf(binding) });
+      if (!classNode) return;
+      const instances = instanceBindings(classNode, sourceCode).map(({ target, site }) => ({
+        variable: variableOf(target),
+        site,
+      }));
+      if (instances.length > 0) migrationCreates.push({ table, instances });
     }
 
     function recordRevert(call) {
@@ -1362,9 +1389,11 @@ const rule = {
       // Deferred so creates and drops in any order across the file are matched.
       "Program:exit"() {
         const prefixes = sawSweepDrop ? sweptPrefixes : [];
-        for (const { table, node, variable } of migrationCreates) {
-          const reverted = reverts.some(
-            (r) => r.variable !== null && r.variable === variable && isWithin(node, r.scope),
+        for (const { table, instances } of migrationCreates) {
+          const reverted = instances.every(({ variable, site }) =>
+            reverts.some(
+              (r) => r.variable !== null && r.variable === variable && isWithin(site, r.scope),
+            ),
           );
           if (reverted) {
             dropped.add(table);
