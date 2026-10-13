@@ -8,9 +8,14 @@ import { extractOptionsBang } from "./hash-utils.js";
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
   const options = extractOptionsBang(methods);
   const names = methods;
-  const { to, prefix, allowNil } = options as unknown as DelegateOptions;
+  const {
+    to = null,
+    prefix = null,
+    allowNil = null,
+    private: priv = null,
+  } = options as unknown as DelegateOptions;
 
-  return Delegation.generate(this, names as string[], { to, prefix, allowNil });
+  return Delegation.generate(this, names as string[], { to, prefix, allowNil, private: priv });
 }
 
 export function delegateMissingTo<T extends object>(
