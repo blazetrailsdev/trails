@@ -1,5 +1,11 @@
 import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
-import { hashAset, rbCheckArrayType, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  hashAset,
+  rbCheckArrayType,
+  rbFSend,
+  rbModInstanceMethod,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
@@ -155,11 +161,12 @@ export function serializableAttributes(
   attributeNames: readonly string[],
 ): Record<string, unknown> {
   const readable = attributeNames.filter((n) => {
-    if (Object.hasOwn(this, n)) return true;
-    let link = Object.getPrototypeOf(this) as object | null;
-    while (link && !Object.hasOwn(link, n)) link = Object.getPrototypeOf(link) as object | null;
-    if (!link || !Object.hasOwn(link, "constructor")) return true;
-    return typeof Object.getOwnPropertyDescriptor(link, n)?.value !== "function";
+    if (Object.hasOwn(this, n) || !(n in this) || n in Object.prototype) return true;
+    let link = Object.getPrototypeOf(this) as object;
+    while (!Object.hasOwn(link, n)) link = Object.getPrototypeOf(link) as object;
+    if (typeof Object.getOwnPropertyDescriptor(link, n)!.value !== "function") return true;
+    const { owner } = rbModInstanceMethod(this.constructor as never, n);
+    return typeof owner === "function" && this instanceof owner;
   });
   return Object.fromEntries(indexWith(readable, (n) => this.readAttributeForSerialization(n)));
 }

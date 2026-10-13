@@ -170,11 +170,7 @@ describe("Serialization — trails-only coverage", () => {
     expect(
       readAttributeForSerialization.call(p as unknown as SerializationRecord, "greeting"),
     ).toBe("Hi Bob");
-    expect({ ...p.serializableHash() }).toEqual({ name: "Bob" });
-    expect({ ...p.serializableHash({ methods: ["greeting"] }) }).toEqual({
-      name: "Bob",
-      greeting: "Hi Bob",
-    });
+    expect({ ...p.serializableHash() }).toEqual({ name: "Bob", greeting: "Hi Bob" });
   });
 
   it("a caller option named __sync does not hijack the internal sync re-entry", () => {

@@ -3,6 +3,7 @@ import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
+import { queryConstraints } from "./persistence.js";
 import type { CallbackChain } from "@blazetrails/activesupport";
 import { Company as CanonicalCompany, Firm, Client } from "./test-helpers/models/company.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
@@ -499,8 +500,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("tree_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        (this as any)._queryConstraintsList = ["tree_id", "id"];
-        (this as any)._hasQueryConstraints = true;
+        queryConstraints.call(this, "tree_id", "id");
         this.hasOne("qcChild", {
           className: "QcChild",
           foreignKey: ["tree_id", "parent_id"],
@@ -529,7 +529,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     registerModel("QcChild", QcChild);
     const owner = new QcOwner({ tree_id: 5, id: 11, name: "Corp" });
     const child = new QcChild({ name: "Doc" });
-    owner.association("qcChild").setTarget(child as any);
+    owner.association("qcChild").setTarget(child);
     const saved = await owner.save();
     expect(saved).toBe(true);
     expect(child.isNewRecord()).toBe(false);
