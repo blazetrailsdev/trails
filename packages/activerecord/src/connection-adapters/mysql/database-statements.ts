@@ -42,7 +42,7 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 
 interface SupportsInsertReturningHost {
   /** @internal */
-  supportsInsertReturning(): Promise<boolean>;
+  supportsInsertReturning(): boolean;
 }
 
 interface AutoIncrementColumnHost {
@@ -104,7 +104,7 @@ export async function returningColumnValues(
   this: SupportsInsertReturningHost,
   result: Result,
 ): Promise<unknown[] | undefined> {
-  if (await this.supportsInsertReturning()) {
+  if (this.supportsInsertReturning()) {
     return first(result.rows);
   } else {
     return abstractReturningColumnValues.call(

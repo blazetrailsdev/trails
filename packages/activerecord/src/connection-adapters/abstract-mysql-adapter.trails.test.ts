@@ -32,6 +32,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
@@ -41,6 +42,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
@@ -50,6 +52,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(
@@ -61,6 +64,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn())).toBe(false);
@@ -75,7 +79,6 @@ describe("AbstractMysqlAdapter#supportsInsertReturning", () => {
     const databaseVersion = new Version(fullVersionString.split("-")[0], fullVersionString);
     return Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       pool: { serverVersion: () => databaseVersion },
-      fullVersion: async () => databaseVersion.fullVersionString,
       quoteColumnName: (c: string) => `\`${c}\``,
       sqlForInsert,
     });
@@ -83,7 +86,7 @@ describe("AbstractMysqlAdapter#supportsInsertReturning", () => {
 
   it("answers false on MySQL 8, which emits no RETURNING", async () => {
     const adapter = await makeAdapter("8.0.36");
-    expect(await adapter.supportsInsertReturning()).toBe(false);
+    expect(adapter.supportsInsertReturning()).toBe(false);
     expect(await adapter.sqlForInsert("INSERT INTO t (x) VALUES (1)", "id", [], null)).toEqual([
       "INSERT INTO t (x) VALUES (1)",
       [],
@@ -92,7 +95,7 @@ describe("AbstractMysqlAdapter#supportsInsertReturning", () => {
 
   it("answers true on MariaDB 10.5, which emits RETURNING", async () => {
     const adapter = await makeAdapter("10.5.0-MariaDB");
-    expect(await adapter.supportsInsertReturning()).toBe(true);
+    expect(adapter.supportsInsertReturning()).toBe(true);
     expect((await adapter.sqlForInsert("INSERT INTO t (x) VALUES (1)", "id", [], null))[0]).toBe(
       "INSERT INTO t (x) VALUES (1) RETURNING `id`",
     );

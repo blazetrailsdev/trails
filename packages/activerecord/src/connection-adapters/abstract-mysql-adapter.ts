@@ -292,12 +292,18 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  async supportsInsertReturning(): Promise<boolean> {
-    return (await this.isMariadb()) && (await this.databaseVersion).compare("10.5.0") >= 0;
+  /** @inventedArm test — CONVERGEABLE mysql-mariadb-predicate-reads-version-memo-synchronously */
+  supportsInsertReturning(): boolean {
+    const databaseVersion = this.databaseVersion as Version;
+    return (
+      /mariadb/i.test(databaseVersion.fullVersionString ?? "") &&
+      databaseVersion.compare("10.5.0") >= 0
+    );
   }
 
   async returnValueAfterInsert(column: Column): Promise<boolean> {
-    return (await this.supportsInsertReturning())
+    await this.databaseVersion;
+    return this.supportsInsertReturning()
       ? column.isAutoPopulated()
       : column.isAutoIncrementedByDb();
   }

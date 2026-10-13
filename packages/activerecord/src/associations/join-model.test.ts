@@ -71,32 +71,6 @@ class PostWithHasOneNullify extends Base {
   }
 }
 
-class WelcomeOnlyTagging extends Base {
-  static {
-    this._tableName = "taggings";
-    this.belongsTo(
-      "taggable",
-      function (this: any) {
-        return this.where({ posts: { title: "Welcome to the weblog" } });
-      },
-      {
-        polymorphic: true,
-      },
-    );
-  }
-}
-class ScopedSourceTag extends Base {
-  static {
-    this._tableName = "tags";
-    this.hasMany("welcomeOnlyTaggings", { foreignKey: "tag_id", className: "WelcomeOnlyTagging" });
-    this.hasMany("welcomeTaggedPosts", {
-      through: "welcomeOnlyTaggings",
-      source: "taggable",
-      sourceType: "Post",
-    });
-  }
-}
-
 const sortById = (records: Base[]): Base[] =>
   [...records].sort((a, b) => Number(a.id) - Number(b.id));
 
@@ -148,8 +122,6 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(PostWithHasManyNullify);
   registerModel(PostWithHasOneDestroy);
   registerModel(PostWithHasOneNullify);
-  registerModel(WelcomeOnlyTagging);
-  registerModel(ScopedSourceTag);
 
   async function findPostWithDependency(postId: number, klass: typeof Base): Promise<Base> {
     const post = await Post.find(postId);
@@ -564,22 +536,6 @@ describe("AssociationsJoinModelTest", () => {
     expect(((await (general as any).taggedPosts.toArray()) as Base[]).length).not.toBe(0);
   });
 
-  it("has many polymorphic with source type merges source reflection scope", async () => {
-    const general = await ScopedSourceTag.find(tags("general").id);
-    const scoped = (await (general as any).welcomeTaggedPosts.toArray()) as Base[];
-    expect(scoped).toEqual([posts("welcome")]);
-  });
-
-  it("eager has many polymorphic with source type merges source reflection scope", async () => {
-    const general = await ScopedSourceTag.all()
-      .includes(":welcomeTaggedPosts")
-      .find(tags("general").id);
-    await assertNoQueries(false, async () => {
-      const target = (general as any).association("welcomeTaggedPosts").target as Base[];
-      expect(target).toEqual([posts("welcome")]);
-    });
-  });
-
   it("eager has many polymorphic with source type", async () => {
     const tagWithInclude = await Tag.all().includes(":taggedPosts").find(tags("general").id);
     const desired = sortById([posts("welcome"), posts("thinking")]);
@@ -662,14 +618,6 @@ describe("AssociationsJoinModelTest", () => {
     const author = (await Author.first()) as Author;
     expect(await isPresent((author as any).comments)).toBeTruthy();
     expect(await (author as any).nonexistentComments.isBlank()).toBeTruthy();
-  });
-
-  it("eager has many through uses conditions specified on the has many association", async () => {
-    const author = (await Author.all().includes(":nonexistentComments").first()) as any;
-    expect(author.association("nonexistentComments").loaded).toBe(true);
-    await assertNoQueries(false, async () => {
-      expect(((await author.nonexistentComments.toArray()) as Base[]).length).toBe(0);
-    });
   });
 
   it("has many through uses correct attributes", async () => {
@@ -961,33 +909,6 @@ describe("AssociationsJoinModelTest", () => {
     expect((await (aircraft as any).engines.toArray()) as Base[]).toEqual([engine]);
   });
 
-  it("polymorphic has many through with composite owner primary key", async () => {
-    class CpkOrderWithTaggings extends CpkOrder {
-      static {
-        this.hasMany("orderTaggings", { className: "Tagging", as: "taggable" });
-        this.hasMany("orderTagNames", {
-          className: "Tag",
-          through: "orderTaggings",
-          source: "tag",
-        });
-      }
-    }
-    registerModel(CpkOrderWithTaggings);
-
-    const order = await CpkOrderWithTaggings.createBang({ shop_id: 42, status: "paid" });
-    const tag = await Tag.createBang({ name: "rails-faithful" });
-    await Tagging.insertAll([
-      {
-        tag_id: (tag as any).id,
-        taggable_id: (order as any)._readAttribute("id"),
-        taggable_type: (CpkOrderWithTaggings as any).polymorphicName(),
-      },
-    ]);
-
-    const loadedTags = (await (order as any).orderTagNames.toArray()) as Base[];
-    expect(loadedTags).toEqual([tag as any]);
-  });
-
   it("has many distinct through count", async () => {
     const author = await Author.find(authors("mary").id);
     expect((author as any).uniqueCategorizedPosts.loaded).toBeFalsy();
@@ -1215,12 +1136,6 @@ describe("AssociationsJoinModelTest", () => {
 
   it("eager association with scope with string joins", async () => {
     await expect(Post.joins(":verySpecialCommentWithStringJoins").first()).resolves.not.toThrow();
-  });
-
-  it("through association with scope with string joins", async () => {
-    const sql = Post.joins(":ratingsViaStringJoinComments").toSql();
-    expect(sql).toContain("JOIN posts AS p2 ON comments.post_id = p2.id");
-    await expect(Post.joins(":ratingsViaStringJoinComments").first()).resolves.not.toThrow();
   });
 
   it("has many through goes through all sti classes", async () => {

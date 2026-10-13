@@ -1624,7 +1624,7 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     expect(await adapter.supportsJson()).toBe(true);
     expect(adapter.supportsComments()).toBe(true);
     expect(adapter.supportsSavepoints()).toBe(true);
-    expect(await adapter.supportsInsertReturning()).toBe(true);
+    expect(adapter.supportsInsertReturning()).toBe(true);
     expect(adapter.supportsDdlTransactions()).toBe(true);
     expect(adapter.supportsAdvisoryLocks()).toBe(true);
     expect(adapter.supportsExplain()).toBe(true);

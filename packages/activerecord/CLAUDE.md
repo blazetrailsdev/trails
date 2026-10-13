@@ -436,6 +436,11 @@ answer, and ask it in line:
 - `InsertAll#primary_keys` (`insert_all.rb:61-63`) reads
   `@model.schema_cache.primary_keys(model.table_name)`, and
   `InsertAll#initialize` reads it and `supports_insert_returning?` (`:39`).
+- `sql_for_insert`
+  (`activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:702-717`)
+  reads `supports_insert_returning?`, which is a `database_version` comparison
+  on SQLite and MySQL, and for a nil `pk` runs `primary_key(table_ref)`, a
+  query.
 
 - `PostgreSQL::Quoting#lookup_cast_type_from_column`
   (`postgresql/quoting.rb:189-192`) runs `verify! if type_map.nil?`, which
@@ -462,6 +467,18 @@ and the synchronous body peeks at the warmed value.**
   client library.
 - `InsertAll` awaits its facts before construction, and `primaryKeys` returns
   the warmed list.
+- `supportsInsertReturning` reads the pool's memoized server version, which
+  `configureConnection` warms through `checkVersion`. `sqlForInsert` is
+  synchronous and peeks the schema cache for a nil `pk`. `execInsert`, its one
+  caller, awaits `databaseVersion` and then Rails' own `primaryKey(tableRef)`
+  query and passes the answer in, so the statements logged are the ones
+  `exec_insert` (`database_statements.rb:157-160`) logs. Warming through
+  `schemaCache.primaryKeys` was rejected: it adds a `data_source_exists?` query
+  and memoizes, which `SQLite3AdapterTest#test_insert_logged` sees. The repo
+  owner ruled that `sqlForInsert` returns synchronously under this section
+  (2026-10-08, story
+  `converge-sql-for-insert-and-supports-insert-returning-to-sync`), and the
+  warm step in `execInsert` is the permanent consequence.
 
 - `lookupCastTypeFromColumn` keeps Rails' line and cannot await it. On a cold
   type map it starts `verifyBang` and the lookup raises `TypeError` off the
@@ -494,7 +511,10 @@ This is a genuine language shortcoming, ratified repo-wide here. The omitted
 `@noRailsEquivalent PERMANENT`, and MySQL's escape-state arm carries
 `@inventedArm if — PERMANENT`, `buildFixtureSql`'s warm step carries
 `@inventedArm if` / `verifyBang — PERMANENT`, and `mismatchedForeignKey`'s
-promise arm carries `@inventedArm then — PERMANENT`, all against this section.
+promise arm carries `@inventedArm then — PERMANENT`, `sqlForInsert`'s omitted
+`primary_key` carries `@missingRailsCall … — PERMANENT`, and `execInsert`'s
+warm step carries `@inventedArm if` / `databaseVersion` /
+`supportsInsertReturning` / `primaryKey — PERMANENT`, all against this section.
 A new instance is not a new decision to argue.
 
 ## Fixtures load from `.ts` modules as well as YAML (`FixtureSet::File`)

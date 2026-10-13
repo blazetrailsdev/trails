@@ -47,9 +47,10 @@ async function resolveConnectionFacts(
   connection: any,
 ): Promise<ResolvedConnectionFacts> {
   const cache = connection.schemaCache;
+  await connection.databaseVersion;
   const supportsInsertReturning =
     typeof connection.supportsInsertReturning === "function"
-      ? await connection.supportsInsertReturning()
+      ? connection.supportsInsertReturning()
       : false;
   const supportsInsertOnDuplicateSkip =
     typeof connection.supportsInsertOnDuplicateSkip === "function"

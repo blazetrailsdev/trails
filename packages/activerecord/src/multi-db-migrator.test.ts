@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { puts, stdout } from "@blazetrails/ruby-compat";
 import { Migration, Migrator } from "./index.js";
 import { MigrationContext } from "./migration.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
+import type { SchemaMigration } from "./schema-migration.js";
+import type { InternalMetadata } from "./internal-metadata.js";
 import type { MigrationProxy } from "./migration.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { Base } from "./base.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
@@ -51,8 +51,8 @@ function migratorClass(
 }
 
 describe("MultiDbMigratorTest", () => {
-  let adapterA: DatabaseAdapter;
-  let adapterB: DatabaseAdapter;
+  let poolA: ConnectionPool;
+  let poolB: ConnectionPool;
   let schemaMigrationA: SchemaMigration;
   let schemaMigrationB: SchemaMigration;
   let internalMetadataA: InternalMetadata;
@@ -62,46 +62,22 @@ describe("MultiDbMigratorTest", () => {
   let verboseWas: boolean | undefined;
 
   beforeEach(async () => {
-    adapterA = await Base.leaseConnection();
-    adapterB = await ARUnit2Model.leaseConnection();
-    schemaMigrationA = new SchemaMigration(adapterA.pool);
-    schemaMigrationB = new SchemaMigration(adapterB.pool);
-    internalMetadataA = new InternalMetadata(adapterA.pool);
-    internalMetadataB = new InternalMetadata(adapterB.pool);
-    await schemaMigrationA.createTable();
-    await schemaMigrationB.createTable();
-    await schemaMigrationA.deleteAllVersions();
-    await schemaMigrationB.deleteAllVersions();
+    poolA = Base.connectionPool();
+    poolB = ARUnit2Model.connectionPool();
 
-    migrationsA = [
-      migrationProxy({
-        version: 1,
-        name: "ValidPeopleHaveLastNames",
-        migration: () => anonymousMigration("ValidPeopleHaveLastNames", 1),
-      }),
-      migrationProxy({
-        version: 2,
-        name: "WeNeedReminders",
-        migration: () => anonymousMigration("WeNeedReminders", 2),
-      }),
-      migrationProxy({
-        version: 3,
-        name: "InnocentJointable",
-        migration: () => anonymousMigration("InnocentJointable", 3),
-      }),
-    ];
-    migrationsB = [
-      migrationProxy({
-        version: 1,
-        name: "PeopleHaveHobbies",
-        migration: () => anonymousMigration("PeopleHaveHobbies", 1),
-      }),
-      migrationProxy({
-        version: 2,
-        name: "PeopleHaveDescriptions",
-        migration: () => anonymousMigration("PeopleHaveDescriptions", 2),
-      }),
-    ];
+    await poolA.schemaMigration.createTable();
+    await poolB.schemaMigration.createTable();
+
+    await poolA.schemaMigration.deleteAllVersions().catch(() => null);
+    await poolB.schemaMigration.deleteAllVersions().catch(() => null);
+
+    schemaMigrationA = poolA.schemaMigration;
+    internalMetadataA = poolA.internalMetadata;
+    migrationsA = new MigrationContext(PATH_A, schemaMigrationA, internalMetadataA).migrations;
+
+    schemaMigrationB = poolB.schemaMigration;
+    internalMetadataB = poolB.internalMetadata;
+    migrationsB = new MigrationContext(PATH_B, schemaMigrationB, internalMetadataB).migrations;
 
     verboseWas = Migration.verbose;
 
@@ -113,8 +89,8 @@ describe("MultiDbMigratorTest", () => {
   });
 
   afterEach(async () => {
-    await schemaMigrationA.deleteAllVersions().catch(() => null);
-    await schemaMigrationB.deleteAllVersions().catch(() => null);
+    await poolA.schemaMigration.deleteAllVersions().catch(() => null);
+    await poolB.schemaMigration.deleteAllVersions().catch(() => null);
 
     Migration.verbose = verboseWas;
     Migration.prototype["puts"] = function (...args: unknown[]) {
@@ -124,15 +100,12 @@ describe("MultiDbMigratorTest", () => {
 
   it("schema migration is different for different connections", () => {
     expect(schemaMigrationA).not.toBe(schemaMigrationB);
-    expect(adapterA).not.toBe(adapterB);
-    expect(Base.connectionPool().poolConfig.connectionDescriptor.name).toBe("ActiveRecord::Base");
-    expect(ARUnit2Model.connectionPool().poolConfig.connectionDescriptor.name).toBe("ARUnit2Model");
+    expect(schemaMigrationA["_pool"]).not.toBe(schemaMigrationB["_pool"]);
+    expect(poolA.poolConfig.connectionDescriptor.name).toBe("ActiveRecord::Base");
+    expect(poolB.poolConfig.connectionDescriptor.name).toBe("ARUnit2Model");
   });
 
   it("finds migrations", () => {
-    const migratorA = new Migrator("up", migrationsA, schemaMigrationA, internalMetadataA);
-    const migratorB = new Migrator("up", migrationsB, schemaMigrationB, internalMetadataB);
-
     const listA = [
       [1, "ValidPeopleHaveLastNames"],
       [2, "WeNeedReminders"],
@@ -144,12 +117,12 @@ describe("MultiDbMigratorTest", () => {
     ];
 
     listA.forEach(([version, name], i) => {
-      expect(Number(migratorA.migrations[i].version)).toBe(version);
-      expect(migratorA.migrations[i].name).toBe(name);
+      expect(Number(migrationsA[i].version)).toBe(version);
+      expect(migrationsA[i].name).toBe(name);
     });
     listB.forEach(([version, name], i) => {
-      expect(Number(migratorB.migrations[i].version)).toBe(version);
-      expect(migratorB.migrations[i].name).toBe(name);
+      expect(Number(migrationsB[i].version)).toBe(version);
+      expect(migrationsB[i].name).toBe(name);
     });
   });
 

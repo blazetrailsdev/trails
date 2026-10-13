@@ -267,13 +267,6 @@ export class EnvironmentStorageError extends ActiveRecordError {
 let migrationVerbose: boolean | undefined = true;
 
 /** @internal */
-function writeMigrationMessage(text = ""): void {
-  if (migrationVerbose) {
-    stdout.write(`${text}\n`);
-  }
-}
-
-/** @internal */
 function announceMigrationText(header: string, message: string): string {
   const text = `${header}: ${message}`;
   const pad = Math.max(0, 75 - text.length);
