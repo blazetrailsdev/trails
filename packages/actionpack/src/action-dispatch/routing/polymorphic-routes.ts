@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
 import { Routing } from "../../namespaces.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
@@ -106,8 +106,9 @@ export function polymorphicPath(
   const opts = { ...options };
   const action = opts.action;
   delete opts.action;
+  const type = "path";
 
-  return HelperMethodBuilder.polymorphicMethod(this, recordOrHashOrArray, action, "path", opts);
+  return HelperMethodBuilder.polymorphicMethod(this, recordOrHashOrArray, action, type, opts);
 }
 
 export function editPolymorphicUrl(
@@ -194,10 +195,11 @@ export class HelperMethodBuilder {
   }
 
   static get(action: string | null | undefined, type: "path" | "url"): HelperMethodBuilder {
-    const key = action ?? null;
-    const cached = HelperMethodBuilder.CACHE[type].get(key);
-    if (cached) return cached;
-    return HelperMethodBuilder.build(key, type);
+    return fetch(
+      HelperMethodBuilder.CACHE[type],
+      action,
+      rbBlock(() => HelperMethodBuilder.build(action, type)),
+    ) as HelperMethodBuilder;
   }
 
   static url(): HelperMethodBuilder {
@@ -208,7 +210,7 @@ export class HelperMethodBuilder {
     return HelperMethodBuilder.CACHE.path.get(null)!;
   }
 
-  static build(action: string | null, type: "path" | "url"): HelperMethodBuilder {
+  static build(action: string | null | undefined, type: "path" | "url"): HelperMethodBuilder {
     const prefix = action ? `${action}_` : "";
     const suffix = type;
     return action === "new"

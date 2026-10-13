@@ -22,6 +22,7 @@ import {
   assertNotPredicate,
   assertNotRespondTo,
   assertPredicate,
+  assertRaises,
   assertRespondTo,
   isBlank,
   isPresent,
@@ -2970,22 +2971,25 @@ describe("RelationTest", () => {
     ["references", (rel) => rel.references()],
     ["includes", (rel) => rel.includes()],
     ["preload", (rel) => rel.preload()],
-    ["eager_load", (rel) => rel.eagerLoad()],
+    ["eager load", (rel) => rel.eagerLoad()],
     ["group", (rel) => rel.group()],
     ["order", (rel) => rel.order()],
     ["reorder", (rel) => rel.reorder()],
     ["reselect", (rel) => rel.reselect()],
     ["unscope", (rel) => rel.unscope()],
     ["joins", (rel) => rel.joins()],
-    ["left_joins", (rel) => rel.leftJoins()],
-    ["left_outer_joins", (rel) => rel.leftOuterJoins()],
-    ["optimizer_hints", (rel) => rel.optimizerHints()],
+    ["left joins", (rel) => rel.leftJoins()],
+    ["left outer joins", (rel) => rel.leftOuterJoins()],
+    ["optimizer hints", (rel) => rel.optimizerHints()],
     ["annotate", (rel) => rel.annotate()],
     ["regroup", (rel) => rel.regroup()],
   ];
   for (const [method, invoke] of noArgGuardedMethods) {
-    it(`no arguments to ${method} raise errors`, () => {
-      expect(() => invoke(Topic.all())).toThrow(`The method .${method}() must contain arguments.`);
+    it(`no arguments to ${method} raise errors`, async () => {
+      const error = await assertRaises([ArgumentError], {}, () => invoke(Topic));
+      expect(error.message).toBe(
+        `The method .${method.replaceAll(" ", "_")}() must contain arguments.`,
+      );
     });
   }
 
