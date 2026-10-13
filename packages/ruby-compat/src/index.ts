@@ -451,3 +451,7 @@ export {
   RFC3986_PARSER,
   URI,
 } from "./uri.js";
+
+import { Kernel } from "./include.js";
+import { abort } from "./process-adapter.js";
+Kernel.abort = abort;

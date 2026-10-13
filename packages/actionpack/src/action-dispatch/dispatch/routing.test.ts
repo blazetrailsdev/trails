@@ -2,11 +2,18 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet, type DrawCallback, type NamedRouteHelper } from "../routing/route-set.js";
 import { bodyFromString, bodyToString, MockRequest } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
-import { controllerConstants, type Request } from "../http/request.js";
+import { controllerConstants, Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertDeprecated, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertDeprecated,
+  assertNothingRaised,
+  assertRaises,
+  stub,
+} from "@blazetrails/activesupport";
+import { include } from "@blazetrails/ruby-compat";
+import { Base } from "../../action-controller/base.js";
 import { deprecator } from "../deprecator.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { RoutedRackApp } from "../../test-helpers/abstract-unit.js";
@@ -2644,9 +2651,70 @@ describe("TestUrlGenerationErrors", () => {
 });
 
 describe("TestAltApp", () => {
-  it.skip("alt request without header", () => {});
-  it.skip("alt request with matched header", () => {});
-  it.skip("alt request with unmatched header", () => {});
+  class AltRequest extends Request {
+    constructor(env: Record<string, unknown>) {
+      super(env);
+      this.pathParameters = {};
+      this.pathInfo = "/";
+      this.scriptName = "";
+    }
+
+    override get requestMethod(): string {
+      return "GET";
+    }
+
+    override get ip(): string {
+      return "127.0.0.1";
+    }
+
+    get xHeader(): string {
+      return (this.env["HTTP_X_HEADER"] as string | undefined) ?? "";
+    }
+  }
+
+  class XHeader {
+    call(_env: Record<string, unknown>) {
+      return [200, { "Content-Type": "text/html" }, bodyFromString("XHeader")];
+    }
+  }
+
+  class AltApp {
+    call(_env: Record<string, unknown>) {
+      return [200, { "Content-Type": "text/html" }, bodyFromString("Alternative App")];
+    }
+  }
+
+  const AltRoutes = new (class extends RouteSet {
+    override requestClass(): typeof AltRequest {
+      return AltRequest;
+    }
+  })();
+  AltRoutes.draw(function () {
+    this.get("/", { to: new XHeader(), constraints: { xHeader: /HEADER/ } });
+    this.get("/", { to: new AltApp() });
+  });
+
+  const APP = IntegrationTest.buildApp(AltRoutes);
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  it("alt request without header", async () => {
+    await t.get("/");
+    expect(t.response.body).toBe("Alternative App");
+  });
+
+  it("alt request with matched header", async () => {
+    await t.get("/", { headers: { HTTP_X_HEADER: "HEADER" } });
+    expect(t.response.body).toBe("XHeader");
+  });
+
+  it("alt request with unmatched header", async () => {
+    await t.get("/", { headers: { HTTP_X_HEADER: "NON_MATCH" } });
+    expect(t.response.body).toBe("Alternative App");
+  });
 });
 
 describe("TestNamespaceWithControllerOption", () => {
@@ -2663,9 +2731,40 @@ describe("TestNamespaceWithControllerOption", () => {
 });
 
 describe("TestGlobRoutingMapper", () => {
-  it.skip("glob constraint", () => {});
-  it.skip("glob constraint skip route", () => {});
-  it.skip("glob constraint skip all", () => {});
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    this.get("/*id", { to: this.redirect("/not_cars"), constraints: { id: /dummy/ } });
+    this.get("/cars", { to: ok });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  it("glob constraint", async () => {
+    await t.get("/dummy");
+    expect(t.response.code).toBe("301");
+    expect(t.response.header.get("Location")!.match("/[^/]+$")![0]).toBe("/not_cars");
+  });
+
+  it("glob constraint skip route", async () => {
+    await t.get("/cars");
+    expect(t.response.code).toBe("200");
+  });
+
+  it("glob constraint skip all", async () => {
+    await t.get("/missing");
+    expect(t.response.code).toBe("404");
+  });
 });
 
 describe("TestOptimizedNamedRoutes", () => {
@@ -2745,7 +2844,50 @@ describe("TestOptimizedNamedRoutes", () => {
 });
 
 describe("TestNamedRouteUrlHelpers", () => {
-  it.skip("URL helpers do not ignore nil parameters when using non-optimized routes", () => {});
+  class CategoriesController extends Base {
+    async show(): Promise<void> {
+      await this.render({ plain: "categories#show" });
+    }
+  }
+
+  class ProductsController extends Base {
+    async show(): Promise<void> {
+      await this.render({ plain: "products#show" });
+    }
+  }
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.scope({ module: "test_named_route_url_helpers" }, () => {
+      this.get("/categories/:id", { to: "categories#show", as: "category" });
+      this.get("/products/:id", { to: "products#show", as: "product" });
+    });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestNamedRouteUrlHelpers extends IntegrationTest {
+    declare productPath: (...args: unknown[]) => string;
+  }
+  include(TestNamedRouteUrlHelpers, Routes.urlHelpers());
+
+  let t: TestNamedRouteUrlHelpers;
+  beforeEach(({ task }) => {
+    controllerConstants.set("test_named_route_url_helpers/categories", CategoriesController);
+    controllerConstants.set("test_named_route_url_helpers/products", ProductsController);
+    t = new TestNamedRouteUrlHelpers(task.name);
+    t.app = APP;
+  });
+
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
+  it("URL helpers do not ignore nil parameters when using non-optimized routes", async () => {
+    await stub(Routes, "isOptimizeRoutesGeneration", false, undefined, async () => {
+      await t.get("/categories/1");
+      assertResponse("success");
+      await assertRaises([UrlGenerationError], {}, () => t.productPath(null));
+    });
+  });
 });
 
 describe("TestUrlConstraints", () => {
@@ -2841,21 +2983,166 @@ describe("TestInvalidUrls", () => {
 });
 
 describe("TestOptionalRootSegments", () => {
-  it.skip("optional root segments", () => {});
+  const Routes = IntegrationTest.stubControllers((routes) => {
+    routes.draw(function () {
+      this.get("/(page/:page)", { to: "pages#index", as: "root" });
+    });
+    return routes;
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestOptionalRootSegments extends IntegrationTest {
+    declare rootPath: (...args: unknown[]) => string;
+  }
+  include(TestOptionalRootSegments, Routes.urlHelpers());
+
+  let t: TestOptionalRootSegments;
+  beforeEach(({ task }) => {
+    t = new TestOptionalRootSegments(task.name);
+    t.app = APP;
+  });
+
+  it("optional root segments", async () => {
+    await t.get("/");
+    expect(t.response.body).toBe("pages#index");
+    expect(t.rootPath()).toBe("/");
+
+    await t.get("/page/1");
+    expect(t.response.body).toBe("pages#index");
+    expect(t.request.params.page).toBe("1");
+    expect(t.rootPath("1")).toBe("/page/1");
+    expect(t.rootPath({ page: "1" })).toBe("/page/1");
+  });
 });
 
 describe("TestPortConstraints", () => {
-  it.skip("integer port constraints", () => {});
-  it.skip("string port constraints", () => {});
-  it.skip("array port constraints", () => {});
-  it.skip("regexp port constraints", () => {});
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    this.get("/integer", { to: ok, constraints: { port: 8080 } });
+    this.get("/string", { to: ok, constraints: { port: "8080" } });
+    this.get("/array/:idx", { to: ok, constraints: { port: [8080], idx: ["first", "last"] } });
+    this.get("/regexp", { to: ok, constraints: { port: /8080/ } });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
+  it("integer port constraints", async () => {
+    await t.get("http://www.example.com/integer");
+    assertResponse("not_found");
+
+    await t.get("http://www.example.com:8080/integer");
+    assertResponse("success");
+  });
+
+  it("string port constraints", async () => {
+    await t.get("http://www.example.com/string");
+    assertResponse("not_found");
+
+    await t.get("http://www.example.com:8080/string");
+    assertResponse("success");
+  });
+
+  it("array port constraints", async () => {
+    await t.get("http://www.example.com/array");
+    assertResponse("not_found");
+
+    await t.get("http://www.example.com:8080/array/middle");
+    assertResponse("not_found");
+
+    await t.get("http://www.example.com:8080/array/first");
+    assertResponse("success");
+  });
+
+  it("regexp port constraints", async () => {
+    await t.get("http://www.example.com/regexp");
+    assertResponse("not_found");
+
+    await t.get("http://www.example.com:8080/regexp");
+    assertResponse("success");
+  });
 });
 
 describe("TestFormatConstraints", () => {
-  it.skip("string format constraints", () => {});
-  it.skip("regexp format constraints", () => {});
-  it.skip("enforce with format true with constraint", () => {});
-  it.skip("enforce with string", () => {});
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    this.get("/string", { to: ok, constraints: { format: "json" } });
+    this.get("/regexp", { to: ok, constraints: { format: /json/ } });
+    this.get("/json_only", { to: ok, format: true, constraints: { format: /json/ } });
+    this.get("/xml_only", { to: ok, format: "xml" });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
+  it("string format constraints", async () => {
+    await t.get("http://www.example.com/string");
+    assertResponse("success");
+
+    await t.get("http://www.example.com/string.json");
+    assertResponse("success");
+
+    await t.get("http://www.example.com/string.html");
+    assertResponse("not_found");
+  });
+
+  it("regexp format constraints", async () => {
+    await t.get("http://www.example.com/regexp");
+    assertResponse("success");
+
+    await t.get("http://www.example.com/regexp.json");
+    assertResponse("success");
+
+    await t.get("http://www.example.com/regexp.html");
+    assertResponse("not_found");
+  });
+
+  it("enforce with format true with constraint", async () => {
+    await t.get("http://www.example.com/json_only.json");
+    assertResponse("success");
+
+    await t.get("http://www.example.com/json_only.html");
+    assertResponse("not_found");
+
+    await t.get("http://www.example.com/json_only");
+    assertResponse("not_found");
+  });
+
+  it("enforce with string", async () => {
+    await t.get("http://www.example.com/xml_only.xml");
+    assertResponse("success");
+
+    await t.get("http://www.example.com/xml_only");
+    assertResponse("success");
+
+    await t.get("http://www.example.com/xml_only.json");
+    assertResponse("not_found");
+  });
 });
 
 describe("TestCallableConstraintValidation", () => {
@@ -2870,8 +3157,40 @@ describe("TestCallableConstraintValidation", () => {
 });
 
 describe("TestRouteDefaults", () => {
-  it.skip("route options are required for url for", () => {});
-  it.skip("route defaults are not required for url for", () => {});
+  const Routes = IntegrationTest.stubControllers((routes) => {
+    routes.draw(function () {
+      this.resources("posts", { bucket_type: "post" });
+      this.resources("projects", { defaults: { bucket_type: "project" } });
+    });
+    return routes;
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestRouteDefaults extends IntegrationTest {}
+  include(TestRouteDefaults, Routes.urlHelpers());
+
+  let t: TestRouteDefaults;
+  beforeEach(({ task }) => {
+    t = new TestRouteDefaults(task.name);
+    t.app = APP;
+  });
+
+  it("route options are required for url for", async () => {
+    await assertRaises([UrlGenerationError], {}, () => {
+      t.urlFor({ controller: "posts", action: "show", id: 1, onlyPath: true });
+    });
+
+    expect(
+      t.urlFor({ controller: "posts", action: "show", id: 1, bucket_type: "post", onlyPath: true }),
+    ).toBe("/posts/1");
+  });
+
+  it("route defaults are not required for url for", () => {
+    expect(t.urlFor({ controller: "projects", action: "show", id: 1, onlyPath: true })).toBe(
+      "/projects/1",
+    );
+  });
 });
 
 describe("TestRackAppRouteGeneration", () => {
@@ -2986,13 +3305,78 @@ describe("TestMultipleNestedController", () => {
 });
 
 describe("TestRedirectInterpolation", () => {
-  it.skip("redirect escapes interpolated parameters with redirect proc", () => {});
-  it.skip("redirect escapes interpolated parameters with option proc", () => {});
-  it.skip("path redirect escapes interpolated parameters correctly", () => {});
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    this.get("/foo/:id", { to: this.redirect("/foo/bar/%{id}") });
+    this.get("/bar/:id", { to: this.redirect({ path: "/foo/bar/%{id}" }) });
+    this.get("/baz/:id", { to: this.redirect("/baz?id=%{id}&foo=?&bar=1#id-%{id}") });
+    this.get("/foo/bar/:id", { to: ok });
+    this.get("/baz", { to: ok });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  function verifyRedirect(url: string, status = 301): void {
+    expect(t.response.status).toBe(status);
+    expect(t.response.headers.get("Location")).toBe(url);
+    expect(t.response.body).toBe("");
+  }
+
+  it("redirect escapes interpolated parameters with redirect proc", async () => {
+    await t.get("/foo/1%3E");
+    verifyRedirect("http://www.example.com/foo/bar/1%3E");
+  });
+
+  it("redirect escapes interpolated parameters with option proc", async () => {
+    await t.get("/bar/1%3E");
+    verifyRedirect("http://www.example.com/foo/bar/1%3E");
+  });
+
+  it("path redirect escapes interpolated parameters correctly", async () => {
+    await t.get("/foo/1%201");
+    verifyRedirect("http://www.example.com/foo/bar/1%201");
+
+    await t.get("/baz/1%201");
+    verifyRedirect("http://www.example.com/baz?id=1+1&foo=?&bar=1#id-1%201");
+  });
 });
 
 describe("TestConstraintsAccessingParameters", () => {
-  it.skip("parameters are reset between constraint checks", () => {});
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    this.get("/:foo", { to: ok, constraints: (r: Request) => r.params.foo === "foo" });
+    this.get("/:bar", { to: ok });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  it("parameters are reset between constraint checks", async () => {
+    await t.get("/bar");
+    expect(t.request.params.foo).toBeUndefined();
+    expect(t.request.params.bar).toBe("bar");
+  });
 });
 
 describe("TestDefaultUrlOptions", () => {

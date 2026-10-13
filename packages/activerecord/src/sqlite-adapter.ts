@@ -46,6 +46,7 @@ export interface SqliteConnection {
   lastInsertRowId(): number | bigint | Promise<number | bigint>;
   close(): void | Promise<void>;
   isOpen(): boolean;
+  filename(dbName?: string): string | null | Promise<string | null>;
   readonly raw: unknown;
 }
 
@@ -80,6 +81,7 @@ export interface SyncSqliteConnection {
   lastInsertRowId(): number | bigint;
   close(): void;
   isOpen(): boolean;
+  filename(dbName?: string): string | null;
   readonly raw: unknown;
 }
 

@@ -21,7 +21,10 @@ import {
   stdout,
   stderr,
   setEnv,
-  getProcessAdapter,
+  Kernel,
+  rbObjDup,
+  rbObjIvarGet,
+  rbObjIvarSet,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
@@ -37,7 +40,10 @@ import { Base } from "../base.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
-import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
+import { adapterType } from "../test-adapter.js";
+import { Backup } from "../sqlite/backup.js";
+import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
+import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
 import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
@@ -278,8 +284,17 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
 });
 
 describe("DatabaseTasksRegisterTask", () => {
+  let tasksWas: unknown;
+  let adaptersWas: unknown;
+
+  beforeEach(() => {
+    tasksWas = rbObjDup(rbObjIvarGet(DatabaseTasks, "@tasks") as object);
+    adaptersWas = rbObjDup(rbObjIvarGet(ConnectionAdapters, "@adapters") as object);
+  });
+
   afterEach(() => {
-    resetRegisteredTasks();
+    rbObjIvarSet(DatabaseTasks, "@tasks", tasksWas);
+    rbObjIvarSet(ConnectionAdapters, "@adapters", adaptersWas);
   });
 
   it("register task", async () => {
@@ -1053,44 +1068,6 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
 
 const skipMigrationTestCase = adapterType !== "sqlite" || inMemoryDb();
 
-async function backupIntoConnection(sourceFile: string): Promise<void> {
-  const adapter = await Base.connectionPool().leaseConnection();
-  await adapter.execute(`ATTACH DATABASE ${adapter.quote(sourceFile)} AS backupSource`);
-  try {
-    const objects = await adapter.selectRows(
-      "SELECT type, name, sql FROM backupSource.sqlite_master " +
-        "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'",
-    );
-    for (const [, , sql] of objects) {
-      await adapter.execute(String(sql));
-    }
-    for (const [type, name] of objects) {
-      if (type !== "table") continue;
-      const table = adapter.quoteTableName(String(name));
-      const columns = await adapter.selectRows(
-        `SELECT name FROM pragma_table_info(${adapter.quote(String(name))}, 'backupSource')`,
-      );
-      const columnList = columns.map(([column]) => adapter.quoteColumnName(String(column)));
-      if (columnList.length === 0) continue;
-      await adapter.execute(
-        `INSERT INTO main.${table} (${columnList.join(", ")}) ` +
-          `SELECT ${columnList.join(", ")} FROM backupSource.${table}`,
-      );
-    }
-    const [[sequences]] = await adapter.selectRows(
-      "SELECT count(*) FROM backupSource.sqlite_master WHERE name = 'sqlite_sequence'",
-    );
-    if (Number(sequences) > 0) {
-      await adapter.execute("DELETE FROM main.sqlite_sequence");
-      await adapter.execute(
-        "INSERT INTO main.sqlite_sequence (name, seq) SELECT name, seq FROM backupSource.sqlite_sequence",
-      );
-    }
-  } finally {
-    await adapter.execute("DETACH DATABASE backupSource");
-  }
-}
-
 function databaseTasksMigrationTestCase(folderName = "valid"): {
   captureMigrationOutput(): Promise<string>;
 } {
@@ -1099,15 +1076,19 @@ function databaseTasksMigrationTestCase(folderName = "valid"): {
   beforeEach(async () => {
     if (skipMigrationTestCase) return;
     const migrationsPath = [MIGRATIONS_ROOT, folderName].join("/");
-    const ambient = ambientPoolConfiguration();
-    const file = String(ambient.database);
+    const file = await (await (
+      (await Base.leaseConnection()) as SQLite3Adapter
+    ).rawConnection())!.filename();
     conn = await Base.establishConnection({
-      ...ambient,
+      adapter: "sqlite3",
       database: ":memory:",
-      pool: 1,
       migrationsPaths: migrationsPath,
     });
-    await backupIntoConnection(file);
+    const sourceDb = await betterSqlite3Driver.open({ database: file! });
+    const destDb = (await ((await Base.leaseConnection()) as SQLite3Adapter).rawConnection())!;
+    const backup = new Backup(destDb, "main", sourceDb, "main");
+    await backup.step(-1);
+    backup.finish();
   });
 
   afterEach(async () => {
@@ -1794,13 +1775,9 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
 
 describe("DatabaseTasksCheckSchemaFileTest", () => {
   it("check schema file", async () => {
-    await stub(getProcessAdapter(), "setExitCode", null, undefined, () =>
-      assertCalledWithArgs(stderr, "write", [/awesome-file.sql/], {}, () => {
-        try {
-          DatabaseTasks.checkSchemaFile("awesome-file.sql");
-        } catch {}
-      }),
-    );
+    await assertCalledWithArgs(Kernel, "abort", [/awesome-file.sql/], {}, () => {
+      DatabaseTasks.checkSchemaFile("awesome-file.sql");
+    });
   });
 });
 

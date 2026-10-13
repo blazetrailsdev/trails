@@ -5,7 +5,6 @@ import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 type AdapterClass = typeof DatabaseAdapter;
-const adapters = new Map<string, [string, string]>();
 const loadErrors = new Map<string, unknown>();
 
 export function register(
@@ -13,13 +12,13 @@ export function register(
   className: string,
   path: string = underscore(className),
 ): void {
-  adapters.set(name, [className, path]);
+  ConnectionAdapters.adapters.set(name, [className, path]);
   loadErrors.delete(name);
 }
 
 /** @noRailsEquivalent PERMANENT */
 export async function load(adapterName: string | undefined): Promise<void> {
-  const [className, pathToAdapter] = adapters.get(adapterName ?? "") ?? [];
+  const [className, pathToAdapter] = ConnectionAdapters.adapters.get(adapterName ?? "") ?? [];
   if (!className) return;
 
   loadErrors.delete(adapterName ?? "");
@@ -33,12 +32,12 @@ export async function load(adapterName: string | undefined): Promise<void> {
 }
 
 export function resolve(adapterName: string | undefined): AdapterClass {
-  const [className, pathToAdapter] = adapters.get(adapterName ?? "") ?? [];
+  const [className, pathToAdapter] = ConnectionAdapters.adapters.get(adapterName ?? "") ?? [];
 
   if (!className) {
     throw new AdapterNotFound(
       `Database configuration specifies nonexistent '${adapterName ?? ""}' adapter. ` +
-        `Available adapters are: ${[...adapters.keys()].sort().join(", ")}. ` +
+        `Available adapters are: ${[...ConnectionAdapters.adapters.keys()].sort().join(", ")}. ` +
         `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
         `adapter gem to your Gemfile if it's not in the list of available adapters.`,
     );
