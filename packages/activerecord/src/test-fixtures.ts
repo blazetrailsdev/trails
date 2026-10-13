@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, type TaskContext } from "vitest";
+import { describedClasses, topLevel } from "@blazetrails/activesupport/testing/autorun";
 import { getCurrentSuite } from "vitest/suite";
 import {
   Dir,
@@ -607,40 +607,48 @@ const USE_FIXTURES_ROOT = "use-fixtures";
 
 let useFixturesCount = 0;
 
-let rootTestCaseClass: TestCaseClass | undefined;
-
-const testCaseClasses = new WeakMap<SuiteScope, TestCaseClass>();
-
-const fixtureRegistrations = new WeakMap<TestCaseClass, { count: number }>();
-
-const testCases = new WeakMap<object, { testCase: TestCase; pending: number }>();
+const warmed = new WeakSet<TestCaseClass>();
 
 let currentTestCase: TestCase | null = null;
 
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
+  let klass = describedClasses.get(suite ?? topLevel) as TestCaseClass | undefined;
+  if (klass !== undefined) return klass;
   if (suite === undefined) {
-    if (rootTestCaseClass === undefined) {
-      const { TestCase } = ActiveRecord;
-      rootTestCaseClass = class extends TestCase {};
-      rootTestCaseClass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
-    }
-    return rootTestCaseClass;
-  }
-  let klass = testCaseClasses.get(suite);
-  if (klass === undefined) {
-    klass = class extends testCaseClassFor(suite.suite) {};
-    testCaseClasses.set(suite, klass);
-  }
-  return klass;
-}
+    const { TestCase } = ActiveRecord;
+    klass = class extends TestCase {
+      override async beforeSetup(): Promise<void> {
+        const testKlass = this.constructor as TestCaseClass;
+        currentTestCase = this;
+        if (!warmed.has(testKlass)) {
+          warmed.add(testKlass);
+          await Base.withConnection(eagerWarmSchemaCache);
+        }
+        await resolveFixtureClassNames(testKlass);
+        await super.beforeSetup();
 
-function registrationsFor(klass: TestCaseClass) {
-  let registrations = fixtureRegistrations.get(klass);
-  if (registrations === undefined) {
-    registrations = { count: 0 };
-    fixtureRegistrations.set(klass, registrations);
+        for (const [fsName, fixtureSet] of Object.entries(this._loadedFixtures)) {
+          const cache = (this._fixtureCache[fsName] ??= {});
+          for (const [label, fixture] of Object.entries(fixtureSet.fixtures)) {
+            cache[label] = fixtureSet.modelClass ? await fixture.find() : fixture.toHash();
+          }
+        }
+      }
+
+      override async afterTeardown(): Promise<void> {
+        try {
+          await super.afterTeardown();
+        } finally {
+          if (currentTestCase === this) currentTestCase = null;
+        }
+      }
+    };
+    klass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
+  } else {
+    klass = class extends testCaseClassFor(suite.suite) {};
   }
-  return registrations;
+  describedClasses.set(suite ?? topLevel, klass);
+  return klass;
 }
 
 const fixtureRegistryNames = new Map(
@@ -667,49 +675,6 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
       registerModel(model);
     }
   }
-}
-
-function registerFixtureHooks(klass: TestCaseClass): void {
-  const registrations = registrationsFor(klass);
-  registrations.count++;
-
-  beforeEach(async (ctx: TaskContext) => {
-    if (testCases.has(ctx.task)) return;
-    const testKlass = testCaseClassFor(ctx.task.suite as SuiteScope | undefined);
-    const testCase = new testKlass(ctx.task.name);
-    testCase._fixtureConnectionPools = [];
-    testCase._pendingPins = [];
-    testCase._savedPoolConfigs = new Hash();
-    let pending = 0;
-    for (
-      let k: TestCaseClass | null = testKlass;
-      k !== null && k !== (Object.getPrototypeOf(Function) as unknown);
-      k = Object.getPrototypeOf(k) as TestCaseClass | null
-    ) {
-      const own = fixtureRegistrations.get(k);
-      if (own) pending += own.count;
-    }
-    testCases.set(ctx.task, { testCase, pending });
-    currentTestCase = testCase;
-
-    await resolveFixtureClassNames(testKlass);
-    await testCase.setupFixtures();
-
-    for (const [fsName, fixtureSet] of Object.entries(testCase._loadedFixtures)) {
-      const cache = (testCase._fixtureCache[fsName] ??= {});
-      for (const [label, fixture] of Object.entries(fixtureSet.fixtures)) {
-        cache[label] = fixtureSet.modelClass ? await fixture.find() : fixture.toHash();
-      }
-    }
-  });
-
-  afterEach(async (ctx: TaskContext) => {
-    const state = testCases.get(ctx.task);
-    if (state === undefined || --state.pending > 0) return;
-    testCases.delete(ctx.task);
-    if (currentTestCase === state.testCase) currentTestCase = null;
-    await state.testCase.teardownFixtures();
-  });
 }
 
 function fixtureAccessor(fixtureSetName: string) {
@@ -740,14 +705,10 @@ export function fixtures(
 ): Record<string, unknown> {
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
-  let warmed = false;
-  beforeEach(async () => {
-    if (warmed) return;
-    warmed = true;
-    await Base.withConnection(eagerWarmSchemaCache);
-  });
   const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
-  klass.usesTransaction(...(usesTransaction ?? []));
+  klass.usesTransaction(
+    ...(usesTransaction ?? []).map((name) => `test_${name.replace(/\s+/g, "_")}`),
+  );
   if (useTransactionalTests !== undefined) klass.useTransactionalTests = useTransactionalTests;
   if (useInstantiatedFixtures !== undefined)
     klass.useInstantiatedFixtures = useInstantiatedFixtures;
@@ -778,7 +739,6 @@ export function fixtures(
     klass.setFixtureClass(classNames);
   }
   klass.fixtures(fixtureSetNames);
-  registerFixtureHooks(klass);
 
   const result: Record<string, unknown> = {};
   for (const [key, fsName] of Object.entries(accessors)) {

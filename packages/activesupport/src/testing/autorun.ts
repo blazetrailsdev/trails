@@ -18,6 +18,9 @@ declare module "vitest" {
   }
 }
 
+export const describedClasses = new WeakMap<object, typeof TestCase>();
+export const topLevel = {};
+
 const capturing = new WeakSet<object>();
 const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
 
@@ -25,11 +28,12 @@ beforeEach(async (context: TestContext) => {
   _takeAssertions();
   let klass = TestCase;
   for (let suite = context.task.suite; suite != null && klass === TestCase; suite = suite.suite) {
-    const constant = safeConstantize(suite.name);
+    const constant = describedClasses.get(suite) ?? safeConstantize(suite.name);
     if (typeof constant === "function" && constant.prototype instanceof TestCase) {
       klass = constant as typeof TestCase;
     }
   }
+  if (klass === TestCase) klass = describedClasses.get(topLevel) ?? TestCase;
   const testName = `test_${context.task.name.replace(/\s+/g, "_")}`;
   const defined = rbModMethodDefined(klass, testName);
   if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);
