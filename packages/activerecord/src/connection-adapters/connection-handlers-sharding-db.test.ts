@@ -13,7 +13,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
 
   const { self } = fixtures(["people"], { useTransactionalTests: false });
 
-
   afterEach(() => {
     self().cleanUpConnectionHandler();
   });
