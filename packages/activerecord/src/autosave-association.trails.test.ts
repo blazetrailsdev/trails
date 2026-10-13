@@ -543,7 +543,7 @@ describe("computePrimaryKey", () => {
     primaryKey?: string | string[];
     queryConstraintsList?: string[];
     hasQueryConstraints?: boolean;
-  }): any {
+  }) {
     return {
       constructor: {
         primaryKey: opts.primaryKey ?? "id",

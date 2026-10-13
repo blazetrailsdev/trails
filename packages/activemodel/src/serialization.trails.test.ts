@@ -173,6 +173,34 @@ describe("Serialization — trails-only coverage", () => {
     expect({ ...p.serializableHash() }).toEqual({ name: "Bob", greeting: "Hi Bob" });
   });
 
+  it("serializable_hash leaves out a stored value an included module's method shares its name with", () => {
+    class Greets {
+      greeting(): string {
+        return "Hi";
+      }
+    }
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        include(this, Greets);
+        this.attribute("name", "string");
+        this.attribute("greeting", "string");
+      }
+    }
+    interface Person extends Attributes, SerializersJSON, Greets {}
+
+    const p = new Person({ name: "Bob" });
+    p._writeAttribute("greeting", "stored");
+    expect({ ...p.serializableHash() }).toEqual({ name: "Bob" });
+    expect({ ...p.serializableHash({ methods: ["greeting"] }) }).toEqual({
+      name: "Bob",
+      greeting: "Hi",
+    });
+  });
+
   it("a caller option named __sync does not hijack the internal sync re-entry", () => {
     class Person extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
