@@ -15,8 +15,10 @@ import {
   Marshal,
   Rational,
   rbCDate,
+  rbCBasicObject,
   rbCDateTime,
   rbCTime,
+  rbModAncestors,
   rbObjClass,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
@@ -1946,6 +1948,12 @@ describe("Marshal over Date", () => {
     expect(rbObjIsKindOf(new RubyDateTime(2016, 1, 1, 10), rbCDateTime)).toBe(true);
     expect(rbObjIsKindOf(Temporal.PlainDateTime.from("2016-01-01T10:00"), rbCDate)).toBe(true);
     expect(rbObjIsKindOf(Temporal.PlainDateTime.from("2016-01-01T10:00"), rbCTime)).toBe(false);
+    expect(rbModAncestors(RubyDateTime).filter((k) => typeof k === "function")).toEqual([
+      RubyDateTime,
+      RubyDate,
+      Object,
+      rbCBasicObject,
+    ]);
   });
 
   it("reads every DateTime seat as a DateTime, a zoned one included", () => {

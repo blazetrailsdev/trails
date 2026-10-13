@@ -49,6 +49,7 @@ import {
   rbModName,
   rbModToS,
   UNDEF_METHOD_TABLES,
+  reopened,
 } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
@@ -1083,7 +1084,8 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
   const ary: object[] = [];
   for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
     if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
-      ary.push((p as { constructor: object }).constructor);
+      const klass = (p as { constructor: object }).constructor;
+      if (!ary.includes(reopened(klass))) ary.push(klass);
     }
     if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
       const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
@@ -1175,7 +1177,8 @@ export function rbClassInheritedP(mod: unknown, arg: unknown): boolean | null {
 function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
   for (let p: object | null = cl.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
     if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
-      if ((p as { constructor: object }).constructor === c) return true;
+      const klass = (p as { constructor: object }).constructor;
+      if (klass === c || klass === reopened(c)) return true;
     }
     if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;

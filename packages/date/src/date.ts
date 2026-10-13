@@ -17,7 +17,6 @@ import {
   Rational,
   rational,
   rbCDate,
-  rbCDateTime,
   rbDbl2num,
   rbDefineAllocFunc,
   rubyClass,
@@ -5860,10 +5859,7 @@ const DateWithoutParseStatics: (new (
     | "rfc3339"
     | "xmlschema"
     | "jisx0301"
-  > = rbCDateTime as never;
-
-Object.setPrototypeOf(rbCDateTime, Date);
-Object.setPrototypeOf(rbCDateTime.prototype, Date.prototype);
+  > = Date;
 
 /** @noRailsEquivalent PERMANENT */
 export class DateTime extends DateWithoutParseStatics {

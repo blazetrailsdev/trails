@@ -62,15 +62,15 @@ export function rbObjClass(obj: unknown): Klass {
   if (hasEpochNanoseconds(obj)) {
     return reopened(
       (obj as { [rubyClass]?: string })[rubyClass] === "DateTime" ? rbCDateTime : rbCTime,
-    );
+    ) as Klass;
   }
   const tag = temporalTag(obj);
-  if (tag === "Temporal.PlainDate") return reopened(rbCDate);
-  if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime);
-  if (tag === "Temporal.PlainTime") return reopened(rbCTime);
+  if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;
+  if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime) as Klass;
+  if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
   if (isPlainHash(obj)) return Hash;
   const klass = (obj as object).constructor as Klass | undefined;
-  if (klass === Date) return reopened(rbCTime);
+  if (klass === Date) return reopened(rbCTime) as Klass;
   return typeof klass === "function" ? klass : Object;
 }
 
@@ -119,8 +119,18 @@ export function rbSetClassPathString(
   classpaths.set(klass, { path: `${str}::${name}`, permanent });
 }
 
-function reopened(klass: Klass): Klass {
-  return (registeredConstant(classpaths.get(klass)!.path) as Klass | undefined) ?? klass;
+/**
+ * The one class object a core class has once a gem reopens it
+ * (`class Date extends rbCDate`, seated by `registerConstant`): MRI has one
+ * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`), so the seat and
+ * the class reopening it are the same class. A class nothing reopens is
+ * answered as it is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function reopened(klass: object): object {
+  const path = classpaths.get(klass)?.path;
+  return path === undefined ? klass : (registeredConstant(path) ?? klass);
 }
 
 function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {

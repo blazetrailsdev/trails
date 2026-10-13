@@ -790,10 +790,14 @@ export function extending<T extends typeof Base, M extends Record<string, (...ar
   mod: M,
 ): Relation<InstanceType<T>> & M;
 export function extending<T extends typeof Base>(this: T, mod: Module): Relation<InstanceType<T>>;
+export function extending<T extends typeof Base>(
+  this: T,
+  block: (mod: Module) => void,
+): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(
   this: T,
-  mod?: Record<string, (...args: any[]) => any> | Module,
+  mod?: Record<string, (...args: any[]) => any> | Module | ((mod: Module) => void),
 ): Relation<InstanceType<T>> {
   return mod
     ? this.all().extending(mod as Record<string, (...args: any[]) => any>)
