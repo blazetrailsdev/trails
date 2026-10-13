@@ -633,8 +633,28 @@ describe("SQLite3Adapter connection parameters", () => {
 
   it("does not expand or mkdir a libsql remote URL as a local path", () => {
     const adapter = new LibSQLRemoteAdapter({ database: "libsql://trails-remote-probe.invalid" });
-    expect(adapter._connectionParameters.remoteUrl).toBe("libsql://trails-remote-probe.invalid");
-    expect(adapter._connectionParameters.database).toBe(":memory:");
+    expect(adapter._connectionParameters.database).toBe("libsql://trails-remote-probe.invalid");
+    expect(adapter.supportsConcurrentConnections()).toBe(true);
+    expect(adapter._memoryDatabase).toBe(false);
+    expect(adapter._previousReadUncommitted).toBeNull();
     expect(File.isDirectory("libsql:")).toBe(false);
+  });
+
+  it("runs SQLite's dialect over AbstractAdapter without SQLite3Adapter's initializer", async () => {
+    const adapter = new LibSQLRemoteAdapter({ database: ":memory:", driver: betterSqlite3Driver });
+    expect(adapter).not.toBeInstanceOf(SQLite3Adapter);
+    expect(adapter.adapterName).toBe("SQLite");
+    expect(LibSQLRemoteAdapter.quoteColumnName("a")).toBe('"a"');
+    try {
+      await adapter.execute("CREATE TABLE t (id integer primary key, name varchar)");
+      await adapter.transaction(async () => {
+        await adapter.execute("INSERT INTO t (name) VALUES ('x')");
+      });
+      expect(await adapter.selectValue("SELECT name FROM t")).toBe("x");
+      expect(await adapter.primaryKeys("t")).toEqual(["id"]);
+      expect((await adapter.columns("t")).map((column) => column.name)).toEqual(["id", "name"]);
+    } finally {
+      await adapter.disconnectBang();
+    }
   });
 });

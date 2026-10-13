@@ -107,7 +107,7 @@ export class Packer<Io = unknown> {
   }
 
   write(v: unknown): this {
-    if (v == null || typeof v === "boolean" || typeof v === "number") {
+    if (v == null || typeof v === "boolean" || Number.isSafeInteger(v)) {
       this.buffer.write(encoder.encodeSharedRef(v));
     } else if (typeof v === "string") {
       this.writeStringValue(v);
@@ -123,10 +123,10 @@ export class Packer<Io = unknown> {
       if (rbClassOf(v) === Hash || !this.tryWriteWithExtTypeLookup(v)) {
         this.writeHashValue(v);
       }
-    } else if (v instanceof Number) {
+    } else if (typeof v === "bigint" || (typeof v === "number" && Number.isInteger(v))) {
+      this.writeBignumValue(BigInt(v));
+    } else if (typeof v === "number" || v instanceof Number) {
       this.buffer.write(floatEncoder.encodeSharedRef(v.valueOf()));
-    } else if (typeof v === "bigint") {
-      this.writeBignumValue(v);
     } else {
       this.writeOtherValue(v);
     }

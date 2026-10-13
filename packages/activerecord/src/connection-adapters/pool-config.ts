@@ -119,7 +119,6 @@ export interface SQLite3Config extends TrailsAdapterOptions {
   strict?: boolean;
   timeout?: number | string | false;
   retries?: number | string | false;
-  remoteUrl?: string;
   driverOptions?: Record<string, unknown>;
 }
 

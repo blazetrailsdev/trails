@@ -247,7 +247,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   _connectionParameters: SQLite3ConnectionParameters;
   /** @internal */
   _lastAffectedRows = 0;
-  private _memoryDatabase: boolean;
+  /** @internal */
+  _memoryDatabase: boolean;
   /** @internal */
   declare _statements: StatementPool;
 

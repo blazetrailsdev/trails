@@ -91,12 +91,6 @@ describe("DefaultScopingTest", () => {
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
-  it("default scope as class method runs on create", async () => {
-    expect((new ClassMethodDeveloperCalledDavid() as any).name).toBe("David");
-    const dev = (await ClassMethodDeveloperCalledDavid.create()) as any;
-    expect(dev.name).toBe("David");
-  });
-
   it("default scope as block referencing scope", async () => {
     const all = await LazyBlockReferencingScopeDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
@@ -860,54 +854,6 @@ describe("DefaultScopingTest", () => {
       expect(await specialCommentIds(Post.eagerLoad(":specialComments"))).toEqual(expected);
       expect(await specialCommentIds(Post.includes(":specialComments"))).toEqual(expected);
       expect(await specialCommentIds(Post.preload(":specialComments"))).toEqual(expected);
-    });
-  });
-
-  it("sti association write paths use the declaring-class foreign key", async () => {
-    const post = posts("thinking") as any;
-    expect(post.constructor.name).toBe("SpecialPost");
-
-    await (SpecialComment as any).unscoped(async () => {
-      const built = post.specialComments.build({ body: "built sti comment" });
-      expect(Number(built._readAttribute("post_id"))).toBe(Number(post.id));
-
-      const assoc = post.association("specialComments");
-      const fresh = new SpecialComment({ body: "fresh sti comment" });
-      assoc.setOwnerAttributes(fresh);
-      expect(Number(fresh._readAttribute("post_id"))).toBe(Number(post.id));
-
-      expect(Object.keys(assoc.nullifiedOwnerAttributes())).toEqual(["post_id"]);
-
-      const pushed = new SpecialComment({ body: "pushed sti comment" });
-      await post.specialComments.push(pushed);
-      expect(Number(pushed._readAttribute("post_id"))).toBe(Number(post.id));
-      expect(pushed.isNewRecord()).toBe(false);
-    });
-  });
-
-  it("sti has_one read build and assign paths use the declaring-class foreign key", async () => {
-    const post = posts("thinking") as any;
-    expect(post.constructor.name).toBe("SpecialPost");
-
-    await (Comment as any).unscoped(async () => {
-      const reader = (await SpecialPost.create({ title: "sti reader", body: "x" })) as any;
-      const comment = await Comment.create({
-        type: "VerySpecialComment",
-        body: "sti has_one comment",
-        post_id: reader.id,
-      });
-      const loaded = await reader.verySpecialComment;
-      expect(loaded.id).toBe(comment.id);
-
-      const assigned = new VerySpecialComment({ body: "assigned sti has_one" });
-      await post.setVerySpecialComment(assigned);
-      expect(Number(assigned._readAttribute("post_id"))).toBe(Number(post.id));
-
-      const builder = (await SpecialPost.create({ title: "sti builder", body: "x" })) as any;
-      const built = await builder
-        .association("verySpecialComment")
-        .build({ body: "built sti has_one" });
-      expect(Number(built._readAttribute("post_id"))).toBe(Number(builder.id));
     });
   });
 

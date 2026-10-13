@@ -42,6 +42,19 @@ describe("MessagePack::CoreExt", () => {
     );
   });
 
+  it("write packs a whole number past 2**53 as an Integer, never a Float", () => {
+    expect(new Packer().write(2 ** 60).toStr()).toEqual(
+      Uint8Array.of(0xcf, 0x10, 0, 0, 0, 0, 0, 0, 0),
+    );
+    expect(new Packer().write(-(2 ** 60)).toStr()).toEqual(
+      Uint8Array.of(0xd3, 0xf0, 0, 0, 0, 0, 0, 0, 0),
+    );
+    expect(new Packer().write(1.5).toStr()).toEqual(
+      Uint8Array.of(0xcb, 0x3f, 0xf8, 0, 0, 0, 0, 0, 0),
+    );
+    expect(() => new Packer().write(2 ** 70)).toThrow("bignum too big to convert");
+  });
+
   it("raises TypeError for a value of the wrong type", () => {
     const packer = new Packer();
     expect(() => packer.writeFloat("hello")).toThrow(

@@ -442,8 +442,7 @@ describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TUR
 
   beforeAll(async () => {
     conn = await libsqlRemoteDriver.open({
-      database: ":memory:",
-      remoteUrl: tursoUrl!,
+      database: tursoUrl!,
       driverOptions: { authToken: tursoToken },
     });
   });
@@ -474,8 +473,8 @@ describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke 
   });
 
   it("executes a SELECT through the adapter", async () => {
-    const rows = (await adapter.execute("SELECT 1 AS n"))!;
-    expect((rows[0] as { n: number }).n).toBe(1);
+    const rows = (await adapter.execute("SELECT 1 AS n")) as { n: number }[];
+    expect(rows[0].n).toBe(1);
   });
 });
 
