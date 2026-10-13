@@ -141,7 +141,6 @@ export interface SqliteOpenConfig {
   strict?: boolean;
   authToken?: string;
   syncUrl?: string;
-  remoteUrl?: string;
   driverOptions?: Record<string, unknown>;
 }
 

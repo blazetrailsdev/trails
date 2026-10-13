@@ -259,7 +259,7 @@ function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
   if (config.authToken !== undefined) {
     (opts as LibsqlReplicaOptions).authToken = config.authToken;
   }
-  return new Database(config.remoteUrl!, opts);
+  return new Database(config.database, opts);
 }
 
 const remoteCapabilities: SqliteDriverCapabilities = {
