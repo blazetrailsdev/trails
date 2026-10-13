@@ -31,7 +31,7 @@ interface PerformQueryHost {
 /** @internal */
 interface LastInsertedIdHost {
   _rawConnection: Mysql2Client | null;
-  supportsInsertReturning(): boolean;
+  supportsInsertReturning(): Promise<boolean>;
 }
 
 /** @internal */
@@ -99,7 +99,7 @@ export async function executeBatch(
 
 /** @internal */
 export async function lastInsertedId(this: LastInsertedIdHost, result: Result): Promise<unknown> {
-  if (this.supportsInsertReturning()) {
+  if (await this.supportsInsertReturning()) {
     return abstractLastInsertedId(result);
   }
   return this._rawConnection?.lastId;

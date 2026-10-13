@@ -227,17 +227,11 @@ export interface DatabaseStatementsHost {
   /** @internal */
   checkIfWriteQuery?(sql: string | null): void;
   /** @internal */
-  supportsInsertReturning?(): boolean;
+  supportsInsertReturning?(): boolean | Promise<boolean>;
   /** @internal */
   quoteColumnName?(col: string): string;
   /** @internal */
-  databaseVersion?: unknown;
-  /** @internal */
-  primaryKey?(table: string): Promise<string | string[] | null>;
-  /** @internal */
-  schemaCache?: {
-    getCachedPrimaryKeys?(tableName: string): string | string[] | null | undefined;
-  };
+  primaryKey?(table: string): string | null | Promise<string | null>;
   /** @internal */
   preprocessQuery?(sql: string | null): string | null;
   /** @internal */
@@ -777,16 +771,10 @@ interface DatabaseStatementsDefaultsHost {
   /** @internal */
   sqlForInsert(
     sql: string,
-    pk: string | string[] | false | null | undefined,
+    pk: string | false | null | undefined,
     binds: unknown[],
     returning: string[] | null | undefined,
-  ): [string, unknown[]];
-  /** @internal */
-  databaseVersion: unknown;
-  /** @internal */
-  supportsInsertReturning(): boolean;
-  /** @internal */
-  primaryKey(tableName: string): Promise<string | string[] | null>;
+  ): Promise<[string, unknown[]]>;
 }
 
 /** @internal */
@@ -893,25 +881,16 @@ export const DatabaseStatements = new Module((mod) => {
     return this.internalExecQuery(sql, name, binds, { prepare });
   },
 
-  /**
-   * @inventedArm if — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
-   * @inventedArm primaryKey — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
-   */
   async execInsert(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name: string | null = null,
     binds: unknown[] = [],
-    pk?: string | string[] | false | null,
+    pk?: string | false | null,
     _sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result> {
-    await this.databaseVersion;
-    if (pk == null && this.supportsInsertReturning()) {
-      const tableRef = extractTableRefFromInsertSql.call(this, sql);
-      if (tableRef) pk = await this.primaryKey(tableRef);
-    }
-    [sql, binds] = this.sqlForInsert(sql, pk, binds, returning);
+    [sql, binds] = await this.sqlForInsert(sql, pk, binds, returning);
     return this.internalExecQuery(sql, name, binds);
   },
 
@@ -1265,24 +1244,21 @@ export function select(
   }
 }
 
-/**
- * @internal
- * @missingRailsCall primary_key — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
- */
-export function sqlForInsert(
+/** @internal */
+export async function sqlForInsert(
   this: DatabaseStatementsHost,
   sql: string,
-  pk: string | string[] | false | null | undefined,
+  pk: string | false | null | undefined,
   binds: unknown[],
   returning: string[] | null | undefined,
-): [string, unknown[]] {
-  if (this.supportsInsertReturning!()) {
+): Promise<[string, unknown[]]> {
+  if (await this.supportsInsertReturning!()) {
     if (pk == null) {
       const tableRef = extractTableRefFromInsertSql.call(this, sql);
-      if (tableRef) pk = this.schemaCache!.getCachedPrimaryKeys!(tableRef);
+      if (tableRef) pk = await this.primaryKey!(tableRef);
     }
 
-    const returningColumns = returning || wrap(pk as string | string[] | null);
+    const returningColumns = returning || wrap(pk as string | null);
 
     const returningColumnsStatement = returningColumns
       .map((c) => this.quoteColumnName!(c))
@@ -1327,7 +1303,10 @@ export function arelFromRelation(relation: unknown): unknown {
 }
 
 /** @internal */
-export function extractTableRefFromInsertSql(this: unknown, sql: string): string | null {
+export function extractTableRefFromInsertSql(
+  this: DatabaseStatementsHost,
+  sql: string,
+): string | null {
   const match = sql.match(/into\s("[ A-Za-z0-9_."[\]]+"|[A-Za-z0-9_.[\]"]+)\s*/im);
   if (!match) return null;
   return match[1].replace(/"/g, "").trim();

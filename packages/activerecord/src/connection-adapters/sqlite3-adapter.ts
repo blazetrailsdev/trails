@@ -304,8 +304,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return (await this.databaseVersion).compare("3.8.3") >= 0;
   }
 
-  supportsInsertReturning(): boolean {
-    return (this.databaseVersion as Version).compare("3.35.0") >= 0;
+  async supportsInsertReturning(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.35.0") >= 0;
   }
 
   /** @internal */

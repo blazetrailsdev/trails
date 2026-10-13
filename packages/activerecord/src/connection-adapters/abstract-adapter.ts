@@ -671,10 +671,10 @@ export interface AbstractAdapter
   /** @internal */
   sqlForInsert(
     sql: string,
-    pk: string | string[] | false | null | undefined,
+    pk: string | false | null | undefined,
     binds: unknown[],
     returning: string[] | null | undefined,
-  ): [string, unknown[]];
+  ): Promise<[string, unknown[]]>;
   /** @internal */
   rawExecute(
     sql: string,
@@ -1289,7 +1289,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsInsertReturning(): boolean {
+  async supportsInsertReturning(): Promise<boolean> {
     return false;
   }
 

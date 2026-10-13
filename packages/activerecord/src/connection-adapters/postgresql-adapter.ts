@@ -446,7 +446,7 @@ export class PostgreSQLAdapter
     return (await this.databaseVersion) >= 120000;
   }
 
-  supportsInsertReturning(): boolean {
+  async supportsInsertReturning(): Promise<boolean> {
     return true;
   }
 

@@ -227,17 +227,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   executeBatch = mysql2ExecuteBatch;
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE mysql-mariadb-and-full-version-answer-a-value-or-a-promise
-   * @inventedArm then — CONVERGEABLE mysql-mariadb-and-full-version-answer-a-value-or-a-promise
-   */
-  override fullVersion(): string | null | Promise<string | null> {
-    const databaseVersion = this.databaseVersion;
-    if (databaseVersion instanceof Promise) {
-      return databaseVersion.then((v) => v.fullVersionString);
-    }
-    return databaseVersion.fullVersionString;
+  /** @internal */
+  override async fullVersion(): Promise<string | null> {
+    return (await this.databaseVersion).fullVersionString;
   }
 
   /** @internal */
