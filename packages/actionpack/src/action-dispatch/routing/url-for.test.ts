@@ -137,10 +137,6 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(polymorphicUrl).toHaveBeenCalledWith([{ id: 1 }], { only_path: true });
   });
 
-  it("array options throw when polymorphicUrl missing", () => {
-    expect(() => fullUrlFor.call(makeHost(), [{ id: 1 }])).toThrow(/PolymorphicRoutes/);
-  });
-
   it("routeFor calls `${name}_url` on the host (matches generateRouteHelpers)", () => {
     const userUrl = vi.fn(() => "/users/42");
     const host = makeHost();

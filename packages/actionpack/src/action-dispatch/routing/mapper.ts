@@ -89,6 +89,7 @@ export interface RouteOptions {
   internal?: boolean;
   on?: string;
   concerns?: string | string[];
+  [key: string]: unknown;
 }
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";

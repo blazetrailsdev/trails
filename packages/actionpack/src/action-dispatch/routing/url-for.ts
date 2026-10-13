@@ -68,17 +68,6 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (options == null) {
     return this._routes!.urlFor({ ...this.urlOptions() });
   }
-  if (typeof options === "string" && !isSymbol(options)) {
-    return options;
-  }
-  if (Array.isArray(options)) {
-    const components = [...options];
-    const opts = extractOptions(components);
-    if (typeof this.polymorphicUrl !== "function") {
-      throw new Error("urlFor(Array) requires PolymorphicRoutes#polymorphicUrl on the host.");
-    }
-    return this.polymorphicUrl(components, opts);
-  }
   if (isPlainObject(options) || options instanceof Parameters) {
     const routeName =
       options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
@@ -92,15 +81,22 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
       routeName == null ? null : isSymbol(routeName) ? symbolToS(routeName) : String(routeName),
     );
   }
-  const builder = HelperMethodBuilder.url();
+  if (typeof options === "string" && !isSymbol(options)) {
+    return options;
+  }
   const target = this as unknown as PolymorphicHost;
   if (isSymbol(options)) {
-    return builder.handleStringCall(target, options);
+    return HelperMethodBuilder.url().handleStringCall(target, options);
+  }
+  if (Array.isArray(options)) {
+    const components = [...options];
+    const opts = extractOptions(components);
+    return this.polymorphicUrl!(components, opts);
   }
   if (isModelClass(options)) {
-    return builder.handleClassCall(target, options);
+    return HelperMethodBuilder.url().handleClassCall(target, options);
   }
-  return builder.handleModelCall(target, options as ToModel);
+  return HelperMethodBuilder.url().handleModelCall(target, options as ToModel);
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {

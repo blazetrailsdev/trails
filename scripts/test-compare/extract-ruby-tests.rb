@@ -177,6 +177,7 @@ class TestExtractor
     # `[...].each { define_method("test_...") }` loops whose cases can't be
     # expanded statically, as "file:line" — reported rather than dropped silently.
     @unexpanded_loops = []
+    @line_offset = 0
   end
 
   def process_file(filepath, package_root)
@@ -383,6 +384,7 @@ class TestExtractor
     end
     if iterator
       return if process_define_method_loop(iterator, block, node)
+      return if process_class_eval_loop(iterator, block, node)
       return if process_test_macro_loop(iterator, block, node)
     end
 
@@ -865,6 +867,75 @@ class TestExtractor
       end
     end
     true
+  end
+
+  # ---- class_eval heredoc loops ----
+
+  # Rails also generates families by evaluating a heredoc per element:
+  #
+  #   %w( references includes ).each do |method|
+  #     class_eval <<~RUBY
+  #       def test_no_arguments_to_#{method}_raise_errors
+  #
+  # (activerecord/test/cases/relations_test.rb:562-570,
+  # activesupport/test/inflector_test.rb:477-484). The heredoc is a string to
+  # Ripper, so each element's source is interpolated and parsed on its own, and
+  # the `def test_*` it holds are extracted as ordinary methods. Returns true
+  # when the node was handled.
+  def process_class_eval_loop(call, block, node)
+    return false unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
+
+    heredocs = []
+    collect_class_evals(block[2], heredocs)
+    heredocs.select! { |heredoc| heredoc.flatten.any? { |leaf| leaf.is_a?(String) && leaf.match?(/\bdef test_/) } }
+    return false if heredocs.empty?
+
+    vars = block_var_names(block[1])
+    elements = loop_elements(call[1])
+    if vars.nil? || elements.nil?
+      report_unexpanded_loop(node)
+      return true
+    end
+
+    heredocs.each do |heredoc|
+      sexps = elements.map do |value|
+        bindings = loop_bindings(vars, value)
+        source = bindings && interpolated_name(heredoc, bindings)
+        source && Ripper.sexp(source.gsub('\\"', '"'))
+      end
+      if sexps.any?(&:nil?)
+        report_unexpanded_loop(node)
+        next
+      end
+      begin
+        @line_offset = extract_line(heredoc) - 1
+        sexps.each { |sexp| walk(sexp) }
+      ensure
+        @line_offset = 0
+      end
+    end
+    true
+  end
+
+  # Every `class_eval <<~RUBY` / `class_eval(<<-RUBY, __FILE__, __LINE__ + 1)`
+  # in a block body, as the heredoc's string_literal node.
+  def collect_class_evals(node, out)
+    return unless node.is_a?(Array)
+
+    args =
+      if node[0] == :command && ident_name(node[1]) == "class_eval"
+        node[2]
+      elsif node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :fcall &&
+            ident_name(node[1][1]) == "class_eval"
+        node[2]
+      end
+    if args
+      heredoc = string_literal_node(args)
+      out << heredoc if heredoc
+      return
+    end
+
+    node.each { |child| collect_class_evals(child, out) if child.is_a?(Array) }
   end
 
   # Rails also generates whole families from a literal table with the `test`
@@ -2455,7 +2526,7 @@ class TestExtractor
   # ---- General helpers ----
 
   def extract_line(node)
-    find_line(node) || 0
+    (find_line(node) || 0) + @line_offset
   end
 
   def find_line(node)

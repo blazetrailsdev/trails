@@ -8,64 +8,11 @@ import {
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
+import { isEmpty, URI } from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
 
 export type RedirectBlock = (params: Record<string, string>, request: Request) => string;
-
-interface ParsedUri {
-  scheme: string | null;
-  host: string | null;
-  port: number | null;
-  path: string;
-  query: string | null;
-  fragment: string | null;
-}
-
-const URI_RE =
-  /^(?:([a-zA-Z][a-zA-Z0-9+.-]*):)?(?:\/\/([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?$/;
-
-function parseUri(raw: string): ParsedUri {
-  const m = URI_RE.exec(raw);
-  if (!m) {
-    return { scheme: null, host: null, port: null, path: raw, query: null, fragment: null };
-  }
-  const [, scheme, authority, path, query, fragment] = m;
-  let host: string | null = null;
-  let port: number | null = null;
-  if (authority !== undefined) {
-    const at = authority.lastIndexOf("@");
-    const hostport = at >= 0 ? authority.slice(at + 1) : authority;
-    const colon = hostport.lastIndexOf(":");
-    if (colon >= 0 && /^\d+$/.test(hostport.slice(colon + 1))) {
-      host = hostport.slice(0, colon) || null;
-      port = Number(hostport.slice(colon + 1));
-    } else {
-      host = hostport || null;
-    }
-  }
-  return {
-    scheme: scheme ?? null,
-    host,
-    port,
-    path: path ?? "",
-    query: query ?? null,
-    fragment: fragment ?? null,
-  };
-}
-
-function uriToString(uri: ParsedUri): string {
-  let out = "";
-  if (uri.scheme) out += `${uri.scheme}://`;
-  if (uri.host !== null) {
-    out += uri.host;
-    if (uri.port !== null) out += `:${uri.port}`;
-  }
-  out += uri.path;
-  if (uri.query !== null) out += `?${uri.query}`;
-  if (uri.fragment !== null) out += `#${uri.fragment}`;
-  return out;
-}
 
 function transformValues(
   params: Record<string, string>,
@@ -103,9 +50,9 @@ export class Redirect extends Endpoint {
     return true;
   }
 
+  /** @missingRailsArgs instrument — CONVERGEABLE call-args-padding-resolves-a-cross-package-callee-signature */
   call(env: RackEnv): [number, Record<string, string>, unknown] {
-    const payload: { status?: number; location?: string; request?: Request } = {};
-    return Notifications.instrument("redirect.action_dispatch", payload, () => {
+    return Notifications.instrument("redirect.action_dispatch", undefined, (payload) => {
       const request = new Request(env);
       const response = this.buildResponse(request);
       payload.status = this.status;
@@ -116,25 +63,25 @@ export class Redirect extends Endpoint {
   }
 
   buildResponse(req: Request): Response {
-    const uri = parseUri(this.path(req.pathParameters as Record<string, string>, req));
+    const uri = URI.parse(this.path(req.pathParameters as Record<string, string>, req));
 
     if (!uri.host) {
       if (this.relativePath(uri.path)) {
         uri.path = `${scriptName(req)}/${uri.path}`;
-      } else if (uri.path === "") {
+      } else if (isEmpty(uri.path!)) {
         uri.path = scriptName(req) === "" ? "/" : scriptName(req);
       }
     }
 
     uri.scheme ??= req.scheme;
     uri.host ??= req.host;
-    if (uri.port === null && !req.isStandardPort) uri.port = req.port;
+    if (!req.isStandardPort) uri.port ??= req.port;
 
     req.commitFlash();
 
     const body = "";
     const headers = {
-      Location: uriToString(uri),
+      Location: uri.toString(),
       "Content-Type": `text/html; charset=${Response.defaultCharset}`,
       "Content-Length": String(body.length),
     };
@@ -150,8 +97,8 @@ export class Redirect extends Endpoint {
   }
 
   /** @internal */
-  protected relativePath(path: string): boolean {
-    return !!path && path !== "" && !path.startsWith("/");
+  protected relativePath(path: string | null): boolean {
+    return path != null && !isEmpty(path) && !path.startsWith("/");
   }
 
   /** @internal */
