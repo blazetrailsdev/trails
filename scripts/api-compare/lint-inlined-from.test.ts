@@ -54,6 +54,11 @@ const ruby = {
           [{ ...def("initialize", `${AR}/proxy.rb`, 2, 4), calls: [] }],
           { includes: ["Core"] },
         ),
+        "ActiveRecord::Spanless": entity(
+          "spanless.rb",
+          [{ name: "initialize", visibility: "public", params: [] } as MethodInfo],
+          { includes: ["Core"] },
+        ),
         "ActiveRecord::Session": entity(
           "session.rb",
           [def("initialize", `${AR}/session.rb`, 2, 4)],
@@ -256,6 +261,9 @@ describe("inlinedFromFindings", () => {
     expect(messages([], { owner: "Proxy", file: "proxy.ts", enrolled })).toEqual([]);
     expect(messages([CORE], { owner: "Proxy", file: "proxy.ts" })).toEqual([
       "ActiveRecord::Core#initialize names a module ActiveRecord::Proxy does not include or prepend",
+    ]);
+    expect(messages([], { owner: "Spanless", file: "spanless.ts", enrolled })).toEqual([
+      "ActiveRecord::Core#initialize is inlined untagged: ActiveRecord::Spanless reaches it from another Ruby file",
     ]);
     expect(messages([], { owner: "Session", file: "session.ts", enrolled })).toEqual([
       "ActiveRecord::Core#initialize is inlined untagged: ActiveRecord::Session reaches it from another Ruby file",

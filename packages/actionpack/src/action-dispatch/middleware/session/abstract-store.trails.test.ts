@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
-import { StaleSessionCheck } from "./abstract-store.js";
+import { AbstractSecureStore, AbstractStore, StaleSessionCheck } from "./abstract-store.js";
+import { MemCacheStore } from "./mem-cache-store.js";
 
 describe("AbstractStore", () => {
   describe("StaleSessionCheck.staleSessionCheckBang", () => {
@@ -31,5 +32,15 @@ describe("AbstractStore", () => {
         }),
       ).toThrow(err);
     });
+  });
+});
+
+describe("Compatibility#initialize (abstract_store.rb:23-26)", () => {
+  it("replaces a false key, as ||= does", () => {
+    for (const Store of [AbstractStore, AbstractSecureStore, MemCacheStore]) {
+      const options: Record<string, unknown> = { key: false, cache: {} };
+      new Store(undefined, options);
+      expect(options.key).toBe("_session_id");
+    }
   });
 });

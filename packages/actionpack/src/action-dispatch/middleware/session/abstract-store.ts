@@ -90,7 +90,7 @@ export const SessionObject = {
 
 export class AbstractStore extends Persisted {
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    options.key ??= "_session_id";
+    if (options.key == null || options.key === false) options.key = "_session_id";
     super(app, options);
   }
 
@@ -109,7 +109,7 @@ includeMixin(AbstractStore, SessionObject);
 
 export class AbstractSecureStore extends PersistedSecure {
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    options.key ??= "_session_id";
+    if (options.key == null || options.key === false) options.key = "_session_id";
     super(app, options);
   }
 

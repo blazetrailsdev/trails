@@ -22,7 +22,7 @@ export class MemCacheStore extends CacheStore {
     if (options.expireAfter == null && options.expires != null) {
       options.expireAfter = options.expires;
     }
-    options.key ??= "_session_id";
+    if (options.key == null || options.key === false) options.key = "_session_id";
     super(app, options);
   }
 }

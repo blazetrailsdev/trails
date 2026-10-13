@@ -14,7 +14,9 @@
  * for it, gates the packages in {@link MISSING_TAG_PACKAGES} only. An
  * `initialize` that calls no `super` ends the chain: `RoutesProxy#initialize`
  * (`action_dispatch/routing/routes_proxy.rb:15-19`) never reaches
- * `Routing::UrlFor#initialize`.
+ * `Routing::UrlFor#initialize`. The Ruby extractor writes `calls` only when a
+ * body makes one, so a `def` read with a line span and no `calls` calls
+ * nothing; an entry with no line span is taken to call `super`.
  *
  * Usage:
  *   pnpm parity:api:inlined          # gate (CI)
@@ -92,7 +94,7 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const infos = Object.fromEntries([...modules].map(([fqn, mod]) => [fqn, mod.info]));
   const ancestors = moduleAncestors(entity.info, entity.fqn, infos, resolve);
   const callsSuper = (body: MethodInfo | undefined) =>
-    body === undefined || (body.calls ?? []).includes("super");
+    body?.line === undefined || (body.calls ?? []).includes("super");
   const behind = (fqns: readonly string[]) => {
     const at = fqns.findIndex((fqn) => !callsSuper(defines(modules.get(fqn), "initialize")));
     return at === -1 ? undefined : fqns.slice(0, at + 1);
@@ -151,8 +153,9 @@ export function inlinedFromFindings(
       const tsFile = ctor?.file ?? klass.file;
       if (tsFile === undefined) continue;
       const short = (klass.name ?? owner).split(".").pop()!;
-      if (visited.has(`${name} ${tsFile} ${short}`)) continue;
-      visited.add(`${name} ${tsFile} ${short}`);
+      const seat = `${name} ${tsFile} ${klass.name ?? owner}`;
+      if (visited.has(seat)) continue;
+      visited.add(seat);
       const counterpart = rubyEntities.find(
         (entity) =>
           entity.package === name &&
