@@ -119,9 +119,6 @@ function isReceiverExpect(call: ts.CallExpression): boolean {
   );
 }
 
-// The test object is `fixtures(...).self()` or vitest's `context.testCase`. A method called on it
-// is Ruby's implicit-self call (`assert_queries_match` in an `ActiveRecord::TestCase`), so it is
-// read by its bare name.
 function isTestObject(owner: ts.Expression): boolean {
   if (ts.isCallExpression(owner)) owner = owner.arguments.length === 0 ? owner.expression : owner;
   return ts.isIdentifier(owner) && (owner.text === "self" || owner.text === "testCase");

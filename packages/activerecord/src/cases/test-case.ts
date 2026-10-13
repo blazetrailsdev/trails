@@ -173,6 +173,7 @@ export class TestCase extends ActiveSupportTestCase {
     });
   }
 
+  /** @missingRailsCall assert_operator — CONVERGEABLE activerecord-describes-are-named-test-case-constants */
   async assertQueriesMatch<T>(
     match: RegExp | string,
     {
@@ -310,7 +311,7 @@ export class TestCase extends ActiveSupportTestCase {
     }
   }
 
-  // vendor/ruby/v3.3.11/hash.c:4961); `setEnv` cannot reach @blazetrails/date, so the reset is here.
+  /** @inventedArm resetLocalTimeZoneId — CONVERGEABLE set-env-tz-resets-the-cached-local-zone */
   async withEnvTz(newTz = "US/Eastern", block: () => unknown): Promise<void> {
     const oldTz = getEnv("TZ");
     try {

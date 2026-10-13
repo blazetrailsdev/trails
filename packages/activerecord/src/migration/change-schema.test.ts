@@ -45,9 +45,7 @@ describe("Migration", () => {
 
     afterEach(async () => {
       const connection = await ambientConnection();
-      try {
-        await connection.dropTable("testings");
-      } catch {}
+      await connection.dropTable("testings").catch(() => null);
       Base.primaryKeyPrefixType = null;
       Base.clearCacheBang();
     });
