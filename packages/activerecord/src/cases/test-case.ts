@@ -278,12 +278,12 @@ export class TestCase extends ActiveSupportTestCase {
     try {
       oldCallbacks.set(
         klass,
-        (klass as CallbacksHost)[`_${camelize(kind, false)}Callbacks`]?.dup(),
+        (klass as CallbacksHost)[`_${camelize(kind, false)}Callbacks`]!.dup(),
       );
       for (const subclass of klass.subclasses) {
         oldCallbacks.set(
           subclass,
-          (subclass as CallbacksHost)[`_${camelize(kind, false)}Callbacks`]?.dup(),
+          (subclass as CallbacksHost)[`_${camelize(kind, false)}Callbacks`]!.dup(),
         );
       }
       await block();
@@ -366,13 +366,13 @@ export class TestCase extends ActiveSupportTestCase {
     if (zone() !== TestCase.EXPECTED_ZONE) {
       puts.call(
         stderr,
-        `\n${this}\n    Global state \`Time.zone\` was leaked.\n      Expected: ${TestCase.EXPECTED_ZONE}\n      Got: ${zone()}\n`,
+        `    \n${this}\n        Global state \`Time.zone\` was leaked.\n          Expected: ${TestCase.EXPECTED_ZONE ?? ""}\n          Got: ${zone() ?? ""}\n`,
       );
     }
     if (defaultTimezone() !== TestCase.EXPECTED_DEFAULT_TIMEZONE) {
       puts.call(
         stderr,
-        `\n${this}\n    Global state \`ActiveRecord.default_timezone\` was leaked.\n      Expected: ${TestCase.EXPECTED_DEFAULT_TIMEZONE}\n      Got: ${defaultTimezone()}\n`,
+        `    \n${this}\n        Global state \`ActiveRecord.default_timezone\` was leaked.\n          Expected: ${TestCase.EXPECTED_DEFAULT_TIMEZONE}\n          Got: ${defaultTimezone()}\n`,
       );
     }
     if (
@@ -380,13 +380,13 @@ export class TestCase extends ActiveSupportTestCase {
     ) {
       puts.call(
         stderr,
-        `\n${this}\n    Global state \`ActiveRecord::Base.time_zone_aware_attributes\` was leaked.\n      Expected: ${TestCase.EXPECTED_TIME_ZONE_AWARE_ATTRIBUTES}\n      Got: ${ActiveRecord.Base.timeZoneAwareAttributes}\n`,
+        `    \n${this}\n        Global state \`ActiveRecord::Base.time_zone_aware_attributes\` was leaked.\n          Expected: ${TestCase.EXPECTED_TIME_ZONE_AWARE_ATTRIBUTES}\n          Got: ${ActiveRecord.Base.timeZoneAwareAttributes}\n`,
       );
     }
     if (!rbEqual(ActiveRecord.Base.timeZoneAwareTypes, TestCase.EXPECTED_AWARE_TYPES)) {
       puts.call(
         stderr,
-        `\n${this}\n    Global state \`ActiveRecord::Base.time_zone_aware_types\` was leaked.\n      Expected: ${rbInspect(TestCase.EXPECTED_AWARE_TYPES)}\n      Got: ${rbInspect(ActiveRecord.Base.timeZoneAwareTypes)}\n`,
+        `    \n${this}\n        Global state \`ActiveRecord::Base.time_zone_aware_types\` was leaked.\n          Expected: ${rbInspect(TestCase.EXPECTED_AWARE_TYPES)}\n          Got: ${rbInspect(ActiveRecord.Base.timeZoneAwareTypes)}\n`,
       );
     }
   }

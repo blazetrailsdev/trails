@@ -1,4 +1,4 @@
-import { Redirect, redirect } from "./redirection.js";
+import { Redirect, Redirection } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
 import { Dispatcher, StaticDispatcher, type DrawCallback, type RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
@@ -1409,7 +1409,7 @@ export class Mapper {
     }
   }
 
-  declare redirect: typeof redirect;
+  declare redirect: typeof Redirection.redirect;
 
   match(
     path: string | Record<string, unknown>,
@@ -1664,10 +1664,7 @@ export class Mapper {
           "Ambiguous route definition. Both :path and the route path were specified as strings.",
         );
       }
-      to =
-        typeof to === "string" || to === undefined
-          ? this.getToFromPath(_path, to, routeOptions.action)
-          : to;
+      to = this.getToFromPath(_path, to, routeOptions.action);
       this.decomposedMatch(
         _path,
         controller,
@@ -1698,11 +1695,11 @@ export class Mapper {
   }
 
   /** @internal */
-  getToFromPath(
+  getToFromPath<T extends string | MountableApp | Redirect | undefined>(
     path: string,
-    to: string | undefined,
+    to: T,
     action: string | undefined,
-  ): string | undefined {
+  ): T | string | undefined {
     if (to || action) return to;
     const stripped = path.replace(/\(\.:format\)$/, "");
     if (this.isUsingMatchShorthand(stripped)) {
@@ -2283,6 +2280,7 @@ const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"
 
 const POISON = {};
 
+/** @noRailsEquivalent PERMANENT */
 const SYMBOL = /^:\w+[?!=]?$/;
 
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
@@ -2292,7 +2290,7 @@ function assertValidOnOption(on: string): void {
   if (!VALID_ON_OPTIONS.has(on)) throw new Error(`Unknown scope :${on} given to :on`);
 }
 
-Mapper.prototype.redirect = redirect;
+include(Mapper, Redirection);
 
 /** @noRailsEquivalent PERMANENT */
 function deleteWithDefault<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
