@@ -425,6 +425,7 @@ function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
+  "reverse_each", // a descending index loop, or a loop over a reversed copy
   "present?", // truthiness (`x != null && x !== ""`)
   "blank?", // truthiness (`!x`)
   "to_str", // implicit String coercion — same family as `to_s`

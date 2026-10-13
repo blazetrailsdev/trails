@@ -957,9 +957,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }
-  if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
-    return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
-  }
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
@@ -1005,6 +1002,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     }
   }
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
+  if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
+    return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
+  }
   const enumerable = enumerableMethod(recv, mid);
   if (enumerable !== undefined) return enumerable(recv, ...args);
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {

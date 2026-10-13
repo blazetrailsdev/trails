@@ -4,8 +4,6 @@ import { block } from "./hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
-  ARRAY_METHOD_TABLE,
-  rbAryRespondTo,
   aryCount,
   aryReject,
   rbFArray,
@@ -37,7 +35,7 @@ import {
   unpack1,
 } from "./array.js";
 import { Range } from "./range.js";
-import { rbFSend } from "./object.js";
+import { rbFSend, rbObjRespondTo } from "./object.js";
 import { byteslice } from "./string/byte-methods.js";
 
 describe("Array#pack", () => {
@@ -755,18 +753,20 @@ describe("the first and to_h sends on a receiver that is not an Array", () => {
 describe("ARRAY_METHOD_TABLE", () => {
   const a = [3, 1, 2, 1];
 
-  it("answers respond_to? for Ruby's names and not for JS's own", () => {
-    expect(rbAryRespondTo(a, "eachCons")).toBe(true);
-    expect(rbAryRespondTo(a, "isIntersect")).toBe(true);
-    expect(rbAryRespondTo(a, "forEach")).toBe(false);
-    expect(rbAryRespondTo(a, "exists")).toBe(false);
+  it("answers respond_to? for the names a JS array has no member for", () => {
+    expect(rbObjRespondTo(a, "eachCons")).toBe(true);
+    expect(rbObjRespondTo(a, "isIntersect")).toBe(true);
+    expect(rbObjRespondTo(a, "push")).toBe(true);
+    expect(rbObjRespondTo(a, "exists")).toBe(false);
   });
 
   it("dispatches a send with MRI's answers", () => {
     expect(rbFSend(a, "rotate", -1)).toEqual([1, 3, 1, 2]);
     expect(rbFSend(a, "rindex", 1)).toBe(3);
     expect(rbFSend(a, "index", (i: number) => i < 3)).toBe(1);
-    expect(rbFSend(a, "eachCons", 2)).toEqual([
+    const cons: unknown[] = [];
+    expect(rbFSend(a, "eachCons", 2, (slice: unknown) => cons.push(slice))).toBe(a);
+    expect(cons).toEqual([
       [3, 1],
       [1, 2],
       [2, 1],
@@ -775,11 +775,10 @@ describe("ARRAY_METHOD_TABLE", () => {
     expect(rbFSend(a, "difference", [1])).toEqual([3, 2]);
     expect(rbFSend(a, "union", [5])).toEqual([3, 1, 2, 5]);
     expect(rbFSend(a, "sortBy", (i: number) => -i)).toEqual([3, 2, 1, 1]);
-    expect(rbFSend(a, "sort")).toEqual([1, 1, 2, 3]);
     expect(rbFSend([], "sample")).toBeNull();
-    expect(rbFSend([1, [2]], "flatMap", (i: unknown) => i)).toEqual([1, 2]);
     expect(rbFSend(a, "detect", (i: number) => i < 3)).toBe(1);
     expect(rbFSend(a, "isOne", 3)).toBe(true);
-    expect([...(ARRAY_METHOD_TABLE.shuffle(a) as number[])].sort()).toEqual([1, 1, 2, 3]);
+    expect(rbFSend(a, "isAll", (i: number) => i > 0)).toBe(true);
+    expect([...(rbFSend(a, "shuffle") as number[])].sort()).toEqual([1, 1, 2, 3]);
   });
 });

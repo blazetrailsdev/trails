@@ -206,7 +206,6 @@ export {
   unpack,
   unpack1,
   ARRAY_METHOD_TABLE,
-  rbAryRespondTo,
 } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";

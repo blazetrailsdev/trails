@@ -248,7 +248,8 @@ export class DatabaseConfigurations {
     const url = config.url;
     const configWithoutUrl = { ...config };
     delete configWithoutUrl.url;
-    for (const handler of [...DatabaseConfigurations.dbConfigHandlers].reverse()) {
+    for (let i = DatabaseConfigurations.dbConfigHandlers.length - 1; i >= 0; i--) {
+      const handler = DatabaseConfigurations.dbConfigHandlers[i];
       const result = handler(envName, name, url, configWithoutUrl);
       if (result) return result;
     }

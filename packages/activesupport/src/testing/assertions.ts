@@ -16,7 +16,6 @@ import {
   rbObjClass,
   rbFSend,
   rbObjClassname,
-  rbAryRespondTo,
   rbStrRespondTo,
   regexpEscape,
   SignalException,
@@ -581,9 +580,6 @@ export function assertInDelta(exp: number, act: number, delta: number = 0.001, m
 function respondsTo(object: object, name: string, includeAll: boolean): boolean {
   if (Object.getPrototypeOf(object) === String.prototype) {
     return rbStrRespondTo(object.valueOf() as string, name, includeAll);
-  }
-  if (Object.getPrototypeOf(object) === Array.prototype) {
-    return rbAryRespondTo(object as unknown[], name, includeAll);
   }
   const override = findDescriptor(object, "isRespondTo");
   if (override && typeof override.value === "function") {

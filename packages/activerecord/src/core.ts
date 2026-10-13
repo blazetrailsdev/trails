@@ -565,7 +565,9 @@ export function connectedToStack(): ConnectedToEntry[] {
 }
 
 export function currentRole(this: CoreHost): string {
-  for (const hash of [...connectedToStack()].reverse()) {
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const hash = stack[i];
     if (hash.role && hash.klasses.includes(ActiveRecord.Base)) return hash.role;
     if (hash.role && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.role;
   }
@@ -574,7 +576,9 @@ export function currentRole(this: CoreHost): string {
 }
 
 export function currentShard(this: CoreHost): string {
-  for (const hash of [...connectedToStack()].reverse()) {
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const hash = stack[i];
     if (hash.shard && hash.klasses.includes(ActiveRecord.Base)) return hash.shard;
     if (hash.shard && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.shard;
   }
@@ -583,7 +587,9 @@ export function currentShard(this: CoreHost): string {
 }
 
 export function currentPreventingWrites(this: CoreHost): boolean {
-  for (const hash of [...connectedToStack()].reverse()) {
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const hash = stack[i];
     if (hash.preventWrites !== undefined && hash.klasses.includes(ActiveRecord.Base))
       return hash.preventWrites;
     if (
@@ -597,7 +603,9 @@ export function currentPreventingWrites(this: CoreHost): boolean {
 }
 
 export function isPreventingWrites(className?: string): boolean {
-  for (const hash of [...connectedToStack()].reverse()) {
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const hash = stack[i];
     if (hash.preventWrites !== undefined && hash.klasses.includes(ActiveRecord.Base))
       return hash.preventWrites;
     if (
