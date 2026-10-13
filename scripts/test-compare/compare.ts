@@ -1172,7 +1172,9 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         const isStub = (i: number) => !consumedTs.has(i) && tsTests[i].pending;
         const stub =
           pathIndex.get(normPath(tc.ancestors, tc.description))?.find(isStub) ??
-          descIndex.get(normalizeErb(tc.description))?.find(isStub);
+          (tc.ancestors.length === 0
+            ? descIndex.get(normalizeErb(tc.description))?.find(isStub)
+            : undefined);
         if (stub !== undefined) consumedTs.add(stub);
       }
 

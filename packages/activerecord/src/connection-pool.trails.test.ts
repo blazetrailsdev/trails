@@ -67,7 +67,7 @@ it("isConnected probes each pooled connection's connected state", async () => {
 
 it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
   const pool = makePool();
-  await pool.pinConnectionBang(false);
+  await pool.pinConnectionBang();
 
   const conn = await pool.checkout();
   const verify = vi.spyOn(conn, "verifyBang");
