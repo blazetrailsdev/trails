@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { eachSlice, kernelArray as Array, pluck } from "@blazetrails/activesupport";
+import { defineModule, eachSlice, kernelArray as Array, pluck } from "@blazetrails/activesupport";
 import { cmp, isEmpty, rbCmpint, rbInspect, rtest, slice } from "@blazetrails/ruby-compat";
 import { stripThenable } from "@blazetrails/activesupport";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
@@ -7,253 +7,279 @@ import type { Base } from "../base.js";
 import type { FindEachOptions, InBatchesOptions, LoadedRelation, Relation } from "../relation.js";
 import { errorOnIgnoredOrder } from "../active-record.js";
 
-export class Batches {
-  static readonly ORDER_IGNORE_MESSAGE =
-    "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
-  static readonly DEFAULT_ORDER = ":asc" as const;
+export const ORDER_IGNORE_MESSAGE =
+  "Scoped order is ignored, use :cursor with :order to configure custom order.";
+export const DEFAULT_ORDER = ":asc" as const;
 
-  findEach<T extends Base>(
-    this: any,
-    opts: FindEachOptions,
-    block: (record: T) => void | Promise<void>,
-  ): Promise<null>;
-  findEach<T extends Base>(
-    this: any,
-    opts?: FindEachOptions,
-  ): AsyncGenerator<T> & { size(): Promise<number> };
-  /** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
-  findEach<T extends Base>(
-    this: any,
-    {
-      start,
-      finish,
-      batchSize = 1000,
-      errorOnIgnore,
-      cursor = this.primaryKey,
-      order = Batches.DEFAULT_ORDER,
-    }: FindEachOptions = {},
-    block?: (record: T) => void | Promise<void>,
-  ): (AsyncGenerator<T> & { size(): Promise<number> }) | Promise<null> {
-    if (block) {
-      return this.findInBatches(
-        { start, finish, batchSize, errorOnIgnore, cursor, order },
-        async (records: T[]) => {
-          for (const record of records) await block(record);
-        },
-      );
-    } else {
-      const relation = this;
-      const enumerator = (async function* () {
-        for await (const records of relation.findInBatches({
-          start,
-          finish,
-          batchSize,
-          errorOnIgnore,
-          cursor,
-          order,
-        })) {
-          yield* records as T[];
-        }
-      })() as AsyncGenerator<T> & { size(): Promise<number> };
-      enumerator.size = async (): Promise<number> => {
-        cursor = Array(cursor);
-        return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
-      };
-      return enumerator;
-    }
-  }
-
-  findInBatches<T extends Base>(
-    this: any,
-    opts: FindEachOptions,
-    block: (batch: T[]) => void | Promise<void>,
-  ): Promise<null>;
-  findInBatches<T extends Base>(
-    this: any,
-    opts?: FindEachOptions,
-  ): AsyncGenerator<T[]> & { size(): Promise<number> };
-  /** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
-  findInBatches<T extends Base>(
-    this: any,
-    {
-      start,
-      finish,
-      batchSize = 1000,
-      errorOnIgnore,
-      cursor = this.primaryKey,
-      order = Batches.DEFAULT_ORDER,
-    }: FindEachOptions = {},
-    block?: (batch: T[]) => void | Promise<void>,
-  ): (AsyncGenerator<T[]> & { size(): Promise<number> }) | Promise<null> {
-    const relation = this;
-    if (!block) {
-      const size = async (): Promise<number> => {
-        cursor = Array(cursor);
-        const total = await applyLimits(
-          relation,
-          cursor,
-          start,
-          finish,
-          buildBatchOrders(cursor, order),
-        ).size();
-        return Math.floor((total - 1) / batchSize) + 1;
-      };
-      const enumerator = (async function* () {
-        for await (const batch of relation
-          .inBatches({ of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order })
-          ._generator()) {
-          yield (await batch.toArray()) as T[];
-        }
-      })() as AsyncGenerator<T[]> & { size(): Promise<number> };
-      enumerator.size = size;
-      return enumerator;
-    }
-
-    return relation.inBatches(
-      { of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order },
-      async (batch: LoadedRelation<Relation<T>>) => {
-        await block(await batch.toArray());
+export function findEach<T extends Base>(
+  this: any,
+  opts: FindEachOptions,
+  block: (record: T) => void | Promise<void>,
+): Promise<null>;
+export function findEach<T extends Base>(
+  this: any,
+  opts?: FindEachOptions,
+): AsyncGenerator<T> & { size(): Promise<number> };
+/** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+export function findEach<T extends Base>(
+  this: any,
+  {
+    start,
+    finish,
+    batchSize = 1000,
+    errorOnIgnore,
+    cursor = this.primaryKey,
+    order = DEFAULT_ORDER,
+  }: FindEachOptions = {},
+  block?: (record: T) => void | Promise<void>,
+): (AsyncGenerator<T> & { size(): Promise<number> }) | Promise<null> {
+  if (block) {
+    return this.findInBatches(
+      { start, finish, batchSize, errorOnIgnore, cursor, order },
+      async (records: T[]) => {
+        for (const record of records) await block(record);
       },
     );
-  }
-
-  inBatches<T extends Base>(
-    this: any,
-    opts: InBatchesOptions,
-    block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
-  ): Promise<null>;
-  inBatches<T extends Base>(
-    this: any,
-    opts?: InBatchesOptions,
-  ): BatchEnumerator<LoadedRelation<Relation<T>>>;
-  /**
-   * @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator
-   * @inventedArm indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
-   */
-  inBatches<T extends Base>(
-    this: any,
-    {
-      of = 1000,
-      start,
-      finish,
-      order = Batches.DEFAULT_ORDER,
-      cursor: cursorOption,
-      errorOnIgnore,
-      load = false,
-      useRanges,
-    }: InBatchesOptions = {},
-    block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
-  ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<null> {
-    const self = this;
-    const cursor = Array(cursorOption ?? this.primaryKey).map(String);
-    ensureValidOptionsForBatchingBang.call(this, cursor, start, finish, order);
-
-    if (this.arel().orders.length > 0) {
-      actOnIgnoredOrder.call(this, errorOnIgnore);
-    }
-
-    const run = async (block: (relation: any) => unknown): Promise<null> => {
-      await self.model.schemaCache().indexes(self.tableName);
-      ensureValidOptionsForBatchingBang.call(self, cursor, start, finish, order);
-
-      let batchLimit = of;
-      let remaining: number | null = null;
-
-      if (self.limitValue !== null) {
-        remaining = self.limitValue as number;
-        if (rbCmpint(cmp(remaining, batchLimit), remaining, batchLimit) < 0) batchLimit = remaining;
-      }
-
-      if (self.loaded) {
-        return batchOnLoadedRelation(
-          {
-            relation: self,
-            start,
-            finish,
-            cursor,
-            order,
-            batchLimit,
-          },
-          block,
-        );
-      } else {
-        return batchOnUnloadedRelation.call(
-          self,
-          {
-            relation: self,
-            start,
-            finish,
-            load,
-            cursor,
-            order,
-            useRanges,
-            remaining,
-            batchLimit,
-          },
-          block,
-        );
-      }
-    };
-
-    const generator = async function* (): AsyncGenerator<LoadedRelation<Relation<T>>> {
-      type Batch = { relation: any; resume: () => void; stop: (reason: unknown) => void };
-      const stopped = {};
-      const state: { pending: Batch | null; finished: boolean; failure: unknown[] } = {
-        pending: null,
-        finished: false,
-        failure: [],
-      };
-      let wake = (): void => {};
-      let batch: Batch | null = null;
-      void run(
-        (relation) =>
-          new Promise<void>((resume, stop) => {
-            state.pending = { relation, resume, stop };
-            wake();
-          }),
-      )
-        .catch((error: unknown) => {
-          if (error !== stopped) state.failure.push(error);
-        })
-        .then(() => {
-          state.finished = true;
-          wake();
-        });
-      try {
-        while (true) {
-          if (!state.pending && !state.finished) {
-            await new Promise<void>((resolve) => (wake = resolve));
-          }
-          batch = state.pending;
-          if (!batch) break;
-          state.pending = null;
-          yield batch.relation;
-          batch.resume();
-          batch = null;
-        }
-      } finally {
-        batch?.stop(stopped);
-      }
-      if (state.failure.length > 0) throw state.failure[0];
-    };
-
-    if (!block) {
-      const enumerator = new BatchEnumerator<LoadedRelation<Relation<T>>>({
-        of,
+  } else {
+    const relation = this;
+    const enumerator = (async function* () {
+      for await (const records of relation.findInBatches({
         start,
         finish,
-        relation: self,
+        batchSize,
+        errorOnIgnore,
         cursor,
         order,
-        useRanges,
-      });
-      enumerator._generator = generator;
-      return enumerator;
-    }
-
-    return run(block);
+      })) {
+        yield* records as T[];
+      }
+    })() as AsyncGenerator<T> & { size(): Promise<number> };
+    enumerator.size = async (): Promise<number> => {
+      cursor = Array(cursor);
+      return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
+    };
+    return enumerator;
   }
 }
+
+export function findInBatches<T extends Base>(
+  this: any,
+  opts: FindEachOptions,
+  block: (batch: T[]) => void | Promise<void>,
+): Promise<null>;
+export function findInBatches<T extends Base>(
+  this: any,
+  opts?: FindEachOptions,
+): AsyncGenerator<T[]> & { size(): Promise<number> };
+/** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+export function findInBatches<T extends Base>(
+  this: any,
+  {
+    start,
+    finish,
+    batchSize = 1000,
+    errorOnIgnore,
+    cursor = this.primaryKey,
+    order = DEFAULT_ORDER,
+  }: FindEachOptions = {},
+  block?: (batch: T[]) => void | Promise<void>,
+): (AsyncGenerator<T[]> & { size(): Promise<number> }) | Promise<null> {
+  const relation = this;
+  if (!block) {
+    const size = async (): Promise<number> => {
+      cursor = Array(cursor);
+      const total = await applyLimits(
+        relation,
+        cursor,
+        start,
+        finish,
+        buildBatchOrders(cursor, order),
+      ).size();
+      return Math.floor((total - 1) / batchSize) + 1;
+    };
+    const enumerator = (async function* () {
+      for await (const batch of relation
+        .inBatches({ of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order })
+        ._generator()) {
+        yield (await batch.toArray()) as T[];
+      }
+    })() as AsyncGenerator<T[]> & { size(): Promise<number> };
+    enumerator.size = size;
+    return enumerator;
+  }
+
+  return relation.inBatches(
+    { of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order },
+    async (batch: LoadedRelation<Relation<T>>) => {
+      await block(await batch.toArray());
+    },
+  );
+}
+
+export function inBatches<T extends Base>(
+  this: any,
+  opts: InBatchesOptions,
+  block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+): Promise<null>;
+export function inBatches<T extends Base>(
+  this: any,
+  opts?: InBatchesOptions,
+): BatchEnumerator<LoadedRelation<Relation<T>>>;
+/**
+ * @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator
+ * @inventedArm indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
+ */
+export function inBatches<T extends Base>(
+  this: any,
+  {
+    of = 1000,
+    start,
+    finish,
+    order = DEFAULT_ORDER,
+    cursor: cursorOption,
+    errorOnIgnore,
+    load = false,
+    useRanges,
+  }: InBatchesOptions = {},
+  block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<null> {
+  const self = this;
+  const cursor = Array(cursorOption ?? this.primaryKey).map(String);
+  ensureValidOptionsForBatchingBang.call(this, cursor, start, finish, order);
+
+  if (this.arel().orders.length > 0) {
+    actOnIgnoredOrder.call(this, errorOnIgnore);
+  }
+
+  const run = async (block: (relation: any) => unknown): Promise<null> => {
+    await self.model.schemaCache().indexes(self.tableName);
+    ensureValidOptionsForBatchingBang.call(self, cursor, start, finish, order);
+
+    let batchLimit = of;
+    let remaining: number | null = null;
+
+    if (self.limitValue !== null) {
+      remaining = self.limitValue as number;
+      if (rbCmpint(cmp(remaining, batchLimit), remaining, batchLimit) < 0) batchLimit = remaining;
+    }
+
+    if (self.loaded) {
+      return batchOnLoadedRelation(
+        {
+          relation: self,
+          start,
+          finish,
+          cursor,
+          order,
+          batchLimit,
+        },
+        block,
+      );
+    } else {
+      return batchOnUnloadedRelation.call(
+        self,
+        {
+          relation: self,
+          start,
+          finish,
+          load,
+          cursor,
+          order,
+          useRanges,
+          remaining,
+          batchLimit,
+        },
+        block,
+      );
+    }
+  };
+
+  const generator = async function* (): AsyncGenerator<LoadedRelation<Relation<T>>> {
+    type Batch = { relation: any; resume: () => void; stop: (reason: unknown) => void };
+    const stopped = {};
+    const state: { pending: Batch | null; finished: boolean; failure: unknown[] } = {
+      pending: null,
+      finished: false,
+      failure: [],
+    };
+    let wake = (): void => {};
+    let batch: Batch | null = null;
+    void run(
+      (relation) =>
+        new Promise<void>((resume, stop) => {
+          state.pending = { relation, resume, stop };
+          wake();
+        }),
+    )
+      .catch((error: unknown) => {
+        if (error !== stopped) state.failure.push(error);
+      })
+      .then(() => {
+        state.finished = true;
+        wake();
+      });
+    try {
+      while (true) {
+        if (!state.pending && !state.finished) {
+          await new Promise<void>((resolve) => (wake = resolve));
+        }
+        batch = state.pending;
+        if (!batch) break;
+        state.pending = null;
+        yield batch.relation;
+        batch.resume();
+        batch = null;
+      }
+    } finally {
+      batch?.stop(stopped);
+    }
+    if (state.failure.length > 0) throw state.failure[0];
+  };
+
+  if (!block) {
+    const enumerator = new BatchEnumerator<LoadedRelation<Relation<T>>>({
+      of,
+      start,
+      finish,
+      relation: self,
+      cursor,
+      order,
+      useRanges,
+    });
+    enumerator._generator = generator;
+    return enumerator;
+  }
+
+  return run(block);
+}
+
+/** @internal */
+export const BatchesPublicInstanceMethods = {
+  findEach,
+  findInBatches,
+  inBatches,
+} as const;
+
+/** @internal */
+export const BatchesPrivateInstanceMethods = {
+  ensureValidOptionsForBatchingBang,
+  applyLimits,
+  applyStartLimit,
+  applyFinishLimit,
+  batchCondition,
+  buildBatchOrders,
+  actOnIgnoredOrder,
+  batchOnLoadedRelation,
+  recordCursorValues,
+  compareValuesForOrder,
+  batchOnUnloadedRelation,
+} as const;
+
+export const Batches = defineModule(
+  BatchesPublicInstanceMethods,
+  undefined,
+  BatchesPrivateInstanceMethods,
+);
 
 /**
  * @internal
@@ -366,16 +392,16 @@ export function buildBatchOrders(
   cursor: string[],
   order: ":asc" | ":desc" | (":asc" | ":desc")[],
 ): [string, ":asc" | ":desc"][] {
-  return cursor.map((column, i) => [column, Array(order)[i] ?? Batches.DEFAULT_ORDER]);
+  return cursor.map((column, i) => [column, Array(order)[i] ?? DEFAULT_ORDER]);
 }
 
 /** @internal */
 export function actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
   const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder();
   if (raise) {
-    throw new ArgumentError(Batches.ORDER_IGNORE_MESSAGE);
+    throw new ArgumentError(ORDER_IGNORE_MESSAGE);
   } else if (this.model.logger) {
-    this.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
+    this.model.logger.warn(ORDER_IGNORE_MESSAGE);
   }
 }
 
