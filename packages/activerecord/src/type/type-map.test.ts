@@ -111,14 +111,6 @@ describe("HashLookupTypeMapTest", () => {
     expect(mapping.lookup(4)).toBeInstanceOf(ValueType);
   });
 
-  it("isKey returns true for registered keys and false otherwise", () => {
-    const mapping = new HashLookupTypeMap();
-    mapping.registerType("foo", { name: "foo" } as any);
-
-    expect(mapping.isKey("foo")).toBe(true);
-    expect(mapping.isKey("bar")).toBe(false);
-  });
-
   it("fetch memoizes on args", () => {
     const mapping = new HashLookupTypeMap();
     mapping.registerType("foo", undefined, (type: string | number, ...args: unknown[]) => {

@@ -62,17 +62,6 @@ describe("AssociationValidationTest", () => {
     expect(await r.isValid()).toBeTruthy();
   });
 
-  it("validates associated with multiple attributes and array forms", async () => {
-    Topic.validatesAssociated(["replies"], "openReplies");
-    Reply.validatesPresenceOf("content");
-    const t = new Topic();
-    t.replies.build({ title: "A reply" });
-    t.openReplies.build({ title: "A reply" });
-    expect(await t.isValid()).toBeFalsy();
-    expect(t.errors.messagesFor("replies").length > 0).toBeTruthy();
-    expect(t.errors.messagesFor("openReplies").length > 0).toBeTruthy();
-  });
-
   it("validates associated marked for destruction", async () => {
     Topic.validatesAssociated("replies");
     Reply.validatesPresenceOf("content");

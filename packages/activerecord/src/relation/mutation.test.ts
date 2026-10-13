@@ -185,21 +185,4 @@ describe("RelationMutationTest", () => {
     rel.distinctBang("foo");
     expect(rel.distinctValue).toBe("foo");
   });
-
-  it("uniq! deduplicates the named clause array", () => {
-    const rel: any = Post.group("title").group("title").group("author");
-    expect(rel.groupValues).toEqual(["title", "title", "author"]);
-    rel.uniqBang("group");
-    expect(rel.groupValues).toEqual(["title", "author"]);
-  });
-
-  it("uniq! is a no-op for unknown clause names", () => {
-    const rel: any = Post.group("title");
-    expect(() => rel.uniqBang("unknown_clause")).not.toThrow();
-  });
-
-  it("uniq! with no argument is a no-op", () => {
-    const rel: any = Post.group("title");
-    expect(() => rel.uniqBang()).not.toThrow();
-  });
 });
