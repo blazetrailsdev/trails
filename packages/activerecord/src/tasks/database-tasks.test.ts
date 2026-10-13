@@ -1766,9 +1766,9 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     ruby: ["ts", "schema.ts"],
     sql: ["sql", "structure.sql"],
   };
-  const self = {} as { configurations: Record<string, Record<string, unknown>> };
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    self.configurations = { development: { adapter: "abstract", database: "my-db" } };
+    configurations = { development: { adapter: "abstract", database: "my-db" } };
   });
 
   it("check dump filename defaults", () => {
@@ -1879,11 +1879,11 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
   }
 
   const withStubbedConfigurations = (
-    configurations: Record<string, Record<string, unknown>> = self.configurations,
+    configurations_: Record<string, Record<string, unknown>> = configurations,
     block: () => void,
   ): void => {
     const oldConfigurations = Base.configurations();
-    Base.configurations(configurations);
+    Base.configurations(configurations_);
 
     try {
       block();
