@@ -40,8 +40,6 @@ describe("HasOneThroughAssociationsTest", () => {
     "comments",
   ]);
 
-  Membership.inheritanceColumn = "type";
-
   it("building with a loaded join row preserves unrelated in-memory changes on it", async () => {
     const newMember = await Member.create({ name: "Joe" });
     const membership = (await currentMembership(newMember).create()) as Membership;
