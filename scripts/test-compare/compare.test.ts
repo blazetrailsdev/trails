@@ -456,7 +456,6 @@ describe("main --extra", () => {
       "core_ext/date_ext_test.rb": [],
     });
     expect((await run(["--json"])).files.every((f) => f.extraTests === undefined)).toBe(true);
-
     const { lines } = await run(["--extra", "--sort-extra", "--min-extra=1"]);
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain("core_ext/time_ext_test.rb");
