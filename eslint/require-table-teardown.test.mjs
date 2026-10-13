@@ -40,7 +40,6 @@ tester.run("require-table-teardown", rule, {
       '    async up() { await this.createTable("widgets", () => {}); }\n' +
       "    async down() { await this.revert(); }\n  })();\n" +
       '  await migration.migrate("up");\n});',
-    // A named class is followed to the instance its revert names.
     "class CreateWidgets extends Migration.Current {\n" +
       '  async change() { await this.createTable("widgets", () => {}); }\n}\n' +
       "const migration = new CreateWidgets();\n" +
@@ -660,7 +659,6 @@ tester.run("require-table-teardown", rule, {
         '  await migration.migrate("up");\n});',
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 5 }],
     },
-    // Reverting an instance of a different named class tears nothing down.
     {
       code:
         "class CreateWidgets extends Migration.Current {\n" +
@@ -671,7 +669,6 @@ tester.run("require-table-teardown", rule, {
         'afterEach(async () => { await other.migrate("down"); });',
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 2 }],
     },
-    // Every instance of the named class has to be reverted.
     {
       code:
         "class CreateWidgets extends Migration.Current {\n" +

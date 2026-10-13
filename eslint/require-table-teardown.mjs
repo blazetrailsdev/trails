@@ -1119,12 +1119,6 @@ function instanceTarget(instance) {
   return target?.type === "Identifier" ? target : null;
 }
 
-/**
- * Each identifier an instance of `classNode` is assigned to, with the node a
- * revert has to cover: the target of `new (class … {})()`, or of each
- * `new Name()` in the file where `Name` is the class declaration or the
- * `const Name = class …` holding it.
- */
 function instanceBindings(classNode, sourceCode) {
   const parent = classNode.parent;
   if (parent.type === "NewExpression" && parent.callee === classNode) {
