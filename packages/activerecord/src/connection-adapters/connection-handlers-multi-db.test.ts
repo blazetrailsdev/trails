@@ -24,7 +24,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
   beforeEach(async () => {
     handler = new ConnectionHandler();
     connectionName = "ActiveRecord::Base";
-    const dbConfig = Base.configurations().configsFor({ envName: "arunit", name: "primary" });
+    const dbConfig = Base.configurations().configsFor({ envName: "arunit", name: "primary" })!;
     rwPool = await handler.establishConnection(dbConfig);
     roPool = await handler.establishConnection(dbConfig, { role: "reading" });
   });

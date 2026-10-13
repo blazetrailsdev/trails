@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  iseqLocationSetup,
   NameError,
   NilClass,
   NoMethodError,
@@ -9,6 +10,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
+import { callerLocations, type CallerLocation } from "./deprecation.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 export class DelegationError extends Error {
@@ -23,7 +25,7 @@ export class DelegationError extends Error {
 }
 
 export interface DelegateOptions {
-  location?: unknown;
+  location?: CallerLocation | null;
   to?: string | object | null;
   prefix?: boolean | string | null;
   allowNil?: boolean | null;
@@ -73,6 +75,7 @@ export namespace Delegation {
       return owner.moduleEval((mod) => generate(mod, methods, options));
     }
     const { to = null, prefix = null, allowNil = null, as = null, signature = null } = options;
+    let location = options.location ?? null;
     let nilable = "nilable" in options ? options.nilable : true;
 
     if (!to) {
@@ -88,6 +91,9 @@ export namespace Delegation {
     }
 
     const methodPrefix = prefix ? `${prefix === true ? String(to) : prefix}_` : "";
+
+    location ||= callerLocations(1, 1)[0];
+    const [file, line] = [location.path, location.lineno];
 
     let receiver: string;
     if (typeof to !== "string") {
@@ -206,6 +212,7 @@ export namespace Delegation {
       } else if (typeof methodObject === "function") {
         Object.defineProperty(value, "length", { value: methodObject.length });
       }
+      iseqLocationSetup(value, file, line);
       Object.defineProperty(owner, methodName, {
         configurable: true,
         enumerable: false,
