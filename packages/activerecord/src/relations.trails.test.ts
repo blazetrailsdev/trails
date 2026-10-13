@@ -2,19 +2,15 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
-import { Author } from "./test-helpers/models/author.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Comment, SpecialComment } from "./test-helpers/models/comment.js";
+import { Comment } from "./test-helpers/models/comment.js";
 
 describe("RelationTest", () => {
-  fixtures(["authors", "topics", "posts", "comments"]);
+  fixtures(["posts"]);
 
   beforeAll(() => {
     registerModel(Post);
-    registerModel(Author);
     registerModel(Comment);
-    registerModel(SpecialComment);
-    registerModel(Topic);
   });
 
   it("eager from() subquery projects the table star, not column aliases", () => {
