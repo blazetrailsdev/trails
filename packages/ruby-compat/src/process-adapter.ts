@@ -426,8 +426,7 @@ export function rubyResetTimezone(_val: string | undefined): void {
 }
 
 /**
- * MRI's `update_tz` (`vendor/ruby/v3.3.11/time.c:753-758`). `tzset` is the
- * caller's own re-read of the zone, since the cached zone lives with `Time`.
+ * MRI's `update_tz` (`vendor/ruby/v3.3.11/time.c:753-758`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -437,7 +436,6 @@ export function updateTz(tzset: () => void): void {
   tzset();
 }
 
-/** MRI's `reset_by_modified_env` (`vendor/ruby/v3.3.11/hash.c:4961-4972`). */
 function resetByModifiedEnv(nam: string, val: string | undefined): void {
   if (nam === "TZ") {
     rubyResetTimezone(val);

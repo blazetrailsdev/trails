@@ -28,6 +28,7 @@ describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
 describe('Time.now after ENV["TZ"] is assigned', () => {
   it("reads the new zone with no reset of its own", () => {
     const oldTz = env.TZ;
+    const zone = Time.now().zone;
     try {
       setEnv("TZ", "America/New_York");
       expect(Time.now().zone).toMatch(/^E[SD]T$/);
@@ -36,6 +37,7 @@ describe('Time.now after ENV["TZ"] is assigned', () => {
     } finally {
       setEnv("TZ", oldTz);
     }
+    expect(Time.now().zone).toBe(zone);
   });
 });
 

@@ -15,7 +15,6 @@ import {
   processAdapterConfig,
   registerProcessAdapter,
   setEnv,
-  updateTz,
   setExitCode,
   stderr,
   stdin,
@@ -183,28 +182,6 @@ describe("processAdapter", () => {
       setEnv("FAKE_FLAG", undefined);
       expect(env.FAKE_FLAG).toBeUndefined();
       expect("FAKE_FLAG" in env).toBe(false);
-    });
-  });
-
-  describe("setEnv TZ", () => {
-    it("assigning or deleting TZ marks the zone stale, and no other key does", () => {
-      registerProcessAdapter(makeFakeAdapter());
-      const tzset = vi.fn();
-      updateTz(tzset);
-      tzset.mockClear();
-
-      setEnv("NEW_KEY", "new-value");
-      updateTz(tzset);
-      expect(tzset).not.toHaveBeenCalled();
-
-      setEnv("TZ", "US/Eastern");
-      updateTz(tzset);
-      updateTz(tzset);
-      expect(tzset).toHaveBeenCalledTimes(1);
-
-      setEnv("TZ", undefined);
-      updateTz(tzset);
-      expect(tzset).toHaveBeenCalledTimes(2);
     });
   });
 

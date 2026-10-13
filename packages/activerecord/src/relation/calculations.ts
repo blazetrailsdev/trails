@@ -779,6 +779,7 @@ export function isDistinctSelect(
 
 /** @internal */
 export function operationOverAggregateColumn(
+  this: CalculationRelation,
   column: any,
   operation: string,
   distinct: boolean,
@@ -807,7 +808,7 @@ function buildCountSubquery(
   }
 
   const subqueryAlias = sql("subquery_for_count", { retryable: true });
-  const selectValue = operationOverAggregateColumn(columnAlias, "count", false);
+  const selectValue = operationOverAggregateColumn.call(this, columnAlias, "count", false);
 
   return isAll
     ? relation.unscope(":order").buildSubquery(subqueryAlias, selectValue)
@@ -839,7 +840,8 @@ export async function executeSimpleCalculation(
     relation = this.unscope(":order").distinctBang(false) as CalculationRelation;
 
     column = relation.aggregateColumn(columnName as string | ArelNode | number | null);
-    const selectValue = operationOverAggregateColumn(
+    const selectValue = operationOverAggregateColumn.call(
+      this,
       column,
       operation,
       distinct === true,
@@ -879,7 +881,7 @@ export async function executeSimpleCalculation(
     if (type instanceof EnumType) type = type.subtype;
   }
 
-  return typeCastCalculatedValue(first(result.castValues()), operation, type);
+  return typeCastCalculatedValue.call(this, first(result.castValues()), operation, type);
 }
 
 /** @internal */
@@ -916,7 +918,12 @@ export async function executeGroupedCalculation(
     const columnAlias = columnAliasTracker.aliasFor(
       `${fn} ${(columnName == null ? "" : String(columnName)).toLowerCase()}`,
     );
-    const selectValue = operationOverAggregateColumn(column, fn, distinct ?? false) as any;
+    const selectValue = operationOverAggregateColumn.call(
+      this,
+      column,
+      fn,
+      distinct ?? false,
+    ) as any;
 
     const selectValues: ArelNode[] = [selectValue.as(connection.quoteColumnName(columnAlias))];
     if (!this.havingClause.isEmpty()) {
@@ -984,7 +991,7 @@ export async function executeGroupedCalculation(
       if ((key as unknown[]).length === 1) key = (key as unknown[])[0];
       if (associated) key = hashAref(keyRecords!, key);
 
-      result.set(key, typeCastCalculatedValue(row[columnAlias], fn, type));
+      result.set(key, typeCastCalculatedValue.call(this, row[columnAlias], fn, type));
     }
     return result;
   });
@@ -1058,7 +1065,12 @@ export async function typeCastPluckValues(
 }
 
 /** @internal */
-export function typeCastCalculatedValue(value: unknown, operation: string, type: any): unknown {
+export function typeCastCalculatedValue(
+  this: CalculationRelation,
+  value: unknown,
+  operation: string,
+  type: any,
+): unknown {
   switch (operation) {
     case "count":
       return toI(value);
