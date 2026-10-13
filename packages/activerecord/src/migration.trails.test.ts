@@ -7,6 +7,8 @@ import type { MigrationProxy } from "./migration.js";
 import { Current, Migration, IllegalMigrationNameError } from "./migration.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import { Base } from "./base.js";
+import { RecordNotUnique } from "./errors.js";
+import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { adapterType, checkoutRawTestAdapter } from "./test-adapter.js";
@@ -676,5 +678,96 @@ describe("Migration#formatArguments", () => {
     const float = new Recording();
     expect(await float.sayWithTime("work", async () => 1.5)).toBe(1.5);
     expect(float.lines).toHaveLength(2);
+  });
+});
+
+describe("Migration index forwarders", () => {
+  async function withTestings(body: () => Promise<void>): Promise<void> {
+    await (
+      await Base.leaseConnection()
+    ).createTable("testings", { force: true }, (t) => {
+      t.string("foo", { limit: 100 });
+      t.string("bar", { limit: 100 });
+    });
+    try {
+      await body();
+    } finally {
+      await (await Base.leaseConnection()).dropTable("testings", { ifExists: true });
+    }
+  }
+
+  it("removeIndex with ifExists does not raise for a missing index", async () => {
+    await withTestings(async () => {
+      const mig = new (class extends Migration.Current {})();
+      await mig.addIndex("testings", "foo");
+      await mig.removeIndex("testings", "foo");
+
+      await expect(mig.removeIndex("testings", "foo")).rejects.toThrow(ArgumentError);
+
+      await mig.removeIndex("testings", "foo", { ifExists: true });
+    });
+  });
+
+  it("removeIndex by name with ifExists removes the index", async () => {
+    await withTestings(async () => {
+      const mig = new (class extends Migration.Current {})();
+      await mig.addIndex("testings", ["foo"], { name: "foo" });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
+
+      await mig.removeIndex("testings", { name: "foo", ifExists: true });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(false);
+    });
+  });
+
+  it("removeIndex by a column array with ifExists keeps a non-matching index", async () => {
+    await withTestings(async () => {
+      const mig = new (class extends Migration.Current {})();
+      await mig.addIndex("testings", ["foo"], { name: "foo" });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
+
+      await mig.removeIndex("testings", { column: ["foo", "bar"], ifExists: true });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
+      expect(await mig.indexExists("testings", ["foo", "bar"], { name: "foo" })).toBe(false);
+    });
+  });
+});
+
+describeIfPostgresqlAdapter("Migration index forwarders (PostgreSQL)", () => {
+  it("addIndex concurrently leaves an invalid index after a unique violation", async () => {
+    const conn = await Base.leaseConnection();
+    await conn.dropTable("ex", { ifExists: true });
+    await conn.createTable("ex", { force: true }, (t) => {
+      t.integer("number");
+    });
+    try {
+      await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
+      const mig = new (class extends Migration.Current {})();
+
+      let error: unknown;
+      try {
+        await mig.addIndex("ex", "number", {
+          unique: true,
+          algorithm: "concurrently",
+          name: "invalid_index",
+        });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(RecordNotUnique);
+
+      expect(await mig.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
+      expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: true })).toBe(
+        false,
+      );
+      expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: false })).toBe(
+        true,
+      );
+    } finally {
+      await conn.dropTable("ex", { ifExists: true });
+    }
   });
 });
