@@ -474,9 +474,11 @@ and the synchronous body peeks at the warmed value.**
   query and passes the answer in, so the statements logged are the ones
   `exec_insert` (`database_statements.rb:157-160`) logs. Warming through
   `schemaCache.primaryKeys` was rejected: it adds a `data_source_exists?` query
-  and memoizes, which `SQLite3AdapterTest#test_insert_logged` sees. Ruled
-  convergeable under this section by the repo owner (2026-10-08, story
-  `converge-sql-for-insert-and-supports-insert-returning-to-sync`).
+  and memoizes, which `SQLite3AdapterTest#test_insert_logged` sees. The repo
+  owner ruled that `sqlForInsert` returns synchronously under this section
+  (2026-10-08, story
+  `converge-sql-for-insert-and-supports-insert-returning-to-sync`), and the
+  warm step in `execInsert` is the permanent consequence.
 
 - `lookupCastTypeFromColumn` keeps Rails' line and cannot await it. On a cold
   type map it starts `verifyBang` and the lookup raises `TypeError` off the
@@ -509,9 +511,10 @@ This is a genuine language shortcoming, ratified repo-wide here. The omitted
 `@noRailsEquivalent PERMANENT`, and MySQL's escape-state arm carries
 `@inventedArm if — PERMANENT`, `buildFixtureSql`'s warm step carries
 `@inventedArm if` / `verifyBang — PERMANENT`, and `mismatchedForeignKey`'s
-promise arm carries `@inventedArm then — PERMANENT`, and `execInsert`'s warm step carries
-`@inventedArm if` / `databaseVersion` / `supportsInsertReturning` /
-`primaryKey — PERMANENT`, all against this section.
+promise arm carries `@inventedArm then — PERMANENT`, `sqlForInsert`'s omitted
+`primary_key` carries `@missingRailsCall … — PERMANENT`, and `execInsert`'s
+warm step carries `@inventedArm if` / `databaseVersion` /
+`supportsInsertReturning` / `primaryKey — PERMANENT`, all against this section.
 A new instance is not a new decision to argue.
 
 ## Fixtures load from `.ts` modules as well as YAML (`FixtureSet::File`)
