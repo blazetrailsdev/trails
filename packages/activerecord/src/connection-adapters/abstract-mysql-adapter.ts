@@ -292,6 +292,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
+  /** @inventedArm test — CONVERGEABLE mysql-mariadb-predicate-reads-version-memo-synchronously */
   supportsInsertReturning(): boolean {
     const databaseVersion = this.databaseVersion as Version;
     return (

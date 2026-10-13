@@ -743,7 +743,7 @@ describe("execInsert", () => {
   }
 
   it("appends RETURNING via sqlForInsert when adapter supports it", async () => {
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       makeInsertHost(true),
       "INSERT INTO t (x) VALUES (1)",
       "id",
@@ -754,7 +754,7 @@ describe("execInsert", () => {
   });
 
   it("passes sql unchanged when adapter does not support RETURNING", async () => {
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       makeInsertHost(false),
       "INSERT INTO t (x) VALUES (1)",
       "id",
@@ -765,7 +765,7 @@ describe("execInsert", () => {
   });
 
   it("uses explicit returning list when provided", async () => {
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       makeInsertHost(true),
       "INSERT INTO t (x) VALUES (1)",
       null,
@@ -823,13 +823,7 @@ describe("sqlForInsert", () => {
       log,
       supportsInsertReturning: () => false,
     };
-    const [sql, binds] = await sqlForInsert.call(
-      host,
-      "INSERT INTO t (x) VALUES (1)",
-      "id",
-      [],
-      null,
-    );
+    const [sql, binds] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
     expect(binds).toEqual([]);
   });
@@ -843,7 +837,7 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
-    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
   });
 
@@ -857,7 +851,7 @@ describe("sqlForInsert", () => {
       quoteColumnName: (c) => `"${c}"`,
       schemaCache: { getCachedPrimaryKeys: () => null },
     };
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       host,
       "INSERT INTO t (x) VALUES (1)",
       null,
@@ -895,7 +889,7 @@ describe("sqlForInsert", () => {
         },
       },
     };
-    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
   });
 
@@ -908,7 +902,7 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       host,
       "INSERT INTO t (x) VALUES (1)",
       false,

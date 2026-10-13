@@ -38,6 +38,25 @@ describe("HasOneAssociationsTest", () => {
     });
   });
 
+  it("create over a loaded target nullifies the prior account", async () => {
+    const company = await Company.create({ name: "NewCo" });
+    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
+    const found = await findCompany(company.id);
+    await found.account;
+    const created = await found.createAccount({ credit_limit: 70 });
+    expect((await Account.find(original.id)).firm_id).toBeNull();
+    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
+    expect((await found.account)!.id).toBe(created.id);
+  });
+
+  it("create over a loaded target destroys the prior dependent account", async () => {
+    const firm = companies("first_firm") as Firm & AccountBuilders;
+    const originalId = (await firm.account)!.id;
+    const created = await firm.createAccount({ credit_limit: 70 });
+    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
+    expect((await firm.account)!.id).toBe(created.id);
+  });
+
   it("create over an unloaded target nullifies the prior account", async () => {
     const company = await Company.create({ name: "UnloadedCo" });
     const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
