@@ -28,11 +28,6 @@
     "reason": "Trilogy adapter implementation; excluded along with adapters/trilogy. PERMANENT: CLAUDE.md \u00a7 \"Trilogy is out of scope\"."
   },
   {
-    "testFile": "adapters/sqlite3/sqlite3_adapter_test.rb",
-    "tests": ["supports extensions", "respond to enable extension", "respond to disable extension"],
-    "reason": "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION entry points, so supports_extensions? / enable_extension / disable_extension cannot be implemented against the driver Trails uses."
-  },
-  {
     "testFile": "connection_handlers_sharding_db_test.rb",
     "tests": [
       "swapping shards globally in a multi threaded environment",
@@ -54,11 +49,6 @@
     "reason": "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache visibility cannot translate to single-threaded Node.js."
   },
   {
-    "testFile": "relations_test.rb",
-    "tests": ["where id with delegated ar object", "where relation with delegated ar object"],
-    "reason": "Rails wraps the AR object in Class.new(SimpleDelegator) and where() unwraps it via the delegator protocol (relations_test.rb:835-847). No idiomatic JS analog: a Proxy could forward method_missing, but the bespoke query-builder unwrapping isn't warranted for this niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched by a plain-object trails test, so it stays counted — its delegation behavior is untested.)"
-  },
-  {
     "testFile": "scoping/default_scoping_test.rb",
     "tests": ["default scoping with threads", "default scope is threadsafe"],
     "reason": "Real OS threads (Thread.new / Concurrent::CyclicBarrier); no single-threaded Node.js equivalent."
@@ -70,43 +60,8 @@
   },
   {
     "testFile": "query_cache_test.rb",
-    "tests": ["query cache does not allow sql key mutation"],
-    "reason": "Asserts Ruby FrozenError on in-place mutation of the frozen sql payload string; JS strings are immutable by value, so the mutation cannot exist."
-  },
-  {
-    "testFile": "query_cache_test.rb",
     "tests": ["query serialized active record", "query serialized string"],
     "reason": "Ruby YAML `serialize` coder round-trip of an AR record (use_yaml_unsafe_load); no JS YAML AR-record (un)safe-load equivalent."
-  },
-  {
-    "testFile": "inherited_test.rb",
-    "tests": ["super before filter attributes", "super after filter attributes"],
-    "reason": "Ruby `inherited` lifecycle-hook `super` ordering around filter_attributes; TS has no class-inheritance hook (ruby-module-semantics, see api-compare conventions.ts)."
-  },
-  {
-    "testFile": "scoping/named_scoping_test.rb",
-    "tests": ["find all should behave like select"],
-    "reason": "Asserts Ruby Array#select == Array#find_all alias equivalence on the materialized relation; JS arrays have only .filter, so there is no distinct method to compare."
-  },
-  {
-    "testFile": "relation/where_test.rb",
-    "tests": ["where with rational for string column"],
-    "reason": "Ruby Rational literal cast to a string column; JS has no Rational."
-  },
-  {
-    "testFile": "relation/with_test.rb",
-    "tests": ["common table expressions are unsupported"],
-    "reason": "Rails' else-branch for adapters lacking CTE support; every adapter trails exercises (SQLite/PG/MySQL) supports CTEs, so the branch is unreachable."
-  },
-  {
-    "testFile": "hstore_test.rb",
-    "tests": ["supports to unsafe h values"],
-    "reason": "ActionController::Parameters#to_unsafe_h is a Ruby-only ProtectedParams API; no equivalent in Node.js request-parameter handling."
-  },
-  {
-    "testFile": "adapters/postgresql/quoting_test.rb",
-    "tests": ["quote rational"],
-    "reason": "Ruby Rational(3, 4) quotes to the string \"3/4\"; JavaScript has no Rational literal or stdlib type, so there is nothing to quote."
   },
   {
     "testFile": "has_and_belongs_to_many_associations_test.rb",
@@ -288,33 +243,6 @@
       "connection removed from pool when thread killed in begin after successfully beginning a transaction"
     ],
     "reason": "Thread.new + Thread#kill to assert per-thread transaction isolation and connection-pool cleanup on thread death. Ruby Thread.kill and the shared-memory Thread model have no Node.js equivalent."
-  },
-  {
-    "testFile": "transactions_test.rb",
-    "tests": [
-      "throw from transaction commits",
-      "deprecation on ruby timeout outside inner transaction"
-    ],
-    "reason": "Ruby throw/catch is non-exceptional control flow that commits the transaction (unlike JS throw, which always causes rollback). There is no JS equivalent for throw/catch semantics."
-  },
-  {
-    "testFile": "transactions_test.rb",
-    "tests": ["after current transaction commit multidb nested transactions"],
-    "reason": "Requires the ARUnit2Model secondary database connection (multi-database setup). The test asserts afterAllTransactionsCommit fires only after the outermost cross-database transaction commits — not available in the single-database test environment."
-  },
-  {
-    "testFile": "dirty_test.rb",
-    "tests": ["string attribute should compare with typecast symbol after update"],
-    "reason": "The test's whole point is that a Ruby symbol (`create!(catchphrase: :foo)` / `update_column :catchphrase, :foo`) type-casts to the string \"foo\" and so compares clean against the persisted value. JS has no auto-coercing symbol; substituting \"foo\" would test \"foo\" == \"foo\" vacuously, exercising no cast."
-  },
-  {
-    "testFile": "dirty_test.rb",
-    "tests": [
-      "in place mutation detection",
-      "in place mutation for binary",
-      "mutating and then assigning doesn't remove the change"
-    ],
-    "reason": "All three mutate a string in place (`catchphrase << \" matey!\"`, `data << \"bar\"` on a serialized binary; dirty_test.rb:668/689/799). JS strings are immutable — there is no in-place string mutation to detect."
   },
   {
     "testFile": "dirty_test.rb",
@@ -539,12 +467,6 @@
     "pattern": "core_ext/string/behavior.rb",
     "package": "activesupport",
     "reason": "Pre-1.0: one arm of `acts_like?`; trails ports the Time/Date arms only."
-  },
-  {
-    "testFile": "adapter_test.rb",
-    "className": "AdapterConnectionTest",
-    "tests": ["transaction restores after remote disconnection"],
-    "reason": "These tests call the `remote_disconnect` helper, which only supports PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip(\"remote_disconnect unsupported\")`, so Rails never runs them on SQLite. A genuine remote disconnect cannot be simulated against in-memory SQLite (closing the handle discards the database), which is also why the surrounding suite is gated `unless in_memory_db?`. Trails always uses :memory: SQLite."
   },
   {
     "testFile": "serialized_attribute_test.rb",

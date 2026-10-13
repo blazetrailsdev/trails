@@ -15,6 +15,7 @@ import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/use-fixtures.js";
+import { rational } from "@blazetrails/ruby-compat";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -524,7 +525,10 @@ describe("WhereTest", () => {
     expect(await Post.where({ title: 0 }).count()).toBe(0);
   });
 
-  it.skip("where with rational for string column", () => {});
+  it("where with rational for string column", async () => {
+    const count = await Post.where({ title: rational(0) }).count();
+    expect(count).toBe(0);
+  });
 
   it("where with duration for string column", async () => {
     expect(await Post.where({ title: seconds(0) }).count()).toBe(0);

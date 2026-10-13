@@ -24,6 +24,7 @@ import {
   assertNothingRaised,
   assertRaises,
   capture,
+  assertRespondTo,
 } from "@blazetrails/activesupport";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { withExampleTable } from "../../support/ddl-helper.js";
@@ -1058,6 +1059,18 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       await Barcode.resetColumnInformation();
       await connection.dropTable("barcodes", { ifExists: true });
     }
+  });
+
+  it("supports extensions", () => {
+    expect(adapter.supportsExtensions(), "does not support extensions").toBeFalsy();
+  });
+
+  it("respond to enable extension", () => {
+    assertRespondTo(adapter, "enableExtension");
+  });
+
+  it("respond to disable extension", () => {
+    assertRespondTo(adapter, "disableExtension");
   });
 
   it("statement closed", async () => {

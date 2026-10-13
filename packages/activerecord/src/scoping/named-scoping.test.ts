@@ -1,3 +1,4 @@
+import { Enumerable } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -472,7 +473,15 @@ describe("NamedScopingTest", () => {
     expect(chainedGot).toEqual(chainedExpected);
   });
 
-  it.skip("find all should behave like select", () => {});
+  it("find all should behave like select", async () => {
+    const toA = await Topic.base();
+    expect((await Topic.base()).filter((t) => t.approved)).toEqual(
+      Enumerable.findAll.call(
+        { each: (block) => toA.forEach(block) },
+        (t) => (t as Topic).approved,
+      ),
+    );
+  });
 
   it("rand should select a random object from proxy", async () => {
     const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";

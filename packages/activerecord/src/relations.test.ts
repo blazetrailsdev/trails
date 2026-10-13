@@ -1091,11 +1091,11 @@ describe("RelationTest", () => {
   });
 
   it.skip("where id with delegated ar object", () => {
-    // PERMANENT-SKIP: Ruby-only — SimpleDelegator has no idiomatic JS analog
+    // BLOCKED: ruby-compat-simple-delegator-for-delegated-ar-object-tests
   });
 
   it.skip("where relation with delegated ar object", () => {
-    // PERMANENT-SKIP: Ruby-only — SimpleDelegator has no idiomatic JS analog
+    // BLOCKED: ruby-compat-simple-delegator-for-delegated-ar-object-tests
   });
 
   it("find by with delegated ar object", async () => {

@@ -1,7 +1,14 @@
-import { kernelThrow, FrozenError, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
+import {
+  kernelCatch,
+  kernelThrow,
+  FrozenError,
+  RuntimeError,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
 import { afterAllTransactionsCommit } from "./active-record.js";
+import { deprecator } from "./deprecator.js";
 
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./support/supports.js";
@@ -21,6 +28,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertCalled,
   assertNoDifference,
+  assertNotDeprecated,
   assertNotCalled,
   assertNothingRaised,
   assertRaises,
@@ -157,8 +165,18 @@ describe("TransactionTest", () => {
     expect(called).toBe(1);
   });
 
-  it.skip("after current transaction commit multidb nested transactions", () => {
-    // PERMANENT-SKIP: requires ARUnit2Model secondary DB connection
+  it("after current transaction commit multidb nested transactions", async () => {
+    let called = 0;
+    await ARUnit2Model.transaction(async () => {
+      await Topic.transaction(async () => {
+        await afterAllTransactionsCommit(() => {
+          called += 1;
+        });
+        expect(called).toBe(0);
+      });
+      expect(called).toBe(0);
+    });
+    expect(called).toBe(1);
   });
 
   it("transaction after commit callback", async () => {
@@ -446,8 +464,24 @@ describe("TransactionTest", () => {
     }
   });
 
-  it.skip("deprecation on ruby timeout outside inner transaction", () => {
-    // PERMANENT-SKIP: Ruby catch/throw semantics — `catch`/`throw timeout` is
+  it("deprecation on ruby timeout outside inner transaction", async () => {
+    await assertNotDeprecated(deprecator(), async () => {
+      await kernelCatch(async (timeout) => {
+        await Topic.transaction(async () => {
+          await Topic.transaction(
+            async () => {
+              first.approved = true;
+              await first.saveBang();
+            },
+            { requiresNew: true },
+          );
+
+          kernelThrow(timeout);
+        });
+      });
+    });
+
+    expect((await Topic.find(1)).approved, "First should have been approved").toBeTruthy();
   });
 
   it("break from transaction commits", async () => {
@@ -465,8 +499,20 @@ describe("TransactionTest", () => {
     expect(((await Topic.find(2)) as any).approved).toBeTruthy();
   });
 
-  it.skip("throw from transaction commits", () => {
-    // PERMANENT-SKIP: Ruby-only — catch/throw is non-exceptional control flow
+  it("throw from transaction commits", async () => {
+    await kernelCatch(":not_an_error", async () => {
+      await first.transaction(async () => {
+        expect(first.approved).toBeFalsy();
+        await first.updateBang({ approved: true });
+
+        kernelThrow(":not_an_error");
+
+        expect(first.approved).toBeTruthy();
+        await first.updateBang({ approved: false });
+      });
+    });
+    expect((await Topic.find(1)).approved, "First should have been approved").toBeTruthy();
+    expect((await Topic.find(2)).approved, "Second should have been approved").toBeTruthy();
   });
 
   async function _testReturnFromTransaction71Behavior() {

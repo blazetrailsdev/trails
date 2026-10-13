@@ -5,7 +5,9 @@ import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company } from "../test-helpers/models/company.js";
-import { describeIfSupports } from "../support/supports.js";
+import { adapterSupports, describeIfSupports } from "../support/supports.js";
+import { StatementInvalid } from "../errors.js";
+import { assertRaises } from "@blazetrails/activesupport";
 
 const SPECIAL_POSTS = [2];
 const POSTS_WITH_TAGS = [1, 2, 7, 8, 9, 10, 11];
@@ -198,5 +200,14 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
 });
 
 describe("WithTest", () => {
-  it.skip("common table expressions are unsupported", () => {});
+  fixtures(["comments", "posts", "companies"]);
+
+  it.skipIf(adapterSupports("common_table_expressions"))(
+    "common table expressions are unsupported",
+    async () => {
+      await assertRaises([StatementInvalid], {}, async () => {
+        await Post.withTagsCte().order("id").pluck("id");
+      });
+    },
+  );
 });

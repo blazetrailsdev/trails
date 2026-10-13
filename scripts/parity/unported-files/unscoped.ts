@@ -185,28 +185,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "development class reloading. An ES module is evaluated once per process and trails has " +
       'no class unload to re-evaluate it after (CLAUDE.md § "Trails has no autoloader").',
   },
-  {
-    testFile: "adapter_test.rb",
-    className: "AdapterConnectionTest",
-    tests: ["transaction restores after remote disconnection"],
-    reason:
-      "These tests call the `remote_disconnect` helper, which only supports " +
-      'PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip("remote_disconnect ' +
-      'unsupported")`, so Rails never runs them on SQLite. A genuine remote ' +
-      "disconnect cannot be simulated against in-memory SQLite (closing the handle " +
-      "discards the database), which is also why the surrounding suite is gated " +
-      "`unless in_memory_db?`. Trails always uses :memory: SQLite.",
-  },
-  // --- Permanently not-portable: single-process SQLite driver limits ---
-  {
-    testFile: "adapters/sqlite3/sqlite3_adapter_test.rb",
-    tests: ["supports extensions", "respond to enable extension", "respond to disable extension"],
-    reason:
-      "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the " +
-      "sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION " +
-      "entry points, so supports_extensions? / enable_extension / disable_extension cannot " +
-      "be implemented against the driver Trails uses.",
-  },
   // --- Permanently not-portable: Ruby Module namespace / constant-path semantics ---
   {
     testFile: "inheritance_test.rb",
@@ -276,16 +254,14 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache " +
       "visibility cannot translate to single-threaded Node.js.",
   },
-  // --- Permanently not-portable: Ruby SimpleDelegator (Delegator/method_missing) ---
   {
     testFile: "relations_test.rb",
     tests: ["where id with delegated ar object", "where relation with delegated ar object"],
     reason:
-      "Rails wraps the AR object in Class.new(SimpleDelegator) and where() unwraps it via the " +
-      "delegator protocol (relations_test.rb:835-847). No idiomatic JS analog: a Proxy could " +
-      "forward method_missing, but the bespoke query-builder unwrapping isn't warranted for this " +
-      "niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched " +
-      "by a plain-object trails test, so it stays counted — its delegation behavior is untested.)",
+      "Wraps the record in Class.new(SimpleDelegator) (relations_test.rb:835-847). ruby-compat " +
+      "ports DelegateClass only, whose instances are `instanceof` the wrapped class where a " +
+      "Delegator is not `is_a?(Base)`. CONVERGEABLE " +
+      "ruby-compat-simple-delegator-for-delegated-ar-object-tests.",
   },
   // --- Permanently not-portable: residual-skip-tail-sweep (RFC 0030) ---
   {
@@ -324,8 +300,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     testFile: "query_cache_test.rb",
     tests: ["query cache does not allow sql key mutation"],
     reason:
-      "Asserts Ruby FrozenError on in-place mutation of the frozen sql payload string; " +
-      "JS strings are immutable by value, so the mutation cannot exist.",
+      "A subscriber calls `payload[:sql].downcase!` and the test asserts FrozenError " +
+      "(query_cache_test.rb:508-522). A JS string has no in-place mutation and no frozen " +
+      'state to raise on. PERMANENT: CLAUDE.md § "Ruby Strings are JS string primitives".',
   },
   {
     testFile: "query_cache_test.rb",
@@ -338,27 +315,10 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     testFile: "inherited_test.rb",
     tests: ["super before filter attributes", "super after filter attributes"],
     reason:
-      "Ruby `inherited` lifecycle-hook `super` ordering around filter_attributes; TS has " +
-      "no class-inheritance hook (ruby-module-semantics, see api-compare conventions.ts).",
-  },
-  {
-    testFile: "scoping/named_scoping_test.rb",
-    tests: ["find all should behave like select"],
-    reason:
-      "Asserts Ruby Array#select == Array#find_all alias equivalence on the materialized " +
-      "relation; JS arrays have only .filter, so there is no distinct method to compare.",
-  },
-  {
-    testFile: "relation/where_test.rb",
-    tests: ["where with rational for string column"],
-    reason: "Ruby Rational literal cast to a string column; JS has no Rational.",
-  },
-  {
-    testFile: "relation/with_test.rb",
-    tests: ["common table expressions are unsupported"],
-    reason:
-      "Rails' else-branch for adapters lacking CTE support; every adapter trails " +
-      "exercises (SQLite/PG/MySQL) supports CTEs, so the branch is unreachable.",
+      "Each defines `self.inherited(subclass)` on a model and asserts the filter_attributes " +
+      "it sets around `super` (inherited_test.rb:11-29). JS has no hook that fires when a " +
+      'subclass is defined. PERMANENT: CLAUDE.md § "`inherited` is deferred to own-property ' +
+      'memo guards".',
   },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
@@ -413,11 +373,17 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "base_test.rb",
     tests: [
-      // GVL
       "new threads get default the default connection handler",
       "changing a connection handler in a main thread does not poison the other threads",
-      "connection_handler can be overridden", // Thread.new overrides the handler in a child thread and asserts isolation
-      // Ruby Marshal serialization
+      "connection_handler can be overridden",
+    ],
+    reason:
+      "Each starts a Thread.new and asserts the connection handler it sees is isolated from " +
+      "the main thread's. Ruby's shared-memory Thread model has no Node.js equivalent.",
+  },
+  {
+    testFile: "base_test.rb",
+    tests: [
       "marshal round trip",
       "marshal inspected round trip",
       "marshal new record round trip",
@@ -425,34 +391,22 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "marshalling with associations 7 1",
       "marshal between processes",
       "marshalling new record round trip with associations",
-      // Ruby string encoding
-      "respect internal encoding",
-      // with_env_tz — process-level TZ change (ENV["TZ"]); Node.js cannot reload TZ after startup
-      "default in local time",
-      "switching default time zone",
-      "mutating time objects",
     ],
-    reason:
-      "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal " +
-      'and with_env_tz (process-level ENV["TZ"] reload) — all Ruby-only with no Node.js ' +
-      "equivalent.",
+    reason: "Ruby Marshal binary serialization of a record — no Node.js equivalent.",
   },
   {
-    testFile: "hstore_test.rb",
-    tests: [
-      // ActionController::Parameters#to_unsafe_h — Ruby-only ProtectedParams API
-      "supports to unsafe h values",
-    ],
+    testFile: "base_test.rb",
+    tests: ["respect internal encoding"],
     reason:
-      "ActionController::Parameters#to_unsafe_h is a Ruby-only ProtectedParams API; " +
-      "no equivalent in Node.js request-parameter handling.",
+      "Sets Encoding.default_internal and asserts the encoding of the column names read back. " +
+      'PERMANENT: CLAUDE.md § "A String has no encoding tag either".',
   },
   {
-    testFile: "adapters/postgresql/quoting_test.rb",
-    tests: ["quote rational"],
+    testFile: "base_test.rb",
+    tests: ["default in local time", "switching default time zone", "mutating time objects"],
     reason:
-      'Ruby Rational(3, 4) quotes to the string "3/4"; JavaScript has no Rational ' +
-      "literal or stdlib type, so there is nothing to quote.",
+      'Each runs under with_env_tz, which reassigns ENV["TZ"] mid-process; Node.js does not ' +
+      "re-read TZ after startup.",
   },
   {
     testFile: "has_and_belongs_to_many_associations_test.rb",
@@ -706,36 +660,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "shared-memory Thread model have no Node.js equivalent.",
   },
   {
-    testFile: "transactions_test.rb",
-    tests: [
-      "throw from transaction commits",
-      "deprecation on ruby timeout outside inner transaction",
-    ],
-    reason:
-      "Ruby throw/catch is non-exceptional control flow that commits the " +
-      "transaction (unlike JS throw, which always causes rollback). " +
-      "There is no JS equivalent for throw/catch semantics.",
-  },
-  {
-    testFile: "transactions_test.rb",
-    tests: ["after current transaction commit multidb nested transactions"],
-    reason:
-      "Requires the ARUnit2Model secondary database connection (multi-database " +
-      "setup). The test asserts afterAllTransactionsCommit fires only after the " +
-      "outermost cross-database transaction commits — not available in the " +
-      "single-database test environment.",
-  },
-  {
-    testFile: "dirty_test.rb",
-    tests: ["string attribute should compare with typecast symbol after update"],
-    reason:
-      "The test's whole point is that a Ruby symbol (`create!(catchphrase: " +
-      ':foo)` / `update_column :catchphrase, :foo`) type-casts to the string "foo" ' +
-      "and so compares clean against the persisted value. JS has no " +
-      'auto-coercing symbol; substituting "foo" would test "foo" == "foo" ' +
-      "vacuously, exercising no cast.",
-  },
-  {
     testFile: "dirty_test.rb",
     tests: [
       "in place mutation detection",
@@ -743,9 +667,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "mutating and then assigning doesn't remove the change",
     ],
     reason:
-      'All three mutate a string in place (`catchphrase << " matey!"`, ' +
-      '`data << "bar"` on a serialized binary; dirty_test.rb:668/689/799). ' +
-      "JS strings are immutable — there is no in-place string mutation to detect.",
+      'All three mutate a String in place (`catchphrase << " matey!"`, `data << "bar"`; ' +
+      "dirty_test.rb:668/689/799) and assert the attribute reads changed with no assignment. " +
+      'PERMANENT: CLAUDE.md § "Ruby Strings are JS string primitives".',
   },
   {
     testFile: "dirty_test.rb",
