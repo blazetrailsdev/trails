@@ -189,8 +189,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 };
 
 /** @noRailsEquivalent CONVERGEABLE activerecord-test-fixtures-vitest-surface-leaves-rails-file */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface TestConstants {}
+export interface TestConstants {} // eslint-disable-line @typescript-eslint/no-empty-object-type
 
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
   Validations: typeof Validations;
