@@ -27,7 +27,7 @@ import {
   stdout,
   stderr,
   puts,
-  abort,
+  Kernel,
   File,
   FileUtils,
   rbEqual,
@@ -98,13 +98,11 @@ export class DatabaseTasks {
   static structureDumpFlags: string | string[] | Record<string, string | string[]> | null = null;
   static structureLoadFlags: string | string[] | Record<string, string | string[]> | null = null;
 
-  private static _registeredTasks: Array<{
-    pattern: RegExp | string;
-    handler: DatabaseTaskHandler;
-  }> = [];
+  private static tasks: Map<RegExp | string, DatabaseTaskHandler>;
 
   static registerTask(pattern: RegExp | string, task: DatabaseTaskHandler): void {
-    this._registeredTasks.push({ pattern, handler: task });
+    this.tasks ??= new Map();
+    this.tasks.set(pattern, task);
   }
 
   /** @internal */
@@ -112,14 +110,11 @@ export class DatabaseTasks {
     const task =
       adapter === undefined
         ? undefined
-        : this._registeredTasks
-            .slice()
-            .reverse()
-            .find(({ pattern }) => {
-              if (typeof pattern === "string") return adapter.includes(pattern);
-              pattern.lastIndex = 0;
-              return pattern.test(adapter);
-            })?.handler;
+        : [...this.tasks].reverse().find(([pattern, _task]) => {
+            if (typeof pattern === "string") return adapter.includes(pattern);
+            pattern.lastIndex = 0;
+            return pattern.test(adapter);
+          })?.[1];
     if (!task) {
       throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
     }
@@ -345,7 +340,7 @@ export class DatabaseTasks {
       if (root != null) {
         message += ` If you do not intend to use a database, you should instead alter ${root}/config/application.rb to limit the frameworks that will be loaded.`;
       }
-      abort(message);
+      Kernel.abort(message);
     }
   }
 
@@ -602,7 +597,7 @@ export class DatabaseTasks {
 
   static async migrateStatus(): Promise<void> {
     if (!(await this.migrationConnectionPool().schemaMigration.tableExists())) {
-      abort("Schema migrations table does not exist yet.");
+      Kernel.abort("Schema migrations table does not exist yet.");
     }
     const rows = await this.migrationConnectionPool().migrationContext.migrationsStatus();
     const center = (s: string, w: number) => {

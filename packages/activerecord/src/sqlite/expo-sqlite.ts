@@ -280,6 +280,11 @@ class ExpoSqliteConnection implements SqliteConnection {
     return this._open;
   }
 
+  async filename(dbName = "main"): Promise<string | null> {
+    const list = (await this.pragma("database_list")) as { name: string; file: string }[];
+    return list.find(({ name }) => name === dbName)?.file ?? null;
+  }
+
   async exec(sql: string): Promise<void> {
     sql = sql.trim();
     while (sql !== "") {

@@ -335,7 +335,9 @@ ActiveRecord.Tasks = Tasks;
 export const ConnectionAdapters = {
   name: "ActiveRecord::ConnectionAdapters",
   loadPath,
+  adapters: new Map(),
 } as AutoloadModule & {
+  adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
   PostgreSQLAdapter: typeof PostgreSQLAdapter;
   register: typeof register;

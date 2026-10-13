@@ -157,6 +157,11 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     return this.raw.open;
   }
 
+  filename(dbName = "main"): string | null {
+    const list = this.pragma("database_list") as { name: string; file: string }[];
+    return list.find(({ name }) => name === dbName)?.file ?? null;
+  }
+
   exec(sql: string): void {
     try {
       this.raw.exec(sql);
