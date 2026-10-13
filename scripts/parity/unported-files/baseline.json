@@ -272,11 +272,6 @@
     "reason": "Decrypts a ciphertext minted before message metadata existed (message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal payload `\\x04\\x08I\"\\x12Ruby on Rails\\x06:\\x06ET` — an ivar-wrapped Ruby String — so passing it requires a real Ruby Marshal wire reader. trails has no Ruby Marshal runtime: the `:marshal` serializer in messages/serializer-with-fallback.ts is a trails-native codec behind Rails' `\\x04\\x08` signature, matching the project-wide Marshal exclusion above (marshalling.rb / marshal_serialization_test.rb). Ruby-only wire format."
   },
   {
-    "testFile": "associations_test.rb",
-    "tests": ["pretty print does not reload a not yet loaded target"],
-    "reason": "Uses Ruby's PP.pp / pretty_print over a not-yet-loaded collection proxy (associations_test.rb). Ruby's pretty-printer has no Node.js equivalent; the inspect-without-reload behavior is covered by the inspect test."
-  },
-  {
     "testFile": "connection_adapters/schema_cache_test.rb",
     "tests": [
       "yaml loads 5 1 dump",

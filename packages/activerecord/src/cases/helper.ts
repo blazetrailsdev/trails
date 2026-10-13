@@ -5,6 +5,7 @@ import "../associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
 import { Timeout } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import "./test-case.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { PoolManager } from "../connection-adapters/pool-manager.js";

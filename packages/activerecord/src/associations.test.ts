@@ -59,7 +59,7 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { NoMethodError, PP, regexpEscape, StandardError } from "@blazetrails/ruby-compat";
+import { NoMethodError, PP, regexpEscape, StandardError, StringIO } from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
 
@@ -258,14 +258,13 @@ describe("AssociationProxyTest", () => {
     expect(await andreas.auditLogs.inspect()).toMatch(/message: "new developer added"/);
     assertPredicate(andreas.auditLogs, (p: any) => p.loaded);
   });
-  it("pretty_print does not reload a not yet loaded target", async () => {
-    const andreas = new Developer({});
-    (andreas as any).log = "new developer added";
-    expect(andreas.auditLogs.loaded).toBe(false);
-    let out = "";
-    await PP.pp(andreas.auditLogs, { write: (s: string) => (out += s) });
-    expect(out).toMatch(/message: "new developer added"/);
-    expect(andreas.auditLogs.loaded).toBe(true);
+  it("pretty print does not reload a not yet loaded target", async () => {
+    const andreas = new Developer({ log: "new developer added" });
+    assertNotPredicate(andreas.auditLogs, (p: any) => p.loaded);
+    const out = new StringIO();
+    await PP.pp(andreas.auditLogs, out);
+    expect(out.string()).toMatch(/message: "new developer added"/);
+    assertPredicate(andreas.auditLogs, (p: any) => p.loaded);
   });
   it("save on parent saves children", async () => {
     const developer = await Developer.create({ name: "Bryan", salary: 50_000 });

@@ -170,7 +170,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("drop table", async () => {
-      // eslint-disable-next-line blazetrails/require-canonical-rebuild, blazetrails/require-table-teardown
+      // eslint-disable-next-line blazetrails/require-table-teardown
       expect(await adapter.dropTable("people")).toBe("DROP TABLE `people`");
     });
 

@@ -670,14 +670,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "encoded payload differs structurally and that byte string is " +
       "unreproducible in principle, not merely unported.",
   },
-  {
-    testFile: "associations_test.rb",
-    tests: ["pretty print does not reload a not yet loaded target"],
-    reason:
-      "Uses Ruby's PP.pp / pretty_print over a not-yet-loaded collection proxy " +
-      "(associations_test.rb). Ruby's pretty-printer has no Node.js equivalent; " +
-      "the inspect-without-reload behavior is covered by the inspect test.",
-  },
   // --- Cross-version Psych/YAML schema-cache deserialization ---
   {
     testFile: "connection_adapters/schema_cache_test.rb",

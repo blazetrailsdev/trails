@@ -28,6 +28,7 @@ import {
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
+import { ActiveRecord } from "./namespaces.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
@@ -43,8 +44,8 @@ import { Dog } from "./test-helpers/models/dog.js";
 import { OtherDog } from "./test-helpers/models/other-dog.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
-import { Movie } from "./test-helpers/models/movie.js";
-import { Computer } from "./test-helpers/models/computer.js";
+import "./test-helpers/models/movie.js";
+import "./test-helpers/models/computer.js";
 import { ActiveRecordError, NotNullViolation, StatementInvalid } from "./errors.js";
 import type { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { runWithoutConnection } from "./support/connection-helper.js";
@@ -109,18 +110,6 @@ import { setVerifyForeignKeysForFixtures, verifyForeignKeysForFixtures } from ".
 for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot, Account, Company, Course, Post]) {
   registerModel(model);
 }
-
-type TestCaseClass = (new (name: string) => InstanceType<typeof Minitest.Test>) & {
-  fixturePaths: unknown[];
-  fixtureTableNames: string[];
-  fixtureClassNames: Record<string, typeof Base | string | null>;
-  fixtures(...fixtureSetNames: unknown[]): void;
-  setupFixtureAccessors(fixtureSetNames?: string | string[] | null): void;
-};
-
-const ActiveRecordTestCase = class extends Minitest.Test {} as unknown as TestCaseClass;
-include(ActiveRecordTestCase, TestFixtures);
-ActiveRecordTestCase.fixturePaths = [TS_FIXTURES_ROOT];
 
 describe("PrimaryKeyErrorTest", () => {
   it("generates the correct value", async () => {
@@ -273,7 +262,7 @@ describe("FixturesTest", () => {
         subscriber.call(e as never),
       );
       try {
-        await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "bulbs", { bulbs: Bulb });
+        await self().createFixtures("bulbs");
         expect(subscriber.events.length, "It takes one INSERT query to insert two fixtures").toBe(
           1,
         );
@@ -291,11 +280,7 @@ describe("FixturesTest", () => {
         subscriber.call(e as never),
       );
       try {
-        await FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["bulbs", "movies", "computers"], {
-          bulbs: Bulb,
-          movies: Movie,
-          computers: Computer,
-        });
+        await self().createFixtures("bulbs", "movies", "computers");
         const conn = await Base.leaseConnection();
         const expectedSql = [
           `INSERT INTO ${conn.quoteTableName("bulbs")} .*`,
@@ -566,9 +551,7 @@ describe("FixturesTest", () => {
   });
 
   it("attributes", async () => {
-    const [topics] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", {
-      topics: Topic,
-    });
+    const [topics] = await self().createFixtures("topics");
     expect(topics.get("first")!.get("title")).toBe("The First Topic");
     expect(topics.get("second")!.get("author_email_address")).toBeNull();
   });
@@ -592,7 +575,7 @@ describe("FixturesTest", () => {
   });
 
   it("inserts", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", { topics: Topic });
+    await self().createFixtures("topics");
     const firstRow = await (
       await Base.leaseConnection()
     ).selectOne("SELECT * FROM topics WHERE author_name = 'David'");
@@ -605,23 +588,19 @@ describe("FixturesTest", () => {
   });
 
   it("insert with datetime", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "tasks", { tasks: Task });
+    await self().createFixtures("tasks");
     const first = await Task.find(1);
     expect(first).toBeTruthy();
   });
 
   it("insert with default function", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "aircrafts", {
-      aircrafts: Aircraft,
-    });
+    await self().createFixtures("aircrafts");
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-manufactured-at" });
     assertInDelta(Time.now().toF(), (aircraft!.manufactured_at as Time).toF(), 1.1);
   });
 
   it("insert with default value", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "aircrafts", {
-      aircrafts: Aircraft,
-    });
+    await self().createFixtures("aircrafts");
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
     expect(aircraft?.wheels_count).toBe(0);
   });
@@ -632,7 +611,7 @@ describe("FixturesTest", () => {
       Base.logger = new Logger(null);
 
       const level = (Base.logger as Logger).level;
-      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", { topics: Topic });
+      await self().createFixtures("topics");
       expect((Base.logger as Logger).level).toBe(level);
     } finally {
       Base.logger = previousLogger;
@@ -640,9 +619,7 @@ describe("FixturesTest", () => {
   });
 
   it("instantiation", async () => {
-    const [topics] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", {
-      topics: Topic,
-    });
+    const [topics] = await self().createFixtures("topics");
     expect(await topics.get("first")!.find()).toBeInstanceOf(Topic);
   });
 
@@ -703,7 +680,7 @@ describe("FixturesTest", () => {
     setEnv("DATABASE_URL", "sqlite3::memory:");
     const configurations = vi.spyOn(Base, "configurations").mockReturnValue({} as never);
     try {
-      const testCase = class extends ActiveRecordTestCase {
+      const testCase = class extends ActiveRecord.TestCase {
         declare accounts: (name: string) => Promise<Account>;
 
         static {
@@ -734,7 +711,8 @@ describe("FixturesTest", () => {
   });
 
   it("fixture method does not clash with a test case method", async () => {
-    const testCase = class extends ActiveRecordTestCase {
+    // @ts-expect-error -- fixtures_test.rb:638-641 defines a private #fixture over TestFixtures#fixture
+    const testCase = class extends ActiveRecord.TestCase {
       declare accounts: (name: string) => Promise<Account>;
 
       static {
@@ -938,14 +916,6 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   let instances: Base[];
 
-  function createFixtures(...fixtureSetNames: string[]) {
-    return FixtureSet.createFixtures(
-      ActiveRecordTestCase.fixturePaths as string[],
-      fixtureSetNames,
-      self().fixtureClassNames,
-    );
-  }
-
   beforeEach(async () => {
     await Course.loadSchema();
     instances = [
@@ -995,13 +965,12 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
   it("create fixtures resets sequences when not cached", async () => {
     for (const instance of instances) {
       const model = instance.constructor as typeof Base;
-      const maxId = Object.entries((await createFixtures(model.tableName!))[0].fixtures).reduce(
-        (_maxId, [, fixture]) => {
-          const fixtureId = Number(toI(fixture.get("id")));
-          return fixtureId > _maxId ? fixtureId : _maxId;
-        },
-        0,
-      );
+      const maxId = Object.entries(
+        (await self().createFixtures(model.tableName!))[0].fixtures,
+      ).reduce((_maxId, [, fixture]) => {
+        const fixtureId = Number(toI(fixture.get("id")));
+        return fixtureId > _maxId ? fixtureId : _maxId;
+      }, 0);
 
       await instance.saveBang();
       expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(maxId + 1);
@@ -1103,8 +1072,10 @@ describe("LoadAllFixturesTest", () => {
 
   it("all there", () => {
     try {
-      (self().constructor as unknown as TestCaseClass).fixturePaths = [TS_FIXTURES_ROOT + "/all"];
-      (self().constructor as unknown as TestCaseClass).fixtures(":all");
+      (self().constructor as typeof ActiveRecord.TestCase).fixturePaths = [
+        TS_FIXTURES_ROOT + "/all",
+      ];
+      (self().constructor as typeof ActiveRecord.TestCase).fixtures(":all");
 
       if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
         expect([...self().fixtureTableNames].sort()).toEqual([
@@ -1127,11 +1098,11 @@ describe("LoadAllFixturesWithArrayTest", () => {
 
   it("all there", () => {
     try {
-      (self().constructor as unknown as TestCaseClass).fixturePaths = [
+      (self().constructor as typeof ActiveRecord.TestCase).fixturePaths = [
         TS_FIXTURES_ROOT + "/all",
         TS_FIXTURES_ROOT + "/categories",
       ];
-      (self().constructor as unknown as TestCaseClass).fixtures(":all");
+      (self().constructor as typeof ActiveRecord.TestCase).fixtures(":all");
 
       if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
         expect([...self().fixtureTableNames].sort()).toEqual([
@@ -1156,16 +1127,8 @@ describe("FasterFixturesTest", () => {
     useTransactionalTests: false,
   });
 
-  function createFixtures(...fixtureSetNames: string[]) {
-    return FixtureSet.createFixtures(
-      ActiveRecordTestCase.fixturePaths as string[],
-      fixtureSetNames,
-      self().fixtureClassNames,
-    );
-  }
-
   async function loadExtraFixture(name: string) {
-    const fixture = (await createFixtures(name))[0];
+    const fixture = (await self().createFixtures(name))[0];
     expect(fixture instanceof FixtureSet).toBeTruthy();
     self()._loadedFixtures[fixture.tableName] = fixture;
   }
@@ -1175,13 +1138,13 @@ describe("FasterFixturesTest", () => {
     expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "authors")).toBeTruthy();
 
     await assertNoQueries(false, async () => {
-      await createFixtures("categories");
-      await createFixtures("authors");
+      await self().createFixtures("categories");
+      await self().createFixtures("authors");
     });
 
     await loadExtraFixture("posts");
     expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "posts")).toBeTruthy();
-    (self().constructor as unknown as TestCaseClass).setupFixtureAccessors("posts");
+    (self().constructor as typeof ActiveRecord.TestCase).setupFixtureAccessors("posts");
     expect(
       (await (self() as unknown as { posts(name: string): Promise<Post> }).posts("welcome")).title,
     ).toBe("Welcome to the weblog");
@@ -1515,12 +1478,7 @@ describe("SameNameDifferentDatabaseFixturesTest", () => {
 
   it("fixtures are properly loaded", async () => {
     FixtureSet.resetCache();
-    await FixtureSet.createFixtures(
-      TS_FIXTURES_ROOT,
-      ["dogs", "other_dogs"],
-      (self().constructor as unknown as { fixtureClassNames: Record<string, typeof Base> })
-        .fixtureClassNames,
-    );
+    await self().createFixtures("dogs", "other_dogs");
 
     expect(dogs("sophie")).toBeInstanceOf(Dog);
     expect(otherDogs("lassie")).toBeInstanceOf(OtherDog);
