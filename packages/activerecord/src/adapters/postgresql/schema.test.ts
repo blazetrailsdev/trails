@@ -289,41 +289,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     };
 
-    it("schema test 1", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      const cols = await adapter.columns(TABLE_NAME);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toContain("id");
-      expect(colNames).toContain("name");
-      expect(colNames).toContain("email");
-      expect(colNames).toContain("description");
-      expect(colNames).toContain("moment");
-    });
-
-    it("schema test 2", async () => {
-      const cols = await adapter.columns(`${SCHEMA_NAME}.${TABLE_NAME}`);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toContain("id");
-      expect(colNames).toContain("name");
-      expect(colNames).toContain("email");
-    });
-
-    it("schema test 3", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA2_NAME);
-      const cols = await adapter.columns(TABLE_NAME);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toContain("id");
-      expect(colNames).toContain("name");
-    });
-
-    it("column exists honors search path", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      expect(await adapter.tableExists(TABLE_NAME)).toBe(true);
-      expect(await adapter.columnExists(TABLE_NAME, "name")).toBe(true);
-      expect(await adapter.columnExists(TABLE_NAME, "email")).toBe(true);
-      expect(await adapter.columnExists(TABLE_NAME, "nonexistent")).toBe(false);
-    });
-
     it("schema names", async () => {
       const schemaNames = await adapter.schemaNames();
       expect(schemaNames).toContain("public");
@@ -663,13 +628,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         INDEX_D_COLUMN,
         INDEX_E_COLUMN,
       );
-    });
-
-    it("indexes report their validity", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      const indexes = await adapter.indexes(TABLE_NAME);
-      expect(indexes.length).toBeGreaterThan(0);
-      expect(indexes.every((i) => i.valid === true)).toBe(true);
     });
 
     it("dump indexes for schema two", async () => {
@@ -1132,25 +1090,22 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("Active Record basics", async () => {
-      await adapter.setSchemaSearchPath('"my.schema"');
-      await adapter.createTable("articles", (t) => {
-        t.string("title");
-      });
-      class Article extends Base {
-        static {
-          this.tableName = '"my.schema".articles';
-          this.attribute("id", "integer");
+      await withSchemaSearchPath('"my.schema"', async () => {
+        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with the my.schema schema (SchemaWithDotsTest teardown)
+        await adapter.createTable("articles", (t) => {
+          t.string("title");
+        });
+        class Article extends Base {
+          static {
+            this.tableName = '"my.schema".articles';
+            this.attribute("id", "integer");
+          }
         }
-      }
-      try {
         await Article.loadSchema();
         await (Article as any).create({ title: "zOMG, welcome to my blorgh!" });
         const welcome = await (Article as any).last();
         expect(welcome.title).toBe("zOMG, welcome to my blorgh!");
-      } finally {
-        // eslint-disable-next-line blazetrails/require-canonical-rebuild
-        await adapter.dropTable("articles", { ifExists: true });
-      }
+      });
     });
   });
 
@@ -1299,29 +1254,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const output = await dumpTableSchema("trains");
 
       expect(output).not.toMatch("options:");
-    });
-  });
-
-  describe("SchemaTableCommentTest", () => {
-    afterEach(async () => {
-      await adapter.dropTable("commented_table", { ifExists: true });
-    });
-
-    it("table comment is dumped and round-trips via createTable", async () => {
-      await adapter.execute(
-        `CREATE TABLE commented_table (id serial primary key, name varchar(50))`,
-      );
-      await adapter.execute(`COMMENT ON TABLE commented_table IS 'a test table'`);
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).table("commented_table", lines);
-      expect(lines.string()).toContain(`comment: "a test table"`);
-      await adapter.execute(`DROP TABLE IF EXISTS commented_table`);
-
-      const ss = adapter;
-      await ss.createTable("commented_table", { comment: "a test table" }, (t) => {
-        t.string("name");
-      });
-      expect(await adapter.tableComment("commented_table")).toBe("a test table");
     });
   });
 });

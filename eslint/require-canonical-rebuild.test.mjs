@@ -14,6 +14,16 @@ const options = [{ canonicalTables: ["subscribers", "people", "posts", "widgets"
 tester.run("require-canonical-rebuild", rule, {
   valid: [
     {
+      code: 'expect(await adapter.dropTable("people")).toBe("DROP TABLE `people`");',
+      options,
+    },
+
+    {
+      code: 'expect(await adapter.dropTable("people", "posts")).toEqual("DROP TABLE `people`, `posts`");',
+      options,
+    },
+
+    {
       code: 'await ctx.dropTable("posts");\nawait loadCanonicalSchema(ctx);',
       options,
     },
@@ -167,6 +177,18 @@ tester.run("require-canonical-rebuild", rule, {
   ],
 
   invalid: [
+    {
+      code: 'expect(await adapter.dropTable("people")).toBe(undefined);',
+      options,
+      errors: [{ messageId: "missingRebuild", data: { table: "people" } }],
+    },
+
+    {
+      code: 'expect(await adapter.dropTable("people")).not.toBe("DROP TABLE `people`");',
+      options,
+      errors: [{ messageId: "missingRebuild", data: { table: "people" } }],
+    },
+
     {
       code:
         'await adapter.execute("DROP TABLE IF EXISTS `subscribers`");\n' +

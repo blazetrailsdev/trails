@@ -9,7 +9,6 @@ import {
   RuntimeError,
   StandardError,
   hashDelete,
-  include,
   isEmpty,
   isSymbol,
   merge,
@@ -21,7 +20,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import {
   Concern,
-  Minitest,
   Notifications,
   classAttribute,
   extend,
@@ -35,7 +33,6 @@ import {
 import { FixtureSet } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import {
-  FIXTURES_ROOT,
   fixtureRegistry,
   isJoinTableEntry,
   type FixtureName,
@@ -46,6 +43,7 @@ import {
 import { ensureCanonicalTables } from "./support/canonical-table-rebuild.js";
 export type { FixtureName } from "./test-helpers/fixtures-registry.js";
 import { Base } from "./base.js";
+import { ActiveRecord } from "./namespaces.js";
 import { registerModel } from "./associations.js";
 import type { WithTransactionalFixturesOptions } from "./test-fixtures/with-transactional-fixtures.js";
 import { eagerWarmSchemaCache } from "./support/schema-cache-dump.js";
@@ -596,7 +594,9 @@ type FixturesOptions = WithTransactionalFixturesOptions & {
 
 type FixturesResult = {
   readonly fixtureTableNames: string[];
-  readonly self: () => TestFixtures & Record<string, unknown>;
+  readonly self: () => TestFixtures & {
+    createFixtures(...fixtureSetNames: string[]): Promise<FixtureSet[]>;
+  } & Record<string, unknown>;
   readonly canonicalTables: (
     adapter: Parameters<typeof ensureCanonicalTables>[0],
     names: readonly string[],
@@ -629,9 +629,9 @@ let currentTestCase: TestFixtures | null = null;
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
   if (suite === undefined) {
     if (rootTestCaseClass === undefined) {
-      rootTestCaseClass = class extends Minitest.Test {} as unknown as TestCaseClass;
-      include(rootTestCaseClass, TestFixtures);
-      rootTestCaseClass.fixturePaths = [FIXTURES_ROOT, USE_FIXTURES_ROOT];
+      const { TestCase } = ActiveRecord as unknown as { TestCase: TestCaseClass };
+      rootTestCaseClass = class extends TestCase {} as TestCaseClass;
+      rootTestCaseClass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
     }
     return rootTestCaseClass;
   }
@@ -703,7 +703,7 @@ function registerFixtureHooks(klass: TestCaseClass): void {
     currentTestCase = testCase;
 
     await resolveFixtureClassNames(testKlass);
-    await testCase.beforeSetup();
+    await testCase.setupFixtures();
 
     for (const [fsName, fixtureSet] of Object.entries(testCase._loadedFixtures)) {
       const cache = (testCase._fixtureCache[fsName] ??= {});
@@ -718,7 +718,7 @@ function registerFixtureHooks(klass: TestCaseClass): void {
     if (state === undefined || --state.pending > 0) return;
     testCases.delete(ctx.task);
     if (currentTestCase === state.testCase) currentTestCase = null;
-    await state.testCase.afterTeardown();
+    await state.testCase.teardownFixtures();
   });
 }
 

@@ -1,7 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { NoMethodError, include } from "@blazetrails/ruby-compat";
 import { Minitest } from "@blazetrails/activesupport";
-import { TestFixtures } from "./test-fixtures.js";
+import "./relation.js";
+import { TestCase } from "./cases/test-case.js";
+import { FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
+import { fixtures, TestFixtures } from "./test-fixtures.js";
+import {
+  configureEncryption,
+  snapshotEncryptionConfig,
+  restoreEncryptionConfig,
+} from "./encryption/test-helpers.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 
 type Host = {
@@ -288,5 +296,63 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
     expect(calls).toEqual(["setup_fixtures", "super before_setup"]);
     expect(instance.topics).toBeTypeOf("function");
     expect(instance.developers).toBeUndefined();
+  });
+});
+
+describe("fixtures() leaves ActiveRecord::TestCase as test_case.rb sets it", () => {
+  fixtures([]);
+
+  it("keeps fixture_paths at FIXTURES_ROOT and declares no sets on the root", () => {
+    expect(TestCase.fixturePaths).toEqual([FIXTURES_ROOT]);
+    expect(TestCase.fixtureTableNames).toEqual([]);
+  });
+});
+
+describe("fixtures() naming one set in two sibling describes", () => {
+  describe("a plain set, first describe", () => {
+    const { deadParrots } = fixtures(["deadParrots"]);
+
+    it("reads a row", () => {
+      expect(deadParrots("deadbird").readAttribute("name")).toBe("Dusty DeadBird");
+    });
+  });
+
+  describe("a plain set, second describe", () => {
+    const { deadParrots } = fixtures(["deadParrots"]);
+
+    it("reads a row", () => {
+      expect(deadParrots("deadbird").readAttribute("name")).toBe("Dusty DeadBird");
+    });
+  });
+
+  describe("an encrypted set", () => {
+    let snapshot: ReturnType<typeof snapshotEncryptionConfig>;
+    beforeAll(() => {
+      snapshot = snapshotEncryptionConfig();
+      configureEncryption();
+    });
+    afterAll(() => {
+      restoreEncryptionConfig(snapshot);
+    });
+
+    describe("first describe", () => {
+      const { encryptedBooks } = fixtures(["encryptedBooks"]);
+
+      it("reads a row", () => {
+        expect(encryptedBooks("awdr").readAttribute("name")).toBe(
+          "Agile Web Development with Rails",
+        );
+      });
+    });
+
+    describe("second describe", () => {
+      const { encryptedBooks } = fixtures(["encryptedBooks"]);
+
+      it("reads a row", () => {
+        expect(encryptedBooks("awdr").readAttribute("name")).toBe(
+          "Agile Web Development with Rails",
+        );
+      });
+    });
   });
 });
