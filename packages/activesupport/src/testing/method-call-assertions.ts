@@ -105,6 +105,7 @@ export function assertCalled<T extends object>(
       timesCalled += 1;
       return returns;
     },
+    undefined,
     block,
   );
   if (result) return result.then(check);
@@ -122,7 +123,13 @@ export function assertCalledWith<T extends object>(
   const mock = new Mock();
   expectCalledWith(mock, args, { returns });
 
-  const result = stub(object, methodName, (...called: unknown[]) => mock.call(...called), block);
+  const result = stub(
+    object,
+    methodName,
+    (...called: unknown[]) => mock.call(...called),
+    undefined,
+    block,
+  );
 
   if (result) return result.then(() => assertMock(mock));
   assertMock(mock);
@@ -238,6 +245,7 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   object: T,
   name: keyof T & string,
   valOrCallable: unknown,
+  blockArgs: unknown[] = [],
   block?: (object: T) => R,
 ): R extends Promise<void> ? Promise<void> : undefined {
   type Result = R extends Promise<void> ? Promise<void> : undefined;
@@ -246,8 +254,12 @@ export function stub<T extends object, R extends void | Promise<void> = void>(
   for (let p = Object.getPrototypeOf(object); !inherited && p; p = Object.getPrototypeOf(p)) {
     inherited = Object.getOwnPropertyDescriptor(p, name);
   }
-  const stubbed = (...args: unknown[]) =>
-    typeof valOrCallable === "function" ? valOrCallable(...args) : valOrCallable;
+  const stubbed = (...args: unknown[]) => {
+    if (typeof valOrCallable === "function") return valOrCallable(...args);
+    const blk = args.at(-1);
+    if (typeof blk === "function") blk(...blockArgs);
+    return valOrCallable;
+  };
   Object.defineProperty(
     object,
     name,

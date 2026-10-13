@@ -401,7 +401,9 @@ export class Dir {
         ensure();
         throw e;
       }
-      if (result instanceof Promise) return result.finally(ensure) as T;
+      if (typeof (result as PromiseLike<unknown> | undefined)?.then === "function") {
+        return Promise.resolve(result).finally(ensure) as T;
+      }
       ensure();
       return result;
     } else {

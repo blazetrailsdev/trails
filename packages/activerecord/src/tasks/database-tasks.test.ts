@@ -344,7 +344,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   it("dump schema cache", async () => {
     try {
       await Dir.mktmpdir(null, null, {}, (dir) =>
-        stub(DatabaseTasks, "dbDir", dir, async () => {
+        stub(DatabaseTasks, "dbDir", dir, undefined, async () => {
           const path = File.join(dir, "schema_cache.yml");
           expect(File.isFile(path)).toBeFalsy();
           await DatabaseTasks.dumpSchemaCache(await Base.leaseConnection(), path);
@@ -358,7 +358,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
 
   it("clear schema cache", () => {
     Dir.mktmpdir(null, null, {}, (dir) => {
-      stub(DatabaseTasks, "dbDir", dir, () => {
+      stub(DatabaseTasks, "dbDir", dir, undefined, () => {
         const path = File.join(dir, "schema_cache.yml");
         File.open(path, "wb", (f) => {
           f.puts("This is a cache.");
@@ -373,7 +373,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   it("cache dump default filename", () => {
     const config = new HashConfig("development", "primary", {});
 
-    stub(DatabaseTasks, "dbDir", "db", () => {
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
       const path = DatabaseTasks.cacheDumpFilename(config);
       expect(path).toBe("db/schema_cache.yml");
     });
@@ -382,7 +382,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   it("cache dump default filename with custom db dir", () => {
     const config = new HashConfig("development", "primary", {});
 
-    stub(DatabaseTasks, "dbDir", "my_db", () => {
+    stub(DatabaseTasks, "dbDir", "my_db", undefined, () => {
       const path = DatabaseTasks.cacheDumpFilename(config);
       expect(path).toBe("my_db/schema_cache.yml");
     });
@@ -391,7 +391,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   it("cache dump alternate filename", () => {
     const config = new HashConfig("development", "alternate", {});
 
-    stub(DatabaseTasks, "dbDir", "db", () => {
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
       const path = DatabaseTasks.cacheDumpFilename(config);
       expect(path).toBe("db/alternate_schema_cache.yml");
     });
@@ -402,7 +402,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
       schemaCachePath: "tmp/something.yml",
     });
 
-    stub(DatabaseTasks, "dbDir", "db", () => {
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
       const path = DatabaseTasks.cacheDumpFilename(config);
       expect(path).toBe("tmp/something.yml");
     });
@@ -413,7 +413,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
       schemaCachePath: "tmp/something.yml",
     });
 
-    stub(DatabaseTasks, "dbDir", "db", () => {
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
       const path = DatabaseTasks.cacheDumpFilename(config, {
         schemaCachePath: "tmp/another.yml",
       });
@@ -426,7 +426,7 @@ describe("DatabaseTasksDumpSchemaTest", () => {
   it("ensure db dir", async () => {
     try {
       await Dir.mktmpdir(null, null, {}, (dir) =>
-        stub(DatabaseTasks, "dbDir", dir, async () => {
+        stub(DatabaseTasks, "dbDir", dir, undefined, async () => {
           const updatedHash = {
             ...Base.configurations().configsFor({ envName: "arunit", name: "primary" })!
               .configurationHash,
@@ -451,7 +451,7 @@ describe("DatabaseTasksDumpSchemaTest", () => {
   it("db dir ignored if included in schema dump", async () => {
     try {
       await Dir.mktmpdir(null, null, {}, (dir) =>
-        stub(DatabaseTasks, "dbDir", dir, async () => {
+        stub(DatabaseTasks, "dbDir", dir, undefined, async () => {
           const updatedHash = {
             ...Base.configurations().configsFor({ envName: "arunit", name: "primary" })!
               .configurationHash,
@@ -588,7 +588,7 @@ describe("DatabaseTasksCreateAllTest", () => {
     Base.configurations(configurations);
 
     try {
-      await stub(Base.connectionHandler, "establishConnection", null, block);
+      await stub(Base.connectionHandler, "establishConnection", null, undefined, block);
     } finally {
       Base.configurations(oldConfigurations);
     }
@@ -682,7 +682,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   });
 
   it("establishes connection for the given environments", async () => {
-    await stub(DatabaseTasks, "create", null, () =>
+    await stub(DatabaseTasks, "create", null, undefined, () =>
       assertCalledWithArgs(Base, "establishConnection", [":development"], {}, async () => {
         await DatabaseTasks.createCurrent("development");
       }),
@@ -696,7 +696,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     Base.configurations(configurations);
 
     try {
-      await stub(Base.connectionHandler, "establishConnection", null, block);
+      await stub(Base.connectionHandler, "establishConnection", null, undefined, block);
     } finally {
       Base.configurations(oldConfigurations);
     }
@@ -1343,9 +1343,9 @@ describe("DatabaseTasksTruncateAllTest", () => {
     const seed = new BetterSQLite3Adapter({ database: dbPath });
     await seed.execute("CREATE TABLE courses (id INTEGER PRIMARY KEY, name TEXT)");
     await seed.execute("CREATE TABLE colleges (id INTEGER PRIMARY KEY, name TEXT)");
-    // eslint-disable-next-line blazetrails/require-table-teardown
+    // eslint-disable-next-line blazetrails/require-table-teardown -- raw SQL in a throwaway SQLite file under Dir.mktmpdir, removed in the finally; database_tasks_test.rb:1300-1347 has fixtures over ARUnit2Model, ported by database-tasks-test-remaining-bodies-match-rails
     await seed.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
-    // eslint-disable-next-line blazetrails/require-table-teardown
+    // eslint-disable-next-line blazetrails/require-table-teardown -- raw SQL in a throwaway SQLite file under Dir.mktmpdir, removed in the finally; database_tasks_test.rb:1300-1347 has fixtures over ARUnit2Model, ported by database-tasks-test-remaining-bodies-match-rails
     await seed.execute("CREATE TABLE ar_internal_metadata (key TEXT PRIMARY KEY, value TEXT)");
     await seed.execute("INSERT INTO courses (name) VALUES ('ruby')");
     await seed.execute("INSERT INTO colleges (name) VALUES ('trails')");
