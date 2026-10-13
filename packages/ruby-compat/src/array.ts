@@ -1070,22 +1070,27 @@ type ArrayMethod = (self: unknown[], ...args: never[]) => unknown;
 type Block = (...args: unknown[]) => unknown;
 
 const blockGiven = (v: unknown): v is Block =>
-  typeof v === "function" && Object.getOwnPropertyDescriptor(v, "prototype")?.writable !== false;
+  typeof v === "function" && rbObjClassname(v) === "Proc";
 
 const enumOf = (ary: unknown[]) => ({ each: (block: (i: unknown) => void) => each(ary, block) });
 
 /**
  * The Array methods `rbFSend` dispatches and `basicObjRespondTo` answers for
  * that a JS array has no member for, keyed by the camelCased Ruby name as
- * `STRING_METHOD_TABLE` keys String's: the ones Rails delegates from a
- * Relation to its records
- * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation/delegation.rb:98-103`),
- * defined by `Init_Array` (`vendor/ruby/v3.3.11/array.c:8606`) or by
- * `Enumerable` (`vendor/ruby/v3.3.11/enum.c:5047`). `-`, `|` and `&` go by
- * the method Ruby also names them (`difference`, `union`, `intersection`) and
- * `+` is `plus`; a block is a trailing function argument, and with no block an
- * entry answers the Array its enumerator would yield, as `each` does. A package that
- * reopens Array, as ActiveSupport's `core_ext/array` does, assigns an entry.
+ * `STRING_METHOD_TABLE` keys String's. They are the ones `Init_Array`
+ * (`vendor/ruby/v3.3.11/array.c:8606`) and `Enumerable`
+ * (`vendor/ruby/v3.3.11/enum.c:5047`) define that a Relation sends its
+ * records: by `delegate ..., to: :records`
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation/delegation.rb:98-103`)
+ * and by `include Enumerable`
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation.rb:67`).
+ * `detect`, `findAll`, `groupBy`, `isNone` and `isOne` only adapt an Array to
+ * the ported function of that name. `-`, `|` and `&` go by the method Ruby
+ * also names them (`difference`, `union`, `intersection`) and `+` is `plus`;
+ * a block is a trailing function that is not a class, and with no block an
+ * entry answers a copy of the Array its enumerator would yield. A package
+ * that reopens Array, as ActiveSupport's `core_ext/array` does, assigns an
+ * entry.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -1103,23 +1108,25 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   /** `rb_ary_intersect_p` (`vendor/ruby/v3.3.11/array.c:5680`). */
   isIntersect: (self, ary2: unknown[]) => isIntersect(self, ary2),
   /** `rb_ary_index` (`vendor/ruby/v3.3.11/array.c:2026`). */
-  index: (self, val: unknown) => {
+  index: (self, ...[val]: unknown[]) => {
+    if (val === undefined) return [...self];
     const i = self.findIndex((e) => (blockGiven(val) ? rtest(val(e)) : rbEqual(e, val)));
     return i < 0 ? null : i;
   },
   /** `rb_ary_rindex` (`vendor/ruby/v3.3.11/array.c:2087`). */
-  rindex: (self, val: unknown) => {
+  rindex: (self, ...[val]: unknown[]) => {
+    if (val === undefined) return [...self].reverse();
     for (let i = self.length; i--; ) {
       if (blockGiven(val) ? rtest(val(self[i])) : rbEqual(self[i], val)) return i;
     }
     return null;
   },
   /** `rb_ary_collect` (`vendor/ruby/v3.3.11/array.c:3625`). */
-  collect: (self, block?: Block) => (block ? self.map((v) => block(v)) : self),
+  collect: (self, block?: Block) => (block ? self.map((v) => block(v)) : [...self]),
   /** `rb_ary_compact` (`vendor/ruby/v3.3.11/array.c:6240`). */
   compact: (self) => compact(self),
   /** `rb_ary_reject` (`vendor/ruby/v3.3.11/array.c:4301`). */
-  reject: (self, block?: Block) => (block ? self.filter((v) => !rtest(block(v))) : self),
+  reject: (self, block?: Block) => (block ? self.filter((v) => !rtest(block(v))) : [...self]),
   /** `rb_ary_rotate_m` (`vendor/ruby/v3.3.11/array.c:3240`). */
   rotate: (self, cnt: number = 1) => {
     const n = self.length === 0 ? 0 : ((cnt % self.length) + self.length) % self.length;
@@ -1136,6 +1143,7 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   },
   /** `Array#sample` (`vendor/ruby/v3.3.11/array.rb:60`). */
   sample: (self, ...args: [number?]) => {
+    if (args.length && args[0]! < 0) throw new ArgumentError("negative sample number");
     const ary = ARRAY_METHOD_TABLE.shuffle(self) as unknown[];
     return args.length ? ary.slice(0, args[0]) : (ary[0] ?? null);
   },
@@ -1148,17 +1156,18 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   isOne: (self, ...argv: unknown[]) => Enumerable.isOne.call(enumOf(self), ...argv),
   /** `enum_find` (`vendor/ruby/v3.3.11/enum.c:361`). */
   detect: (self, ...argv: unknown[]) =>
-    blockGiven(argv.at(-1)) ? Enumerable.find.call(enumOf(self), ...argv) : self,
+    blockGiven(argv.at(-1)) ? Enumerable.find.call(enumOf(self), ...argv) : [...self],
   /** `enum_find_all` (`vendor/ruby/v3.3.11/enum.c:509`). */
-  findAll: (self, block?: Block) => (block ? Enumerable.findAll.call(enumOf(self), block) : self),
+  findAll: (self, block?: Block) =>
+    block ? Enumerable.findAll.call(enumOf(self), block) : [...self],
   /** `enum_partition` (`vendor/ruby/v3.3.11/enum.c:1102`). */
-  partition: (self, block?: Block) => (block ? partition(self, block) : self),
+  partition: (self, block?: Block) => (block ? partition(self, block) : [...self]),
   /** `enum_group_by` (`vendor/ruby/v3.3.11/enum.c:1157`). */
-  groupBy: (self, block?: Block) => (block ? groupBy(self, block) : self),
+  groupBy: (self, block?: Block) => (block ? groupBy(self, block) : [...self]),
   /** `enum_sort_by` (`vendor/ruby/v3.3.11/enum.c:1651`). */
   sortBy: (self, block?: Block) =>
     !block
-      ? self
+      ? [...self]
       : self
           .map((v) => [block(v), v])
           .sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]))

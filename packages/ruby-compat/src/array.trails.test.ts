@@ -773,7 +773,7 @@ describe("ARRAY_METHOD_TABLE", () => {
     expect(rbFSend(a, "isAll", (i: number) => i > 0)).toBe(true);
     expect(rbFSend(a, "isAll", Number)).toBe(true);
     expect(rbFSend([Number, String], "index", String)).toBe(1);
-    expect(rbFSend(a, "collect")).toBe(a);
+    expect(rbFSend(a, "collect")).not.toBe(a);
     expect(rbFSend(a, "eachCons", 3)).toHaveLength(2);
     expect([...(rbFSend(a, "shuffle") as number[])].sort()).toEqual([1, 1, 2, 3]);
   });

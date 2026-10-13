@@ -25,6 +25,7 @@ import {
   Range,
   arySlice,
   extend,
+  fetch,
   include,
   rbFPublicSend,
   rbModConstSet,
@@ -242,10 +243,20 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     toXmlArray(records, options, block),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
-const ARRAY_METHODS =
-  "intersection union plus difference isIntersect compact index rindex sample rotate shuffle";
-for (const name of ARRAY_METHODS.split(" ")) {
-  RECORD_DELEGATES[name] = ARRAY_METHOD_TABLE[name] as RecordDelegate;
+for (const name of [
+  "intersection",
+  "union",
+  "plus",
+  "difference",
+  "isIntersect",
+  "compact",
+  "index",
+  "rindex",
+  "sample",
+  "rotate",
+  "shuffle",
+]) {
+  RECORD_DELEGATES[name] = fetch(ARRAY_METHOD_TABLE, name);
 }
 
 class ImplicitCountError extends globalThis.TypeError {}
