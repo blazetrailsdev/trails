@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
-import { bootApplicationBang } from "../command/actions.js";
+import { Actions } from "../command/actions.js";
 import {
   env,
   setExitCode,
@@ -380,7 +380,7 @@ async function structureLoadReachesDatabase(
 
 let _seedImportCounter = 0;
 async function runSeed(prefix = ""): Promise<void> {
-  await bootApplicationBang();
+  await Actions.bootApplicationBang();
   const fs = getFs();
   const path = getPath();
   const cwd = fs.cwd();

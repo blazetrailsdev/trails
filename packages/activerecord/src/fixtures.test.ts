@@ -45,7 +45,9 @@ import { Comment } from "./test-helpers/models/comment.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
 import { Movie } from "./test-helpers/models/movie.js";
 import { Computer } from "./test-helpers/models/computer.js";
-import { ActiveRecordError, NotNullViolation } from "./errors.js";
+import { ActiveRecordError, NotNullViolation, StatementInvalid } from "./errors.js";
+import type { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
+import { runWithoutConnection } from "./support/connection-helper.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -351,6 +353,88 @@ describe("FixturesTest", () => {
           });
         },
       );
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "bulk insert with multi statements enabled",
+    async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: ["MULTI_STATEMENTS"] });
+
+        const fixtures = {
+          traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a"] }],
+        };
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).resolves.not.toThrow();
+
+        await assertDifference(
+          async () => await TrafficLight.count(),
+          1,
+          null,
+          async () => {
+            await Base.transaction(async () => {
+              const conn = await Base.leaseConnection();
+              expect(conn.openTransactions()).toBe(1);
+              await conn.insertFixturesSet(fixtures);
+              expect(conn.openTransactions()).toBe(1);
+            });
+          },
+        );
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).resolves.not.toThrow();
+      });
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "bulk insert with multi statements disabled",
+    async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: [] });
+
+        const fixtures = {
+          traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a"] }],
+        };
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).rejects.toThrow(StatementInvalid);
+
+        await assertDifference(
+          async () => await TrafficLight.count(),
+          1,
+          null,
+          async () => {
+            const conn = await Base.leaseConnection();
+            await conn.insertFixturesSet(fixtures);
+          },
+        );
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).rejects.toThrow(StatementInvalid);
+      });
     },
   );
 

@@ -3217,9 +3217,10 @@ class ApiExtractor
 
   # The file's ivars whose class is provable, keyed `[owner, name]` by the
   # lexical class/module that assigns them, valued `"hash"`, `"array"` or nil.
-  # An ivar is `"hash"` when every `@x = …` in that owner assigns a `to_hash`
-  # call, whose result Ruby's implicit-conversion contract requires to be a
-  # Hash — `@row = fixture.to_hash` (`fixture_set/table_row.rb:69`). It is
+  # An ivar is `"hash"` when every `@x = …` in that owner assigns a Hash literal
+  # (`@cascade_for = {}`, `rack/cascade.rb:25`) or a `to_hash` call, whose
+  # result Ruby's implicit-conversion contract requires to be a Hash —
+  # `@row = fixture.to_hash` (`fixture_set/table_row.rb:69`). It is
   # `"array"` when every one assigns an Array literal or a `Kernel#Array` call
   # (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`, always an Array) —
   # `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
@@ -3233,9 +3234,7 @@ class ApiExtractor
   # name is not a literal), any assignment of another kind in the same owner,
   # and one of another kind to the same name in any other class or module of
   # the file (a subclass or mixin writing the parent's ivar). An ivar of the
-  # same name in another class of the file is not proven by it. A hash-literal
-  # assignment is not yet admitted: story
-  # prove-hash-literal-ivars-in-ruby-compat-receiver-kinds.
+  # same name in another class of the file is not proven by it.
   def typed_ivars(node, owner = [], assigned = {}, scope = :body)
     return assigned unless node.is_a?(Array)
 
@@ -3299,6 +3298,7 @@ class ApiExtractor
 
   def assigned_ivar_kind(value)
     return nil unless value.is_a?(Array)
+    return "hash" if LITERAL_HASH_NODES.include?(value[0])
     return "hash" if value[0] == :call && ident_name(value[3]) == "to_hash"
     return "array" if value[0] == :array || kernel_array_call?(value)
 

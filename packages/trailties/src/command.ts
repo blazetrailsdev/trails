@@ -1,3 +1,5 @@
+import { presence } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/ruby-compat";
 import type { Command as Program } from "commander";
 import type { Base } from "./command/base.js";
 
@@ -8,6 +10,10 @@ let _hiddenCommands: (typeof Base)[] | undefined;
 
 export function hiddenCommands(): (typeof Base)[] {
   return (_hiddenCommands ??= []);
+}
+
+export function environment(): string {
+  return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";
 }
 
 /** @missingRailsArgs invoke_rake — PERMANENT */

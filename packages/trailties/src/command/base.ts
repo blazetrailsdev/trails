@@ -1,13 +1,20 @@
 import { classAttribute, underscore } from "@blazetrails/activesupport";
+import { include, type Included } from "@blazetrails/ruby-compat";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
+import { Actions } from "./actions.js";
 
 export interface ClassOptionConfig {
   aliases?: string | string[];
   desc?: string;
   type?: "boolean" | "string" | "numeric";
+  enum?: string[];
   default?: unknown;
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type */
+export interface Base extends Included<typeof Actions> {}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export class Base {
   declare private static _namespace: string | undefined;
   declare private static _commandName: string | undefined;
@@ -126,3 +133,5 @@ export class Base {
     console.log(String(message));
   }
 }
+
+include(Base, Actions);

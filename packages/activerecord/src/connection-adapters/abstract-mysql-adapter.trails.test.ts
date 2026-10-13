@@ -67,6 +67,38 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
   });
 });
 
+describe("AbstractMysqlAdapter#supportsInsertReturning", () => {
+  async function makeAdapter(fullVersionString: string) {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const { Version } = await import("./abstract-adapter.js");
+    const { sqlForInsert } = await import("./abstract/database-statements.js");
+    const databaseVersion = new Version(fullVersionString.split("-")[0], fullVersionString);
+    return Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      pool: { serverVersion: () => databaseVersion },
+      fullVersion: async () => databaseVersion.fullVersionString,
+      quoteColumnName: (c: string) => `\`${c}\``,
+      sqlForInsert,
+    });
+  }
+
+  it("answers false on MySQL 8, which emits no RETURNING", async () => {
+    const adapter = await makeAdapter("8.0.36");
+    expect(await adapter.supportsInsertReturning()).toBe(false);
+    expect(await adapter.sqlForInsert("INSERT INTO t (x) VALUES (1)", "id", [], null)).toEqual([
+      "INSERT INTO t (x) VALUES (1)",
+      [],
+    ]);
+  });
+
+  it("answers true on MariaDB 10.5, which emits RETURNING", async () => {
+    const adapter = await makeAdapter("10.5.0-MariaDB");
+    expect(await adapter.supportsInsertReturning()).toBe(true);
+    expect((await adapter.sqlForInsert("INSERT INTO t (x) VALUES (1)", "id", [], null))[0]).toBe(
+      "INSERT INTO t (x) VALUES (1) RETURNING `id`",
+    );
+  });
+});
+
 describe("AbstractMysqlAdapter#_columnMethodNames", () => {
   it("appends MySQL ColumnMethods shorthands to the abstract list", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");

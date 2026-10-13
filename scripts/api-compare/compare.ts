@@ -5074,6 +5074,17 @@ export function main() {
     }
     const moduleIncluderFqns = buildModuleIncluderFqns(allClassesAndModules, moduleFqnByShort);
 
+    const rubyNamesByMirrorTs = new Map<string, Set<string>>();
+    for (const { info } of allClassesAndModules) {
+      if (!info.file) continue;
+      const mirror = rubyFileToTs(info.file, pkg);
+      const names = rubyNamesByMirrorTs.get(mirror) ?? new Set<string>();
+      for (const m of [...(info.instanceMethods ?? []), ...(info.classMethods ?? [])]) {
+        names.add(m.name);
+      }
+      rubyNamesByMirrorTs.set(mirror, names);
+    }
+
     // Step 2: transitively resolve includer files (DFS with memoization)
     const moduleIncluderFiles = new Map<string, Set<string>>();
     const resolveIncluderFiles = (modFqn: string, visited: Set<string>): Set<string> => {
@@ -6491,7 +6502,7 @@ export function main() {
               misplacedMatch,
               misplacedActualFile!,
               rubyModule,
-              false,
+              rubyNamesByMirrorTs.get(misplacedActualFile!)?.has(rubyName) === true,
               true,
               level,
             );

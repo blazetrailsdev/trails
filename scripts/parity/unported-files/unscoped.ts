@@ -47,19 +47,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: [
-      "bulk insert with multi statements disabled",
-      "bulk insert with multi statements enabled",
-    ],
-    reason:
-      "Reconnect with flags MULTI_STATEMENTS / [] and assert a two-statement execute succeeds / " +
-      "raises (fixtures_test.rb:156-251). trails' Mysql2Adapter always opens the driver with " +
-      "multipleStatements: true, so there is no disabled connection to observe. CONVERGEABLE " +
-      "mysql2-honour-multi-statements-flag.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: [
       "broken yaml exception",
       "clean fixtures",
       "create fixtures",
