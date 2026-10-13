@@ -310,7 +310,6 @@ export class TestCase extends ActiveSupportTestCase {
     }
   }
 
-  /** @inventedArm resetLocalTimeZoneId — CONVERGEABLE set-env-tz-resets-the-cached-local-zone */
   async withEnvTz(newTz = "US/Eastern", block: () => unknown): Promise<void> {
     const oldTz = getEnv("TZ");
     try {
