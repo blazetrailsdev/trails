@@ -2879,10 +2879,12 @@ describe("TestNamedRouteUrlHelpers", () => {
     t.app = APP;
   });
 
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
   it("URL helpers do not ignore nil parameters when using non-optimized routes", async () => {
     await stub(Routes, "isOptimizeRoutesGeneration", false, undefined, async () => {
       await t.get("/categories/1");
-      t.assertResponse("success");
+      assertResponse("success");
       await assertRaises([UrlGenerationError], {}, () => t.productPath(null));
     });
   });
@@ -3036,39 +3038,41 @@ describe("TestPortConstraints", () => {
     t.app = APP;
   });
 
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
   it("integer port constraints", async () => {
     await t.get("http://www.example.com/integer");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
 
     await t.get("http://www.example.com:8080/integer");
-    t.assertResponse("success");
+    assertResponse("success");
   });
 
   it("string port constraints", async () => {
     await t.get("http://www.example.com/string");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
 
     await t.get("http://www.example.com:8080/string");
-    t.assertResponse("success");
+    assertResponse("success");
   });
 
   it("array port constraints", async () => {
     await t.get("http://www.example.com/array");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
 
     await t.get("http://www.example.com:8080/array/middle");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
 
     await t.get("http://www.example.com:8080/array/first");
-    t.assertResponse("success");
+    assertResponse("success");
   });
 
   it("regexp port constraints", async () => {
     await t.get("http://www.example.com/regexp");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
 
     await t.get("http://www.example.com:8080/regexp");
-    t.assertResponse("success");
+    assertResponse("success");
   });
 });
 
@@ -3094,48 +3098,50 @@ describe("TestFormatConstraints", () => {
     t.app = APP;
   });
 
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
   it("string format constraints", async () => {
     await t.get("http://www.example.com/string");
-    t.assertResponse("success");
+    assertResponse("success");
 
     await t.get("http://www.example.com/string.json");
-    t.assertResponse("success");
+    assertResponse("success");
 
     await t.get("http://www.example.com/string.html");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
   });
 
   it("regexp format constraints", async () => {
     await t.get("http://www.example.com/regexp");
-    t.assertResponse("success");
+    assertResponse("success");
 
     await t.get("http://www.example.com/regexp.json");
-    t.assertResponse("success");
+    assertResponse("success");
 
     await t.get("http://www.example.com/regexp.html");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
   });
 
   it("enforce with format true with constraint", async () => {
     await t.get("http://www.example.com/json_only.json");
-    t.assertResponse("success");
+    assertResponse("success");
 
     await t.get("http://www.example.com/json_only.html");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
 
     await t.get("http://www.example.com/json_only");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
   });
 
   it("enforce with string", async () => {
     await t.get("http://www.example.com/xml_only.xml");
-    t.assertResponse("success");
+    assertResponse("success");
 
     await t.get("http://www.example.com/xml_only");
-    t.assertResponse("success");
+    assertResponse("success");
 
     await t.get("http://www.example.com/xml_only.json");
-    t.assertResponse("not_found");
+    assertResponse("not_found");
   });
 });
 
