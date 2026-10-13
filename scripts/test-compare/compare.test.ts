@@ -408,6 +408,62 @@ describe("main cross-file credit", () => {
   });
 });
 
+describe("main --extra", () => {
+  const run = async (flags: string[]) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const pkg = "activesupport";
+    const tc = (ancestors: string[], description: string) => ({ ancestors, description });
+    const manifest = (source: string, toFile: (rb: string) => string, time: unknown[]) => ({
+      source,
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            { file: toFile("core_ext/time_ext_test.rb"), testCases: time },
+            { file: toFile("core_ext/date_ext_test.rb"), testCases: [tc(["D"], "yesterday")] },
+          ],
+        },
+      },
+    });
+    const ruby = manifest("ruby", (rb) => rb, [tc(["T"], "last quarter")]);
+    const conv = (rb: string) => `${PKG_SRC_DIRS[pkg]}${rubyToConventionTs(rb, pkg)}`;
+    const ts = manifest("typescript", conv, [tc(["T"], "last quarter"), tc(["T", "z"], "Offset")]);
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify(ts));
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (...parts: unknown[]) => void lines.push(parts.join(" "));
+    try {
+      main(["--package", pkg, ...flags], dir);
+    } finally {
+      console.log = log;
+    }
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { files: ConventionFileResult[] }[] };
+    await fs.rm(dir, { recursive: true });
+    return {
+      files: results[0].files,
+      lines: lines.filter((l) => /^ {2}(core_ext| {4}\+)/.test(l)),
+    };
+  };
+
+  it("lists each unconsumed TS test by describe path and name, composing with --sort-extra and --min-extra=N", async () => {
+    const { files } = await run(["--extra", "--json"]);
+    const extras = Object.fromEntries(files.map((f) => [f.rubyFile, f.extraTests]));
+    expect(extras).toEqual({
+      "core_ext/time_ext_test.rb": ["T > z > Offset"],
+      "core_ext/date_ext_test.rb": [],
+    });
+    expect((await run(["--json"])).files.every((f) => f.extraTests === undefined)).toBe(true);
+    const { lines } = await run(["--extra", "--sort-extra", "--min-extra=1"]);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("core_ext/time_ext_test.rb");
+    expect(lines[1]).toBe("      + T > z > Offset");
+    expect((await run([])).lines).toHaveLength(2);
+  });
+});
+
 describe("main erb description credit", () => {
   it("credits a tse-spelled description against its erb-spelled Rails original", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));

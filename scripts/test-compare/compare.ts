@@ -21,7 +21,7 @@
  *
  * Usage:
  *   npx tsx scripts/test-compare/compare.ts [--missing] [--json]
- *     [--incomplete] [--gates] [--check] [--sort-extra] [--min-extra=N]
+ *     [--incomplete] [--gates] [--check] [--sort-extra] [--min-extra=N] [--extra]
  *     [--package activesupport]
  *
  *   --incomplete  In the per-file table, hide files that are fully complete
@@ -63,6 +63,9 @@
  *                 tests — a fidelity smell.
  *   --min-extra=N In the per-file table, only show files whose Extra count is
  *                 >= N. Combine with --sort-extra to triage the worst offenders.
+ *   --extra       Under each file of the per-file table, list the TS tests no
+ *                 Rails test consumed, as `describe > path > name`. Adds them
+ *                 to the JSON artifact as `extraTests`.
  */
 
 import * as fs from "fs";
@@ -458,6 +461,7 @@ export interface ConventionFileResult {
   // file (the per-file form of the global "extra (TS only)" concept). A large
   // count flags a file ballooned with bespoke/non-Rails tests — a fidelity smell.
   extra: number;
+  extraTests?: string[];
   missingTests?: string[];
   misplacedTests?: MisplacedTest[];
   wrongDescribeTests?: WrongDescribeTest[];
@@ -546,6 +550,7 @@ export function arClosureResult(
 interface TsTestInfo {
   path: string; // normalized full path
   desc: string; // normalized description
+  title: string; // describe path and name as written, " > "-joined (--extra)
   dynamic: boolean; // name recovered from a template literal — matches only on its collapsed form
   pending: boolean;
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
@@ -657,6 +662,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
   const checkGates = args.includes("--check");
   const showAssertions = args.includes("--assertions");
   const sortExtra = args.includes("--sort-extra");
+  const showExtra = args.includes("--extra");
   const showDynamic = args.includes("--dynamic");
   const showSiblingClasses = args.includes("--sibling-classes");
   let minExtra = 0;
@@ -743,6 +749,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         tests.push({
           path: np,
           desc: nd,
+          title: [...tc.ancestors, tc.description].join(" > "),
           dynamic: !!tc.dynamic,
           pending: !!tc.pending,
           gate: tc.gate,
@@ -1181,6 +1188,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       // TS tests in the convention file that no Rails test consumed.
       const extra = tsTests.length - consumedTs.size;
       totalExtra += extra;
+      const extraTests = tsTests.filter((_, i) => !consumedTs.has(i)).map((t) => t.title);
 
       fileResults.push({
         rubyFile: file.file,
@@ -1194,6 +1202,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         misplaced,
         missing: file.testCases.length - excludedCount - matched - misplaced,
         extra,
+        ...(showExtra ? { extraTests } : {}),
         ...(showMissing ? { missingTests } : {}),
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
@@ -1562,6 +1571,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
           console.log(`      - ${m}`);
         }
       }
+      if (showExtra) for (const e of f.extraTests ?? []) console.log(`      + ${e}`);
     }
   }
 

@@ -1,3 +1,4 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Base } from "./base.js";
@@ -7,6 +8,15 @@ import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./a
 import { Relation } from "./relation.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import { connectedToStack, currentRole, currentShard, currentPreventingWrites } from "./core.js";
+import { adapterType } from "./test-adapter.js";
+import { restoreWorkerConnection } from "./support/connection.js";
+import { DEFAULT_ENV } from "./connection-handling.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
+import { UrlConfig } from "./database-configurations/url-config.js";
+import { AdapterNotSpecified } from "./errors.js";
 
 describe("directly bound adapter", () => {
   it("connection, leaseConnection and withConnection resolve to the same session", async () => {
@@ -118,5 +128,356 @@ describe("withRoleAndShard return value", () => {
 
     expect(returned).toBe(duck);
     expect(load).not.toHaveBeenCalled();
+  });
+});
+
+describe("ConnectionHandling", () => {
+  fixtures(["posts"], {
+    usesTransaction: [
+      "establish_connection with a url stores a UrlConfig with discrete fields",
+      "remove_connection removes the pool",
+      "remove_connection returns undefined when no pool exists",
+      "establishConnection raises AdapterNotSpecified for an adapter-less HashConfig",
+      "autoConnect honors an in-memory DatabaseConfigurations registry",
+      "autoConnect reconnects via mutated configuration.database for UrlConfig",
+    ],
+  });
+
+  afterEach(() => {
+    connectedToStack().length = 0;
+  });
+
+  it("connected_to switches role for block", async () => {
+    expect(currentRole.call(Base)).toBe("writing");
+    Base.connectedTo({ role: "reading" }, () => {
+      expect(currentRole.call(Base)).toBe("reading");
+    });
+    expect(currentRole.call(Base)).toBe("writing");
+  });
+
+  it("connected_to with reading role automatically prevents writes", async () => {
+    expect(currentPreventingWrites.call(Base)).toBe(false);
+    Base.connectedTo({ role: "reading" }, () => {
+      expect(currentPreventingWrites.call(Base)).toBe(true);
+    });
+    expect(currentPreventingWrites.call(Base)).toBe(false);
+  });
+
+  it("connected_to switches shard for block", async () => {
+    expect(currentShard.call(Base)).toBe("default");
+    Base.connectedTo({ role: "writing", shard: "shard_one" }, () => {
+      expect(currentShard.call(Base)).toBe("shard_one");
+    });
+    expect(currentShard.call(Base)).toBe("default");
+  });
+
+  it("connected_to? checks role and shard", async () => {
+    expect(Base.isConnectedTo({ role: "writing" })).toBe(true);
+    expect(Base.isConnectedTo({ role: "reading" })).toBe(false);
+    Base.connectedTo({ role: "reading" }, () => {
+      expect(Base.isConnectedTo({ role: "reading" })).toBe(true);
+    });
+  });
+
+  it("while_preventing_writes", async () => {
+    expect(currentPreventingWrites.call(Base)).toBe(false);
+    Base.whilePreventingWrites(() => {
+      expect(currentPreventingWrites.call(Base)).toBe(true);
+    });
+    expect(currentPreventingWrites.call(Base)).toBe(false);
+  });
+
+  it("prohibit_shard_swapping", async () => {
+    expect(Base.isShardSwappingProhibited()).toBeNull();
+    Base.prohibitShardSwapping(() => {
+      expect(Base.isShardSwappingProhibited()).toBe(true);
+      expect(() => {
+        Base.connectedTo({ role: "writing", shard: "other" }, () => {});
+      }).toThrow(/cannot swap.*shard/);
+    });
+    expect(Base.isShardSwappingProhibited()).toBeNull();
+  });
+
+  it("connection_specification_name defaults to Base", async () => {
+    expect(Base.connectionSpecificationName).toBe("ActiveRecord::Base");
+  });
+
+  it("connection_specification_name returns 'Base' for a primary class even before connectsTo plants it", async () => {
+    const { __resetPrimaryAbstractClass, primaryAbstractClass } = await import("./inheritance.js");
+    class AppRecord extends Base {}
+    try {
+      __resetPrimaryAbstractClass();
+      primaryAbstractClass(AppRecord);
+      expect(Object.prototype.hasOwnProperty.call(AppRecord, "_connectionSpecificationName")).toBe(
+        false,
+      );
+      expect(AppRecord.connectionSpecificationName).toBe("ActiveRecord::Base");
+    } finally {
+      __resetPrimaryAbstractClass();
+    }
+  });
+
+  it("shard_keys and sharded?", async () => {
+    expect(Base.shardKeys()).toEqual([]);
+    expect(Base.isSharded()).toBe(false);
+  });
+
+  it("lease_connection and release_connection", async () => {
+    const conn = await Base.leaseConnection();
+    expect(conn).toBeTruthy();
+    expect(Base.connectionPool().activeConnection).toBe(conn);
+    Base.releaseConnection();
+    expect(Base.connectionPool().isActiveConnection()).toBeNull();
+  });
+
+  it("connection_pool returns pool", async () => {
+    const pool = Base.connectionPool();
+    expect(pool).toBeTruthy();
+    expect(pool.role).toBe("writing");
+  });
+
+  it("connection_db_config", async () => {
+    expect(Base.connectionDbConfig()).toBe(Base.connectionPool().dbConfig);
+    expect(Base.connectionDbConfig().adapter).toBeTruthy();
+  });
+
+  it("connectsTo rejects both database and shards", async () => {
+    await expect(
+      Base.connectsTo({
+        database: { writing: ":primary" },
+        shards: { default: { writing: ":primary" } },
+      }),
+    ).rejects.toThrow(
+      "`connects_to` can only accept a `database` or `shards` argument, but not both arguments.",
+    );
+  });
+
+  it("establish_connection with a url stores a UrlConfig with discrete fields", async () => {
+    await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
+    const config = Base.connectionDbConfig();
+    expect(config.adapter).toBe("sqlite3");
+    expect(config.database).toBe("db/discrete.sqlite3");
+    expect(config.configurationHash).not.toHaveProperty("url");
+    await restoreWorkerConnection();
+  });
+
+  it("is_connected?", async () => {
+    const pool = Base.connectionPool();
+    await (await pool.leaseConnection()).verifyBang();
+    expect(Base.isConnected()).toBe(true);
+    pool.releaseConnection();
+  });
+
+  it("connectingTo pushes onto stack", async () => {
+    Base.connectingTo({ role: "reading" });
+    expect(currentRole.call(Base)).toBe("reading");
+    connectedToStack().pop();
+    expect(currentRole.call(Base)).toBe("writing");
+  });
+
+  it("connectedToMany switches for classes", async () => {
+    class AbstractConn extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    Base.connectedToMany([AbstractConn], { role: "reading" }, () => {
+      expect(currentRole.call(AbstractConn)).toBe("reading");
+    });
+    expect(currentRole.call(AbstractConn)).toBe("writing");
+  });
+
+  it("clear_query_caches_for_current_thread does not throw", async () => {
+    expect(() => Base.clearQueryCachesForCurrentThread()).not.toThrow();
+  });
+
+  it("schema_cache and clear_cache_bang do not throw", async () => {
+    expect(() => Base.schemaCache()).not.toThrow();
+    expect(() => Base.clearCacheBang()).not.toThrow();
+  });
+
+  it("remove_connection removes the pool", async () => {
+    const ambientDbConfig = Base.connectionDbConfig();
+    expect(Base.connectionPool()).toBeTruthy();
+    const removed = await Base.removeConnection();
+    expect(removed).toBe(ambientDbConfig);
+    expect(() => Base.connectionPool()).toThrow(/No database connection/);
+    await restoreWorkerConnection();
+  });
+
+  it("remove_connection returns undefined when no pool exists", async () => {
+    await Base.removeConnection();
+    expect(await Base.removeConnection()).toBeUndefined();
+    await restoreWorkerConnection();
+  });
+
+  it("connected_to stack is isolated per async context", async () => {
+    let innerRoleBeforeAwait: string | undefined;
+    let innerRoleAfterAwait: string | undefined;
+
+    await new Thread(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        innerRoleBeforeAwait = currentRole.call(Base);
+        await Promise.resolve();
+        innerRoleAfterAwait = currentRole.call(Base);
+      });
+    }).value();
+
+    const outerRole = currentRole.call(Base);
+
+    expect(innerRoleBeforeAwait).toBe("reading");
+    expect(innerRoleAfterAwait).toBe("reading");
+    expect(outerRole).toBe("writing");
+    expect(connectedToStack()).toHaveLength(0);
+  });
+
+  it("prohibit_shard_swapping is isolated per async context", async () => {
+    let resolveOverlap!: () => void;
+    const overlap = new Promise<void>((resolve) => {
+      resolveOverlap = resolve;
+    });
+    let prohibitedBeforeAwait: boolean | null | undefined;
+    let prohibitedAfterAwait: boolean | null | undefined;
+    let concurrentProhibited: boolean | null | undefined;
+
+    const prohibitedTask = new Thread(async () => {
+      await Base.prohibitShardSwapping(async () => {
+        prohibitedBeforeAwait = Base.isShardSwappingProhibited();
+        await Promise.resolve();
+        prohibitedAfterAwait = Base.isShardSwappingProhibited();
+        await overlap;
+      });
+    }).value();
+
+    const concurrentTask = new Thread(async () => {
+      await Promise.resolve();
+      concurrentProhibited = Base.isShardSwappingProhibited();
+      resolveOverlap();
+    }).value();
+
+    await Promise.all([prohibitedTask, concurrentTask]);
+
+    expect(prohibitedBeforeAwait).toBe(true);
+    expect(prohibitedAfterAwait).toBe(true);
+    expect(concurrentProhibited).toBeNull();
+    expect(Base.isShardSwappingProhibited()).toBeNull();
+  });
+
+  it("concurrent async contexts do not interfere", async () => {
+    let resolveTask1!: () => void;
+    const task1Gate = new Promise<void>((r) => {
+      resolveTask1 = r;
+    });
+    let resolveTask2!: () => void;
+    const task2Gate = new Promise<void>((r) => {
+      resolveTask2 = r;
+    });
+    const results: string[] = [];
+
+    const task1 = new Thread(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        await Promise.resolve();
+        results.push(`task1: ${currentRole.call(Base)}`);
+        resolveTask2();
+        await task1Gate;
+      });
+    }).value();
+
+    const task2 = new Thread(async () => {
+      await task2Gate;
+      await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+        await Promise.resolve();
+        results.push(`task2: ${currentRole.call(Base)}`);
+        resolveTask1();
+      });
+    }).value();
+
+    await Promise.all([task1, task2]);
+
+    expect(results).toContain("task1: reading");
+    expect(results).toContain("task2: writing");
+    expect(currentRole.call(Base)).toBe("writing");
+    expect(connectedToStack()).toHaveLength(0);
+  });
+
+  it("#isPrimaryClass returns true for Base", async () => {
+    expect(Base.isPrimaryClass()).toBe(true);
+  });
+
+  it("#isPrimaryClass returns false for a normal model subclass", async () => {
+    class Post extends Base {}
+    expect(Post.isPrimaryClass()).toBeFalsy();
+  });
+
+  it.skipIf(adapterType !== "sqlite")(
+    "#adapterClass resolves to the SQLite3Adapter constructor",
+    async () => {
+      expect(Base.adapterClass()).toBe(BetterSQLite3Adapter);
+    },
+  );
+
+  it("autoConnect honors an in-memory DatabaseConfigurations registry", async () => {
+    const priorConfigs = Base.configurations();
+    class InMemoryModel extends Base {}
+    try {
+      const inMemory = new DatabaseConfigurations([
+        new HashConfig(DEFAULT_ENV(), "primary", {
+          ...Base.connectionDbConfig().configurationHash,
+          database: "db/common.sqlite3",
+        }),
+      ]);
+
+      Base.configurations(inMemory);
+
+      await InMemoryModel.establishConnection();
+      expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
+      expect(InMemoryModel.adapterClass()).toBe(Base.adapterClass());
+    } finally {
+      await InMemoryModel.removeConnection();
+      Base.configurations(priorConfigs);
+    }
+  });
+
+  it("autoConnect reconnects via mutated configuration.database for UrlConfig", async () => {
+    const priorConfigs = Base.configurations();
+    class WorkerModel extends Base {}
+    try {
+      const url = new UrlConfig(DEFAULT_ENV(), "primary", "sqlite3:db/foo.sqlite3");
+      url._database = "db/foo-2.sqlite3";
+      const inMemory = new DatabaseConfigurations([url]);
+
+      Base.configurations(inMemory);
+
+      await WorkerModel.establishConnection();
+      const pool = WorkerModel.connectionPool();
+      expect(pool.dbConfig.database).toBe("db/foo-2.sqlite3");
+      const Klass = WorkerModel.adapterClass();
+      expect(Klass).toBe(BetterSQLite3Adapter);
+    } finally {
+      await WorkerModel.removeConnection();
+      Base.configurations(priorConfigs);
+    }
+  });
+
+  it("establishConnection raises AdapterNotSpecified for an adapter-less HashConfig", async () => {
+    const configurationHash = { url: "sqlite3:db/foo.sqlite3" };
+    const dbConfig = new HashConfig(DEFAULT_ENV(), "primary", configurationHash);
+    expect(dbConfig.adapter).toBeUndefined();
+
+    class BackfillModel extends Base {}
+    try {
+      await expect(BackfillModel.establishConnection(dbConfig)).rejects.toThrow(
+        AdapterNotSpecified,
+      );
+
+      expect(dbConfig.configurationHash).toEqual(configurationHash);
+      expect(Object.isFrozen(dbConfig.configurationHash)).toBe(true);
+    } finally {
+      await BackfillModel.removeConnection();
+    }
+
+    const resolved = new DatabaseConfigurations({}).resolve(configurationHash)!;
+    expect(resolved.adapter).toBe("sqlite3");
   });
 });

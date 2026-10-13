@@ -371,7 +371,8 @@ per-file "Extra" column counts TS tests in the convention file that matched no
 Rails test — a large value flags a file that has ballooned with bespoke/non-Rails
 tests (a fidelity smell). Use `parity:test --sort-extra` (sort the table by
 Extra descending) and `--min-extra=N` (hide files under N extra) to triage the
-worst offenders.
+worst offenders. `--extra` lists each file's extra tests under its row, as
+`describe > path > name`.
 
 The exact Ruby→TypeScript naming rules `parity:api` matches on — predicate/bang/
 setter forms, token renames, file-path aliases, and the skip list with reasons —
