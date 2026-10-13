@@ -1,6 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet, type DrawCallback, type NamedRouteHelper } from "../routing/route-set.js";
-import type { RouteOptions } from "../routing/mapper.js";
 import { bodyFromString, bodyToString, MockRequest } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, type Request } from "../http/request.js";
@@ -2216,7 +2215,7 @@ describe("TestRoutingMapper", () => {
 
   it("default string params with match", async () => {
     draw(function () {
-      this.match("/", { to: "pages#show", via: "get", id: "home" } as RouteOptions);
+      this.match("/", { to: "pages#show", via: "get", id: "home" });
     });
 
     await t.get("/");
@@ -2234,7 +2233,7 @@ describe("TestRoutingMapper", () => {
 
   it("default string params with root", async () => {
     draw(function () {
-      this.root({ to: "pages#show", id: "home" } as RouteOptions);
+      this.root({ to: "pages#show", id: "home" });
     });
 
     await t.get("/");
@@ -2373,7 +2372,7 @@ describe("TestRoutingMapper", () => {
   it("greedy resource id regexp doesnt match edit and custom action", () => {
     const routes = new RouteSet();
     routes.draw(function () {
-      this.resources("sections", { id: /.+/ } as RouteOptions, () => {
+      this.resources("sections", { id: /.+/ }, () => {
         this.get("preview", { on: "member" });
       });
     });
