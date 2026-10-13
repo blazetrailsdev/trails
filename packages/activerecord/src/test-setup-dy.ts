@@ -42,6 +42,8 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   await recordBootOutcome("fullLoad", await canonicalSchemaUpToDate(canonicalConn));
 }
 
+await Base.connectionPool().schemaMigration.createTable();
+
 const _conn = (await Base.leaseConnection()) as unknown as {
   tableExists(n: string): Promise<boolean>;
 };

@@ -25,7 +25,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
 import { ActiveRecord } from "../namespaces.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
-import { stripThenable } from "@blazetrails/activesupport";
+import { defineModule, stripThenable } from "@blazetrails/activesupport";
 
 export const ONE_AS_ONE = "1 AS one";
 
@@ -388,7 +388,7 @@ export function raiseRecordNotFoundExceptionBang(
   throw new RecordNotFound(error, name, key, ids);
 }
 
-export const FinderMethods = {
+export const FinderMethodsPublicInstanceMethods = {
   find,
   findBy,
   findByBang,
@@ -418,6 +418,10 @@ export const FinderMethods = {
   isInclude,
   isMember,
   raiseRecordNotFoundExceptionBang,
+} as const;
+
+/** @internal */
+export const FinderMethodsPrivateInstanceMethods = {
   constructRelationForExists,
   applyJoinDependency,
   usingLimitableReflections,
@@ -434,6 +438,12 @@ export const FinderMethods = {
   orderedRelation,
   _orderColumns,
 } as const;
+
+export const FinderMethods = defineModule(
+  FinderMethodsPublicInstanceMethods,
+  undefined,
+  FinderMethodsPrivateInstanceMethods,
+);
 
 /** @internal */
 export function constructRelationForExists(this: FinderRelation, conditions: unknown): any {

@@ -839,7 +839,7 @@ function assertStructurallyCompatible(
   }
 }
 
-function structurallyCompatible(this: QueryMethodsHost, other: any): boolean {
+function isStructurallyCompatible(this: QueryMethodsHost, other: any): boolean {
   return structurallyIncompatibleValuesFor.call(this, other).length === 0;
 }
 
@@ -1565,7 +1565,7 @@ export const QueryMethodsPublicInstanceMethods = {
   rewhere,
   invertWhere,
   invertWhereBang,
-  structurallyCompatible,
+  isStructurallyCompatible,
   and,
   andBang,
   or,

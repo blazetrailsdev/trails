@@ -220,6 +220,7 @@ export async function restoreWorkerConnection(): Promise<void> {
   if (!(await connection.tableExists(CANONICAL_PROBE_TABLE))) {
     const adapter = await Base.leaseConnection();
     await loadSchema(adapter);
+    await Base.connectionPool().schemaMigration.createTable();
     await stampCanonicalSchema(adapter);
   } else if (!(await connection.tableExists(ADAPTER_SPECIFIC_PROBE_TABLE))) {
     await loadAdapterSpecificSchema(await Base.leaseConnection());

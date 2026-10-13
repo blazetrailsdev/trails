@@ -149,7 +149,7 @@ export class Batches {
     ensureValidOptionsForBatchingBang.call(this, cursor, start, finish, order);
 
     if (this.arel().orders.length > 0) {
-      this.actOnIgnoredOrder(errorOnIgnore);
+      actOnIgnoredOrder.call(this, errorOnIgnore);
     }
 
     const run = async (block: (relation: any) => unknown): Promise<null> => {
@@ -252,16 +252,6 @@ export class Batches {
     }
 
     return run(block);
-  }
-
-  /** @internal */
-  actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
-    const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder();
-    if (raise) {
-      throw new ArgumentError(Batches.ORDER_IGNORE_MESSAGE);
-    } else if (this.model.logger) {
-      this.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
-    }
   }
 }
 
@@ -377,6 +367,16 @@ export function buildBatchOrders(
   order: ":asc" | ":desc" | (":asc" | ":desc")[],
 ): [string, ":asc" | ":desc"][] {
   return cursor.map((column, i) => [column, Array(order)[i] ?? Batches.DEFAULT_ORDER]);
+}
+
+/** @internal */
+export function actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
+  const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder();
+  if (raise) {
+    throw new ArgumentError(Batches.ORDER_IGNORE_MESSAGE);
+  } else if (this.model.logger) {
+    this.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
+  }
 }
 
 /** @internal */
