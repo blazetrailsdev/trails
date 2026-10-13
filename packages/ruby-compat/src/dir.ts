@@ -385,18 +385,27 @@ export class Dir {
       },
     );
     if (block != null) {
-      try {
-        return block(path);
-      } finally {
+      const ensure = () => {
         if (base == null) {
           const stat = File.stat(File.dirname(path));
           if ((stat.mode & 0o002) !== 0 && (stat.mode & 0o1000) === 0) {
-            // eslint-disable-next-line no-unsafe-finally
             throw new ArgumentError("parent directory is world writable but not sticky");
           }
         }
         FileUtils.removeEntry(path);
+      };
+      let result: T;
+      try {
+        result = block(path);
+      } catch (e) {
+        ensure();
+        throw e;
       }
+      if (typeof (result as PromiseLike<unknown> | undefined)?.then === "function") {
+        return Promise.resolve(result).finally(ensure) as T;
+      }
+      ensure();
+      return result;
     } else {
       return path;
     }

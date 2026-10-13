@@ -51,7 +51,7 @@ const Mapping: DrawCallback = function () {
 
   this.get("symbols", { controller: "symbols", action: "show", name: "as_symbol" });
   this.get("id_default(/:id)", { to: "foo#id_default", id: 1 });
-  this.match("get_or_post", { to: "foo#get_or_post", via: ["get", "post"] });
+  this.match("get_or_post", { to: "foo#get_or_post", via: [":get", ":post"] });
   this.get("optional/:optional", { to: "posts#index" });
   this.get("projects/:project_id", { to: "project#index", as: "project" });
   this.get("clients", { to: "projects#index" });

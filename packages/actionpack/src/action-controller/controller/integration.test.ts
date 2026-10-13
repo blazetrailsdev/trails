@@ -373,7 +373,7 @@ class IntegrationProcessTest extends IntegrationTest {
           this.get("moved", { to: this.redirect("/method") });
 
           deprecator().silence(() => {
-            this.match(":action", { to, via: ["get", "post"], as: "action" });
+            this.match(":action", { to, via: [":get", ":post"], as: "action" });
             this.get("get/:action", { to, as: "get_action" });
           });
         });
@@ -1023,7 +1023,7 @@ describe("EnvironmentFilterIntegrationTest", () => {
     static {
       controllerConstants.set("environment_filter_integration_test/test", TestController);
       this.routes.draw(function () {
-        this.match("/post", { to: "environment_filter_integration_test/test#post", via: "post" });
+        this.match("/post", { to: "environment_filter_integration_test/test#post", via: ":post" });
       });
     }
 

@@ -583,6 +583,7 @@ export {
   expectCalledWith,
   assertCalledOnInstanceOf,
   assertNotCalledOnInstanceOf,
+  stub,
   stubAnyInstance,
 } from "./testing/method-call-assertions.js";
 export {

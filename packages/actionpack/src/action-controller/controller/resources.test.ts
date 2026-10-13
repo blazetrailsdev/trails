@@ -458,7 +458,7 @@ describe("ResourcesTest", () => {
   it("test_assert_routing_fails_when_not_all_http_methods_are_recognized", () => {
     const host = makeHost();
     host.routes!.draw(function () {
-      this.match("/products", { to: "products#show", via: ["get", "post", "put"] });
+      this.match("/products", { to: "products#show", via: [":get", ":post", ":put"] });
     });
     expect(() =>
       assertRouting.call(

@@ -8,6 +8,7 @@ import {
   assertCalledOnInstanceOf,
   assertCalledWith,
   assertNotCalledOnInstanceOf,
+  stub,
 } from "./method-call-assertions.js";
 
 describe("assertCalled with an async block", () => {
@@ -182,5 +183,16 @@ describe("assertCalledOnInstanceOf on a subclass", () => {
     expect(() =>
       assertNotCalledOnInstanceOf(Widget, "nope" as keyof Widget & string, null, () => {}),
     ).toThrow(NameError);
+  });
+});
+
+describe("stub with a value", () => {
+  it("yields blockArgs to a block passed to the stubbed method", () => {
+    const object = { each: (_block: (...args: number[]) => void): number => 0 };
+    const yielded: number[] = [];
+    stub(object, "each", 1, [2, 3], (receiver) => {
+      yielded.push(receiver.each((...args) => yielded.push(...args)));
+    });
+    expect(yielded).toEqual([2, 3, 1]);
   });
 });

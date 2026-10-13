@@ -1757,7 +1757,7 @@ describe("TestRoutingMapper", () => {
   it("keyed default string params with match", () => {
     const routes = new RouteSet();
     routes.draw(function () {
-      this.match("/", { to: "pages#show", via: "get", defaults: { id: "home" } });
+      this.match("/", { to: "pages#show", via: ":get", defaults: { id: "home" } });
     });
     const m = routes.recognizePath("/");
     expect(m.id).toBe("home");
@@ -1768,7 +1768,7 @@ describe("TestRoutingMapper", () => {
   it("keyed default string params with root", () => {
     const routes = new RouteSet();
     routes.draw(function () {
-      this.match("/", { to: "pages#show", via: "get", as: "root", defaults: { id: "home" } });
+      this.match("/", { to: "pages#show", via: ":get", as: "root", defaults: { id: "home" } });
     });
     const m = routes.recognizePath("/");
     expect(m.id).toBe("home");
