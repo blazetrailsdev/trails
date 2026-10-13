@@ -166,25 +166,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
-  /**
-   * @inventedArm loop — CONVERGEABLE collection-proxy-extensions-function-form
-   * @inventedArm if — CONVERGEABLE collection-proxy-extensions-function-form
-   */
   constructor(klass: typeof Base, association: CollectionAssociation) {
     super(klass);
     this._association = association;
     this._assocName = association.reflection.name;
 
     const extensions = association.extensions;
-    if (extensions.length > 0) {
-      for (const mod of [...extensions].reverse()) {
-        if (typeof mod === "function") {
-          (mod as (rel: unknown) => void)(this);
-        } else {
-          extend(this, mod as object);
-        }
-      }
-    }
+    if (extensions.length > 0) extend(this, ...extensions);
   }
 
   protected override async execQueries(): Promise<T[]> {

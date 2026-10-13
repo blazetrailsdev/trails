@@ -11,7 +11,15 @@ import {
   type DateParts,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
-import { Marshal, Rational } from "@blazetrails/ruby-compat";
+import {
+  Marshal,
+  Rational,
+  rbCDate,
+  rbCDateTime,
+  rbCTime,
+  rbObjClass,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat";
 
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
@@ -1926,5 +1934,29 @@ describe("Marshal over Date", () => {
     expect(loaded[0].equals(date)).toBe(true);
     expect(loaded[0].cmp(Temporal.PlainDate.from("2016-01-02"))).toBe(-1);
     expect(loaded[1].equals(date)).toBe(true);
+  });
+
+  it("answers one class object for a Temporal seat and the instance it seats", () => {
+    expect(rbObjClass(Temporal.PlainDate.from("2016-01-01"))).toBe(RubyDate);
+    expect(rbObjClass(new RubyDate(2016, 1, 1))).toBe(RubyDate);
+    expect(rbObjClass(Temporal.PlainDateTime.from("2016-01-01T10:00"))).toBe(RubyDateTime);
+    expect(rbObjClass(new RubyDateTime(2016, 1, 1, 10))).toBe(RubyDateTime);
+    expect(rbObjClass(Temporal.Now.zonedDateTimeISO())).toBe(RubyTime);
+    expect(rbObjClass(RubyTime.now())).toBe(RubyTime);
+    expect(rbObjIsKindOf(new RubyDateTime(2016, 1, 1, 10), rbCDateTime)).toBe(true);
+    expect(rbObjIsKindOf(Temporal.PlainDateTime.from("2016-01-01T10:00"), rbCDate)).toBe(true);
+    expect(rbObjIsKindOf(Temporal.PlainDateTime.from("2016-01-01T10:00"), rbCTime)).toBe(false);
+  });
+
+  it("reads every DateTime seat as a DateTime, a zoned one included", () => {
+    const utc = RubyDateTime.civil(2016, 1, 1, 10, 0, 0, 0);
+    const zoned = RubyDateTime.civil(2016, 1, 1, 10, 0, 0, "+09:00");
+    const subMinute = RubyDateTime.civil(2016, 1, 1, 10, 0, 0, new Rational(1, 86400));
+    for (const seat of [utc, zoned, subMinute, RubyDateTime.now()]) {
+      expect(rbObjClass(seat)).toBe(RubyDateTime);
+      expect(rbObjIsKindOf(seat, rbCDateTime)).toBe(true);
+      expect(rbObjIsKindOf(seat, rbCTime)).toBe(false);
+    }
+    expect(Object.keys(zoned)).toEqual([]);
   });
 });

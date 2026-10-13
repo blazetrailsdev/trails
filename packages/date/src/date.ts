@@ -17,6 +17,7 @@ import {
   Rational,
   rational,
   rbCDate,
+  rbCDateTime,
   rbDbl2num,
   rbDefineAllocFunc,
   rubyClass,
@@ -5859,7 +5860,10 @@ const DateWithoutParseStatics: (new (
     | "rfc3339"
     | "xmlschema"
     | "jisx0301"
-  > = Date;
+  > = rbCDateTime as never;
+
+Object.setPrototypeOf(rbCDateTime, Date);
+Object.setPrototypeOf(rbCDateTime.prototype, Date.prototype);
 
 /** @noRailsEquivalent PERMANENT */
 export class DateTime extends DateWithoutParseStatics {
@@ -6691,13 +6695,14 @@ export class DateTime extends DateWithoutParseStatics {
       nanosecond: ns % 1000,
     });
     if (this.#of === 0) return plain;
-    if (this.#of % 60 !== 0) {
-      return new SubMinuteOffsetZonedDateTime(
-        plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: this.#of }),
-        this.#of,
-      );
-    }
-    return plain.toZonedDateTime(of2str(this.#of));
+    const zoned =
+      this.#of % 60 !== 0
+        ? new SubMinuteOffsetZonedDateTime(
+            plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: this.#of }),
+            this.#of,
+          )
+        : plain.toZonedDateTime(of2str(this.#of));
+    return Object.defineProperty(zoned, rubyClass, { value: "DateTime" });
   }
 
   get hour(): number {

@@ -1836,16 +1836,31 @@ export function prepend(
  */
 export function extend<T extends AnyClass | object>(
   klass: T,
-  mod: ModuleObject | AnyClass | Module,
+  ...argv: Array<ModuleObject | AnyClass | Module>
 ): T {
+  let argc = argv.length;
+  if (argc < 1) {
+    throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1+)`);
+  }
+  while (argc--) {
+    extendObject(klass, argv[argc]);
+  }
+  return klass;
+}
+
+/**
+ * One turn of `rb_obj_extend`'s loop (`vendor/ruby/v3.3.11/eval.c:1794-1797`):
+ * `extend_object` (`rb_extend_object`, :1713-1716) and then `extended`.
+ */
+function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
   const extendedHook = featureHook(mod, "extended");
   if (extendedHook) {
     extendedHook(klass);
-    return klass;
+    return;
   }
   if (mod instanceof Module) {
     mod.extendObject(klass);
-    return klass;
+    return;
   }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
   const owners = new Map<string, object>();
@@ -1914,7 +1929,6 @@ export function extend<T extends AnyClass | object>(
   if (typeof (mod as ModuleHooks)[extended] === "function") {
     (mod as ModuleHooks)[extended]!(klass);
   }
-  return klass;
 }
 
 /**

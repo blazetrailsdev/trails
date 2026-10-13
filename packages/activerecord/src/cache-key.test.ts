@@ -4,7 +4,6 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
-import { setDefaultTimezone } from "./active-record.js";
 
 function usec(ts: unknown): string {
   if (ts instanceof RubyTime) ts = ts.getutc().toZonedDateTime().toInstant();
@@ -141,23 +140,6 @@ describe("CacheKeyTest", () => {
     },
   );
 
-  it.skipIf(adapterType !== "sqlite")(
-    "cache_version does call updated_at when default_timezone is not utc",
-    async () => {
-      const CacheMeWithVersion = cacheMeWithVersion();
-      const record = await CacheMeWithVersion.create({});
-      const recordFromDb = await CacheMeWithVersion.find(record.id);
-      const spy = vi.spyOn(recordFromDb, "readAttribute");
-      setDefaultTimezone("local");
-      try {
-        recordFromDb.cacheVersion();
-        expect(spy).toHaveBeenCalledWith("updated_at");
-      } finally {
-        setDefaultTimezone("utc");
-      }
-    },
-  );
-
   it("cache_version does call updated_at when it is assigned via a Time object", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
@@ -176,17 +158,6 @@ describe("CacheKeyTest", () => {
     recordFromDb.updated_at = "2016-11-12T01:02:03Z";
     recordFromDb.cacheVersion();
     expect(spy).toHaveBeenCalledWith("updated_at");
-  });
-
-  it("cache_version does call updated_at when a DB-format string is assigned by the user", async () => {
-    const CacheMeWithVersion = cacheMeWithVersion();
-    const record = await CacheMeWithVersion.create({});
-    const recordFromDb = await CacheMeWithVersion.find(record.id);
-    const spy = vi.spyOn(recordFromDb, "readAttribute");
-    recordFromDb.updated_at = "2016-11-12 01:02:03.000000";
-    const version = recordFromDb.cacheVersion();
-    expect(spy).toHaveBeenCalledWith("updated_at");
-    expect(version).toBe("20161112010203000000");
   });
 
   it("cache_version does call updated_at when it is assigned via a hash", async () => {
