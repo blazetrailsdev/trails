@@ -30,9 +30,9 @@ export class Backup {
     }
 
     const foreignKeys = await dstdb.pragma("foreign_keys", { simple: true });
-    await dstdb.pragma("foreign_keys = OFF");
     await dstdb.exec(`ATTACH DATABASE '${Database.quote(file)}' AS sqlite3_backup`);
     try {
+      await dstdb.pragma("foreign_keys = OFF");
       const objects = (
         await dstdb.execute(
           "SELECT type, name, sql FROM sqlite3_backup.sqlite_master " +
