@@ -5,7 +5,6 @@ import { Delegation, type DelegateOptions } from "./delegation.js";
 import { callerLocations } from "./deprecation.js";
 import { extractOptionsBang } from "./hash-utils.js";
 
-/** @missingRailsArgs generate — PERMANENT */
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
   const options = extractOptionsBang(methods);
   const names = methods;

@@ -148,17 +148,19 @@ export namespace Delegation {
 
       if (/[^\]]=$/.test(method)) {
         const attr = method.slice(0, -1);
+        const set = function (this: Record<string, unknown>, arg: unknown) {
+          const _ = resolve(this);
+          if (_ == null) {
+            if (nilable !== false) return;
+            throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+          }
+          (_ as Record<string, unknown>)[attr] = arg;
+        };
+        iseqLocationSetup(set, file, line);
         Object.defineProperty(owner, methodName.slice(0, -1), {
           configurable: true,
           enumerable: false,
-          set(this: Record<string, unknown>, arg: unknown) {
-            const _ = resolve(this);
-            if (_ == null) {
-              if (nilable !== false) return;
-              throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
-            }
-            (_ as Record<string, unknown>)[attr] = arg;
-          },
+          set,
         });
         continue;
       }
@@ -187,17 +189,19 @@ export namespace Delegation {
         }
       }
       if (descriptor?.get) {
+        const get = function (this: Record<string, unknown>) {
+          const _ = resolve(this);
+          if (_ == null && nilable !== false) return undefined;
+          if (!(method in Object(_))) {
+            throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+          }
+          return (_ as Record<string, unknown>)[method];
+        };
+        iseqLocationSetup(get, file, line);
         Object.defineProperty(owner, methodName, {
           configurable: true,
           enumerable: false,
-          get(this: Record<string, unknown>) {
-            const _ = resolve(this);
-            if (_ == null && nilable !== false) return undefined;
-            if (!(method in Object(_))) {
-              throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
-            }
-            return (_ as Record<string, unknown>)[method];
-          },
+          get,
         });
         continue;
       }
