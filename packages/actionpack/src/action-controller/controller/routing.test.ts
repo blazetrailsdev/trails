@@ -116,21 +116,6 @@ class LegacyRouteSetTests {
     return new (MockController.build(this.rs.urlHelpers(), options))() as unknown as NamedRoutes;
   }
 
-  testNamedRouteMethod(): void {
-    this.rs.draw(function () {
-      this.get({ categories: "content#categories", as: "categories" });
-
-      deprecator().silence(() => {
-        this.get(":controller(/:action(/:id))");
-      });
-    });
-
-    expect(this.urlFor(this.rs, { controller: "content", action: "categories" })).toBe(
-      "/categories",
-    );
-    expect(this.urlFor(this.rs, { controller: "content", action: "hi" })).toBe("/content/hi");
-  }
-
   setupRequestMethodRoutesFor(method: string): void {
     this.rs.draw(function () {
       this.match({ "/match": `books#${method}`, via: method });
@@ -1041,12 +1026,25 @@ describe("LegacyRouteSetTests", () => {
     expect(tc.setupForNamedRoute().homeUrl()).toBe("http://test.host/");
   });
 
+  const testNamedRouteMethod = () => {
+    rs.draw(function () {
+      this.get({ categories: "content#categories", as: "categories" });
+
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id))");
+      });
+    });
+
+    expect(tc.urlFor(rs, { controller: "content", action: "categories" })).toBe("/categories");
+    expect(tc.urlFor(rs, { controller: "content", action: "hi" })).toBe("/content/hi");
+  };
+
   it("named route method", () => {
-    tc.testNamedRouteMethod();
+    testNamedRouteMethod();
   });
 
   it("named routes array", () => {
-    tc.testNamedRouteMethod();
+    testNamedRouteMethod();
     expect(rs.namedRoutes.names()).toEqual(["categories"]);
   });
 
