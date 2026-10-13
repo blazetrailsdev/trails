@@ -131,7 +131,7 @@ describe("SerializedAttributeTest", () => {
     const klass = class extends Base {
       static {
         this.tableName = Topic.tableName;
-        this.attribute("content", "text", { default: { key: "value" } });
+        this.attribute("content", undefined, { default: { key: "value" } });
         this.serialize("content", { type: Hash });
       }
     };
@@ -544,7 +544,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     const klass = class extends Base {
       static {
         this.tableName = Topic.tableName;
-        this.attribute("content", "text", { default: { key: "value" } });
+        this.attribute("content", undefined, { default: { key: "value" } });
         this.serialize("content", { type: Hash });
       }
     };
@@ -564,8 +564,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     const klass = class extends Base {
       static {
         this.tableName = Topic.tableName;
-        this.attribute("content", "text", { default: { key: "value" } });
-        this.serialize("content", { type: Hash });
+        this.serialize("content", { type: Hash, default: { key: "value" } });
       }
     };
     const t = new klass();
