@@ -100,7 +100,7 @@ describe("BindParameterTest", () => {
   it("statement cache", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
-    conn.clearCacheBang();
+    await conn.clearCacheBang();
 
     const topics = Topic.where({ id: 1 });
     expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
@@ -108,7 +108,7 @@ describe("BindParameterTest", () => {
     const key = toSqlKey(conn, topics.arel());
     expect(statementCacheKeys(conn)).toContain(key);
 
-    conn.clearCacheBang();
+    await conn.clearCacheBang();
     expect(statementCacheKeys(conn)).not.toContain(key);
   });
 
@@ -116,7 +116,7 @@ describe("BindParameterTest", () => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     conn.enableQueryCacheBang();
-    conn.clearCacheBang();
+    await conn.clearCacheBang();
     try {
       const topics = Topic.where({ id: 1 });
       expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
@@ -130,7 +130,7 @@ describe("BindParameterTest", () => {
   it("statement cache with find", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
-    conn.clearCacheBang();
+    await conn.clearCacheBang();
 
     expect(Number((await Topic.find(1)).id)).toBe(1);
     const topicSql = cachedStatement(conn, Topic, [Topic.primaryKey as string]);
@@ -147,7 +147,7 @@ describe("BindParameterTest", () => {
   it("statement cache with find by", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
-    conn.clearCacheBang();
+    await conn.clearCacheBang();
 
     expect(Number((await Topic.findBy({ id: 1 }))!.id)).toBe(1);
     const topicSql = cachedStatement(conn, Topic, ["id"]);
@@ -164,7 +164,7 @@ describe("BindParameterTest", () => {
   it("statement cache with in clause", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
-    conn.clearCacheBang();
+    await conn.clearCacheBang();
 
     const topics = Topic.where({ id: [1, 3] });
     expect(
@@ -177,7 +177,7 @@ describe("BindParameterTest", () => {
   it("statement cache with sql string literal", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
-    conn.clearCacheBang();
+    await conn.clearCacheBang();
 
     const topics = Topic.where("topics.id = ?", 1);
     expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
