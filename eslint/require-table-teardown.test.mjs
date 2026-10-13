@@ -25,6 +25,13 @@ tester.run("require-table-teardown", rule, {
       "  const migration = new (class extends Migration.Current {\n" +
       '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
       '  try { await migration.migrate("up"); } finally { await migration.migrate("down"); }\n});',
+    // A non-null assertion on the receiver is still the same variable.
+    "let migration: Migration | null;\n" +
+      'afterEach(async () => { await migration!.migrate("down"); });\n' +
+      'it("x", async () => {\n' +
+      "  migration = new (class extends Migration.Current {\n" +
+      '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+      '  await migration.migrate("up");\n});',
     // up() is reverted by the class's own down().
     "let migration;\n" +
       'afterEach(async () => { await migration.migrate("down"); });\n' +
@@ -648,6 +655,17 @@ tester.run("require-table-teardown", rule, {
       code:
         "let migration;\n" +
         'afterEach(async () => { await migration.migrate("up"); });\n' +
+        'it("x", async () => {\n' +
+        "  migration = new (class extends Migration.Current {\n" +
+        '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+        '  await migration.migrate("up");\n});',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 5 }],
+    },
+    // A before hook is not a teardown.
+    {
+      code:
+        "let migration;\n" +
+        'beforeEach(async () => { if (migration) await migration.migrate("down"); });\n' +
         'it("x", async () => {\n' +
         "  migration = new (class extends Migration.Current {\n" +
         '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +

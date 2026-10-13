@@ -347,6 +347,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return undefined;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override async active(): Promise<boolean> {
     return this.lock.synchronize(async () => this.isActive() ?? false);
   }
