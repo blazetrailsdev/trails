@@ -676,6 +676,10 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
   }
 }
 
+/**
+ * @missingRailsCall before_setup — CONVERGEABLE activerecord-test-case-remaining-members-and-one-test-object
+ * @missingRailsCall after_teardown — CONVERGEABLE activerecord-test-case-remaining-members-and-one-test-object
+ */
 function registerFixtureHooks(klass: TestCaseClass): void {
   const registrations = registrationsFor(klass);
   registrations.count++;
