@@ -78,7 +78,7 @@ export class Error {
   }
 
   base: ModelBase;
-  readonly attribute: string;
+  attribute: string;
   type: string;
   rawType: string | null;
   options: Record<string, unknown>;
@@ -226,7 +226,7 @@ export class Error {
   }
 
   initializeDup(_other: Error): void {
-    (this as { attribute: string }).attribute = rbObjDup(this.attribute);
+    this.attribute = rbObjDup(this.attribute);
     this.rawType = rbObjDup(this.rawType);
     this.type = rbObjDup(this.type);
     this.options = deepDup(this.options);
