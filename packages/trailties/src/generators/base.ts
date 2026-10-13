@@ -266,7 +266,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         configurable: true,
         writable: true,
       });
-      hashDelete(this.hooks(), name);
+      delete this.hooks()[name];
     }
   }
 

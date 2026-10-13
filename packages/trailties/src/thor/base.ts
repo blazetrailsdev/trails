@@ -437,7 +437,7 @@ export const ClassMethods = {
 
   removeClassOption(this: BaseClass, ...names: string[]): void {
     names.forEach((name) => {
-      hashDelete(this.classOptions(), name);
+      delete this.classOptions()[name];
     });
   },
 

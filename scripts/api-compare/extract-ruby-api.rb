@@ -2987,8 +2987,34 @@ class ApiExtractor
         found << stmt while stmt.is_a?(Array) && (stmt = stmt[MODIFIER_SLOTS[stmt[0]] || stmt.length])
       end
     end
+    void_block_tail(node[2], found) if node[0] == :method_add_block && value_discarding_iterator?(node[1])
     node.each { |child| void_statements(child, found) }
     found
+  end
+
+  # The iterators that return their receiver whatever the block answers
+  # (`rb_ary_each`, `rb_hash_each_pair`, `enum_each_with_index`, `int_dotimes`),
+  # so the block's last statement is one whose value nothing reads.
+  VALUE_DISCARDING_ITERATORS = %w[each each_pair each_key each_value each_with_index times].freeze
+
+  def value_discarding_iterator?(call)
+    call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg
+    call.is_a?(Array) && call[0] == :call && VALUE_DISCARDING_ITERATORS.include?(ident_name(call[3]))
+  end
+
+  # Marks the last statement of a block, or of a branch, and where that
+  # statement is itself an `if` / `unless`, the last statement of each arm.
+  def void_block_tail(node, found)
+    return unless node.is_a?(Array)
+
+    node = node[2] if node[0] == :do_block
+    stmts = node[STATEMENT_SLOTS[node[0]] || node.length]
+    stmt = stmts.is_a?(Array) && stmts.last
+    return unless stmt.is_a?(Array)
+
+    found << stmt
+    void_block_tail(stmt, found) if %i[if unless elsif else].include?(stmt[0])
+    void_block_tail(node[3], found) if %i[if unless elsif].include?(node[0])
   end
 
   # `module_eval` / `class_eval` given a String (`module_eval <<-RUBY … RUBY`,
