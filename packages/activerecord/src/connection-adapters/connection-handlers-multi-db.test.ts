@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Concurrent, Tempfile, Thread, setEnv } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertRaises, getEnv } from "@blazetrails/activesupport";
+import { assertNotNil, assertRaises, getEnv } from "@blazetrails/activesupport";
 import { ConnectionNotDefined } from "../errors.js";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { Base } from "../base.js";
@@ -142,14 +142,14 @@ describe("ConnectionHandlersMultiDbTest", () => {
       await Base.connectsTo({ database: { writing: ":default", reading: ":readonly" } });
 
       let pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-      expect(pool).not.toBeNull();
+      assertNotNil(pool);
       expect(pool!.dbConfig.database).toEqual("test/db/primary.sqlite3");
       expect(pool!.dbConfig.name).toEqual("default");
 
       pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
         role: "reading",
       });
-      expect(pool).not.toBeNull();
+      assertNotNil(pool);
       expect(pool!.dbConfig.database).toEqual("test/db/readonly.sqlite3");
       expect(pool!.dbConfig.name).toEqual("readonly");
     } finally {
@@ -214,13 +214,13 @@ describe("ConnectionHandlersMultiDbTest", () => {
         let pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "default",
         });
-        expect(pool).not.toBeNull();
+        assertNotNil(pool);
         expect(pool!.dbConfig.database).toEqual("test/db/primary.sqlite3");
 
         pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "readonly",
         });
-        expect(pool).not.toBeNull();
+        assertNotNil(pool);
         expect(pool!.dbConfig.database).toEqual("test/db/readonly.sqlite3");
       } finally {
         Base.configurations(prevConfigs);
@@ -245,7 +245,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       expect(Base.connectionHandler).toEqual(handler);
 
       const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
-      expect(pool).not.toBeNull();
+      assertNotNil(pool);
       expect(pool!.dbConfig.configurationHash).toEqual({
         adapter: "postgresql",
         database: "bar",
@@ -272,7 +272,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       expect(Base.connectionHandler).toEqual(handler);
 
       const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
-      expect(pool).not.toBeNull();
+      assertNotNil(pool);
       expect(pool!.dbConfig.configurationHash).toEqual(config);
     } finally {
       await Base.establishConnection(":arunit");
@@ -280,16 +280,10 @@ describe("ConnectionHandlersMultiDbTest", () => {
     }
   });
 
-  it.skipIf(inMemoryDb())("switching connections without database and role raises", () => {
-    let error: any;
-    expect(() => {
-      try {
-        Base.connectedTo({}, () => {});
-      } catch (e) {
-        error = e;
-        throw e;
-      }
-    }).toThrow(ArgumentError);
+  it.skipIf(inMemoryDb())("switching connections without database and role raises", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
+      Base.connectedTo({}, () => {});
+    });
     expect(error.message).toEqual("must provide a `shard` and/or `role`.");
   });
 
@@ -316,7 +310,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         expect(Base.connectionHandler).toEqual(handler);
 
         const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
-        expect(pool).not.toBeNull();
+        assertNotNil(pool);
         expect(pool!.dbConfig.configurationHash).toEqual(config.default_env.animals);
       } finally {
         Base.configurations(prevConfigs);
@@ -349,7 +343,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         expect(Base.connectionHandler).toEqual(handler);
 
         const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
-        expect(pool).not.toBeNull();
+        assertNotNil(pool);
         expect(pool!.dbConfig.configurationHash).toEqual(config.default_env.primary);
       } finally {
         Base.configurations(prevConfigs);
@@ -394,7 +388,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
         role: "reading",
       });
-      expect(pool).not.toBeNull();
+      assertNotNil(pool);
       expect(pool!.dbConfig.database).toEqual("test/db/readonly.sqlite3");
     } finally {
       Base.configurations(prevConfigs);
@@ -454,8 +448,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("retrieve connection pool", () => {
-    expect(handler.retrieveConnectionPool(connectionName)).not.toBeNull();
-    expect(handler.retrieveConnectionPool(connectionName, { role: "reading" })).not.toBeNull();
+    assertNotNil(handler.retrieveConnectionPool(connectionName));
+    assertNotNil(handler.retrieveConnectionPool(connectionName, { role: "reading" }));
   });
 
   it("retrieve connection pool with invalid id", () => {

@@ -36,6 +36,9 @@ class Somewhere {
 registerConstant("Somewhere", Somewhere);
 
 class Someone {
+  static FAILED_DELEGATE_LINE: number;
+  static FAILED_DELEGATE_LINE_2: number;
+
   static tableName() {
     return "some_table";
   }
@@ -60,10 +63,10 @@ delegate.call(Someone.prototype, "toUpperCase", { to: "place.city" });
 delegate.call(Someone.prototype, "tableName", { to: "class" });
 delegate.call(Someone.prototype, "tableName", { to: "class", prefix: true });
 delegate.call(Someone.prototype, "country", { to: Somewhere });
-const FAILED_DELEGATE_LINE = callerLocations(0, 1)[0].lineno + 1;
+Someone.FAILED_DELEGATE_LINE = callerLocations(0, 1)[0].lineno + 1;
 delegate.call(Someone.prototype, "foo", { to: "place" });
 
-const FAILED_DELEGATE_LINE_2 = callerLocations(0, 1)[0].lineno + 1;
+Someone.FAILED_DELEGATE_LINE_2 = callerLocations(0, 1)[0].lineno + 1;
 delegate.call(Someone.prototype, "bar", { to: "place", allowNil: true });
 
 class Invoice {
@@ -327,12 +330,12 @@ describe("ModuleTest", () => {
 
   it("delegation line number", () => {
     const [, line] = rbObjMethod(Someone.prototype, "foo").sourceLocation()!;
-    expect(line).toEqual(FAILED_DELEGATE_LINE);
+    expect(line).toEqual(Someone.FAILED_DELEGATE_LINE);
   });
 
   it("delegate line with nil", () => {
     const [, line] = rbObjMethod(Someone.prototype, "bar").sourceLocation()!;
-    expect(line).toEqual(FAILED_DELEGATE_LINE_2);
+    expect(line).toEqual(Someone.FAILED_DELEGATE_LINE_2);
   });
 
   it("delegation exception backtrace", () => {
