@@ -889,6 +889,11 @@ export class TransactionManager {
     });
   }
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm throw — PERMANENT
+   * @inventedArm throwDataP — PERMANENT
+   */
   async withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: UserTransaction) => Promise<T> | T,
