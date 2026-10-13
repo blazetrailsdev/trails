@@ -1,4 +1,3 @@
-import { resetLocalTimeZoneId } from "@blazetrails/date";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   MethodCallAssertions,
@@ -314,11 +313,9 @@ export class TestCase extends ActiveSupportTestCase {
     const oldTz = getEnv("TZ");
     try {
       setEnv("TZ", newTz);
-      resetLocalTimeZoneId();
       await block();
     } finally {
       setEnv("TZ", oldTz != null ? oldTz : undefined);
-      resetLocalTimeZoneId();
     }
   }
 

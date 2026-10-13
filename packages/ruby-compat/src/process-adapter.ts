@@ -414,9 +414,44 @@ export function exec(...argv: [exePath: string, ...args: string[]]): never {
   return adapter.exec(argv);
 }
 
-/** @noRailsEquivalent PERMANENT */
+let rubyTzUptodateP = false;
+
+/**
+ * MRI's `ruby_reset_timezone` (`vendor/ruby/v3.3.11/time.c:743-750`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rubyResetTimezone(_val: string | undefined): void {
+  rubyTzUptodateP = false;
+}
+
+/**
+ * MRI's `update_tz` (`vendor/ruby/v3.3.11/time.c:753-758`). `tzset` is the
+ * caller's own re-read of the zone, since the cached zone lives with `Time`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function updateTz(tzset: () => void): void {
+  if (rubyTzUptodateP) return;
+  rubyTzUptodateP = true;
+  tzset();
+}
+
+/** MRI's `reset_by_modified_env` (`vendor/ruby/v3.3.11/hash.c:4961-4972`). */
+function resetByModifiedEnv(nam: string, val: string | undefined): void {
+  if (nam === "TZ") {
+    rubyResetTimezone(val);
+  }
+}
+
+/**
+ * MRI's `env_aset` and `env_delete` (`vendor/ruby/v3.3.11/hash.c:4975-4985,5420-5438`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 export function setEnv(key: string, value: string | undefined): void {
   requireAdapter().setEnv(key, value);
+  resetByModifiedEnv(key, value);
   if (value === undefined) {
     delete envInternal[key];
   } else {

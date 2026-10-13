@@ -27,11 +27,17 @@ import {
   rbObjRespondTo,
   registerConstant,
   stringInspect,
+  updateTz,
 } from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
+function tzset(): void {
+  localTimeZoneId = null;
+}
+
 function nowTimeZoneId(): string {
+  updateTz(tzset);
   return (localTimeZoneId ??= Temporal.Now.timeZoneId());
 }
 
@@ -41,6 +47,7 @@ function systemEpochNs(): bigint {
 
 /** @noRailsEquivalent PERMANENT */
 export function resetLocalTimeZoneId(timeZoneId: string | null = null): string | null {
+  updateTz(tzset);
   const oldTimeZoneId = localTimeZoneId;
   localTimeZoneId = timeZoneId;
   return oldTimeZoneId;

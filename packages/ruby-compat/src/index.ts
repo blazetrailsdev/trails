@@ -296,11 +296,13 @@ export {
   rbProgname,
   setArg0,
   registerProcessAdapter,
+  rubyResetTimezone,
   setEnv,
   setExitCode,
   stderr,
   stdin,
   stdout,
+  updateTz,
 } from "./process-adapter.js";
 export type {
   ProcessAdapter,

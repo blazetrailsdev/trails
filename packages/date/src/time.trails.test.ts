@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
-import { Rational, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Rational, env, rbFSend, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
 
 describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
   afterEach(() => {
@@ -22,6 +22,20 @@ describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
     expect(String(rbFSend(date, "getutc"))).toBe("2020-01-02T03:04:05+00:00[UTC]");
     expect(String(rbFSend(date, "getlocal"))).toBe("2020-01-01T22:04:05-05:00[America/New_York]");
     expect(rbObjRespondTo(Temporal.PlainDate.from("2020-01-02"), "getutc")).toBe(false);
+  });
+});
+
+describe('Time.now after ENV["TZ"] is assigned', () => {
+  it("reads the new zone with no reset of its own", () => {
+    const oldTz = env.TZ;
+    try {
+      setEnv("TZ", "America/New_York");
+      expect(Time.now().zone).toMatch(/^E[SD]T$/);
+      setEnv("TZ", "Asia/Tokyo");
+      expect(Time.now().zone).toBe("JST");
+    } finally {
+      setEnv("TZ", oldTz);
+    }
   });
 });
 
