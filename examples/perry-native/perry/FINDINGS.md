@@ -23,13 +23,13 @@ before codegen begins.
 
 Status of each wall after re-verification:
 
-| Wall                               | Status                                                                                                                                                                |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — codegen memory                 | **The live blocker at app scale.** 362 modules fit in 20GB, but the 1,283-module app exhausts 32GB while still _collecting_ modules.                                  |
-| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                |
-| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                                                       |
-| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                                                       |
-| 3c — init-time hang at 362 modules | **Fixed, and filed upstream with the patch** — [issue 12587](https://github.com/PerryTS/perry/issues/12587), [PR 12588](https://github.com/PerryTS/perry/pull/12588). |
+| Wall                               | Status                                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 — codegen memory                 | **The live blocker at app scale.** 362 modules fit in 20GB, but the 1,283-module app exhausts 32GB while still _collecting_ modules. |
+| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                               |
+| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                      |
+| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                      |
+| 3c — init-time hang at 362 modules | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).     |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -295,7 +295,8 @@ finish.
 The reduction ran 362-module app → `namespaces.js` → `extend(target,
 namespace)` (59 modules) → two files, zero dependencies.
 
-**A fix is written, and it works** — [upstream/namespace-prototype/fix.patch](upstream/namespace-prototype/fix.patch),
+**A fix is written, and it is now merged upstream** (Perry `main` `39bea98d`,
+[PR 12588](https://github.com/PerryTS/perry/pull/12588), merged verbatim) — [upstream/namespace-prototype/fix.patch](upstream/namespace-prototype/fix.patch),
 12 added lines in `js_finalize_namespace`, the one chokepoint both namespace
 paths pass through. It marks the namespace `OBJ_FLAG_NULL_PROTO`, which is
 already the proof `Object.getPrototypeOf` reads to answer `null`; no other
@@ -379,9 +380,11 @@ Treat only `perry compile` — and then running the binary — as a result.
 
 ## If someone picks this up
 
-1. **3c is filed with its fix** — [issue 12587](https://github.com/PerryTS/perry/issues/12587)
-   and [PR 12588](https://github.com/PerryTS/perry/pull/12588). Nothing further
-   is needed from this repo unless review asks for changes.
+1. **3c is done.** The fix from this work is merged into Perry `main` as
+   `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588),
+   [issue 12587](https://github.com/PerryTS/perry/issues/12587) closed), and
+   re-verified against a pristine upstream build. It will reach us in the next
+   Perry release; until then a from-source build carries it.
 2. **Do not file Wall 3a — already fixed on `main`, just unreleased.** Verified
    by building the compiler from source. What would help is asking the Perry
    project to cut a release past 0.5.1520 (2026-09-11); until then a
