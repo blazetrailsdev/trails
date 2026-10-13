@@ -1,4 +1,4 @@
-import { aryIncludes } from "./array.js";
+import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
@@ -529,6 +529,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     return true;
   }
   if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
+  if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
   if (temporalMethod(obj, mid) !== undefined) return true;
   if (enumerableMethod(obj, mid) !== undefined) return true;
   if (
@@ -955,6 +956,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (bound !== undefined) return bound(recv, ...args);
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
+  }
+  if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
+    return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
   }
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;

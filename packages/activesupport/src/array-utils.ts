@@ -3,7 +3,7 @@ import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, isEmpty } from "@blazetrails/ruby-compat";
 import { rbEqq, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
@@ -228,3 +228,10 @@ export function toXml(
   }
   return builder.target();
 }
+
+ARRAY_METHOD_TABLE.inGroupsOf = inGroupsOf;
+ARRAY_METHOD_TABLE.inGroups = inGroups;
+ARRAY_METHOD_TABLE.toSentence = toSentence;
+ARRAY_METHOD_TABLE.toFs = toFs;
+ARRAY_METHOD_TABLE.toFormattedS = toFs;
+ARRAY_METHOD_TABLE.toXml = toXml;

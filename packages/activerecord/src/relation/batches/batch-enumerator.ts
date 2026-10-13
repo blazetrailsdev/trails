@@ -124,6 +124,8 @@ export interface BatchEnumerator<T extends BatchRelation> {
   toA(): Promise<T[]>;
   first(): Promise<T | null>;
   first(n: number): Promise<T[]>;
+  reverseEach(): Pick<BatchEnumerator<T>, "sum" | "toA" | "first">;
+  reverseEach(block: (relation: T) => unknown): Promise<this>;
   [Symbol.asyncIterator](): AsyncIterator<T>;
 }
 

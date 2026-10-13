@@ -1,3 +1,4 @@
+import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { isBlank } from "../object/blank.js";
 
 export class Array {
@@ -63,6 +64,11 @@ export class Array {
     }
     return self;
   }
+}
+
+for (const name of Object.getOwnPropertyNames(Array)) {
+  const method = (Array as unknown as Record<string, unknown>)[name];
+  if (typeof method === "function") ARRAY_METHOD_TABLE[name] = method as never;
 }
 
 function eql(a: unknown, b: unknown): boolean {

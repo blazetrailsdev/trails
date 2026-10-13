@@ -613,6 +613,31 @@ export const AsyncEnumerable = {
 
   first,
 
+  /**
+   * Mirrors: Ruby's Enumerable#reverse_each — `vendor/ruby/v3.3.11/enum.c:3006`
+   * `enum_reverse_each`: `to_a`, then the block over it from the last element.
+   * With no block it answers the enumerator `RETURN_SIZED_ENUMERATOR` builds.
+   * @noRailsEquivalent PERMANENT
+   */
+  reverseEach<T>(this: AsyncEach<T>, block?: (i: T) => unknown): unknown {
+    const toA = (): Promise<T[]> => AsyncEnumerable.toA.call(this) as Promise<T[]>;
+    async function* reverseEach(): AsyncGenerator<T> {
+      const ary = await toA();
+      let len = ary.length;
+      while (len--) yield ary[len];
+    }
+    const each = async (block: (i: T) => unknown): Promise<unknown> => {
+      for await (const i of reverseEach()) await block(i);
+      return this;
+    };
+    if (!block) {
+      return Object.assign(Object.create(AsyncEnumerable), {
+        each: (block?: (i: T) => unknown) => (block ? each(block) : reverseEach()),
+      });
+    }
+    return each(block);
+  },
+
   /** @noRailsEquivalent PERMANENT */
   [Symbol.asyncIterator]<T>(this: AsyncEach<T>): AsyncIterator<T> {
     return this.each()[Symbol.asyncIterator]();

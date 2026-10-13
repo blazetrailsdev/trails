@@ -5,9 +5,17 @@ import { cmp, rbCmpint } from "./comparable.js";
 import { Hash, rbBlockGivenP } from "./hash.js";
 import { IndexError } from "./index-error.js";
 import { warn } from "./kernel-warn.js";
-import { rbBigNorm } from "./numeric.js";
+import { Enumerable } from "./enumerable.js";
+import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
-import { conversionMismatch, rbBuiltinClassName, rbObjClassname, toS } from "./object.js";
+import {
+  ENUMERABLE_METHOD_TABLE,
+  conversionMismatch,
+  rbBuiltinClassName,
+  rbObjClassname,
+  rtest,
+  toS,
+} from "./object.js";
 import { Range } from "./range.js";
 import { checkArity, num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
@@ -1063,4 +1071,141 @@ function aryJoin1(obj: readonly unknown[], ary: readonly unknown[], sep: string)
       return toS(val);
     })
     .join(sep);
+}
+
+type ArrayMethod = (self: unknown[], ...args: never[]) => unknown;
+type Block = (...args: unknown[]) => unknown;
+
+const enumOf = (ary: unknown[]) => ({ each: (block: (i: unknown) => void) => each(ary, block) });
+
+function aryShuffle(ary: readonly unknown[]): unknown[] {
+  const result = [...ary];
+  for (let i = result.length; i > 1; ) {
+    const j = Math.floor(Math.random() * i--);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+const aryMatch = (val: unknown) => (e: unknown) =>
+  typeof val === "function" ? rtest(val(e)) : rbEqual(e, val);
+
+function arySortBy(ary: readonly unknown[], compare: (a: unknown, b: unknown) => number) {
+  return [...ary].sort(compare);
+}
+
+/**
+ * The public methods an Array answers, keyed by the camelCased Ruby name as
+ * `STRING_METHOD_TABLE` keys String's: those `Init_Array`
+ * (`vendor/ruby/v3.3.11/array.c:8606`) defines on `rb_cArray`, and those of
+ * `Enumerable` (`vendor/ruby/v3.3.11/enum.c:5047` `Init_Enumerable`), which it
+ * includes. An operator goes by the method Ruby also names it (`-`
+ * `difference`, `|` `union`, `&` `intersection`) or by trails' spelling (`+`
+ * `plus`, `[]` `get`); a block is a trailing function argument. No entry
+ * mutates its receiver, and a method with no block answers the Array its
+ * enumerator would yield. A package that reopens Array, as ActiveSupport's
+ * `core_ext/array` does, assigns an entry.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Object.create(null), {
+  plus: (self, y: unknown) => rbPlus(self, y),
+  difference: (self, ...arrays: unknown[][]) =>
+    self.filter((v) => !arrays.some((ary) => aryIncludes(ary, v))),
+  union: (self, ...arrays: unknown[][]) => arrays.reduce(union, uniq(self)),
+  intersection: (self, ...arrays: unknown[][]) =>
+    arrays.reduce((ary, ary2) => uniq(ary.filter((v) => ary2.some((e) => rbEql(e, v)))), [...self]),
+  isIntersect: (self, ary2: unknown[]) => isIntersect(self, ary2),
+  get: (self, ...args: [unknown, unknown?]) => arySlice(self, ...args),
+  slice: (self, ...args: [unknown, unknown?]) => arySlice(self, ...args),
+  at: (self, pos: unknown) => self.at(Number(num2long(pos))) ?? null,
+  first: (self, ...args: [number?]) => Enumerable.first.call(enumOf(self), ...(args as [number])),
+  last: (self, ...args: [number?]) => (args.length ? last(self, args[0]!) : (last(self) ?? null)),
+  take: (self, n: number) => take(self, n),
+  drop: (self, n: number) => drop(self, n),
+  length: (self) => self.length,
+  size: (self) => self.length,
+  count: (self, block?: Block) => aryCount(self, block),
+  isEmpty: (self) => self.length === 0,
+  isInclude: (self, item: unknown) => aryIncludes(self, item),
+  index: (self, val: unknown) => {
+    const i = self.findIndex(aryMatch(val));
+    return i < 0 ? null : i;
+  },
+  rindex: (self, val: unknown) => {
+    const i = [...self].reverse().findIndex(aryMatch(val));
+    return i < 0 ? null : self.length - 1 - i;
+  },
+  each: (self, block?: Block) => each(self, block),
+  eachWithIndex: (self, block?: Block) => {
+    if (!block) return self.map((v, i) => [v, i]);
+    self.forEach((v, i) => block(v, i));
+    return self;
+  },
+  eachCons: (self, n: number, block?: Block) => {
+    if (n <= 0) throw new ArgumentError("invalid size");
+    const slices = self.slice(n - 1).map((_, i) => self.slice(i, i + n));
+    if (!block) return slices;
+    slices.forEach((slice) => block(slice));
+    return self;
+  },
+  collect: (self, block: Block) => self.map((v) => block(v)),
+  map: (self, block: Block) => self.map((v) => block(v)),
+  flatMap: (self, block: Block) => self.flatMap((v) => block(v)),
+  select: (self, block: Block) => Enumerable.findAll.call(enumOf(self), block),
+  filter: (self, block: Block) => Enumerable.findAll.call(enumOf(self), block),
+  findAll: (self, block: Block) => Enumerable.findAll.call(enumOf(self), block),
+  reject: (self, block: Block) => self.filter((v) => !rtest(block(v))),
+  detect: (self, ...argv: unknown[]) => Enumerable.find.call(enumOf(self), ...argv),
+  find: (self, ...argv: unknown[]) => Enumerable.find.call(enumOf(self), ...argv),
+  partition: (self, block: Block) => partition(self, block),
+  groupBy: (self, block: Block) => groupBy(self, block),
+  isAll: (self, block?: Block) => self.every((v) => rtest(block ? block(v) : v)),
+  isAny: (self, ...args: unknown[]) => Enumerable.isAny.call(enumOf(self), ...args),
+  isNone: (self, ...args: unknown[]) => Enumerable.isNone.call(enumOf(self), ...args),
+  isOne: (self, ...args: unknown[]) => Enumerable.isOne.call(enumOf(self), ...args),
+  compact: (self) => compact(self),
+  uniq: (self) => uniq(self),
+  flatten: (self) => flatten(self),
+  zip: (self, ...argv: unknown[][]) => zip(self, ...argv),
+  reverse: (self) => [...self].reverse(),
+  rotate: (self, cnt: number = 1) => {
+    const n = self.length === 0 ? 0 : ((cnt % self.length) + self.length) % self.length;
+    return [...self.slice(n), ...self.slice(0, n)];
+  },
+  shuffle: (self) => aryShuffle(self),
+  sample: (self, ...args: [number?]) =>
+    args.length ? aryShuffle(self).slice(0, args[0]) : (aryShuffle(self)[0] ?? null),
+  sort: (self, block?: Block) =>
+    block ? arySortBy(self, (a, b) => rbCmpint(block(a, b) as number | null, a, b)) : sort(self),
+  sortBy: (self, block: Block) =>
+    arySortBy(
+      self.map((v) => [block(v), v]),
+      (a, b) => rbCmpint(cmp((a as unknown[])[0], (b as unknown[])[0]), a, b),
+    ).map((pair) => (pair as unknown[])[1]),
+  join: (self, sep: string | null = null) => aryJoin(self, sep),
+  toA: (self) => self,
+  toAry: (self) => self,
+  toH: (self) => toH(self),
+  toSet: (self) => new Set(self),
+} satisfies Record<string, ArrayMethod>);
+
+const JS_ARRAY_METHODS = new Set(Object.getOwnPropertyNames(Array.prototype));
+
+/**
+ * `ary.respond_to?` (`vendor/ruby/v3.3.11/vm_method.c:2977` `obj_respond_to`) over
+ * {@link ARRAY_METHOD_TABLE}'s names and the `Enumerable` methods a package
+ * defines: JS's own `Array.prototype` members are not Ruby's. See CLAUDE.md,
+ * "Method visibility is compile-time only".
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbAryRespondTo(
+  ary: readonly unknown[],
+  method: string,
+  includeAll: boolean = false,
+): boolean {
+  void includeAll;
+  if (method in ARRAY_METHOD_TABLE || method in ENUMERABLE_METHOD_TABLE) return true;
+  return Object.hasOwn(Object.getPrototypeOf(ary), method) && !JS_ARRAY_METHODS.has(method);
 }
