@@ -186,7 +186,9 @@ uncontended entry runs its block before `synchronize` returns, as a Ruby monitor
 does: callers that do not await `lock.synchronize` depend on it. For the same
 reason `SQLite3Adapter#disconnectBang` closes the handle under `lock`, where
 Rails' `disconnect!` (`sqlite3_adapter.rb:221-226`) closes it after `super`
-releases `@lock`.
+releases `@lock`. `SQLite3Adapter#active` answers under `lock` too, where Rails'
+`active?` (`sqlite3_adapter.rb:210-215`) takes none, so a `verify!` cannot
+answer while a `reconnect!` is inside `reset_transaction`'s block.
 
 This is a genuine language shortcoming, ratified repo-wide here. Stories that
 serialize adapter access build on the monitor default; none of them is a story

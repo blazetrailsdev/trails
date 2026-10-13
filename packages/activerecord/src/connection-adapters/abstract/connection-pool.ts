@@ -314,10 +314,7 @@ export class ConnectionPool implements ReapablePool {
     return this.connectionLease().sticky === null;
   }
 
-  /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm synchronize — CONVERGEABLE pin-connection-runs-verify-and-begin-under-an-invented-adapter-lock
-   */
+  /** @inventedArm if — PERMANENT */
   async pinConnectionBang(lockThread = false): Promise<void> {
     const connection =
       this._pinnedConnection || this.connectionLease()?.connection || (await this.checkout());
@@ -333,10 +330,8 @@ export class ConnectionPool implements ReapablePool {
 
     if (lockThread) this._pinnedConnection.setLockThread(IsolatedExecutionState.context());
     const pinnedConnection = this._pinnedConnection;
-    await pinnedConnection.lock.synchronize(async () => {
-      await pinnedConnection.verifyBang();
-      await pinnedConnection.beginTransaction({ joinable: false, _lazy: false });
-    });
+    await pinnedConnection.verifyBang();
+    await pinnedConnection.beginTransaction({ joinable: false, _lazy: false });
   }
 
   async unpinConnectionBang(): Promise<boolean> {

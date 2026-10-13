@@ -11,6 +11,28 @@ const tester = new RuleTester({
 
 tester.run("require-table-teardown", rule, {
   valid: [
+    // ── migrate("down") ──
+    // Reverting the migration whose change() created the table is Rails'
+    // teardown (migration/compatibility_test.rb:1079-1083).
+    "let migration;\n" +
+      'afterEach(async () => { if (migration) await migration.migrate("down"); });\n' +
+      'it("x", async () => {\n' +
+      "  migration = new (class extends Migration.Current {\n" +
+      '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+      '  await migration.migrate("up");\n});',
+    // The same revert in a finally, on a declared instance.
+    'it("x", async () => {\n' +
+      "  const migration = new (class extends Migration.Current {\n" +
+      '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+      '  try { await migration.migrate("up"); } finally { await migration.migrate("down"); }\n});',
+    // up() is reverted by the class's own down().
+    "let migration;\n" +
+      'afterEach(async () => { await migration.migrate("down"); });\n' +
+      'it("x", async () => {\n' +
+      "  migration = new (class extends Migration.Current {\n" +
+      '    async up() { await this.createTable("widgets", () => {}); }\n' +
+      "    async down() { await this.revert(); }\n  })();\n" +
+      '  await migration.migrate("up");\n});',
     // ── failureSafe ──
     // A drop in an afterAll/afterEach hook survives a failing assertion.
     'it("x", async () => { await ctx.createTable("widgets", () => {}); });\n' +
@@ -578,6 +600,71 @@ tester.run("require-table-teardown", rule, {
       "}",
   ],
   invalid: [
+    // ── migrate("down") ──
+    // A change()-created table with no revert at all is still a leak.
+    {
+      code:
+        "let migration;\n" +
+        'it("x", async () => {\n' +
+        "  migration = new (class extends Migration.Current {\n" +
+        '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+        '  await migration.migrate("up");\n});',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 4 }],
+    },
+    // A revert on the happy path is skipped by a failing assertion.
+    {
+      code:
+        "let migration;\n" +
+        'it("x", async () => {\n' +
+        "  migration = new (class extends Migration.Current {\n" +
+        '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+        '  await migration.migrate("up");\n  await migration.migrate("down");\n});',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 4 }],
+    },
+    // A revert outside any hook or finally guards nothing.
+    {
+      code:
+        "let migration;\n" +
+        'it("x", async () => {\n' +
+        "  migration = new (class extends Migration.Current {\n" +
+        '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+        '  await migration.migrate("up");\n});\n' +
+        'await migration.migrate("down");',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 4 }],
+    },
+    // Reverting a different migration does not tear this one down.
+    {
+      code:
+        "let migration, other;\n" +
+        'afterEach(async () => { await other.migrate("down"); });\n' +
+        'it("x", async () => {\n' +
+        "  migration = new (class extends Migration.Current {\n" +
+        '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+        '  await migration.migrate("up");\n});',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 5 }],
+    },
+    // migrate("up") in a hook is not a revert.
+    {
+      code:
+        "let migration;\n" +
+        'afterEach(async () => { await migration.migrate("up"); });\n' +
+        'it("x", async () => {\n' +
+        "  migration = new (class extends Migration.Current {\n" +
+        '    async change() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+        '  await migration.migrate("up");\n});',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 5 }],
+    },
+    // up() with no down() has nothing to revert it.
+    {
+      code:
+        "let migration;\n" +
+        'afterEach(async () => { await migration.migrate("down"); });\n' +
+        'it("x", async () => {\n' +
+        "  migration = new (class extends Migration.Current {\n" +
+        '    async up() { await this.createTable("widgets", () => {}); }\n  })();\n' +
+        '  await migration.migrate("up");\n});',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 5 }],
+    },
     // A for…of over a non-literal iterable resolves to nothing — the create is
     // still reported, since the loop's names are not statically knowable.
     {

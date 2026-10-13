@@ -348,7 +348,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override async active(): Promise<boolean> {
-    return this.isActive() ?? false;
+    return this.lock.synchronize(async () => this.isActive() ?? false);
   }
 
   declare resetBang: AbstractAdapter["reconnectBang"];

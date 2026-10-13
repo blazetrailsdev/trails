@@ -1328,8 +1328,6 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
 
   afterEach(async () => {
     if (migration) await migration.migrate("down");
-    const connection = await ambientConnection();
-    await connection.dropTable("legacy_primary_keys", "apples_bananas", { ifExists: true });
     Migration.verbose = verboseWas;
     await Base.connectionPool()
       .schemaMigration.deleteAllVersions()
