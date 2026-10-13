@@ -1072,7 +1072,7 @@ describe("LegacyRouteSetTests", () => {
 
   it("recognize array of methods", () => {
     rs.draw(function () {
-      this.match({ "/match": "books#get_or_post", via: ["get", "post"] });
+      this.match({ "/match": "books#get_or_post", via: [":get", ":post"] });
       this.put({ "/match": "books#not_get_or_post" });
     });
 

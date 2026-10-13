@@ -233,18 +233,33 @@ export function stubAnyInstance<T>(
   }
 }
 
-function stub<T extends object>(
+/** @noRailsEquivalent PERMANENT */
+export function stub<T extends object, R extends void | Promise<void> = void>(
   object: T,
-  methodName: keyof T & string,
-  replacement: (...args: unknown[]) => unknown,
-  block?: () => void | Promise<void>,
-): Promise<void> | undefined {
-  const original = object[methodName];
+  name: keyof T & string,
+  valOrCallable: unknown,
+  block?: () => R,
+): R extends Promise<void> ? Promise<void> : undefined {
+  type Result = R extends Promise<void> ? Promise<void> : undefined;
+  const original = Object.getOwnPropertyDescriptor(object, name);
+  let inherited = original;
+  for (let p = Object.getPrototypeOf(object); !inherited && p; p = Object.getPrototypeOf(p)) {
+    inherited = Object.getOwnPropertyDescriptor(p, name);
+  }
+  const stubbed = (...args: unknown[]) =>
+    typeof valOrCallable === "function" ? valOrCallable(...args) : valOrCallable;
+  Object.defineProperty(
+    object,
+    name,
+    inherited?.get
+      ? { configurable: true, get: () => stubbed(), set: inherited.set }
+      : { configurable: true, writable: true, value: stubbed },
+  );
   const restore = () => {
-    (object as Record<string, unknown>)[methodName] = original;
+    if (original) Object.defineProperty(object, name, original);
+    else delete (object as Record<string, unknown>)[name];
   };
-  (object as Record<string, unknown>)[methodName] = replacement;
-  let result: void | Promise<void>;
+  let result: R | undefined;
   try {
     result = block?.();
   } catch (e) {
@@ -252,10 +267,10 @@ function stub<T extends object>(
     throw e;
   }
   if (result && typeof result.then === "function") {
-    return result.finally(restore);
+    return result.finally(restore) as Result;
   }
   restore();
-  return undefined;
+  return undefined as Result;
 }
 
 function assertMock(mock: Mock): void {

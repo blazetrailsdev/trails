@@ -576,7 +576,7 @@ describe("TestRouter", () => {
   it("recognize cares about get verbs", () => {
     const routeSet = new RouteSet();
     routeSet.draw(function () {
-      this.match("/books(/:action(.:format))", { to: "foo#bar", via: "get" });
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: ":get" });
     });
 
     const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
@@ -592,7 +592,7 @@ describe("TestRouter", () => {
   it("recognize cares about post verbs", () => {
     const routeSet = new RouteSet();
     routeSet.draw(function () {
-      this.match("/books(/:action(.:format))", { to: "foo#bar", via: "post" });
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: ":post" });
     });
 
     const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
@@ -608,7 +608,7 @@ describe("TestRouter", () => {
   it("multi verb recognition", () => {
     const routeSet = new RouteSet();
     routeSet.draw(function () {
-      this.match("/books(/:action(.:format))", { to: "foo#bar", via: ["post", "get"] });
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: [":post", ":get"] });
     });
 
     for (const verb of ["POST", "GET"]) {

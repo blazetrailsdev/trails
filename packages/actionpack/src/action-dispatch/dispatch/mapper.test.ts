@@ -103,7 +103,7 @@ describe("MapperTest", () => {
   it("via scope", () => {
     const fakeset = new FakeSet();
     const mapper = new Mapper(fakeset);
-    mapper.scope({ via: "put" }, () => {
+    mapper.scope({ via: ":put" }, () => {
       mapper.match("/", { to: "posts#index", as: "main" });
     });
     expect([...fakeset.routes][0].verb).toBe("PUT");
