@@ -2937,46 +2937,40 @@ describe("TestUrlConstraints", () => {
     override get app(): unknown {
       return APP;
     }
+
+    declare adminRootUrl: () => string;
+    declare secureRootUrl: () => string;
+    declare alternateRootUrl: () => string;
+    declare searchUrl: () => string;
+    declare logsUrl: () => string;
   }
+  include(TestUrlConstraints, Routes.urlHelpers());
   registerConstant("TestUrlConstraints", TestUrlConstraints);
 
   let t: TestUrlConstraints;
-  const urlHelper = (name: string) => (): string =>
-    (Routes.namedRoutes.urlHelpersModule.instanceMethod(name)!.value as NamedRouteHelper).call({
-      _routes: Routes,
-      urlOptions: () => t.urlOptions(),
-      optimizeRoutesGeneration: () => Routes.isOptimizeRoutesGeneration(),
-    });
-  const adminRootUrl = urlHelper("adminRootUrl");
-  const secureRootUrl = urlHelper("secureRootUrl");
-  const alternateRootUrl = urlHelper("alternateRootUrl");
-  const searchUrl = urlHelper("searchUrl");
-  const logsUrl = urlHelper("logsUrl");
-
   const get = (path: string): Promise<void> => t.get(path);
   const assertResponse = (type: string): void => t.assertResponse(type);
 
   beforeEach(({ testCase }) => {
     t = testCase as TestUrlConstraints;
-    t.routes = Routes;
   });
 
   it("constraints are copied to defaults when using constraints method", async () => {
-    expect(adminRootUrl()).toBe("http://admin.example.com/");
+    expect(t.adminRootUrl()).toBe("http://admin.example.com/");
 
     await get("http://admin.example.com/");
     assertResponse("success");
   });
 
   it("constraints are copied to defaults when using scope constraints hash", async () => {
-    expect(secureRootUrl()).toBe("https://www.example.com/");
+    expect(t.secureRootUrl()).toBe("https://www.example.com/");
 
     await get("https://www.example.com/");
     assertResponse("success");
   });
 
   it("constraints are copied to defaults when using route constraints hash", async () => {
-    expect(alternateRootUrl()).toBe("http://www.example.com:8080/");
+    expect(t.alternateRootUrl()).toBe("http://www.example.com:8080/");
 
     await get("http://www.example.com:8080/");
     assertResponse("success");
@@ -2985,7 +2979,7 @@ describe("TestUrlConstraints", () => {
   it("false constraint expressions check for absence of values", async () => {
     await get("http://example.com/search");
     assertResponse("success");
-    expect(searchUrl()).toBe("http://example.com/search");
+    expect(t.searchUrl()).toBe("http://example.com/search");
 
     await get("http://api.example.com/search");
     assertResponse("not_found");
@@ -2994,7 +2988,7 @@ describe("TestUrlConstraints", () => {
   it("true constraint expressions check for presence of values", async () => {
     await get("http://api.example.com/logs");
     assertResponse("success");
-    expect(logsUrl()).toBe("http://api.example.com/logs");
+    expect(t.logsUrl()).toBe("http://api.example.com/logs");
 
     await get("http://example.com/logs");
     assertResponse("not_found");
