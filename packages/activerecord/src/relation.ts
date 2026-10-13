@@ -2032,8 +2032,6 @@ export interface Relation<T extends Base, G extends boolean = false>
   orderedRelation(): Relation<T, G>;
   /** @internal */
   _orderColumns(): string[];
-  /** @internal */
-  actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void;
   findEach(opts: FindEachOptions, block: (record: T) => void | Promise<void>): Promise<null>;
   findEach(opts?: FindEachOptions): AsyncGenerator<T> & { size(): Promise<number> };
   findInBatches(opts: FindEachOptions, block: (batch: T[]) => void | Promise<void>): Promise<null>;
