@@ -1,6 +1,5 @@
 import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
 import {
-  hashAset,
   rbCheckArrayType,
   rbFSend,
   rbModInstanceMethod,
@@ -56,7 +55,7 @@ export function serializableHash(
   const result = this.serializableAttributes(attributeNames);
 
   for (const method of rubyArray(options.methods)) {
-    hashAset(result, method, rbFSend(this, method));
+    result[method] = rbFSend(this, method);
   }
 
   this.serializableAddIncludes(options, (assocName, records, opts) => {
@@ -70,29 +69,23 @@ export function serializableHash(
       }
       const items = rbCheckArrayType(records);
       if (items == null) throw new NoMethodError("undefined method 'map' for nil");
-      hashAset(
-        result,
-        assocName,
-        items.map((a) => {
-          if (!rbObjRespondTo(a, "serializableHash")) {
-            throw new NoMethodError(
-              `undefined method 'serializableHash' for an instance of ${(a as object).constructor.name}`,
-            );
-          }
-          return (a as { serializableHash(o: SerializeOptions): unknown }).serializableHash(opts);
-        }),
-      );
+      result[assocName] = items.map((a) => {
+        if (!rbObjRespondTo(a, "serializableHash")) {
+          throw new NoMethodError(
+            `undefined method 'serializableHash' for an instance of ${(a as object).constructor.name}`,
+          );
+        }
+        return (a as { serializableHash(o: SerializeOptions): unknown }).serializableHash(opts);
+      });
     } else {
       if (!rbObjRespondTo(records, "serializableHash")) {
         throw new NoMethodError(
           `undefined method 'serializableHash' for an instance of ${(records as object).constructor.name}`,
         );
       }
-      hashAset(
-        result,
-        assocName,
-        (records as { serializableHash(o: SerializeOptions): unknown }).serializableHash(opts),
-      );
+      result[assocName] = (
+        records as { serializableHash(o: SerializeOptions): unknown }
+      ).serializableHash(opts);
     }
   });
 
@@ -193,9 +186,9 @@ export function serializableAddIncludes(
     includes = {};
     for (const n of Array.isArray(includeOpt) ? includeOpt : [includeOpt]) {
       if (isIncludeHash(n)) {
-        for (const [k, v] of Object.entries(n)) hashAset(includes, k, v);
+        for (const [k, v] of Object.entries(n)) includes[k] = v;
       } else {
-        hashAset(includes, n, {});
+        includes[n] = {};
       }
     }
   }
