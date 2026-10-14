@@ -4,6 +4,7 @@ import { getFn, setFn } from "vitest/suite";
 import { Time } from "@blazetrails/date";
 import {
   RuntimeError,
+  publicInstanceMethods,
   iseqLocationSetup,
   rbModMethodDefined,
   rbModToS,
@@ -18,59 +19,81 @@ declare module "vitest" {
   }
 }
 
-type Matcher = RegExp | ((desc: string) => boolean);
+type Matcher = RegExp | ((desc: string, ...additional: string[]) => boolean);
 type DescribedSuite = { name: string; file?: unknown; suite?: DescribedSuite };
+type SpecClass = typeof TestCase & { desc?: string; children?: SpecClass[] };
 
 /** @noRailsEquivalent PERMANENT */
 export const TYPES: [Matcher, typeof TestCase][] = [[/(?:)/, TestCase]];
 
 /** @noRailsEquivalent PERMANENT */
 export function registerSpecType(
-  ...args: [matcher: Matcher, klass: typeof TestCase] | [klass: typeof TestCase, block: Matcher]
+  matcherOrKlass: Matcher | typeof TestCase,
+  klass: typeof TestCase | undefined = undefined,
+  block: Matcher | undefined = undefined,
 ): void {
-  const last = args[args.length - 1];
-  const block =
-    typeof last === "function" && last !== TestCase && !(last.prototype instanceof TestCase)
-      ? (last as Matcher)
-      : undefined;
-  let matcher: Matcher, klass: typeof TestCase;
+  let matcher: Matcher;
   if (block) {
-    [matcher, klass] = [block, args[0] as typeof TestCase];
+    [matcher, klass] = [block, matcherOrKlass as typeof TestCase];
   } else {
-    [matcher, klass] = args as [Matcher, typeof TestCase];
+    matcher = matcherOrKlass as Matcher;
   }
-  TYPES.unshift([matcher, klass]);
+  TYPES.unshift([matcher, klass!]);
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function specType(desc: string): typeof TestCase {
-  return TYPES.find(([matcher]) =>
-    typeof matcher === "function" ? matcher(desc) : matcher.test(String(desc)),
-  )![1];
+export function specType(desc: string, ...additional: string[]): typeof TestCase {
+  return TYPES.find(([matcher]) => {
+    if (typeof matcher === "function") {
+      return matcher(desc, ...additional);
+    } else {
+      return matcher.test(String(desc));
+    }
+  })![1];
 }
 
-function create(sclas: typeof TestCase, name: string): typeof TestCase {
-  const cls = class extends sclas {};
+function children(klass: SpecClass): SpecClass[] {
+  if (!Object.hasOwn(klass, "children")) klass.children = [];
+  return klass.children!;
+}
+
+function nukeTestMethodsBang(klass: SpecClass): void {
+  for (const name of publicInstanceMethods(klass).filter((n) => /^test_/.test(n))) {
+    Object.defineProperty(klass.prototype, name, { value: undefined, configurable: true });
+  }
+}
+
+function create(sclas: SpecClass, name: string, desc: string): SpecClass {
+  const cls: SpecClass = class extends sclas {};
   Object.defineProperty(cls, "name", { value: name });
+  cls.desc = desc;
+  nukeTestMethodsBang(cls);
+
+  children(sclas).push(cls);
+
   return cls;
 }
 
-const described = new WeakMap<object, typeof TestCase>();
-let fileClass: typeof TestCase | undefined;
+const described = new WeakMap<object, SpecClass>();
+let fileClass: SpecClass | undefined;
 
 /** @noRailsEquivalent PERMANENT */
-export function describe(suite: DescribedSuite | undefined): typeof TestCase {
+export function describe(suite: DescribedSuite | undefined): SpecClass {
   if (suite === undefined || suite.file === suite) {
-    return (fileClass ??= create(specType(""), ""));
+    return (fileClass ??= create(specType(""), "", ""));
   }
   let cls = described.get(suite);
   if (cls === undefined) {
     const constant = safeConstantize(suite.name);
     if (typeof constant === "function" && constant.prototype instanceof TestCase) {
-      cls = constant as typeof TestCase;
+      cls = constant as SpecClass;
     } else {
-      const sclas = describe(suite.suite);
-      cls = create(sclas, [sclas.name, suite.name].filter((n) => n !== "").join("::"));
+      const parent =
+        suite.suite === undefined || suite.suite.file === suite.suite ? undefined : suite.suite;
+      const stackLast = parent === undefined ? fileClass : describe(parent);
+      const name = [stackLast?.name, suite.name].filter((n) => n != null && n !== "").join("::");
+      const sclas = stackLast || specType(suite.name);
+      cls = create(sclas, name, suite.name);
     }
     described.set(suite, cls);
   }
