@@ -12,16 +12,10 @@ import { ExceptionWrapper } from "./exception-wrapper.js";
 import { X_CASCADE } from "../constants.js";
 import { Mime, type MimeType } from "../http/mime-type.js";
 import { Request } from "../http/request.js";
+import { InvalidType } from "../http/mime-negotiation.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
-
-export interface DebugExceptionsOptions {
-  showDetailedExceptions?: boolean;
-  showExceptions?: boolean;
-  interceptors?: Interceptor[];
-  responseFormat?: "default" | "api";
-}
 
 export type Interceptor = (request: Request, exception: Error) => void;
 
@@ -34,18 +28,21 @@ export class DebugExceptions {
   }
 
   private app: RackApp;
-  private showDetailedExceptions: boolean;
-  private showExceptions: boolean;
-  private interceptors: Interceptor[];
+  private routesApp: unknown;
   private responseFormat: "default" | "api";
+  private interceptors: Interceptor[];
   private _stderrLogger?: ActiveSupportLogger;
 
-  constructor(app: RackApp, options: DebugExceptionsOptions = {}) {
+  constructor(
+    app: RackApp,
+    routesApp: unknown = null,
+    responseFormat: "default" | "api" = "default",
+    interceptors: Interceptor[] = DebugExceptions.interceptors,
+  ) {
     this.app = app;
-    this.showDetailedExceptions = options.showDetailedExceptions !== false;
-    this.showExceptions = options.showExceptions !== false;
-    this.interceptors = options.interceptors ?? [...DebugExceptions.interceptors];
-    this.responseFormat = options.responseFormat ?? "default";
+    this.routesApp = routesApp;
+    this.responseFormat = responseFormat;
+    this.interceptors = interceptors;
   }
 
   /** @internal */
@@ -193,7 +190,7 @@ export class DebugExceptions {
       const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
 
       this.invokeInterceptors(request, exception, wrapper);
-      if (!this.showExceptions) throw exception;
+      if (!wrapper.show(request)) throw exception;
       return this.renderException(request, exception, wrapper);
     }
   }
@@ -205,20 +202,27 @@ export class DebugExceptions {
   ): RackResponse {
     this.logError(request, wrapper);
 
-    if (!this.showDetailedExceptions) {
+    if (rtest(request.getHeader("action_dispatch.show_detailed_exceptions"))) {
+      let contentType: MimeType | undefined;
+      try {
+        contentType = request.formats[0];
+      } catch (e) {
+        if (!(e instanceof InvalidType)) throw e;
+        contentType = Mime.get("text")!;
+      }
+
+      if (this.isApiRequest(contentType)) {
+        return this.renderForApiRequest(contentType, wrapper);
+      } else {
+        if (request.xhr) {
+          return this.renderTextError(wrapper);
+        }
+
+        return this.renderHtmlError(request, wrapper);
+      }
+    } else {
       throw exception;
     }
-
-    const contentType = request.formats[0];
-    if (this.isApiRequest(contentType)) {
-      return this.renderForApiRequest(contentType, wrapper);
-    }
-
-    if (request.xhr) {
-      return this.renderTextError(wrapper);
-    }
-
-    return this.renderHtmlError(request, wrapper);
   }
 
   private renderTextError(wrapper: ExceptionWrapper): RackResponse {

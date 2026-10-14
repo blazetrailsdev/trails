@@ -114,8 +114,7 @@ describe("RenderTest", () => {
     });
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("rendering more than once raises an exception", async () => {
+  it("rendering more than once raises an exception", async () => {
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         deprecator().silence(() => {
@@ -141,8 +140,7 @@ describe("TestOnlyRenderPublicActions", () => {
     t = new TestOnlyRenderPublicActions(task.name);
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("raises an exception when a method of Object is called", async () => {
+  it("raises an exception when a method of Object is called", async () => {
     await assertRaises([ActionNotFound], {}, async () => {
       await t.get("/render/blank_render/clone", {
         headers: { "action_dispatch.show_exceptions": "none" },

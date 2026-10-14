@@ -18,9 +18,10 @@ async function contentTypeFor(
   accept: string,
   responseFormat: "default" | "api" = "default",
 ): Promise<string> {
-  const [, headers] = await new DebugExceptions(errorApp, { responseFormat }).call({
+  const [, headers] = await new DebugExceptions(errorApp, null, responseFormat).call({
     REQUEST_METHOD: "GET",
     PATH_INFO: "/test",
+    "action_dispatch.show_detailed_exceptions": true,
     HTTP_ACCEPT: accept,
   });
   return String(headers["content-type"]);
@@ -60,6 +61,7 @@ describe("DebugExceptions browser render", () => {
     const [, headers] = await new DebugExceptions(errorApp).call({
       REQUEST_METHOD: "POST",
       PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
       CONTENT_TYPE: "text/plain",
     });
     expect(String(headers["content-type"])).toContain("text/html");
@@ -69,9 +71,11 @@ describe("DebugExceptions browser render", () => {
 describe("DebugExceptions interceptors", () => {
   it("receives the ActionDispatch::Request call built, not the Rack env", async () => {
     let received: unknown;
-    await new DebugExceptions(errorApp, {
-      interceptors: [(request) => (received = request)],
-    }).call({ REQUEST_METHOD: "GET", PATH_INFO: "/test" });
+    await new DebugExceptions(errorApp, null, "default", [(request) => (received = request)]).call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
+    });
     expect(received).toBeInstanceOf(Request);
   });
 });
@@ -81,9 +85,12 @@ describe("DebugExceptions API body conversions", () => {
     MimeType.register("text/wibble", ":wibble");
     HASH_CONVERSIONS.toWibble = (hash) => `wibble:${String(hash.status)}`;
     try {
-      const [, headers, body] = await new DebugExceptions(errorApp, {
-        responseFormat: "api",
-      }).call({ REQUEST_METHOD: "GET", PATH_INFO: "/test", HTTP_ACCEPT: "text/wibble" });
+      const [, headers, body] = await new DebugExceptions(errorApp, null, "api").call({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/test",
+        "action_dispatch.show_detailed_exceptions": true,
+        HTTP_ACCEPT: "text/wibble",
+      });
       expect(String(headers["content-type"])).toContain("text/wibble");
       expect(await bodyToString(body)).toBe("wibble:500");
     } finally {
@@ -99,6 +106,7 @@ describe("DebugExceptions#log_error rescue_response? gate", () => {
     await new DebugExceptions(app).call({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
       "action_dispatch.logger": new Logger(output),
       "action_dispatch.log_rescued_responses": false,
     });
@@ -128,6 +136,7 @@ describe("DebugExceptions#log_array", () => {
     await new DebugExceptions(errorApp).call({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
       "action_dispatch.logger": logger,
     });
     output.rewind();

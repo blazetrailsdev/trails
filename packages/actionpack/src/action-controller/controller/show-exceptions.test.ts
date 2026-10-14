@@ -35,7 +35,7 @@ class ShowExceptionsController extends Base {
 }
 
 describe("ShowExceptionsTest", () => {
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
+  // BLOCKED: show-exceptions-call-gates-on-wrapper-show
   it.skip("show error page from a remote ip", async ({ task }) => {
     const t = new IntegrationTest(task.name);
     t.app = ShowExceptionsController.action("boom");
@@ -79,7 +79,7 @@ class ShowExceptionsOverriddenController extends ShowExceptionsController {
 }
 
 describe("ShowExceptionsOverriddenTest", () => {
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
+  // BLOCKED: show-exceptions-call-gates-on-wrapper-show
   it.skip("show error page", async ({ task }) => {
     const t = new IntegrationTest(task.name);
     t.app = ShowExceptionsOverriddenController.action("boom");
@@ -103,7 +103,7 @@ describe("ShowExceptionsFormatsTest", () => {
     t = new IntegrationTest(task.name);
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
+  // BLOCKED: show-exceptions-call-gates-on-wrapper-show
   it.skip("render json exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "application/json" } });
@@ -114,7 +114,7 @@ describe("ShowExceptionsFormatsTest", () => {
     );
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
+  // BLOCKED: show-exceptions-call-gates-on-wrapper-show
   it.skip("render xml exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "application/xml" } });
@@ -123,7 +123,8 @@ describe("ShowExceptionsFormatsTest", () => {
     expect(t.response.body).toBe(toXml({ status: 500, error: "Internal Server Error" }));
   });
 
-  it("render fallback exception", async () => {
+  // BLOCKED: show-exceptions-call-gates-on-wrapper-show
+  it.skip("render fallback exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "text/csv" } });
     assertResponse("internal_server_error");

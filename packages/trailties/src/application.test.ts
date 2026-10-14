@@ -507,7 +507,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     app.config.considerAllRequestsLocal = true;
     await Trails.initialize();
 
-    const [status] = await app.app()({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
+    const [status] = await app.call({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
     expect(status).toBe(500);
   });
 });
@@ -739,7 +739,7 @@ describe("Application::DefaultMiddlewareStack", () => {
     const mw = new DefaultMiddlewareStack(app, app.config, paths)
       .buildStack()
       .middlewares.find((m) => m.klass === DebugExceptions)!;
-    expect(mw.args).toEqual([{ responseFormat: "api" }]);
+    expect(mw.args).toEqual([app, "api"]);
   });
 
   it("default stack always includes RequestId, ShowExceptions, DebugExceptions, Callbacks, Static", () => {
