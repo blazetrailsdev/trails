@@ -41,7 +41,6 @@ import {
   excSetupMessage,
   exec,
   fetch,
-  initializeIncludedModules,
   isEmpty,
   isNil,
   last,
@@ -912,14 +911,19 @@ export class AbstractAdapter implements Quoting {
     throw new NotImplementedError();
   }
 
-  /** @missingRailsName config — PERMANENT */
+  /**
+   * @missingRailsName config — PERMANENT
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::QueryCache#initialize rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/query_cache.rb:196-199
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::DatabaseStatements#initialize rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:6-9
+   */
   constructor(
     configOrDeprecatedConnection: unknown,
     deprecatedLogger: unknown = null,
     deprecatedConnectionOptions: unknown = null,
     deprecatedConfig: unknown = null,
   ) {
-    initializeIncludedModules(this);
+    this.resetTransaction();
+    this._queryCache = null;
 
     this._rawConnection = null;
     this._unconfiguredConnection = null;

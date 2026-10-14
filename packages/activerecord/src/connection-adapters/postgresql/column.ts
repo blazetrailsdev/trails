@@ -17,6 +17,7 @@ export class Column extends BaseColumn {
     return (this.sqlTypeMetadata as TypeMetadata | null)?.fmod ?? null;
   }
 
+  /** @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,
@@ -38,6 +39,7 @@ export class Column extends BaseColumn {
     this._serial = options.serial ?? false;
     this._identity = options.identity ?? null;
     this._generated = options.generated ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   isIdentity(): boolean {

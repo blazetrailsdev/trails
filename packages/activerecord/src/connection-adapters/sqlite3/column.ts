@@ -8,6 +8,7 @@ export class Column extends BaseColumn {
   rowid: boolean;
   private _generatedType: "stored" | "virtual" | null;
 
+  /** @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,
@@ -25,6 +26,7 @@ export class Column extends BaseColumn {
     this._autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
     this._generatedType = options.generatedType ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   isAutoIncrement(): boolean {

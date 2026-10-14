@@ -7,7 +7,7 @@ function makeColumn(options: {
   generatedType?: "stored" | "virtual" | null;
 }): Column {
   return new Column(
-    "col",
+    `col_${options.generatedType ?? "plain"}_${options.defaultValue ?? "none"}`,
     options.defaultValue ?? null,
     new SqlTypeMetadata({ sqlType: "text" }),
     true,

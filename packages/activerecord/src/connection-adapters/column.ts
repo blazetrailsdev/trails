@@ -17,7 +17,6 @@ export interface Column extends Included<typeof Deduplicable> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Column {
   declare static registry: typeof ClassMethods.registry;
-  declare static new: typeof ClassMethods.new;
 
   name: string;
   sqlTypeMetadata: SqlTypeMetadata | null;
@@ -47,6 +46,7 @@ export class Column {
     return this.sqlTypeMetadata?.sqlType ?? null;
   }
 
+  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,
@@ -65,6 +65,7 @@ export class Column {
     this.defaultFunction = defaultFunction;
     this.collation = options.collation ?? null;
     this.comment = options.comment ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   get hasDefault(): boolean {
@@ -167,6 +168,7 @@ export type ColumnCoder = Record<string, unknown>;
 export class NullColumn extends Column {
   constructor(name: string) {
     super(name, null);
+    if (new.target === NullColumn) return this.deduplicate();
   }
 }
 

@@ -31,13 +31,6 @@ export function registry(this: object): Hash<object, object> {
 
 export const ClassMethods = {
   registry,
-
-  new<C extends new (...args: never[]) => { deduplicate(): unknown }>(
-    this: C,
-    ...args: ConstructorParameters<C>
-  ): InstanceType<C> {
-    return new this(...(args as never[])).deduplicate() as InstanceType<C>;
-  },
 };
 Deduplicable.ClassMethods = ClassMethods;
 

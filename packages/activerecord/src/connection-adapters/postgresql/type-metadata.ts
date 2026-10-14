@@ -16,11 +16,14 @@ export interface TypeMetadata extends Included<typeof Deduplicable> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
   declare static registry: typeof ClassMethods.registry;
-  declare static new: typeof ClassMethods.new;
 
   readonly oid: number | null;
   readonly fmod: number | null;
 
+  /**
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15
+   * @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor
+   */
   constructor(
     typeMetadata: SqlTypeMetadata,
     options: { oid?: number | null; fmod?: number | null } = {},
@@ -28,6 +31,7 @@ export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
     super(typeMetadata);
     this.oid = options.oid ?? null;
     this.fmod = options.fmod ?? null;
+    if (new.target === TypeMetadata) return this.deduplicate();
   }
 
   equals(other: unknown): boolean {

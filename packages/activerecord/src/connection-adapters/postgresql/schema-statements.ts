@@ -1292,7 +1292,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
     }
 
-    return Column.new(columnName, defaultValue, typeMetadata, !notnull, defaultFunction, {
+    return new Column(columnName, defaultValue, typeMetadata, !notnull, defaultFunction, {
       collation: collation ?? undefined,
       comment: comment || null,
       serial,
@@ -1309,14 +1309,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
     fmod: number,
   ): Promise<TypeMetadata> {
     const castType = await this.getOidType(oid, fmod, columnName, sqlType);
-    const simpleType = SqlTypeMetadata.new({
+    const simpleType = new SqlTypeMetadata({
       sqlType,
       type: castType.type(),
       limit: castType.limit ?? null,
       precision: castType.precision ?? null,
       scale: castType.scale ?? null,
     });
-    return TypeMetadata.new(simpleType, { oid, fmod });
+    return new TypeMetadata(simpleType, { oid, fmod });
   }
 
   /** @internal */

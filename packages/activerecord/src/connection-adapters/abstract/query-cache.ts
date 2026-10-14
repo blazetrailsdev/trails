@@ -1,5 +1,5 @@
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { initialize, IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import {
   toSqlAndBinds,
   arelFromRelation,
@@ -12,7 +12,7 @@ import { Fiber, included, Module, rbEnsure, Thread } from "@blazetrails/ruby-com
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
-const DEFAULT_MAX_SIZE = 100;
+export const DEFAULT_SIZE = 100;
 
 export class Store {
   private _map = new Map<string, Result>();
@@ -26,7 +26,7 @@ export class Store {
     return this.dirties;
   }
 
-  constructor(version: { value: number } | null = null, maxSize: number | null = DEFAULT_MAX_SIZE) {
+  constructor(version: { value: number } | null = null, maxSize: number | null = DEFAULT_SIZE) {
     this._maxSize = maxSize;
     this._version = version;
     this._currentVersion = version?.value ?? 0;
@@ -169,23 +169,6 @@ export interface ConnectionPoolConfiguration {
 }
 
 export const ConnectionPoolConfiguration: Module = new Module((mod) => {
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-    this: ConnectionPoolConfigurationHost,
-  ): void {
-    this._queryCacheVersion = { value: 0 };
-    this._threadQueryCaches = new QueryCacheRegistry();
-    const queryCache = this.dbConfig?.queryCache;
-    if (queryCache === 0 || queryCache === false) {
-      this._queryCacheMaxSize = null;
-    } else if (typeof queryCache === "number") {
-      this._queryCacheMaxSize = queryCache;
-    } else if (queryCache == null) {
-      this._queryCacheMaxSize = DEFAULT_MAX_SIZE;
-    } else {
-      this._queryCacheMaxSize = null;
-    }
-  };
-
   mod.defineMethod(
     "checkoutAndVerify",
     async function (
@@ -488,11 +471,7 @@ export const QueryCache: Module & {
     prototype: object;
     setCallback(name: string, ...filterList: unknown[]): void;
   }) => void;
-} = new Module((mod) => {
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: QueryCacheHost): void {
-    this._queryCache = null;
-  };
-}).include({
+} = new Module().include({
   get queryCache(): Store | null {
     return (this as unknown as QueryCacheHost)._queryCache;
   },
