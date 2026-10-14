@@ -3,7 +3,6 @@ import { ArgumentError } from "../argument-error.js";
 import { Exception } from "../exception.js";
 import { rbModName } from "../object.js";
 import { Psych } from "../psych.js";
-import { yaml } from "../psych-adapter.js";
 import { Range } from "../range.js";
 import { RuntimeError } from "../runtime-error.js";
 import { registerConstant, unregisterConstant } from "../variable.js";
@@ -12,7 +11,7 @@ class Widget {}
 class Point {}
 
 function visit(visitor: InstanceType<typeof Psych.Visitors.ToRuby>, source: string): unknown {
-  return visitor.accept(yaml.parseDocument(source).contents as never);
+  return visitor.accept(Psych.parse(source) || null);
 }
 
 function restricted(classes: string[], symbols: string[], aliases = false) {

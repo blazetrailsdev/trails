@@ -4,11 +4,15 @@ import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
 import type { Struct, StructInstance } from "../../struct.js";
 import type { Alias, Node, ParsedNode, Scalar, YAMLMap, YAMLSeq } from "yaml";
 import { Psych } from "../../psych.js";
-import { yaml } from "../../psych-adapter.js";
+import type * as Yaml from "yaml";
+import { yaml as backend, type PsychNode } from "../../psych-adapter.js";
 import { Coder } from "../coder.js";
+import { Omap } from "../omap.js";
 import { ClassLoader } from "../class-loader.js";
 import { AliasesNotEnabled, AnchorNotDefined } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
+
+const yaml = backend as unknown as typeof Yaml;
 
 type RubyClass = { prototype: object; allocate?: () => object };
 
@@ -43,6 +47,8 @@ export class ToRuby {
   private readonly ss: ScalarScanner;
   private readonly symbolizeNames: boolean;
   private readonly freeze: boolean;
+  private readonly loadTags: Record<string, string>;
+  private readonly domainTypes: typeof Psych.domainTypes;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
@@ -51,18 +57,75 @@ export class ToRuby {
     { symbolizeNames = false, freeze = false } = {},
   ) {
     this.ss = ss;
+    this.loadTags = Psych.loadTags;
+    this.domainTypes = Psych.domainTypes;
     this.classLoader = classLoader;
     this.symbolizeNames = symbolizeNames;
     this.freeze = freeze;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  accept(o: ParsedNode | null): unknown {
-    if (o === null) return null;
+  /**
+   * `ToRuby#accept` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:35-50`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  accept(target: PsychNode | null): unknown {
+    if (target === null) return null;
+    let result = this.visit(target as ParsedNode);
+
+    if (!(Object.keys(this.domainTypes).length === 0 || !target.tag)) {
+      let key = target.tag.replace(/^[!/]*/, "").replace(/(,\d+)\//, "$1:");
+      if (!/^(?:tag:|x-private)/.test(key)) key = `tag:${key}`;
+
+      if (Object.hasOwn(this.domainTypes, key)) {
+        const [value, block] = this.domainTypes[key];
+        result = block(value, result);
+      }
+    }
+
+    if (this.freeze) result = Object.freeze(result);
+    return result;
+  }
+
+  private visit(o: ParsedNode): unknown {
     if (yaml.isAlias(o)) return this.visitPsychNodesAlias(o);
     if (yaml.isMap(o)) return this.visitMapping(o);
-    if (yaml.isSeq(o)) return this.register(o, this.registerEmpty(o));
+    if (yaml.isSeq(o)) return this.visitPsychNodesSequence(o);
     return this.register(o, this.deserialize(o));
+  }
+
+  private visitPsychNodesSequence(o: YAMLSeq.Parsed): unknown {
+    const klass = this.resolveClass(this.loadTags[o.tag ?? ""]);
+    if (klass) {
+      const instance = allocate(klass);
+
+      if (rbObjRespondTo(instance, "initWith")) {
+        const coder = new Coder(o.tag!);
+        coder.setSeq(o.items.map((c) => this.accept(c)));
+        (instance as { initWith(coder: Coder): void }).initWith(coder);
+      }
+
+      return instance;
+    }
+
+    let match: RegExpExecArray | null;
+    if (!o.tag) {
+      return this.register(o, this.registerEmpty(o));
+    } else if (o.tag === "!omap" || o.tag === "tag:yaml.org,2002:omap") {
+      const map = this.register(o, new Omap());
+      for (const a of o.items as YAMLMap.Parsed[]) {
+        const { key, value } = a.items[0] as { key: ParsedNode; value: ParsedNode };
+        map.set(this.accept(key), this.accept(value));
+      }
+      return map;
+    } else if ((match = /^!(?:seq|ruby\/array):(.*)$/.exec(o.tag))) {
+      const klass = this.resolveClass(match[1]);
+      const list = this.register(o, allocate(klass) as unknown[]);
+      for (const c of o.items) list.push(this.accept(c));
+      return list;
+    } else {
+      return this.register(o, this.registerEmpty(o));
+    }
   }
 
   /**
@@ -70,12 +133,26 @@ export class ToRuby {
    *
    * @noRailsEquivalent PERMANENT
    */
-  visitPsychNodesAlias(o: Alias): unknown {
-    if (!this.st.has(o.source)) throw new AnchorNotDefined(o.source);
-    return this.st.get(o.source);
+  visitPsychNodesAlias(o: PsychNode): unknown {
+    const { source } = o as Alias;
+    if (!this.st.has(source)) throw new AnchorNotDefined(source);
+    return this.st.get(source);
   }
 
   private deserialize(o: Scalar.Parsed): unknown {
+    const klass = this.resolveClass(this.loadTags[o.tag ?? ""]);
+    if (klass) {
+      const instance = allocate(klass);
+
+      if (rbObjRespondTo(instance, "initWith")) {
+        const coder = new Coder(o.tag!);
+        coder.setScalar(o.source);
+        (instance as { initWith(coder: Coder): void }).initWith(coder);
+      }
+
+      return instance;
+    }
+
     if (!o.tag && o.type !== yaml.Scalar.PLAIN) return o.value;
     if (!o.tag) return this.ss.tokenize(o.source);
 
@@ -104,8 +181,8 @@ export class ToRuby {
   }
 
   private visitMapping(o: YAMLMap): unknown {
-    if (o.tag && Psych.loadTags[o.tag])
-      return this.revive(this.resolveClass(Psych.loadTags[o.tag]), o);
+    if (o.tag && this.loadTags[o.tag])
+      return this.revive(this.resolveClass(this.loadTags[o.tag]), o);
     if (!o.tag)
       return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
 
@@ -169,7 +246,11 @@ export class ToRuby {
     return list;
   }
 
-  private reviveHash(hash: Record<string, unknown>, o: YAMLMap): Record<string, unknown> {
+  private reviveHash(
+    hash: Record<string, unknown>,
+    o: YAMLMap,
+    tagged = false,
+  ): Record<string, unknown> {
     const aset = (key: string, val: unknown) => {
       if (hash instanceof Map) hash.set(key, val);
       else hash[key] = val;
@@ -178,13 +259,18 @@ export class ToRuby {
       for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(String(k), v);
     };
     for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
-      const key = String(this.accept(k));
+      const key = this.accept(k);
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
         if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") mergeBang(val as object);
         else if (yaml.isSeq(v)) (val as object[]).slice().reverse().forEach(mergeBang);
-        else aset(key, val);
-      } else aset(key, val);
+        else aset(String(key), val);
+      } else {
+        aset(
+          String(!tagged && this.symbolizeNames && typeof key === "string" ? `:${key}` : key),
+          val,
+        );
+      }
     }
     return hash;
   }
@@ -193,7 +279,7 @@ export class ToRuby {
     const s = this.register(node, allocate(klass));
     return this.initWith(
       s,
-      this.reviveHash(Object.create(null) as Record<string, never>, node),
+      this.reviveHash(Object.create(null) as Record<string, never>, node, true),
       node,
     );
   }
@@ -208,7 +294,7 @@ export class ToRuby {
     return o;
   }
 
-  private resolveClass(klassname: string): RubyClass {
+  private resolveClass(klassname: string | undefined): RubyClass {
     return this.classLoader.load(klassname) as RubyClass;
   }
 }
@@ -220,7 +306,7 @@ export class ToRuby {
  */
 export class NoAliasRuby extends ToRuby {
   /** @noRailsEquivalent PERMANENT */
-  override visitPsychNodesAlias(_o: Alias): unknown {
+  override visitPsychNodesAlias(_o: PsychNode): unknown {
     throw new AliasesNotEnabled();
   }
 }

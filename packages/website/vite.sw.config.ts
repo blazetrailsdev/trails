@@ -11,22 +11,6 @@ function pkgAlias(name: string, entry: string) {
   };
 }
 
-function stubPsychAdapter() {
-  return {
-    name: "stub-psych-adapter",
-    enforce: "pre" as const,
-    resolveId(source: string, importer: string | undefined) {
-      if (
-        source === "@blazetrails/ruby-compat/psych-adapter" ||
-        (source.endsWith("/psych-adapter.js") && importer?.includes("/ruby-compat/"))
-      ) {
-        return path.resolve(__dirname, "src/stubs/yaml-stub.ts");
-      }
-      return null;
-    },
-  };
-}
-
 function prependImportScripts() {
   return {
     name: "prepend-importscripts",
@@ -41,14 +25,13 @@ function prependImportScripts() {
 }
 
 export default defineConfig({
-  plugins: [stubPsychAdapter(), prependImportScripts()],
+  plugins: [prependImportScripts()],
   resolve: {
     alias: [
       // Subpath imports must come before the base alias. The activerecord
       // sqlite drivers (@blazetrails/activerecord/sqlite/<name>) are handled by
       // the generic activerecord subpath alias below — the src/sqlite/ dir
       // matches the specifier, so no special case is needed.
-      pkgAlias("@blazetrails/ruby-compat/psych-adapter", "src/stubs/yaml-stub.ts"),
       {
         find: /^@blazetrails\/activesupport\/(.+)$/,
         replacement: path.resolve(__dirname, "../activesupport/src/$1.ts"),

@@ -20,6 +20,13 @@ export const coderType: unique symbol = Symbol("type");
 export const coderSeq: unique symbol = Symbol("seq");
 
 /**
+ * `Psych::Coder`'s `@scalar` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:20`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const coderScalar: unique symbol = Symbol("scalar");
+
+/**
  * `Psych::Coder` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:9`).
  *
  * @noRailsEquivalent PERMANENT
@@ -28,7 +35,9 @@ export class Coder {
   /** @noRailsEquivalent PERMANENT */
   declare [coderTag]: string | null;
   /** @noRailsEquivalent PERMANENT */
-  declare [coderType]: ":map" | ":seq";
+  declare [coderType]: ":map" | ":seq" | ":scalar";
+  /** @noRailsEquivalent PERMANENT */
+  declare [coderScalar]: unknown;
   /** @noRailsEquivalent PERMANENT */
   declare [coderSeq]: unknown[];
   [key: string]: unknown;
@@ -49,6 +58,29 @@ export class Coder {
   representSeq(tag: string | null, list: unknown[]): void {
     this[coderTag] = tag;
     this.setSeq(list);
+  }
+
+  /**
+   * `Psych::Coder#scalar` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:24-31`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  scalar(...args: unknown[]): unknown {
+    if (args.length > 0) {
+      [this[coderTag], this[coderScalar]] = args as [string | null, unknown];
+      this[coderType] = ":scalar";
+    }
+    return this[coderScalar];
+  }
+
+  /**
+   * `Psych::Coder#scalar=` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:66-69`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  setScalar(value: unknown): void {
+    this[coderType] = ":scalar";
+    this[coderScalar] = value;
   }
 
   /**

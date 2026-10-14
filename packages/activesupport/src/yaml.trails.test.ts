@@ -145,7 +145,7 @@ describe("Psych object protocol", () => {
     })();
     h.set("x", 42);
     expect(Psych.dump(h)).toBe(
-      "---\n!ruby/hash-with-ivars:Carrier\nivars:\n  :@foo: bar\nelements:\n  x: 42\n",
+      "--- !ruby/hash-with-ivars:Carrier\nivars:\n  :@foo: bar\nelements:\n  x: 42\n",
     );
   });
 
@@ -163,6 +163,6 @@ describe("Psych object protocol", () => {
   it("tags a Hash subclass without ivars as !ruby/hash", () => {
     const h = new (class Plain extends HashWithIndifferentAccess {})();
     h.set("x", 42);
-    expect(Psych.dump(h)).toBe("---\n!ruby/hash:Plain\nx: 42\n");
+    expect(Psych.dump(h)).toBe("--- !ruby/hash:Plain\nx: 42\n");
   });
 });
