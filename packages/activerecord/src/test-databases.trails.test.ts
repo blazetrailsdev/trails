@@ -4,16 +4,9 @@ import { setEnv } from "@blazetrails/ruby-compat";
 import { TestDatabases } from "./test-databases.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
-import { UrlConfig } from "./database-configurations/url-config.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as connectionHandling from "./connection-handling.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-
-const stubConfigurations = (configs: UrlConfig[]): DatabaseConfigurations => {
-  const dc = new DatabaseConfigurations({});
-  vi.spyOn(DatabaseConfigurations.prototype, "configsFor").mockReturnValue(configs);
-  return dc;
-};
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -37,14 +30,12 @@ describe("TestDatabases.createAndLoadSchema", () => {
     vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
     vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined as never);
 
-    const dbConfig = new UrlConfig("arunit", "primary", "test/db/primary.sqlite3", {
-      adapter: "sqlite3",
-    });
-
-    Base.configurations(stubConfigurations([dbConfig]));
+    Base.configurations({ arunit: { primary: { url: "sqlite3:test/db/primary.sqlite3" } } });
 
     await TestDatabases.createAndLoadSchema(5, { envName: "arunit" });
-    expect(dbConfig.database).toBe("test/db/primary.sqlite3-5");
+    expect(Base.configurations().configsFor({ envName: "arunit", name: "primary" })!.database).toBe(
+      "test/db/primary.sqlite3-5",
+    );
   });
 
   it("reconnects through the ensure even when the registry is empty", async () => {
@@ -71,11 +62,7 @@ describe("TestDatabases.createAndLoadSchema", () => {
       .spyOn(connectionHandling, "establishConnection")
       .mockResolvedValue(undefined as never);
 
-    const dbConfig = new UrlConfig("arunit", "primary", "test/db/primary.sqlite3", {
-      adapter: "sqlite3",
-    });
-
-    Base.configurations(stubConfigurations([dbConfig]));
+    Base.configurations({ arunit: { primary: { url: "sqlite3:test/db/primary.sqlite3" } } });
 
     const originalVerbose = getEnv("VERBOSE");
     setEnv("VERBOSE", "1");
