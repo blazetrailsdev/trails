@@ -183,19 +183,16 @@ export class Delegator {
   /** @noRailsEquivalent PERMANENT */
   constructor(obj: unknown) {
     this.__setobj__(obj);
-    return methodMissingProxy(this, { delegate: (self) => self.__getobj__() });
+    return methodMissingProxy(this, { delegate: (self) => self.__getobj__(() => undefined) });
   }
 
-  /**
-   * `Delegator#__getobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:190-192`).
-   */
-  __getobj__(): unknown {
+  /** `Delegator#__getobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:190-192`). */
+  // eslint-disable-next-line unused-imports/no-unused-vars -- Ruby's implicit block, which the overrides yield to.
+  __getobj__(block?: () => unknown): unknown {
     throw new NotImplementedError("need to define `__getobj__'");
   }
 
-  /**
-   * `Delegator#__setobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:198-200`).
-   */
+  /** `Delegator#__setobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:198-200`). */
   // eslint-disable-next-line unused-imports/no-unused-vars -- the abstract method names the parameter its overrides take.
   __setobj__(obj: unknown): void {
     throw new NotImplementedError("need to define `__setobj__'");
@@ -212,17 +209,16 @@ export class SimpleDelegator extends Delegator {
   /** @noRailsEquivalent PERMANENT */
   declare delegateSdObj: unknown;
 
-  /**
-   * `SimpleDelegator#__getobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:320-326`).
-   */
-  override __getobj__(): unknown {
-    if (!("delegateSdObj" in this)) throw new ArgumentError("not delegated");
+  /** `SimpleDelegator#__getobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:320-326`). */
+  override __getobj__(block?: () => unknown): unknown {
+    if (!Object.hasOwn(this, "delegateSdObj")) {
+      if (block) return block();
+      throw new ArgumentError("not delegated");
+    }
     return this.delegateSdObj;
   }
 
-  /**
-   * `SimpleDelegator#__setobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:340-343`).
-   */
+  /** `SimpleDelegator#__setobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:340-343`). */
   override __setobj__(obj: unknown): void {
     if ((this as unknown) === obj) throw new ArgumentError("cannot delegate to self");
     this.delegateSdObj = obj;

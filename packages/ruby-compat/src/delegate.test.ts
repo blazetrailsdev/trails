@@ -90,5 +90,9 @@ describe("TestDelegateClass", () => {
     const unset = Object.create(SimpleDelegator.prototype) as SimpleDelegator;
     expect(() => unset.__getobj__()).toThrow(ArgumentError);
     expect(() => unset.__getobj__()).toThrow(/not delegated/);
+    expect(unset.__getobj__(() => "block")).toBe("block");
+    const proxied = new SimpleDelegator([]);
+    delete (proxied as { delegateSdObj?: unknown }).delegateSdObj;
+    expect("length" in proxied).toBe(false);
   });
 });
