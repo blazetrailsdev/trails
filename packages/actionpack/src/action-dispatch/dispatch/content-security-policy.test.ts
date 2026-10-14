@@ -237,7 +237,7 @@ describe("ContentSecurityPolicyTest", () => {
 
   it("require sri for directive", () => {
     const policy = new ContentSecurityPolicy();
-    policy.requireSriFor("script", "style");
+    policy.requireSriFor(":script", ":style");
     expect(policy.build()).toBe("require-sri-for script style");
   });
 

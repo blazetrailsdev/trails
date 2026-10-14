@@ -149,9 +149,8 @@ export class PermissionsPolicy {
   }
 
   /** @internal */
-  initializeCopy(other: PermissionsPolicy): this {
-    this.directives = deepDup(other.directives);
-    return this;
+  initializeCopy(other: PermissionsPolicy): Record<string, PolicySource[]> {
+    return (this.directives = deepDup(other.directives));
   }
 
   build(context?: unknown): string {

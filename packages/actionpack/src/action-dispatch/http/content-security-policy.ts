@@ -93,8 +93,8 @@ export class ContentSecurityPolicy {
     if (init) init(this);
   }
 
-  initializeCopy(other: ContentSecurityPolicy): void {
-    this.directives = deepDup(other.directives);
+  initializeCopy(other: ContentSecurityPolicy): Record<DirectiveName, DirectiveValue> {
+    return (this.directives = deepDup(other.directives));
   }
 
   defaultSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
@@ -291,8 +291,10 @@ export class ContentSecurityPolicy {
 
   /** @internal */
   private resolveSource(source: CSPSource, context: unknown): string[] {
-    if (typeof source === "string") {
+    if (typeof source === "string" && !source.startsWith(":")) {
       return [source];
+    } else if (typeof source === "string") {
+      return [source.slice(1)];
     }
     if (typeof source === "function") {
       if (context === undefined) {

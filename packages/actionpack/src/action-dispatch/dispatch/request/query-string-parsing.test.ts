@@ -1,11 +1,15 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Request as RackRequest, type RackApp, type RackEnv } from "@blazetrails/rack";
+import {
+  Request as RackRequest,
+  type RackApp,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Request } from "../../http/request.js";
 import { Base } from "../../../action-controller/base.js";
 import { deprecator } from "../../deprecator.js";
 import { IntegrationTest } from "../../testing/integration.js";
-import type { MiddlewareFactory } from "../../middleware/stack.js";
 import type { RouteSet } from "../../routing/route-set.js";
 import "../../../test-helpers/abstract-unit.js";
 
@@ -33,7 +37,7 @@ describe("QueryStringParsingTest", () => {
       void new RackRequest(env).params;
     }
 
-    call(env: RackEnv) {
+    async call(env: RackEnv): Promise<RackResponse> {
       this.populateRackCache(env);
       return this.app(env);
     }
@@ -43,12 +47,13 @@ describe("QueryStringParsingTest", () => {
   beforeEach(({ testCase }) => {
     t = testCase as QueryStringParsingTest;
     t.app = IntegrationTest.buildApp(null, (middleware) => {
-      middleware.use(EarlyParse as unknown as MiddlewareFactory);
+      middleware.use(EarlyParse);
     });
   });
   const initialPerformDeepMunge = Request.Utils.performDeepMunge;
   afterEach(() => {
     Request.Utils.performDeepMunge = initialPerformDeepMunge;
+    TestController.lastQueryParameters = null;
   });
 
   const assertParses = async (expected: unknown, actual: string): Promise<void> => {
