@@ -327,6 +327,7 @@ const UTC_OFFSET_WITHOUT_COLON = UTC_OFFSET_WITH_COLON.replaceAll(":", "");
 
 const zoneCache = new Map<string, TimeZone>();
 let zones: TimeZone[] | null = null;
+let creating = false;
 const countryZonesMemo = new Map<string, TimeZone[]>();
 let zonesMapMemo: Record<string, TimeZone> | null = null;
 
@@ -595,11 +596,17 @@ export class Timezone {
 }
 
 export class TimeZone {
-  readonly name: string;
-  readonly tzinfo: Timezone;
-  private readonly _utcOffset: number | null;
+  declare readonly name: string;
+  declare readonly tzinfo: Timezone;
+  declare private readonly _utcOffset: number | null;
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm create — PERMANENT
+   */
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
+    if (!creating) return TimeZone.find(name) ?? TimeZone.create(name);
+    creating = false;
     this.name = name;
     this._utcOffset = utcOffset;
     this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
@@ -653,7 +660,12 @@ export class TimeZone {
     utcOffset: number | null = null,
     tzinfo: Timezone | null = null,
   ): TimeZone {
-    return new TimeZone(name, utcOffset, tzinfo);
+    creating = true;
+    try {
+      return new TimeZone(name, utcOffset, tzinfo);
+    } finally {
+      creating = false;
+    }
   }
 
   static all(): TimeZone[] {
