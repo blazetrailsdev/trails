@@ -1953,3 +1953,14 @@ describe("Module#include of a Module", () => {
     expect(seen).toEqual([Outer]);
   });
 });
+
+describe("Module#include of a Module with a named included", () => {
+  it("fires the named included hook", () => {
+    const seen: unknown[] = [];
+    const Inner = new Module() as Module & { included(base: unknown): void };
+    Inner.included = (base: unknown) => seen.push(base);
+    const Outer = new Module();
+    Outer.include(Inner);
+    expect(seen).toEqual([Outer]);
+  });
+});

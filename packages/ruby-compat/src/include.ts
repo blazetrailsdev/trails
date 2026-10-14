@@ -277,6 +277,8 @@ export class Module<I extends object = Record<never, never>> {
       Module.prototype.appendFeatures.call(mod, this);
       if (typeof (mod as ModuleHooks)[included] === "function") {
         (mod as ModuleHooks)[included]!(this);
+      } else {
+        featureHook(mod, "included")?.(this);
       }
       return this;
     }
