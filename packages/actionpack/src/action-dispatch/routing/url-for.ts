@@ -8,6 +8,7 @@ import {
 import {
   extend,
   type Hash,
+  dup,
   hashDelete,
   include,
   isSymbol,
@@ -71,7 +72,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     const routeName =
       options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
     const mergedUrlOptions = reverseMergeBang(
-      toH<Record<string, unknown> | Hash<string, unknown>>(options),
+      dup(toH<Record<string, unknown> | Hash<string, unknown>>(options)),
       this.urlOptions(),
     );
     return this._routes!.urlFor(

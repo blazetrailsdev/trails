@@ -68,7 +68,7 @@ export class InfoController extends ApplicationController {
         match = routeWrapper.path.match(new RegExp(query));
         match ||= routeWrapper.name.includes(queryWithoutUrlOrPathSuffix);
       }
-      match ||= query === (routeWrapper.__getobj__() as typeof route).verb;
+      match ||= query === routeWrapper.verb;
       if (!match) {
         const controllerAction = RFC2396_PARSER.escape(routeWrapper.reqs);
         match = exactMatch ? query === controllerAction : controllerAction.includes(query);

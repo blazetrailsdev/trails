@@ -163,6 +163,13 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     });
   });
 
+  it("leaves the caller's hash untouched when url_options are merged in", () => {
+    const host = makeHost({ urlOptions: () => ({ host: "www.example.com" }) });
+    const options = { controller: "posts", action: "show" };
+    fullUrlFor.call(host, options);
+    expect(options).toEqual({ controller: "posts", action: "show" });
+  });
+
   it("unpermitted Parameters throw UnfilteredParameters from toH()", () => {
     const params = new Parameters({ id: 1 });
     expect(() => fullUrlFor.call(makeHost(), params)).toThrow(/unpermitted|unfiltered/i);

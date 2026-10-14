@@ -1,6 +1,6 @@
 import { underscore } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
+import { except, RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
@@ -31,22 +31,27 @@ function formatConstraints(c: Record<string, unknown>): string {
   return `{${parts.join(", ")}}`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface RouteWrapper extends Pick<
+  Route,
+  "app" | "requirements" | "parts" | "internal" | "verb" | "sourceLocation"
+> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RouteWrapper extends SimpleDelegator {
   private _reqs: string | undefined = undefined;
 
   /** @internal */
   isMatchesFilter(filter: string, value: RegExp | string): boolean {
     if (filter === "exact_path_match") {
-      if (typeof value !== "string") return false;
-      return (this.__getobj__() as Route).path.match(value) !== undefined;
+      return (this.__getobj__() as Route).path.match(value as string) !== undefined;
     }
-    const re = value instanceof RegExp ? value : new RegExp(String(value));
-    const target = (this as unknown as Record<string, unknown>)[filter];
-    return typeof target === "string" && re.test(target);
+
+    return (value as RegExp).test((this as unknown as Record<string, string>)[filter]);
   }
 
   get endpoint(): string {
-    if (((this.__getobj__() as Route).app as Endpoint).dispatcher()) {
+    if ((this.app as Endpoint).dispatcher()) {
       return `${this.controller}#${this.action}`;
     } else if (
       typeof this.rackApp === "function" &&
@@ -59,12 +64,11 @@ export class RouteWrapper extends SimpleDelegator {
   }
 
   get constraints(): Record<string, unknown> {
-    const { controller: _c, action: _a, ...rest } = (this.__getobj__() as Route).requirements;
-    return rest;
+    return except(this.requirements, "controller", "action");
   }
 
   get rackApp(): unknown {
-    return ((this.__getobj__() as Route).app as Endpoint).rackApp();
+    return (this.app as Endpoint).rackApp();
   }
 
   get path(): string {
@@ -74,14 +78,12 @@ export class RouteWrapper extends SimpleDelegator {
     return (this.__getobj__() as Route).name ?? "";
   }
   get controller(): string {
-    return (this.__getobj__() as Route).parts.includes("controller")
+    return this.parts.includes("controller")
       ? ":controller"
-      : ((this.__getobj__() as Route).requirements.controller as string);
+      : (this.requirements.controller as string);
   }
   get action(): string {
-    return (this.__getobj__() as Route).parts.includes("action")
-      ? ":action"
-      : ((this.__getobj__() as Route).requirements.action as string);
+    return this.parts.includes("action") ? ":action" : (this.requirements.action as string);
   }
 
   get reqs(): string {
@@ -95,11 +97,11 @@ export class RouteWrapper extends SimpleDelegator {
 
   /** @internal */
   isInternal(): boolean {
-    return (this.__getobj__() as Route).internal;
+    return this.internal;
   }
 
   isEngine(): boolean {
-    return ((this.__getobj__() as Route).app as Endpoint).engine();
+    return (this.app as Endpoint).engine();
   }
 }
 
@@ -167,10 +169,10 @@ export class RoutesInspector {
         this.collectEngineRoutes(w);
         return {
           name: w.name,
-          verb: (w.__getobj__() as Route).verb,
+          verb: w.verb,
           path: w.path,
           reqs: w.reqs,
-          sourceLocation: (w.__getobj__() as Route).sourceLocation ?? undefined,
+          sourceLocation: w.sourceLocation ?? undefined,
         };
       });
   }

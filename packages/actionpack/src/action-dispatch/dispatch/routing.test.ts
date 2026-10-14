@@ -3034,8 +3034,8 @@ describe("TestRoutingMapper", () => {
       after = this.hasNamedRoute("hello");
     });
 
-    expect(before).toBe(false);
-    expect(after).toBe(true);
+    expect(before).toBeFalsy();
+    expect(after).toBeTruthy();
   });
   it("explicitly avoiding the named route", () => {
     draw(function () {
@@ -3046,7 +3046,7 @@ describe("TestRoutingMapper", () => {
       });
     });
 
-    expect(rbObjRespondTo(t, "routesNoCollisionPath")).toBe(false);
+    expect(rbObjRespondTo(t, "routesNoCollisionPath")).toBeFalsy();
   });
   it("nested route in nested resource", async () => {
     draw(function () {
@@ -3271,7 +3271,7 @@ describe("TestRoutingMapper", () => {
     });
 
     await t.get("/search");
-    expect(Object.isFrozen(t.request.params["action"])).toBe(true);
+    expect(Object.isFrozen(t.request.params["action"])).toBeTruthy();
   });
   it("absolute controller namespace", async () => {
     draw(function () {

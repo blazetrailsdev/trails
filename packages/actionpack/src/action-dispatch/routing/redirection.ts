@@ -217,7 +217,7 @@ export function redirect(
   >
 ): Redirect<unknown> {
   const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
-  const status = (hashDelete(options, "status") as number | null) ?? 301;
+  const status = (hashDelete(options, "status") as number | null) || 301;
   const path = args.shift();
 
   if (Object.keys(options).length > 0) {
