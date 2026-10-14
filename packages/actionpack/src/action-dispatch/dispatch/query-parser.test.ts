@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { QueryParser, type QueryPair } from "./query-parser.js";
+import { QueryParser, type QueryPair } from "../http/query-parser.js";
 
 function parsedPairs(query: string, separator?: string | null): QueryPair[] {
   return Array.from(QueryParser.eachPair(query, separator));

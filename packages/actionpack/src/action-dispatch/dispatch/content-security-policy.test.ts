@@ -4,7 +4,16 @@ import { ContentSecurityPolicy, MAPPINGS } from "../content-security-policy.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { Base } from "../../action-controller/base.js";
 import type { AbstractController } from "../../abstract-controller/base.js";
-import type { RackApp, RackEnv } from "@blazetrails/rack";
+import {
+  Lint,
+  bodyFromString,
+  MockRequest,
+  type RackApp,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
+import { Middleware } from "../http/content-security-policy.js";
+import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import type { RouteSet } from "../routing/route-set.js";
 import { controllerConstants } from "../http/request.js";
 import { Cookies } from "../middleware/cookies.js";
@@ -228,7 +237,7 @@ describe("ContentSecurityPolicyTest", () => {
 
   it("require sri for directive", () => {
     const policy = new ContentSecurityPolicy();
-    policy.requireSriFor("script", "style");
+    policy.requireSriFor(":script", ":style");
     expect(policy.build()).toBe("require-sri-for script style");
   });
 
@@ -300,38 +309,38 @@ describe("ContentSecurityPolicyTest", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("'self'");
     policy.scriptSrc();
-    expect(policy.directives.has("script-src")).toBe(false);
+    expect("script-src" in policy.directives).toBe(false);
   });
 
   it("DSL with falsy first arg clears the directive", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("'self'");
     policy.scriptSrc(null);
-    expect(policy.directives.has("script-src")).toBe(false);
+    expect("script-src" in policy.directives).toBe(false);
   });
 
   it("DSL with empty-string first arg keeps the directive (Ruby truthiness)", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("");
-    expect(policy.directives.has("script-src")).toBe(true);
+    expect("script-src" in policy.directives).toBe(true);
   });
 
   it("block_all_mixed_content stores true sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.blockAllMixedContent();
-    expect(policy.directives.get("block-all-mixed-content")).toBe(true);
+    expect(policy.directives["block-all-mixed-content"]).toBe(true);
   });
 
   it("upgrade_insecure_requests stores true sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.upgradeInsecureRequests();
-    expect(policy.directives.get("upgrade-insecure-requests")).toBe(true);
+    expect(policy.directives["upgrade-insecure-requests"]).toBe(true);
   });
 
   it("sandbox with no args stores true sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.sandbox();
-    expect(policy.directives.get("sandbox")).toBe(true);
+    expect(policy.directives["sandbox"]).toBe(true);
     expect(policy.build()).toBe("sandbox");
   });
 
@@ -345,7 +354,7 @@ describe("ContentSecurityPolicyTest", () => {
     const policy = new ContentSecurityPolicy();
     policy.upgradeInsecureRequests();
     const copy = rbObjDup(policy);
-    expect(copy.directives.get("upgrade-insecure-requests")).toBe(true);
+    expect(copy.directives["upgrade-insecure-requests"]).toBe(true);
     expect(copy.build()).toBe("upgrade-insecure-requests");
   });
 });
@@ -458,6 +467,57 @@ function buildCspApp() {
   controllerConstants.set("csp", CspIntegrationController);
   return app;
 }
+
+describe("ContentSecurityPolicyMiddlewareTest", () => {
+  function buildApp(app: RackApp): Lint {
+    const inner = new Lint(app);
+    const middleware = new Middleware((e) => inner.call(e));
+    return new Lint((e) => middleware.call(e));
+  }
+  let env: RackEnv;
+  let defaultCsp: string;
+
+  beforeEach(() => {
+    env = MockRequest.envFor("", {});
+    env["action_dispatch.content_security_policy"] = new ContentSecurityPolicy((p) => {
+      p.defaultSrc(() => ":self");
+    });
+    env["action_dispatch.content_security_policy_nonce_generator"] = () => "iyhD0Yc0W+c=";
+    env["action_dispatch.content_security_policy_report_only"] = false;
+    env["action_dispatch.show_exceptions"] = ":none";
+
+    defaultCsp = "default-src 'self' https: http:";
+  });
+
+  it("rack lint", async () => {
+    const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
+
+    await expect(buildApp(app).call(env)).resolves.toBeDefined();
+  });
+
+  it("does not override app content security policy", async () => {
+    const app = async (): Promise<RackResponse> => [
+      200,
+      { [CONTENT_SECURITY_POLICY]: defaultCsp },
+      bodyFromString(""),
+    ];
+    const [, headers] = await buildApp(app).call(env);
+
+    expect(headers[CONTENT_SECURITY_POLICY]).toBe(defaultCsp);
+  });
+
+  it("does not override app content security policy report only", async () => {
+    const app = async (): Promise<RackResponse> => [
+      200,
+      { [CONTENT_SECURITY_POLICY_REPORT_ONLY]: defaultCsp },
+      bodyFromString(""),
+    ];
+    env["action_dispatch.content_security_policy_report_only"] = true;
+    const [, headers] = await buildApp(app).call(env);
+
+    expect(headers[CONTENT_SECURITY_POLICY_REPORT_ONLY]).toBe(defaultCsp);
+  });
+});
 
 function cspEnv(policy: ContentSecurityPolicy | null, extra: Record<string, unknown> = {}) {
   return {

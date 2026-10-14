@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./param-error.js";
-import { ParamBuilder } from "./param-builder.js";
+import {
+  InvalidParameterError,
+  ParameterTypeError,
+  ParamsTooDeepError,
+} from "../http/param-error.js";
+import { ParamBuilder } from "../http/param-builder.js";
 
 function plain(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(plain);
@@ -13,7 +17,7 @@ function plain(v: unknown): unknown {
   return v;
 }
 
-describe("ParamBuilder", () => {
+describe("ParamBuilderTest", () => {
   const previous = ParamBuilder.ignoreLeadingBrackets;
   afterEach(() => {
     ParamBuilder.ignoreLeadingBrackets = previous;

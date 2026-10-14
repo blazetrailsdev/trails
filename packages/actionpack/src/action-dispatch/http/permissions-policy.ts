@@ -1,7 +1,8 @@
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, hashDelete, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
+import { deepDup } from "@blazetrails/activesupport";
 
 /** @internal */
 const MAPPINGS: Record<string, string> = {
@@ -46,98 +47,189 @@ export class Middleware {
   }
 
   private policyEmpty(policy: PermissionsPolicy | null | undefined): boolean {
-    return policy?.directives.size === 0;
+    return policy != null && Object.keys(policy.directives).length === 0;
   }
 }
 
 export class PermissionsPolicy {
   /** @internal */
-  directives: Map<string, PolicySource[]> = new Map();
+  directives: Record<string, PolicySource[]> = {};
 
   constructor(block?: (policy: PermissionsPolicy) => void) {
     if (block) block(this);
   }
 
-  accelerometer(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("accelerometer", sources);
-  }
-  ambientLightSensor(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("ambient-light-sensor", sources);
-  }
-  autoplay(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("autoplay", sources);
-  }
-  camera(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("camera", sources);
-  }
-  displayCapture(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("display-capture", sources);
-  }
-  encryptedMedia(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("encrypted-media", sources);
-  }
-  fullscreen(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("fullscreen", sources);
-  }
-  geolocation(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("geolocation", sources);
-  }
-  gyroscope(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("gyroscope", sources);
-  }
-  hid(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("hid", sources);
-  }
-  idleDetection(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("idle-detection", sources);
-  }
-  keyboardMap(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("keyboard-map", sources);
-  }
-  magnetometer(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("magnetometer", sources);
-  }
-  microphone(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("microphone", sources);
-  }
-  midi(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("midi", sources);
-  }
-  payment(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("payment", sources);
-  }
-  pictureInPicture(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("picture-in-picture", sources);
-  }
-  screenWakeLock(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("screen-wake-lock", sources);
-  }
-  serial(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("serial", sources);
-  }
-  syncXhr(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("sync-xhr", sources);
-  }
-  usb(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("usb", sources);
-  }
-  webShare(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("web-share", sources);
-  }
-
-  /** @internal */
-  private _set(directive: string, sources: Array<PolicySource | null | undefined>): void {
-    if (sources.length === 0 || sources[0] == null) {
-      this.directives.delete(directive);
+  accelerometer(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["accelerometer"] = this.applyMappings(sources as PolicySource[]));
     } else {
-      this.directives.set(directive, this.applyMappings(sources as PolicySource[]));
+      return hashDelete(this.directives, "accelerometer");
+    }
+  }
+  ambientLightSensor(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["ambient-light-sensor"] = this.applyMappings(
+        sources as PolicySource[],
+      ));
+    } else {
+      return hashDelete(this.directives, "ambient-light-sensor");
+    }
+  }
+  autoplay(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["autoplay"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "autoplay");
+    }
+  }
+  camera(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["camera"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "camera");
+    }
+  }
+  displayCapture(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["display-capture"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "display-capture");
+    }
+  }
+  encryptedMedia(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["encrypted-media"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "encrypted-media");
+    }
+  }
+  fullscreen(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["fullscreen"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "fullscreen");
+    }
+  }
+  geolocation(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["geolocation"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "geolocation");
+    }
+  }
+  gyroscope(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["gyroscope"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "gyroscope");
+    }
+  }
+  hid(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["hid"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "hid");
+    }
+  }
+  idleDetection(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["idle-detection"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "idle-detection");
+    }
+  }
+  keyboardMap(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["keyboard-map"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "keyboard-map");
+    }
+  }
+  magnetometer(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["magnetometer"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "magnetometer");
+    }
+  }
+  microphone(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["microphone"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "microphone");
+    }
+  }
+  midi(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["midi"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "midi");
+    }
+  }
+  payment(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["payment"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "payment");
+    }
+  }
+  pictureInPicture(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["picture-in-picture"] = this.applyMappings(
+        sources as PolicySource[],
+      ));
+    } else {
+      return hashDelete(this.directives, "picture-in-picture");
+    }
+  }
+  screenWakeLock(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["screen-wake-lock"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "screen-wake-lock");
+    }
+  }
+  serial(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["serial"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "serial");
+    }
+  }
+  syncXhr(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["sync-xhr"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "sync-xhr");
+    }
+  }
+  usb(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["usb"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "usb");
+    }
+  }
+  webShare(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["web-share"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "web-share");
     }
   }
 
-  /** @internal */
-  initializeCopy(other: PermissionsPolicy): this {
-    this.directives = new Map(Array.from(other.directives.entries()).map(([k, v]) => [k, [...v]]));
-    return this;
+  initializeCopy(other: PermissionsPolicy): Record<string, PolicySource[]> {
+    return (this.directives = deepDup(other.directives));
   }
 
   build(context?: unknown): string {
@@ -172,7 +264,7 @@ export class PermissionsPolicy {
   /** @internal */
   private buildDirectives(context?: unknown): Array<string | null> {
     const result: Array<string | null> = [];
-    for (const [directive, sources] of this.directives) {
+    for (const [directive, sources] of Object.entries(this.directives)) {
       if (Array.isArray(sources)) {
         result.push(`${directive} ${this.buildDirective(sources, context).join(" ")}`);
       } else if (sources) {

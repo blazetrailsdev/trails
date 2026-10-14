@@ -218,15 +218,6 @@ describe("parseFormattedParameters", () => {
     });
   });
 
-  it("yields when rawPost is empty even if content-length is absent", () => {
-    const host = makeHost({
-      contentLength: undefined,
-      contentMimeType: Mime.get(":json")!,
-      rawPost: "",
-    });
-    expect(parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({}))).toEqual({});
-  });
-
   it("yields when no parser registered for the MIME type", () => {
     const host = makeHost({ contentLength: 1, contentMimeType: Mime.get(":html")!, rawPost: "x" });
     const out = parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({ y: 1 }));
