@@ -2534,7 +2534,7 @@ class RackMountIntegrationTests {
 
   sortExtrasBang(extras: [string, string[]]): [string, string[]] {
     if (extras.length === 2) {
-      extras[1].sort((a, b) => String(a).localeCompare(String(b)));
+      extras[1].sort((a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0));
     }
     return extras;
   }
