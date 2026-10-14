@@ -1,7 +1,6 @@
 # Audit: Rails' `inherited` hooks and `@inlinedFrom`
 
-RFC 0188 (`module-initialize-inlined-into-constructors`), story
-`audit-inherited-hooks-for-an-inlined-from-entry`. The RFC lists `inherited` as
+RFC 0188 (`module-initialize-inlined-into-constructors`). The RFC lists `inherited` as
 a possible third entry in `@inlinedFrom`'s closed list. JS has no hook that
 fires when a subclass is defined (CLAUDE.md § "`inherited` is deferred to
 own-property memo guards"), so trails runs each Rails `inherited` body at some
@@ -59,7 +58,7 @@ and Minitest's (`vendor/minitest/v5.27.0/lib/minitest.rb:1241`).
 | 31  | `Thor::Base::ClassMethods#inherited`                                 | `thor/v1.3.2/lib/thor/base.rb:721`                                    | `Base.registerKlassFile(this)` written inside `namespace` (`trailties/src/thor/base.ts:505`)                                                                                                                                    | Inlined  |
 | 32  | `Minitest::Runnable.inherited`                                       | `minitest/v5.27.0/lib/minitest.rb:1241`                               | none; vitest collects tests                                                                                                                                                                                                     | Unported |
 
-Totals: 10 Inlined, 6 Named, 13 Replaced, 3 Unported.
+Totals: 10 Inlined, 7 Named, 12 Replaced, 3 Unported.
 
 ## Recommendation: `inherited` does not join the closed list
 
