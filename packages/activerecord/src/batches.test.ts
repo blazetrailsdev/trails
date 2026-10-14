@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Relation, Base } from "./index.js";
-import { Batches } from "./relation/batches.js";
+import { ORDER_IGNORE_MESSAGE } from "./relation/batches.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
@@ -124,7 +124,7 @@ describe("EachTest", () => {
     try {
       for await (const _post of Post.order("title").findEach({})) {
       }
-      expect(logger.warn).toHaveBeenCalledWith(Batches.ORDER_IGNORE_MESSAGE);
+      expect(logger.warn).toHaveBeenCalledWith(ORDER_IGNORE_MESSAGE);
     } finally {
       Base.logger = previousLogger;
     }

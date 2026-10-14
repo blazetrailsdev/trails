@@ -414,9 +414,41 @@ export function exec(...argv: [exePath: string, ...args: string[]]): never {
   return adapter.exec(argv);
 }
 
+let rubyTzUptodateP = false;
+
+/**
+ * MRI's `ruby_tz_uptodate_p` (`vendor/ruby/v3.3.11/time.c:702`), which
+ * `update_tz` (`time.c:753-758`) reads.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isRubyTzUptodate(): boolean {
+  return rubyTzUptodateP;
+}
+
 /** @noRailsEquivalent PERMANENT */
+export function setRubyTzUptodate(val: boolean): void {
+  rubyTzUptodateP = val;
+}
+
+function rubyResetTimezone(_val: string | undefined): void {
+  rubyTzUptodateP = false;
+}
+
+function resetByModifiedEnv(nam: string, val: string | undefined): void {
+  if (nam === "TZ") {
+    rubyResetTimezone(val);
+  }
+}
+
+/**
+ * MRI's `env_aset` and `env_delete` (`vendor/ruby/v3.3.11/hash.c:4975-4985,5420-5438`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 export function setEnv(key: string, value: string | undefined): void {
   requireAdapter().setEnv(key, value);
+  resetByModifiedEnv(key, value);
   if (value === undefined) {
     delete envInternal[key];
   } else {

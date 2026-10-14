@@ -19,6 +19,7 @@ import {
 import {
   Rational,
   TEMPORAL_METHOD_TABLE,
+  isRubyTzUptodate,
   kernelInteger,
   rbCTime,
   rbDefineAllocFunc,
@@ -26,12 +27,20 @@ import {
   rbObjDup,
   rbObjRespondTo,
   registerConstant,
+  setRubyTzUptodate,
   stringInspect,
 } from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
+function updateTz(): void {
+  if (isRubyTzUptodate()) return;
+  setRubyTzUptodate(true);
+  localTimeZoneId = null;
+}
+
 function nowTimeZoneId(): string {
+  updateTz();
   return (localTimeZoneId ??= Temporal.Now.timeZoneId());
 }
 
@@ -41,6 +50,7 @@ function systemEpochNs(): bigint {
 
 /** @noRailsEquivalent PERMANENT */
 export function resetLocalTimeZoneId(timeZoneId: string | null = null): string | null {
+  updateTz();
   const oldTimeZoneId = localTimeZoneId;
   localTimeZoneId = timeZoneId;
   return oldTimeZoneId;

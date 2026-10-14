@@ -295,11 +295,13 @@ export {
   rbArgv,
   rbProgname,
   setArg0,
+  isRubyTzUptodate,
   registerProcessAdapter,
   setEnv,
   setExitCode,
   stderr,
   stdin,
+  setRubyTzUptodate,
   stdout,
 } from "./process-adapter.js";
 export type {

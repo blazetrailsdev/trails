@@ -15,8 +15,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const intType = { cast: (v: unknown) => Number(v) };
     const fakeNode = { baseKlass: { attributeTypes: () => ({ credit_limit: intType }) } };
     const fakeJd = fakeJoinDependency([fakeNode]);
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const result = lookupCastTypeFromJoinDependencies.call(
+      {} as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "credit_limit",
       [fakeJd],
     );
@@ -25,8 +25,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
 
   it("returns null when name is not in any joined table", () => {
     const fakeNode = { baseKlass: { attributeTypes: () => ({ other: {} }) } };
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const result = lookupCastTypeFromJoinDependencies.call(
+      {} as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "missing",
       [fakeJoinDependency([fakeNode])],
     );
@@ -38,8 +38,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const type2 = { cast: (v: unknown) => Number(v) };
     const node1 = { baseKlass: { attributeTypes: () => ({ name: type1 }) } };
     const node2 = { baseKlass: { attributeTypes: () => ({ name: type2 }) } };
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const result = lookupCastTypeFromJoinDependencies.call(
+      {} as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "name",
       [fakeJoinDependency([node1]), fakeJoinDependency([node2])],
     );
@@ -64,8 +64,8 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
 
   it("resolves joined column cast type through the join-dependency walk", () => {
     const rel = CalcAuthor.joins(":topics");
-    const castType = lookupCastTypeFromJoinDependencies(
-      rel as unknown as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const castType = lookupCastTypeFromJoinDependencies.call(
+      rel as unknown as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "written_on",
     ) as {
       constructor: { name: string };
@@ -194,18 +194,18 @@ describe("ungrouped calculation HAVING", () => {
 describe("typeFor", () => {
   it("resolves a bare, qualified and node-shaped field through the model's attribute type", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const rel = Account.all() as unknown as Parameters<typeof typeFor>[0];
+    const rel = Account.all() as unknown as ThisParameterType<typeof typeFor>;
     const expected = Account.typeForAttribute("credit_limit");
 
-    expect(typeFor(rel, "credit_limit")).toBe(expected);
-    expect(typeFor(rel, "accounts.credit_limit")).toBe(expected);
-    expect(typeFor(rel, Account.arelTable.get("credit_limit") as never)).toBe(expected);
+    expect(typeFor.call(rel, "credit_limit")).toBe(expected);
+    expect(typeFor.call(rel, "accounts.credit_limit")).toBe(expected);
+    expect(typeFor.call(rel, Account.arelTable.get("credit_limit") as never)).toBe(expected);
   });
 
   it("returns the model's own type for an enum attribute without unwrapping the subtype", async () => {
     const { Book } = await import("./test-helpers/models/book.js");
     expect(Book.typeForAttribute("status")).toHaveProperty("subtype");
-    expect(typeFor(Book.all() as unknown as Parameters<typeof typeFor>[0], "status")).toBe(
+    expect(typeFor.call(Book.all() as unknown as ThisParameterType<typeof typeFor>, "status")).toBe(
       Book.typeForAttribute("status"),
     );
   });
