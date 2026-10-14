@@ -97,123 +97,121 @@ export class ContentSecurityPolicy {
     this.directives = deepDup(other.directives);
   }
 
-  defaultSrc(...sources: CSPSourceOrClear[]): this {
+  defaultSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("default-src", sources);
   }
-  scriptSrc(...sources: CSPSourceOrClear[]): this {
+  scriptSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("script-src", sources);
   }
-  scriptSrcAttr(...sources: CSPSourceOrClear[]): this {
+  scriptSrcAttr(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("script-src-attr", sources);
   }
-  scriptSrcElem(...sources: CSPSourceOrClear[]): this {
+  scriptSrcElem(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("script-src-elem", sources);
   }
-  styleSrc(...sources: CSPSourceOrClear[]): this {
+  styleSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("style-src", sources);
   }
-  styleSrcAttr(...sources: CSPSourceOrClear[]): this {
+  styleSrcAttr(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("style-src-attr", sources);
   }
-  styleSrcElem(...sources: CSPSourceOrClear[]): this {
+  styleSrcElem(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("style-src-elem", sources);
   }
-  imgSrc(...sources: CSPSourceOrClear[]): this {
+  imgSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("img-src", sources);
   }
-  fontSrc(...sources: CSPSourceOrClear[]): this {
+  fontSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("font-src", sources);
   }
-  connectSrc(...sources: CSPSourceOrClear[]): this {
+  connectSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("connect-src", sources);
   }
-  mediaSrc(...sources: CSPSourceOrClear[]): this {
+  mediaSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("media-src", sources);
   }
-  objectSrc(...sources: CSPSourceOrClear[]): this {
+  objectSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("object-src", sources);
   }
-  frameSrc(...sources: CSPSourceOrClear[]): this {
+  frameSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("frame-src", sources);
   }
-  childSrc(...sources: CSPSourceOrClear[]): this {
+  childSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("child-src", sources);
   }
-  workerSrc(...sources: CSPSourceOrClear[]): this {
+  workerSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("worker-src", sources);
   }
-  frameAncestors(...sources: CSPSourceOrClear[]): this {
+  frameAncestors(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("frame-ancestors", sources);
   }
-  formAction(...sources: CSPSourceOrClear[]): this {
+  formAction(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("form-action", sources);
   }
-  baseUri(...sources: CSPSourceOrClear[]): this {
+  baseUri(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("base-uri", sources);
   }
-  manifestSrc(...sources: CSPSourceOrClear[]): this {
+  manifestSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("manifest-src", sources);
   }
-  prefetchSrc(...sources: CSPSourceOrClear[]): this {
+  prefetchSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("prefetch-src", sources);
   }
-  sandbox(...values: CSPSourceOrClear[]): this {
+  sandbox(...values: CSPSourceOrClear[]): DirectiveValue | null {
     if (values.length === 0) {
-      this.directives["sandbox"] = true;
+      return (this.directives["sandbox"] = true);
     } else if (values[0] != null && values[0] !== false) {
-      this.directives["sandbox"] = values as CSPSource[];
+      return (this.directives["sandbox"] = values as CSPSource[]);
     } else {
-      hashDelete(this.directives, "sandbox");
+      return hashDelete(this.directives, "sandbox");
     }
-    return this;
   }
-  pluginTypes(...types: CSPSourceOrClear[]): this {
+  pluginTypes(...types: CSPSourceOrClear[]): DirectiveValue | null {
     if (types[0] != null && types[0] !== false) {
-      this.directives["plugin-types"] = types as CSPSource[];
+      return (this.directives["plugin-types"] = types as CSPSource[]);
     } else {
-      hashDelete(this.directives, "plugin-types");
+      return hashDelete(this.directives, "plugin-types");
     }
-    return this;
   }
-  reportUri(uri: CSPSource): this {
-    this.directives["report-uri"] = [uri];
-    return this;
+  reportUri(uri: CSPSource): CSPSource[] {
+    return (this.directives["report-uri"] = [uri]);
   }
-  blockAllMixedContent(enabled: boolean | null = true): this {
-    if (enabled === false || enabled == null) {
-      hashDelete(this.directives, "block-all-mixed-content");
-      return this;
+  blockAllMixedContent(enabled: boolean | null = true): DirectiveValue | null {
+    if (enabled != null && enabled !== false) {
+      return (this.directives["block-all-mixed-content"] = true);
+    } else {
+      return hashDelete(this.directives, "block-all-mixed-content");
     }
-    this.directives["block-all-mixed-content"] = true;
-    return this;
   }
-  upgradeInsecureRequests(enabled: boolean | null = true): this {
-    if (enabled === false || enabled == null) {
-      hashDelete(this.directives, "upgrade-insecure-requests");
-      return this;
+  upgradeInsecureRequests(enabled: boolean | null = true): DirectiveValue | null {
+    if (enabled != null && enabled !== false) {
+      return (this.directives["upgrade-insecure-requests"] = true);
+    } else {
+      return hashDelete(this.directives, "upgrade-insecure-requests");
     }
-    this.directives["upgrade-insecure-requests"] = true;
-    return this;
   }
-  requireSriFor(...types: CSPSourceOrClear[]): this {
-    return this.setDirective("require-sri-for", types);
+  requireSriFor(...types: CSPSourceOrClear[]): DirectiveValue | null {
+    if (types[0] != null && types[0] !== false) {
+      return (this.directives["require-sri-for"] = types as CSPSource[]);
+    } else {
+      return hashDelete(this.directives, "require-sri-for");
+    }
   }
-  requireTrustedTypesFor(...sources: CSPSourceOrClear[]): this {
+  requireTrustedTypesFor(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("require-trusted-types-for", sources);
   }
-  trustedTypes(...sources: CSPSourceOrClear[]): this {
+  trustedTypes(...sources: CSPSourceOrClear[]): DirectiveValue | null {
     return this.setDirective("trusted-types", sources);
   }
 
   /** @internal */
-  private setDirective(name: string, sources: CSPSourceOrClear[]): this {
+  private setDirective(name: string, sources: CSPSourceOrClear[]): DirectiveValue | null {
     const first = sources[0];
-    if (sources.length === 0 || first == null || first === false) {
-      hashDelete(this.directives, name);
-      return this;
+    if (first != null && first !== false) {
+      return (this.directives[name] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, name);
     }
-    this.directives[name] = this.applyMappings(sources as CSPSource[]);
-    return this;
   }
 
   build(context?: unknown, nonce?: string, nonceDirectives?: readonly string[]): string {

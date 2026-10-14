@@ -59,79 +59,92 @@ export class PermissionsPolicy {
     if (block) block(this);
   }
 
-  accelerometer(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("accelerometer", sources);
+  accelerometer(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("accelerometer", sources);
   }
-  ambientLightSensor(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("ambient-light-sensor", sources);
+  ambientLightSensor(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    return this._set("ambient-light-sensor", sources);
   }
-  autoplay(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("autoplay", sources);
+  autoplay(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("autoplay", sources);
   }
-  camera(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("camera", sources);
+  camera(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("camera", sources);
   }
-  displayCapture(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("display-capture", sources);
+  displayCapture(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    return this._set("display-capture", sources);
   }
-  encryptedMedia(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("encrypted-media", sources);
+  encryptedMedia(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    return this._set("encrypted-media", sources);
   }
-  fullscreen(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("fullscreen", sources);
+  fullscreen(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("fullscreen", sources);
   }
-  geolocation(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("geolocation", sources);
+  geolocation(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("geolocation", sources);
   }
-  gyroscope(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("gyroscope", sources);
+  gyroscope(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("gyroscope", sources);
   }
-  hid(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("hid", sources);
+  hid(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("hid", sources);
   }
-  idleDetection(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("idle-detection", sources);
+  idleDetection(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("idle-detection", sources);
   }
-  keyboardMap(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("keyboard-map", sources);
+  keyboardMap(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("keyboard-map", sources);
   }
-  magnetometer(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("magnetometer", sources);
+  magnetometer(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("magnetometer", sources);
   }
-  microphone(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("microphone", sources);
+  microphone(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("microphone", sources);
   }
-  midi(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("midi", sources);
+  midi(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("midi", sources);
   }
-  payment(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("payment", sources);
+  payment(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("payment", sources);
   }
-  pictureInPicture(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("picture-in-picture", sources);
+  pictureInPicture(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    return this._set("picture-in-picture", sources);
   }
-  screenWakeLock(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("screen-wake-lock", sources);
+  screenWakeLock(
+    ...sources: Array<PolicySource | false | null | undefined>
+  ): PolicySource[] | null {
+    return this._set("screen-wake-lock", sources);
   }
-  serial(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("serial", sources);
+  serial(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("serial", sources);
   }
-  syncXhr(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("sync-xhr", sources);
+  syncXhr(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("sync-xhr", sources);
   }
-  usb(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("usb", sources);
+  usb(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("usb", sources);
   }
-  webShare(...sources: Array<PolicySource | null | undefined>): void {
-    this._set("web-share", sources);
+  webShare(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
+    return this._set("web-share", sources);
   }
 
   /** @internal */
-  private _set(directive: string, sources: Array<PolicySource | null | undefined>): void {
-    if (sources.length === 0 || sources[0] == null) {
-      hashDelete(this.directives, directive);
+  private _set(
+    directive: string,
+    sources: Array<PolicySource | false | null | undefined>,
+  ): PolicySource[] | null {
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives[directive] = this.applyMappings(sources as PolicySource[]));
     } else {
-      this.directives[directive] = this.applyMappings(sources as PolicySource[]);
+      return hashDelete(this.directives, directive);
     }
   }
 
