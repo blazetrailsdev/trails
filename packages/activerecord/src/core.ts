@@ -9,7 +9,6 @@ import {
   rbObjIsKindOf,
   Module,
   type Hash,
-  hasKey,
   hashAref,
   keys as hashKeys,
   include,
@@ -46,7 +45,7 @@ import { TableMetadata } from "./table-metadata.js";
 import type { PP } from "@blazetrails/ruby-compat";
 import { Table } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { cachedTableExists, columnsHash, isSchemaLoaded } from "./model-schema.js";
+import { cachedTableExists, isSchemaLoaded } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
@@ -485,6 +484,7 @@ interface CoreHost {
   name: string;
   tableName?: string | null;
   primaryKey?: string | string[];
+  columnsHash(): Record<string, unknown>;
   filterAttributes: FilterAttributes;
   _filterAttributes?: FilterAttributes;
   _inspectionFilter?: any;
@@ -1005,8 +1005,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
 
     if (
       !compositePrimaryKey &&
-      (!hasKey(columnsHash.call(this as any), key as string) ||
-        StatementCache.unsupportedValue(value))
+      (!Object.hasOwn(this.columnsHash(), key as string) || StatementCache.unsupportedValue(value))
     ) {
       return this.all().findBy(conditions);
     }

@@ -447,6 +447,23 @@ describe("significantMissingCalls", () => {
     expect(unnamed.has("size")).toBe(true);
   });
 
+  it("significantCallsForReceivers drops key? off a SCREAMING_CASE constant only for that constant's in form", () => {
+    const credited = significantCallsForReceivers(
+      { "key?": ["const"] },
+      undefined,
+      new Set(["in", "in:STATUS_WITH_NO_ENTITY_BODY"]),
+      { "key?": ["STATUS_WITH_NO_ENTITY_BODY"] },
+    );
+    expect(credited.has("key?")).toBe(false);
+    const other = significantCallsForReceivers(
+      { "key?": ["const"] },
+      undefined,
+      new Set(["in", "in:HEADERS"]),
+      { "key?": ["STATUS_WITH_NO_ENTITY_BODY"] },
+    );
+    expect(other.has("key?")).toBe(true);
+  });
+
   it("significantCallsForReceivers drops new when every site is an argument-less Hash.new / Array.new", () => {
     expect(significantCallsForReceivers({ new: ["literal-new"] }).has("new")).toBe(false);
     expect(significantCallsForReceivers({ new: ["const"] }).has("new")).toBe(true);

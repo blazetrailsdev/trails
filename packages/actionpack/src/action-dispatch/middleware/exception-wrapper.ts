@@ -1,4 +1,4 @@
-import { excBacktraceLocations, File, hasKey, type Location } from "@blazetrails/ruby-compat";
+import { excBacktraceLocations, File, type Location } from "@blazetrails/ruby-compat";
 
 import { ActionableError, cattrAccessor, type BacktraceCleaner } from "@blazetrails/activesupport";
 import { statusCode } from "@blazetrails/rack";
@@ -309,7 +309,7 @@ export class ExceptionWrapper {
   }
 
   rescueResponse(): boolean {
-    return hasKey(this.rescueResponses, this.exceptionClassName);
+    return Object.hasOwn(this.rescueResponses, this.exceptionClassName);
   }
 
   exceptionInspect(): string {

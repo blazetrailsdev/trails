@@ -24,7 +24,7 @@ import {
   tryCall,
 } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import { hashDelete, hasKey, IO, rbRegMatchP, rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import { hashDelete, IO, rbRegMatchP, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -522,9 +522,10 @@ export class PostgreSQLAdapter
     this._rawConnection = null;
     this._noticeReceiverSqlWarnings = [];
 
-    this._useInsertReturning = hasKey(this._config, "insertReturning")
-      ? PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning)
-      : true;
+    this._useInsertReturning =
+      "insertReturning" in this._config
+        ? PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning)
+        : true;
   }
 
   override isConnected(): boolean {

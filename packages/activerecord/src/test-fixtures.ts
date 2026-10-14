@@ -6,7 +6,6 @@ import {
   NoMethodError,
   RuntimeError,
   StandardError,
-  hashDelete,
   isEmpty,
   isSymbol,
   merge,
@@ -441,7 +440,7 @@ function accessFixture(this: TestFixtures, fsName: string, ...fixtureNames: unkn
   const instances = fixtureNames.map((name) => {
     let fName = name as string;
     if (isSymbol(fName)) fName = symbolToS(fName);
-    if (forceReload) hashDelete(this._fixtureCache[fsName], fName);
+    if (forceReload) delete this._fixtureCache[fsName][fName];
 
     const loaded = this._loadedFixtures[fsName].fixtures[fName];
     if (loaded) {

@@ -2,7 +2,6 @@ import type { DatabaseConfig } from "../database-configurations/database-config.
 import {
   anybits,
   fetch,
-  hasKey,
   last,
   merge,
   rbRegMatchP,
@@ -205,7 +204,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       }
     }
 
-    if (!hasKey(this._config, "strict")) {
+    if (!("strict" in this._config)) {
       this._config.strict = SQLite3Adapter.strictStringsByDefault;
     }
     this._connectionParameters = merge(this._config as SQLite3Config, {
