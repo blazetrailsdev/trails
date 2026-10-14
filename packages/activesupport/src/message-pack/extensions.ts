@@ -1,4 +1,5 @@
 import { MessagePack, type Factory, type Packer, type Unpacker } from "@blazetrails/msgpack";
+import { extend, Module } from "@blazetrails/ruby-compat/include";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
 import {
@@ -76,7 +77,7 @@ function classOf(value: object): ObjectClass {
   return (value as { constructor: ObjectClass }).constructor;
 }
 
-export const Extensions = {
+const ExtensionsMethods = {
   /**
    * Mirrors `ActiveSupport::MessagePack::Extensions#install`
    * (`vendor/rails/v8.0.2/activesupport/lib/active_support/message_pack/extensions.rb:20-110`).
@@ -418,3 +419,7 @@ export const Extensions = {
     }
   },
 };
+
+export const Extensions = new Module().include(ExtensionsMethods) as Module &
+  typeof ExtensionsMethods;
+extend(Extensions, Extensions);
