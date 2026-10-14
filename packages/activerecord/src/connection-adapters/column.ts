@@ -46,10 +46,7 @@ export class Column {
     return this.sqlTypeMetadata?.sqlType ?? null;
   }
 
-  /**
-   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15
-   * @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor
-   */
+  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,
@@ -169,7 +166,6 @@ function metadataEquals(a: SqlTypeMetadata | null, b: SqlTypeMetadata | null): b
 export type ColumnCoder = Record<string, unknown>;
 
 export class NullColumn extends Column {
-  /** @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
   constructor(name: string) {
     super(name, null);
     if (new.target === NullColumn) return this.deduplicate();
