@@ -204,7 +204,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (command === "start") start(readFileSync(0, "utf8"));
   else if (command === "schedule") await schedule();
   else if (command === "wait" && args.length > 0) process.exitCode = await waitAll(args);
-  else if (command === "summary") process.exit(summary());
+  else if (command === "summary") process.exitCode = summary();
   else {
     console.error("usage: bg-gates.mjs start < spec | wait ID... | summary");
     process.exit(2);
