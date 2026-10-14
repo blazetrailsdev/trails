@@ -281,7 +281,6 @@ export function keyReadRows(
   return rows;
 }
 
-/** The one body the pair's owners name, else every candidate pooled. */
 function pooled<T extends { params: unknown[] }>(
   bodies: readonly T[],
   merge: (into: T, body: T) => void,
