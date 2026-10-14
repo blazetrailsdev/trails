@@ -19,7 +19,6 @@ import {
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
 } from "./support/schema-dumping-helper.js";
-import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
 
 function assertNoLineUp(lines: string[], pattern: RegExp): void {
   if (lines.length === 0) return expect(true).toBeTruthy();
@@ -379,6 +378,8 @@ describe("SchemaDumperTest", () => {
 });
 
 describe("SchemaDumperTest", () => {
+  const { self } = fixtures([], { useTransactionalTests: false });
+
   afterEach(async () => {
     SchemaDumper.ignoreTables = [];
     SchemaDumper.fkIgnorePattern = /^fk_rails_[0-9a-f]{10}$/;
@@ -829,29 +830,31 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       let migration!: Migration;
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        class TimestampsMigration extends Current {
-          override async up(): Promise<void> {
-            await this.createTable("timestamps", (t) => {
-              t.datetime("this_should_remain_datetime");
-              (t as PostgreSQLTableDefinition).timestamptz("this_is_an_alias_of_datetime");
-              t.column("without_time_zone", "timestamp");
-              t.column("with_time_zone", "timestamptz");
-            });
+      await self()
+        .withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Current {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps", (t) => {
+                t.datetime("this_should_remain_datetime");
+                (t as PostgreSQLTableDefinition).timestamptz("this_is_an_alias_of_datetime");
+                t.column("without_time_zone", "timestamp");
+                t.column("with_time_zone", "timestamptz");
+              });
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
           }
-          override async down(): Promise<void> {
-            await this.dropTable("timestamps");
-          }
-        }
-        migration = new TimestampsMigration();
-        await migration.migrate("up");
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
 
-        const output = await dumpTableSchema("timestamps");
-        expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
-        expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
-        expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
-        expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
-      }).finally(() => migration.migrate("down"));
+          const output = await dumpTableSchema("timestamps");
+          expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
+          expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
+          expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
+          expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
+        })
+        .finally(() => migration.migrate("down"));
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -888,27 +891,29 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       let migration!: Migration;
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        class TimestampsMigration extends Migration.get(6.1) {
-          override async up(): Promise<void> {
-            await this.createTable("timestamps", (t) => {
-              t.datetime("this_should_change_to_timestamp");
-              t.timestamp("this_should_stay_as_timestamp");
-              t.column("this_should_also_stay_as_timestamp", "timestamp");
-            });
+      await self()
+        .withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Migration.get(6.1) {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps", (t) => {
+                t.datetime("this_should_change_to_timestamp");
+                t.timestamp("this_should_stay_as_timestamp");
+                t.column("this_should_also_stay_as_timestamp", "timestamp");
+              });
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
           }
-          override async down(): Promise<void> {
-            await this.dropTable("timestamps");
-          }
-        }
-        migration = new TimestampsMigration();
-        await migration.migrate("up");
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
 
-        const output = await dumpTableSchema("timestamps");
-        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_also_stay_as_timestamp"')).toBeTruthy();
-      }).finally(() => migration.migrate("down"));
+          const output = await dumpTableSchema("timestamps");
+          expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_also_stay_as_timestamp"')).toBeTruthy();
+        })
+        .finally(() => migration.migrate("down"));
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -936,7 +941,7 @@ describe("SchemaDumperTest", () => {
         expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
         expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
 
-        await withPostgresqlDatetimeType("timestamptz", async () => {
+        await self().withPostgresqlDatetimeType("timestamptz", async () => {
           output = await dumpTableSchema("timestamps");
           expect(output.includes('t.timestamp("default_format"')).toBeTruthy();
           expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
@@ -1045,25 +1050,27 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       let migration!: Migration;
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        class TimestampsMigration extends Migration.get(6.1) {
-          override async up(): Promise<void> {
-            await this.createTable("timestamps");
+      await self()
+        .withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Migration.get(6.1) {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps");
 
-            await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
-            await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+              await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
+              await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
           }
-          override async down(): Promise<void> {
-            await this.dropTable("timestamps");
-          }
-        }
-        migration = new TimestampsMigration();
-        await migration.migrate("up");
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
 
-        const output = await dumpTableSchema("timestamps");
-        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
-      }).finally(() => migration.migrate("down"));
+          const output = await dumpTableSchema("timestamps");
+          expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+        })
+        .finally(() => migration.migrate("down"));
     },
   );
 
@@ -1072,25 +1079,27 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       let migration!: Migration;
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        class TimestampsMigration extends Migration.get(6.1) {
-          override async up(): Promise<void> {
-            await this.createTable("timestamps");
+      await self()
+        .withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Migration.get(6.1) {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps");
 
-            await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
-            await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+              await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
+              await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
           }
-          override async down(): Promise<void> {
-            await this.dropTable("timestamps");
-          }
-        }
-        migration = new TimestampsMigration();
-        await migration.migrate("up");
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
 
-        const output = await dumpTableSchema("timestamps");
-        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
-      }).finally(() => migration.migrate("down"));
+          const output = await dumpTableSchema("timestamps");
+          expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+        })
+        .finally(() => migration.migrate("down"));
     },
   );
 });

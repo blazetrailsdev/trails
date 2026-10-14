@@ -10,7 +10,6 @@ import {
 import { formatForInspect } from "./attribute-methods.js";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
@@ -578,7 +577,7 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
 });
 
 describe("attributesForCreate (trails)", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
 
   it("keeps a nil composite primary key member", async () => {
     await CpkBook.loadSchema();
@@ -591,7 +590,7 @@ describe("attributesForCreate (trails)", () => {
     CpkOrder.partialInserts = false;
     try {
       let order: CpkOrder | undefined;
-      await assertQueriesMatch(/INSERT INTO[^(]+\([^)]*shop_id/i, 1, false, async () => {
+      await self().assertQueriesMatch(/INSERT INTO[^(]+\([^)]*shop_id/i, { count: 1 }, async () => {
         order = await CpkOrder.create({ status: "paid" });
       });
       expect(order?.shop_id).toBeNull();

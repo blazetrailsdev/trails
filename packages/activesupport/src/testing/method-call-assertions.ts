@@ -322,3 +322,13 @@ function assertEqual(expected: unknown, actual: unknown, message: string): void 
     () => `${message}.\nExpected: ${expected}\n  Actual: ${actual}`,
   );
 }
+
+export const MethodCallAssertions = {
+  assertCalled,
+  assertCalledWith,
+  assertNotCalled,
+  expectCalledWith,
+  assertCalledOnInstanceOf,
+  assertNotCalledOnInstanceOf,
+  stubAnyInstance,
+};

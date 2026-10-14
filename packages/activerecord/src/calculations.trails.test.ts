@@ -212,7 +212,7 @@ describe("typeFor", () => {
 });
 
 describe("empty-scope aggregate identities", () => {
-  fixtures(["companies", "accounts"]);
+  const { self } = fixtures(["companies", "accounts"]);
 
   it("sums a bigint column through the column type on a contradictory scope", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
@@ -235,8 +235,7 @@ describe("empty-scope aggregate identities", () => {
 
   it("async sums the nil identity value when no column is given", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const { captureSql } = await import("./testing/sql-capture.js");
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await expect(Account.asyncSum()).rejects.toThrow();
       await expect(Account.group("firm_id").asyncSum()).rejects.toThrow();
     });

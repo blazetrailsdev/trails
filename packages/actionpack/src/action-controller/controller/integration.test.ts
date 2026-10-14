@@ -373,7 +373,7 @@ class IntegrationProcessTest extends IntegrationTest {
           this.get("moved", { to: this.redirect("/method") });
 
           deprecator().silence(() => {
-            this.match(":action", { to, via: [":get", ":post"], as: "action" });
+            this.match("/:action", { to, via: [":get", ":post"], as: "action" });
             this.get("get/:action", { to, as: "get_action" });
           });
         });
@@ -1283,7 +1283,7 @@ describe("IntegrationRequestsWithoutSetup", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.get(":action", { to: FooController as unknown as MountableApp });
+          this.get("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1344,7 +1344,7 @@ describe("IntegrationRequestEncodersTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.post(":action", { to: FooController as unknown as MountableApp });
+          this.post("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1358,7 +1358,7 @@ describe("IntegrationRequestEncodersTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.post(":action", { to: FooController as unknown as MountableApp });
+          this.post("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1387,7 +1387,7 @@ describe("IntegrationRequestEncodersTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.post(":action", { to: FooController as unknown as MountableApp });
+          this.post("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1447,7 +1447,7 @@ describe("IntegrationRequestEncodersTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.get(":action", { to: FooController as unknown as MountableApp });
+          this.get("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1461,7 +1461,7 @@ describe("IntegrationRequestEncodersTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.get(":action", { to: FooController as unknown as MountableApp });
+          this.get("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1475,7 +1475,7 @@ describe("IntegrationRequestEncodersTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.get(":action", { to: FooController as unknown as MountableApp });
+          this.get("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1491,7 +1491,7 @@ describe("IntegrationRequestEncodersTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
-          this.get(":action", { to: FooController as unknown as MountableApp });
+          this.get("/:action", { to: FooController as unknown as MountableApp });
         });
       });
 

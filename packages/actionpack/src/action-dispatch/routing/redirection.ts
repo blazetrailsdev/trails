@@ -249,3 +249,5 @@ export function redirect(
   if (!block) throw new Error("redirection argument not supported");
   return new Redirect(status, block);
 }
+
+export const Redirection = { redirect };

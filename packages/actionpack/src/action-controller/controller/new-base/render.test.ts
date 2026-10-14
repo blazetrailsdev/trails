@@ -103,7 +103,7 @@ describe("RenderTest", () => {
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         deprecator().silence(() => {
-          this.get(":controller", { action: "index" });
+          this.get("/:controller", { action: "index" });
         });
       });
 
@@ -119,7 +119,7 @@ describe("RenderTest", () => {
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         deprecator().silence(() => {
-          this.get(":controller", { action: "index" });
+          this.get("/:controller", { action: "index" });
         });
       });
 

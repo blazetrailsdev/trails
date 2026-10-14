@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import "./index.js";
 import { assertEmpty, assertNotEmpty, assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError, regexpEscape } from "@blazetrails/ruby-compat";
-import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
-import { quoteTableName } from "./support/quote-regex.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { registerModel } from "./associations.js";
 import type { Relation } from "./relation.js";
@@ -21,7 +20,7 @@ async function assertNoExcludes(post: Post, relation: Relation<Post>) {
 }
 
 describe("ExcludingTest", () => {
-  const { posts, comments } = fixtures(["posts", "comments"]);
+  const { self, posts, comments } = fixtures(["posts", "comments"]);
 
   it("result set does not include single excluded record", async () => {
     const post = posts("welcome");
@@ -45,10 +44,9 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
     const query = Post.where({ id: post });
 
-    await assertQueriesMatch(
-      new RegExp(`SELECT ${regexpEscape(quoteTableName("posts.id"))} FROM`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`SELECT ${regexpEscape(self().quoteTableName("posts.id"))} FROM`),
+      {},
       async () => {
         const records = await Post.excluding(query);
 
@@ -108,10 +106,9 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
     const relation = post.comments;
 
-    await assertQueriesMatch(
-      new RegExp(`SELECT ${regexpEscape(quoteTableName("comments.id"))} FROM`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`SELECT ${regexpEscape(self().quoteTableName("comments.id"))} FROM`),
+      {},
       async () => {
         const records = await Comment.excluding(relation);
 

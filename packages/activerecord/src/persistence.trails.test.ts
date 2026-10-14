@@ -12,7 +12,6 @@ import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Company } from "./test-helpers/models/company.js";
-import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { queryConstraints, queryConstraintsList } from "./persistence.js";
@@ -187,11 +186,11 @@ describe("PersistenceTest (trails)", () => {
 });
 
 describe("PersistenceTest (trails)", () => {
-  const { clothingItems } = fixtures(["clothingItems"]);
+  const { self, clothingItems } = fixtures(["clothingItems"]);
 
   it("updateColumns targets query_constraints columns in the WHERE", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.updateColumns({ description: "Lovely green t-shirt" });
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";

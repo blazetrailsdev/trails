@@ -3,12 +3,7 @@ import { Relation, Base } from "./index.js";
 import { Batches } from "./relation/batches.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
-import { quoteTableName } from "./support/quote-regex.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { assertEqual, isPresent } from "@blazetrails/activesupport";
@@ -30,7 +25,7 @@ import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./active-record.js"
 registerModel([Tagging, Tag]);
 
 describe("EachTest", () => {
-  const { posts } = fixtures(["posts", "subscribers", "developers", "cpkOrders"]);
+  const { self, posts } = fixtures(["posts", "subscribers", "developers", "cpkOrders"]);
 
   it("each should execute one query per batch", async () => {
     const total = Number(await Post.count());
@@ -195,10 +190,9 @@ describe("EachTest", () => {
   });
 
   it("find in batches should quote batch order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))}`, "i"),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))}`, "i"),
+      {},
       async () => {
         for await (const batch of Post.findInBatches({ batchSize: 1 })) {
           expect(batch).toBeInstanceOf(Array);
@@ -209,10 +203,9 @@ describe("EachTest", () => {
   });
 
   it("find in batches should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
         for await (const batch of Post.findInBatches({ batchSize: 1, order: ":desc" })) {
           expect(batch).toBeInstanceOf(Array);
@@ -713,11 +706,10 @@ describe("EachTest", () => {
   });
 
   it("in batches executes range queries when unconstrained", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(
       new RegExp(`WHERE ${quoted} > .+ AND ${quoted} <= .+`, "i"),
-      undefined,
-      false,
+      {},
       async () => {
         for await (const relation of Post.inBatches({ of: 2 })) {
           expect(await relation.first()).toBeInstanceOf(Post);
@@ -727,41 +719,30 @@ describe("EachTest", () => {
   });
 
   it("in batches executes in queries when unconstrained and opted out of ranges", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
-      new RegExp(`${quoted} IN \\(.+\\)`, "i"),
-      undefined,
-      false,
-      async () => {
-        for await (const relation of Post.inBatches({ of: 2, useRanges: false })) {
-          expect(await relation.first()).toBeInstanceOf(Post);
-          break;
-        }
-      },
-    );
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(new RegExp(`${quoted} IN \\(.+\\)`, "i"), {}, async () => {
+      for await (const relation of Post.inBatches({ of: 2, useRanges: false })) {
+        expect(await relation.first()).toBeInstanceOf(Post);
+        break;
+      }
+    });
   });
 
   it("in batches executes in queries when constrained", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
-      new RegExp(`${quoted} IN \\(.+\\)`, "i"),
-      undefined,
-      false,
-      async () => {
-        for await (const relation of Post.where("id < ?", 5).inBatches({ of: 2 })) {
-          expect(await relation.first()).toBeInstanceOf(Post);
-          break;
-        }
-      },
-    );
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(new RegExp(`${quoted} IN \\(.+\\)`, "i"), {}, async () => {
+      for await (const relation of Post.where("id < ?", 5).inBatches({ of: 2 })) {
+        expect(await relation.first()).toBeInstanceOf(Post);
+        break;
+      }
+    });
   });
 
   it("in batches executes range queries when constrained and opted in into ranges", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(
       new RegExp(`${quoted} > .+ AND ${quoted} <= .+`, "i"),
-      undefined,
-      false,
+      {},
       async () => {
         for await (const relation of Post.where("id < ?", 5).inBatches({
           of: 2,
@@ -774,15 +755,10 @@ describe("EachTest", () => {
   });
 
   it("in batches no subqueries for whole tables batching", async () => {
-    const quotedPosts = regexpEscape(quoteTableName("posts"));
-    await assertQueriesMatch(
-      new RegExp(`DELETE FROM ${quotedPosts}`, "i"),
-      undefined,
-      false,
-      async () => {
-        await Post.inBatches({ of: 2 }).deleteAll();
-      },
-    );
+    const quotedPosts = regexpEscape(self().quoteTableName("posts"));
+    await self().assertQueriesMatch(new RegExp(`DELETE FROM ${quotedPosts}`, "i"), {}, async () => {
+      await Post.inBatches({ of: 2 }).deleteAll();
+    });
   });
 
   it("in batches shouldnt execute query unless needed", async () => {
@@ -801,10 +777,9 @@ describe("EachTest", () => {
   });
 
   it("in batches should quote batch order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))}`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))}`),
+      {},
       async () => {
         for await (const relation of Post.inBatches({ of: 1 })) {
           expect(relation).toBeInstanceOf(Relation);
@@ -816,10 +791,9 @@ describe("EachTest", () => {
   });
 
   it("in batches should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
         for await (const relation of Post.inBatches({ of: 1, order: ":desc" })) {
           expect(relation).toBeInstanceOf(Relation);
@@ -831,10 +805,9 @@ describe("EachTest", () => {
   });
 
   it("in batches enumerator should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
         const relation = (await Post.inBatches({ of: 1, order: ":desc" }).first())!;
         expect(relation).toBeInstanceOf(Relation);
@@ -844,10 +817,9 @@ describe("EachTest", () => {
   });
 
   it("in batches enumerator each record should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
         for await (const record of Post.inBatches({ of: 1, order: ":desc" }).eachRecord()) {
           expect(record).toBeInstanceOf(Post);

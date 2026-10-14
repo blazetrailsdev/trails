@@ -55,12 +55,7 @@ import {
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { resetI18n } from "../test-helpers/i18n.js";
-import {
-  assertQueriesCount,
-  assertNoQueries,
-  assertQueriesMatch,
-} from "../testing/query-assertions.js";
-import { captureSql } from "../testing/sql-capture.js";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import {
   assert,
   assertNot,
@@ -138,7 +133,7 @@ class SpecialBulb extends Base {
 }
 
 describe("HasOneAssociationsTest", () => {
-  const { companies, accounts, pirates, ships } = fixtures([
+  const { self, companies, accounts, pirates, ships } = fixtures([
     "companies",
     "accounts",
     "developers",
@@ -203,7 +198,7 @@ describe("HasOneAssociationsTest", () => {
   it("has one", async () => {
     const firm = companies("first_firm") as any;
     const firstAccount = await Account.find(1);
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       const account = await readHasOne(firm, "account");
       expect(account.id).toBe(firstAccount.id);
       expect(account.credit_limit).toBe(firstAccount.credit_limit);
@@ -211,7 +206,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("has one does not use order by", async () => {
-    const sqlLog = await captureSql(async () => {
+    const sqlLog = await self().captureSql({}, async () => {
       await readHasOne(companies("first_firm"), "account");
     });
     assert(

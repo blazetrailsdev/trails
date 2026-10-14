@@ -423,7 +423,7 @@ describe("Mapper block receivers", () => {
       this.get("up", { to: "health#show" });
 
       this.constraints({ owner: /blazetrailsdev/ }, function () {
-        this.get(":owner", { to: "owners#show" });
+        this.get("/:owner", { to: "owners#show" });
       });
     });
 

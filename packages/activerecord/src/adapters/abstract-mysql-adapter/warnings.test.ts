@@ -1,16 +1,18 @@
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-  withDbWarningsAction,
-} from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SQLWarning } from "../../errors.js";
 import { Base } from "../../base.js";
 import type { Mysql2Result } from "../../mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  const { self } = fixtures([]);
+
+  beforeEach(() => {
+    self()._originalDbWarningsAction = "ignore";
+  });
+
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -22,7 +24,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
   describe("WarningsTest", () => {
     it("db_warnings_action :raise on warning", async () => {
-      await withDbWarningsAction("raise", async () => {
+      await self().withDbWarningsAction("raise", undefined, async () => {
         const error = await assertRaises([SQLWarning], {}, () =>
           adapter.execute(`SELECT 1 + 'foo'`),
         );
@@ -32,14 +34,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("db_warnings_action :ignore on warning", async () => {
-      await withDbWarningsAction("ignore", async () => {
+      await self().withDbWarningsAction("ignore", undefined, async () => {
         const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
         expect(result.toA()[0]).toEqual([1]);
       });
     });
 
     it("db_warnings_action :log on warning", async () => {
-      await withDbWarningsAction("log", async () => {
+      await self().withDbWarningsAction("log", undefined, async () => {
         const mysqlWarning = `[ActiveRecord::SQLWarning] Truncated incorrect DOUBLE value: 'foo' (1292)`;
         const logger = { warn: vi.fn() };
         const previousLogger = Base.logger;
@@ -65,7 +67,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       });
       ActiveSupport.errorReporter = errorReporter;
       try {
-        await withDbWarningsAction("report", async () => {
+        await self().withDbWarningsAction("report", undefined, async () => {
           await adapter.execute(`SELECT 1 + 'foo'`);
 
           const warningEvent = events[0];
@@ -86,7 +88,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         warningLevel = warning.level;
       };
 
-      await withDbWarningsAction(warningAction, async () => {
+      await self().withDbWarningsAction(warningAction, undefined, async () => {
         await adapter.execute(`SELECT 1 + 'foo'`);
 
         expect(warningMessage).toEqual(`Truncated incorrect DOUBLE value: 'foo'`);
@@ -95,21 +97,21 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("db_warnings_action allows a list of warnings to ignore", async () => {
-      await withDbWarningsAction("raise", [/Truncated incorrect DOUBLE value/], async () => {
+      await self().withDbWarningsAction("raise", [/Truncated incorrect DOUBLE value/], async () => {
         const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
         expect(result.toA()[0]).toEqual([1]);
       });
     });
 
     it("db_warnings_action allows a list of codes to ignore", async () => {
-      await withDbWarningsAction("raise", ["1292"], async () => {
+      await self().withDbWarningsAction("raise", ["1292"], async () => {
         const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
         expect(result.toA()[0]).toEqual([1]);
       });
     });
 
     it("db_warnings_action ignores note level warnings", async () => {
-      await withDbWarningsAction("raise", async () => {
+      await self().withDbWarningsAction("raise", undefined, async () => {
         const result = (await adapter.execute(
           "DROP TABLE IF EXISTS non_existent_table_warnings_test",
         )) as Mysql2Result | null;
@@ -119,8 +121,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("db_warnings_action handles when warning_count does not match returned warnings", async () => {
-      await withDbWarningsAction("raise", async () => {
-        vi.spyOn(adapter._rawConnection!, "warningCount", "get").mockReturnValue(1);
+      await self().withDbWarningsAction("raise", undefined, async () => {
+        vi.spyOn(
+          (await adapter.rawConnection()) as NonNullable<typeof adapter._rawConnection>,
+          "warningCount",
+          "get",
+        ).mockReturnValue(1);
         const error = await assertRaises([SQLWarning], {}, () => adapter.execute(`SELECT 'x'`));
 
         const expected = `Query had warning_count=1 but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`;

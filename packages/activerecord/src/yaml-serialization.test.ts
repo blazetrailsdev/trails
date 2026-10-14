@@ -6,12 +6,11 @@ import { assertRaises } from "@blazetrails/activesupport";
 import { File as RubyFile, RuntimeError } from "@blazetrails/ruby-compat";
 import { TEST_ROOT } from "./config.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
 
 describe("YamlSerializationTest", () => {
-  fixtures(["topics", "authors", "posts"]);
+  const { self } = fixtures(["topics", "authors", "posts"]);
 
   function yamlLoad<T = Topic>(payload: string): T {
     return YAML.unsafeLoad(payload) as T;
@@ -27,7 +26,7 @@ describe("YamlSerializationTest", () => {
 
   it("to yaml with time with zone should not raise exception", async () => {
     try {
-      await withTimezoneConfig(
+      await self().withTimezoneConfig(
         { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           const topic = new Topic({ written_on: DateTime.now() });

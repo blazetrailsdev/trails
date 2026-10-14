@@ -76,7 +76,7 @@ describe("ExplicitContentTypeTest", () => {
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         deprecator().silence(() => {
-          this.get(":controller", { action: "index" });
+          this.get("/:controller", { action: "index" });
         });
       });
 

@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { resetCallbacks } from "./support/reset-callbacks.js";
 import {
   assertNoDifference,
   assertNotEmpty,
@@ -12,7 +11,7 @@ import { Lesson, LessonError } from "./test-helpers/models/lesson.js";
 import { Student } from "./test-helpers/models/student.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
-fixtures([]);
+const { self } = fixtures([]);
 
 describe("HabtmDestroyOrderTest", () => {
   registerModel([Lesson, Student]);
@@ -44,7 +43,7 @@ describe("HabtmDestroyOrderTest", () => {
   });
 
   it("not destroying a student with lessons leaves student<=>lesson association intact", async () => {
-    await resetCallbacks(Student, "destroy", async () => {
+    await self().resetCallbacks(Student, "destroy", async () => {
       Student.beforeDestroy(async (r: any) => {
         if (!(await r.association("lessons").reader.isEmpty())) throw new Rollback();
       });

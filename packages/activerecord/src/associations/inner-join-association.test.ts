@@ -9,8 +9,6 @@ import {
   assertNot,
 } from "@blazetrails/activesupport";
 import { Table, Nodes } from "@blazetrails/arel";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
-import { captureSql } from "../testing/sql-capture.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Post, CategoryPost } from "../test-helpers/models/post.js";
 import {
@@ -30,22 +28,30 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 
 describe("InnerJoinAssociationTest", () => {
-  const { authors, posts, people, categories, categoriesPosts, shardedBlogPosts, shardedComments } =
-    fixtures([
-      "authors",
-      "authorAddresses",
-      "essays",
-      "posts",
-      "comments",
-      "categories",
-      "categoriesPosts",
-      "categorizations",
-      "taggings",
-      "tags",
-      "people",
-      "shardedComments",
-      "shardedBlogPosts",
-    ]);
+  const {
+    self,
+    authors,
+    posts,
+    people,
+    categories,
+    categoriesPosts,
+    shardedBlogPosts,
+    shardedComments,
+  } = fixtures([
+    "authors",
+    "authorAddresses",
+    "essays",
+    "posts",
+    "comments",
+    "categories",
+    "categoriesPosts",
+    "categorizations",
+    "taggings",
+    "tags",
+    "people",
+    "shardedComments",
+    "shardedBlogPosts",
+  ]);
 
   Category.inheritanceColumn = "type";
   registerModel(Author);
@@ -109,7 +115,7 @@ describe("InnerJoinAssociationTest", () => {
       "JOIN people agents_people ON agents_people.primary_contact_id = agents_people_2.id AND agents_people.id > agents_people_2.id";
 
     const expected = people("susan");
-    await assertQueriesMatch(/agents_people_2/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/agents_people_2/i, {}, async () => {
       const result = await Person.joins(":agents").joins(stringJoin);
       expect(result.map((p) => p.id)).toEqual([(expected as any).id]);
     });
@@ -124,7 +130,7 @@ describe("InnerJoinAssociationTest", () => {
       .and(agents.get("id").gt(agents2.get("id")));
 
     const expected = people("susan");
-    await assertQueriesMatch(/agents_people_2/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/agents_people_2/i, {}, async () => {
       const result = await Person.joins(":agents").joins(
         new Nodes.InnerJoin(agents, new Nodes.On(constraint)),
       );
@@ -359,7 +365,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("inner joins includes all nested associations", async () => {
-    const [sql] = await captureSql(async () => {
+    const [sql] = await self().captureSql({}, async () => {
       await Friendship.joins([":friendFavoriteReferenceJob", ":followerFavoriteReferenceJob"]);
     });
     expect(sql).toMatch(/["`]friendships["`]\.["`]friend_id["`]/);

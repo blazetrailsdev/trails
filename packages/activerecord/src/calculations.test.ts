@@ -18,18 +18,11 @@ import {
 import { ArgumentError, ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { currentAdapter } from "./support/adapter-helper.js";
-import { quoteTableName } from "./support/quote-regex.js";
 import { StatementInvalid } from "./errors.js";
 import { deprecator } from "./deprecator.js";
-import { captureSql } from "./testing/sql-capture.js";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { assertAsyncEqual } from "./support/async-helper.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Account } from "./test-helpers/models/account.js";
@@ -84,7 +77,7 @@ function byRecord(result: unknown, record: { id: unknown }): unknown {
 }
 
 describe("CalculationsTest", () => {
-  const { companies, topics, cpkBooks, minivans } = fixtures([
+  const { self, companies, topics, cpkBooks, minivans } = fixtures([
     "companies",
     "accounts",
     "authors",
@@ -362,13 +355,14 @@ describe("CalculationsTest", () => {
   });
 
   it("should not use alias for grouped field", async () => {
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(
-        `GROUP BY ${quoteTableName("accounts.firm_id").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+        `GROUP BY ${self()
+          .quoteTableName("accounts.firm_id")
+          .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
         "i",
       ),
-      undefined,
-      false,
+      {},
       async () => {
         const c = await Account.group("firm_id").order("accounts_firm_id").sum("credit_limit");
         expect([...c.keys()].filter((k) => k != null)).toEqual([1, 2, 6, 9]);
@@ -439,7 +433,7 @@ describe("CalculationsTest", () => {
   });
 
   it("limit is kept", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.limit(1).count();
     });
     expect(queries.length).toEqual(1);
@@ -447,7 +441,7 @@ describe("CalculationsTest", () => {
   });
 
   it("offset is kept", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.offset(1).count();
     });
     expect(queries.length).toEqual(1);
@@ -455,7 +449,7 @@ describe("CalculationsTest", () => {
   });
 
   it("limit with offset is kept", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.limit(1).offset(1).count();
     });
     expect(queries.length).toEqual(1);
@@ -464,7 +458,7 @@ describe("CalculationsTest", () => {
   });
 
   it("no limit no offset", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.count();
     });
     expect(queries.length).toEqual(1);
@@ -473,7 +467,7 @@ describe("CalculationsTest", () => {
   });
 
   it("no order by when counting all", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.order({ id: "desc" }).limit(10).count();
     });
     expect(queries.length).toBe(1);
@@ -490,7 +484,7 @@ describe("CalculationsTest", () => {
   });
 
   it("apply distinct in count", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.distinct().count();
       await Account.group("firm_id").distinct().count();
     });
@@ -758,7 +752,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped by function", async () => {
-    const c = await Company.group(`UPPER(${quoteTableName("type")})`).count(":all");
+    const c = await Company.group(`UPPER(${self().quoteTableName("type")})`).count(":all");
     expect(c.get(null)).toBe(2);
     expect(c.get("DEPENDENTFIRM")).toBe(1);
     expect(c.get("CLIENT")).toBe(5);
@@ -766,7 +760,9 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped by function with table alias", async () => {
-    const c = await Company.group(`UPPER(companies.${quoteTableName("type")})`).count(":all");
+    const c = await Company.group(`UPPER(companies.${self().quoteTableName("type")})`).count(
+      ":all",
+    );
     expect(c.get(null)).toBe(2);
     expect(c.get("DEPENDENTFIRM")).toBe(1);
     expect(c.get("CLIENT")).toBe(5);
@@ -825,7 +821,7 @@ describe("CalculationsTest", () => {
 
   it("should not perform joined include by default", async () => {
     expect(await Account.includes(":firm").count()).toEqual(await Account.count());
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.includes(":firm").count();
     });
     expect(queries[queries.length - 1]).not.toMatch(/join/i);
@@ -1627,7 +1623,7 @@ describe("CalculationsTest", () => {
     ]);
     const actual = await Post.group("type")
       .order("count_posts_id")
-      .count(quoteTableName("posts.id"));
+      .count(self().quoteTableName("posts.id"));
     expect(actual).toEqual(expected);
   });
 
@@ -2038,7 +2034,7 @@ describe("CalculationsTest", () => {
 
   it("minimum and maximum on tz aware attributes", async () => {
     try {
-      await withTimezoneConfig(
+      await self().withTimezoneConfig(
         { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           await Topic.resetColumnInformation();

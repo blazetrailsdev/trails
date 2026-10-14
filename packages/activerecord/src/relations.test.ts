@@ -9,11 +9,7 @@ import {
   registerModel,
   Base,
 } from "./index.js";
-import {
-  assertQueriesCount,
-  assertNoQueries,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
+import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertDifference,
@@ -32,7 +28,6 @@ import { PP } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { captureSql } from "./testing/sql-capture.js";
 
 import {
   Post,
@@ -68,6 +63,7 @@ afterEach(() => {
 
 describe("RelationTest", () => {
   const {
+    self,
     authors,
     topics,
     posts,
@@ -1000,7 +996,7 @@ describe("RelationTest", () => {
 
   it("to sql on eager join", async () => {
     const expected = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Post.eagerLoad(":lastComment").order("comments.id DESC");
       })
     )[0];
@@ -2210,10 +2206,10 @@ describe("RelationTest", () => {
     const query = Tag.select("name").where({ id: [tag1.id, tag2.id] });
 
     expect((await query).map((t) => t.name)).toEqual(["Foo", "Foo"]);
-    await assertQueriesMatch(/DISTINCT/, undefined, false, async () => {
+    await self().assertQueriesMatch(/DISTINCT/, {}, async () => {
       expect((await query.distinct()).map((t) => t.name)).toEqual(["Foo"]);
     });
-    await assertQueriesMatch(/DISTINCT/, undefined, false, async () => {
+    await self().assertQueriesMatch(/DISTINCT/, {}, async () => {
       expect((await query.distinct(true)).map((t) => t.name)).toEqual(["Foo"]);
     });
     expect((await query.distinct(true).distinct(false)).map((t) => t.name)).toEqual(["Foo", "Foo"]);
@@ -2363,7 +2359,7 @@ describe("RelationTest", () => {
   it("reorder with first", async () => {
     let post: Post | null = null;
 
-    const sqlLog = await captureSql(async () => {
+    const sqlLog = await self().captureSql({}, async () => {
       post = await Post.order("title").reorder(null).first();
     });
 
@@ -2376,7 +2372,7 @@ describe("RelationTest", () => {
   });
 
   it("reorder with take", async () => {
-    const sqlLog = await captureSql(async () => {
+    const sqlLog = await self().captureSql({}, async () => {
       expect(await Post.order("title").reorder(null).take()).toBeTruthy();
     });
     assertPredicate(
@@ -2470,7 +2466,7 @@ describe("RelationTest", () => {
   });
 
   it("find_by doesn't have implicit ordering", async () => {
-    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+    await self().assertQueriesMatch(/^((?!ORDER).)*$/, {}, async () => {
       await Post.all().findBy({ author_id: 2 });
     });
   });
@@ -2496,7 +2492,7 @@ describe("RelationTest", () => {
   });
 
   it("find_by! doesn't have implicit ordering", async () => {
-    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+    await self().assertQueriesMatch(/^((?!ORDER).)*$/, {}, async () => {
       await Post.all().findByBang({ author_id: 2 });
     });
   });
@@ -2572,13 +2568,13 @@ describe("RelationTest", () => {
   });
 
   it("relations don't load all records in #inspect", async () => {
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       await (Post.all() as any).inspect();
     });
   });
 
   it("loading query is annotated in #inspect", async () => {
-    await assertQueriesMatch(/\/\* loading for inspect \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* loading for inspect \*\//, {}, async () => {
       await (Post.all() as any).inspect();
     });
   });
@@ -2606,13 +2602,13 @@ describe("RelationTest", () => {
   });
 
   it("relations don't load all records in #pretty_print", async () => {
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       await PP.pp(Post.all(), { write: () => {} });
     });
   });
 
   it("loading query is annotated in #pretty_print", async () => {
-    await assertQueriesMatch(/\/\* loading for pp \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* loading for pp \*\//, {}, async () => {
       await PP.pp(Post.all(), { write: () => {} });
     });
   });

@@ -19,7 +19,6 @@ import {
 import { adapterType } from "../test-adapter.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
@@ -114,7 +113,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
   });
 
   describe("ForeignKeyTest", () => {
-    fixtures([], { useTransactionalTests: false });
+    const { self } = fixtures([], { useTransactionalTests: false });
 
     it("foreign keys", async () => {
       const conn = await ambientConnection();
@@ -880,7 +879,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           });
         };
 
-        await assertQueriesMatch(deferrableClause, undefined, false, addTheKey);
+        await self().assertQueriesMatch(deferrableClause, {}, addTheKey);
 
         const foreignKeys = await conn.foreignKeys("astronauts");
         expect(foreignKeys.length).toBe(1);

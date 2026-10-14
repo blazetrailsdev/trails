@@ -2,13 +2,12 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
-import { captureSql } from "../testing/sql-capture.js";
 import type { Base } from "../index.js";
 
 const RAISE = 'Expected corresponding value for ["shop_id", "id"] to be an Array';
 
 describe("CpkBook eager count / aggregate build_joins fold", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
 
   beforeAll(() => {
     [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) =>
@@ -27,7 +26,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
   it("eager_load(:assoc).count on a composite-PK model de-duplicates via DISTINCT", async () => {
     await seedBooksWithChapters();
     let count = 0;
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       count = await CpkBook.eagerLoad(":chapters").count();
     });
     expect(count).toBe(2);
@@ -58,7 +57,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
   it("eager_load(:assoc).limit(n).count(column) bounds ROWS via a DISTINCT-pk id fetch, then re-counts", async () => {
     await seedBooksDuplicateRevisions();
     let count = 0;
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       count = await CpkBook.eagerLoad(":chapters")
         .order("cpk_books.author_id", "cpk_books.id")
         .limit(2)
@@ -76,7 +75,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
   it("eager_load(:assoc).order(non_pk_col).limit(n).count(column) routes the id fetch through columns_for_distinct", async () => {
     await seedBooksDuplicateRevisions();
     let count = 0;
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       count = await CpkBook.eagerLoad(":chapters")
         .order("cpk_books.title")
         .limit(2)
@@ -108,7 +107,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:x).group(:composite_fk_belongs_to).count folds the eager JD", async () => {
     await seedBooksWithOrders();
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await expect(
         CpkBook.eagerLoad(":order").group("order").count("cpk_books.id"),
       ).rejects.toThrow(RAISE);

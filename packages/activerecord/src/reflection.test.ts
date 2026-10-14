@@ -60,10 +60,9 @@ import { DrinkDesigner, MocktailDesigner } from "./test-helpers/models/drink-des
 import { CakeDesigner } from "./test-helpers/models/cake-designer.js";
 import { Recipe } from "./test-helpers/models/recipe.js";
 import { FirstPost } from "./test-helpers/models/post.js";
-import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
-fixtures(["topics", "customers", "companies", "subscribers", "priceEstimates"]);
+const { self } = fixtures(["topics", "customers", "companies", "subscribers", "priceEstimates"]);
 
 describe("ReflectionTest", () => {
   function makeModels() {
@@ -151,14 +150,14 @@ describe("ReflectionTest", () => {
     const drink = await department.chefs.create({ employable: await DrinkDesigner.create() });
     await Recipe.create({ chef_id: drink.id, hotel_id: hotel.id });
 
-    const expectedSql = await captureSql(async () => {
+    const expectedSql = await self().captureSql({}, async () => {
       await hotel.recipes;
     });
 
     CanonicalHotel.reflectOnAssociation("recipes")!.clearAssociationScopeCache();
     await hotel.reload();
     await hotel.drinkDesigners;
-    const loadedSql = await captureSql(async () => {
+    const loadedSql = await self().captureSql({}, async () => {
       await hotel.recipes;
     });
 

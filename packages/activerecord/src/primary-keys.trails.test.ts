@@ -4,7 +4,6 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Country } from "./test-helpers/models/country.js";
 import { Keyboard } from "./test-helpers/models/keyboard.js";
-import { captureSqlAndBinds } from "./test-helpers/test-case.js";
 
 describe("CompositePrimaryKey#id= — Enumerable acceptance (trails-only)", () => {
   fixtures({});
@@ -30,7 +29,7 @@ describe("CompositePrimaryKey#id= — Enumerable acceptance (trails-only)", () =
 });
 
 describe("primary_key on a key-less table after a reconnect (trails-only)", () => {
-  const { canonicalTables } = fixtures({}, { useTransactionalTests: false });
+  const { self, canonicalTables } = fixtures({}, { useTransactionalTests: false });
 
   it("answers nil and inserts with no RETURNING once the connection is re-established", async () => {
     class KeylessEdge extends Base {
@@ -44,7 +43,9 @@ describe("primary_key on a key-less table after a reconnect (trails-only)", () =
       await KeylessEdge.loadSchema();
       expect(KeylessEdge.primaryKey).toBeNull();
 
-      const log = await captureSqlAndBinds(() => KeylessEdge.create({ source_id: 1, sink_id: 2 }));
+      const log = await self().captureSqlAndBinds(() =>
+        KeylessEdge.create({ source_id: 1, sink_id: 2 }),
+      );
       const inserts = log.map(([sql]) => sql).filter((sql) => /^INSERT/i.test(sql));
       expect(inserts).toHaveLength(1);
       expect(inserts[0]).not.toMatch(/RETURNING/i);

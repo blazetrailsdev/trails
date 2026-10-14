@@ -10,7 +10,7 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { cleanUpConnectionHandler, waitForAsyncQuery } from "../cases/helper.js";
+import { waitForAsyncQuery } from "../cases/helper.js";
 import { Base } from "../base.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { OtherDog } from "../test-helpers/models/other-dog.js";
@@ -360,7 +360,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncNullExecutorTest", () => {
 });
 
 describe.skipIf(inMemoryDb())("LoadAsyncMultiThreadPoolExecutorTest", () => {
-  fixtures(["posts", "comments"]);
+  const { self } = fixtures(["posts", "comments"]);
 
   let oldConfig: ReturnType<typeof asyncQueryExecutor>;
 
@@ -385,7 +385,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncMultiThreadPoolExecutorTest", () => {
 
   afterEach(async () => {
     setAsyncQueryExecutor(oldConfig);
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
     await Base.establishConnection(":arunit");
     await ARUnit2Model.establishConnection(":arunit2");
   });
@@ -502,7 +502,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncMultiThreadPoolExecutorTest", () => {
 });
 
 describe.skipIf(inMemoryDb())("LoadAsyncMixedThreadPoolExecutorTest", () => {
-  fixtures(["posts", "comments", "otherDogs"]);
+  const { self } = fixtures(["posts", "comments", "otherDogs"]);
 
   let previousEnv: string | undefined;
   let oldConfig: ReturnType<typeof asyncQueryExecutor>;
@@ -538,7 +538,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncMixedThreadPoolExecutorTest", () => {
     setEnv("TRAILS_ENV", previousEnv);
     Base.configurations(prevConfigs);
     setAsyncQueryExecutor(oldConfig);
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
   });
 
   // BLOCKED: load-async-mixed-pool-scheduled-test-needs-a-synchronous-null-executor-load

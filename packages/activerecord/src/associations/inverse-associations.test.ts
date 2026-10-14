@@ -44,47 +44,8 @@ import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
 
-async function withHasManyInversing(
-  model: typeof Base,
-  fn: () => Promise<void> | void,
-): Promise<void> {
-  const prev = (model as any).hasManyInversing;
-  (model as any).hasManyInversing = true;
-  try {
-    await fn();
-  } finally {
-    (model as any).hasManyInversing = prev;
-  }
-}
-
-async function withAutomaticScopeInversing(
-  reflections: any[],
-  fn: () => Promise<void> | void,
-): Promise<void> {
-  const saved = reflections.map((r) => ({
-    r,
-    prevAutoScope: r.klass.automaticScopeInversing,
-    prevNameCache: r._inverseNameCache,
-    prevOfCache: r._inverseOfCache,
-  }));
-  for (const { r } of saved) {
-    r.klass.automaticScopeInversing = true;
-    r._inverseNameCache = undefined;
-    r._inverseOfCache = undefined;
-  }
-  try {
-    await fn();
-  } finally {
-    for (const { r, prevAutoScope, prevNameCache, prevOfCache } of saved) {
-      r.klass.automaticScopeInversing = prevAutoScope;
-      r._inverseNameCache = prevNameCache;
-      r._inverseOfCache = prevOfCache;
-    }
-  }
-}
-
 describe("AutomaticInverseFindingTests", () => {
-  const { books } = fixtures([
+  const { self, books } = fixtures([
     "ratings",
     "comments",
     "cars",
@@ -211,7 +172,7 @@ describe("AutomaticInverseFindingTests", () => {
     const companyReflection = (SpecialContract as any).reflectOnAssociation("company");
     expect(contactsReflection.scope).toBeTruthy();
     expect(companyReflection.scope).toBeFalsy();
-    await withAutomaticScopeInversing([contactsReflection, companyReflection], () => {
+    await self().withAutomaticScopeInversing(contactsReflection, companyReflection, () => {
       expect(contactsReflection.hasInverse()).toBeTruthy();
       expect(contactsReflection.inverseOf()).toBe(companyReflection);
       expect(companyReflection.inverseOf()).not.toBe(contactsReflection);
@@ -223,7 +184,7 @@ describe("AutomaticInverseFindingTests", () => {
     const authorReflection = (Post as any).reflectOnAssociation("author");
     expect(postReflection.scope).toBeTruthy();
     expect(authorReflection.scope).toBeFalsy();
-    await withAutomaticScopeInversing([postReflection, authorReflection], () => {
+    await self().withAutomaticScopeInversing(postReflection, authorReflection, () => {
       expect(postReflection.hasInverse()).toBeTruthy();
       expect(postReflection.inverseOf()).toBe(authorReflection);
       expect(authorReflection.inverseOf()).not.toBe(postReflection);
@@ -240,7 +201,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(subscriptionReflection.scope).toBeFalsy();
     expect(bookReflection.scope).toBeTruthy();
 
-    await withAutomaticScopeInversing([bookReflection, subscriptionReflection], async () => {
+    await self().withAutomaticScopeInversing(bookReflection, subscriptionReflection, async () => {
       expect(await book.subscriptions.build({}).book).toBeNull();
     });
   });
@@ -874,7 +835,7 @@ describe("InverseHasManyTests", () => {
 });
 
 describe("InverseBelongsToTests", () => {
-  const { faces, interests } = fixtures(["humans", "faces", "interests"]);
+  const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
   beforeAll(() => {
     [Human, Face, Interest].forEach((m) => registerModel(m));
   });
@@ -945,7 +906,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting");
       const human = (await loadSingularTarget(interest, "human")) as any;
       expect(human.interests).not.toBeNull();
@@ -961,7 +922,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing should have single record when setting record through attribute in build method", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const human = await Human.create({});
       human.interests.build({ human });
       expect(await human.interests.size()).toBe(1);
@@ -971,7 +932,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting");
       const human = (await loadSingularTarget(interest, "humanWithCallbacks")) as any;
       assertNotPredicate(human, (h: any) => h.addCallbackCalled);
@@ -979,7 +940,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing does not add duplicate associated objects", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const human = new Human();
       const interest = new Interest();
       (interest as any).human = human;
@@ -989,7 +950,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing does not add unsaved duplicate records when collection is loaded", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const human = await Human.create({});
       await human.interests.load();
       const interest = new Interest();
@@ -1000,7 +961,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing does not add saved duplicate records when collection is loaded", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const human = await Human.create({});
       await human.interests.load();
       const interest = await Interest.create({ human_id: (human as any).id });
@@ -1060,7 +1021,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("building has many parent association inverses one record", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const interest = new Interest();
       (interest as any).buildHuman();
       expect(await (interest as any).human.association("interests").reader.size()).toBe(1);
@@ -1071,7 +1032,7 @@ describe("InverseBelongsToTests", () => {
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  const { faces, interests } = fixtures(["humans", "faces", "interests"]);
+  const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
   beforeAll(() => {
     [Human, Face, Interest].forEach((m) => registerModel(m));
   });
@@ -1164,7 +1125,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const interest = interests("llama_wrangling");
       const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
       expect(human.polymorphicInterests).not.toBeNull();
@@ -1180,7 +1141,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const interest = interests("llama_wrangling");
       const human = await (interest as any).polymorphicHumanWithCallbacks;
       assertNotPredicate(human, (h: any) => h.addCallbackCalled);
@@ -1240,13 +1201,13 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 });
 
 describe("InverseBelongsToTests", () => {
-  fixtures({});
+  const { self } = fixtures({});
   beforeAll(() => {
     [Branch, BrokenBranch].forEach((m) => registerModel(m));
   });
 
   it("recursive model has many inversing", async () => {
-    await withHasManyInversing(Branch, async () => {
+    await self().withHasManyInversing(Branch, async () => {
       const main = await Branch.create({});
       const feature = (await main.branches.create({})) as any;
       const topic = feature.association("branches").reader.build({});
@@ -1255,7 +1216,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("recursive inverse on recursive model has many inversing", async () => {
-    await withHasManyInversing(BrokenBranch, async () => {
+    await self().withHasManyInversing(BrokenBranch, async () => {
       const main = await BrokenBranch.create({});
       const feature = await main.branches.create({});
       const topic = (feature.association("branches") as CollectionAssociation).reader.build({});

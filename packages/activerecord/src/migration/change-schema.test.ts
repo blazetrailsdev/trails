@@ -1,3 +1,4 @@
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { Migration } from "../migration.js";
@@ -5,7 +6,6 @@ import { NotNullViolation, StatementInvalid } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { ambientConnection } from "../support/rocket-tables.js";
-import { withPostgresqlDatetimeType } from "../support/with-postgresql-datetime-type.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { adapterType } from "../test-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
@@ -41,9 +41,11 @@ const mysql = currentAdapter("Mysql2Adapter", "TrilogyAdapter");
 
 describe("Migration", () => {
   describe("ChangeSchemaTest", () => {
+    const { self } = fixtures([]);
+
     afterEach(async () => {
       const connection = await ambientConnection();
-      await connection.dropTable("testings", { ifExists: true });
+      await connection.dropTable("testings").catch(() => null);
       Base.primaryKeyPrefixType = null;
       Base.clearCacheBang();
     });
@@ -299,7 +301,7 @@ describe("Migration", () => {
     it.skipIf(!currentAdapter("PostgreSQLAdapter"))(
       "add column with datetime in timestamptz mode",
       async () => {
-        await withPostgresqlDatetimeType("timestamptz", async () => {
+        await self().withPostgresqlDatetimeType("timestamptz", async () => {
           const connection = await ambientConnection();
           await connection.createTable("testings", (t) => {
             t.column("foo", "datetime");
@@ -581,6 +583,8 @@ describe("Migration", () => {
   });
 
   describeIfSupports("foreign_keys", "ChangeSchemaWithDependentObjectsTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     beforeEach(async () => {
       const connection = await ambientConnection();
       await connection.createTable("trains");

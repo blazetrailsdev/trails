@@ -7,9 +7,7 @@ import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { inTimeZone } from "./cases/helper.js";
-import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
 import { zone } from "@blazetrails/activesupport";
 import { inTimeZone as dateInTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 
@@ -18,7 +16,7 @@ function nsec(v: RubyTime): number {
 }
 
 describe("DateTimePrecisionTest", () => {
-  fixtures({}, { useTransactionalTests: false });
+  const { self } = fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
 
   class Foo extends Base {
@@ -137,7 +135,7 @@ describe("DateTimePrecisionTest", () => {
     "datetime_with_precision",
     "formatting datetime according to precision when time zone aware",
     async () => {
-      await withTimezoneConfig(
+      await self().withTimezoneConfig(
         { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           await adapter.createTable("foos", { force: true }, (t) => {
@@ -166,7 +164,7 @@ describe("DateTimePrecisionTest", () => {
     "datetime_with_precision",
     "formatting datetime according to precision using timestamptz",
     async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.createTable("foos", { force: true }, (t) => {
           t.datetime("created_at", { precision: 0 });
           t.datetime("updated_at", { precision: 4 });
@@ -192,8 +190,8 @@ describe("DateTimePrecisionTest", () => {
     "datetime_with_precision",
     "formatting datetime according to precision when time zone aware using timestamptz",
     async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        await withTimezoneConfig(
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
+        await self().withTimezoneConfig(
           { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
           async () => {
             await adapter.createTable("foos", { force: true }, (t) => {
@@ -243,7 +241,7 @@ describe("DateTimePrecisionTest", () => {
     "datetime_with_precision",
     "writing a blank attribute timestamptz",
     async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.createTable("foos", { force: true }, (t) => {
           t.datetime("happened_at");
         });
@@ -258,7 +256,7 @@ describe("DateTimePrecisionTest", () => {
     "datetime_with_precision",
     "writing a date attribute timestamptz",
     async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.createTable("foos", { force: true }, (t) => {
           t.datetime("happened_at");
         });
@@ -273,7 +271,7 @@ describe("DateTimePrecisionTest", () => {
     "datetime_with_precision",
     "writing a time with zone attribute timestamptz",
     async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.createTable("foos", { force: true }, (t) => {
           t.datetime("happened_at");
         });

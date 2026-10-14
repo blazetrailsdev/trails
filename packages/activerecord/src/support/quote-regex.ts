@@ -21,6 +21,4 @@ function _selectImpl() {
 
 const _impl = _selectImpl();
 
-export const quoteTableName: (name: string) => string = _impl.quoteTableName;
-
 export const quoteColumnName: (name: string) => string = _impl.quoteColumnName;

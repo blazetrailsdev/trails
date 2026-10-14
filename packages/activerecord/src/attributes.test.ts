@@ -12,7 +12,6 @@ import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -53,7 +52,7 @@ class UnoverloadedType extends Base {
 }
 
 describe("CustomPropertiesTest", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
   beforeAll(async () => {
     await loadSchemaFromAdapter.call(OverloadedType);
     await loadSchemaFromAdapter.call(UnoverloadedType);
@@ -170,7 +169,7 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("time zone aware attribute", async () => {
-    await withTimezoneConfig(
+    await self().withTimezoneConfig(
       { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
       async () => {
         class WithTimes extends OverloadedType {

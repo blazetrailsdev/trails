@@ -5,7 +5,6 @@ import { Nodes } from "@blazetrails/arel";
 import { Time as RubyTime } from "@blazetrails/date";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
-import { captureSql } from "../testing/sql-capture.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Developer,
@@ -69,11 +68,9 @@ registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);
 const namesAndIds = (rows: any[]) => rows.map((r) => [r.name, r.id]);
-const capSql = (fn: () => unknown) =>
-  captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("DefaultScopingTest", () => {
-  const { developers, posts, comments } = fixtures(["developers", "posts", "comments"]);
+  const { self, developers, posts, comments } = fixtures(["developers", "posts", "comments"]);
 
   it("default scope", async () => {
     const expected = salaries(await Developer.order("salary DESC"));
@@ -149,7 +146,9 @@ describe("DefaultScopingTest", () => {
   it("default scope runs on create", async () => {
     await Mentor.create();
     const createSql = (
-      await capSql(() => DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" }),
+      )
     )[1];
     expect(createSql).toMatch(/mentor_id/);
   });
@@ -157,14 +156,18 @@ describe("DefaultScopingTest", () => {
   it("default scope with all queries runs on create", async () => {
     await Mentor.create();
     const createSql = (
-      await capSql(() => DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" }),
+      )
     )[1];
     expect(createSql).toMatch(/mentor_id/);
   });
 
   it("nilable default scope with all queries runs on create", async () => {
     const createSql = (
-      await capSql(() => DeveloperWithDefaultNilableFirmScopeAllQueries.create({ name: "Nikita" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultNilableFirmScopeAllQueries.create({ name: "Nikita" }),
+      )
     )[0];
     expect(createSql).not.toMatch(/AND$/);
   });
@@ -173,7 +176,9 @@ describe("DefaultScopingTest", () => {
     await Mentor.create();
     await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" });
     const selectSql = (
-      await capSql(() => DeveloperwithDefaultMentorScopeNot.findBy({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperwithDefaultMentorScopeNot.findBy({ name: "Eileen" }),
+      )
     )[0];
     expect(selectSql).toMatch(/mentor_id/);
   });
@@ -182,7 +187,9 @@ describe("DefaultScopingTest", () => {
     await Mentor.create();
     await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" });
     const selectSql = (
-      await capSql(() => DeveloperWithDefaultMentorScopeAllQueries.findBy({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultMentorScopeAllQueries.findBy({ name: "Eileen" }),
+      )
     )[0];
     expect(selectSql).toMatch(/mentor_id/);
   });
@@ -190,7 +197,9 @@ describe("DefaultScopingTest", () => {
   it("nilable default scope with all queries runs on select", async () => {
     await DeveloperWithDefaultNilableFirmScopeAllQueries.create({ name: "Nikita" });
     const selectSql = (
-      await capSql(() => DeveloperWithDefaultNilableFirmScopeAllQueries.findBy({ name: "Nikita" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultNilableFirmScopeAllQueries.findBy({ name: "Nikita" }),
+      )
     )[0];
     expect(selectSql).not.toMatch(/AND$/);
   });
@@ -198,14 +207,14 @@ describe("DefaultScopingTest", () => {
   it("default scope doesnt run on update", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.update({ name: "Not Eileen" })))[0];
+    const updateSql = (await self().captureSql({}, () => dev.update({ name: "Not Eileen" })))[0];
     expect(updateSql).not.toMatch(/mentor_id/);
   });
 
   it("default scope with all queries runs on update", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.update({ name: "Not Eileen" })))[1];
+    const updateSql = (await self().captureSql({}, () => dev.update({ name: "Not Eileen" })))[1];
     expect(updateSql).toMatch(/mentor_id/);
   });
 
@@ -213,14 +222,16 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const updateSql = (await capSql(() => dev.update({ name: "Not Nikita" })))[0];
+    const updateSql = (await self().captureSql({}, () => dev.update({ name: "Not Nikita" })))[0];
     expect(updateSql).not.toMatch(/AND$/);
   });
 
   it("default scope doesnt run on update columns", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Eileen" })))[0];
+    const updateSql = (
+      await self().captureSql({}, () => dev.updateColumns({ name: "Not Eileen" }))
+    )[0];
     expect(updateSql).not.toMatch(/mentor_id/);
   });
 
@@ -228,21 +239,23 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Nikita" })))[0];
+    const updateSql = (
+      await self().captureSql({}, () => dev.updateColumns({ name: "Not Nikita" }))
+    )[0];
     expect(updateSql).not.toMatch(/AND$/);
   });
 
   it("default scope doesnt run on destroy", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const destroySql = (await capSql(() => dev.destroy()))[0];
+    const destroySql = (await self().captureSql({}, () => dev.destroy()))[0];
     expect(destroySql).not.toMatch(/mentor_id/);
   });
 
   it("default scope with all queries runs on destroy", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const destroySql = (await capSql(() => dev.destroy()))[1];
+    const destroySql = (await self().captureSql({}, () => dev.destroy()))[1];
     expect(destroySql).toMatch(/mentor_id/);
   });
 
@@ -250,14 +263,14 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const destroySql = (await capSql(() => dev.destroy()))[0];
+    const destroySql = (await self().captureSql({}, () => dev.destroy()))[0];
     expect(destroySql).not.toMatch(/AND$/);
   });
 
   it("default scope doesnt run on reload", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).not.toMatch(/mentor_id/);
   });
 
@@ -265,7 +278,7 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).not.toMatch(/AND$/);
   });
 
@@ -274,7 +287,7 @@ describe("DefaultScopingTest", () => {
       name: "Eileen",
       mentor_id: 2,
     })) as any;
-    const reloadSql = (await capSql(() => dev.reload({ unscoped: true })))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload({ unscoped: true })))[0];
     expect(reloadSql).not.toMatch(/mentor_id/);
   });
 
@@ -708,14 +721,16 @@ describe("DefaultScopingTest", () => {
   it("default scope with all queries runs on update columns", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Eileen" })))[0];
+    const updateSql = (
+      await self().captureSql({}, () => dev.updateColumns({ name: "Not Eileen" }))
+    )[0];
     expect(updateSql).toMatch(/mentor_id/);
   });
 
   it("default scope with all queries runs on reload", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).toMatch(/mentor_id/);
   });
 
@@ -725,7 +740,7 @@ describe("DefaultScopingTest", () => {
       (await DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries.create(
         { name: "Eileen" },
       )) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).not.toMatch(/mentor_id/);
     expect(reloadSql).toMatch(/firm_id/);
   });
@@ -734,11 +749,11 @@ describe("DefaultScopingTest", () => {
     await Mentor.create();
     const klass =
       DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries;
-    const createSql = (await capSql(() => klass.create({ name: "Steve" })))[1];
+    const createSql = (await self().captureSql({}, () => klass.create({ name: "Steve" })))[1];
     expect(createSql).toMatch(/mentor_id/);
     expect(createSql).toMatch(/firm_id/);
     const developer = (await klass.findBy({ name: "Steve" })) as any;
-    const updateSql = (await capSql(() => developer.update({ name: "Stephen" })))[1];
+    const updateSql = (await self().captureSql({}, () => developer.update({ name: "Stephen" })))[1];
     expect(updateSql).not.toMatch(/mentor_id/);
     expect(updateSql).toMatch(/firm_id/);
   });

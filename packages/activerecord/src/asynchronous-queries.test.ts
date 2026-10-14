@@ -18,7 +18,6 @@ import { AsynchronousQueryInsideTransactionError, StatementInvalid } from "./err
 import { FutureResult } from "./future-result.js";
 import { Result } from "./result.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { cleanUpConnectionHandler } from "./cases/helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
@@ -160,7 +159,7 @@ describe("AsynchronousQueriesWithTransactionalTest", () => {
 });
 
 describe("AsynchronousExecutorTypeTest", () => {
-  fixtures({});
+  const { self } = fixtures({});
 
   const asyncExecutor = (pool: unknown) =>
     (pool as { asyncExecutor: ThreadPoolExecutor | null }).asyncExecutor;
@@ -190,7 +189,7 @@ describe("AsynchronousExecutorTypeTest", () => {
 
       expect(handler.connectionPoolList("all").length).toEqual(2);
     } finally {
-      cleanUpConnectionHandler();
+      self().cleanUpConnectionHandler();
       setAsyncQueryExecutor(oldValue);
     }
   });
@@ -224,7 +223,7 @@ describe("AsynchronousExecutorTypeTest", () => {
       expect(handler.connectionPoolList("all").length).toEqual(2);
       expect(asyncPool2).toBe(asyncPool1);
     } finally {
-      cleanUpConnectionHandler();
+      self().cleanUpConnectionHandler();
       setAsyncQueryExecutor(oldValue);
     }
   });
@@ -266,7 +265,7 @@ describe("AsynchronousExecutorTypeTest", () => {
       expect(handler.connectionPoolList("all").length).toEqual(2);
       expect(asyncPool2).toBe(asyncPool1);
     } finally {
-      cleanUpConnectionHandler();
+      self().cleanUpConnectionHandler();
       setGlobalExecutorConcurrency(oldConcurrency);
       setAsyncQueryExecutor(oldValue);
       rbObjIvarSet(
@@ -330,7 +329,7 @@ describe("AsynchronousExecutorTypeTest", () => {
       expect(handler.connectionPoolList("all").length).toEqual(2);
       expect(asyncPool2).not.toBe(asyncPool1);
     } finally {
-      cleanUpConnectionHandler();
+      self().cleanUpConnectionHandler();
       setAsyncQueryExecutor(oldValue);
     }
   });
@@ -372,7 +371,7 @@ describe("AsynchronousExecutorTypeTest", () => {
       expect(handler.connectionPoolList("all").length).toEqual(2);
       expect(asyncPool2).not.toBe(asyncPool1);
     } finally {
-      cleanUpConnectionHandler();
+      self().cleanUpConnectionHandler();
       setAsyncQueryExecutor(oldValue);
     }
   });

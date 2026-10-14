@@ -8,7 +8,6 @@ import { Base } from "../base.js";
 import "./test-case.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import type { PoolManager } from "../connection-adapters/pool-manager.js";
 import { I18n } from "@blazetrails/activemodel";
 import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
@@ -156,16 +155,4 @@ export async function waitForAsyncQuery(
   }
 
   throw new Timeout.Error(`The async executor wasn't drained after ${timeout} seconds`);
-}
-
-export function cleanUpConnectionHandler(): void {
-  const handler = Base.connectionHandler as unknown as {
-    _connectionNameToPoolManager: { eachPair(block: (k: string, v: PoolManager) => void): void };
-  };
-  handler._connectionNameToPoolManager.eachPair((owner, poolManager) => {
-    for (const roleName of [...poolManager.roleNames]) {
-      if (roleName === Base.defaultRole && CLEAN_UP_KEPT_OWNERS.includes(owner)) continue;
-      poolManager.removeRole(roleName);
-    }
-  });
 }

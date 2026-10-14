@@ -22,12 +22,7 @@ import {
   Topic as CanonicalTopic,
   BlankTopic as CanonicalBlankTopic,
 } from "./test-helpers/models/topic.js";
-import {
-  assertQueriesCount,
-  assertQueriesMatch,
-  assertNoQueries,
-} from "./testing/query-assertions.js";
-import { quoteTableName } from "./support/quote-regex.js";
+import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
@@ -69,12 +64,11 @@ function assertNotCalledFlag(called: boolean): void {
   if (called) throw new Error("Expected instantiate not to be called");
 }
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { assertAsyncEqual } from "./support/async-helper.js";
 import { Time as RubyTime } from "@blazetrails/date";
 
 describe("FinderTest", () => {
-  const { topics } = fixtures(["topics", "entrants", "developers", "developersProjects"]);
+  const { self, topics } = fixtures(["topics", "entrants", "developers", "developersProjects"]);
   const rid = (r: unknown) => (r as { id: number }).id;
   const Topic = CanonicalTopic;
   registerModel("Topic", Topic);
@@ -302,18 +296,19 @@ describe("FinderTest", () => {
   });
 
   it("nth to last with order uses limit", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+      {},
       async () => {
         await Topic.secondToLast();
       },
     );
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("topics.updated_at"))} DESC LIMIT`, "i"),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(
+        `ORDER BY ${regexpEscape(self().quoteTableName("topics.updated_at"))} DESC LIMIT`,
+        "i",
+      ),
+      {},
       async () => {
         await Topic.order(":updated_at").secondToLast();
       },
@@ -348,13 +343,13 @@ describe("FinderTest", () => {
 
   it("take and first and last with integer should use sql limit", async () => {
     const limitRe = /LIMIT|ROWNUM <=|FETCH FIRST/;
-    await assertQueriesMatch(limitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(limitRe, {}, async () => {
       await Topic.take(3);
     });
-    await assertQueriesMatch(limitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(limitRe, {}, async () => {
       await Topic.first(2);
     });
-    await assertQueriesMatch(limitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(limitRe, {}, async () => {
       await Topic.last(5);
     });
   });
@@ -532,25 +527,35 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  const { topics, companies, accounts, entrants, posts, customers, cpkBooks, cpkReviews, authors } =
-    fixtures([
-      "topics",
-      "companies",
-      "accounts",
-      "entrants",
-      "posts",
-      "comments",
-      "customers",
-      "cpkBooks",
-      "cpkAuthors",
-      "cpkReviews",
-      "authors",
-      "authorAddresses",
-      "clothingItems",
-      "developers",
-      "categorizations",
-      "categories",
-    ]);
+  const {
+    self,
+    topics,
+    companies,
+    accounts,
+    entrants,
+    posts,
+    customers,
+    cpkBooks,
+    cpkReviews,
+    authors,
+  } = fixtures([
+    "topics",
+    "companies",
+    "accounts",
+    "entrants",
+    "posts",
+    "comments",
+    "customers",
+    "cpkBooks",
+    "cpkAuthors",
+    "cpkReviews",
+    "authors",
+    "authorAddresses",
+    "clothingItems",
+    "developers",
+    "categorizations",
+    "categories",
+  ]);
   registerModel("Topic", CanonicalTopic);
   registerModel("Reply", CanonicalReply);
   registerModel(CanonicalPost);
@@ -736,7 +741,7 @@ describe("FinderTest", () => {
   });
 
   it("find doesnt have implicit ordering", async () => {
-    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+    await self().assertQueriesMatch(/^((?!ORDER).)*$/, {}, async () => {
       await Topic.find(1);
     });
   });
@@ -842,13 +847,12 @@ describe("FinderTest", () => {
       expect(rid(await Topic.first())).toBe(rid(topics("fifth")));
       expect(rid(await Topic.last())).toBe(rid(topics("third")));
 
-      await assertQueriesMatch(
+      await self().assertQueriesMatch(
         new RegExp(
-          `ORDER BY ${regexpEscape(quoteTableName("topics.title"))} DESC, ${regexpEscape(quoteTableName("topics.id"))} DESC LIMIT`,
+          `ORDER BY ${regexpEscape(self().quoteTableName("topics.title"))} DESC, ${regexpEscape(self().quoteTableName("topics.id"))} DESC LIMIT`,
           "i",
         ),
-        undefined,
-        false,
+        {},
         async () => {
           await Topic.last();
         },
@@ -862,13 +866,12 @@ describe("FinderTest", () => {
     const oldImplicitOrderColumn = NonPrimaryKey.implicitOrderColumn;
     NonPrimaryKey.implicitOrderColumn = "created_at";
     try {
-      await assertQueriesMatch(
+      await self().assertQueriesMatch(
         new RegExp(
-          `ORDER BY ${regexpEscape(quoteTableName("non_primary_keys.created_at"))} DESC LIMIT`,
+          `ORDER BY ${regexpEscape(self().quoteTableName("non_primary_keys.created_at"))} DESC LIMIT`,
           "i",
         ),
-        undefined,
-        false,
+        {},
         async () => {
           await NonPrimaryKey.last();
         },
@@ -880,14 +883,13 @@ describe("FinderTest", () => {
 
   it("implicit order column reorders query constraints", async () => {
     ClothingItem.implicitOrderColumn = "color";
-    const quotedType = regexpEscape(quoteTableName("clothing_items.clothing_type"));
-    const quotedColor = regexpEscape(quoteTableName("clothing_items.color"));
+    const quotedType = regexpEscape(self().quoteTableName("clothing_items.clothing_type"));
+    const quotedColor = regexpEscape(self().quoteTableName("clothing_items.color"));
 
     try {
-      await assertQueriesMatch(
+      await self().assertQueriesMatch(
         new RegExp(`ORDER BY ${quotedColor} ASC, ${quotedType} ASC LIMIT`, "i"),
-        undefined,
-        false,
+        {},
         async () => {
           expect(await ClothingItem.first()).toBeInstanceOf(ClothingItem);
         },
@@ -899,18 +901,17 @@ describe("FinderTest", () => {
 
   it("implicit order column prepends query constraints", async () => {
     ClothingItem.implicitOrderColumn = "description";
-    const quotedType = regexpEscape(quoteTableName("clothing_items.clothing_type"));
-    const quotedColor = regexpEscape(quoteTableName("clothing_items.color"));
-    const quotedDescription = regexpEscape(quoteTableName("clothing_items.description"));
+    const quotedType = regexpEscape(self().quoteTableName("clothing_items.clothing_type"));
+    const quotedColor = regexpEscape(self().quoteTableName("clothing_items.color"));
+    const quotedDescription = regexpEscape(self().quoteTableName("clothing_items.description"));
 
     try {
-      await assertQueriesMatch(
+      await self().assertQueriesMatch(
         new RegExp(
           `ORDER BY ${quotedDescription} ASC, ${quotedType} ASC, ${quotedColor} ASC LIMIT`,
           "i",
         ),
-        undefined,
-        false,
+        {},
         async () => {
           expect(await ClothingItem.first()).toBeInstanceOf(ClothingItem);
         },
@@ -1193,13 +1194,12 @@ describe("FinderTest", () => {
   });
 
   it("#last for a model with composite query constraints", async () => {
-    const quotedType = regexpEscape(quoteTableName("clothing_items.clothing_type"));
-    const quotedColor = regexpEscape(quoteTableName("clothing_items.color"));
+    const quotedType = regexpEscape(self().quoteTableName("clothing_items.clothing_type"));
+    const quotedColor = regexpEscape(self().quoteTableName("clothing_items.color"));
 
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(`ORDER BY ${quotedType} DESC, ${quotedColor} DESC LIMIT`, "i"),
-      undefined,
-      false,
+      {},
       async () => {
         expect(await ClothingItem.last()).toBeInstanceOf(ClothingItem);
       },
@@ -1207,13 +1207,12 @@ describe("FinderTest", () => {
   });
 
   it("#first for a model with composite query constraints", async () => {
-    const quotedType = regexpEscape(quoteTableName("clothing_items.clothing_type"));
-    const quotedColor = regexpEscape(quoteTableName("clothing_items.color"));
+    const quotedType = regexpEscape(self().quoteTableName("clothing_items.clothing_type"));
+    const quotedColor = regexpEscape(self().quoteTableName("clothing_items.color"));
 
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(`ORDER BY ${quotedType} ASC, ${quotedColor} ASC LIMIT`, "i"),
-      undefined,
-      false,
+      {},
       async () => {
         expect(await ClothingItem.first()).toBeInstanceOf(ClothingItem);
       },
@@ -1381,7 +1380,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  const { posts, topics, accounts, companies, cars, authors } = fixtures([
+  const { self, posts, topics, accounts, companies, cars, authors } = fixtures([
     "posts",
     "topics",
     "accounts",
@@ -1496,10 +1495,9 @@ describe("FinderTest", () => {
     const oldImplicitOrderColumn = CanonicalTopic.implicitOrderColumn;
     CanonicalTopic.implicitOrderColumn = "id";
     try {
-      await assertQueriesMatch(
-        new RegExp(`ORDER BY ${regexpEscape(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
-        undefined,
-        false,
+      await self().assertQueriesMatch(
+        new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+        {},
         async () => {
           await CanonicalTopic.last();
         },
@@ -1658,7 +1656,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  fixtures(["topics", "comments", "posts", "companies", "accounts"]);
+  const { self } = fixtures(["topics", "comments", "posts", "companies", "accounts"]);
   registerModel("Topic", CanonicalTopic);
   registerModel("Reply", CanonicalReply);
   registerModel("Comment", CanonicalComment);
@@ -1804,7 +1802,7 @@ describe("FinderTest", () => {
   });
 
   it("hash condition utc time interpolation with default timezone local", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const topic = await Topic.first();
       const found = await Topic.where({
         written_on: (topic as { written_on: unknown }).written_on,
@@ -1814,7 +1812,7 @@ describe("FinderTest", () => {
   });
 
   it("hash condition local time interpolation with default timezone utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       const topic = await Topic.first();
       const found = await Topic.where({
         written_on: (topic as { written_on: unknown }).written_on,
@@ -1874,7 +1872,7 @@ describe("FinderTest", () => {
   });
 
   it("condition utc time interpolation with default timezone local", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const topic = await Topic.first();
       const found = await Topic.where([
         "written_on = ?",
@@ -1885,7 +1883,7 @@ describe("FinderTest", () => {
   });
 
   it("condition local time interpolation with default timezone utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       const topic = await Topic.first();
       const found = await Topic.where([
         "written_on = ?",
@@ -1897,7 +1895,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  const { customers, cpkBooks, authors, topics } = fixtures([
+  const { self, customers, cpkBooks, authors, topics } = fixtures([
     "customers",
     "cpkBooks",
     "cpkAuthors",
@@ -1944,13 +1942,13 @@ describe("FinderTest", () => {
   });
 
   it("include on unloaded relation with match", async () => {
-    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(oneLimitRe, {}, async () => {
       expect(await Customer.where({ name: "David" }).isInclude(customers("david"))).toBe(true);
     });
   });
 
   it("include on unloaded relation without match", async () => {
-    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(oneLimitRe, {}, async () => {
       expect(await Customer.where({ name: "David" }).isInclude(customers("mary"))).toBe(false);
     });
   });
@@ -1965,7 +1963,7 @@ describe("FinderTest", () => {
   });
 
   it("include on unloaded relation with offset", async () => {
-    await assertQueriesMatch(/ORDER BY name ASC/, undefined, false, async () => {
+    await self().assertQueriesMatch(/ORDER BY name ASC/, {}, async () => {
       expect(await Customer.offset(1).order("name ASC").isInclude(customers("mary"))).toBe(true);
     });
   });
@@ -2022,7 +2020,7 @@ describe("FinderTest", () => {
   });
 
   it("include on unloaded relation with composite primary key", async () => {
-    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(oneLimitRe, {}, async () => {
       const book = cpkBooks("cpk_great_author_first_book");
       expect(await CpkBook.where({ title: "The first book" }).isInclude(book)).toBeTruthy();
     });
@@ -2038,13 +2036,13 @@ describe("FinderTest", () => {
   });
 
   it("member on unloaded relation with match", async () => {
-    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(oneLimitRe, {}, async () => {
       expect(await Customer.where({ name: "David" }).isMember(customers("david"))).toBe(true);
     });
   });
 
   it("member on unloaded relation without match", async () => {
-    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(oneLimitRe, {}, async () => {
       expect(await Customer.where({ name: "David" }).isMember(customers("mary"))).toBe(false);
     });
   });
@@ -2059,7 +2057,7 @@ describe("FinderTest", () => {
   });
 
   it("member on unloaded relation with offset", async () => {
-    await assertQueriesMatch(/ORDER BY name ASC/, undefined, false, async () => {
+    await self().assertQueriesMatch(/ORDER BY name ASC/, {}, async () => {
       expect(await Customer.offset(1).order("name ASC").isMember(customers("mary"))).toBe(true);
     });
   });
@@ -2093,7 +2091,7 @@ describe("FinderTest", () => {
   });
 
   it("member on unloaded relation with composite primary key", async () => {
-    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+    await self().assertQueriesMatch(oneLimitRe, {}, async () => {
       const book = cpkBooks("cpk_great_author_first_book");
       expect(await CpkBook.where({ title: "The first book" }).isMember(book)).toBeTruthy();
     });
@@ -2155,7 +2153,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  const { topics, authors, developers } = fixtures([
+  const { self, topics, authors, developers } = fixtures([
     "topics",
     "authors",
     "posts",
@@ -2267,10 +2265,9 @@ describe("FinderTest", () => {
   });
 
   it("exists does not select columns without alias", async () => {
-    await assertQueriesMatch(
-      new RegExp(`SELECT 1 AS one FROM ${regexpEscape(quoteTableName("topics"))}`, "i"),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`SELECT 1 AS one FROM ${regexpEscape(self().quoteTableName("topics"))}`, "i"),
+      {},
       async () => {
         await Topic.isExists();
       },
@@ -2287,7 +2284,7 @@ describe("FinderTest", () => {
 
   it("exists with loaded relation", async () => {
     const relation = await Topic.all().load();
-    await assertQueriesMatch(/SELECT 1 AS one/i, 1, false, async () => {
+    await self().assertQueriesMatch(/SELECT 1 AS one/i, { count: 1 }, async () => {
       expect(await relation.isExists()).toBeTruthy();
     });
   });
@@ -2295,7 +2292,7 @@ describe("FinderTest", () => {
   it("exists with empty loaded relation", async () => {
     await Topic.deleteAll();
     const relation = await Topic.all().load();
-    await assertQueriesMatch(/SELECT 1 AS one/i, 1, false, async () => {
+    await self().assertQueriesMatch(/SELECT 1 AS one/i, { count: 1 }, async () => {
       expect(await relation.isExists()).toBeFalsy();
     });
   });
@@ -2306,7 +2303,7 @@ describe("FinderTest", () => {
     assertNotEmpty(await posts.records());
     for (const post of await posts.records()) await post.destroy();
 
-    await assertQueriesMatch(/SELECT 1 AS one/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/SELECT 1 AS one/i, {}, async () => {
       expect(await author.posts.isExists()).toBeFalsy();
     });
   });
@@ -2465,7 +2462,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  const { topics, posts, accounts } = fixtures(["topics", "posts", "accounts"]);
+  const { self, topics, posts, accounts } = fixtures(["topics", "posts", "accounts"]);
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
   registerModel("Topic", Topic);
@@ -2552,7 +2549,7 @@ describe("FinderTest", () => {
   });
 
   it("find_by doesn't have implicit ordering", async () => {
-    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+    await self().assertQueriesMatch(/^((?!ORDER).)*$/, {}, async () => {
       await Post.findBy({ id: posts("eager_other").id });
     });
   });
@@ -2570,7 +2567,7 @@ describe("FinderTest", () => {
   });
 
   it("find_by! doesn't have implicit ordering", async () => {
-    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
+    await self().assertQueriesMatch(/^((?!ORDER).)*$/, {}, async () => {
       await Post.findByBang({ id: posts("eager_other").id });
     });
   });

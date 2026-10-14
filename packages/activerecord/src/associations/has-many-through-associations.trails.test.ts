@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { quoteTableName } from "../support/quote-regex.js";
 import { Author } from "../test-helpers/models/author.js";
 import {
   CpkBookWithOrderAgreements,
@@ -17,7 +16,7 @@ import { Tag } from "../test-helpers/models/tag.js";
 import type { CollectionAssociation } from "./collection-association.js";
 
 describe("HasManyThroughAssociationsTest", () => {
-  const { posts, people, authors, categories, shardedBlogPosts, cpkTags } = fixtures([
+  const { self, posts, people, authors, categories, shardedBlogPosts, cpkTags } = fixtures([
     "posts",
     "readers",
     "people",
@@ -80,12 +79,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const agreement = await CpkOrderAgreement.create({ order_id: order.readAttribute("id_value") });
 
     const sql = await book.orderAgreements.toSql();
-    const orderId = quoteTableName("cpk_orders.id");
-    expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_orders")}`, "i"));
+    const orderId = self().quoteTableName("cpk_orders.id");
+    expect(sql).toMatch(new RegExp(`INNER JOIN ${self().quoteTableName("cpk_orders")}`, "i"));
     expect(sql).toMatch(
-      new RegExp(`${quoteTableName("cpk_order_agreements.order_id")} = ${orderId}`, "i"),
+      new RegExp(`${self().quoteTableName("cpk_order_agreements.order_id")} = ${orderId}`, "i"),
     );
-    expect(sql).toMatch(new RegExp(`${quoteTableName("cpk_orders.shop_id")} =`, "i"));
+    expect(sql).toMatch(new RegExp(`${self().quoteTableName("cpk_orders.shop_id")} =`, "i"));
     expect(sql).toMatch(new RegExp(`${orderId} =`, "i"));
 
     expect(await book.orderAgreements).toEqual([agreement]);
@@ -94,7 +93,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("composite-pk target and through model has_many through routes via join scope", async () => {
     const tag = cpkTags("cpk_tag_loyal_customer");
     const sql = await tag.orders.toSql();
-    const q = quoteTableName;
+    const q = (name: string) => self().quoteTableName(name);
     expect(sql).toMatch(new RegExp(`INNER JOIN ${q("cpk_order_tags")}`, "i"));
     expect(sql).toMatch(new RegExp(`${q("cpk_orders.id")} = ${q("cpk_order_tags.order_id")}`, "i"));
     expect(sql).toMatch(new RegExp(`${q("cpk_order_tags.tag_id")} =`, "i"));
@@ -107,7 +106,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await order.association("book").create({ id: [7, 8] });
 
     const sql = await order.chapters.toSql();
-    const q = quoteTableName;
+    const q = (name: string) => self().quoteTableName(name);
     expect(sql).toMatch(
       new RegExp(`${q("cpk_chapters.author_id")} = ${q("cpk_books.author_id")}`, "i"),
     );

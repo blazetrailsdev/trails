@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertRaises, isBlank } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/ruby-compat";
-import { captureSql } from "../testing/sql-capture.js";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
 import { Base, Range, RecordNotFound, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
@@ -32,7 +30,7 @@ registerModel(BadReference);
 registerModel(FirstPost);
 registerModel(SpecialPostWithDefaultScope);
 
-const { developers, people, references, authors, comments } = fixtures([
+const { self, developers, people, references, authors, comments } = fixtures([
   "developers",
   "projects",
   "developersProjects",
@@ -216,7 +214,7 @@ describe("RelationScopingTest", () => {
   it("scoped find with annotation", async () => {
     await Developer.annotate("scoped").scoping(async () => {
       let developer: Developer | null = null;
-      await assertQueriesMatch(/\/\* scoped \*\//, undefined, false, async () => {
+      await self().assertQueriesMatch(/\/\* scoped \*\//, {}, async () => {
         developer = (await Developer.where("name = 'David'").first()) as Developer;
       });
       expect(developer!.name).toBe("David");
@@ -228,7 +226,7 @@ describe("RelationScopingTest", () => {
       .unscoped()
       .scoping(async () => {
         let developer: Developer | null = null;
-        const log = await captureSql(async () => {
+        const log = await self().captureSql({}, async () => {
           developer = (await Developer.where("name = 'David'").first()) as Developer;
         });
 
@@ -241,7 +239,7 @@ describe("RelationScopingTest", () => {
 
   it("find with annotation unscope", async () => {
     let developer: Developer | null = null;
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       developer = (await Developer.annotate("unscope")
         .where("name = 'David'")
         .unscope(":annotate")
@@ -436,13 +434,15 @@ describe("RelationScopingTest", () => {
     const dev = (await Author.where({ organization_id: "agency_1" }).first()) as Author;
 
     await Author.where({ organization_id: "agency_1" }).scoping(async () => {
-      const updateSql = (await captureSql(() => (dev as any).update({ name: "Eileen" })))[0];
+      const updateSql = (
+        await self().captureSql({}, () => (dev as any).update({ name: "Eileen" }))
+      )[0];
       expect(updateSql).not.toMatch(/organization_id/);
     });
 
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
       const updateScopedSql = (
-        await captureSql(() => (dev as any).update({ name: "Not Eileen" }))
+        await self().captureSql({}, () => (dev as any).update({ name: "Not Eileen" }))
       )[1];
       expect(updateScopedSql).toMatch(/organization_id/);
     });
@@ -453,11 +453,11 @@ describe("RelationScopingTest", () => {
     const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
     const dev2 = (await Author.where({ organization_id: "agency_1" }).last()) as Base;
     await Author.where({ organization_id: "agency_1" }).scoping(async () => {
-      const deleteSql = (await captureSql(() => (dev1 as any).delete()))[0];
+      const deleteSql = (await self().captureSql({}, () => (dev1 as any).delete()))[0];
       expect(deleteSql).not.toMatch(/organization_id/);
     });
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
-      const deleteScopedSql = (await captureSql(() => (dev2 as any).delete()))[0];
+      const deleteScopedSql = (await self().captureSql({}, () => (dev2 as any).delete()))[0];
       expect(deleteScopedSql).toMatch(/organization_id/);
     });
   });
@@ -466,12 +466,12 @@ describe("RelationScopingTest", () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
     const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
     await Author.where({ organization_id: "agency_1" }).scoping(async () => {
-      const reloadSql = (await captureSql(() => (dev1 as any).reload()))[0];
+      const reloadSql = (await self().captureSql({}, () => (dev1 as any).reload()))[0];
       expect(reloadSql).not.toMatch(/organization_id/);
     });
 
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
-      const scopedReloadSql = (await captureSql(() => (dev1 as any).reload()))[0];
+      const scopedReloadSql = (await self().captureSql({}, () => (dev1 as any).reload()))[0];
       expect(scopedReloadSql).toMatch(/organization_id/);
     });
   });
@@ -480,7 +480,7 @@ describe("RelationScopingTest", () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
       const selectSql = (
-        await captureSql(async () => {
+        await self().captureSql({}, async () => {
           await Author.first();
         })
       )[0];
@@ -488,7 +488,7 @@ describe("RelationScopingTest", () => {
 
       await Author.where({ owned_essay_id: null }).scoping(async () => {
         const secondSelectSql = (
-          await captureSql(async () => {
+          await self().captureSql({}, async () => {
             await Author.first();
           })
         )[0];
@@ -497,7 +497,7 @@ describe("RelationScopingTest", () => {
       });
 
       const thirdSelectSql = (
-        await captureSql(async () => {
+        await self().captureSql({}, async () => {
           await Author.first();
         })
       )[0];
@@ -510,7 +510,7 @@ describe("RelationScopingTest", () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
       const selectSql = (
-        await captureSql(async () => {
+        await self().captureSql({}, async () => {
           await Author.first();
         })
       )[0];
@@ -669,18 +669,22 @@ describe("HasManyScopingTest", () => {
     const welcome = (await Post.find(1)) as Base;
     await (welcome as any).comments.updateAll({ author_id: 1 });
 
-    const commentsSql = (await captureSql(() => (welcome as any).comments.toArray())).at(-1);
+    const commentsSql = (await self().captureSql({}, () => (welcome as any).comments.toArray())).at(
+      -1,
+    );
     expect(commentsSql).not.toMatch(/author_id/);
 
     await Comment.where({ author_id: 1 }).scoping({ allQueries: true }, async () => {
       const scopedCommentsSql = (
-        await captureSql(async () => (await (welcome as any).comments.reload()).toArray())
+        await self().captureSql({}, async () =>
+          (await (welcome as any).comments.reload()).toArray(),
+        )
       ).at(-1);
       expect(scopedCommentsSql).toMatch(/author_id/);
     });
 
     const unscopedCommentsSql = (
-      await captureSql(async () => (await (welcome as any).comments.reload()).toArray())
+      await self().captureSql({}, async () => (await (welcome as any).comments.reload()).toArray())
     ).at(-1);
     expect(unscopedCommentsSql).not.toMatch(/author_id/);
   });

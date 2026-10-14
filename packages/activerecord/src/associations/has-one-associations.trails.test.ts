@@ -3,7 +3,6 @@ import { registerModel, RecordNotFound } from "../index.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
 
 type AccountAttributes = { credit_limit: number };
 type AccountBuilders = {
@@ -12,7 +11,7 @@ type AccountBuilders = {
 };
 
 describe("HasOneAssociationsTest", () => {
-  const { companies } = fixtures(["companies", "accounts"]);
+  const { self, companies } = fixtures(["companies", "accounts"]);
   registerModel(Company);
   registerModel(Firm);
   registerModel(Account);
@@ -33,7 +32,7 @@ describe("HasOneAssociationsTest", () => {
     const account = await Account.find(1);
     expect(account.association("firm").isLoaded()).toBe(false);
     expect(account.association("unautosavedFirm").isLoaded()).toBe(false);
-    await assertQueriesMatch(/FROM\s+.?companies.?/i, 1, false, async () => {
+    await self().assertQueriesMatch(/FROM\s+.?companies.?/i, { count: 1 }, async () => {
       await account.destroy();
     });
   });

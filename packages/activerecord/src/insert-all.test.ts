@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -13,8 +13,6 @@ import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
-import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
@@ -74,7 +72,11 @@ async function withRecordTimestamps(
 }
 
 describe("InsertAllTest", () => {
-  fixtures(["authors", "books"]);
+  const { self } = fixtures(["authors", "books"]);
+
+  beforeEach(() => {
+    self()._originalDbWarningsAction = "ignore";
+  });
 
   beforeAll(async () => {
     ReadonlyNameBook.attrReadonly("name");
@@ -223,7 +225,7 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_skip",
     "insert all generates correct sql",
     async () => {
-      await assertQueriesMatch(/ON DUPLICATE KEY UPDATE/, undefined, false, async () => {
+      await self().assertQueriesMatch(/ON DUPLICATE KEY UPDATE/, {}, async () => {
         await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
       });
     },
@@ -530,7 +532,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_update", "upsert and db warnings", async () => {
     try {
-      await withDbWarningsAction("raise", async () => {
+      await self().withDbWarningsAction("raise", undefined, async () => {
         await expect(
           Book.upsert({ id: 1001, name: "Remote", author_id: 1 }),
         ).resolves.not.toThrow();

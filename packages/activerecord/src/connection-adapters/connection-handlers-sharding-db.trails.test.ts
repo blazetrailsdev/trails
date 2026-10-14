@@ -2,13 +2,12 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { connectedToStack } from "../core.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { cleanUpConnectionHandler } from "../cases/helper.js";
 
 describe("ConnectionHandlersShardingDbTest (trails-only)", () => {
-  fixtures({}, { useTransactionalTests: false });
+  const { self } = fixtures({}, { useTransactionalTests: false });
 
   afterEach(() => {
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
   });
 
   it("connectingTo uses the class defaultShard when shard is omitted", async () => {

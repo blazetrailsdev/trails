@@ -18,9 +18,9 @@ declare module "vitest" {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE activerecord-test-case-remaining-members */
+/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
 export const describedClasses = new WeakMap<object, typeof TestCase>();
-/** @noRailsEquivalent CONVERGEABLE activerecord-test-case-remaining-members */
+/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
 export const topLevel = {};
 
 const capturing = new WeakSet<object>();

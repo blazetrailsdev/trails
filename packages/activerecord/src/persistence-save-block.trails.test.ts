@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { resetCallbacks } from "./support/reset-callbacks.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 
@@ -20,7 +19,7 @@ const postsOf = (author: Author): CollectionAssociationLike =>
   );
 
 describe("save block threading (trails)", () => {
-  const { authors } = fixtures(["authors", "posts"]);
+  const { self, authors } = fixtures(["authors", "posts"]);
 
   beforeAll(() => {
     registerModel(Author);
@@ -29,7 +28,7 @@ describe("save block threading (trails)", () => {
 
   it("save yields the block after the INSERT and before after_create", async () => {
     const seen: string[] = [];
-    await resetCallbacks(Post, "create", async () => {
+    await self().resetCallbacks(Post, "create", async () => {
       Post.afterCreate(() => {
         seen.push("after_create");
       });
@@ -50,7 +49,7 @@ describe("save block threading (trails)", () => {
 
   it("save! yields the block after the INSERT and before after_create", async () => {
     const seen: string[] = [];
-    await resetCallbacks(Post, "create", async () => {
+    await self().resetCallbacks(Post, "create", async () => {
       Post.afterCreate(() => {
         seen.push("after_create");
       });
@@ -68,7 +67,7 @@ describe("save block threading (trails)", () => {
     const seen: string[] = [];
     const post = await Post.create({ title: "updatable", body: "body" });
 
-    await resetCallbacks(Post, "update", async () => {
+    await self().resetCallbacks(Post, "update", async () => {
       Post.afterUpdate(() => {
         seen.push("after_update");
       });
@@ -87,7 +86,7 @@ describe("save block threading (trails)", () => {
     const seen: string[] = [];
     const author = await Author.find(authors("david").id);
 
-    await resetCallbacks(Post, "create", async () => {
+    await self().resetCallbacks(Post, "create", async () => {
       Post.afterCreate(() => {
         seen.push("after_create");
       });
@@ -106,7 +105,7 @@ describe("save block threading (trails)", () => {
   it("an after_create callback that loads the collection leaves no duplicate target entry", async () => {
     const author = await Author.find(authors("david").id);
 
-    await resetCallbacks(Post, "create", async () => {
+    await self().resetCallbacks(Post, "create", async () => {
       Post.afterCreate(async () => {
         await author.posts.load();
       });

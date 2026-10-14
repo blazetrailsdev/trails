@@ -78,3 +78,5 @@ export async function capture(
     reopen(streamIo, originStream);
   }
 }
+
+export const Stream = { silenceStream, quietly, capture };

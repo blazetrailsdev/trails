@@ -39,7 +39,7 @@ import {
   travelBack,
 } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
-import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 import { adapterType } from "./test-adapter.js";
 import { deprecator } from "./deprecator.js";
 
@@ -707,7 +707,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 });
 
 describe("PessimisticLockingTest", () => {
-  const { people } = fixtures(["people"], {
+  const { self, people } = fixtures(["people"], {
     usesTransaction: ["with lock sets isolation"],
   });
 
@@ -794,7 +794,7 @@ describe("PessimisticLockingTest", () => {
   it.skipIf(adapterType !== "postgres")("lock sending custom lock statement", async () => {
     await Person.transaction(async () => {
       const person = await Person.find(people("michael").id);
-      await assertQueriesMatch(/LIMIT \$?\d FOR SHARE NOWAIT/, undefined, false, async () => {
+      await self().assertQueriesMatch(/LIMIT \$?\d FOR SHARE NOWAIT/, {}, async () => {
         await person.lockBang("FOR SHARE NOWAIT");
       });
     });
@@ -811,7 +811,7 @@ describe("PessimisticLockingTest", () => {
 
   it.skipIf(adapterType !== "postgres")("with lock locks with no args", async () => {
     const p = await Person.find(people("michael").id);
-    await assertQueriesMatch(/LIMIT \$?\d FOR UPDATE/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT \$?\d FOR UPDATE/i, {}, async () => {
       await p.withLock(async () => {});
     });
   });

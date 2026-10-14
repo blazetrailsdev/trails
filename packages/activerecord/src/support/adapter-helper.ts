@@ -124,3 +124,16 @@ export async function disableExtensionBang(
   await connection.disableExtension(extension, { force: "cascade" });
   return connection.reconnectBang();
 }
+
+export const AdapterHelper = {
+  currentAdapter,
+  inMemoryDb,
+  sqlite3AdapterStrictStringsDisabled,
+  mysqlEnforcingGtidConsistency,
+  supportsDefaultExpression,
+  supportsNonUniqueConstraintName,
+  supportsTextColumnWithDefault,
+  supportsSqlStandardDropConstraint,
+  enableExtensionBang,
+  disableExtensionBang,
+};

@@ -2,11 +2,10 @@ import { describe, it, beforeEach, expect } from "vitest";
 import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
-import { captureSql } from "../../testing/sql-capture.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
-  fixtures({});
+  const { self } = fixtures({});
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -42,7 +41,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       CollationTest.validatesUniquenessOf("string_ci_column", { caseSensitive: false });
       await CollationTest.create({ string_ci_column: "A" });
       const invalid = new CollationTest({ string_ci_column: "a" });
-      const queries = await captureSql(async () => {
+      const queries = await self().captureSql({}, async () => {
         await invalid.save();
       });
       const ciUniquenessQuery = queries.find((q) => /string_ci_column/.test(q))!;
@@ -54,7 +53,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       CollationTest.validatesUniquenessOf("string_cs_column", { caseSensitive: false });
       await CollationTest.create({ string_cs_column: "A" });
       const invalid = new CollationTest({ string_cs_column: "a" });
-      const queries = await captureSql(async () => {
+      const queries = await self().captureSql({}, async () => {
         await invalid.save();
       });
       const csUniquenessQuery = queries.find((q) => /string_cs_column/.test(q))!;
@@ -66,7 +65,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       CollationTest.validatesUniquenessOf("string_ci_column", { caseSensitive: true });
       await CollationTest.create({ string_ci_column: "A" });
       const invalid = new CollationTest({ string_ci_column: "A" });
-      const queries = await captureSql(async () => {
+      const queries = await self().captureSql({}, async () => {
         await invalid.save();
       });
       const ciUniquenessQuery = queries.find((q) => /string_ci_column/.test(q))!;
@@ -78,7 +77,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       CollationTest.validatesUniquenessOf("string_cs_column", { caseSensitive: true });
       await CollationTest.create({ string_cs_column: "A" });
       const invalid = new CollationTest({ string_cs_column: "A" });
-      const queries = await captureSql(async () => {
+      const queries = await self().captureSql({}, async () => {
         await invalid.save();
       });
       const csUniquenessQuery = queries.find((q) => /string_cs_column/.test(q))!;
@@ -90,7 +89,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       CollationTest.validatesUniquenessOf("binary_column", { caseSensitive: true });
       await CollationTest.create({ binary_column: "A" });
       const invalid = new CollationTest({ binary_column: "A" });
-      const queries = await captureSql(async () => {
+      const queries = await self().captureSql({}, async () => {
         await invalid.save();
       });
       const binUniquenessQuery = queries.find((q) => /binary_column/.test(q))!;

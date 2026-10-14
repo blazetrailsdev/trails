@@ -34,7 +34,6 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { adapterSupports } from "./support/supports.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
-import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem, ClothingItemSized } from "./test-helpers/models/clothing-item.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { queryConstraints, queryConstraintsList } from "./persistence.js";
@@ -106,18 +105,9 @@ for (const klass of [
   registerModel(klass);
 }
 
-async function assertUsesQueryConstraintsOnReload(object: any, columns: string[]) {
-  if (columns.length === 0) throw new Error("columns argument must not be empty");
-
-  const sql = (await captureSql(async () => object.reload()))[0];
-  for (const column of columns) {
-    expect(sql).toMatch(new RegExp(`WHERE .*${column}`));
-  }
-}
-
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics, accounts, clothingItems } = fixtures([
+  const { self, topics, accounts, clothingItems } = fixtures([
     "topics",
     "minimalistics",
     "accounts",
@@ -454,7 +444,7 @@ describe("PersistenceTest", () => {
 
   it("update uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await (clothingItem as any).update({ description: "Lovely green t-shirt" });
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -464,7 +454,7 @@ describe("PersistenceTest", () => {
 
   it("destroy uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await (clothingItem as any).destroy();
     });
     const sql = sqls.find((s) => /^DELETE/.test(s.trimStart())) ?? "";
@@ -474,7 +464,7 @@ describe("PersistenceTest", () => {
 
   it("delete uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await (clothingItem as any).delete();
     });
     const sql = sqls.find((s) => /^DELETE/.test(s.trimStart())) ?? "";
@@ -485,7 +475,7 @@ describe("PersistenceTest", () => {
   it("save uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
     clothingItem.description = "Lovely green t-shirt";
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.save();
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -495,7 +485,7 @@ describe("PersistenceTest", () => {
 
   it("reload uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.reload();
     });
     const sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
@@ -505,7 +495,7 @@ describe("PersistenceTest", () => {
 
   it("update attribute uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.updateAttribute("description", "Lovely green t-shirt");
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -517,7 +507,7 @@ describe("PersistenceTest", () => {
     const clothingItem = clothingItems("green_t_shirt");
     clothingItem.color = "blue";
     clothingItem.description = "Now it's a blue t-shirt";
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.save();
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -1834,7 +1824,16 @@ describe("PersistenceTest", () => {
 });
 
 describe("QueryConstraintsTest", () => {
-  const { clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"]);
+  const { self, clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"]);
+
+  async function assertUsesQueryConstraintsOnReload(object: any, columns: string[]) {
+    if (columns.length === 0) throw new Error("columns argument must not be empty");
+
+    const sql = (await self().captureSql({}, async () => object.reload()))[0];
+    for (const column of columns) {
+      expect(sql).toMatch(new RegExp(`WHERE .*${column}`));
+    }
+  }
 
   beforeAll(async () => {
     await ClothingItem.loadSchema();

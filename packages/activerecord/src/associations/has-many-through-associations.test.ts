@@ -20,7 +20,6 @@ import { HasManyThroughCantAssociateThroughHasOneOrManyReflection } from "./erro
 import { AssociationTypeMismatch } from "../errors.js";
 import { deprecator } from "../deprecator.js";
 import { Preloader } from "./preloader.js";
-import { quoteTableName } from "../support/quote-regex.js";
 
 import {
   Author,
@@ -95,6 +94,7 @@ import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thin
 
 describe("HasManyThroughAssociationsTest", () => {
   const {
+    self,
     posts,
     readers,
     people,
@@ -2578,8 +2578,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const tags2 = await (blogPost as any).tags.toArray();
     for (const t of tags2) tagIds.push(t.id);
 
-    const quotedTagsBlogId = quoteTableName("sharded_tags.blog_id");
-    const quotedPostsTagsBlogId = quoteTableName("sharded_blog_posts_tags.blog_id");
+    const quotedTagsBlogId = self().quoteTableName("sharded_tags.blog_id");
+    const quotedPostsTagsBlogId = self().quoteTableName("sharded_blog_posts_tags.blog_id");
     const tagsSql = await (blogPost as any).tags.toSql();
     expect(tagsSql).toMatch(
       new RegExp(`ON.*${quotedTagsBlogId} = ${quotedPostsTagsBlogId}.*WHERE`, "i"),
@@ -2602,8 +2602,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const blogPosts2 = await (tag as any).blogPosts.toArray();
     const blogPostIds = blogPosts2.map((p: any) => p.id);
 
-    const quotedBlogPostsBlogId = quoteTableName("sharded_blog_posts.blog_id");
-    const quotedPostsTagsBlogId = quoteTableName("sharded_blog_posts_tags.blog_id");
+    const quotedBlogPostsBlogId = self().quoteTableName("sharded_blog_posts.blog_id");
+    const quotedPostsTagsBlogId = self().quoteTableName("sharded_blog_posts_tags.blog_id");
     const blogPostsSql = await (tag as any).blogPosts.toSql();
     expect(blogPostsSql).toMatch(
       new RegExp(`ON.*${quotedBlogPostsBlogId} = ${quotedPostsTagsBlogId}.*WHERE`, "i"),
