@@ -44,7 +44,9 @@ import { TAG } from "./inlined-from-tags.js";
 export const MISSING_TAG_PACKAGES: readonly string[] = [
   "actioncontroller",
   "actiondispatch",
+  "activesupport",
   "i18n",
+  "rack-test",
 ];
 
 export interface InlinedFromFinding {

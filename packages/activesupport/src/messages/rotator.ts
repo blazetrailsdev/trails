@@ -11,57 +11,36 @@ export interface Rotatable {
   readMessage(message: string, options?: Record<string, unknown>): unknown;
 }
 
-interface RotatorState {
+export interface RotatorHost {
   args: unknown[];
   options: Record<string, unknown>;
   rotations: Rotatable[];
-  onRotation: OnRotation | null;
+  _onRotation: OnRotation | null;
 }
 
-const STATE = new WeakMap<object, RotatorState>();
-
-function stateOf(host: object): RotatorState {
-  let state = STATE.get(host);
-  if (!state) {
-    state = { args: [], options: {}, rotations: [], onRotation: null };
-    STATE.set(host, state);
-  }
-  return state;
-}
-
-export function initialize(
-  host: object,
-  args: unknown[],
-  options: Record<string, unknown> = {},
-): void {
-  const { onRotation, ...rest } = options as RotatableOptions & Record<string, unknown>;
-  STATE.set(host, { args, options: rest, rotations: [], onRotation: onRotation ?? null });
-}
-
-export function rotate<T extends object>(this: T, ...args: unknown[]): T {
+export function rotate<T extends RotatorHost>(this: T, ...args: unknown[]): T {
   return fallBackTo.call(this, buildRotation.call(this, args)) as T;
 }
 
-export function onRotation<T extends object>(this: T, callback: OnRotation): T {
-  stateOf(this).onRotation = callback;
+export function onRotation<T extends RotatorHost>(this: T, callback: OnRotation): T {
+  this._onRotation = callback;
   return this;
 }
 
-export function fallBackTo<T extends object>(this: T, fallback: Rotatable): T {
-  stateOf(this).rotations.push(fallback);
+export function fallBackTo<T extends RotatorHost>(this: T, fallback: Rotatable): T {
+  this.rotations.push(fallback);
   return this;
 }
 
 /** @internal */
-function buildRotation<T extends object>(this: T, args: unknown[]): Rotatable {
-  const state = stateOf(this);
+function buildRotation<T extends RotatorHost>(this: T, args: unknown[]): Rotatable {
   const trailing = args.length > 0 && isPlainOptions(args[args.length - 1]);
   const positional = trailing ? args.slice(0, -1) : args;
   const options = trailing ? (args[args.length - 1] as Record<string, unknown>) : {};
   const ctor = this.constructor as new (...ctorArgs: unknown[]) => Rotatable;
 
-  return new ctor(...positional, ...state.args.slice(positional.length), {
-    ...state.options,
+  return new ctor(...positional, ...this.args.slice(positional.length), {
+    ...this.options,
     ...options,
   });
 }
@@ -91,23 +70,22 @@ function catchRotationError<T>(block: () => T): { value?: T; error?: Thrown } {
 }
 
 export function readMessage(
-  this: object,
+  this: RotatorHost,
   super_: (...superArgs: unknown[]) => unknown,
   message: string,
   options: Record<string, unknown> = {},
 ): unknown {
-  const state = stateOf(this);
   const { onRotation: perCall, ...rest } = options as RotatableOptions & Record<string, unknown>;
-  const callback = perCall === undefined ? state.onRotation : perCall;
+  const callback = perCall === undefined ? this._onRotation : perCall;
 
-  if (isEmpty(state.rotations)) {
+  if (isEmpty(this.rotations)) {
     return super_.call(this, message, rest);
   }
 
   const first = catchRotationError(() => super_.call(this, message, rest));
   if (!first.error) return first.value;
 
-  for (const rotation of state.rotations) {
+  for (const rotation of this.rotations) {
     const rotated = catchRotationError(() => rotation.readMessage(message, rest));
     if (!rotated.error) {
       callback?.();

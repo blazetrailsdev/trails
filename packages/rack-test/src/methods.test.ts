@@ -46,7 +46,7 @@ describe("Rack::Test::Methods", () => {
   });
 
   it("#build_rack_mock_session will be used if present", () => {
-    const session = Session.new(spec.app);
+    const session = new Session(spec.app);
     spec.buildRackMockSession = () => session;
     expect(spec.currentSession()).toBe(session);
   });

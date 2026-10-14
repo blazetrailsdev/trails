@@ -33,10 +33,10 @@ export interface Session extends Included<typeof Utils> {}
 export class Session {
   cookieJar!: CookieJar;
 
-  readonly defaultHost: string;
+  readonly defaultHost!: string;
 
   /** @internal */
-  private readonly app: RackApp | RackMiddleware;
+  private readonly app!: RackApp | RackMiddleware;
 
   /** @internal */
   private _env: RackEnv = {};
@@ -50,15 +50,10 @@ export class Session {
   /** @internal */
   private _lastResponse: MockResponse | null = null;
 
-  static new(app: RackApp | RackMiddleware | Session, defaultHost: string = DEFAULT_HOST): Session {
+  constructor(app: RackApp | RackMiddleware | Session, defaultHost: string = DEFAULT_HOST) {
     if (app instanceof Session) {
       return app;
-    } else {
-      return new Session(app, defaultHost);
     }
-  }
-
-  constructor(app: RackApp | RackMiddleware, defaultHost: string = DEFAULT_HOST) {
     this._env = {};
     this.app = app;
     this._afterRequest = [];

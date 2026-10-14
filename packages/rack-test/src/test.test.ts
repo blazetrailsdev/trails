@@ -23,11 +23,11 @@ const lastResponse = (): MockResponse => session.lastResponse();
 
 describe("Rack::Test::Session", () => {
   it("supports being initialized with a Rack::MockSession app", async () => {
-    mustBe(await Session.new(new Session(app)).request("/"), "isOk");
+    mustBe(await new Session(new Session(app)).request("/"), "isOk");
   });
 
   it("supports being initialized with an app", async () => {
-    mustBe(await Session.new(app).request("/"), "isOk");
+    mustBe(await new Session(app).request("/"), "isOk");
   });
 });
 

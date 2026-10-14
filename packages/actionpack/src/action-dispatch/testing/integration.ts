@@ -238,7 +238,7 @@ export class IntegrationTest extends TestCase {
       Headers.fromHash(requestEnv).mergeBang(options.env!);
     }
 
-    const session = RackTestSession.new(this._mockSession);
+    const session = new RackTestSession(this._mockSession);
 
     let uri = this.buildFullUri(path, requestEnv);
 
