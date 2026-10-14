@@ -36,9 +36,8 @@ against `main` at `b8bcadc150`, on Linux with Node 24.16.0 and SQLite, with
 
 ### 1. Build the framework from a checkout
 
-Use **Node 24**, the version CI runs. Node 20 fails at import time
-(`SyntaxError: Invalid regular expression … Duplicate capture group name` from
-`@blazetrails/rack`).
+Use **Node 24** or later; the workspace's `engines` field enforces it at
+`pnpm install`.
 
 ```sh
 git clone https://github.com/blazetrailsdev/trails.git
@@ -632,14 +631,14 @@ What the prose above means in practice:
   status / schema dump / runner / console / models dump.
 - **Full stack** (`trails new`): generates an app that type-checks, then boots,
   migrates, routes, runs a console, renders TSE views with layouts, and serves
-  from Vite in development. The scaffold generators still need the manual
-  fixes listed in the quickstart, and a real app will hit unported ActionView
-  helpers and ActionController modules.
+  from Vite in development. `generate scaffold` produces a working CRUD
+  resource with passing tests, as the quickstart shows. A real app will still
+  hit unported ActionView helpers and ActionController modules.
 
 ## Requirements
 
-- **Node 24.** CI runs Node 24, and a generated app pins it in `.node-version`.
-  Node 20 fails at import time.
+- **Node >= 24**, enforced by `engines`. The repo and a generated app pin
+  `24.16.0` in `.node-version`.
 - **pnpm**, through `corepack enable`. The repo pins `pnpm@12.3.4`.
 - **TypeScript 7.1** for the workspace, pinned to the exact nightly
   `7.1.0-dev.20260920.1` that CI builds with. The pin moves to 7.1 stable when
