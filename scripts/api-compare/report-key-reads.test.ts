@@ -5,10 +5,12 @@ import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { SkeletonRow } from "./report-arms.js";
 import {
+  bodyKey,
   keyReadRows,
   rubyBodyOf,
   tsBodyOf,
   tsKeyReads,
+  type RubyBody,
   type RubyKeyReads,
 } from "./report-key-reads.js";
 
@@ -77,14 +79,18 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
       "  class C; class << self; def call; o[:c]; end; end; end",
       "  module ClassMethods; def call; o[:m]; end; end",
       "  D = Struct.new(:x) do; def call; o[:d]; end; end",
+      "  class A::E; def call; o[:e]; end; end",
+      "  class ::F; def call; def inner; o[:i]; end; o[:f]; end; end",
       "end",
     ]);
     expect(defs.call.map((b) => `${b.owner} ${b.seat} ${b.reads[0][1]}`)).toEqual([
       "A::B instance b",
       "A::B class s",
       "A::C class c",
-      "A class m",
+      "A::ClassMethods instance m",
       "A::D instance d",
+      "A::E instance e",
+      "F instance f",
     ]);
   });
 
@@ -103,10 +109,28 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
     ).toEqual([["o", "s"]]);
   });
 
+  it("a ClassMethods module's def is its parent's class seat, and an unknown owner of several bodies joins nothing", () => {
+    const bodies: RubyBody[] = [
+      { owner: "A::ClassMethods", seat: "instance", params: [], reads: [["o", "m"]] },
+      { owner: "A", seat: "instance", params: [], reads: [["o", "i"]] },
+    ];
+    expect(rubyBodyOf({ ...ROW, rubyOwner: "A", rubySeat: "class" }, bodies)!.reads).toEqual([
+      ["o", "m"],
+    ]);
+    expect(rubyBodyOf({ ...ROW, rubyOwner: "Z", rubySeat: "instance" }, bodies)).toBeUndefined();
+    const ts = tsKeyReads(
+      "class B { call(o) { return o.b; } } class C { call(o) { return o.c; } }",
+    );
+    expect(tsBodyOf({ ...ROW, tsOwner: "Z" }, ts.get("call")!)).toBeUndefined();
+  });
+
   it("a nested function that is itself a compared pair reads for itself", () => {
     const text = "function urlFor(options) { function host(options) { return options.host; } }";
     expect(tsKeyReads(text).get("urlFor")![0].reads.get("options")).toEqual(new Set(["host"]));
-    expect(tsKeyReads(text, "f.ts", new Set(["host"])).get("urlFor")![0].reads.size).toBe(0);
+    const paired = new Set([bodyKey("", "host")]);
+    expect(tsKeyReads(text, "f.ts", paired).get("urlFor")![0].reads.size).toBe(0);
+    const otherOwner = new Set([bodyKey("Url", "host")]);
+    expect(tsKeyReads(text, "f.ts", otherOwner).get("urlFor")![0].reads.size).toBe(1);
   });
 
   it("a parameter the port destructures is read by its destructured names", () => {
@@ -120,6 +144,9 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
         "{ onlyPath }, k",
       ),
     ).toEqual(["options[:only_path] matched", "options[:host] key-unread"]);
+    expect(buckets("return rest;", [["options", "host"]], "{ ...rest }, k")).toEqual([
+      "options[:host] key-unread",
+    ]);
   });
 
   it.each([

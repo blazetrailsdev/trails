@@ -15,9 +15,8 @@
 #
 # A body is keyed by its owner — the enclosing class/module's full name — and
 # its seat: `def self.x` and a `def` inside `class << self` are `class`, any
-# other `def` is `instance`; a `def` in a `ClassMethods` module is its
-# parent's, on the `class` seat, as compare.ts reads it, and a
-# `Name = Struct.new … do` block is `Name`'s. So two classes' `def call` in one file, or
+# other `def` is `instance`; a `Name = Struct.new … do` block is `Name`'s. A
+# body's reads stop at a nested `def`, which is its own body. So two classes' `def call` in one file, or
 # `def self.x` beside `def x`, are separate bodies. `params` is the def's
 # positional parameters, then its `**kwrest`, which is how a port that
 # destructures a Hash parameter is credited.
@@ -52,7 +51,7 @@ def symbol_key(args)
 end
 
 def collect(node, reads)
-  return unless node.is_a?(Array)
+  return unless node.is_a?(Array) && !%i[def defs].include?(node[0])
 
   if node[0] == :aref
     recv = receiver_name(node[1])
@@ -61,14 +60,25 @@ def collect(node, reads)
   node.each { |child| collect(child, reads) }
 end
 
-def const_name(node)
+def const_path(node)
   case node && node[0]
-  when :const_ref, :top_const_ref then node[1][1]
-  when :var_ref then node[1][0] == :@const ? node[1][1] : nil
+  when :const_ref, :top_const_ref then [node[1][1]]
+  when :var_ref then node[1][0] == :@const ? [node[1][1]] : nil
   when :const_path_ref
-    outer = const_name(node[1])
-    outer && "#{outer}::#{node[2][1]}"
+    outer = const_path(node[1])
+    outer && outer + [node[2][1]]
   end
+end
+
+# The owner path a `class`/`module` header opens. `::A` is absolute; `A::B`
+# resolves its head lexically, against the nearest enclosing owner named `A`.
+def nested_owner(owner, node)
+  path = const_path(node)
+  return nil unless path
+  return path if node[0] == :top_const_ref
+
+  head = owner.rindex(path.first) if path.length > 1
+  head ? owner[0...head] + path : owner + path
 end
 
 def param_names(params)
@@ -85,10 +95,10 @@ def walk(node, defs, owner = [], singleton = false)
 
   case node[0]
   when :class, :module
-    name = const_name(node[1])
-    return node.each { |child| walk(child, defs, owner, singleton) } unless name
+    nested = nested_owner(owner, node[1])
+    return node.each { |child| walk(child, defs, owner, singleton) } unless nested
 
-    return walk(node.last, defs, owner + [name], false)
+    return walk(node.last, defs, nested, false)
   when :sclass
     return walk(node.last, defs, owner, true)
   when :assign
@@ -103,10 +113,9 @@ def walk(node, defs, owner = [], singleton = false)
     reads = []
     collect(body, reads)
     unless reads.empty?
-      class_methods = owner.length > 1 && owner.last == "ClassMethods"
       (defs[name[1]] ||= []) << {
-        owner: (class_methods ? owner[0...-1] : owner).join("::"),
-        seat: singleton || class_methods || node[0] == :defs ? "class" : "instance",
+        owner: owner.join("::"),
+        seat: singleton || node[0] == :defs ? "class" : "instance",
         params: param_names(params),
         reads: reads
       }
