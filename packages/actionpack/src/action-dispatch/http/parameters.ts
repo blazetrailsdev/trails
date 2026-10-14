@@ -1,7 +1,7 @@
 import { Logger } from "@blazetrails/activesupport";
 import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
 
-import { merge } from "@blazetrails/ruby-compat";
+import { merge, type Hash } from "@blazetrails/ruby-compat";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
 import { Mime, MimeType } from "./mime-type.js";
 import type { ParamHash } from "../request/utils.js";
@@ -10,7 +10,7 @@ import { BadRequest } from "../../action-controller/metal/exceptions.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
 
-export type ParameterParser = (rawPost: string) => Record<string, unknown>;
+export type ParameterParser = (rawPost: string) => Record<string, unknown> | Hash<string, unknown>;
 
 export type ParameterParsers = Record<string, ParameterParser>;
 
@@ -78,6 +78,10 @@ export class Parameters {
     Parameters._parameterParsers = normalized;
   }
 
+  get params(): Record<string, unknown> {
+    return parameters.call(this as unknown as ParametersHost);
+  }
+
   set pathParameters(parameters: Record<string, unknown>) {
     try {
       this.deleteHeader("action_dispatch.request.parameters");
@@ -123,7 +127,7 @@ export function parseFormattedParameters(
   this: ParametersHost,
   parsers: ParameterParsers,
   fallback: () => Record<string, unknown>,
-): Record<string, unknown> {
+): Record<string, unknown> | Hash<string, unknown> {
   if (this.contentLength === 0 || this.contentMimeType === null) {
     return fallback();
   }

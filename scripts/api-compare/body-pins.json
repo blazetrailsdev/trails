@@ -4987,13 +4987,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/request.rb",
-    "rubyName": "domain",
-    "digest": "50ab2fe963bddae2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
     "rubyName": "empty",
     "digest": "c3eee1ca8868e38c",
     "ref": "v8.0.2"
@@ -5136,13 +5129,6 @@
     "rubyFile": "http/request.rb",
     "rubyName": "host",
     "digest": "84ea977f40f925ba",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "host_with_port",
-    "digest": "e531a21386f2c16e",
     "ref": "v8.0.2"
   },
   {
@@ -5325,20 +5311,6 @@
     "rubyFile": "http/request.rb",
     "rubyName": "path_parameters=",
     "digest": "3f28875fd0ea5a3e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "permissions_policy",
-    "digest": "5be0a99bdde8f99b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "permissions_policy=",
-    "digest": "5231a87d815f3b4f",
     "ref": "v8.0.2"
   },
   {
@@ -5549,20 +5521,6 @@
     "rubyFile": "http/request.rb",
     "rubyName": "standard_port?",
     "digest": "249639c790d56d37",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "subdomain",
-    "digest": "7e119244bb558d67",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "subdomains",
-    "digest": "856ff5be4fc4a19a",
     "ref": "v8.0.2"
   },
   {

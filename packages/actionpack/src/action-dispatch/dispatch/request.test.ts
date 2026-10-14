@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Request, PassNotFound, controllerConstants } from "../request.js";
+import { Request, PASS_NOT_FOUND, controllerConstants } from "../request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import { Mime, MimeType } from "../http/mime-type.js";
@@ -141,17 +141,17 @@ describe("RequestHost", () => {
 
   it("raw without specifying port", () => {
     const req = new Request({ SERVER_NAME: "example.com", SERVER_PORT: "80" });
-    expect(req.rawHost).toBe("example.com:80");
+    expect(req.rawHostWithPort).toBe("example.com:80");
   });
 
   it("raw host with default port", () => {
     const req = new Request({ HTTP_HOST: "example.com:80" });
-    expect(req.rawHost).toBe("example.com:80");
+    expect(req.rawHostWithPort).toBe("example.com:80");
   });
 
   it("raw host with non default port", () => {
     const req = new Request({ HTTP_HOST: "example.com:3000" });
-    expect(req.rawHost).toBe("example.com:3000");
+    expect(req.rawHostWithPort).toBe("example.com:3000");
   });
 
   it("http host", () => {
@@ -821,10 +821,10 @@ describe("RequestContentSecurityPolicy", () => {
 });
 
 describe("RequestControllerClass", () => {
-  it("controllerClassFor returns PassNotFound when name is absent", () => {
+  it("controllerClassFor returns PASS_NOT_FOUND when name is absent", () => {
     const req = new Request({});
-    expect(req.controllerClassFor(null)).toBe(PassNotFound);
-    expect(req.controllerClassFor(undefined)).toBe(PassNotFound);
+    expect(req.controllerClassFor(null)).toBe(PASS_NOT_FOUND);
+    expect(req.controllerClassFor(undefined)).toBe(PASS_NOT_FOUND);
   });
 
   it("controllerClassFor throws when a controller name is supplied", () => {
@@ -842,14 +842,14 @@ describe("RequestControllerClass", () => {
     }
   });
 
-  it("controllerClass defaults action to 'index' and returns PassNotFound without a controller", () => {
+  it("controllerClass defaults action to 'index' and returns PASS_NOT_FOUND without a controller", () => {
     const req = new Request({});
-    expect(req.controllerClass()).toBe(PassNotFound);
+    expect(req.controllerClass()).toBe(PASS_NOT_FOUND);
     expect(req.pathParameters["action"]).toBe("index");
   });
 
-  it("PassNotFound.call returns 404 with x-cascade pass", async () => {
-    const [status, headers, body] = PassNotFound.call({});
+  it("PASS_NOT_FOUND.call returns 404 with x-cascade pass", async () => {
+    const [status, headers, body] = PASS_NOT_FOUND.call({});
     expect(status).toBe(404);
     expect(headers[X_CASCADE]).toBe("pass");
     const chunks: unknown[] = [];
@@ -857,9 +857,9 @@ describe("RequestControllerClass", () => {
     expect(chunks).toEqual([]);
   });
 
-  it("PassNotFound.action returns the sentinel itself", () => {
-    expect(PassNotFound.action("show")).toBe(PassNotFound);
-    expect(PassNotFound.actionEncodingTemplate("show")).toBe(false);
+  it("PASS_NOT_FOUND.action returns the sentinel itself", () => {
+    expect(PASS_NOT_FOUND.action("show")).toBe(PASS_NOT_FOUND);
+    expect(PASS_NOT_FOUND.actionEncodingTemplate("show")).toBe(false);
   });
 });
 

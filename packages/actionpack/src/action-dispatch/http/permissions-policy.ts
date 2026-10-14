@@ -4,6 +4,21 @@ import { FEATURE_POLICY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
 import { deepDup } from "@blazetrails/activesupport";
 
+export class Request {
+  static POLICY = "action_dispatch.permissions_policy";
+
+  declare protected getHeader: (key: string) => unknown;
+  declare protected setHeader: (key: string, value: unknown) => unknown;
+
+  get permissionsPolicy(): PermissionsPolicy | null | undefined {
+    return this.getHeader(Request.POLICY) as PermissionsPolicy | null | undefined;
+  }
+
+  set permissionsPolicy(policy: PermissionsPolicy | null) {
+    this.setHeader(Request.POLICY, policy);
+  }
+}
+
 /** @internal */
 const MAPPINGS: Record<string, string> = {
   self: "'self'",

@@ -48,7 +48,11 @@ describe("Request ENV_METHODS readers", () => {
 
 describe("Request include MimeNegotiation", () => {
   it("keeps its own format / formats / variant readers beside the module's writers", () => {
-    for (const name of ["format", "formats", "variant"]) {
+    expect(typeof Object.getOwnPropertyDescriptor(Request.prototype, "format")?.get).toBe(
+      "function",
+    );
+    expect(typeof Request.prototype.setFormat).toBe("function");
+    for (const name of ["formats", "variant"]) {
       const descriptor = Object.getOwnPropertyDescriptor(Request.prototype, name);
       expect(typeof descriptor?.get).toBe("function");
       expect(typeof descriptor?.set).toBe("function");
@@ -87,6 +91,16 @@ describe("Request module initialize bodies", () => {
     const request = new Request({ PATH_INFO: "/a", QUERY_STRING: "" });
     expect(request.filteredPath()).toBe("/a");
     expect(request._filteredPath).toBe("/a");
+  });
+});
+
+describe("Request on_load(:action_dispatch_request)", () => {
+  it("includes RequestCookieMethods onto Request.prototype", () => {
+    expect(Object.hasOwn(Request.prototype, "cookieJar")).toBe(true);
+    const keyGenerator = { generateKey: () => "k" };
+    const request = new Request({ "action_dispatch.key_generator": keyGenerator });
+    expect(request.keyGenerator()).toBe(keyGenerator);
+    expect(request.isHaveCookieJar()).toBe(false);
   });
 });
 

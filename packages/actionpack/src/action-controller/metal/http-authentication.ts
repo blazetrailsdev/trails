@@ -329,7 +329,7 @@ export namespace HttpAuthentication {
     }
 
     export function secretToken(request: Request): string {
-      const keyGenerator = request.keyGenerator!;
+      const keyGenerator = request.keyGenerator()!;
       const httpAuthSalt = request.httpAuthSalt as string;
       const key = keyGenerator.generateKey(httpAuthSalt);
       return typeof key === "string" ? b(key) : Buffer.from(key).toString("latin1");
