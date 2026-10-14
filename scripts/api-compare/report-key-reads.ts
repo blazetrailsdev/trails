@@ -51,12 +51,19 @@ export interface RubyBody {
  *  owner → the modules it `include`s or `extend`s. */
 export interface RubyKeyReads {
   defs: Record<string, Record<string, RubyBody[]>>;
-  includes: Record<string, string[]>;
+  includes: Record<string, Mixin[]>;
+}
+
+export interface Mixin {
+  kind: "include" | "extend";
+  module: string;
 }
 
 export interface TsBody {
   owner: string;
   isStatic: boolean;
+  /** Whether the function declares a `this` parameter: a mixin's method. */
+  thisTyped: boolean;
   /** Per parameter (`this` excluded): its destructured names, else `null`. */
   params: (string[] | null)[];
   /** Receiver → the keys read off it; `*` is a computed key. */
@@ -165,6 +172,10 @@ function bindingNames(pattern: ts.ObjectBindingPattern): string[] {
   });
 }
 
+function thisTyped(node: ts.Node): boolean {
+  return ts.isFunctionDeclaration(node) && node.parameters[0]?.name.getText() === "this";
+}
+
 function paramsOf(node: ts.Node): (string[] | null)[] {
   const init = "initializer" in node ? (node.initializer as ts.Node | undefined) : undefined;
   const fn = ts.isFunctionLike(node) ? node : init && ts.isFunctionLike(init) ? init : undefined;
@@ -244,6 +255,7 @@ export function tsKeyReads(
         owner: ownerOf(node),
         isStatic: modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword) ?? false,
         params: paramsOf(node),
+        thisTyped: thisTyped(node),
         reads,
       });
     }
@@ -301,11 +313,26 @@ export function ownerSeat(owner: string, seat: string): string {
 }
 
 /**
- * Whether `owner` mixes in `module` with an `include`/`extend` whose written
- * name `module` ends with.
+ * Whether `owner` mixes `module` into `seat`: `include` adds its instance
+ * methods to the owner's instances and `extend` to the owner itself
+ * (`active_support/concern.rb:129-137`). A written name resolves lexically,
+ * against each enclosing namespace of the owner in turn.
  */
-function mixesIn(includes: Readonly<Record<string, string[]>>, owner: string, module: string) {
-  return (includes[owner] ?? []).some((m) => module === m || module.endsWith(`::${m}`));
+function mixesIn(
+  includes: Readonly<Record<string, Mixin[]>>,
+  owner: string,
+  seat: string,
+  module: string,
+): boolean {
+  const scopes = owner.split("::");
+  return (includes[owner] ?? []).some(({ kind, module: name }) => {
+    if ((kind === "include") !== (seat === "instance")) return false;
+    if (name.startsWith("::")) return module === name.slice(2);
+    return (
+      scopes.some((_, n) => [...scopes.slice(0, scopes.length - n), name].join("::") === module) ||
+      module === name
+    );
+  });
 }
 
 /**
@@ -316,14 +343,17 @@ function mixesIn(includes: Readonly<Record<string, string[]>>, owner: string, mo
 export function rubyBodyOf(
   row: SkeletonRow,
   bodies: readonly RubyBody[],
-  includes: Readonly<Record<string, string[]>> = {},
+  includes: Readonly<Record<string, Mixin[]>> = {},
 ): RubyBody | undefined {
   const owner = row.rubyOwner ?? "";
   const want = ownerSeat(owner, row.rubySeat ?? "instance");
   const own = bodies.filter((b) => ownerSeat(b.owner, b.seat) === want);
   if (own.length === 1) return own[0];
   const [lone] = bodies;
-  return bodies.length === 1 && (lone.owner === owner || mixesIn(includes, owner, lone.owner))
+  return bodies.length === 1 &&
+    (lone.owner === owner ||
+      (lone.seat === "instance" &&
+        mixesIn(includes, owner, row.rubySeat ?? "instance", lone.owner)))
     ? lone
     : undefined;
 }
@@ -331,15 +361,20 @@ export function rubyBodyOf(
 /**
  * The TS body a pair reads: its owner's, on the seat the Ruby def is defined
  * on. Where the owner records none, the file's lone body answers only when it
- * is a top-level function, which is how a mixin's method is ported (CLAUDE.md,
- * "Module mixins"), or the class compare.ts names `<Owner>__mixin`.
+ * is a top-level function with a `this` parameter, which is how a mixin's
+ * method is ported (CLAUDE.md, "Module mixins"); a top-level function where
+ * the owner is the namespace named for the Ruby module, which compare.ts
+ * re-lists the file's top-level functions under (`recordSkeletonBody`); or
+ * the class compare.ts names `<Owner>__mixin`.
  */
 export function tsBodyOf(row: SkeletonRow, bodies: readonly TsBody[]): TsBody | undefined {
   let own = bodies.filter((b) => b.owner === (row.tsOwner ?? ""));
   if (own.length > 1) own = own.filter((b) => b.isStatic === (row.rubySeat === "class"));
   if (own.length === 1) return own[0];
   const [lone] = bodies;
-  return bodies.length === 1 && (lone.owner === "" || `${lone.owner}__mixin` === row.tsOwner)
+  return bodies.length === 1 &&
+    ((lone.owner === "" && (lone.thisTyped || row.tsOwner === row.rubyOwner?.split("::").at(-1))) ||
+      `${lone.owner}__mixin` === row.tsOwner)
     ? lone
     : undefined;
 }

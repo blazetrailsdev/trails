@@ -21,15 +21,15 @@
 # positional parameters, then its `**kwrest`, which is how a port that
 # destructures a Hash parameter is credited.
 #
-# `includes` maps an owner to the modules it `include`s or `extend`s, as
-# written, which is what lets a pair owned by the includer read the module's
-# body.
+# `includes` maps an owner to the modules it `include`s or `extend`s, each
+# name as written (a leading `::` is absolute), which is what lets a pair
+# owned by the includer read the module's body.
 #
 # Usage: ruby extract-key-reads.rb '{"<pkg>": "<lib dir>", …}'
 # Prints {"<pkg>": {"defs": {"<file under lib>": {"<def name>":
 #   [{"owner": "<A::B>", "seat": "class"|"instance", "params": […],
 #     "reads": [["<recv>", "<key>"|null], …]}, …]}},
-#   "includes": {"<A::B>": ["<C>", …]}}}.
+#   "includes": {"<A::B>": [{"kind": "include"|"extend", "module": "<C>"}, …]}}}.
 require "json"
 require "ripper"
 
@@ -102,7 +102,9 @@ def walk(node, defs, includes, owner = [], singleton = false)
   if node[0] == :command && %w[include extend].include?(node[1][1]) && node[2].is_a?(Array)
     (node[2][1] || []).each do |arg|
       path = const_path(arg)
-      (includes[owner.join("::")] ||= []) << path.reject(&:empty?).join("::") if path
+      next unless path
+
+      (includes[owner.join("::")] ||= []) << { kind: node[1][1], module: path.join("::") }
     end
   end
   case node[0]

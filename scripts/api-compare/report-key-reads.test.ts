@@ -84,7 +84,12 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
       "  class ::G::H; include M, N::O; def call; o[:h]; end; end",
       "end",
     ]);
-    expect(includes).toEqual({ "G::H": ["M", "N::O"] });
+    expect(includes).toEqual({
+      "G::H": [
+        { kind: "include", module: "M" },
+        { kind: "include", module: "N::O" },
+      ],
+    });
     expect(defs["url_for.rb"].call.map((b) => `${b.owner} ${b.seat} ${b.reads[0][1]}`)).toEqual([
       "A::B instance b",
       "A::B class s",
@@ -133,11 +138,16 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
     ];
     const row = { ...ROW, rubyOwner: "R", rubySeat: "instance" as const };
     expect(rubyBodyOf(row, env)).toBeUndefined();
-    expect(rubyBodyOf(row, env, { R: ["Env"] })).toBe(env[0]);
+    expect(rubyBodyOf(row, env, { R: [{ kind: "include", module: "Env" }] })).toBe(env[0]);
+    expect(rubyBodyOf(row, env, { R: [{ kind: "extend", module: "Env" }] })).toBeUndefined();
+    expect(rubyBodyOf(row, env, { R: [{ kind: "include", module: "X::Env" }] })).toBeUndefined();
     const other = tsKeyReads("class B { call(o) { return o.b; } }").get("call")!;
     expect(tsBodyOf({ ...ROW, tsOwner: "C" }, other)).toBeUndefined();
     const mixin = tsKeyReads("function call(this: C, o) { return o.c; }").get("call")!;
     expect(tsBodyOf({ ...ROW, tsOwner: "C" }, mixin)).toBe(mixin[0]);
+    const bare = tsKeyReads("function call(o) { return o.c; }").get("call")!;
+    expect(tsBodyOf({ ...ROW, tsOwner: "C" }, bare)).toBeUndefined();
+    expect(tsBodyOf({ ...ROW, tsOwner: "C", rubyOwner: "A::C" }, bare)).toBe(bare[0]);
   });
 
   it("a nested function that is itself a compared pair reads for itself", () => {
