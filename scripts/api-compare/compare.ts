@@ -5654,7 +5654,10 @@ export function main() {
           rubyModule,
           level,
         );
-        if (ambiguous) return;
+        // Two Ruby owners of `initialize` in one file (a class and a same-file
+        // module it includes) are exactly the chain the segments already
+        // order, so the chain disambiguates the pairing.
+        if (ambiguous && segments.length < 2) return;
         if (
           ownerRecordsNothing(
             tsCallsByFileNameOwner,
@@ -5907,7 +5910,7 @@ export function main() {
           rubyModule,
           level,
         );
-        if (ambiguous) return;
+        if (ambiguous && segments.length < 2) return;
         if (
           ownerRecordsNothing(
             tsCallArgsByFileNameOwner,

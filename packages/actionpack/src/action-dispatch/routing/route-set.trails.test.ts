@@ -1,3 +1,4 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
 import { RouteSet, StaticDispatcher, type DrawCallback } from "./route-set.js";
@@ -323,5 +324,20 @@ describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection#define_url_hel
     options.set("onlyPath", true);
     options.permitBang();
     expect(helpers.urlFor(options)).toBe(`/posts/7?${query}`);
+  });
+
+  it("routes a HashWithIndifferentAccess straight through url_for", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
+    });
+    const options = new HashWithIndifferentAccess({
+      controller: "posts",
+      action: "show",
+      id: "7",
+      page: "2",
+      onlyPath: true,
+    });
+    expect(routes.urlFor(options)).toBe("/posts/7?page=2");
   });
 });

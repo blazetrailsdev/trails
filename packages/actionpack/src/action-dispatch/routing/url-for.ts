@@ -6,7 +6,6 @@ import {
   reverseMergeBang,
 } from "@blazetrails/activesupport";
 import {
-  eachPair,
   extend,
   type Hash,
   hashDelete,
@@ -71,11 +70,10 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (isPlainObject(options) || options instanceof Parameters) {
     const routeName =
       options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
-    const mergedUrlOptions: Record<string, unknown> = {};
-    eachPair(toH<Record<string, unknown> | Hash<string, unknown>>(options), (key, value) => {
-      mergedUrlOptions[key] = value;
-    });
-    reverseMergeBang(mergedUrlOptions, this.urlOptions());
+    const mergedUrlOptions = reverseMergeBang(
+      toH<Record<string, unknown> | Hash<string, unknown>>(options),
+      this.urlOptions(),
+    );
     return this._routes!.urlFor(
       mergedUrlOptions,
       routeName == null ? null : isSymbol(routeName) ? symbolToS(routeName) : String(routeName),

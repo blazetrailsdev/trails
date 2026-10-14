@@ -188,6 +188,12 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     expect(compare()).toEqual({ calls: [], args: [] });
   });
 
+  it("compares a constructor whose own and same-file module initialize share a file", () => {
+    const { calls } = compare({ sameFileModule: true, tsCalls: ["buildReflection", "super"] });
+    expect(calls.join("\n")).toContain("assign_attributes → assignAttributes");
+    expect(compare({ sameFileModule: true })).toEqual({ calls: [], args: [] });
+  });
+
   it("compares a class with no Rails initialize of its own against the tagged chain alone", () => {
     const { calls } = compare({ rubyInitialize: false, tsCalls: ["buildReflection", "super"] });
     expect(calls.join("\n")).toContain("assign_attributes → assignAttributes");

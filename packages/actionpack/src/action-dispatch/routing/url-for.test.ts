@@ -155,7 +155,11 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const host = makeHost();
     const routes = host._routes as ReturnType<typeof makeRoutes>;
     fullUrlFor.call(host, params);
-    expect(routes.calls[0][0]).toEqual({ controller: "posts", action: "show", id: 7 });
+    expect(Object.fromEntries(routes.calls[0][0] as Map<string, unknown>)).toEqual({
+      controller: "posts",
+      action: "show",
+      id: 7,
+    });
   });
 
   it("unpermitted Parameters throw UnfilteredParameters from toH()", () => {
