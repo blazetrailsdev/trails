@@ -600,7 +600,10 @@ export class TimeZone {
   declare readonly tzinfo: Timezone;
   declare private readonly _utcOffset: number | null;
 
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm create — PERMANENT
+   */
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
     if (!creating) return TimeZone.find(name) ?? TimeZone.create(name);
     creating = false;
