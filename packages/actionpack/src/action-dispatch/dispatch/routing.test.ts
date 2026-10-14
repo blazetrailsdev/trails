@@ -3612,8 +3612,8 @@ describe("TestRecognizePath", () => {
     expect(actualParams).toEqual(expectedParams);
   });
 
-  function recognizePath(...args: Parameters<RouteSet["recognizePath"]>) {
-    return Routes.recognizePath(...args);
+  function recognizePath(path: string) {
+    return Routes.recognizePath(path);
   }
 });
 
