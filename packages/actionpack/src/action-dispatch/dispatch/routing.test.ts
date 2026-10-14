@@ -659,8 +659,8 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.resources("replies", () => {
         this.member(() => {
-          this.put("answer", { to: "replies#mark_as_answer" });
-          this.delete("answer", { to: "replies#unmark_as_answer" });
+          this.put(":answer", { action: "mark_as_answer" });
+          this.delete(":answer", { action: "unmark_as_answer" });
         });
       });
     });
@@ -676,8 +676,8 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.resources("replies", () => {
         this.member(() => {
-          this.put("answer", { to: "replies#mark_as_answer" });
-          this.delete("answer", { to: "replies#unmark_as_answer" });
+          this.put(":answer", { action: "mark_as_answer" });
+          this.delete(":answer", { action: "unmark_as_answer" });
         });
       });
     });
@@ -1519,11 +1519,11 @@ describe("TestRoutingMapper", () => {
   it("bookmarks", () => {
     const routes = new RouteSet();
     routes.draw(function () {
-      this.scope("bookmark", { module: "bookmarks", as: "bookmark" }, () => {
-        this.get("build", { action: "new", as: "new" });
-        this.post("create", { action: "create", as: "" });
-        this.put("update", { action: "update", as: "update" });
-        this.get("remove", { action: "destroy", as: "remove" });
+      this.scope("bookmark", { controller: "bookmarks", as: "bookmark" }, () => {
+        this.get(":new", { path: "build" });
+        this.post(":create", { path: "create", as: "" });
+        this.put(":update");
+        this.get(":remove", { action: "destroy", as: "remove" });
       });
     });
     expect(routes.recognizePath("/bookmark/build").controller).toBe("bookmarks");
@@ -1712,14 +1712,14 @@ describe("TestRoutingMapper", () => {
     draw(function () {
       this.resources("projects", () => {
         this.resources("posts", () => {
-          this.get("archive", { on: "collection" });
-          this.get("toggle_view", { on: "collection" });
-          this.post("preview", { on: "member" });
+          this.get(":archive", { on: "collection" });
+          this.get(":toggle_view", { on: "collection" });
+          this.post(":preview", { on: "member" });
 
           this.resource("subscription");
 
           this.resources("comments", () => {
-            this.post("preview", { on: "collection" });
+            this.post(":preview", { on: "collection" });
           });
         });
       });
@@ -3225,7 +3225,7 @@ describe("TestRoutingMapper", () => {
     const routes = new RouteSet();
     routes.draw(function () {
       this.resources("sections", { id: /.+/ }, () => {
-        this.get("preview", { on: "member" });
+        this.get(":preview", { on: "member" });
       });
     });
 

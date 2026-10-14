@@ -487,7 +487,7 @@ describe("RoutingAssertionsControllerTest", () => {
 
       await t().withRouting(async (routes: RouteSet) => {
         routes.draw(function () {
-          this.get("new_route", { to: "secure_articles#index" });
+          this.get(":new_route", { to: "secure_articles#index" });
         });
 
         await t().get("index");
@@ -522,7 +522,7 @@ describe("RoutingAssertionsIntegrationTest", () => {
     it("with_routing routes are reachable", async () => {
       await t().withRouting(async (routes: RouteSet) => {
         routes.draw(function () {
-          this.get("new_route", { to: "secure_articles#index" });
+          this.get(":new_route", { to: "secure_articles#index" });
         });
 
         await t().get("/new_route");

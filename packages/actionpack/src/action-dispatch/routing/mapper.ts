@@ -2150,8 +2150,11 @@ export class Mapper {
   }
 
   /** @internal */
-  canonicalAction(action: string): boolean {
-    return CANONICAL_ACTIONS.includes(SYMBOL.test(action) ? symbolToS(action) : action);
+  isCanonicalAction(action: string): boolean {
+    return (
+      this.isResourceMethodScope() &&
+      CANONICAL_ACTIONS.includes(SYMBOL.test(action) ? symbolToS(action) : action)
+    );
   }
 
   /** @internal */
@@ -2176,7 +2179,7 @@ export class Mapper {
   pathForAction(action: string, path: string | undefined): string {
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     if (path != null) return `${prefix}/${path}`;
-    if (this.canonicalAction(action)) {
+    if (this.isCanonicalAction(action)) {
       return prefix;
     } else {
       const actionPath = this.actionPath(action);
@@ -2191,7 +2194,7 @@ export class Mapper {
   ): string | undefined {
     let prefix: string | undefined;
     if (as !== undefined && as !== null) prefix = as;
-    else if (action && !this.canonicalAction(action)) prefix = action;
+    else if (action && !this.isCanonicalAction(action)) prefix = action;
     if (prefix && prefix !== "/" && prefix.length > 0) {
       return Mapper.normalizeName(prefix.replace(/-/g, "_"));
     }
