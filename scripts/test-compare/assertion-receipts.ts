@@ -31,6 +31,26 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actiondispatch:dispatch/request/multipart_params_parsing_test.rb › MultipartParamsParsingTest › parses utf8 filename with percent character":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/request/multipart_params_parsing_test.rb:86 `file.original_filename` is a binary String decoded only by UploadedFile#initialize\'s encode! rescue arm — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
+  "actiondispatch:dispatch/request/multipart_params_parsing_test.rb › MultipartParamsParsingTest › parses mixed files":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/request/multipart_params_parsing_test.rb:139 `files.bytesize` counts the bytes of a body force-tagged UTF-8 while invalid, which a decoded JS string cannot keep — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
   "activerecord:connection_pool_test.rb › pin connection synchronize the connection": [
     {
       kind: "assert_equal",

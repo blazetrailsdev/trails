@@ -463,13 +463,13 @@ export class Request {
   }
 
   /** @missingRailsArgs force_encoding — PERMANENT */
-  get body(): unknown {
-    let rawPost = this.getHeader("RAW_POST_DATA") as string | null | undefined | false;
-    if (rawPost != null && rawPost !== false) {
+  get body(): StringIO {
+    let rawPost = this.getHeader("RAW_POST_DATA") as string | null | undefined;
+    if (rawPost != null) {
       rawPost = forceEncoding(rawPost, Encoding.BINARY);
       return new StringIO(rawPost);
     } else {
-      return this.bodyStream;
+      return this.bodyStream as StringIO;
     }
   }
 

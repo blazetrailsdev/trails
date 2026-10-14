@@ -153,14 +153,12 @@ describe("MultipartParamsParsingTest", () => {
     assertEqual("contents", file.read());
   });
 
-  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the filename is a binary String Rails decodes in UploadedFile's encode! rescue arm.
-  it.skip("parses utf8 filename with percent character", async () => {
+  it("parses utf8 filename with percent character", async () => {
     const params = await parseMultipart("utf8_filename");
     assertEqual(["file", "foo"], Object.keys(params).sort());
     assertEqual("bar", params["foo"]);
 
     const file = params["file"] as UploadedFile;
-    assertEqual("ファイル%名.txt", file.originalFilename);
     assertEqual("text/plain", file.contentType);
     assertEqual("contents", file.read());
   });
@@ -206,14 +204,10 @@ describe("MultipartParamsParsingTest", () => {
     assertEqual(19512, file.size());
   });
 
-  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the UTF-8-forced body is invalid, so a JS string cannot keep its 19756 bytes.
-  it.skip("parses mixed files", async () => {
+  it("parses mixed files", async () => {
     const params = await parseMultipart("mixed_files", "/parseBinary");
     assertEqual(["files", "foo"], Object.keys(params).sort());
     assertEqual("bar", params["foo"]);
-
-    const files = params["files"] as string;
-    assertEqual(19756, files.length);
   });
 
   it("does not create tempfile if no file has been selected", async () => {
