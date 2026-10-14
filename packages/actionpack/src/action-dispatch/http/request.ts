@@ -23,6 +23,7 @@ import {
 import {
   etagMatches as _etagMatches,
   fresh as _fresh,
+  Request as CacheRequest,
   ifModifiedSince as _ifModifiedSince,
   ifNoneMatch as _ifNoneMatch,
   ifNoneMatchEtags as _ifNoneMatchEtags,
@@ -346,6 +347,22 @@ export class Request {
 
   get url(): string {
     return `${this.scheme}://${this.hostWithPort()}${this.fullpath}`;
+  }
+
+  get secureProtocol(): boolean {
+    return HttpURL.secureProtocol;
+  }
+
+  set secureProtocol(value: boolean) {
+    HttpURL.secureProtocol = value;
+  }
+
+  get tldLength(): number {
+    return HttpURL.tldLength;
+  }
+
+  set tldLength(value: number) {
+    HttpURL.tldLength = value;
   }
 
   domain(tldLength: number = HttpURL.tldLength): string | null {
@@ -1015,9 +1032,10 @@ export interface Request {
   get xForwardedHost(): string | undefined;
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
-export interface Request extends CspRequest {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface Request extends CspRequest, CacheRequest {}
 include(Request, CspRequest);
+include(Request, CacheRequest);
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {

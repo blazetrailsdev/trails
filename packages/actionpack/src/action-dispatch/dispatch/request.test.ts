@@ -269,7 +269,7 @@ describe("RequestMethod", () => {
 describe("RequestMimeType", () => {
   it("content type", () => {
     const req = new Request({ CONTENT_TYPE: "text/html" });
-    expect(req.contentMimeType).toBe(MimeType.HTML);
+    expect(req.contentMimeType).toBe(Mime.get(":html")!);
     expect(req.mediaType).toBe("text/html");
     expect(req.contentType).toBe("text/html");
   });
@@ -312,7 +312,7 @@ describe("RequestMimeType", () => {
     const xml = Mime.get(":xml")!;
     const json = Mime.get(":json")!;
     assertNil(req.negotiateMime([xml, json]));
-    expect(req.negotiateMime([xml, MimeType.HTML])).toBe(MimeType.HTML);
+    expect(req.negotiateMime([xml, Mime.get(":html")!])).toBe(Mime.get(":html")!);
     const all = MimeType.parse("*/*")[0];
     expect(req.negotiateMime([xml, all])?.symbol).toBe(":html");
   });
@@ -421,14 +421,14 @@ describe("RequestFormat", () => {
       HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
       QUERY_STRING: "",
     });
-    expect(req.formats).toEqual([MimeType.JS]);
+    expect(req.formats).toEqual([Mime.get(":js")!]);
   });
 
   it("format taken from the path extension", () => {
     const r1 = new Request({ PATH_INFO: "/foo.xml", QUERY_STRING: "" });
     expect(r1.formats.map((m) => m.symbol)).toEqual([":xml"]);
     const r2 = new Request({ PATH_INFO: "/foo.123", QUERY_STRING: "" });
-    expect(r2.formats).toEqual([MimeType.HTML]);
+    expect(r2.formats).toEqual([Mime.get(":html")!]);
   });
 
   it("formats from accept headers have higher precedence than path extension", () => {
@@ -463,15 +463,15 @@ describe("RequestFormat", () => {
     Request.ignoreAcceptHeader = true;
     try {
       const r1 = new Request({ HTTP_ACCEPT: "application/xml", QUERY_STRING: "" });
-      expect(r1.formats).toEqual([MimeType.HTML]);
+      expect(r1.formats).toEqual([Mime.get(":html")!]);
       const r2 = new Request({ HTTP_ACCEPT: "*/*;q=0.1", QUERY_STRING: "" });
-      expect(r2.formats).toEqual([MimeType.HTML]);
+      expect(r2.formats).toEqual([Mime.get(":html")!]);
       const r3 = new Request({
         HTTP_ACCEPT: "application/xml",
         HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
         QUERY_STRING: "",
       });
-      expect(r3.formats).toEqual([MimeType.JS]);
+      expect(r3.formats).toEqual([Mime.get(":js")!]);
       const r4 = new Request({
         HTTP_ACCEPT: "application/xml",
         HTTP_X_REQUESTED_WITH: "XMLHttpRequest",

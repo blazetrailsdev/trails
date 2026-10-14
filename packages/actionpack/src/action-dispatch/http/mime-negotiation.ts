@@ -1,18 +1,14 @@
 import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesupport";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
-import { MimeType, NullType } from "./mime-type.js";
+import { InvalidMimeType, MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /** @internal */
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
-export class InvalidType extends Error {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActionDispatch::Http::MimeNegotiation::InvalidType";
-  }
-}
+export class InvalidType extends InvalidMimeType {}
+InvalidType.prototype.name = "ActionDispatch::Http::MimeNegotiation::InvalidType";
 
 export interface MimeNegotiationHost {
   getHeader(key: string): unknown;
@@ -24,8 +20,8 @@ export interface MimeNegotiationHost {
 }
 
 export class MimeNegotiation {
-  declare setHeader: MimeNegotiationHost["setHeader"];
-  declare parameters: MimeNegotiationHost["parameters"];
+  declare protected setHeader: MimeNegotiationHost["setHeader"];
+  declare protected parameters: MimeNegotiationHost["parameters"];
   /** @internal */
   declare _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
 
@@ -67,7 +63,8 @@ export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
       const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
       return this.setHeader(k, v);
     } catch (e) {
-      throw new InvalidType((e as Error).message);
+      if (!(e instanceof InvalidMimeType)) throw e;
+      throw new InvalidType(e.message);
     }
   }) as MimeType | null;
 }
@@ -85,7 +82,8 @@ export function accepts(this: MimeNegotiationHost): MimeType[] {
         header === "" ? ([contentMimeType.call(this)] as MimeType[]) : MimeType.parse(header);
       return this.setHeader(k, v);
     } catch (e) {
-      throw new InvalidType((e as Error).message);
+      if (!(e instanceof InvalidMimeType)) throw e;
+      throw new InvalidType(e.message);
     }
   }) as MimeType[];
 }

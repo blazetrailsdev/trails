@@ -3,7 +3,7 @@ import { File } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
-import { MimeType } from "../http/mime-type.js";
+import { InvalidMimeType, Mime, MimeType } from "../http/mime-type.js";
 import { Response } from "../http/response.js";
 
 async function* emptyBody(): RackBody {}
@@ -27,7 +27,13 @@ export class PublicExceptions {
     const pathInfo = String(env["PATH_INFO"] ?? "");
     const status = parseInt(pathInfo.slice(1), 10) || 0;
 
-    const contentType = this.firstFormat(env);
+    let contentType: MimeType | undefined;
+    try {
+      contentType = this.firstFormat(env);
+    } catch (e) {
+      if (!(e instanceof InvalidMimeType)) throw e;
+      contentType = Mime.get(":text");
+    }
 
     const body: ErrorBody = {
       status,

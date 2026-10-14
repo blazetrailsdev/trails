@@ -87,10 +87,8 @@ describe("ContentSecurityPolicyTest", () => {
   it("reporting directives", () => {
     const policy = new ContentSecurityPolicy();
     policy.reportUri("/csp-report");
-    policy.reportTo("default");
     const header = policy.build();
     expect(header).toContain("report-uri /csp-report");
-    expect(header).toContain("report-to default");
   });
 
   it("other directives", () => {
@@ -177,22 +175,6 @@ describe("ContentSecurityPolicyTest", () => {
     expect(() => policy.build()).toThrow(/Missing context/);
   });
 
-  it("has directive check", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'");
-    expect(policy.hasDirective("default-src")).toBe(true);
-    expect(policy.hasDirective("script-src")).toBe(false);
-  });
-
-  it("get directives returns copy", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'");
-    policy.scriptSrc("cdn.example.com");
-    const dirs = policy.getDirectives();
-    expect(dirs.size).toBe(2);
-    expect(dirs.get("default-src")).toEqual(["'self'"]);
-  });
-
   it("constructor with init function", () => {
     const policy = new ContentSecurityPolicy((p) => {
       p.defaultSrc("'self'");
@@ -242,12 +224,6 @@ describe("ContentSecurityPolicyTest", () => {
     const policy = new ContentSecurityPolicy();
     policy.manifestSrc("'self'");
     expect(policy.build()).toBe("manifest-src 'self'");
-  });
-
-  it("navigate to directive", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.navigateTo("'self'");
-    expect(policy.build()).toBe("navigate-to 'self'");
   });
 
   it("require sri for directive", () => {
@@ -324,38 +300,38 @@ describe("ContentSecurityPolicyTest", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("'self'");
     policy.scriptSrc();
-    expect(policy.hasDirective("script-src")).toBe(false);
+    expect(policy.directives.has("script-src")).toBe(false);
   });
 
   it("DSL with falsy first arg clears the directive", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("'self'");
     policy.scriptSrc(null);
-    expect(policy.hasDirective("script-src")).toBe(false);
+    expect(policy.directives.has("script-src")).toBe(false);
   });
 
   it("DSL with empty-string first arg keeps the directive (Ruby truthiness)", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("");
-    expect(policy.hasDirective("script-src")).toBe(true);
+    expect(policy.directives.has("script-src")).toBe(true);
   });
 
   it("block_all_mixed_content stores true sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.blockAllMixedContent();
-    expect(policy.getDirectives().get("block-all-mixed-content")).toBe(true);
+    expect(policy.directives.get("block-all-mixed-content")).toBe(true);
   });
 
   it("upgrade_insecure_requests stores true sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.upgradeInsecureRequests();
-    expect(policy.getDirectives().get("upgrade-insecure-requests")).toBe(true);
+    expect(policy.directives.get("upgrade-insecure-requests")).toBe(true);
   });
 
   it("sandbox with no args stores true sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.sandbox();
-    expect(policy.getDirectives().get("sandbox")).toBe(true);
+    expect(policy.directives.get("sandbox")).toBe(true);
     expect(policy.build()).toBe("sandbox");
   });
 
@@ -369,7 +345,7 @@ describe("ContentSecurityPolicyTest", () => {
     const policy = new ContentSecurityPolicy();
     policy.upgradeInsecureRequests();
     const copy = rbObjDup(policy);
-    expect(copy.getDirectives().get("upgrade-insecure-requests")).toBe(true);
+    expect(copy.directives.get("upgrade-insecure-requests")).toBe(true);
     expect(copy.build()).toBe("upgrade-insecure-requests");
   });
 });

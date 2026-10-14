@@ -1,5 +1,6 @@
 import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { Digest } from "@blazetrails/activesupport/digest";
+import { mattrAccessor } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 
 const HTTP_IF_MODIFIED_SINCE = "If-Modified-Since";
@@ -18,10 +19,18 @@ const NO_STORE = "no-store",
 const MUST_REVALIDATE = "must-revalidate",
   IMMUTABLE = "immutable";
 
-export const CacheConfig = { strictFreshness: false };
+export class Request {
+  declare static strictFreshness: boolean;
+  declare strictFreshness: boolean;
+
+  static {
+    mattrAccessor.call(this, "strictFreshness", { default: false });
+  }
+}
 
 export interface RequestCacheHost {
   getHeader(name: string): string | undefined;
+  strictFreshness: boolean;
 }
 
 export interface CacheResponseLike {
@@ -54,7 +63,7 @@ export function etagMatches(this: RequestCacheHost, etag: string | undefined): b
 }
 
 export function fresh(this: RequestCacheHost, response: CacheResponseLike): boolean {
-  if (CacheConfig.strictFreshness) {
+  if (this.strictFreshness) {
     if (ifNoneMatch.call(this)) return etagMatches.call(this, response.etag);
     if (ifModifiedSince.call(this)) return notModified.call(this, response.lastModified);
     return false;
@@ -155,9 +164,9 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
 type R = ResponseCacheHost;
 
 export class Response {
-  declare getHeader: ResponseCacheHost["getHeader"];
-  declare setHeader: ResponseCacheHost["setHeader"];
-  declare hasHeader: ResponseCacheHost["hasHeader"];
+  declare protected getHeader: ResponseCacheHost["getHeader"];
+  declare protected setHeader: ResponseCacheHost["setHeader"];
+  declare protected hasHeader: ResponseCacheHost["hasHeader"];
   /** @internal */
   declare _cacheControlHash: CacheControlHash;
 
@@ -192,7 +201,7 @@ export class Response {
   }
 
   set etag(v: unknown) {
-    weakEtag.call(this, v);
+    weakEtag.call(this as unknown as R, v);
   }
 }
 

@@ -2,7 +2,7 @@ import { assertEqual, assertPredicate, Duration, isBlank } from "@blazetrails/ac
 import { Time } from "@blazetrails/date";
 import { toI } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
-import { CacheConfig } from "../../../action-dispatch/http/cache.js";
+import { Request as CacheRequest } from "../../../action-dispatch/http/cache.js";
 import { EtagHelper } from "../../../test-helpers/support/etag-helper.js";
 import "../../../test-helpers/abstract-unit.js";
 import { API } from "../../api.js";
@@ -62,12 +62,12 @@ describe("ConditionalGetApiTest", () => {
   });
 
   async function withStrictFreshness(value: boolean, block: () => Promise<void>): Promise<void> {
-    const oldValue = CacheConfig.strictFreshness;
-    CacheConfig.strictFreshness = value;
+    const oldValue = CacheRequest.strictFreshness;
+    CacheRequest.strictFreshness = value;
     try {
       await block();
     } finally {
-      CacheConfig.strictFreshness = oldValue;
+      CacheRequest.strictFreshness = oldValue;
     }
   }
 

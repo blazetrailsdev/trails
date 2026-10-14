@@ -1,4 +1,4 @@
-import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
+import { isBlank, mattrAccessor, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
 import { fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
@@ -155,8 +155,7 @@ function buildHostUrl(
 }
 
 export const URL = {
-  secureProtocol: false as boolean,
-  tldLength: 1 as number,
+  ...({} as { secureProtocol: boolean; tldLength: number }),
 
   extractDomain(host: string, tldLength: number): string | null {
     return namedHost(host) ? extractDomainFrom(host, tldLength) : null;
@@ -195,3 +194,6 @@ export const URL = {
     return parts.join("");
   },
 };
+
+mattrAccessor.call(URL, "secureProtocol", { default: false });
+mattrAccessor.call(URL, "tldLength", { default: 1 });

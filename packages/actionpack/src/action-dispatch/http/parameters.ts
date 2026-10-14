@@ -3,7 +3,7 @@ import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
 
 import { merge } from "@blazetrails/ruby-compat";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
-import { MimeType } from "./mime-type.js";
+import { Mime, MimeType } from "./mime-type.js";
 import type { ParamHash } from "../request/utils.js";
 import { ActionDispatch } from "../../namespaces.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
@@ -15,7 +15,7 @@ export type ParameterParser = (rawPost: string) => Record<string, unknown>;
 export type ParameterParsers = Record<string, ParameterParser>;
 
 export const DEFAULT_PARSERS: ParameterParsers = {
-  [MimeType.JSON.symbol!]: (rawPost: string) => {
+  [Mime.get(":json")!.symbol!]: (rawPost: string) => {
     const data = JSON.parse(rawPost);
     if (data !== null && typeof data === "object" && !Array.isArray(data)) {
       return data as Record<string, unknown>;
@@ -46,8 +46,8 @@ export interface ParametersHost {
 
 export class Parameters {
   declare controllerClassFor: ParametersHost["controllerClassFor"];
-  declare setHeader: ParametersHost["setHeader"];
-  declare deleteHeader: ParametersHost["deleteHeader"];
+  protected declare setHeader: ParametersHost["setHeader"];
+  protected declare deleteHeader: ParametersHost["deleteHeader"];
 
   /** @internal */
   private static _parameterParsers: ParameterParsers = DEFAULT_PARSERS;

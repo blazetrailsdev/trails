@@ -70,6 +70,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "ActionController::Parameters": { "[]": ["get"], "[]=": ["set"] },
   "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
   "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
+  // action_dispatch/http/headers.rb:63 `def [](key)` → http/headers.ts
+  // `Headers#get`, and :68 `def []=(key, value)` → `set`.
+  "ActionDispatch::Http::Headers": { "[]": ["get"], "[]=": ["set"] },
+  // action_dispatch/http/mime_type.rb:51 `def [](type)` inside `class << self`
+  // → http/mime-type.ts `Mime.get`.
+  Mime: { "self.[]": ["get"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // arel/nodes/table_alias.rb:10 `def [](name)` → nodes/table-alias.ts `get`.

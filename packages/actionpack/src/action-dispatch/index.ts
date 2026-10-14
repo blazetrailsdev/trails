@@ -161,4 +161,4 @@ export {
   type ServerAddress,
 } from "./system-testing/server.js";
 export { RequestUtils } from "./request/utils.js";
-export { CacheConfig } from "./http/cache.js";
+export { Request as CacheRequest } from "./http/cache.js";

@@ -8,8 +8,11 @@ import {
   KeyError,
   NoMethodError,
   PROTOCOL_PROBES,
+  rbInspect,
+  regexpEscape,
   rbEqual,
   rbHash,
+  StandardError,
   stringToSym,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -153,6 +156,9 @@ export class AcceptList {
   }
 }
 
+export class InvalidMimeType extends StandardError {}
+InvalidMimeType.prototype.name = "Mime::Type::InvalidMimeType";
+
 export const EXTENSION_LOOKUP: Map<string, MimeType> = new Map();
 export const LOOKUP: Map<string, MimeType> = new Map();
 
@@ -190,7 +196,8 @@ export class MimeType {
   readonly synonyms: string[];
   private readonly _hash: number;
 
-  private static callbacks: Array<(type: MimeType) => void> = [];
+  /** @internal */
+  private static _registerCallbacks: Array<(type: MimeType) => void> = [];
 
   static readonly SET: Mimes = new Mimes();
 
@@ -198,7 +205,19 @@ export class MimeType {
     return this._hash;
   }
 
-  constructor(string: string, symbol: string | null = null, synonyms: string[] = []) {
+  static readonly MIME_NAME = "[a-zA-Z0-9][a-zA-Z0-9!#\\$&\\-\\^_\\.\\+]{0,126}";
+  static readonly MIME_PARAMETER_VALUE = `(?:${MimeType.MIME_NAME}|"[^"\\r\\\\]*")`;
+  static readonly MIME_PARAMETER = ` *; *${MimeType.MIME_NAME}(?:=${MimeType.MIME_PARAMETER_VALUE})?`;
+  static readonly MIME_REGEXP = new RegExp(
+    `^(?:\\*\\/\\*|${MimeType.MIME_NAME}\\/(?:\\*|${MimeType.MIME_NAME})(?:(?=(${MimeType.MIME_PARAMETER}))\\1)*\\s*)$`,
+  );
+
+  static InvalidMimeType = InvalidMimeType;
+
+  constructor(string: string | null, symbol: string | null = null, synonyms: string[] = []) {
+    if (!(string != null && MimeType.MIME_REGEXP.test(string))) {
+      throw new InvalidMimeType(`${rbInspect(string)} is not a valid MIME type`);
+    }
     this.string = string;
     this.symbol = symbol;
     this.synonyms = synonyms;
@@ -210,18 +229,17 @@ export class MimeType {
     return this.string;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toStr(): string {
     return this.toString();
   }
 
-  match(mimeType: string | RegExp): boolean {
-    if (mimeType instanceof RegExp) return mimeType.test(this.string);
-    if (mimeType === "*/*") return true;
-    if (mimeType.endsWith("/*")) {
-      const type = mimeType.slice(0, -2);
-      return this.string.startsWith(type + "/");
-    }
-    return this.string === mimeType || this.synonyms.includes(mimeType);
+  match(mimeType: MimeType | string | null | undefined): boolean {
+    if (mimeType == null) return false;
+    const regexp = new RegExp(regexpEscape(mimeType.toString()));
+    return (
+      this.synonyms.some((synonym) => regexp.test(synonym.toString())) || regexp.test(this.string)
+    );
   }
 
   ref(): string {
@@ -295,7 +313,7 @@ export class MimeType {
     if (!skipLookup) for (const str of [string, ...mimeTypeSynonyms]) LOOKUP.set(str, newMime);
     for (const ext of [symbolToS(symbol), ...extensionSynonyms]) EXTENSION_LOOKUP.set(ext, newMime);
 
-    for (const callback of MimeType.callbacks) {
+    for (const callback of MimeType._registerCallbacks) {
       callback(newMime);
     }
     return newMime;
@@ -318,8 +336,8 @@ export class MimeType {
   static lookup(string: string): MimeType {
     if (LOOKUP.has(string)) return LOOKUP.get(string)!;
 
-    string = string.split(";", 2)[0].trimEnd();
-    return LOOKUP.get(string) ?? new MimeType(string);
+    const str = string === "" ? null : string.split(";", 2)[0].trimEnd();
+    return (str != null ? LOOKUP.get(str) : undefined) ?? new MimeType(str);
   }
 
   static lookupByExtension(extension: string | null): MimeType | undefined {
@@ -331,12 +349,8 @@ export class MimeType {
     return MimeType.SET.select(() => true);
   }
 
-  static onRegister(callback: (type: MimeType) => void): void {
-    MimeType.callbacks.push(callback);
-  }
-
   static registerCallback(callback: (type: MimeType) => void): void {
-    MimeType.onRegister(callback);
+    MimeType._registerCallbacks.push(callback);
   }
 
   /** @internal */
@@ -388,82 +402,6 @@ export class MimeType {
       }
     }
     return AcceptList.sortBang(list);
-  }
-
-  static get HTML(): MimeType {
-    return MimeType.lookupByExtension("html")!;
-  }
-  static get TEXT(): MimeType {
-    return MimeType.lookupByExtension("text")!;
-  }
-  static get JS(): MimeType {
-    return MimeType.lookupByExtension("js")!;
-  }
-  static get CSS(): MimeType {
-    return MimeType.lookupByExtension("css")!;
-  }
-  static get ICS(): MimeType {
-    return MimeType.lookupByExtension("ics")!;
-  }
-  static get CSV(): MimeType {
-    return MimeType.lookupByExtension("csv")!;
-  }
-  static get VCF(): MimeType {
-    return MimeType.lookupByExtension("vcf")!;
-  }
-  static get PNG(): MimeType {
-    return MimeType.lookupByExtension("png")!;
-  }
-  static get JPEG(): MimeType {
-    return MimeType.lookupByExtension("jpeg")!;
-  }
-  static get GIF(): MimeType {
-    return MimeType.lookupByExtension("gif")!;
-  }
-  static get BMP(): MimeType {
-    return MimeType.lookupByExtension("bmp")!;
-  }
-  static get TIFF(): MimeType {
-    return MimeType.lookupByExtension("tiff")!;
-  }
-  static get SVG(): MimeType {
-    return MimeType.lookupByExtension("svg")!;
-  }
-  static get WEBP(): MimeType {
-    return MimeType.lookupByExtension("webp")!;
-  }
-  static get MPEG(): MimeType {
-    return MimeType.lookupByExtension("mpeg")!;
-  }
-  static get XML(): MimeType {
-    return MimeType.lookupByExtension("xml")!;
-  }
-  static get RSS(): MimeType {
-    return MimeType.lookupByExtension("rss")!;
-  }
-  static get ATOM(): MimeType {
-    return MimeType.lookupByExtension("atom")!;
-  }
-  static get YAML(): MimeType {
-    return MimeType.lookupByExtension("yaml")!;
-  }
-  static get MULTIPART_FORM(): MimeType {
-    return MimeType.lookupByExtension("multipart_form")!;
-  }
-  static get URL_ENCODED_FORM(): MimeType {
-    return MimeType.lookupByExtension("url_encoded_form")!;
-  }
-  static get JSON(): MimeType {
-    return MimeType.lookupByExtension("json")!;
-  }
-  static get PDF(): MimeType {
-    return MimeType.lookupByExtension("pdf")!;
-  }
-  static get ZIP(): MimeType {
-    return MimeType.lookupByExtension("zip")!;
-  }
-  static get GZIP(): MimeType {
-    return MimeType.lookupByExtension("gzip")!;
   }
 
   declare static readonly ALL: AllType;
