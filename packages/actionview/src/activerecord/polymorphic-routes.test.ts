@@ -177,7 +177,8 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withTestRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- Rails declares `options = {}` and never reads it (`polymorphic_routes_test.rb:655,680,695,717`).
+  withTestRoutes<T>(options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.resources("projects", () => {
@@ -202,7 +203,8 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withTopLevelAndNestedRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- Rails declares `options = {}` and never reads it (`polymorphic_routes_test.rb:655,680,695,717`).
+  withTopLevelAndNestedRoutes<T>(options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.resources("blogs", () => {
@@ -217,7 +219,8 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withAdminTestRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- Rails declares `options = {}` and never reads it (`polymorphic_routes_test.rb:655,680,695,717`).
+  withAdminTestRoutes<T>(options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.namespace("admin", () => {
@@ -239,7 +242,8 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withAdminAndSiteTestRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- Rails declares `options = {}` and never reads it (`polymorphic_routes_test.rb:655,680,695,717`).
+  withAdminAndSiteTestRoutes<T>(options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.namespace("admin", () => {
