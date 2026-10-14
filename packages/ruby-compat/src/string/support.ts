@@ -1,7 +1,8 @@
 import { ArgumentError } from "../argument-error.js";
 import { IndexError } from "../index-error.js";
-import { rbBuiltinClassName } from "../object.js";
+import { conversionMismatch, rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
+import { RangeError as RbRangeError } from "../range-error.js";
 import { TypeError } from "../type-error.js";
 
 /**
@@ -41,6 +42,28 @@ export function strlen(str: string): number {
 }
 
 /**
+ * `String.new(str)` (`rb_str_s_new`, `vendor/ruby/v3.3.11/string.c:1910`): a
+ * String holding a copy of `str`'s content. A JS string is an immutable value
+ * with no identity, so the value is its own copy.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrSNew(str: string = ""): string {
+  return str;
+}
+
+/**
+ * `String#-@` (`str_uminus`, `vendor/ruby/v3.3.11/string.c:3059`): the frozen,
+ * interned String with `str`'s content. A JS string is already immutable and
+ * compared by value, so the value is its own interned copy.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function strUminus<T extends string | Uint8Array>(str: T): T {
+  return str;
+}
+
+/**
  * `rb_str_sublen` (`vendor/ruby/v3.3.11/string.c:2841`): a UTF-16 offset as a character offset.
  *
  * @noRailsEquivalent PERMANENT
@@ -60,11 +83,13 @@ export function strOffset(str: string, pos: number): number {
 
 /**
  * `StringValue` (`vendor/ruby/v3.3.11/string.c:2551` `rb_string_value`): a String, or its `to_str`.
+ * A `Uint8Array` is a binary String (`rbObjClass` answers `rbCString` for it), read as UTF-8.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function stringValue(val: unknown): string {
   if (typeof val === "string") return val;
+  if (val instanceof Uint8Array) return new TextDecoder().decode(val);
   const toStr = (val as { toStr?: unknown } | null)?.toStr;
   if (typeof toStr === "function") return toStr.call(val) as string;
   throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into String`);
@@ -78,19 +103,55 @@ export function stringValue(val: unknown): string {
 export function rbCheckStringType(val: unknown): string | null {
   if (typeof val === "string") return val;
   const toStr = (val as { toStr?: unknown } | null)?.toStr;
-  if (typeof toStr === "function") return toStr.call(val) as string;
-  return null;
+  if (typeof toStr !== "function") return null;
+  const v: unknown = toStr.call(val);
+  if (v == null) return null;
+  if (typeof v !== "string") conversionMismatch(val, "String", "to_str", v);
+  return v;
 }
 
 /**
- * `NUM2LONG` (`vendor/ruby/v3.3.11/numeric.c:3135` `rb_num2long`).
+ * `NUM2LONG` (`vendor/ruby/v3.3.11/numeric.c:3135` `rb_num2long`): a Float
+ * outside `long` raises `RangeError` with `out_of_range_float`'s `%-.10g`
+ * (`numeric.c:3109-3124`), a `bigint` (Ruby's Bignum) outside it raises
+ * `rb_big2long`'s, and anything else goes through `rb_to_int`. The result
+ * is a JS `number`, the one integer type an index or length takes, so an
+ * in-range `bigint` past `Number.MAX_SAFE_INTEGER` arrives rounded to the
+ * nearest double.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function num2long(val: unknown): number {
-  if (typeof val === "number") return Math.trunc(val);
-  if (val == null) throw new TypeError("no implicit conversion from nil to integer");
-  throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
+  for (;;) {
+    if (val == null) throw new TypeError("no implicit conversion from nil to integer");
+    if (typeof val === "number") {
+      if (val < 2 ** 63 && -(2 ** 63) <= val) return Math.trunc(val);
+      const g = Number.isNaN(val)
+        ? "NaN"
+        : Number.isFinite(val)
+          ? val.toPrecision(10).replace(/\.?0*e/, "e")
+          : val > 0
+            ? "Inf"
+            : "-Inf";
+      throw new RbRangeError(`float ${g} out of range of integer`);
+    }
+    if (typeof val === "bigint") {
+      if (val < 2n ** 63n && -(2n ** 63n) <= val) return Number(val);
+      throw new RbRangeError("bignum too big to convert into `long'");
+    }
+    const toInt = (val as { toInt?: unknown }).toInt;
+    if (typeof toInt !== "function") {
+      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
+    }
+    const v = (toInt as () => unknown).call(val);
+    if (typeof v !== "bigint" && (typeof v !== "number" || !Number.isInteger(v))) {
+      const klass = rbBuiltinClassName(val);
+      throw new TypeError(
+        `can't convert ${klass} to Integer (${klass}#to_int gives ${rbBuiltinClassName(v)})`,
+      );
+    }
+    val = v;
+  }
 }
 
 /**

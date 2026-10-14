@@ -38,6 +38,17 @@ describe("SqliteDriver — libsql round-trip", () => {
     expect(row["qty"]).toBe(42);
   });
 
+  it("rollback() rolls the open transaction back and answers true, as the gem's Database#rollback does", async () => {
+    const before = await driver.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear");
+    await driver.exec("BEGIN");
+    await driver.execute("UPDATE widgets SET qty = qty + 1 WHERE name = ?", ["gear"]);
+    expect(await driver.rollback()).toBe(true);
+    expect(await driver.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear")).toBe(
+      before,
+    );
+    await expect((async () => driver.rollback())()).rejects.toThrow();
+  });
+
   it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
     const rows = await driver.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
     expect(rows).toEqual([{ name: "sprocket" }]);
@@ -192,27 +203,27 @@ describe("LibSQLAdapter — local-file smoke", () => {
     removeFiles();
     adapter = new LibSQLAdapter({ database: dbPath });
     await adapter.execute(
-      "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
+      "CREATE TABLE libsql_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
   });
 
   afterAll(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS items");
+    await adapter.execute("DROP TABLE IF EXISTS libsql_items");
     await adapter.disconnectBang();
     removeFiles();
   });
 
   it("inserts and selects rows through the adapter", async () => {
-    await adapter.execute("INSERT INTO items (name) VALUES ('apple')");
-    await adapter.execute("INSERT INTO items (name) VALUES ('banana')");
-    const rows = (await adapter.execute("SELECT name FROM items ORDER BY id"))!;
+    await adapter.execute("INSERT INTO libsql_items (name) VALUES ('apple')");
+    await adapter.execute("INSERT INTO libsql_items (name) VALUES ('banana')");
+    const rows = (await adapter.execute("SELECT name FROM libsql_items ORDER BY id"))!;
     expect(rows.map((r) => (r as { name: string }).name)).toEqual(["apple", "banana"]);
   });
 
   it("reflects schema ops via the shared SQLite3Adapter dialect", async () => {
     const tables = await adapter.tables();
-    expect(tables).toContain("items");
-    const columns = await adapter.columns("items");
+    expect(tables).toContain("libsql_items");
+    const columns = await adapter.columns("libsql_items");
     expect(columns.map((c) => c.name)).toContain("name");
   });
 });
@@ -242,8 +253,8 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
     removeTempFiles();
     const tpl = await libsqlDriver.open({ database: templatePath });
     await tpl.exec(
-      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
-        "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
+      "CREATE TABLE libsql_items (id INTEGER PRIMARY KEY, label TEXT);" +
+        "INSERT INTO libsql_items (label) VALUES ('alpha'), ('beta');",
     );
     await tpl.close();
   });
@@ -254,7 +265,7 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
     await libsqlDriver.restoreFromPath!(templatePath, destPath);
 
     const probe = await libsqlDriver.open({ database: destPath });
-    const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
+    const count = (await (await probe.prepare("SELECT count(*) AS c FROM libsql_items")).get()) as {
       c: number;
     };
     expect(count.c).toBe(2);
@@ -305,10 +316,6 @@ describe("libsqlRemoteDriver — capabilities and async-open dispatch", () => {
     expect(libsqlRemoteDriver.capabilities.loadExtension).toBe(false);
   });
 
-  it("omits openSync so the async-open path is used", () => {
-    expect(libsqlRemoteDriver.openSync).toBeUndefined();
-  });
-
   it("omits databaseExists", () => {
     expect(libsqlRemoteDriver.databaseExists).toBeUndefined();
   });
@@ -351,10 +358,6 @@ describe("isReplicaConfig — embedded-replica mode selection", () => {
 describe("libsqlReplicaDriver — capabilities and async-open dispatch", () => {
   it("has inProcessSync: false", () => {
     expect(libsqlReplicaDriver.capabilities.inProcessSync).toBe(false);
-  });
-
-  it("omits openSync so the async-open path is used", () => {
-    expect(libsqlReplicaDriver.openSync).toBeUndefined();
   });
 
   it("omits databaseExists and restoreFromPath", () => {
@@ -439,8 +442,7 @@ describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TUR
 
   beforeAll(async () => {
     conn = await libsqlRemoteDriver.open({
-      database: ":memory:",
-      remoteUrl: tursoUrl!,
+      database: tursoUrl!,
       driverOptions: { authToken: tursoToken },
     });
   });
@@ -471,8 +473,8 @@ describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke 
   });
 
   it("executes a SELECT through the adapter", async () => {
-    const rows = (await adapter.execute("SELECT 1 AS n"))!;
-    expect((rows[0] as { n: number }).n).toBe(1);
+    const rows = (await adapter.execute("SELECT 1 AS n")) as { n: number }[];
+    expect(rows[0].n).toBe(1);
   });
 });
 

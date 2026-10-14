@@ -1,28 +1,38 @@
-import { block, fetch, KeyError } from "@blazetrails/ruby-compat";
+import { isPlainObject } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  block,
+  fetch,
+  first,
+  type Hash,
+  hashAref,
+  KeyError,
+  last,
+  rbEqual,
+  rbInspect,
+  rbModConstSet,
+  transformValues,
+} from "@blazetrails/ruby-compat";
+import { ActiveRecord } from "./namespaces.js";
 import { FutureResult, type Complete } from "./future-result.js";
+import { defaultValue } from "./type.js";
 
 export type ColumnType = { deserialize(value: unknown): unknown };
 export type ColumnTypes = Record<string | number, ColumnType>;
 
 const EMPTY_COLUMN_TYPES: ColumnTypes = Object.freeze({}) as ColumnTypes;
 
-const IDENTITY_TYPE: ColumnType = {
-  deserialize(value: unknown) {
-    return value;
-  },
-};
-
 export class IndexedRow {
-  readonly #columnIndexes: Record<string, number>;
-  readonly #row: unknown[];
+  private readonly columnIndexes: Record<string, number>;
+  private readonly row: unknown[];
 
   constructor(columnIndexes: Record<string, number>, row: unknown[]) {
-    this.#columnIndexes = columnIndexes;
-    this.#row = row;
+    this.columnIndexes = columnIndexes;
+    this.row = row;
   }
 
   get size(): number {
-    return Object.keys(this.#columnIndexes).length;
+    return Object.keys(this.columnIndexes).length;
   }
 
   get length(): number {
@@ -30,50 +40,50 @@ export class IndexedRow {
   }
 
   keys(): string[] {
-    return Object.keys(this.#columnIndexes);
+    return Object.keys(this.columnIndexes);
   }
 
   eachKey(block: (key: string) => void): void {
-    for (const key of Object.keys(this.#columnIndexes)) block(key);
+    for (const key of Object.keys(this.columnIndexes)) block(key);
   }
 
   isKey(column: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.#columnIndexes, column);
+    return Object.prototype.hasOwnProperty.call(this.columnIndexes, column);
+  }
+
+  fetch(column: string, block?: () => unknown): unknown {
+    let index;
+    if ((index = hashAref(this.columnIndexes, column) as number | null) != null) {
+      return this.row[index];
+    } else if (block) {
+      return block();
+    } else {
+      throw new KeyError(`key not found: ${rbInspect(column)}`);
+    }
   }
 
   get(column: string): unknown {
-    const i = this.#columnIndexes[column];
-    return i === undefined ? undefined : this.#row[i];
+    let index;
+    if ((index = hashAref(this.columnIndexes, column) as number | null) != null) {
+      return this.row[index];
+    }
+    return null;
   }
 
-  fetch(column: string, fallback?: () => unknown): unknown {
-    if (Object.prototype.hasOwnProperty.call(this.#columnIndexes, column)) {
-      return this.#row[this.#columnIndexes[column]];
-    }
-    if (fallback) return fallback();
-    throw new KeyError(`key not found: "${column}"`);
+  toH(): Record<string, unknown> {
+    return transformValues(this.columnIndexes, (index) => this.row[index]);
   }
 
   toHash(): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    for (const [key, index] of Object.entries(this.#columnIndexes)) {
-      out[key] = this.#row[index];
-    }
-    return out;
+    return this.toH();
   }
 
   equals(other: unknown): boolean {
-    if (other instanceof IndexedRow) {
+    if (isPlainObject(other)) {
+      return rbEqual(this.toHash(), other);
+    } else {
       return this === other;
     }
-    if (other && typeof other === "object") {
-      const hash = this.toHash();
-      const otherObj = other as Record<string, unknown>;
-      const keys = Object.keys(hash);
-      if (keys.length !== Object.keys(otherObj).length) return false;
-      return keys.every((k) => hash[k] === otherObj[k]);
-    }
-    return false;
   }
 }
 
@@ -84,7 +94,7 @@ export class Result {
 
   #hashRows: Record<string, unknown>[] | null = null;
   #columnIndexes: Record<string, number> | null = null;
-  #indexedRows: IndexedRow[] | null = null;
+  #indexedRows: readonly IndexedRow[] | null = null;
 
   constructor(columns: string[], rows: unknown[][], columnTypes: ColumnTypes | null = null) {
     this.columns = columns;
@@ -100,7 +110,7 @@ export class Result {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE result-includes-enumerable-and-cast-values-asks-columns-one-p */
   [Symbol.iterator](): IterableIterator<Record<string, unknown>> {
     return this.hashRows()[Symbol.iterator]();
   }
@@ -134,8 +144,12 @@ export class Result {
     return iter;
   }
 
-  toArray(): Record<string, unknown>[] {
+  toAry(): Record<string, unknown>[] {
     return this.hashRows();
+  }
+
+  toArray(): Record<string, unknown>[] {
+    return this.toAry();
   }
 
   pluck(key: string): unknown[];
@@ -160,17 +174,14 @@ export class Result {
   first(n?: number): Record<string, unknown> | Record<string, unknown>[] | undefined {
     const rows = this.hashRows();
     if (n === undefined) return rows[0];
-    if (n < 0) throw new Error("negative array size");
+    if (n < 0) throw new ArgumentError("attempt to take negative size");
     return rows.slice(0, n);
   }
 
   last(): Record<string, unknown> | undefined;
   last(n: number): Record<string, unknown>[];
   last(n?: number): Record<string, unknown> | Record<string, unknown>[] | undefined {
-    const rows = this.hashRows();
-    if (n === undefined) return rows[rows.length - 1];
-    if (n < 0) throw new Error("negative array size");
-    return n >= rows.length ? rows.slice() : rows.slice(rows.length - n);
+    return n != null ? last(this.hashRows(), n) : last(this.hashRows());
   }
 
   result(): Result {
@@ -181,68 +192,75 @@ export class Result {
     return this;
   }
 
-  /**
-   * @missingRailsCall first — PERMANENT
-   * @missingRailsCall one? — PERMANENT
-   */
-  castValues(typeOverrides: ColumnTypes | ColumnType[] = {}): unknown[] {
-    const overridesArray = Array.isArray(typeOverrides) ? typeOverrides : null;
-
+  /** @missingRailsCall one? — CONVERGEABLE result-includes-enumerable-and-cast-values-asks-columns-one-p */
+  castValues(typeOverrides: ColumnTypes | Hash<string, ColumnType> | ColumnType[] = {}): unknown[] {
     if (this.columns.length === 1) {
-      const type = overridesArray
-        ? overridesArray[0]
-        : this.#columnType(this.columns[0], 0, typeOverrides as ColumnTypes);
-      return this.rows.map((row) => type.deserialize(row[0]));
+      const type = Array.isArray(typeOverrides)
+        ? first(typeOverrides)!
+        : this.#columnType(first(this.columns)!, 0, typeOverrides);
+
+      return this.rows.map(([value]) => type.deserialize(value));
+    } else {
+      const types = Array.isArray(typeOverrides)
+        ? typeOverrides
+        : this.columns.map((name, i) => this.#columnType(name, i, typeOverrides));
+
+      return this.rows.map((values) =>
+        Array.from({ length: values.length }, (_, i) => types[i].deserialize(values[i])),
+      );
     }
-
-    const types = overridesArray
-      ? overridesArray
-      : this.columns.map((name, i) => this.#columnType(name, i, typeOverrides as ColumnTypes));
-
-    return this.rows.map((row) => row.map((value, i) => types[i].deserialize(value)));
   }
 
   dup(): Result {
     return new Result(this.columns, this.rows.slice(), { ...this.columnTypes });
   }
 
-  get columnIndexes(): Record<string, number> {
-    if (this.#columnIndexes) return this.#columnIndexes;
-    const hash: Record<string, number> = {};
-    for (let i = 0; i < this.columns.length; i++) {
-      hash[this.columns[i]] = i;
-    }
-    this.#columnIndexes = hash;
-    return hash;
+  freeze(): this {
+    Object.freeze(this.hashRows());
+    Object.freeze(this.indexedRows);
+    Object.freeze(this);
+    return this;
   }
 
-  get indexedRows(): IndexedRow[] {
-    if (this.#indexedRows) return this.#indexedRows;
-    const columns = this.columnIndexes;
-    this.#indexedRows = this.rows.map((row) => new IndexedRow(columns, row));
-    return this.#indexedRows;
+  get columnIndexes(): Record<string, number> {
+    return (this.#columnIndexes ??= (() => {
+      let index = 0;
+      const hash: Record<string, number> = {};
+      const length = this.columns.length;
+      while (index < length) {
+        hash[this.columns[index]] = index;
+        index += 1;
+      }
+      return Object.freeze(hash);
+    })());
+  }
+
+  get indexedRows(): readonly IndexedRow[] {
+    return (this.#indexedRows ??= (() => {
+      const columns = this.columnIndexes;
+      return Object.freeze(this.rows.map((row) => new IndexedRow(columns, row)));
+    })());
   }
 
   /** @internal */
   private hashRows(): Record<string, unknown>[] {
-    if (this.#hashRows) return this.#hashRows;
-    const entries = Object.entries(this.columnIndexes);
-    this.#hashRows = this.rows.map((row) => {
-      const obj: Record<string, unknown> = {};
-      for (const [key, i] of entries) obj[key] = row[i];
-      return obj;
-    });
-    return this.#hashRows;
+    return (this.#hashRows ??= this.rows.map((row) =>
+      transformValues(this.columnIndexes, (index) => row[index]),
+    ));
   }
 
-  #columnType(name: string, index: number, typeOverrides: ColumnTypes): ColumnType {
+  #columnType(
+    name: string,
+    index: number,
+    typeOverrides: ColumnTypes | Hash<string, ColumnType>,
+  ): ColumnType {
     return columnType(this, name, index, typeOverrides);
   }
 }
 
 const EMPTY_COLUMNS = Object.freeze([]) as unknown as string[];
 const EMPTY_ROWS = Object.freeze([]) as unknown as unknown[][];
-const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES)) as Result;
+const EMPTY = new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES).freeze();
 
 let EMPTY_ASYNC: Complete | undefined;
 
@@ -250,26 +268,26 @@ function emptyAsync(): Complete {
   return (EMPTY_ASYNC ??= FutureResult.wrap(EMPTY) as Complete);
 }
 
-/**
- * @internal
- * @missingRailsArgs fetch — PERMANENT
- */
+/** @internal */
 export function columnType(
   result: Result,
   name: string,
   index: number,
-  typeOverrides: ColumnTypes,
+  typeOverrides: ColumnTypes | Hash<string, ColumnType>,
 ): ColumnType {
   const columnTypes = result.columnTypes;
   return fetch<ColumnType>(
-    typeOverrides ?? {},
+    typeOverrides,
     name,
     block(() =>
       fetch<ColumnType>(
         columnTypes,
         index as unknown as string,
-        block(() => fetch<ColumnType>(columnTypes, name, IDENTITY_TYPE)),
+        block(() => fetch<ColumnType>(columnTypes, name, defaultValue())),
       ),
     ),
   );
 }
+
+rbModConstSet(ActiveRecord, "Result", Result);
+rbModConstSet(Result, "IndexedRow", IndexedRow);

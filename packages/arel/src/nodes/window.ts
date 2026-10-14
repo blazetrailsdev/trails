@@ -1,12 +1,14 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 import { SqlLiteral } from "./sql-literal.js";
+import type { ArelNode } from "../arel.js";
 
 export class Window extends Node {
-  orders: Node[];
-  partitions: Node[];
+  orders: ArelNode[];
+  partitions: ArelNode[];
   framing: Node | null;
 
   constructor() {
@@ -16,12 +18,12 @@ export class Window extends Node {
     this.framing = null;
   }
 
-  order(...expr: (Node | string)[]): this {
+  order(...expr: (ArelNode | string)[]): this {
     this.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
-  partition(...expr: (Node | string)[]): this {
+  partition(...expr: (ArelNode | string)[]): this {
     this.partitions.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
@@ -60,6 +62,10 @@ export class Window extends Node {
       rbEqual(this.partitions, other.partitions)
     );
   }
+
+  initializeCopy(_other: Window): void {
+    this.orders = this.orders.map((x) => rbObjClone(x));
+  }
 }
 
 export class NamedWindow extends Window {
@@ -77,17 +83,20 @@ export class NamedWindow extends Window {
   override eql(other: unknown): boolean {
     return super.eql(other) && rbEqual(this.name, (other as NamedWindow).name);
   }
+
+  override initializeCopy(other: NamedWindow): void {
+    super.initializeCopy(other);
+    this.name = rbObjClone(other.name);
+  }
 }
 
-export class Rows extends Unary {
-  declare expr: Node | null;
+export class Rows extends Unary<Node | null> {
   constructor(expr: Node | null = null) {
     super(expr);
   }
 }
 
-export class Range extends Unary {
-  declare expr: Node | null;
+export class Range extends Unary<Node | null> {
   constructor(expr: Node | null = null) {
     super(expr);
   }
@@ -115,10 +124,10 @@ export class Following extends Unary {
   }
 }
 
-Nodes.Window = Window;
-Nodes.NamedWindow = NamedWindow;
-Nodes.Preceding = Preceding;
-Nodes.Following = Following;
-Nodes.CurrentRow = CurrentRow;
-Nodes.Rows = Rows;
-Nodes.Range = Range;
+rbModConstSet(Nodes, "Window", Window);
+rbModConstSet(Nodes, "NamedWindow", NamedWindow);
+rbModConstSet(Nodes, "Preceding", Preceding);
+rbModConstSet(Nodes, "Following", Following);
+rbModConstSet(Nodes, "CurrentRow", CurrentRow);
+rbModConstSet(Nodes, "Rows", Rows);
+rbModConstSet(Nodes, "Range", Range);

@@ -1,86 +1,38 @@
-import { File, FileUtils, Zlib, sort } from "@blazetrails/ruby-compat";
-import { atomicWrite, camelize, underscore } from "@blazetrails/activesupport";
-import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
-import type { CollectionTag, YAMLMap } from "@blazetrails/activesupport/yaml";
-import { Column, NullColumn } from "./column.js";
-import { deduplicate } from "./deduplicable.js";
-import type { Deduplicable } from "./deduplicable.js";
-import type { ColumnCoder } from "./column.js";
-import { Column as MysqlColumn } from "./mysql/column.js";
-import { Column as PostgresqlColumn } from "./postgresql/column.js";
-import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { SqlTypeMetadata } from "./sql-type-metadata.js";
-import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
-import { TypeMetadata as PostgresqlTypeMetadata } from "./postgresql/type-metadata.js";
+import {
+  Encoding,
+  File,
+  FileUtils,
+  Marshal,
+  Zlib,
+  forceEncoding,
+  isModuleIncluded,
+  registerConstant,
+  sort,
+  synchronize,
+} from "@blazetrails/ruby-compat";
+import { atomicWrite } from "@blazetrails/activesupport";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import type { Column } from "./column.js";
+import { Deduplicable } from "./deduplicable.js";
 import { isSchemaCacheIgnoredTable } from "../active-record.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
-import { IndexDefinition } from "./abstract/schema-definitions.js";
+import type { IndexDefinition } from "./abstract/schema-definitions.js";
+import "./column.js";
+import "./sql-type-metadata.js";
+import "./abstract/schema-definitions.js";
 
 export type Pool = {
   withConnection<T>(callback: (connection: any) => T | Promise<T>): T | Promise<T>;
+  withConnectionSync?<T>(callback: (connection: any) => T): T;
 };
-
-type ToJSContext = Parameters<YAMLMap["toJSON"]>[1];
-
-const RUBY_OBJECT_CLASSES: Record<string, { prototype: object }> = {
-  "ActiveRecord::ConnectionAdapters::Column": Column,
-  "ActiveRecord::ConnectionAdapters::MySQL::Column": MysqlColumn,
-  "ActiveRecord::ConnectionAdapters::PostgreSQL::Column": PostgresqlColumn,
-  "ActiveRecord::ConnectionAdapters::SQLite3::Column": Sqlite3Column,
-  "ActiveRecord::ConnectionAdapters::NullColumn": NullColumn,
-  "ActiveRecord::ConnectionAdapters::SqlTypeMetadata": SqlTypeMetadata,
-  "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": MysqlTypeMetadata,
-  "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": PostgresqlTypeMetadata,
-  "ActiveRecord::ConnectionAdapters::IndexDefinition": IndexDefinition,
-};
-
-const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).map(
-  ([name, klass]) => {
-    let RubyObject: (new () => YAMLMap) | undefined;
-    return {
-      tag: `!ruby/object:${name}`,
-      collection: "map",
-      default: false,
-      identify: (value) => value != null && Object.getPrototypeOf(value) === klass.prototype,
-      createNode: (schema, value, ctx) => {
-        const coder: ColumnCoder = {};
-        if (value instanceof Column) value.encodeWith(coder);
-        else for (const [ivar, v] of Object.entries(value as object)) coder[underscore(ivar)] = v;
-        return schema.tags.find((t) => t.tag === "tag:yaml.org,2002:map")!.createNode!(
-          schema,
-          coder,
-          ctx,
-        );
-      },
-      resolve: (map) => {
-        const nodeClass = (RubyObject ??= class extends (map.constructor as typeof YAMLMap) {
-          override toJSON(arg?: unknown, ctx?: ToJSContext): object {
-            const object = Object.create(klass.prototype) as object;
-            ctx?.onCreate?.(object);
-            const coder = super.toJSON(arg, ctx) as ColumnCoder;
-            if (object instanceof Column) object.initWith(coder);
-            else
-              for (const [ivar, v] of Object.entries(coder))
-                Object.assign(object, { [camelize(ivar, false)]: v });
-            return object;
-          }
-        });
-        return Object.assign(new nodeClass(), map);
-      },
-    };
-  },
-);
 
 export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
 
-  /** @noRailsEquivalent PERMANENT */
-  static eagerLoadSchemaCache = false;
-
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
-  private _cachePromise: Promise<SchemaCache> | null = null;
+  private _peekedColumnsHash = new Map<string, Record<string, Column>>();
 
   constructor(cachePath?: string | null, cache?: SchemaCache) {
     this._cache = cache ?? null;
@@ -89,7 +41,7 @@ export class SchemaReflection {
 
   clearBang(): void {
     this._cache = this.emptyCache();
-    this._cachePromise = null;
+    this._peekedColumnsHash.clear();
   }
 
   async loadBang(pool: Pool): Promise<this> {
@@ -138,6 +90,7 @@ export class SchemaReflection {
   }
 
   async clearDataSourceCacheBang(pool: Pool, name: string): Promise<void> {
+    this.clearCachedColumnsHash(name);
     if (!this._cache && !this.possibleCacheAvailable()) return;
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
@@ -156,7 +109,6 @@ export class SchemaReflection {
     const freshCache = this.emptyCache();
     await freshCache.addAll(pool);
     await freshCache.dumpTo(filename);
-    this._cachePromise = null;
     return (this._cache = freshCache);
   }
 
@@ -164,31 +116,18 @@ export class SchemaReflection {
     return new SchemaCache();
   }
 
-  private async cache(pool: Pool): Promise<SchemaCache> {
-    if (this._cache) return this._cache;
-
-    if (!this._cachePromise) {
-      const promise = this.loadCache(pool).then((loaded) => {
-        if (this._cachePromise === promise) {
-          this._cache = loaded ?? this.emptyCache();
-          this._cachePromise = null;
-        }
-        return this._cache ?? this.emptyCache();
-      });
-      this._cachePromise = promise;
-    }
-    return this._cachePromise;
+  private cache(pool: Pool): Promise<SchemaCache> {
+    return (synchronize<SchemaCache>).call(
+      this,
+      async () => (this._cache ||= (await this.loadCache(pool)) || this.emptyCache()),
+    );
   }
 
   /** @missingRailsName cachePath — PERMANENT */
   private possibleCacheAvailable(): boolean {
-    if (!SchemaReflection.useSchemaCacheDump) return false;
-    if (!this._cachePath) return false;
-    try {
-      return File.isFile(this._cachePath);
-    } catch {
-      return false;
-    }
+    return (
+      SchemaReflection.useSchemaCacheDump && this._cachePath != null && File.isFile(this._cachePath)
+    );
   }
 
   private async loadCache(pool: Pool | null): Promise<SchemaCache | null> {
@@ -199,18 +138,17 @@ export class SchemaReflection {
 
     if (SchemaReflection.checkSchemaCacheDumpVersion) {
       try {
-        const expired = await pool!.withConnection(async (connection) => {
+        return await pool!.withConnection(async (connection) => {
           const currentVersion = await connection.schemaVersion();
 
           if ((await newCache.version(connection)) !== currentVersion) {
             console.warn(
               `Ignoring ${this._cachePath} because it has expired. The current schema version is ${currentVersion}, but the one in the schema cache file is ${newCache.schemaVersion}.`,
             );
-            return true;
+            return null;
           }
-          return false;
+          return newCache;
         });
-        if (expired) return null;
       } catch (error) {
         if (!(error instanceof ActiveRecordError)) throw error;
         console.warn(
@@ -237,6 +175,46 @@ export class SchemaReflection {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
+  getCachedColumnsHash(pool: Pool, tableName: string): Record<string, Column> | undefined {
+    const hash =
+      this._cache?.getCachedColumnsHash(tableName) ?? this._peekedColumnsHash.get(tableName);
+    if (hash) return hash;
+    let connection: { columns?: (tableName: string) => unknown } | undefined;
+    try {
+      connection = pool.withConnectionSync?.((connection) => connection);
+    } catch {
+      return undefined;
+    }
+    if (typeof connection?.columns !== "function") return undefined;
+    const columns = connection.columns(tableName);
+    if (columns instanceof Promise) {
+      void columns.catch(() => {});
+      return undefined;
+    }
+    if (!Array.isArray(columns)) return undefined;
+    if (this._cache) {
+      this._cache.setColumns(tableName, columns as Column[]);
+      return this._cache.getCachedColumnsHash(tableName);
+    }
+    const columnsHash = Object.fromEntries(
+      (columns as Column[]).map((column) => [column.name, column]),
+    );
+    this._peekedColumnsHash.set(tableName, columnsHash);
+    return columnsHash;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  clearCachedColumnsHash(tableName: string): void {
+    this._peekedColumnsHash.delete(tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   get loadedCache(): SchemaCache | null {
     return this._cache;
   }
@@ -247,7 +225,6 @@ export class SchemaReflection {
    */
   set loadedCache(cache: SchemaCache | null) {
     this._cache = cache;
-    this._cachePromise = null;
   }
 }
 
@@ -332,6 +309,38 @@ export class BoundSchemaReflection {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
+  getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
+    return this._schemaReflection.getCachedColumnsHash(this._pool, tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedDataSourceExists(name: string): boolean | undefined {
+    return this._schemaReflection.loadedCache?.getCachedDataSourceExists(name);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
+    return this._schemaReflection.loadedCache?.getCachedPrimaryKeys(tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedIndexes(tableName: string): IndexDefinition[] | undefined {
+    return this._schemaReflection.loadedCache?.getCachedIndexes(tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   async loadAllBang(): Promise<this> {
     await this._schemaReflection.loadAllBang(this._pool);
     return this;
@@ -358,34 +367,29 @@ export class SchemaCache {
   private _indexes = new Map<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
-  /** @missingRailsCall load — PERMANENT */
+  /** @inventedArm forceEncoding — PERMANENT */
   static async _loadFrom(filename: string): Promise<SchemaCache | null> {
-    try {
-      if (!File.isFile(filename)) return null;
-      const data = await SchemaCache.read(filename, (content) => content);
-      const parsed = yamlParse(data, {
-        customTags: RUBY_OBJECT_TAGS,
-        maxAliasCount: -1,
-      }) as Record<string, Record<string, unknown[]> | null>;
-      const cache = new SchemaCache();
-      cache.initWith({
-        ...parsed,
-        columns: new Map(Object.entries(parsed["columns"] ?? {}) as [string, Column[]][]),
-        primary_keys: new Map(Object.entries(parsed["primary_keys"] ?? {})),
-        data_sources: new Map(Object.entries(parsed["data_sources"] ?? {})),
-        indexes: new Map(Object.entries(parsed["indexes"] ?? {}) as [string, IndexDefinition[]][]),
-      });
-      return cache;
-    } catch {
-      return null;
-    }
+    if (!File.isFile(filename)) return null;
+
+    return SchemaCache.read(filename, (file) => {
+      if (filename.includes(".dump")) {
+        return Marshal.load(file) as SchemaCache;
+      } else {
+        file = forceEncoding(file, Encoding.UTF_8);
+        return YAML.unsafeLoad(file) as SchemaCache;
+      }
+    });
   }
 
+  /**
+   * @missingRailsArgs read — PERMANENT
+   * @inventedArm binread — PERMANENT
+   */
   private static async read<T>(filename: string, callback: (data: string) => T): Promise<T> {
     if (File.extname(filename) === ".gz") {
       return Zlib.GzipReader.open(filename, async (gz) => callback(await gz.read()));
     }
-    return callback(File.read(filename));
+    return callback(File.binread(filename));
   }
 
   initializeDup(): SchemaCache {
@@ -534,9 +538,11 @@ export class SchemaCache {
 
   async dumpTo(filename: string): Promise<void> {
     await this.open(filename, (f) => {
-      const coder: Record<string, unknown> = {};
-      this.encodeWith(coder);
-      f.write(yamlStringify(coder, { customTags: RUBY_OBJECT_TAGS }));
+      if (filename.includes(".dump")) {
+        f.write(Uint8Array.from(Marshal.dump(this), (byte) => byte.charCodeAt(0)));
+      } else {
+        f.write(YAML.dump(this));
+      }
     });
   }
 
@@ -605,25 +611,22 @@ export class SchemaCache {
     this._indexes = deepDeduplicate(this._indexes);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs atomic_write — PERMANENT
-   */
+  /** @internal */
   private async open(
     filename: string,
-    block: (file: { write(string: string): unknown }) => void,
-  ): Promise<void> {
+    block: (file: { write(string: string | Uint8Array): unknown }) => unknown,
+  ): Promise<unknown> {
     FileUtils.mkdirP(File.dirname(filename));
 
-    await atomicWrite(filename, undefined, async (file) => {
+    return atomicWrite(filename, async (file) => {
       if (File.extname(filename) === ".gz") {
         const zipper = new Zlib.GzipWriter(file);
         zipper.mtime = 0;
-        block(zipper);
+        await block(zipper);
         await zipper.flush();
-        await zipper.close();
+        return zipper.close();
       } else {
-        block(file);
+        return block(file);
       }
     });
   }
@@ -677,6 +680,14 @@ export class SchemaCache {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
+  getCachedIndexes(tableName: string): IndexDefinition[] | undefined {
+    return this._indexes.get(tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   setColumns(tableName: string, cols: Column[]): void {
     this._columns.set(tableName, cols);
     const hash: Record<string, Column> = {};
@@ -688,20 +699,31 @@ export class SchemaCache {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE psych-to-ruby-revives-a-mapping-as-a-record-where-marshal-answers-a-map
+ */
 export function deepDeduplicate<T>(value: T): T {
-  if (value instanceof Map) {
+  if (
+    value instanceof Map ||
+    (typeof value === "object" && value && !Object.getPrototypeOf(value))
+  ) {
     return new Map(
-      [...value].map(([k, v]) => [deepDeduplicate(k), deepDeduplicate(v)]),
+      [...(value instanceof Map ? value : Object.entries(value))].map(([k, v]) => [
+        deepDeduplicate(k),
+        deepDeduplicate(v),
+      ]),
     ) as unknown as T;
   }
   if (Array.isArray(value)) return value.map((i) => deepDeduplicate(i)) as unknown as T;
   if (
     value !== null &&
     typeof value === "object" &&
-    typeof (value as unknown as Deduplicable).deduplicated === "function"
+    isModuleIncluded(value.constructor as { prototype: object }, Deduplicable)
   ) {
-    return deduplicate(value as unknown as Deduplicable & { hash(): number }) as unknown as T;
+    return (value as unknown as { negate(): T }).negate();
   }
   return value;
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::SchemaCache", SchemaCache);

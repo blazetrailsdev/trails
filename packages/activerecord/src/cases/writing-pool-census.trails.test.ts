@@ -25,6 +25,21 @@ describe("writing pool census", () => {
     }
     expect(writingPoolsLeakedSinceBaseline()).toEqual(["CensusLeakModel"]);
   });
+
+  it("does not report a shard cleanUpConnectionHandler keeps on ActiveRecord::Base", async () => {
+    const dbConfig = Base.configurations().configsFor({ envName: "arunit", name: "primary" });
+    try {
+      await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+        await Base.establishConnection(dbConfig);
+      });
+      expect(writingPoolsLeakedSinceBaseline()).toEqual(["CensusLeakModel"]);
+    } finally {
+      await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base", {
+        role: "writing",
+        shard: "shard_one",
+      });
+    }
+  });
 });
 
 afterAll(async () => {

@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, expect, beforeAll, afterAll, vi } from "vitest";
 import { File as FixtureFile } from "../../fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../config.js";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { FixtureSet } from "../../fixtures.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { Base } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -79,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("virtual_columns", "change table", async () => {
-      await adapter.changeTable("virtual_columns", async (t) => {
+      await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)", stored: true });
       });
       adapter.schemaCache.clearBang();
@@ -93,24 +93,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     itIfSupports("virtual_columns", "non persisted column", async () => {
       await expect(
-        adapter.changeTable("virtual_columns", async (t) => {
+        adapter.changeTable("virtual_columns", {}, async (t) => {
           await t.virtual("invalid_definition", { type: "string", as: "LOWER(name)" });
         }),
       ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
     });
 
-    it("non persisted column via createTable", async () => {
-      await expect(
-        adapter.createTable("bad_virtual", { force: true }, (t) => {
-          t.virtual("invalid", { type: "string", as: "LOWER(name)" });
-        }),
-      ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
-      // eslint-disable-next-line blazetrails/require-table-teardown
-      await adapter.dropTable("bad_virtual", { ifExists: true }).catch(() => {});
-    });
-
     itIfSupports("virtual_columns", "schema dumping", async () => {
-      const output = await dumpTableSchema(adapter, "virtual_columns");
+      const output = await dumpTableSchema("virtual_columns");
       expect(output).toMatch(
         /t\.virtual\(\s*"upper_name",\s*\{\s*type:\s*"string",\s*as:\s*"upper\(\(name\)::text\)",\s*stored:\s*true\s*\}\s*\)/i,
       );

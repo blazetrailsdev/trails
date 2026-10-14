@@ -1,4 +1,6 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { expandCacheKey } from "@blazetrails/activesupport/cache";
+import { Digest } from "@blazetrails/activesupport/digest";
+import { Time } from "@blazetrails/date";
 
 const HTTP_IF_MODIFIED_SINCE = "If-Modified-Since";
 const HTTP_IF_NONE_MATCH = "If-None-Match";
@@ -156,21 +158,33 @@ export class Response {
   declare getHeader: ResponseCacheHost["getHeader"];
   declare setHeader: ResponseCacheHost["setHeader"];
   declare hasHeader: ResponseCacheHost["hasHeader"];
+  /** @internal */
+  declare _cacheControlHash: CacheControlHash;
+
+  get cacheControl(): CacheControlHash {
+    return this._cacheControlHash;
+  }
 
   get lastModified(): Date | undefined {
     return parseHttpDate(this.getHeader(LAST_MODIFIED));
   }
 
-  set lastModified(t: Date | undefined) {
-    this.setHeader(LAST_MODIFIED, (t as Date).toUTCString());
+  set lastModified(t: Date | Time | { epochMilliseconds: number }) {
+    if (t instanceof Time) {
+      this.setHeader(LAST_MODIFIED, t.utc().httpdate());
+      return;
+    }
+    // boundary: bridge a Temporal.Instant to Date for the RFC 1123 rendering.
+    const utc = "epochMilliseconds" in t ? new Date(t.epochMilliseconds) : t;
+    this.setHeader(LAST_MODIFIED, utc.toUTCString());
   }
 
   get date(): Date | undefined {
     return parseHttpDate(this.getHeader(DATE));
   }
 
-  set date(t: Date | undefined) {
-    this.setHeader(DATE, (t as Date).toUTCString());
+  set date(t: Date | Time) {
+    this.setHeader(DATE, t instanceof Time ? t.utc().httpdate() : t.toUTCString());
   }
 
   get etag(): string | undefined {
@@ -211,18 +225,7 @@ export function generateWeakEtag(validators: unknown): string {
 }
 /** @internal */
 export function generateStrongEtag(validators: unknown): string {
-  return `"${getCrypto().createHash("md5").update(expandCacheKey(validators)).digest("hex").slice(0, 32)}"`;
-}
-
-/** @internal */
-function expandCacheKey(key: unknown): string {
-  if (Array.isArray(key)) return key.map(expandCacheKey).join("/");
-  if (key == null) return "";
-  if (typeof key === "object") {
-    const obj = key as { cacheKey?: () => string };
-    if (typeof obj.cacheKey === "function") return obj.cacheKey();
-  }
-  return String(key);
+  return `"${Digest.hexdigest(expandCacheKey(validators))}"`;
 }
 
 /** @internal */
@@ -243,7 +246,7 @@ export function cacheControlHeaders(this: ResponseCacheHost): CacheControlHash {
     const directive = eq === -1 ? segment : segment.slice(0, eq);
     const argument = eq === -1 ? undefined : segment.slice(eq + 1);
     if (SPECIAL_KEYS.has(directive)) {
-      result[directive.replace(/-/g, "_")] = argument ?? true;
+      result[directive.replace(/-(.)/g, (_, c: string) => c.toUpperCase())] = argument ?? true;
     } else {
       (result.extras ??= []).push(segment);
     }
@@ -251,13 +254,11 @@ export function cacheControlHeaders(this: ResponseCacheHost): CacheControlHash {
   return result;
 }
 
-export function cacheControl(this: ResponseCacheHost): CacheControlHash {
-  return cacheControlHeaders.call(this);
-}
-
 /** @internal */
-export function prepareCacheControlBang(this: ResponseCacheHost): CacheControlHash {
-  return cacheControlHeaders.call(this);
+export function prepareCacheControlBang(
+  this: ResponseCacheHost & { _cacheControlHash: CacheControlHash },
+): CacheControlHash {
+  return (this._cacheControlHash = cacheControlHeaders.call(this));
 }
 
 /** @internal */
@@ -280,8 +281,8 @@ export function mergeAndNormalizeCacheControlBang(
   if (Object.keys(control).length === 0 && ccKeys.length === 0) return;
 
   if (ccKeys.length > 0) {
-    delete control.no_cache;
-    delete control.no_store;
+    delete control.noCache;
+    delete control.noStore;
     if (control.extras) {
       cacheControl.extras = [...new Set([...(cacheControl.extras ?? []), ...control.extras])];
       delete control.extras;
@@ -290,22 +291,22 @@ export function mergeAndNormalizeCacheControlBang(
   }
 
   const options: string[] = [];
-  if (control.no_store) {
+  if (control.noStore) {
     if (control.private) options.push(PRIVATE);
     options.push(NO_STORE);
-  } else if (control.no_cache) {
+  } else if (control.noCache) {
     if (control.public) options.push(PUBLIC);
     options.push(NO_CACHE);
     if (control.extras) options.push(...control.extras);
   } else {
-    const max = control.max_age;
-    const swr = control.stale_while_revalidate;
-    const sie = control.stale_if_error;
-    if (max !== undefined) options.push(`max-age=${parseInt(String(max), 10) || 0}`);
+    const max = control.maxAge;
+    const swr = control.staleWhileRevalidate;
+    const sie = control.staleIfError;
+    if (max != null) options.push(`max-age=${parseInt(String(max), 10) || 0}`);
     options.push(control.public ? PUBLIC : PRIVATE);
-    if (control.must_revalidate) options.push(MUST_REVALIDATE);
-    if (swr !== undefined) options.push(`stale-while-revalidate=${parseInt(String(swr), 10) || 0}`);
-    if (sie !== undefined) options.push(`stale-if-error=${parseInt(String(sie), 10) || 0}`);
+    if (control.mustRevalidate) options.push(MUST_REVALIDATE);
+    if (swr != null) options.push(`stale-while-revalidate=${parseInt(String(swr), 10) || 0}`);
+    if (sie != null) options.push(`stale-if-error=${parseInt(String(sie), 10) || 0}`);
     if (control.immutable) options.push(IMMUTABLE);
     if (control.extras) options.push(...control.extras);
   }

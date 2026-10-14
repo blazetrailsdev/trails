@@ -9,6 +9,10 @@ import {
   _normalizeOptions,
   _normalizeRender,
   _processVariant,
+  _setHtmlContentType,
+  _setRenderedContentType,
+  _setVaryHeader,
+  renderedFormat,
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
@@ -22,6 +26,10 @@ function makeHost(opts: Partial<RenderingHost> = {}): RenderingHost {
     _normalizeArgs,
     _processVariant,
     _normalizeOptions,
+    _setHtmlContentType,
+    _setRenderedContentType,
+    _setVaryHeader,
+    renderedFormat,
     ...opts,
   };
 }
@@ -117,12 +125,12 @@ describe("_normalizeArgs", () => {
   });
 
   it("returns a permitted params-like object directly", () => {
-    const params = { permitted: () => true, template: "x" };
+    const params = { isPermitted: () => true, template: "x" };
     expect(_normalizeArgs(params)).toBe(params);
   });
 
   it("throws when params-like input is not permitted", () => {
-    const params = { permitted: () => false };
+    const params = { isPermitted: () => false };
     expect(() => _normalizeArgs(params)).toThrow(/not permitted/);
   });
 });

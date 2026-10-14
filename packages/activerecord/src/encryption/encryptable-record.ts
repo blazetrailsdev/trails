@@ -1,9 +1,14 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
-import { Contexts } from "./contexts.js";
 import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
+import {
+  classAttribute,
+  extractOptionsBang,
+  filterMap,
+  included,
+  kernelArray as Array,
+} from "@blazetrails/activesupport";
 import { Module, include } from "@blazetrails/ruby-compat";
-import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Encryption } from "../encryption.js";
 
@@ -17,9 +22,9 @@ import { Encryption } from "../encryption.js";
  * @internal
  */
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
-  return Encryption.config.previousSchemes
-    .filter((previousScheme) => scheme.isCompatibleWith(previousScheme))
-    .map((previousScheme) => scheme.merge(previousScheme));
+  return filterMap(Encryption.config.previousSchemes, (previousScheme) => {
+    if (scheme.isCompatibleWith(previousScheme)) return scheme.merge(previousScheme);
+  });
 }
 
 /** @internal */
@@ -33,48 +38,13 @@ function schemeFor(options: SchemeOptions): Scheme {
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
 export class EncryptableRecord {
-  /**
-   * Raise when a preserved (`ignore_case`) attribute's `original_<name>` column
-   * is absent and `supportUnencryptedData` is false — mirrors Rails
-   * encryptable_record.rb:101–103. Checked at declaration time against the
-   * columns known then. Rails' `column_names` forces a schema load so the set is
-   * always complete; ours can be empty at Base.encrypts static-init (the adapter
-   * isn't connected yet), so an empty list means "unknown" and we defer rather
-   * than raise a false positive — the same fail-open-when-unknown behavior the
-   * scheme-based path shipped with.
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the missing-original-column raise of encrypts (encryption/encryptable_record.rb:101-103), split out for the deferred re-check.
-   */
-  static requireOriginalColumnPresent(modelClass: any, name: string, colNames: string[]): void {
-    if (Encryption.config.supportUnencryptedData) return;
-    const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-    if (colNames.length === 0 || colNames.includes(originalName)) return;
-    throw new Configuration(
-      `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
-    );
-  }
+  static [included](base: any): void {
+    classAttribute.call(base, "encryptedAttributes");
 
-  /**
-   * Re-run the `original_<name>` missing-column requirement for every
-   * ignoreCase-preserved attribute against the authoritative column set
-   * reflected from the real adapter schema. Driven from schema reflection
-   * (`applyColumnsHash`), which runs only once the DB columns are known — so
-   * unlike the eager `columnNames()` partial-load path, `reflectedColumnNames`
-   * distinguishes "schema reflected, column absent" (fail-closed, raise) from
-   * "declaration in progress" (never reaches here). Mirrors Rails' fail-closed
-   * `preserve_original_encrypted`, whose `column_names` is always complete.
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE re-runs that same raise once the schema is reflected (encryption/encryptable_record.rb:101-103); Ruby's column_names is always complete.
-   */
-  static requireOriginalColumnsAfterReflection(
-    modelClass: any,
-    reflectedColumnNames: string[],
-  ): void {
-    const preserved: Set<string> | undefined = modelClass._ignoreCasePreservedAttributes;
-    if (!preserved || preserved.size === 0) return;
-    for (const name of preserved) {
-      this.requireOriginalColumnPresent(modelClass, name, reflectedColumnNames);
-    }
+    base.validate(":cantModifyEncryptedAttributesWhenFrozen", {
+      if: (record: any) =>
+        hasEncryptedAttributes.call(record) && Encryption.context.frozenEncryption,
+    });
   }
 
   static loadSchemaBang(this: typeof EncryptableRecord, superFn: () => void): void {
@@ -94,15 +64,16 @@ export function addLengthValidationForEncryptedColumns(this: any): void {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm generatedAttributeMethods — PERMANENT
+ */
 export function overrideAccessorsToPreserveOriginal(
   this: any,
   name: string,
   originalAttributeName: string,
 ): void {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
-  }
+  this.generatedAttributeMethods();
   include(
     this,
     new Module((mod) => {
@@ -138,38 +109,25 @@ export function validateColumnSize(this: any, attributeName: string): void {
   }
 }
 
-export function encrypts(this: any, ...namesAndOptions: unknown[]): void {
-  let options: SchemeOptions = {};
-  const names: string[] = [];
+export function encrypts(this: any, ...names: unknown[]): void {
+  const options: SchemeOptions = extractOptionsBang(names);
+  this.encryptedAttributes ||= new Set<string>();
 
-  for (const arg of namesAndOptions) {
-    if (typeof arg === "string") {
-      names.push(arg);
-    } else if (typeof arg === "object" && arg !== null) {
-      options = arg as SchemeOptions;
-    }
-  }
-
-  this.encryptedAttributes ??= new Set<string>();
-
-  for (const name of names) {
+  for (const name of names as string[]) {
     encryptAttribute.call(this, name, options);
   }
 }
 
-export function deterministicEncryptedAttributes(this: any): Set<string> {
-  if (Object.prototype.hasOwnProperty.call(this, "_deterministicEncryptedAttributes")) {
-    return this._deterministicEncryptedAttributes;
-  }
-  const result = new Set<string>();
-  for (const attributeName of this.encryptedAttributes ?? new Set<string>()) {
-    const type = this.typeForAttribute(attributeName) as EncryptedAttributeType;
-    if (type.deterministic) {
-      result.add(attributeName);
-    }
-  }
-  this._deterministicEncryptedAttributes = result;
-  return result;
+export function deterministicEncryptedAttributes(this: any): string[] | undefined {
+  return (
+    Object.getOwnPropertyDescriptor(this, "_deterministicEncryptedAttributes")?.value ||
+    (this._deterministicEncryptedAttributes =
+      this.encryptedAttributes &&
+      Array<string>(this.encryptedAttributes).filter(
+        (attributeName) =>
+          (this.typeForAttribute(attributeName) as EncryptedAttributeType).deterministic,
+      ))
+  );
 }
 
 export function sourceAttributeFromPreservedAttribute(
@@ -199,37 +157,37 @@ export function ciphertextFor(this: any, attributeName: string): unknown {
 }
 
 /** @internal */
-export async function encrypt(this: any): Promise<void> {
+export async function encrypt(this: any): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
-    await encryptAttributes.call(this);
+    return await encryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function decrypt(this: any): Promise<void> {
+export async function decrypt(this: any): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
-    await decryptAttributes.call(this);
+    return await decryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function encryptAttributes(this: any): Promise<void> {
+export async function encryptAttributes(this: any): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
-  await this.updateColumns(buildEncryptAttributeAssignments.call(this));
+  return await this.updateColumns(buildEncryptAttributeAssignments.call(this));
 }
 
 /** @internal */
-export async function decryptAttributes(this: any): Promise<void> {
+export async function decryptAttributes(this: any): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
   const decryptAttributeAssignments = buildDecryptAttributeAssignments.call(this);
-  await Contexts.withoutEncryption(() => this.updateColumns(decryptAttributeAssignments));
+  return await Encryption.withoutEncryption(() => this.updateColumns(decryptAttributeAssignments));
 }
 
 /** @internal */
 export function validateEncryptionAllowed(this: any): void {
-  if (Contexts.context.frozenEncryption) {
+  if (Encryption.context.frozenEncryption) {
     throw new Configuration("can't be modified because it is encrypted");
   }
 }
@@ -256,27 +214,24 @@ export async function _createRecord(
 
 /** @internal */
 export function buildEncryptAttributeAssignments(this: any): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const attributeName of this.constructor.encryptedAttributes ?? new Set<string>()) {
-    result[attributeName] =
-      typeof this.readAttribute === "function"
-        ? this.readAttribute(attributeName)
-        : this[attributeName];
-  }
-  return result;
+  return Object.fromEntries(
+    Array<string>(this.constructor.encryptedAttributes).map((attributeName) => [
+      attributeName,
+      this.readAttribute(attributeName),
+    ]),
+  );
 }
 
 /** @internal */
 export function buildDecryptAttributeAssignments(this: any): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const attributeName of this.constructor.encryptedAttributes ?? new Set<string>()) {
-    const type = this.constructor.typeForAttribute(attributeName) as {
-      deserialize: (v: unknown) => unknown;
-    };
-    const encryptedValue = ciphertextFor.call(this, attributeName);
-    result[attributeName] = type.deserialize(encryptedValue);
-  }
-  return result;
+  return Object.fromEntries(
+    Array<string>(this.constructor.encryptedAttributes).map((attributeName) => {
+      const type = this.constructor.typeForAttribute(attributeName) as EncryptedAttributeType;
+      const encryptedValue = ciphertextFor.call(this, attributeName);
+      const newValue = type.deserialize(encryptedValue);
+      return [attributeName, newValue];
+    }),
+  );
 }
 
 /** @internal */
@@ -301,26 +256,20 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
   Encryption.encryptedAttributeWasDeclared(this, name);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE preserve-original-encrypted-skips-its-column-check-on-a-cold-schema-cache
+ */
 export function preserveOriginalEncrypted(this: any, name: string): void {
-  const modelClass = this;
   const originalAttributeName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
-    modelClass._ignoreCasePreservedAttributes = new Set<string>(
-      modelClass._ignoreCasePreservedAttributes ?? [],
-    );
-  }
-  modelClass._ignoreCasePreservedAttributes.add(name);
 
-  const columnNames: string[] = this.columnNames?.() ?? [];
-  if (
-    !Encryption.config.supportUnencryptedData &&
-    columnNames.length !== 0 &&
-    !columnNames.includes(originalAttributeName)
-  ) {
-    throw new Configuration(
-      `To use :ignore_case for '${name}' you must create an additional column named '${originalAttributeName}'`,
-    );
+  const columnNames: string[] = this.columnNames();
+  if (columnNames.length !== 0) {
+    if (!Encryption.config.supportUnencryptedData && !columnNames.includes(originalAttributeName)) {
+      throw new Configuration(
+        `To use :ignore_case for '${name}' you must create an additional column named '${originalAttributeName}'`,
+      );
+    }
   }
 
   encrypts.call(this, originalAttributeName);

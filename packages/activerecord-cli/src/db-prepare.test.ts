@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -54,14 +54,16 @@ describe("DbPrepareTest", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     DatabaseTasks.seedLoader = null;
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 
   it("db:setup calls create, loadSchemaCurrent, loadSeed in order", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     const callOrder: string[] = [];
     createSpy.mockImplementation(() => {
       callOrder.push("create");
@@ -90,7 +92,7 @@ describe("DbPrepareTest", () => {
 
   it("db:setup exits 1 when create fails", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     createSpy.mockRejectedValue(new Error("create boom"));
     const code = await run(["db:setup"], dir);
     expect(code).toBe(1);
@@ -99,7 +101,7 @@ describe("DbPrepareTest", () => {
 
   it("db:setup exits 1 when loadSchemaCurrent fails", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     loadSchemaSpy.mockRejectedValue(new Error("schema boom"));
     const code = await run(["db:setup"], dir);
     expect(code).toBe(1);
@@ -108,7 +110,7 @@ describe("DbPrepareTest", () => {
 
   it("db:reset calls drop then create/loadSchema/loadSeed", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     const callOrder: string[] = [];
     dropSpy.mockImplementation(() => {
       callOrder.push("drop");
@@ -137,7 +139,7 @@ describe("DbPrepareTest", () => {
 
   it("db:reset exits 1 when drop fails", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     dropSpy.mockRejectedValue(new Error("drop boom"));
     const code = await run(["db:reset"], dir);
     expect(code).toBe(1);
@@ -152,7 +154,7 @@ describe("DbPrepareTest", () => {
 
   it("db:prepare calls DatabaseTasks.prepareAll", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     const code = await run(["db:prepare"], dir);
     expect(code).toBe(0);
     expect(prepareAllSpy).toHaveBeenCalledOnce();
@@ -160,7 +162,7 @@ describe("DbPrepareTest", () => {
 
   it("db:prepare exits 1 when prepareAll throws", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     prepareAllSpy.mockRejectedValue(new Error("prepare boom"));
     const code = await run(["db:prepare"], dir);
     expect(code).toBe(1);

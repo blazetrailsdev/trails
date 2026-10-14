@@ -8,7 +8,7 @@ export class ResourceRouteGenerator extends NamedBase {
 
   async addResourceRoute(): Promise<void> {
     if (isPresent((this.options as { actions?: string[] }).actions)) return;
-    await this.route(`mapper.resources(${JSON.stringify(pluralize(this.fileName))});`, {
+    await this.route(`this.resources(${JSON.stringify(pluralize(this.fileName))});`, {
       namespace: this.regularClassPath(),
     });
   }

@@ -3,7 +3,7 @@ import { Result } from "./result.js";
 import { FutureResult, Complete, type FutureResultConnection } from "./future-result.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { DatabaseStatements, select } from "./connection-adapters/abstract/database-statements.js";
-import { selectAll as querySelectAll, Store } from "./connection-adapters/abstract/query-cache.js";
+import { QueryCache, Store } from "./connection-adapters/abstract/query-cache.js";
 import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
@@ -14,7 +14,20 @@ import {
   type NotificationEvent,
 } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "./future-result.js";
-import { setAsyncQueryExecutor } from "./active-record.js";
+
+function overSuper(
+  props: object,
+  superSelectAll: (...args: never[]) => unknown,
+): { selectAll(...args: unknown[]): unknown } {
+  class Parent {
+    selectAll(...args: unknown[]): unknown {
+      return (superSelectAll as (...a: unknown[]) => unknown)(...args);
+    }
+  }
+  class Host extends Parent {}
+  QueryCache.appendFeatures(Host);
+  return Object.assign(new Host(), props);
+}
 
 describe("Result.empty", () => {
   it("returns EMPTY for the sync arm", () => {
@@ -156,13 +169,12 @@ describe("DatabaseStatements#select", () => {
 
   afterEach(() => {
     execution.completeBang();
-    setAsyncQueryExecutor(null);
   });
 
   it("raises AsynchronousQueryInsideTransactionError inside a joinable transaction", () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const host = {
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       currentTransaction: () => ({ open: true, joinable: true }),
     };
 
@@ -174,7 +186,7 @@ describe("DatabaseStatements#select", () => {
   it("resolves to the Result when async is set but no executor is enabled", async () => {
     const result = new Result(["id"], [[1]]);
     const host = {
-      asyncEnabled: () => false,
+      isAsyncEnabled: () => false,
       internalExecQuery: async () => result,
     };
 
@@ -184,12 +196,12 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("forwards prepare and async through to the connection's rawExecQuery", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     const pool = fakePool(result);
     const host = {
       pool,
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
     };
@@ -208,12 +220,12 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("schedules a FutureResult through the pool when async is enabled", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     const pool = fakePool(result);
     const host = {
       pool,
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
       internalExecQuery: async () => {
@@ -228,12 +240,12 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("hands back a pending FutureResult without waiting for the query", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     const pool = deferredPool(result);
     const host = {
       pool,
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
     };
@@ -250,13 +262,13 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("runs the query to completion before returning when connections are not concurrent", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
     const host = {
       pool: {},
-      asyncEnabled: () => true,
+      isAsyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => false,
       currentTransaction: () => ({ open: false, joinable: false }),
       rawExecQuery: async () => {
@@ -285,7 +297,7 @@ describe("DatabaseStatements#select", () => {
 
   it("returns a bare Result when async is not set", async () => {
     const result = new Result(["id"], [[1]]);
-    const host = { asyncEnabled: () => false, internalExecQuery: async () => result };
+    const host = { isAsyncEnabled: () => false, internalExecQuery: async () => result };
     expect(await select.call(host as never, "SELECT 1", null, [])).toBe(result);
   });
 });
@@ -298,7 +310,10 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
+    const result = await DatabaseStatements.instanceMethod("selectAll")!.value.call(
+      host as never,
+      "SELECT 1",
+    );
     expect(result).toBe(Result.empty());
   });
 
@@ -309,7 +324,10 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
+    const result = await DatabaseStatements.instanceMethod("selectAll")!.value.call(
+      host as never,
+      "SELECT 1",
+    );
     expect(result).toBe(Result.empty());
   });
 
@@ -320,9 +338,9 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    await expect(DatabaseStatements.selectAll.call(host as never, "SELECT 1")).rejects.toThrow(
-      "boom",
-    );
+    await expect(
+      DatabaseStatements.instanceMethod("selectAll")!.value.call(host as never, "SELECT 1"),
+    ).rejects.toThrow("boom");
   });
 });
 
@@ -352,16 +370,9 @@ describe("QueryCache#select_all", () => {
     ]);
     const superSelectAll = () => pending;
 
-    const returned = querySelectAll.call(
-      cacheHost(store) as never,
-      superSelectAll as never,
-      "SELECT 1",
-      null,
-      [],
-      {
-        async: true,
-      },
-    );
+    const returned = overSuper(cacheHost(store), superSelectAll).selectAll("SELECT 1", null, [], {
+      async: true,
+    });
 
     expect(returned).toBe(pending);
     expect((returned as FutureResult).pending()).toBe(true);
@@ -375,16 +386,9 @@ describe("QueryCache#select_all", () => {
       throw new Error("must not reach super on a cache hit");
     };
 
-    const returned = querySelectAll.call(
-      cacheHost(store) as never,
-      superSelectAll as never,
-      "SELECT 1",
-      null,
-      [],
-      {
-        async: true,
-      },
-    );
+    const returned = overSuper(cacheHost(store), superSelectAll).selectAll("SELECT 1", null, [], {
+      async: true,
+    });
 
     expect(returned).toBeInstanceOf(Complete);
     expect((returned as Complete).pending()).toBe(false);
@@ -398,14 +402,9 @@ describe("QueryCache#select_all", () => {
     const superSelectAll = async () => result;
 
     expect(
-      await querySelectAll.call(
-        cacheHost(store) as never,
-        superSelectAll as never,
-        "SELECT 1",
-        null,
-        [],
-        { async: false },
-      ),
+      await overSuper(cacheHost(store), superSelectAll).selectAll("SELECT 1", null, [], {
+        async: false,
+      }),
     ).toEqual(result);
   });
 });

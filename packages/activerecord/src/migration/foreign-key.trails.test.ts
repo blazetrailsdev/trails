@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   ambientConnection,
   withCompositeRocketTables,
@@ -57,7 +57,9 @@ describe("removeForeignKey without a matching foreign key", () => {
   it("inspects the lookup options with Symbol keys", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
-      const e = await conn.removeForeignKey("astronauts", { column: "rocket_id" }).catch((e) => e);
+      const e = await conn
+        .removeForeignKey("astronauts", undefined, { column: "rocket_id" })
+        .catch((e) => e);
       expect(e).toBeInstanceOf(ArgumentError);
       expect(e.message).toBe(`Table 'astronauts' has no foreign key for {:column=>"rocket_id"}`);
     });

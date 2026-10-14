@@ -1,7 +1,7 @@
 import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
@@ -24,7 +24,9 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
 
   class Ebook extends Base {
     static override _tableName = "ebooks'";
-    static override _primaryKey = "id";
+    static {
+      this.primaryKey = "id";
+    }
   }
 
   beforeAll(async () => {
@@ -88,7 +90,7 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
-    const schema = await dumpTableSchema((await conn()) as any, "ebooks'");
+    const schema = await dumpTableSchema("ebooks'");
     expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
   });
 });
@@ -149,7 +151,7 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
-    const schema = await dumpTableSchema((await conn()) as any, "paperbacks");
+    const schema = await dumpTableSchema("paperbacks");
     expect(schema).not.toMatch(/ctx\.createTable\("paperbacks"/);
   });
 });
@@ -161,7 +163,9 @@ describe("UpdateableViewTest", () => {
 
   class PrintedBook extends Base {
     static override _tableName = "printed_books";
-    static override _primaryKey = "id";
+    static {
+      this.primaryKey = "id";
+    }
   }
 
   beforeAll(async () => {

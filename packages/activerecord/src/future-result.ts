@@ -226,7 +226,7 @@ export class FutureResult {
   private async executeOrWait(): Promise<void> {
     if (this.pending()) {
       const start = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond");
-      if (this.#scheduled) await this.#scheduled;
+      await this.#scheduled;
       await this.#mutex.synchronize(async () => {
         if (this.pending()) {
           await this.pool.withConnection((connection) => this.executeQuery(connection));

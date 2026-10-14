@@ -8,19 +8,24 @@ export {
   type ParamEncoder,
 } from "./request-encoder.js";
 export { AssertionResponse } from "./assertion-response.js";
+export { Assertions } from "./assertions.js";
 export {
+  ResponseAssertions,
   assertResponse,
   assertRedirectedTo,
+  type AssertionResponseHost,
+  type AssertionResponseLike,
+} from "./assertions/response.js";
+export {
+  RoutingAssertions,
   assertRecognizes,
   assertGenerates,
   assertRouting,
   withRouting,
   setup,
-  type AssertionResponseHost,
-  type AssertionResponseLike,
   type RoutingAssertionsHost,
   type PathWithMethod,
-} from "./assertions.js";
+} from "./assertions/routing.js";
 export {
   TestProcess,
   FixtureFile,

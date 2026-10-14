@@ -1,14 +1,17 @@
+import { Namespaced } from "../test-helpers/models/company.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { registerModel } from "../index.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Post } from "../test-helpers/models/post.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 class NamespacedPost extends Base {
   static _tableName = "posts";
-  static moduleName = "Namespaced";
-  static _demodulizedName = "Post";
+  static {
+    rbModConstSet(Namespaced, "Post", this);
+  }
 
   declare title: string;
   declare body: string;

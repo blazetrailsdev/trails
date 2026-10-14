@@ -24,7 +24,7 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "nil"]);
+const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "isNil"]);
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
 export interface KeyValue extends Base {}
@@ -213,7 +213,7 @@ export class SubtreeProxy {
     return value;
   }
 
-  nil(): boolean {
+  isNil(): boolean {
     return this.#subtree == null;
   }
 }

@@ -1,19 +1,20 @@
 import { ConverterNotFoundError } from "./converter-not-found-error.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { Encoding } from "./encoding.js";
-import { getFs, type FsStatResult } from "./fs-adapter.js";
+import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
 import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
 import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
+import { format } from "./kernel-format.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`) is called through. */
 const putsAryInFlight = new Set<unknown[]>();
 
 /** The receiver `rb_io_puts` sends to (`vendor/ruby/v3.3.11/io.c:8947`). */
 export interface GenericWritable {
-  write(string: string): number;
+  write(string: string): unknown;
 }
 
 /**
@@ -82,6 +83,22 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
  */
 export function print(this: GenericWritable, ...args: unknown[]): null {
   for (const arg of args) this.write(arg == null ? "" : String(arg));
+  return null;
+}
+
+/**
+ * `rb_io_printf` (`vendor/ruby/v3.3.11/io.c:8589`), `IO#printf`:
+ * `rb_f_sprintf`'s String, written to the receiver, answering `nil`. The
+ * `printf(io, format_string, *objects)` form and the no-argument `nil` belong
+ * to `Kernel#printf` (`rb_f_printf`, `vendor/ruby/v3.3.11/io.c:8630`), a
+ * separate function that is not ported; `rb_f_sprintf` raises "too few
+ * arguments" for an `IO#printf` with none, which `fmt` being required stands
+ * in for.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO#printf` (`vendor/ruby/v3.3.11/io.c:8589`).
+ */
+export function printf(this: GenericWritable, fmt: string, ...argv: unknown[]): null {
+  this.write(format(fmt, ...argv));
   return null;
 }
 
@@ -504,6 +521,19 @@ function parseModeEnc(
  * class this file's export lives in.
  */
 export class IO {
+  /**
+   * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`
+   * includes (`file.c:7773`), so it is `IO::NULL` and `File::NULL`:
+   * `ruby_null_device` (`file.c:6540`), `"NUL"` on a DOSISH build and
+   * `"/dev/null"` everywhere else. The platform answer comes from the
+   * registered path backend's separator, as `File::ALT_SEPARATOR` does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO::NULL`.
+   */
+  static get NULL(): string {
+    return getPath().sep === "\\" ? "NUL" : "/dev/null";
+  }
+
   /**
    * The descriptor `rb_io_s_open` (`vendor/ruby/v3.3.11/io.c:8148`) opened the stream
    * on, and the offset `rb_io_seek_m` (`io.c:2495`) moves — Ruby's `rb_io_t`
@@ -1063,6 +1093,17 @@ export class IO {
     }
     this._pos += n;
     return n;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/io.c:2379` `rb_io_flush`, which answers the stream.
+   * {@link write} holds no buffer.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#flush`
+   * (`vendor/ruby/v3.3.11/io.c:2379`).
+   */
+  flush(): this {
+    return this;
   }
 
   /**

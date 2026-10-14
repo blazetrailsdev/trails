@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { assertNotEmpty } from "@blazetrails/activesupport";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { registerModel } from "./associations.js";
 import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
 
@@ -11,6 +11,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Project } from "./test-helpers/models/project.js";
 import "./test-helpers/models/reader.js";
+import "./test-helpers/models/ship.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 

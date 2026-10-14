@@ -25,14 +25,17 @@ export async function establishConnectionTo(
   const originalPool = (connection as unknown as { pool: unknown }).pool;
   const dbConfig = new HashConfig("test", `${klass.name}_fake`, { adapter: "fake" });
   dbConfig.newConnection = () => connection;
+  dbConfig.adapterClass = () => connection.constructor as never;
   await klass.establishConnection(dbConfig);
   const pool = klass.connectionPool();
+  const schemaCache = Object.getOwnPropertyDescriptor(connection, "schemaCache")?.value;
+  if (schemaCache) pool.schemaReflection.loadedCache = schemaCache;
   (klass as unknown as { resetColumnInformation(): void }).resetColumnInformation();
   let restored = false;
   const restore = async () => {
     if (restored) return;
     restored = true;
-    pool.remove(connection);
+    await pool.remove(connection);
     try {
       connection.expire();
     } catch {}

@@ -1,126 +1,253 @@
-import { describe, expect, it } from "vitest";
-import { defineCallbacks, runCallbacks, setCallback, skipCallback } from "./callbacks.js";
+import { include } from "@blazetrails/ruby-compat";
+import type { Extended, Included } from "@blazetrails/ruby-compat/include";
+import { beforeEach, describe, expect, it } from "vitest";
+import { Callbacks } from "./callbacks.js";
 import { assertNotPredicate, assertPredicate } from "./testing/assertions.js";
 
-describe("BasicCallbacksTest", () => {
-  it("basic conditional callback1", () => {
-    const target = { log: [] as string[], condition: true };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("before"), {
-      if: (t: any) => t.condition,
+type ClassMethods = Extended<typeof Callbacks.ClassMethods>;
+type RunCallbacks = Included<typeof Callbacks>["runCallbacks"];
+
+class GrandParent {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
+  readonly log: string[];
+  readonly actionName: string;
+
+  constructor(actionName: string) {
+    this.actionName = actionName;
+    this.log = [];
+  }
+
+  static {
+    this.defineCallbacks("dispatch");
+    this.setCallback("dispatch", "before", ":before1", ":before2", {
+      if: (c: GrandParent) => c.actionName === "index" || c.actionName === "update",
     });
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["before", "action"]);
+    this.setCallback("dispatch", "after", ":after1", ":after2", {
+      if: (c: GrandParent) => c.actionName === "update" || c.actionName === "delete",
+    });
+  }
+
+  before1(): void {
+    this.log.push("before1");
+  }
+
+  before2(): void {
+    this.log.push("before2");
+  }
+
+  after1(): void {
+    this.log.push("after1");
+  }
+
+  after2(): void {
+    this.log.push("after2");
+  }
+
+  dispatch(): this {
+    this.runCallbacks("dispatch", () => {
+      this.log.push(this.actionName);
+    });
+    return this;
+  }
+}
+
+class Parent extends GrandParent {
+  static {
+    this.skipCallback("dispatch", "before", ":before2", {
+      unless: (c: GrandParent) => c.actionName === "update",
+    });
+    this.skipCallback("dispatch", "after", ":after2", {
+      unless: (c: GrandParent) => c.actionName === "delete",
+    });
+  }
+}
+
+class Child extends GrandParent {
+  static {
+    this.skipCallback("dispatch", "before", ":before2", {
+      unless: (c: GrandParent) => c.actionName === "update",
+      if: ":isStateOpen",
+    });
+  }
+
+  private state: string;
+
+  isStateOpen(): boolean {
+    return this.state === ":open";
+  }
+
+  constructor(actionName: string, state: string) {
+    super(actionName);
+    this.state = state;
+  }
+}
+
+class EmptyParent {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
+  private performed?: boolean;
+
+  isPerformed(): boolean {
+    return (this.performed ||= false);
+  }
+
+  static {
+    this.defineCallbacks("dispatch");
+  }
+
+  performBang(): void {
+    this.performed = true;
+  }
+
+  dispatch(): this {
+    this.runCallbacks("dispatch");
+    return this;
+  }
+}
+
+class EmptyChild extends EmptyParent {
+  static {
+    this.setCallback("dispatch", "before", ":doNothing");
+  }
+
+  doNothing(): void {}
+}
+
+class CountingParent {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
+  count: number;
+
+  static {
+    this.defineCallbacks("dispatch");
+  }
+
+  constructor() {
+    this.count = 0;
+  }
+
+  countBang(): void {
+    this.count += 1;
+  }
+
+  dispatch(): this {
+    this.runCallbacks("dispatch");
+    return this;
+  }
+}
+
+class CountingChild extends CountingParent {}
+
+describe("BasicCallbacksTest", () => {
+  let index: GrandParent;
+  let update: GrandParent;
+  let del: GrandParent;
+
+  beforeEach(() => {
+    index = new GrandParent("index").dispatch();
+    update = new GrandParent("update").dispatch();
+    del = new GrandParent("delete").dispatch();
+  });
+
+  it("basic conditional callback1", () => {
+    expect(index.log).toEqual(["before1", "before2", "index"]);
   });
 
   it("basic conditional callback2", () => {
-    const target = { log: [] as string[], condition: false };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("before"), {
-      if: (t: any) => t.condition,
-    });
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["action"]);
+    expect(update.log).toEqual(["before1", "before2", "update", "after2", "after1"]);
   });
 
   it("basic conditional callback3", () => {
-    const target = { log: [] as string[], condition: true };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("before"), {
-      unless: (t: any) => t.condition,
-    });
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["action"]);
+    expect(del.log).toEqual(["delete", "after2", "after1"]);
   });
 });
 
 describe("InheritedCallbacksTest", () => {
+  let index: Parent;
+  let update: Parent;
+  let del: Parent;
+
+  beforeEach(() => {
+    index = new Parent("index").dispatch();
+    update = new Parent("update").dispatch();
+    del = new Parent("delete").dispatch();
+  });
+
   it("inherited excluded", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const cb = (t: any) => t.log.push("base_cb");
-    setCallback(target, "save", "before", cb);
-    skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["action"]);
+    expect(index.log).toEqual(["before1", "index"]);
   });
 
   it("inherited not excluded", () => {
-    const base = { log: [] as string[] };
-    defineCallbacks(base, "save");
-    setCallback(base, "save", "before", (t: any) => t.log.push("base_cb"));
-
-    const child = Object.create(base);
-    child.log = [];
-    runCallbacks(child, "save", () => child.log.push("action"));
-    expect(child.log).toEqual(["base_cb", "action"]);
+    expect(update.log).toEqual(["before1", "before2", "update", "after1"]);
   });
 
   it("partially excluded", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const cb1 = (t: any) => t.log.push("cb1");
-    setCallback(target, "save", "before", cb1);
-    setCallback(target, "save", "before", (t: any) => t.log.push("cb2"));
-    skipCallback(target, "save", "before", cb1);
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["cb2", "action"]);
+    expect(del.log).toEqual(["delete", "after2", "after1"]);
   });
 });
 
 describe("InheritedCallbacksTest2", () => {
+  let update1: Child;
+  let update2: Child;
+
+  beforeEach(() => {
+    update1 = new Child("update", ":open").dispatch();
+    update2 = new Child("update", ":closed").dispatch();
+  });
+
   it("complex mix on", () => {
-    const target = { log: [] as string[], enabled: true };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("cb"), {
-      if: (t: any) => t.enabled,
-    });
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["cb", "action"]);
+    expect(update1.log).toEqual(["before1", "update", "after2", "after1"]);
   });
 
   it("complex mix off", () => {
-    const target = { log: [] as string[], enabled: false };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("cb"), {
-      if: (t: any) => t.enabled,
-    });
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["action"]);
+    expect(update2.log).toEqual(["before1", "before2", "update", "after2", "after1"]);
   });
 });
 
 describe("DynamicInheritedCallbacks", () => {
   it("callbacks looks to the superclass before running", () => {
-    const emptyParent = { performed: false };
-    defineCallbacks(emptyParent, "dispatch");
-    let child: { performed: boolean } = Object.create(emptyParent);
-    runCallbacks(child, "dispatch");
-    assertNotPredicate(child, (c) => c.performed);
-
-    setCallback(emptyParent, "dispatch", "before", (c: any) => (c.performed = true));
-    child = Object.create(emptyParent);
-    runCallbacks(child, "dispatch");
-    assertPredicate(child, (c) => c.performed);
+    let child = new EmptyChild().dispatch();
+    assertNotPredicate(child, (c) => c.isPerformed());
+    EmptyParent.setCallback("dispatch", "before", ":performBang");
+    child = new EmptyChild().dispatch();
+    assertPredicate(child, (c) => c.isPerformed());
   });
 
   it("callbacks should be performed once in child class", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("cb"));
-    runCallbacks(target, "save");
-    expect(target.log).toEqual(["cb"]);
+    CountingParent.setCallback("dispatch", "before", function (this: CountingParent) {
+      this.countBang();
+    });
+    const child = new CountingChild().dispatch();
+    expect(child.count).toBe(1);
   });
 });
 
 describe("DynamicDefinedCallbacks", () => {
   it("callbacks should be performed once in child class after dynamic define", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    runCallbacks(target, "save", () => target.log.push("action"));
-    setCallback(target, "save", "before", (t: any) => t.log.push("dynamic_cb"));
-    target.log = [];
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["dynamic_cb", "action"]);
+    GrandParent.defineCallbacks("foo");
+    GrandParent.setCallback("foo", "before", ":before1");
+    const parent = new Parent("foo");
+    parent.runCallbacks("foo");
+    expect(parent.log).toEqual(["before1"]);
   });
 });

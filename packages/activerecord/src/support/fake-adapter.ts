@@ -2,10 +2,10 @@ import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { Column } from "../connection-adapters/column.js";
 import type { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
 import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
-import { register } from "../connection-adapters.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
 export interface MergeColumnOptions {
-  default?: unknown;
+  default?: string | null;
   null?: boolean;
 }
 
@@ -37,7 +37,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     options: MergeColumnOptions = {},
   ): void {
     this.columns(tableName).push(
-      new Column(name, options.default, this.fetchTypeMetadata(sqlType), options.null),
+      new Column(name, options.default ?? null, this.fetchTypeMetadata(sqlType), options.null),
     );
   }
 
@@ -66,11 +66,4 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
   }
 }
 
-export function registerFakeAdapter(): void {
-  register(
-    "fake",
-    "FakeActiveRecordAdapter",
-    "./support/fake-adapter.js",
-    async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter,
-  );
-}
+registerConstant("FakeActiveRecordAdapter", FakeActiveRecordAdapter);

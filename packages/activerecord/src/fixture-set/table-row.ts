@@ -1,7 +1,6 @@
-import { hasKey, hashDelete } from "@blazetrails/ruby-compat";
+import { hashDelete, rtest } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
-import { findStiClass } from "../inheritance.js";
 import type { TableRows } from "./table-rows.js";
 import type { ModelMetadata } from "./model-metadata.js";
 
@@ -53,7 +52,7 @@ export class HasManyThroughProxy extends ReflectionProxy {
     return this._association.throughReflection.tableName;
   }
 
-  get timestampColumnNames(): string[] {
+  get timestampColumnNames(): readonly string[] {
     return this._association.throughReflection.klass.allTimestampAttributesInModel();
   }
 }
@@ -109,7 +108,7 @@ export class TableRow {
     if (!this.modelClass) return;
     this.fillTimestamps();
     this.interpolateLabel();
-    if (this.modelClass.compositePrimaryKey) {
+    if (this.modelClass.isCompositePrimaryKey()) {
       this.generateCompositePrimaryKey();
     } else {
       this.generatePrimaryKey();
@@ -121,9 +120,9 @@ export class TableRow {
   private get reflectionClass(): typeof Base {
     return (this._reflectionClass ??= (() => {
       const inheritanceColumnName = this.modelMetadata.inheritanceColumnName;
-      if (inheritanceColumnName != null && hasKey(this._row, inheritanceColumnName)) {
+      if (inheritanceColumnName != null && Object.hasOwn(this._row, inheritanceColumnName)) {
         try {
-          return findStiClass(this.modelClass!, String(this._row[inheritanceColumnName]));
+          return this.modelClass!.findStiClass(String(this._row[inheritanceColumnName]));
         } catch {
           return this.modelClass!;
         }
@@ -136,7 +135,7 @@ export class TableRow {
   private fillTimestamps(): void {
     if (this.modelClass!.recordTimestamps) {
       for (const cName of this.modelMetadata.timestampColumnNames) {
-        if (!hasKey(this._row, cName)) this._row[cName] = this._now;
+        if (!Object.hasOwn(this._row, cName)) this._row[cName] = this._now;
       }
     }
   }
@@ -170,39 +169,32 @@ export class TableRow {
   }
 
   private isColumnDefined(col: string): boolean {
-    return !this.modelMetadata.hasColumn(col) || hasKey(this._row, col);
+    return !this.modelMetadata.hasColumn(col) || Object.hasOwn(this._row, col);
   }
 
   private resolveEnums(): void {
-    const definedEnums = (
-      this.reflectionClass as {
-        _enums?: Map<string, Record<string, number | string | boolean | null>>;
-      }
-    )._enums;
-    for (const [name, values] of definedEnums ?? []) {
-      if (hasKey(this._row, name)) {
-        const value = this._row[name];
-        this._row[name] =
-          typeof value === "string" && Object.hasOwn(values, value) ? values[value] : value;
+    for (const [name, values] of Object.entries(this.reflectionClass.definedEnums)) {
+      if (Object.hasOwn(this._row, name)) {
+        this._row[name] = values.fetch(this._row[name] as string, this._row[name] as never);
       }
     }
   }
 
   private resolveStiReflections(): void {
-    const reflections = (this.reflectionClass as { _reflections?: Record<string, unknown> })
-      ._reflections;
-    for (const association of Object.values(reflections ?? {}) as FixtureReflection[]) {
+    for (const association of Object.values(
+      this.reflectionClass._reflections,
+    ) as unknown as FixtureReflection[]) {
       switch (association.macro) {
         case "belongsTo": {
           const fkName = association.joinForeignKey;
 
           let value: unknown;
-          if (association.name !== fkName) {
-            value = hashDelete(this._row, association.name);
-          }
-          if (association.name !== fkName && value != null && value !== false) {
+          if (
+            association.name !== fkName &&
+            rtest((value = hashDelete(this._row, association.name)))
+          ) {
             if (association.isPolymorphic()) {
-              const match = typeof value === "string" ? /\s*\(([^)]*)\)\s*$/.exec(value) : null;
+              const match = (value as string).match(/\s*\(([^)]*)\)\s*$/);
               if (match) {
                 value = (value as string).slice(0, match.index);
                 this._row[association.joinForeignType!] = match[1];
@@ -256,9 +248,7 @@ export class TableRow {
         }
         return join;
       });
-      const tables = this._tableRows.tables;
-      if (!tables.get(tableName)) tables.set(tableName, []);
-      tables.get(tableName)!.push(...joins);
+      this._tableRows.tables.get(tableName)!.push(...joins);
     }
   }
 }

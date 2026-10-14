@@ -153,15 +153,11 @@ const RAILS_TYPE_TO_SPEC: Readonly<Record<string, string>> = {
 export type Verdict = "INVENTED-TABLE" | "INVENTED-COLUMN" | "SHAPE" | "OPTION" | "UNPORTED-COLUMN";
 
 /**
- * How many `OPTION` findings the vendored schema currently carries. The gate
- * ratchets this down: it may fall as divergences are fixed, never rise. When it
- * reaches 0 the option check is armed — any `OPTION` finding then fails the gate
- * fatally, alongside the INVENTED verdicts (see {@link optionRegressions}).
- *
- * The 4 live findings are `parrots.{created,updated}_{at,on}`: schema.rb pins
- * `precision: 0` on those timestamps but TEST_SCHEMA leaves precision implicit.
+ * How many `OPTION` findings the vendored schema may carry. It is 0, so the
+ * option check is armed: any `OPTION` finding fails the gate fatally, alongside
+ * the INVENTED verdicts (see {@link optionRegressions}). It never rises.
  */
-export const OPTION_DEBT_CEILING = 4;
+export const OPTION_DEBT_CEILING = 0;
 
 export interface Finding {
   verdict: Verdict;

@@ -1,23 +1,24 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { JoinSource } from "./join-source.js";
 import type { OptimizerHints } from "./unary.js";
+import type { ArelNode } from "../arel.js";
 
 export class SelectCore extends Node {
   source: JoinSource;
-  projections: Node[];
-  wheres: Node[];
-  groups: Node[];
-  havings: Node[];
+  projections: (ArelNode | ArelNode[])[];
+  wheres: ArelNode[];
+  groups: ArelNode[];
+  havings: (ArelNode | string)[];
   windows: Node[];
   setQuantifier: Node | null;
   optimizerHints: OptimizerHints | null;
   comment: Node | null;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.source = new JoinSource(relation);
     this.projections = [];
@@ -30,19 +31,19 @@ export class SelectCore extends Node {
     this.comment = null;
   }
 
-  get from(): Node | Table | null {
+  get from(): ArelNode | Table | null {
     return this.source.left;
   }
 
-  set from(value: Node | Table | null) {
+  set from(value: ArelNode | Table | null) {
     this.source.left = value;
   }
 
-  get froms(): Node | Table | null {
+  get froms(): ArelNode | Table | null {
     return this.from;
   }
 
-  set froms(value: Node | null) {
+  set froms(value: ArelNode | Table | null) {
     this.from = value;
   }
 
@@ -76,16 +77,14 @@ export class SelectCore extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.source) copy.source = cloneSlot(this.source);
-    copy.projections = [...this.projections];
-    copy.wheres = [...this.wheres];
-    copy.groups = [...this.groups];
-    copy.havings = [...this.havings];
-    copy.windows = [...this.windows];
-    return copy;
+  initializeCopy(_other: SelectCore): void {
+    if (this.source != null) this.source = rbObjClone(this.source);
+    this.projections = rbObjClone(this.projections);
+    this.wheres = rbObjClone(this.wheres);
+    this.groups = rbObjClone(this.groups);
+    this.havings = rbObjClone(this.havings);
+    this.windows = rbObjClone(this.windows);
   }
 }
 
-Nodes.SelectCore = SelectCore;
+rbModConstSet(Nodes, "SelectCore", SelectCore);

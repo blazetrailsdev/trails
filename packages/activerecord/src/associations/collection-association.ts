@@ -1,7 +1,23 @@
-import { aryDelete, kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  aryDelete,
+  compact,
+  isEmpty,
+  kernelCatch,
+  rbEqual,
+  rbObjRespondTo,
+  rbDeclareIvar,
+  Set,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
-import { underscore, compactBlank, indexBy, valuesAt } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  compactBlank,
+  indexBy,
+  isBlank,
+  kernelArray,
+  pluck,
+  valuesAt,
+} from "@blazetrails/activesupport";
+import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { Associations } from "../namespaces.js";
@@ -12,11 +28,10 @@ export abstract class CollectionAssociation extends Association {
   nestedAttributesTarget: (Base | null)[] | null = null;
   protected _proxy?: AssociationProxy;
   protected _associationIds: unknown[] | null = null;
-  _lastRemoveAborted = false;
   /** @internal */
-  callback = callback;
+  declare callback: typeof callback;
   /** @internal */
-  callbacksFor = callbacksFor;
+  declare callbacksFor: typeof callbacksFor;
 
   override _targetStore: Base | Base[] | null = [];
 
@@ -39,7 +54,7 @@ export abstract class CollectionAssociation extends Association {
   }
 
   /** @internal */
-  _replacedOrAddedTargets = new Set<Base>();
+  _replacedOrAddedTargets = new Set<Base>().compareByIdentity();
 
   /** @internal */
   _wasLoaded: boolean | null = null;
@@ -53,7 +68,7 @@ export abstract class CollectionAssociation extends Association {
     for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
     if (
       (this.owner as { isPersisted?: () => boolean }).isPersisted?.() ||
-      this.findTargetNeeded() ||
+      this.isFindTarget() ||
       this.difference(this.target, records).some((r) => !r.isNewRecord())
     ) {
       throw new CollectionPersistedAssignmentError(this.reflection.name);
@@ -66,74 +81,54 @@ export abstract class CollectionAssociation extends Association {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   async idsReader(): Promise<unknown[]> {
-    const pk = this.associationPrimaryKey();
-    const keys = Array.isArray(pk) ? pk : [pk];
-    const readKey = (r: Base): unknown => {
-      const vals = keys.map((key) =>
-        typeof (r as any)._readAttribute === "function"
-          ? (r as any)._readAttribute(key)
-          : (r as any)[key],
-      );
-      return vals.length === 1 ? vals[0] : vals;
-    };
     if (this.isLoaded()) {
-      return this.target.map(readKey);
+      return pluck(
+        this.target,
+        ...(kernelArray(this.reflection.associationPrimaryKey()) as (keyof Base)[]),
+      );
+    } else if (!isEmpty(this.target)) {
+      return pluck(
+        await this.loadTarget(),
+        ...(kernelArray(this.reflection.associationPrimaryKey()) as (keyof Base)[]),
+      );
+    } else {
+      return (this._associationIds ??= await this.scope().pluck(
+        ...kernelArray(this.reflection.associationPrimaryKey()),
+      ));
     }
-    if (this.target.length > 0) {
-      await this.loadTarget();
-      return this.target.map(readKey);
-    }
-    if (this._associationIds) return this._associationIds;
-    const rel = this.scope();
-    if (rel && typeof rel.pluck === "function") {
-      this._associationIds = await rel.pluck(...keys);
-      return this._associationIds!;
-    }
-    return [];
-  }
-
-  protected associationPrimaryKey(): string | string[] {
-    return this.reflection.associationPrimaryKey?.() ?? (this.klass as any).primaryKey ?? "id";
   }
 
   /** @missingRailsName size — PERMANENT */
   async idsWriter(ids: unknown[]): Promise<void> {
+    const primaryKey = this.reflection.associationPrimaryKey();
     const klass = this.klass as any;
-    const primaryKey = this.associationPrimaryKey();
     const pkType = klass.typeForAttribute(primaryKey);
-    ids = compactBlank(ids == null ? [] : Array.isArray(ids) ? ids : [ids]);
+    ids = compactBlank(kernelArray(ids));
     ids = ids.map((id) => pkType.cast(id));
 
-    const indexKey = (key: unknown): string =>
-      Array.isArray(key) ? key.map(String).join(",") : String(key);
     let indexed: Record<string, Base>;
-    if (klass.compositePrimaryKey) {
-      const rows: Base[] = await klass.where(new Map([[primaryKey, ids]])).toArray();
-      indexed = indexBy<Base, string>(rows, (record) =>
-        indexKey(
-          (primaryKey as string[]).map((primaryKey) => (record as any)._readAttribute(primaryKey)),
-        ),
+    if (klass.isCompositePrimaryKey()) {
+      indexed = indexBy<Base, string>(
+        await klass.where(new Map([[primaryKey, ids]])).toArray(),
+        (record) =>
+          String(
+            (primaryKey as string[]).map((primaryKey) =>
+              (record as any)._readAttribute(primaryKey),
+            ),
+          ),
       );
     } else {
-      const rows: Base[] = await klass.where({ [primaryKey as string]: ids }).toArray();
-      indexed = indexBy<Base, string>(rows, (record) =>
-        indexKey((record as any)._readAttribute(primaryKey as string)),
+      indexed = indexBy<Base, string>(
+        await klass.where({ [primaryKey as string]: ids }).toArray(),
+        (record) => String((record as any)._readAttribute(primaryKey)),
       );
     }
-    const records: Base[] = valuesAt(indexed, ...ids.map(indexKey)).filter(
-      (record): record is Base => record != null,
-    );
+    const records = compact(valuesAt(indexed, ...ids.map(String)));
 
     if (records.length !== ids.length) {
-      const foundIds = records.map((record) =>
-        Array.isArray(primaryKey)
-          ? primaryKey.map((primaryKey) => (record as any)._readAttribute(primaryKey))
-          : (record as any)._readAttribute(primaryKey),
-      );
-      const foundKeys = new Set(foundIds.map(indexKey));
-      const notFoundIds = ids.filter((id) => !foundKeys.has(indexKey(id)));
+      const foundIds = records.map((record) => String((record as any)._readAttribute(primaryKey)));
+      const notFoundIds = ids.filter((id) => !foundIds.includes(String(id)));
       klass
         .all()
         .raiseRecordNotFoundExceptionBang(ids, records.length, ids.length, primaryKey, notFoundIds);
@@ -144,48 +139,59 @@ export abstract class CollectionAssociation extends Association {
 
   override reset(): void {
     super.reset();
-    this.#loadingTarget = null;
+    loadingTarget.delete(this);
     this._targetStore = [];
-    this._replacedOrAddedTargets = new Set<Base>();
+    this._replacedOrAddedTargets = new Set<Base>().compareByIdentity();
     this._associationIds = null;
   }
 
   /** @missingRailsName size — PERMANENT */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
-    const scope = this.scope();
-
-    if (this.reflection.options.inverseOf && this.isLoaded()) {
+    if (this.options.inverseOf && this.isLoaded()) {
       const argsFlatten = (args as any[]).flat(Infinity);
-      const model = scope.model;
+      const model = this.scope().model;
 
-      if (argsFlatten.length === 0) {
-        throw new RecordNotFound(
-          `Couldn't find ${model.name} without an ID`,
-          model.name,
-          String(model.primaryKey),
-          args,
-        );
+      if (isBlank(argsFlatten)) {
+        const errorMessage = `Couldn't find ${model.name} without an ID`;
+        throw new RecordNotFound(errorMessage, model.name, String(model.primaryKey), args);
       }
 
-      const result = this.findByScan(args);
+      const result = await this.findByScan(args);
 
-      const resultSize = Array.isArray(result) ? result.length : result == null ? 0 : 1;
+      const resultSize = kernelArray(result).length;
       if (!result || resultSize !== argsFlatten.length) {
-        scope.raiseRecordNotFoundExceptionBang(argsFlatten, resultSize, argsFlatten.length);
+        return this.scope().raiseRecordNotFoundExceptionBang(
+          argsFlatten,
+          resultSize,
+          argsFlatten.length,
+        );
+      } else {
+        return result as Base | Base[];
       }
-      return result as Base | Base[];
+    } else {
+      return this.scope().find(...args);
     }
-
-    if (scope && typeof scope.find === "function") {
-      return await scope.find(...args);
-    }
-    return null;
   }
 
   build(attributes: Record<string, unknown>[], block?: (record: Base) => void): Base[];
-  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base;
   build(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+    block?: (record: Base) => void,
+  ): Base;
+  build(
+    attributes?:
+      | Record<string, unknown>
+      | Map<string, unknown>
+      | PermittedAttributes
+      | Record<string, unknown>[],
+    block?: (record: Base) => void,
+  ): Base | Base[];
+  build(
+    attributes?:
+      | Record<string, unknown>
+      | Map<string, unknown>
+      | PermittedAttributes
+      | Record<string, unknown>[],
     block?: (record: Base) => void,
   ): Base | Base[] {
     if (Array.isArray(attributes)) {
@@ -195,6 +201,7 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
+  /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   concat(...records: Base[]): Promise<Base[] | undefined> | Base[] | undefined {
     records = records.flat();
     if (this.owner.isNewRecord()) {
@@ -208,11 +215,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected transaction<R>(block: () => Promise<R> | R): Promise<R | undefined> {
-    const klass = (this.reflection as any).klass ?? this.klass;
-    if (klass && typeof klass.transaction === "function") {
-      return klass.transaction(() => Promise.resolve(block()));
-    }
-    return Promise.resolve(block());
+    return (this.reflection.klass as any).transaction(block);
   }
 
   /** @internal */
@@ -237,7 +240,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected override async _createRecord(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[],
     raise = false,
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {
@@ -261,8 +264,7 @@ export abstract class CollectionAssociation extends Association {
         ((record: Base) => {
           yielded = block(record);
         }),
-    );
-    if (!record) return null;
+    )!;
     await yielded;
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;
@@ -276,7 +278,12 @@ export abstract class CollectionAssociation extends Association {
     return record;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   * @inventedArm loop — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   * @inventedArm throw — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
     let result = true;
 
@@ -317,24 +324,15 @@ export abstract class CollectionAssociation extends Association {
   }
 
   async deleteAll(dependent?: string): Promise<number> {
-    if (
-      dependent &&
-      dependent !== "nullify" &&
-      dependent !== "delete_all" &&
-      dependent !== "deleteAll"
-    ) {
+    if (dependent && !["nullify", "deleteAll"].includes(dependent)) {
       throw new ArgumentError("Valid values are :nullify or :delete_all");
     }
 
-    const optionDep = this.options.dependent;
-    dependent =
-      dependent === "delete_all"
+    dependent = dependent
+      ? dependent
+      : this.options.dependent === "destroy"
         ? "deleteAll"
-        : dependent
-          ? dependent
-          : optionDep === "destroy" || optionDep === "delete"
-            ? "deleteAll"
-            : optionDep;
+        : (this.options.dependent as string | undefined);
 
     const count = await this.deleteOrNullifyAllRecords(dependent);
 
@@ -343,11 +341,10 @@ export abstract class CollectionAssociation extends Association {
     return count;
   }
 
-  protected async deleteOrNullifyAllRecords(method?: string): Promise<number> {
-    if (method === "deleteAll") {
-      return this.deleteAllRecords();
-    }
-    return this.nullifyAllRecords();
+  /** @internal */
+  protected deleteOrNullifyAllRecords(_method?: string): Promise<number> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/collection_association.rb:163
+    throw new NotImplementedError();
   }
 
   async destroyAll(): Promise<Base[] | undefined> {
@@ -369,21 +366,14 @@ export abstract class CollectionAssociation extends Association {
     return this.deleteOrDestroy(records as Array<Base | number | string | bigint>, "destroy");
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   size(): Promise<number> | number {
-    if (!this.findTargetNeeded() || this.isLoaded()) {
+    if (!this.isFindTarget() || this.isLoaded()) {
       return this.target.length;
     } else if (this._associationIds) {
       return this._associationIds.length;
-    } else if (
-      ((this.associationScope() as { groupValues?: unknown[] } | undefined)?.groupValues ?? [])
-        .length > 0
-    ) {
+    } else if (!isEmpty(this.associationScope().groupValues)) {
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
-    } else if (
-      !(this.associationScope() as { distinctValue?: boolean } | undefined)?.distinctValue &&
-      this.target.length > 0
-    ) {
+    } else if (!this.associationScope().distinctValue && !isEmpty(this.target)) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());
       return (this as unknown as { countRecords(): Promise<number> })
         .countRecords()
@@ -400,6 +390,7 @@ export abstract class CollectionAssociation extends Association {
     return this.target.length === 0 && !(await this.scope().isExists());
   }
 
+  /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   replace(otherArray: Base[]): Promise<Base[] | undefined> | Base[] {
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
     const replaceAgainst = (originalTarget: Base[]): Promise<Base[] | undefined> | Base[] => {
@@ -429,7 +420,7 @@ export abstract class CollectionAssociation extends Association {
     } else if (this.isLoaded()) {
       return this.target.some((r) => r.equals(record));
     } else {
-      const recordId = klass.compositePrimaryKey
+      const recordId = klass.isCompositePrimaryKey()
         ? Object.fromEntries(
             (klass.primaryKey as string[]).map((key, i) => [key, (record.id as unknown[])[i]]),
           )
@@ -465,13 +456,15 @@ export abstract class CollectionAssociation extends Association {
     return this.target.some((r) => r.equals(record));
   }
 
+  /** @inventedArm if — CONVERGEABLE collection-association-load-target-in-flight-memo-and-reader-catch */
   override loadTarget(): Promise<Base[]> | Base[] {
     const loaded = (): Base[] => {
       this.loadedBang();
       return this.target;
     };
-    if (this.#loadingTarget) return this.#loadingTarget;
-    if (this.findTargetNeeded()) {
+    const inFlight = loadingTarget.get(this);
+    if (inFlight) return inFlight;
+    if (this.isFindTarget()) {
       const loading = Promise.resolve(this.findTarget())
         .then((findTarget) => {
           if (!this.isLoaded()) {
@@ -480,15 +473,14 @@ export abstract class CollectionAssociation extends Association {
           return loaded();
         })
         .finally(() => {
-          if (this.#loadingTarget === loading) this.#loadingTarget = null;
+          if (loadingTarget.get(this) === loading) loadingTarget.delete(this);
         });
-      return (this.#loadingTarget = loading);
+      loadingTarget.set(this, loading);
+      return loading;
     }
 
     return loaded();
   }
-
-  #loadingTarget: Promise<Base[]> | null = null;
 
   addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
   addToTarget(
@@ -502,13 +494,12 @@ export abstract class CollectionAssociation extends Association {
     save?: () => Promise<void> | void,
   ): Base | null | Promise<Base | null> {
     const { skipCallbacks = false, replace = false } = options;
-    const distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
-      ?.distinctValue;
-    const shouldReplace = replace || distinctValue;
-    if (save) {
-      return this.replaceOnTarget(record, skipCallbacks, { replace: shouldReplace }, save);
-    }
-    return this.replaceOnTarget(record, skipCallbacks, { replace: shouldReplace }) as Base | null;
+    return this.replaceOnTarget(
+      record,
+      skipCallbacks,
+      { replace: replace || this.associationScope().distinctValue },
+      save,
+    );
   }
 
   override scope(): any {
@@ -535,8 +526,12 @@ export abstract class CollectionAssociation extends Association {
     return true;
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE collection-association-load-target-in-flight-memo-and-reader-catch
+   * @inventedArm try — CONVERGEABLE collection-association-load-target-in-flight-memo-and-reader-catch
+   */
   get reader(): AssociationProxy {
-    this.ensureKlassExists();
+    this.ensureKlassExistsBang();
 
     if (this.isStaleTarget()) {
       const reloaded = this.reload();
@@ -551,69 +546,7 @@ export abstract class CollectionAssociation extends Association {
     return this._proxy;
   }
 
-  private ensureKlassExists(): void {
-    try {
-      void this.klass;
-    } catch (error) {
-      throw new Error(`Association ${this.reflection.name}: target class does not exist`, {
-        cause: error,
-      });
-    }
-  }
-
-  protected setOwnerAttributes(record: Base): void {
-    if (this.reflection.options.through) return;
-
-    const ctor = this.owner.constructor as any;
-    const fks = this.foreignKeyColumns();
-    const richPk = (
-      ctor._reflectOnAssociation?.(this.reflection.name) as
-        | { activeRecordPrimaryKey?: string | string[] }
-        | undefined
-    )?.activeRecordPrimaryKey;
-    const configuredPk = this.reflection.options.primaryKey ?? richPk ?? ctor.primaryKey ?? "id";
-    const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
-
-    for (let i = 0; i < fks.length; i++) {
-      const pkCol = pks[i] ?? pks[0];
-      const pkValue =
-        typeof (this.owner as any)._readAttribute === "function"
-          ? (this.owner as any)._readAttribute(pkCol)
-          : (this.owner as any)[pkCol];
-
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(fks[i], pkValue);
-      } else {
-        (record as any)[fks[i]] = pkValue;
-      }
-    }
-
-    if (this.reflection.options.as) {
-      const typeCol = this.polymorphicTypeColumn()!;
-      const typeName = (ctor as typeof Base).polymorphicName();
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(typeCol, typeName);
-      } else {
-        (record as any)[typeCol] = typeName;
-      }
-    }
-  }
-
-  private foreignKeyColumns(): string[] {
-    const foreignKey = this.reflection.foreignKey();
-    return Array.isArray(foreignKey) ? foreignKey : [foreignKey];
-  }
-
-  private foreignKeyColumn(): string {
-    return this.foreignKeyColumns()[0];
-  }
-
-  private polymorphicTypeColumn(): string | null {
-    const opts = this.reflection.options as { as?: string; foreignType?: string };
-    if (!opts.as) return null;
-    return opts.foreignType ?? `${underscore(opts.as)}_type`;
-  }
-
+  /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   protected deleteOrDestroy(
     records: Array<Base | number | string | bigint>,
     method?: string,
@@ -651,7 +584,10 @@ export abstract class CollectionAssociation extends Association {
     return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected removeRecords(
     existingRecords: Base[],
     records: Base[],
@@ -663,10 +599,8 @@ export abstract class CollectionAssociation extends Association {
         return records;
       }) == null
     ) {
-      this._lastRemoveAborted = true;
       return false;
     }
-    this._lastRemoveAborted = false;
     const pruned = (): boolean => {
       this._targetStore = this.target.filter((r) => !records.some((record) => rbEqual(record, r)));
       this._associationIds = null;
@@ -681,54 +615,9 @@ export abstract class CollectionAssociation extends Association {
   }
 
   /** @internal */
-  protected deleteRecords(_records: Base[], _method: string): Promise<number> | number {
+  protected deleteRecords(_records: Base[], _method: string): Promise<unknown> | unknown {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/collection_association.rb:415
     throw new NotImplementedError();
-  }
-
-  /** @internal */
-  protected computeNullifiedOwnerAttributes(): Record<string, null> {
-    const nullAttrs: Record<string, null> = {};
-    for (const fk of this.foreignKeyColumns()) {
-      nullAttrs[fk] = null;
-    }
-    const typeCol = this.polymorphicTypeColumn();
-    if (typeCol) {
-      nullAttrs[typeCol] = null;
-    }
-    return nullAttrs;
-  }
-
-  protected async nullifyAllRecords(): Promise<number> {
-    const nullAttrs = this.computeNullifiedOwnerAttributes();
-
-    const rel = this.scope();
-    if (rel && typeof rel.updateAll === "function") {
-      return rel.updateAll(nullAttrs);
-    }
-
-    await this.loadTarget();
-    for (const record of this.target) {
-      for (const [attr, val] of Object.entries(nullAttrs)) {
-        if (typeof (record as any)._writeAttribute === "function") {
-          (record as any)._writeAttribute(attr, val);
-        } else {
-          (record as any)[attr] = val;
-        }
-      }
-      if (typeof (record as any).save === "function") {
-        await (record as any).save();
-      }
-    }
-    return this.target.length;
-  }
-
-  private async deleteAllRecords(): Promise<number> {
-    const rel = this.scope();
-    if (rel && typeof rel.deleteAll === "function") {
-      return rel.deleteAll();
-    }
-    return 0;
   }
 
   /** @internal */
@@ -760,7 +649,7 @@ export abstract class CollectionAssociation extends Association {
     return [...merged, ...memory.filter((record) => !record.isPersisted())];
   }
 
-  private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {
+  private async findByScan(args: unknown[]): Promise<Base | Array<Base | undefined> | undefined> {
     const expectsArray = Array.isArray(args[0]);
     const ids = [
       ...new Set(
@@ -773,14 +662,17 @@ export abstract class CollectionAssociation extends Association {
 
     if (ids.length === 1) {
       const id = ids[0];
-      const record = this.target.find((r) => id === String((r as any).id));
+      const record = (await this.loadTarget()).find((r) => id === String((r as any).id));
       return expectsArray ? [record] : record;
+    } else {
+      return (await this.loadTarget()).filter((r) => ids.includes(String((r as any).id)));
     }
-
-    return this.target.filter((r) => ids.includes(String((r as any).id)));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   replaceOnTarget(
     record: Base,
     skipCallbacks: boolean,
@@ -850,6 +742,8 @@ export function isThenable<T>(value: Promise<T> | T): value is Promise<T> {
 }
 
 /** @internal */
+const loadingTarget = new WeakMap<CollectionAssociation, Promise<Base[]>>();
+
 function diffHooks(assoc: CollectionAssociation): {
   difference(a: Base[], b: Base[]): Base[];
   intersection(a: Base[], b: Base[]): Base[];
@@ -925,14 +819,19 @@ export function callback(this: CallbackHost, method: string, record: Base): void
 
 /** @internal */
 export function callbacksFor(this: CallbackHost, callbackName: string): unknown[] {
-  const fullName = `${callbackName}For${this.reflection.name.charAt(0).toUpperCase()}${this.reflection.name.slice(1)}`;
-  const owner = this.owner.constructor as any;
-  const stored = owner[fullName];
-  if (typeof stored === "function") return stored();
-  if (Array.isArray(stored)) return stored;
-  const fromOptions = (this.reflection.options as Record<string, unknown>)[callbackName];
-  return Array.isArray(fromOptions) ? fromOptions : fromOptions != null ? [fromOptions] : [];
+  const fullCallbackName = `${callbackName}For${this.reflection.name.charAt(0).toUpperCase()}${this.reflection.name.slice(1)}`;
+  if (rbObjRespondTo(this.owner.constructor, fullCallbackName)) {
+    return (this.owner.constructor as any)[fullCallbackName];
+  } else {
+    return [];
+  }
 }
+
+CollectionAssociation.prototype.callback = callback;
+CollectionAssociation.prototype.callbacksFor = callbacksFor;
+rbDeclareIvar(CollectionAssociation, "@proxy", "_proxy");
+rbDeclareIvar(CollectionAssociation, "@association_ids", "_associationIds");
+rbDeclareIvar(CollectionAssociation, "@replaced_or_added_targets", "_replacedOrAddedTargets");
 
 function arraysEqual(a: Base[], b: Base[]): boolean {
   if (a.length !== b.length) return false;

@@ -10,26 +10,32 @@
 import type { UnportedFile } from "./types.js";
 import { ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES } from "./activerecord-test-support.js";
 import { ACTIONVIEW_UNPORTED_FILES } from "./actionview.js";
+import { ACTIVEJOB_UNPORTED_FILES } from "./activejob.js";
 import { ACTIVESUPPORT_UNPORTED_FILES } from "./activesupport.js";
 import { DATE_UNPORTED_FILES } from "./date.js";
 import { DID_YOU_MEAN_UNPORTED_FILES } from "./did-you-mean.js";
 import { GLOBALID_UNPORTED_FILES } from "./globalid.js";
 import { I18N_UNPORTED_FILES } from "./i18n.js";
+import { THOR_UNPORTED_FILES } from "./thor.js";
 import { TRAILTIES_UNPORTED_FILES } from "./trailties.js";
 import { UNSCOPED_UNPORTED_FILES } from "./unscoped.js";
+import { VERSION_UNPORTED_FILES } from "./version.js";
 
 export type { UnportedFile } from "./types.js";
 
 export const UNPORTED_FILES: UnportedFile[] = [
   ...ACTIONVIEW_UNPORTED_FILES,
+  ...ACTIVEJOB_UNPORTED_FILES,
   ...ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES,
   ...ACTIVESUPPORT_UNPORTED_FILES,
   ...DATE_UNPORTED_FILES,
   ...DID_YOU_MEAN_UNPORTED_FILES,
   ...GLOBALID_UNPORTED_FILES,
   ...I18N_UNPORTED_FILES,
+  ...THOR_UNPORTED_FILES,
   ...TRAILTIES_UNPORTED_FILES,
   ...UNSCOPED_UNPORTED_FILES,
+  ...VERSION_UNPORTED_FILES,
 ];
 
 export function isSourceUnported(file: string, pkg?: string): boolean {

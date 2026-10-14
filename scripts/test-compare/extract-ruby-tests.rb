@@ -177,6 +177,7 @@ class TestExtractor
     # `[...].each { define_method("test_...") }` loops whose cases can't be
     # expanded statically, as "file:line" — reported rather than dropped silently.
     @unexpanded_loops = []
+    @line_offset = 0
   end
 
   def process_file(filepath, package_root)
@@ -192,7 +193,10 @@ class TestExtractor
     # Enclosing class/module names only (the describe_stack also carries block
     # descriptions) — the scope path helper resolution matches against.
     @class_stack = []
+    @in_non_test_class = false
+    @non_test_classes = []
     @test_cases = []
+    @interpolated_names = {}.compare_by_identity
     @source_lines = source.lines
     @quote_styles = build_quote_styles(source)
     @gate_stack = []
@@ -205,6 +209,9 @@ class TestExtractor
     @module_collect = nil
     @module_includes = {}
     @module_def_gates = {}
+    # Every class this file defines, in definition order, with the tests its own
+    # body emitted, for `replay_inherited_tests`.
+    @class_defs = []
 
     # Same-file non-assertion helper `def`s, keyed by name → list of definitions,
     # so a test that delegates its assertions to a helper (e.g. `test_copy_table`,
@@ -243,9 +250,17 @@ class TestExtractor
 
     walk(sexp)
 
+    replay_inherited_tests
+    collect_lib_modules(filepath)
     flush_collected_modules
 
     return if @test_cases.empty?
+
+    @test_cases.each do |tc|
+      segments = tc[:ancestors] + [tc[:description]]
+      next unless segments.any? { |name| @interpolated_names.key?(name) }
+      tc[:pattern] = segments.map { |name| @interpolated_names.fetch(name, name) }
+    end
 
     # Determine top-level class name from file path
     class_name = File.basename(rel_path, "_test.rb")
@@ -301,16 +316,20 @@ class TestExtractor
     if inner.is_a?(Array) && inner[0] == :command
       cmd_name = ident_name(inner[1])
       case cmd_name
-      when "describe"
+      when "describe", "context"
         desc = extract_first_string(inner[2])
         return if desc.nil? && collect_shared_example(inner[2], node)
+        desc ||= const_name_from_args(inner[2]) unless @describe_stack.empty?
         if desc
           @describe_stack.push(desc)
           walk(block) if block.is_a?(Array)
           @describe_stack.pop
           return
         end
-      when "it"
+      when "shared_examples"
+        name = extract_first_string(inner[2])
+        return define_shared_example(name, node) if name
+      when "it", "specify"
         # Pass outer node so assertion extraction can walk the block body
         process_it(inner[2], node)
         return
@@ -325,7 +344,7 @@ class TestExtractor
       if inner[1].is_a?(Array) && inner[1][0] == :fcall
         cmd_name = ident_name(inner[1][1])
         case cmd_name
-        when "describe"
+        when "describe", "context"
           desc = extract_string_from_arg_paren(inner[2])
           if desc
             @describe_stack.push(desc)
@@ -333,7 +352,7 @@ class TestExtractor
             @describe_stack.pop
             return
           end
-        when "it"
+        when "it", "specify"
           # Pass inner for desc extraction, outer node includes block for assertions
           process_it_paren(inner, node)
           return
@@ -353,6 +372,7 @@ class TestExtractor
           description: desc, line: extract_line(node), assertions: assertion_kinds.uniq,
           assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
           assertion_values: assertion_values,
+          gates: @gate_stack.drop(@module_gate_base),
           body_gate: body_skip_gate(node)
         }
         return
@@ -368,6 +388,7 @@ class TestExtractor
     end
     if iterator
       return if process_define_method_loop(iterator, block, node)
+      return if process_class_eval_loop(iterator, block, node)
       return if process_test_macro_loop(iterator, block, node)
     end
 
@@ -375,20 +396,69 @@ class TestExtractor
     node.each { |child| walk(child) if child.is_a?(Array) }
   end
 
+  NON_TEST_SUPERCLASSES = %w[
+    ActionController::Base
+    ActionController::API
+    ActionController::Metal
+    ApplicationController
+  ].freeze
+
   def process_class(node)
     name = const_name(node[1])
     return unless name
 
     @describe_stack.push(name)
     @class_stack.push(name)
+    # A class whose superclass is a controller base, or a class this file
+    # already defined as one, is not a test case: Minitest never runs its
+    # `def test_*`, which are controller actions (`LiveTestController#test_action`,
+    # actionpack/test/controller/render_test.rb:980). Decided by the superclass
+    # the file shows, never by the class name: `TestErrorsInController <
+    # ActionDispatch::IntegrationTest` (dispatch/routing_test.rb) is a test case.
+    superclass = const_name(node[2])
+    prev_non_test = @in_non_test_class
+    @in_non_test_class = !superclass.nil? &&
+      (NON_TEST_SUPERCLASSES.include?(superclass) || @non_test_classes.include?(superclass))
+    @non_test_classes << name << name.split("::").last if @in_non_test_class
     # A class body always emits its `def test_*` directly (even a class nested
     # inside a module is a real test case), so suspend any module collection.
     prev = @module_collect
     @module_collect = nil
+    class_def = { name: name, superclass: superclass, ancestors: @describe_stack.dup, tests: [] }
+    @class_defs << class_def unless @in_non_test_class
+    first = @test_cases.length
     walk_body(node[3] || node[2])
+    class_def[:tests] = @test_cases[first..].select { |tc| tc[:ancestors] == class_def[:ancestors] }
     @module_collect = prev
+    @in_non_test_class = prev_non_test
     @class_stack.pop
     @describe_stack.pop
+  end
+
+  # Minitest runs every `test_*` a test class answers, inherited ones included
+  # (`Minitest::Runnable.methods_matching`), so `ForeignKeyChangeColumnWithPrefixTest
+  # < ForeignKeyChangeColumnTest` (activerecord/test/cases/migration/foreign_key_test.rb:145)
+  # runs its superclass's six tests under its own name. Each same-file
+  # superclass's tests are replayed under the subclass, in definition order so a
+  # superclass already holds what it inherited; a redefined test is not copied.
+  # A reopened class (no `<`) is not a test superclass defined here.
+  def replay_inherited_tests
+    @class_defs.each do |class_def|
+      superclass = class_def[:superclass]
+      next unless superclass
+      parent = @class_defs.take_while { |other| !other.equal?(class_def) }.reverse
+        .find { |other| other[:superclass] && other[:name].split("::").last == superclass.split("::").last }
+      next unless parent
+      own = class_def[:tests].map { |tc| tc[:description] }
+      inherited = parent[:tests].reject { |tc| own.include?(tc[:description]) }.map do |tc|
+        tc.merge(
+          path: (class_def[:ancestors] + [tc[:description]]).join(" > "),
+          ancestors: class_def[:ancestors].dup,
+        )
+      end
+      class_def[:tests] += inherited
+      @test_cases.concat(inherited)
+    end
   end
 
   # `module Foo ... end` — when its body defines `def test_*`, the module is a
@@ -398,12 +468,15 @@ class TestExtractor
   def process_module(node)
     name = const_name(node[1])
     prev = @module_collect
+    prev_base = @module_gate_base
     @module_collect = []
+    @module_gate_base = @gate_stack.length
     @class_stack.push(name) if name
     walk_body(node[2])
     @class_stack.pop if name
     collected = @module_collect
     @module_collect = prev
+    @module_gate_base = prev_base
     if name && !collected.empty?
       @modules[name] = (@modules[name] || []) + collected
       # Remember the gate in force at the definition site, used as a fallback for
@@ -427,6 +500,35 @@ class TestExtractor
     @module_includes[name] ||= @gate_stack.dup
   end
 
+  LIB_TEST_MODULES = %w[ActiveModel::Lint::Tests].freeze
+
+  def collect_lib_modules(filepath)
+    @module_includes.keys.each do |name|
+      next if @modules.key?(name) || !LIB_TEST_MODULES.include?(name)
+      path = lib_module_path(name, filepath)
+      sexp = path && Ripper.sexp(File.read(path))
+      next unless sexp
+      own = @modules
+      @modules = {}
+      walk(sexp)
+      tests = @modules[name.split("::").last]
+      @modules = own
+      @modules[name] = tests if tests
+    end
+  end
+
+  def lib_module_path(name, filepath)
+    segments = name.split("::").map { |s| s.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase }
+    gem = File.dirname(filepath)
+    gem = File.dirname(gem) until File.directory?(File.join(gem, "lib")) || gem == File.dirname(gem)
+    until segments.empty?
+      found = Dir.glob("#{File.join(File.dirname(gem), "*", "lib", *segments)}.rb").first
+      return found if found
+      segments.pop
+    end
+    nil
+  end
+
   # Emit every collected mixin module's tests once (bare — no class ancestor, as
   # before), but stamped with the gate of the class(es) it is `include`d into.
   # A module mixed into a class under `if supports_views?` thus yields tests
@@ -435,8 +537,10 @@ class TestExtractor
     @modules.each do |name, tests|
       gate_stack = @module_includes[name] || @module_def_gates[name] || []
       saved = @gate_stack
-      @gate_stack = gate_stack
-      tests.each { |t| @test_cases << materialize_module_test(t) }
+      tests.each do |t|
+        @gate_stack = gate_stack + t[:gates]
+        @test_cases << materialize_module_test(t)
+      end
       @gate_stack = saved
     end
   end
@@ -454,8 +558,10 @@ class TestExtractor
   # accessor because the definition lives in a different FILE from its callers.
   def collect_shared_example(args, node)
     name = shared_example_name(args)
-    return false unless name
+    name ? define_shared_example(name, node) : false
+  end
 
+  def define_shared_example(name, node)
     saved_cases = @test_cases
     saved_stack = @describe_stack
     @test_cases = []
@@ -474,7 +580,7 @@ class TestExtractor
   # an 8-line shell. The call site is a real line in that file and names the
   # shared body, which is the one hop a reader wants.
   def materialize_shared_example(args, node)
-    name = first_symbol_name(args)
+    name = first_symbol_name(args) || extract_first_string(args)
     return unless name
     line = extract_line(node)
     (@shared_examples[name] || []).each do |t|
@@ -536,11 +642,11 @@ class TestExtractor
     args = node[2]
 
     case cmd_name
-    when "describe"
+    when "describe", "context"
       process_describe(args, node)
-    when "it_behaves_like", "it_should_behave_like"
+    when "it_behaves_like", "it_should_behave_like", "include_examples"
       materialize_shared_example(args, node)
-    when "it"
+    when "it", "specify"
       process_it(args, node)
     when "test"
       process_test_macro(args, node)
@@ -554,9 +660,9 @@ class TestExtractor
     if node[1].is_a?(Array) && node[1][0] == :fcall
       cmd_name = ident_name(node[1][1])
       case cmd_name
-      when "describe"
+      when "describe", "context"
         process_describe_paren(node)
-      when "it"
+      when "it", "specify"
         process_it_paren(node)
       when "test"
         process_test_macro_paren(node)
@@ -693,6 +799,7 @@ class TestExtractor
     name = ident_name(name_node)
     return unless name
     return unless name.start_with?("test_")
+    return if @in_non_test_class
     # Minitest invokes test methods with no arguments, so a `def test_*` that
     # declares a *required* parameter (e.g. the private helper
     # `test_lock_free(lock_name)`) can never be run as a test — skip it so it
@@ -716,6 +823,7 @@ class TestExtractor
         description: desc, line: line, assertions: assertion_kinds.uniq,
         assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
         assertion_values: assertion_values,
+        gates: @gate_stack.drop(@module_gate_base),
         body_gate: body_skip_gate(node)
       }
       return
@@ -793,6 +901,75 @@ class TestExtractor
       end
     end
     true
+  end
+
+  # ---- class_eval heredoc loops ----
+
+  # Rails also generates families by evaluating a heredoc per element:
+  #
+  #   %w( references includes ).each do |method|
+  #     class_eval <<~RUBY
+  #       def test_no_arguments_to_#{method}_raise_errors
+  #
+  # (activerecord/test/cases/relations_test.rb:562-570,
+  # activesupport/test/inflector_test.rb:477-484). The heredoc is a string to
+  # Ripper, so each element's source is interpolated and parsed on its own, and
+  # the `def test_*` it holds are extracted as ordinary methods. Returns true
+  # when the node was handled.
+  def process_class_eval_loop(call, block, node)
+    return false unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
+
+    heredocs = []
+    collect_class_evals(block[2], heredocs)
+    heredocs.select! { |heredoc| heredoc.flatten.any? { |leaf| leaf.is_a?(String) && leaf.match?(/\bdef test_/) } }
+    return false if heredocs.empty?
+
+    vars = block_var_names(block[1])
+    elements = loop_elements(call[1])
+    if vars.nil? || elements.nil?
+      report_unexpanded_loop(node)
+      return true
+    end
+
+    heredocs.each do |heredoc|
+      sexps = elements.map do |value|
+        bindings = loop_bindings(vars, value)
+        source = bindings && interpolated_name(heredoc, bindings)
+        source && Ripper.sexp(source.gsub('\\"', '"'))
+      end
+      if sexps.any?(&:nil?)
+        report_unexpanded_loop(node)
+        next
+      end
+      begin
+        @line_offset = extract_line(heredoc) - 1
+        sexps.each { |sexp| walk(sexp) }
+      ensure
+        @line_offset = 0
+      end
+    end
+    true
+  end
+
+  # Every `class_eval <<~RUBY` / `class_eval(<<-RUBY, __FILE__, __LINE__ + 1)`
+  # in a block body, as the heredoc's string_literal node.
+  def collect_class_evals(node, out)
+    return unless node.is_a?(Array)
+
+    args =
+      if node[0] == :command && ident_name(node[1]) == "class_eval"
+        node[2]
+      elsif node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :fcall &&
+            ident_name(node[1][1]) == "class_eval"
+        node[2]
+      end
+    if args
+      heredoc = string_literal_node(args)
+      out << heredoc if heredoc
+      return
+    end
+
+    node.each { |child| collect_class_evals(child, out) if child.is_a?(Array) }
   end
 
   # Rails also generates whole families from a literal table with the `test`
@@ -909,7 +1086,10 @@ class TestExtractor
     true
   end
 
+  LOOP_KIND_OF_CLASSES = { "Array" => Array, "Hash" => Hash, "String" => String, "Symbol" => LoopSymbolName }.freeze
+
   def eval_loop_condition(node, bindings)
+    return eval_loop_kind_of(node, bindings) if node.is_a?(Array) && node[0] == :method_add_arg
     return nil unless node.is_a?(Array) && node[0] == :binary
     _, left, op, right = node
     return nil unless left.is_a?(Array) && left[0] == :call && %w[length size].include?(ident_name(left[3]))
@@ -918,6 +1098,20 @@ class TestExtractor
     bound = bindings[ident_name(receiver[1])]
     return nil unless bound.is_a?(Array) && right.is_a?(Array) && right[0] == :@int
     %i[> >= < <= ==].include?(op) ? bound.length.public_send(op, Integer(right[1])) : nil
+  end
+
+  def eval_loop_kind_of(node, bindings)
+    call = node[1]
+    return nil unless call.is_a?(Array) && call[0] == :call && %w[kind_of? is_a?].include?(ident_name(call[3]))
+    receiver = call[1]
+    return nil unless receiver.is_a?(Array) && %i[var_ref vcall].include?(receiver[0])
+    args = positional_args(node[2])
+    path = args && args.length == 1 ? const_path(args[0]) : nil
+    klass = path && path[:segments].length == 1 ? LOOP_KIND_OF_CLASSES[path[:segments].first] : nil
+    name = ident_name(receiver[1])
+    return nil unless klass && bindings.key?(name)
+    bound = bindings[name]
+    klass == String ? bound.is_a?(String) && !bound.is_a?(LoopSymbolName) : bound.is_a?(klass)
   end
 
   # Collect every same-file `CONST = [...]`, name → the array's literal element
@@ -966,6 +1160,7 @@ class TestExtractor
         description: desc, line: line, assertions: assertion_kinds.uniq,
         assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
         assertion_values: assertion_values,
+        gates: @gate_stack.drop(@module_gate_base),
         body_gate: body_skip_gate(node)
       }
       return
@@ -1230,6 +1425,12 @@ class TestExtractor
     when :var_ref, :vcall
       bound = bindings[ident_name(node[1])]
       bound.is_a?(String) ? bound : nil
+    when :string_literal
+      interpolated_name(node, bindings)
+    when :ifop
+      taken = eval_loop_condition(node[1], bindings)
+      return nil if taken.nil?
+      eval_loop_expr(taken ? node[2] : node[3], bindings)
     when :call
       receiver = eval_loop_expr(node[1], bindings)
       return nil if receiver.nil?
@@ -1320,6 +1521,7 @@ class TestExtractor
         description: desc, line: line, assertions: assertion_kinds.uniq,
         assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
         assertion_values: assertion_values,
+        gates: @gate_stack.drop(@module_gate_base),
         body_gate: body_skip_gate(define_node)
       }
       return
@@ -1879,6 +2081,41 @@ class TestExtractor
     end
   end
 
+  RSPEC_TO = { "to" => "to", "not_to" => "not_to", "to_not" => "not_to" }.freeze
+  RSPEC_MATCHER_CHAIN = %i[method_add_arg method_add_block call command_call].freeze
+
+  def rspec_expectation(node)
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call &&
+       node[2].is_a?(Array) && node[2][0] == :arg_paren
+      node = [:command_call, node[1][1], node[1][2], node[1][3], node[2][1]]
+    end
+    return nil unless node[0] == :command_call && (to = RSPEC_TO[ident_name(node[3])])
+    recv = node[1]
+    recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_block
+    recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
+    return nil unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
+    matcher = (positional_args(node[4]) || node[4])&.first
+    matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_block
+    if matcher.is_a?(Array) && matcher[0] == :binary && matcher[1].is_a?(Array) &&
+       matcher[1][0] == :vcall && ident_name(matcher[1][1]) == "be"
+      rhs = matcher[3]
+      const = rhs.is_a?(Array) && (rhs[0] == :const_path_ref || (rhs[0] == :var_ref && rhs[1][0] == :@const))
+      name = const && %i[< <=].include?(matcher[2]) ? "be_kind_of" : "be_#{matcher[2]}"
+      return ["expect_#{to}_#{name}", recv, nil]
+    end
+    args = nil
+    while matcher.is_a?(Array) && RSPEC_MATCHER_CHAIN.include?(matcher[0])
+      args = matcher[0] == :method_add_arg ? matcher[2] : nil
+      matcher = matcher[1]
+    end
+    args = matcher[2] if matcher.is_a?(Array) && matcher[0] == :command
+    return nil unless matcher.is_a?(Array) && %i[fcall vcall command].include?(matcher[0])
+    name = ident_name(matcher[1])
+    name = "be_nil" if name == "be" && literal_token(positional_args(args)&.first) == "x:nil"
+    name = "be_truthy" if name == "be" && matcher[0] == :vcall
+    name ? ["expect_#{to}_#{name}", recv, args] : nil
+  end
+
   # Collect every same-file `def name` → { scope:, body: } (node[3] is the
   # bodystmt), where `scope` is the enclosing class/module name path. Includes
   # `test_*` methods too: a test method is itself a valid helper when another
@@ -2053,15 +2290,24 @@ class TestExtractor
   def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args, scope, pending_never = false)
     return unless node.is_a?(Array)
 
+    if (rspec = rspec_expectation(node))
+      kind, expect_node, matcher_args = rspec
+      (@rspec_expects ||= {}.compare_by_identity)[expect_node] = true
+      results << kind
+      values << literal_token(positional_args(matcher_args)&.first)
+    end
+
     name = self_call_name(node)
     if name
       if assertion_method?(name)
         # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
         # [:fcall, ...], ...]`; self_call_name matches the inner :fcall, and the
         # recursion below descends into it — so the wrapper is not double-counted.
-        results << (pending_never ? "#{name}_never" : name)
-        args = node[0] == :command ? node[2] : pending_args
-        values << literal_token(expected_arg(args, name))
+        unless @rspec_expects&.key?(node)
+          results << (pending_never ? "#{name}_never" : name)
+          args = node[0] == :command ? node[2] : pending_args
+          values << literal_token(expected_arg(args, name))
+        end
       elsif depth < MAX_HELPER_DEPTH && !visiting.include?(name)
         resolved = resolve_helper(name, scope)
         if resolved
@@ -2267,13 +2513,22 @@ class TestExtractor
     end
   end
 
+  INTERPOLATION_PLACEHOLDER = "<expr>"
+
   def extract_string_content(node)
     return nil unless node.is_a?(Array)
     if node[0] == :string_literal
       content = node[1]
       if content.is_a?(Array) && content[0] == :string_content
         parts = content[1..]
-        return parts.map { |p| p.is_a?(Array) && p[0] == :@tstring_content ? p[1] : "" }.join
+        blanked = parts.map { |p| p.is_a?(Array) && p[0] == :@tstring_content ? p[1] : "" }.join
+        if @interpolated_names && parts.any? { |p| p.is_a?(Array) && p[0] == :string_embexpr }
+          @interpolated_names[blanked] = parts.map { |p|
+            next "" unless p.is_a?(Array)
+            p[0] == :@tstring_content ? p[1] : (p[0] == :string_embexpr ? INTERPOLATION_PLACEHOLDER : "")
+          }.join
+        end
+        return blanked
       end
     end
     nil
@@ -2305,7 +2560,7 @@ class TestExtractor
   # ---- General helpers ----
 
   def extract_line(node)
-    find_line(node) || 0
+    (find_line(node) || 0) + @line_offset
   end
 
   def find_line(node)

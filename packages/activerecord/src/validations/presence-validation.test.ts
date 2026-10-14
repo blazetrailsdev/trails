@@ -1,8 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { SingularAssociation } from "../associations/singular-association.js";
 import { Base, registerModel } from "../index.js";
-import { collectionProxyFor as association } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
@@ -14,7 +13,7 @@ class Boy extends Human {
   static name = "Boy";
 }
 
-function setAssoc(record: Base, name: string, value: Base | null): void | Promise<void> {
+function setAssoc(record: Base, name: string, value: Base | null): unknown {
   return (record.association(name) as SingularAssociation).writer(value);
 }
 
@@ -66,7 +65,7 @@ describe("PresenceValidationTest", () => {
     const b = new Boy();
     const i1 = new Interest();
     const i2 = new Interest();
-    await association(b, "interests").concat(i1, i2);
+    await b.interests.concat(i1, i2);
     expect(await b.isValid()).toBeTruthy();
 
     i1.markForDestruction();

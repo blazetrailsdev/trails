@@ -4,7 +4,8 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
 function clientOptions(config: Record<string, unknown>): Record<string, unknown> {
   const adapter = new PostgreSQLAdapter(config as never);
-  return (adapter as unknown as { _pgClientOptions: Record<string, unknown> })._pgClientOptions;
+  return (adapter as unknown as { _connectionParameters: Record<string, unknown> })
+    ._connectionParameters;
 }
 
 describe("PostgreSQLAdapter conn_params", () => {
@@ -19,7 +20,7 @@ describe("PostgreSQLAdapter conn_params", () => {
       hsot: "typo",
     });
 
-    expect(options.database).toBe("trails_test");
+    expect(options.dbname).toBe("trails_test");
     expect(options.host).toBe("localhost");
     expect(options).not.toHaveProperty("adapter");
     expect(options).not.toHaveProperty("pool");
@@ -32,10 +33,10 @@ describe("PostgreSQLAdapter conn_params", () => {
     const options = clientOptions({
       user: "alice",
       password: "s3cret",
-      database: "trails_test",
+      dbname: "trails_test",
       host: "localhost",
       port: 5432,
-      application_name: "trails",
+      applicationName: "trails",
       connectionTimeoutMillis: 100,
       ssl: false,
     });
@@ -43,23 +44,23 @@ describe("PostgreSQLAdapter conn_params", () => {
     expect(options).toMatchObject({
       user: "alice",
       password: "s3cret",
-      database: "trails_test",
+      dbname: "trails_test",
       host: "localhost",
       port: 5432,
-      application_name: "trails",
+      applicationName: "trails",
       connectionTimeoutMillis: 100,
       ssl: false,
     });
   });
 
-  it("drops undefined-valued params so pg applies its own defaults", () => {
+  it("drops nil-valued params, as conn_params is @config.compact", () => {
     const options = clientOptions({
       database: "trails_test",
       password: undefined,
       host: null,
     });
 
-    expect(options.database).toBe("trails_test");
+    expect(options.dbname).toBe("trails_test");
     expect(options).not.toHaveProperty("password");
     expect(options).not.toHaveProperty("host");
   });
@@ -91,11 +92,11 @@ describe("PostgreSQLAdapter conn_params", () => {
     });
   });
 
-  it("keeps database rather than renaming it to dbname", () => {
+  it("renames database to dbname, as Rails maps its param names to PG's", () => {
     const options = clientOptions({ database: "trails_test" });
 
-    expect(options.database).toBe("trails_test");
-    expect(options).not.toHaveProperty("dbname");
+    expect(options.dbname).toBe("trails_test");
+    expect(options).not.toHaveProperty("database");
   });
 
   describe("through buildAdapterArg (the connection-handling path)", () => {
@@ -110,7 +111,7 @@ describe("PostgreSQLAdapter conn_params", () => {
       });
 
       expect(options.user).toBe("alice");
-      expect(options.database).toBe("trails_test");
+      expect(options.dbname).toBe("trails_test");
       expect(options).not.toHaveProperty("adapter");
       expect(options).not.toHaveProperty("username");
       expect(options).not.toHaveProperty("pool");

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFile } from "fs/promises";
-import { fixtures } from "./test-fixtures.js";
+import type { BinaryData } from "@blazetrails/activemodel";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 
 describe("BinaryTest", () => {
@@ -11,7 +12,7 @@ describe("BinaryTest", () => {
   it("mixed encoding", async () => {
     const str = new Uint8Array([0x80]);
 
-    const binary = Binary.new({ name: "いただきます！", data: str });
+    const binary = new Binary({ name: "いただきます！", data: str });
     await binary.saveBang();
     await binary.reload();
     expect(new Uint8Array(binary.data)).toEqual(str);
@@ -28,7 +29,7 @@ describe("BinaryTest", () => {
         await readFile(new URL(`./test-helpers/assets/${filename}`, import.meta.url)),
       );
 
-      const bin = Binary.new({ data });
+      const bin = new Binary({ data });
       expect(new Uint8Array(bin.data)).toEqual(data);
 
       await bin.saveBang();
@@ -42,7 +43,7 @@ describe("BinaryTest", () => {
   it("unicode input casting", async () => {
     const textBytes = new TextEncoder().encode("text");
 
-    const binary = Binary.new({ name: 123 as unknown as string, data: "text" });
+    const binary = new Binary({ name: 123 as unknown as string, data: "text" });
 
     expect(binary.readAttribute("name")).toEqual("123");
     expect(binary.readAttributeBeforeTypeCast("name")).toEqual(123);
@@ -55,7 +56,7 @@ describe("BinaryTest", () => {
     expect(binary.readAttributeBeforeTypeCast("name")).toEqual("123");
     expect(new Uint8Array(binary.data)).toEqual(textBytes);
     expect(
-      new Uint8Array((binary.readAttributeBeforeTypeCast("data") as { bytes: Uint8Array }).bytes),
+      new Uint8Array((binary.readAttributeBeforeTypeCast("data") as BinaryData).toString()),
     ).toEqual(textBytes);
 
     await binary.reload();

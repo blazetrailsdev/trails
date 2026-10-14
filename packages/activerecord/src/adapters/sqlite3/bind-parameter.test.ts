@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { BigDecimal } from "@blazetrails/activesupport";
+import { Rational } from "@blazetrails/ruby-compat";
 import { Post } from "../../test-helpers/models/post.js";
 
 describeIfSqlite("SQLite3Adapter", () => {
@@ -27,7 +28,7 @@ describeIfSqlite("SQLite3Adapter", () => {
     });
 
     it("where with float for string column using bind parameters", async () => {
-      await assertQuotedAs("0", 0.0);
+      await assertQuotedAs("0.0", new Number(0.0));
     });
 
     it("where with boolean for string column using bind parameters", async () => {
@@ -39,7 +40,7 @@ describeIfSqlite("SQLite3Adapter", () => {
     });
 
     it("where with rational for string column using bind parameters", async () => {
-      await assertQuotedAs("0", 0);
+      await assertQuotedAs("0/1", new Rational(0, 1));
     });
   });
 });

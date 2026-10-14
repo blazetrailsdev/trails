@@ -2,13 +2,10 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  diffRatchet,
   findOffenders,
   hasTransactionalWiring,
   isOffender,
-  loadRatchet,
   NON_MODEL_RECEIVERS,
-  RATCHET_PATH,
   reachesSharedConnection,
   rowWritesAtItScope,
   TEST_ROOT,
@@ -341,14 +338,8 @@ describe("non-transactional row writes", () => {
     expect(isOffender(src)).toBe(false);
   });
 
-  it("does not grow past the seeded ratchet", async () => {
+  it("finds no offender in the tree", async () => {
     const offenders = await findOffenders(path.join(REPO_ROOT, TEST_ROOT));
-    const relative = offenders.map((file) => path.relative(REPO_ROOT, file));
-    const { added, stale } = diffRatchet(
-      relative,
-      await loadRatchet(path.join(REPO_ROOT, RATCHET_PATH)),
-    );
-    expect(added).toEqual([]);
-    expect(stale).toEqual([]);
+    expect(offenders.map((file) => path.relative(REPO_ROOT, file))).toEqual([]);
   });
 });

@@ -1,15 +1,30 @@
 import { SchemaDumper } from "../../schema-dumper.js";
-import { PostgreSQLAdapter } from "../postgresql-adapter.js";
+import { ConnectionAdapters } from "../../namespaces.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
   Table as AbstractTable,
   AlterTable as AbstractAlterTable,
 } from "../abstract/schema-definitions.js";
-import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
+import type {
+  ColumnMethodsBase,
+  ColumnOptions,
+  ColumnType,
+} from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
+import {
+  fetch,
+  include,
+  included,
+  Module,
+  rbEqual,
+  rbRegMatchP,
+  RuntimeError,
+  slice,
+  toS,
+} from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -78,6 +93,64 @@ export interface ColumnMethods {
   enum(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
 
+function primaryKey(
+  this: object,
+  name: string,
+  type: ColumnType = "primary_key",
+  options: ColumnOptions = {},
+): unknown {
+  if (type === "uuid") {
+    options = {
+      ...options,
+      default: fetch(options as Record<string, unknown>, "default", "gen_random_uuid()"),
+    };
+  }
+
+  return ColumnMethods.superMethod(this, "primaryKey")!(name, type, options);
+}
+
+export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
+  new Module();
+
+ColumnMethods.defineMethod("primaryKey", primaryKey);
+
+ColumnMethods[included] = function (base: ColumnMethodsBase): void {
+  base.defineColumnMethods(
+    "bigserial",
+    "bit",
+    "bit_varying",
+    "cidr",
+    "citext",
+    "daterange",
+    "hstore",
+    "inet",
+    "interval",
+    "int4range",
+    "int8range",
+    "jsonb",
+    "ltree",
+    "macaddr",
+    "money",
+    "numrange",
+    "oid",
+    "point",
+    "line",
+    "lseg",
+    "box",
+    "path",
+    "polygon",
+    "circle",
+    "serial",
+    "tsrange",
+    "tstzrange",
+    "tsvector",
+    "uuid",
+    "xml",
+    "timestamptz",
+    "enum",
+  );
+};
+
 export interface ExclusionConstraintOptions {
   name?: string;
   using?: string;
@@ -109,9 +182,8 @@ export class ExclusionConstraintDefinition {
     return this.options.deferrable;
   }
 
-  /** @missingRailsCall match? — PERMANENT */
-  exportNameOnSchemaDump(): boolean {
-    return this.name != null && this.name.search(SchemaDumper.exclIgnorePattern) === -1;
+  exportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.exclIgnorePattern, this.name) : null;
   }
 }
 
@@ -146,27 +218,26 @@ export class UniqueConstraintDefinition {
     return this.options.nullsNotDistinct;
   }
 
-  exportNameOnSchemaDump(): boolean {
-    return this.name != null && this.name.search(SchemaDumper.uniqueIgnorePattern) === -1;
+  exportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.uniqueIgnorePattern, this.name) : null;
   }
 
-  definedFor(
-    opts: { name?: string; column?: string | string[]; [key: string]: unknown } = {},
-  ): boolean {
-    const { name, column, ...rest } = opts;
-    if (name != null && this.name !== String(name)) return false;
-    if (column != null) {
-      const thisCol = wrap(this.column);
-      const thatCol = wrap(column).map(String);
-      if (thisCol.join(",") !== thatCol.join(",")) return false;
-    }
-    const toS = (x: unknown): string => (x == null ? "" : String(x));
-    const storedOpts = this.options as Record<string, unknown>;
-    for (const [k, v] of Object.entries(rest)) {
-      if (!(k in storedOpts)) continue;
-      if (toS(storedOpts[k]) !== toS(v)) return false;
-    }
-    return true;
+  definedFor({
+    name = null,
+    column = null,
+    ...options
+  }: {
+    name?: string | null;
+    column?: string | string[] | null;
+    [key: string]: unknown;
+  } = {}): boolean {
+    options = slice(options, ...Object.keys(this.options));
+
+    return (
+      (name == null || this.name === toS(name)) &&
+      (column == null || rbEqual(wrap(this.column), wrap(column).map(toS))) &&
+      Object.entries(options).every(([k, v]) => toS(this.options[k]) === toS(v))
+    );
   }
 }
 
@@ -203,7 +274,7 @@ export class TableDefinition extends AbstractTableDefinition {
     } = {},
   ) {
     super(conn, name, options);
-    this.unlogged = PostgreSQLAdapter.createUnloggedTables;
+    this.unlogged = ConnectionAdapters.PostgreSQLAdapter.createUnloggedTables;
   }
 
   exclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): this {
@@ -286,40 +357,7 @@ export class TableDefinition extends AbstractTableDefinition {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`postgresql/schema_definitions.rb:246`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TableDefinition extends ColumnMethods {}
 
-TableDefinition.defineColumnMethods(
-  "bigserial",
-  "bit",
-  "bit_varying",
-  "cidr",
-  "citext",
-  "daterange",
-  "hstore",
-  "inet",
-  "interval",
-  "int4range",
-  "int8range",
-  "jsonb",
-  "ltree",
-  "macaddr",
-  "money",
-  "numrange",
-  "oid",
-  "point",
-  "line",
-  "lseg",
-  "box",
-  "path",
-  "polygon",
-  "circle",
-  "serial",
-  "tsrange",
-  "tstzrange",
-  "tsvector",
-  "uuid",
-  "xml",
-  "timestamptz",
-  "enum",
-);
+include(TableDefinition, ColumnMethods);
 
 export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
   addExclusionConstraint(
@@ -327,7 +365,11 @@ export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
     expression: string,
     options?: ExclusionConstraintOptions,
   ): Promise<void>;
-  removeExclusionConstraint(tableName: string, options?: { name?: string }): Promise<void>;
+  removeExclusionConstraint(
+    tableName: string,
+    expression?: string | null,
+    options?: { name?: string },
+  ): Promise<void>;
   addUniqueConstraint(
     tableName: string,
     column: string | string[],
@@ -335,7 +377,7 @@ export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
   ): Promise<void>;
   removeUniqueConstraint(tableName: string, options?: { name?: string }): Promise<void>;
   validateConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
-  validateCheckConstraint(tableName: string, constraintName: string): Promise<void>;
+  validateCheckConstraint(tableName: string, ...args: unknown[]): Promise<void>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
@@ -353,8 +395,10 @@ export class Table extends AbstractTable {
     return this._pgSchema.addExclusionConstraint(this._pgTableName, expression, options);
   }
 
-  removeExclusionConstraint(options?: { name?: string }): Promise<void> {
-    return this._pgSchema.removeExclusionConstraint(this._pgTableName, options);
+  removeExclusionConstraint(
+    ...args: [expression?: string | null, options?: { name?: string }]
+  ): Promise<void> {
+    return this._pgSchema.removeExclusionConstraint(this._pgTableName, ...args);
   }
 
   uniqueConstraint(column: string | string[], options?: UniqueConstraintOptions): Promise<void> {
@@ -369,48 +413,15 @@ export class Table extends AbstractTable {
     return this._pgSchema.validateConstraint(this._pgTableName, constraintName);
   }
 
-  validateCheckConstraint(constraintName: string): Promise<void> {
-    return this._pgSchema.validateCheckConstraint(this._pgTableName, constraintName);
+  validateCheckConstraint(...args: unknown[]): Promise<void> {
+    return this._pgSchema.validateCheckConstraint(this._pgTableName, ...args);
   }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`postgresql/schema_definitions.rb:304`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Table extends ColumnMethods {}
 
-Table.defineColumnMethods(
-  "bigserial",
-  "bit",
-  "bit_varying",
-  "cidr",
-  "citext",
-  "daterange",
-  "hstore",
-  "inet",
-  "interval",
-  "int4range",
-  "int8range",
-  "jsonb",
-  "ltree",
-  "macaddr",
-  "money",
-  "numrange",
-  "oid",
-  "point",
-  "line",
-  "lseg",
-  "box",
-  "path",
-  "polygon",
-  "circle",
-  "serial",
-  "tsrange",
-  "tstzrange",
-  "tsvector",
-  "uuid",
-  "xml",
-  "timestamptz",
-  "enum",
-);
+include(Table, ColumnMethods);
 
 export class AlterTable extends AbstractAlterTable {
   readonly constraintValidations: (string | undefined)[] = [];
@@ -438,7 +449,7 @@ export class AlterTable extends AbstractAlterTable {
   /** @internal */
   protected get _pgTd(): TableDefinition {
     if (this._td == null) {
-      throw new Error(
+      throw new RuntimeError(
         "PostgreSQL AlterTable was constructed without a TableDefinition; use adapter.createAlterTable(name) to obtain one.",
       );
     }

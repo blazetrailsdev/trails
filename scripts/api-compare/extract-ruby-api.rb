@@ -98,7 +98,7 @@ end
 
 # ---- Param extraction from Ripper AST ----
 
-def extract_params(params_node)
+def extract_params(params_node, opener_at = nil)
   return [] if params_node.nil?
   return [] unless params_node.is_a?(Array) && params_node[0] == :params
 
@@ -120,7 +120,7 @@ def extract_params(params_node)
       name = ident_name(p[0])
       if name
         entry = { name: name, kind: "optional", default: "..." }
-        lit = literal_value(p[1])
+        lit = literal_value(p[1], opener_at)
         entry[:literal] = lit if lit
         result << entry
       end
@@ -151,7 +151,7 @@ def extract_params(params_node)
           result << { name: name.chomp(":"), kind: "keyword" }
         else
           entry = { name: name.chomp(":"), kind: "keyword", default: "..." }
-          lit = literal_value(kw[1])
+          lit = literal_value(kw[1], opener_at)
           entry[:literal] = lit if lit
           result << entry
         end
@@ -258,6 +258,29 @@ def strip_sexp_positions(node)
   node.map { |child| strip_sexp_positions(child) }
 end
 
+INLINED_HOOKS = %w[initialize new].freeze
+VENDOR_ROOT = File.expand_path("../../vendor", __dir__)
+
+class DefEndLines < Ripper
+  attr_reader :ends
+
+  def initialize(*)
+    super
+    @ends = {}
+    @starts = []
+  end
+
+  def on_kw(tok)
+    @starts << lineno if tok == "def"
+    tok
+  end
+
+  def on_def(*)
+    @ends[@starts.pop] = lineno
+  end
+  alias on_defs on_def
+end
+
 def body_digest(body)
   return nil if body.nil?
   Digest::SHA256.hexdigest(strip_sexp_positions(body).inspect)[0, 16]
@@ -265,7 +288,7 @@ end
 
 # Classify a default-value or constant-RHS node as a literal {kind:, value:};
 # {kind: "expr"} for non-literals (calls, refs, lambdas), nil when no node.
-def literal_value(node)
+def literal_value(node, opener_at = nil)
   return nil if node.nil?
   return { kind: "expr" } unless node.is_a?(Array)
   case node[0]
@@ -275,7 +298,11 @@ def literal_value(node)
     { kind: "float", value: node[1] }
   when :string_literal
     val = string_literal_value(node)
-    val.nil? ? { kind: "expr" } : { kind: "string", value: val }
+    return { kind: "expr" } if val.nil?
+    lit = { kind: "string", value: val }
+    opener = val.include?("\\") && opener_at ? opener_at.call(node.dig(1, 1, 2)) : nil
+    lit[:opener] = opener if opener && raw_string_opener?(opener)
+    lit
   when :symbol_literal
     inner = node[1]
     name = inner.is_a?(Array) && inner[0] == :symbol ? ident_name(inner[1]) : nil
@@ -318,6 +345,11 @@ def string_literal_value(node)
   str
 end
 
+def raw_string_opener?(opener)
+  opener == "'" || opener.start_with?("%q") || opener.start_with?("%s") ||
+    (opener.start_with?("<<") && opener.include?("'"))
+end
+
 # ---- Dependency detection patterns ----
 # Each entry maps a dependency name to the constants and identifiers that
 # indicate usage. Adding a new dependency is just adding a new key here.
@@ -358,6 +390,7 @@ class ApiExtractor
     # receiver_kind: `MIME_TYPES.fetch` is provably `Hash#fetch`).
     @file_hash_constants = {}
     @hash_ivars = Set.new
+    @array_ivars = Set.new
     # rel_path → Set of Ruby Hash KEY names declared in that file: the literal
     # keys of a Hash-constant assignment (`PARSING`, xml_mini.rb:67-88) and the
     # Symbol keys an options hash is read by in a method body (`@options.fetch(
@@ -423,9 +456,39 @@ class ApiExtractor
   # (`options.fetch(:k, default)`).
   OPTION_READER_METHODS = %w[fetch delete key? has_key? include? member?].to_set
 
+  STRING_OPENER_TOKENS = %i[
+    on_tstring_beg on_qwords_beg on_words_beg on_qsymbols_beg on_symbols_beg on_backtick
+  ].freeze
+
+  def string_opener_at(pos)
+    @string_openers ||= lex_string_openers
+    @string_openers[pos]
+  end
+
+  def lex_string_openers
+    openers = {}
+    stack = []
+    heredocs = []
+    Ripper.lex(@source).each do |pos, type, tok|
+      case type
+      when *STRING_OPENER_TOKENS then stack.push(tok)
+      when :on_symbeg then stack.push(tok) if tok.length > 1
+      when :on_tstring_end then stack.pop
+      when :on_heredoc_beg then heredocs.push(tok)
+      when :on_heredoc_end then heredocs.shift
+      when :on_tstring_content then openers[pos] = stack.last || heredocs.first
+      end
+    end
+    openers
+  end
+
   def process_file(filepath, package_root)
     source = File.read(filepath)
     @source_lines = source.lines
+    @source = source
+    @string_openers = nil
+    @def_end_lines = nil
+    @vendor_file = filepath.start_with?("#{VENDOR_ROOT}/") ? filepath.delete_prefix("#{VENDOR_ROOT}/") : nil
     sexp = Ripper.sexp(source)
     return unless sexp
 
@@ -445,7 +508,13 @@ class ApiExtractor
 
     @current_file = rel_path
     @current_line = 0
-    @hash_ivars = hash_typed_ivars(sexp).select { |_name, hashy| hashy }.keys.to_set
+    @defines_fail = source.match?(/^\s*def\s+(?:self\.)?fail\b/)
+    ivar_kinds = typed_ivars(sexp)
+    ivar_kinds.clear if ivar_kinds.keys.any? { |_owner, name| name == "*" }
+    kinds_by_name = ivar_kinds.group_by { |(_owner, name), _kind| name }.transform_values { |rows| rows.map(&:last).uniq }
+    ivar_kinds.reject! { |(_owner, name), _kind| kinds_by_name[name].size > 1 }
+    @hash_ivars = ivar_kinds.select { |_key, kind| kind == "hash" }.keys.to_set
+    @array_ivars = ivar_kinds.select { |_key, kind| kind == "array" }.keys.to_set
     walk(sexp)
 
     # Handle dynamic class creation via const_set:
@@ -587,6 +656,7 @@ class ApiExtractor
       # only: re-walking the call would reach process_method_add_arg's
       # define_method arm and record the same method a second time.
       consumed_call = process_define_method_block(node)
+      process_each_include(node)
       unless process_each_codegen(node)
         @in_on_load += 1 if on_load_block?(node)
         included_target = concern_included_block?(node) ? (@modules[current_fqn]) : nil
@@ -605,6 +675,7 @@ class ApiExtractor
       lhs, rhs = node[1], node[2]
       maybe_record_valid_options(lhs, rhs)
       maybe_record_constant(lhs, rhs)
+      maybe_record_module_list(lhs, rhs)
       # Only enter the struct-class path when:
       #   lhs = [:var_field, [:@const, "Name", ...]]
       #   rhs = [:method_add_block, [:method_add_arg, [:call, Struct, ., :new], ...], block]
@@ -626,6 +697,16 @@ class ApiExtractor
         @classes[fqn][:superclass] = "Struct"
         synthesize_struct_members(fqn, struct_call)
         walk_body(body) if body
+        @visibility_stack.pop
+        @namespace_stack.pop
+      elsif lhs.is_a?(Array) && lhs[0] == :var_field &&
+            lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
+            (body = class_new_body(rhs))
+        @namespace_stack.push(lhs[1][1])
+        @visibility_stack.push(:public)
+        fqn = current_fqn
+        @classes[fqn] ||= new_class_info(lhs[1][1], fqn)
+        walk_body(body)
         @visibility_stack.pop
         @namespace_stack.pop
       else
@@ -664,7 +745,8 @@ class ApiExtractor
     name = const_name(node[1])
     return unless name
 
-    superclass = qualified_const_name(node[2]) if node[2]
+    delegated = delegate_class_target(node[2])
+    superclass = qualified_const_name(delegated || node[2]) if node[2]
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
@@ -673,6 +755,7 @@ class ApiExtractor
     fqn = current_fqn
     @classes[fqn] ||= new_class_info(name, fqn)
     @classes[fqn][:superclass] = superclass if superclass
+    @classes[fqn][:delegateClass] = true if delegated && superclass
     synthesize_struct_members(fqn, node[2]) if superclass == "Struct"
 
     body = node[3] || node[2]
@@ -698,6 +781,16 @@ class ApiExtractor
     return nil unless call.is_a?(Array) &&
                       (call[0] == :method_add_arg || call[0] == :command_call)
     const_name(call[1]) == "Struct" ? call : nil
+  end
+
+  def class_new_body(rhs)
+    rhs = rhs[1] if rhs.is_a?(Array) && rhs[0] == :call && rhs[3].is_a?(Array) && rhs[3][1] == "new"
+    return nil unless rhs.is_a?(Array) && rhs[0] == :method_add_block
+    call = rhs[1][0] == :method_add_arg ? rhs[1][1] : rhs[1]
+    return nil unless call.is_a?(Array) && call[0] == :call &&
+                      const_name(call[1]) == "Class" && call[3][1] == "new"
+    block = rhs[2]
+    block.is_a?(Array) && (block[0] == :do_block || block[0] == :brace_block) ? block[2] : nil
   end
 
   # `class Attribute < Struct.new :relation, :name` (arel/attributes/attribute.rb:5)
@@ -801,7 +894,7 @@ class ApiExtractor
     name = ident_name(name_node)
     return unless name
 
-    params = extract_params(find_params(node))
+    params = extract_params(find_params(node), method(:string_opener_at))
     vis = current_visibility
     vis = :public if @current_doc_methods&.include?(name)
 
@@ -817,6 +910,12 @@ class ApiExtractor
       line: @current_line,
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
+    if INLINED_HOOKS.include?(name)
+      @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
+      end_line = @def_end_lines[method_info[:line]]
+      method_info[:endLine] = end_line if end_line
+      method_info[:vendorFile] = @vendor_file if @vendor_file
+    end
     if name == "method_missing" && !@in_sclass
       reader = method_missing_send_receiver(node[3], find_params(node))
       (target[:methodMissingSends] ||= []) << reader if reader
@@ -847,7 +946,7 @@ class ApiExtractor
     name = ident_name(name_node)
     return unless name
 
-    params = extract_params(find_params_defs(node))
+    params = extract_params(find_params_defs(node), method(:string_opener_at))
     vis = current_visibility
     vis = :public if @current_doc_methods&.include?(name)
 
@@ -867,6 +966,18 @@ class ApiExtractor
     target[:classMethods] << method_info
 
     maybe_update_module_file(fqn, target)
+
+    each_base_class_attribute(node[5]) { |call| process_method_add_arg(call) } if %w[extended included].include?(name)
+  end
+
+  def each_base_class_attribute(node, &block)
+    return unless node.is_a?(Array)
+
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call
+      yield node
+    else
+      node.each { |child| each_base_class_attribute(child, &block) }
+    end
   end
 
   # Update a module's or class's file to where its first method is defined, not
@@ -916,6 +1027,8 @@ class ApiExtractor
       end
     when "include"
       process_include(args)
+    when "prepend"
+      process_prepend(extract_const_args(args, keep_absolute: true))
     when "extend"
       process_extend(args)
     when "attr_reader"
@@ -978,6 +1091,17 @@ class ApiExtractor
   end
 
   def process_method_add_arg(node)
+    # `base.class_attribute(:foo, …)` inside `def self.extended(base)` /
+    # `def self.included(base)` (activerecord/lib/active_record/enum.rb:166-168)
+    # declares the attribute on whatever extends the module, as the bare
+    # `class_attribute` of an `included do` block does.
+    if node[1].is_a?(Array) && node[1][0] == :call && ident_name(node[1][3]) == "class_attribute" &&
+       node[1][1].is_a?(Array) && %i[var_ref vcall].include?(node[1][1][0]) &&
+       ident_name(node[1][1][1]) == "base"
+      process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
+      return
+    end
+
     # Handle things like: private(def ...) or public(:method_name)
     if node[1].is_a?(Array) && node[1][0] == :fcall
       cmd_name = ident_name(node[1][1])
@@ -1000,6 +1124,8 @@ class ApiExtractor
         process_attr_from_arg_paren(node[2], cmd_name)
       when "include"
         process_include_from_arg_paren(node[2])
+      when "prepend"
+        process_prepend(extract_const_args_from_paren(node[2], keep_absolute: true))
       when "extend"
         process_extend_from_arg_paren(node[2])
       when "scope"
@@ -1104,6 +1230,50 @@ class ApiExtractor
     names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "include", names: names } if names.any?
+  end
+
+  def maybe_record_module_list(lhs, rhs)
+    return unless lhs.is_a?(Array) && lhs[0] == :var_field
+    const = lhs[1]
+    return unless const.is_a?(Array) && const[0] == :@const
+    rhs = unwrap_freeze(rhs)
+    return unless rhs.is_a?(Array) && rhs[0] == :array && rhs[1].is_a?(Array)
+    elements = rhs[1]
+    return unless elements.all? { |e| e.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(e[0]) }
+    names = elements.map { |e| qualified_const_name(e) }
+    return if names.empty? || names.any?(&:nil?)
+    (@module_lists ||= {})[[current_fqn, const[1]]] = names
+  end
+
+  def process_each_include(node)
+    return if @in_on_load.positive?
+    call = node[1]
+    return unless call.is_a?(Array) && call[0] == :call && ident_name(call[3]) == "each"
+    receiver = call[1]
+    return unless receiver.is_a?(Array) && receiver[0] == :var_ref &&
+                  receiver[1].is_a?(Array) && receiver[1][0] == :@const
+    fqn = current_fqn
+    names = (@module_lists ||= {})[[fqn, receiver[1][1]]]
+    return unless names
+    block = node[2]
+    return unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
+    loop_var = block_param_name(block)
+    return unless loop_var
+    body = block[2]
+    stmts = body.is_a?(Array) && body[0] == :bodystmt ? body[1] : body
+    return unless stmts.is_a?(Array) && stmts.length == 1
+    stmt = stmts[0]
+    return unless stmt.is_a?(Array) && stmt[0] == :command && ident_name(stmt[1]) == "include"
+    arg = stmt.dig(2, 1, 0)
+    return unless arg.is_a?(Array) && arg[0] == :var_ref && ident_name(arg[1]) == loop_var
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+    names.each do |mod_name|
+      target[:includes] << mod_name
+      (@include_groups[[fqn, :includes]] ||= []) << [mod_name]
+      (target[:mixinOrder] ||= []) << { kind: "include", names: [mod_name] }
+    end
   end
 
   def process_include_from_arg_paren(args)
@@ -1115,6 +1285,15 @@ class ApiExtractor
     names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "include", names: names } if names.any?
+  end
+
+  def process_prepend(names)
+    return if @in_on_load.positive?
+    target = @classes[current_fqn] || @modules[current_fqn]
+    return unless target
+    target[:prepends].concat(names)
+    (target[:mixinOrder] ||= []) << { kind: "prepend", names: names } if names.any?
   end
 
   def process_extend(args)
@@ -1126,6 +1305,7 @@ class ApiExtractor
     names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:extends] << mod_name }
     (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "extend", names: names } if names.any?
   end
 
   def process_extend_from_arg_paren(args)
@@ -1136,6 +1316,7 @@ class ApiExtractor
     names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:extends] << mod_name }
     (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
+    (target[:mixinOrder] ||= []) << { kind: "extend", names: names } if names.any?
   end
 
   # Is `recv` a `singleton_class` receiver — either the bare
@@ -1927,7 +2108,7 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return false unless target
 
-    record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method",
+    record_metaprogrammed_method(fqn, target, name, extract_params(params_node, method(:string_opener_at)), "define_method",
                                  body: body, params_node: params_node)
     maybe_update_module_file(fqn, target)
     true
@@ -1985,7 +2166,7 @@ class ApiExtractor
         name = unrolled_name(list[0], loop_var, member)
         next unless name
         if kind == "define_method"
-          record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method",
+          record_metaprogrammed_method(fqn, target, name, extract_params(params_node, method(:string_opener_at)), "define_method",
                                        body: body, params_node: params_node)
         else
           old = list[1] && unrolled_name(list[1], loop_var, member)
@@ -2066,12 +2247,15 @@ class ApiExtractor
     mark_symbol_discriminated(entry[:params], body)
     entry[:takesBlock] = true if entry[:params].any? { |p| p[:kind] == "block" } || body_takes_block?(body)
     dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers = collect_method_calls(body, params_node)
+    calls, weak_calls, call_receivers, call_receiver_names, string_eval_calls =
+      collect_method_calls(body, params_node)
     entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     entry[:calls] = calls unless calls.empty?
     entry[:weakCalls] = weak_calls unless weak_calls.empty?
     entry[:callReceivers] = call_receivers unless call_receivers.empty?
+    entry[:callReceiverNames] = call_receiver_names unless call_receiver_names.empty?
+    entry[:stringEvalCalls] = string_eval_calls unless string_eval_calls.empty?
     call_args = collect_call_args(body)
     entry[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
@@ -2550,6 +2734,8 @@ class ApiExtractor
     parts = name.split("::")
     const = parts.last
     container = parts[0...-1].join("::")
+    own = store.dig(current_fqn, const)
+    return own if own && !absolute && container.empty?
     store.each do |fqn, consts|
       next unless consts.key?(const)
       if absolute
@@ -2675,27 +2861,40 @@ class ApiExtractor
     calls = []
     weak = []
     receivers = {}
+    receiver_names = {}
+    string_evals = []
     with_capture_locals do
       with_call_receivers(body_node, params_node) do
         walk_for_calls(body_node, calls, weak)
         calls = drop_raised_new(calls)
         receivers = call_receiver_kinds(calls.uniq)
+        receiver_names = @call_receiver_names.transform_values { |names| names.to_a.sort }
+        string_evals = @string_eval_calls.to_a.sort
       end
     end
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
-    [calls.uniq, weak_calls, receivers]
+    [calls.uniq, weak_calls, receivers, receiver_names, string_evals]
   end
 
   def with_call_receivers(body_node, params_node)
     outer_receivers = @call_receivers
+    outer_receiver_names = @call_receiver_names
+    outer_string_evals = @string_eval_calls
     outer_hash_locals = @hash_locals
+    outer_void_statements = @void_statements
+    @void_statements = void_statements(body_node)
     @call_receivers = {}
+    @call_receiver_names = {}
+    @string_eval_calls = Set.new
     @hash_locals = hash_typed_locals(body_node, params_node)
     yield
   ensure
     @call_receivers = outer_receivers
+    @call_receiver_names = outer_receiver_names
+    @string_eval_calls = outer_string_evals
     @hash_locals = outer_hash_locals
+    @void_statements = outer_void_statements
   end
 
   # call name => its sites' receiver kinds, SORTED. A name whose every
@@ -2742,6 +2941,160 @@ class ApiExtractor
     end
   end
 
+  # The calls whose non-`array` receivers `callReceiverNames` records, read by
+  # compare.ts's native-form credits: the `.length` read for `size` / `length`,
+  # the direct invocation of a Proc-valued receiver for `call`, and the native
+  # Hash forms (`in`, `delete`, `Object.assign`, a spread, an `Object.entries`
+  # loop) for the Hash calls each one ports.
+  RECEIVER_NAMED_CALLS = %w[
+    size length call key? has_key? include? member? delete merge! update merge each_pair
+  ].freeze
+
+  # The Hash calls whose block arm no native form ports: the miss block of
+  # `delete` and the conflict block of `merge` / `merge!` / `update`. A site
+  # passing one, literal or `&blk`, records its receiver as unnamed, so no form
+  # credits it. Neither does a `delete` whose removed value is used: JS
+  # `delete` answers a boolean.
+  BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
+
+  def block_pass?(args)
+    args.any? do |arg|
+      arg = arg[1] if arg.is_a?(Array) && arg[0] == :arg_paren
+      arg.is_a?(Array) && arg[0] == :args_add_block && arg[2]
+    end
+  end
+
+  # Ripper node kind => the slot holding its statement list.
+  STATEMENT_SLOTS = {
+    bodystmt: 1, if: 2, elsif: 2, unless: 2, else: 1, while: 2, until: 2,
+    when: 2, ensure: 1, rescue: 3, brace_block: 2, for: 3
+  }.freeze
+
+  # Modifier node kind => the slot holding the one statement it wraps.
+  MODIFIER_SLOTS = { if_mod: 2, unless_mod: 2, while_mod: 2, until_mod: 2, rescue_mod: 1 }.freeze
+
+  # The statements whose value nothing reads: every statement of a list but
+  # its last, which may be the value of the method, block or branch, and the
+  # statement a void modifier wraps (`options.delete(:k) if cond`).
+  def void_statements(node, found = Set.new.compare_by_identity)
+    return found unless node.is_a?(Array)
+
+    slot = node[0].is_a?(Symbol) && STATEMENT_SLOTS[node[0]]
+    stmts = slot && node[slot]
+    if stmts.is_a?(Array) && stmts[0].is_a?(Array)
+      stmts[0...-1].each do |stmt|
+        void_block_tail([:bodystmt, [stmt]], found)
+        found << stmt
+        found << stmt while stmt.is_a?(Array) && (stmt = stmt[MODIFIER_SLOTS[stmt[0]] || stmt.length])
+      end
+    end
+    void_block_tail(node[2], found) if node[0] == :method_add_block && value_discarding_iterator?(node[1])
+    node.each { |child| void_statements(child, found) }
+    found
+  end
+
+  # The iterators that return their receiver whatever the block answers
+  # (`rb_ary_each`, `rb_hash_each_pair`, `enum_each_with_index`, `int_dotimes`),
+  # so the block's last statement is one whose value nothing reads. Matched by
+  # name on an explicit receiver: a receiverless `each { }` is the class's own
+  # `each`, which may read the block's value, and is left as it was.
+  VALUE_DISCARDING_ITERATORS = %w[each each_pair each_key each_value each_with_index times].freeze
+
+  def value_discarding_iterator?(call)
+    call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg
+    call.is_a?(Array) && call[0] == :call && VALUE_DISCARDING_ITERATORS.include?(ident_name(call[3]))
+  end
+
+  # Node kind => the slot holding the next arm of its chain.
+  ARM_CHAIN_SLOTS = { if: 3, unless: 3, elsif: 3, when: 3 }.freeze
+
+  # Marks the last statement of a block or of a branch, the statement a
+  # modifier on it wraps, and where it is an `if` / `unless` / `case` /
+  # `begin`, the last statement of each arm.
+  def void_block_tail(node, found)
+    return unless node.is_a?(Array)
+
+    node = node[2] if node[0] == :do_block
+    stmts = node[STATEMENT_SLOTS[node[0]] || node.length]
+    tail = stmts.is_a?(Array) && stmts.last
+    if tail.is_a?(Array)
+      stmt = tail
+      found << stmt
+      found << stmt while stmt.is_a?(Array) && (stmt = stmt[MODIFIER_SLOTS[stmt[0]] || stmt.length])
+      void_block_tail(tail, found) if ARM_CHAIN_SLOTS.key?(tail[0])
+      void_block_tail(tail[2], found) if tail[0] == :case
+      void_block_tail(tail[1], found) if tail[0] == :begin
+    end
+    void_block_tail(node[ARM_CHAIN_SLOTS[node[0]] || node.length], found)
+  end
+
+  # `module_eval` / `class_eval` given a String (`module_eval <<-RUBY … RUBY`,
+  # relation/delegation.rb:79-83): Ripper never parses the string, so the calls
+  # in it have no position in this body's stream. Recorded as `stringEvalCalls`
+  # for compare.ts#reorderedCalls; the block form is parsed like any block.
+  STRING_EVAL_CALLS = %w[module_eval class_eval].freeze
+
+  def string_literal_arg?(args)
+    return false unless args.is_a?(Array)
+    return true if %i[string_literal xstring_literal].include?(args[0])
+    return false if args[0].is_a?(Symbol) && !%i[arg_paren args_add_block args_add].include?(args[0])
+
+    args.any? { |child| child.is_a?(Array) && string_literal_arg?(child) }
+  end
+
+  # The name a receiver ENDS in — a local or reader (`cursor`, `predicates`), the
+  # method of a call chain (`result.columns` → `columns`,
+  # `c.select_rows(…)` → `select_rows`, `Array.wrap(ids)` → `wrap`), an ivar
+  # (`@stack`), a constant or the last segment of a constant path
+  # (`ActiveRecord::ConnectionHandling::DEFAULT_ENV` → `DEFAULT_ENV`), or the
+  # Symbol key of an index read (`options[:on_skip]` → `on_skip`) — or nil for
+  # any other shape. A parenthesised `a || b` names both operands, joined by
+  # `|` (`(callable || block)` → `callable|block`), and is nil when either
+  # operand has no name.
+  def receiver_tail_name(recv)
+    return nil unless recv.is_a?(Array)
+
+    case recv[0]
+    when :var_ref, :vcall
+      inner = recv[1]
+      inner.is_a?(Array) && %i[@ident @ivar @cvar @const].include?(inner[0]) ? inner[1] : nil
+    when :const_path_ref then const_name(recv[2])
+    when :top_const_ref then const_name(recv[1])
+    when :aref then symbol_key_name(recv[2])
+    when :paren
+      stmts = recv[1]
+      stmts.is_a?(Array) && stmts.length == 1 ? or_operand_names(stmts[0]) : nil
+    when :call then recv[3].is_a?(Array) ? ident_name(recv[3]) : nil
+    when :method_add_arg
+      callee = recv[1]
+      return nil unless callee.is_a?(Array)
+
+      case callee[0]
+      when :fcall then ident_name(callee[1])
+      when :call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+      end
+    end
+  end
+
+  def or_operand_names(node)
+    return receiver_tail_name(node) unless node.is_a?(Array) && node[0] == :binary && node[2] == :"||"
+
+    names = [or_operand_names(node[1]), or_operand_names(node[3])]
+    names.all? ? names.join("|") : nil
+  end
+
+  def symbol_key_name(args)
+    return nil unless args.is_a?(Array) && args[0] == :args_add_block
+
+    keys = args[1]
+    return nil unless keys.is_a?(Array) && keys.length == 1
+
+    key = keys[0]
+    return nil unless key.is_a?(Array) && key[0] == :symbol_literal && key[1].is_a?(Array)
+
+    ident_name(key[1][1])
+  end
+
   # Core Ruby methods whose return is Array UNCONDITIONALLY, regardless of
   # what receiver_kind can prove about their OWN receiver — `String#split`,
   # `String#scan` (`vendor/ruby/v3.3.11/string.c`). Deliberately tiny and hand-picked:
@@ -2777,6 +3130,8 @@ class ApiExtractor
   # `shards.keys.values.first` does not chase `shards.keys`'s own kind back
   # through this same function, so `.values`'s receiver reads `expr`.
   def chain_receiver_kind(recv)
+    return "array" if kernel_array_call?(recv)
+
     call_node = recv[0] == :method_add_arg ? recv[1] : recv
     return "expr" unless call_node.is_a?(Array) && call_node[0] == :call
 
@@ -2811,11 +3166,26 @@ class ApiExtractor
 
     case inner[0]
     when :@ident then @hash_locals.include?(inner[1]) ? "hash" : "local"
-    when :@ivar then @hash_ivars.include?([@namespace_stack.join("::"), inner[1]]) ? "hash" : "ivar"
+    when :@ivar then ivar_receiver_kind([@namespace_stack.join("::"), inner[1]])
     when :@const then hash_constant?(inner[1]) ? "hash" : "const"
     when :@kw then inner[1] == "self" ? self_receiver_kind : "expr"
     else "expr"
     end
+  end
+
+  def ivar_receiver_kind(key)
+    return "hash" if @hash_ivars.include?(key)
+    return "array" if @array_ivars.include?(key)
+
+    "ivar"
+  end
+
+  def kernel_array_call?(node)
+    return false unless node.is_a?(Array) && node[0] == :method_add_arg
+
+    fcall = node[1]
+    fcall.is_a?(Array) && fcall[0] == :fcall && fcall[1].is_a?(Array) &&
+      fcall[1][0] == :@const && fcall[1][1] == "Array"
   end
 
   # An implicit (or explicit `self`) receiver inside a `core_ext` file that
@@ -2882,36 +3252,101 @@ class ApiExtractor
     node.each { |child| note_hash_assignments(child, assigned) if child.is_a?(Array) }
   end
 
-  # The file's ivars that are provably a Hash, keyed `[owner, name]` by the
-  # lexical class/module that assigns them: every `@x = …` in that owner
-  # assigns a `to_hash` call, whose result Ruby's
-  # implicit-conversion contract requires to be a Hash — `@row =
-  # fixture.to_hash` (`fixture_set/table_row.rb:69`). An `@x ||= …` keeps
-  # whatever truthy value `@x` already held, so it proves nothing; it, or any
-  # other non-Hash assignment in the same owner, leaves the ivar an `ivar`. An
-  # ivar of the same name in another class of the file is not proven by it.
-  # A hash-literal assignment is not yet admitted: story
-  # prove-hash-literal-ivars-in-ruby-compat-receiver-kinds.
-  def hash_typed_ivars(node, owner = [], assigned = {})
+  # The file's ivars whose class is provable, keyed `[owner, name]` by the
+  # lexical class/module that assigns them, valued `"hash"`, `"array"` or nil.
+  # An ivar is `"hash"` when every `@x = …` in that owner assigns a Hash literal
+  # (`@cascade_for = {}`, `rack/cascade.rb:25`) or a `to_hash` call, whose
+  # result Ruby's implicit-conversion contract requires to be a Hash —
+  # `@row = fixture.to_hash` (`fixture_set/table_row.rb:69`). It is
+  # `"array"` when every one assigns an Array literal or a `Kernel#Array` call
+  # (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`, always an Array) —
+  # `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
+  # (`connection_pool/queue.rb:17`). Anything else that may write the ivar
+  # leaves it an `ivar`, which is what keeps an `@records` / `@target` a
+  # Relation or association may be assigned to unproven: an `@x ||= …` (it keeps
+  # whatever truthy value `@x` already held), a multiple-assignment target, an
+  # assignment in the class body itself (a class-level ivar) or inside
+  # `class << self` / a `def self.`, an `attr_writer` / `attr_accessor` for the
+  # name, an `instance_variable_set` of it (of every ivar in the file, when the
+  # name is not a literal), any assignment of another kind in the same owner,
+  # and one of another kind to the same name in any other class or module of
+  # the file (a subclass or mixin writing the parent's ivar). An ivar of the
+  # same name in another class of the file is not proven by it.
+  def typed_ivars(node, owner = [], assigned = {}, scope = :body)
     return assigned unless node.is_a?(Array)
 
     case node[0]
     when :class, :module
       name = const_name(node[1])
       body = node[0] == :class ? node[3] : node[2]
-      hash_typed_ivars(body, owner + [name], assigned) if name
+      typed_ivars(body, owner + [name], assigned) if name
       return assigned
+    when :sclass, :defs
+      node.each { |child| typed_ivars(child, owner, assigned, :singleton) if child.is_a?(Array) }
+      return assigned
+    when :def
+      scope = :instance unless scope == :singleton
     when :assign, :opassign
-      target = node[1]
-      if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) && target[1][0] == :@ivar
-        key = [owner.join("::"), target[1][1]]
-        value = node[2]
-        hashy = node[0] == :assign && value.is_a?(Array) && value[0] == :call && ident_name(value[3]) == "to_hash"
-        assigned[key] = assigned.fetch(key, true) && hashy
+      key = ivar_target_key(node[1], owner)
+      if key
+        kind = node[0] == :assign && scope == :instance ? assigned_ivar_kind(node[2]) : nil
+        assigned[key] = assigned.key?(key) && assigned[key] != kind ? nil : kind
       end
+    when :massign
+      each_massign_ivar(node[1]) { |name| assigned[[owner.join("::"), name]] = nil }
+    when :command, :command_call, :method_add_arg
+      external_ivar_writes(node).each { |name| assigned[[owner.join("::"), name]] = nil }
     end
-    node.each { |child| hash_typed_ivars(child, owner, assigned) if child.is_a?(Array) }
+    node.each { |child| typed_ivars(child, owner, assigned, scope) if child.is_a?(Array) }
     assigned
+  end
+
+  IVAR_WRITER_MACROS = %w[attr_writer attr_accessor].freeze
+
+  def external_ivar_writes(node)
+    callee = %i[command command_call].include?(node[0]) ? node : node[1]
+    return [] unless callee.is_a?(Array)
+
+    name = case callee[0]
+           when :command, :fcall then ident_name(callee[1])
+           when :call, :command_call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+           end
+    args = node[0] == :command_call ? node[4] : node[2]
+    return extract_symbol_args(args).map { |attr| "@#{attr}" } if IVAR_WRITER_MACROS.include?(name)
+    return [] unless name == "instance_variable_set"
+
+    first = first_call_arg(args)
+    ivar = first.is_a?(Array) && first[0] == :symbol_literal && first[1].is_a?(Array) && first[1][1]
+    ivar.is_a?(Array) && ivar[0] == :@ivar ? [ivar[1]] : ["*"]
+  end
+
+  def first_call_arg(args)
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    args.is_a?(Array) ? args[0] : nil
+  end
+
+  def ivar_target_key(target, owner)
+    return nil unless target.is_a?(Array) && target[0] == :var_field
+    return nil unless target[1].is_a?(Array) && target[1][0] == :@ivar
+
+    [owner.join("::"), target[1][1]]
+  end
+
+  def assigned_ivar_kind(value)
+    return nil unless value.is_a?(Array)
+    return "hash" if LITERAL_HASH_NODES.include?(value[0])
+    return "hash" if value[0] == :call && ident_name(value[3]) == "to_hash"
+    return "array" if value[0] == :array || kernel_array_call?(value)
+
+    nil
+  end
+
+  def each_massign_ivar(targets, &block)
+    return unless targets.is_a?(Array)
+    return block.call(targets[1][1]) if targets[0] == :var_field && targets[1].is_a?(Array) && targets[1][0] == :@ivar
+
+    targets.each { |child| each_massign_ivar(child, &block) if child.is_a?(Array) }
   end
 
   # The local a `:var_field` assignment target names, or nil for an ivar,
@@ -2959,6 +3394,17 @@ class ApiExtractor
   # non-logical op-assign (`+=`) is not a branch and emits nothing.
   SKELETON_LOGICAL_OP_ASSIGNS = { "||=" => "or", "&&=" => "and" }.freeze
 
+  # `x = find { … } || return`
+  # (`activerecord/lib/active_record/relation/merger.rb:103-105`): an `||` whose
+  # right side leaves the method, block or loop is `return unless x`, an arm and
+  # not a value fallback. Its port is `if (!x) return;`, a JS `||` having no
+  # statement for a right side, so it tokens as the `if` that port emits.
+  SKELETON_EXIT_NODES = %i[return return0 next break].freeze
+
+  def skeleton_or_exit?(node)
+    SKELETON_LOGICAL_OPS[node[2]] == "or" && node[3].is_a?(Array) && SKELETON_EXIT_NODES.include?(node[3][0])
+  end
+
   # The body's ordered control + call skeleton — `if` / `loop` / `try` /
   # `rescue` / `throw`, the `or` / `and` short-circuits,
   # `new:Const` and `ref:<name>` reaches, in source order
@@ -3002,10 +3448,49 @@ class ApiExtractor
   def walk_for_skeleton(node, tokens)
     return unless node.is_a?(Array)
 
+    walk_node_for_skeleton(node, tokens)
+    source = skeleton_string_eval_source(node)
+    tokens.concat(skeleton_string_eval_arms(source)) if source
+  end
+
+  SKELETON_STRING_EVAL_ARMS = /\A(?:if|loop|try|rescue|or|and|throw(?::.*)?)\z/.freeze
+
+  def skeleton_string_eval_arms(source)
+    sexp = Ripper.sexp(source)
+    return [] unless sexp
+
+    arms = []
+    with_capture_locals { walk_for_skeleton(sexp, arms) }
+    arms.grep(SKELETON_STRING_EVAL_ARMS)
+  end
+
+  def skeleton_string_eval_source(node)
+    name, args =
+      case node[0]
+      when :command then [node[1], node[2]]
+      when :command_call then [node[3], node[4]]
+      when :method_add_arg
+        callee = node[1]
+        [callee.is_a?(Array) ? { fcall: callee[1], call: callee[3] }[callee[0]] : nil, node[2]]
+      end
+    return unless name.is_a?(Array) && STRING_EVAL_CALLS.include?(ident_name(name))
+
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    first = args[1].first if args.is_a?(Array) && args[0] == :args_add_block && args[1].is_a?(Array)
+    return unless first.is_a?(Array) && first[0] == :string_literal && first[1].is_a?(Array)
+
+    parts = first[1].drop(1)
+    return if parts.empty? || !parts.all? { |part| part[0] == :@tstring_content }
+
+    parts.map { |part| part[1] }.join
+  end
+
+  def walk_node_for_skeleton(node, tokens)
     kind = node[0]
     tokens << "send:setter" if setter_send?(node)
     if SKELETON_IF_NODES.include?(kind)
       tokens << "if"
+      tokens << "when:#{node[1].length}" if kind == :when && skeleton_when_list?(node[1])
     elsif SKELETON_LOOP_NODES.include?(kind)
       tokens << "loop"
     elsif kind == :bodystmt && (node[2] || node[4])
@@ -3025,11 +3510,18 @@ class ApiExtractor
       return
     elsif kind == :binary && SKELETON_LOGICAL_OPS.key?(node[2])
       walk_for_skeleton(node[1], tokens)
-      tokens << SKELETON_LOGICAL_OPS[node[2]]
+      tokens << if skeleton_or_exit?(node)
+        "if"
+      else
+        skeleton_string_or_symbol?(node) ? "or:string-symbol" : SKELETON_LOGICAL_OPS[node[2]]
+      end
       walk_for_skeleton(node[3], tokens)
       return
     elsif kind == :opassign && SKELETON_LOGICAL_OP_ASSIGNS.key?(op_assign_op(node[2]).to_s)
       tokens << SKELETON_LOGICAL_OP_ASSIGNS[op_assign_op(node[2]).to_s]
+    elsif kind == :assign && node[1].is_a?(Array) && node[1][0] == :field &&
+          node[1][2].is_a?(Array) && node[1][2][1] == "&."
+      tokens << "if"
     elsif kind == :aref
       # Receiver, then the `[]` reach, then the index — as
       # extract-ts-api.ts#extractSkeleton emits an ElementAccessExpression.
@@ -3063,6 +3555,36 @@ class ApiExtractor
 
     node.each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
     note_capture_locals(node)
+  end
+
+  # Does this `:when` test a value LIST — `when Arel::Nodes::Node,
+  # Arel::Table, …` (`activerecord/lib/arel/nodes/casted.rb:50`) — rather than
+  # one value or a splat? Its `when:N` mark (after the clause's `if`) is what a
+  # port's `||` chain of N type tests on one operand is credited against
+  # (extract-ts-api.ts#whenListChain); compare.ts#foldSkeletonTokens drops the
+  # mark from this stream, since the list emits no `or` of its own.
+  def skeleton_when_list?(values)
+    values.is_a?(Array) && values.length > 1 && values.all? { |v| v.is_a?(Array) && v[0].is_a?(Symbol) }
+  end
+
+  # Is this `||` the String-or-Symbol test `String === x || Symbol === x`
+  # (`activerecord/lib/arel/nodes/window.rb:14-28`), on one operand? A Ruby
+  # Symbol is a JS string, so its port is the one `typeof x === "string"` and
+  # emits no `or`; the `or:string-symbol` mark folds away in
+  # compare.ts#foldSkeletonTokens unless the TS stream still shows an `or`.
+  def skeleton_string_or_symbol?(node)
+    return false unless %i[|| or].include?(node[2])
+
+    tests = [node[1], node[3]].map do |test|
+      next nil unless test.is_a?(Array) && test[0] == :binary && test[2] == :===
+      const = test[1]
+      next nil unless const.is_a?(Array) && %i[var_ref top_const_ref].include?(const[0]) &&
+                      const[1][0] == :@const
+      [const[1][1], strip_sexp_positions(test[3])]
+    end
+    return false if tests.include?(nil)
+
+    tests.map(&:first).sort == %w[String Symbol] && tests[0][1] == tests[1][1]
   end
 
   SETTER_SEND_NAMES = %w[send public_send __send__].freeze
@@ -3105,7 +3627,7 @@ class ApiExtractor
   def skeleton_push_name(tokens, name, recv, args = nil)
     return unless name
 
-    if name == "raise"
+    if name == "raise" || (name == "fail" && recv.nil? && !@defines_fail)
       const = skeleton_raise_class(args)
       tokens << (const ? "throw:#{const}" : "throw")
     elsif name == "new"
@@ -3222,7 +3744,7 @@ class ApiExtractor
     maybe_record_collection_constant(const[1], rhs)
     maybe_record_symbol_hash_keys(const[1], rhs)
     record_file_hash_keys(literal_hash_keys(rhs))
-    lit = literal_value(rhs)
+    lit = literal_value(rhs, method(:string_opener_at))
     return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit
   end
@@ -3368,12 +3890,25 @@ class ApiExtractor
     names
   end
 
+  OPTION_COPY_METHODS = %w[dup clone merge except slice].to_set
+
   def walk_for_option_keys(node, vars, consts, keys)
     return unless node.is_a?(Array)
     case node[0]
+    when :assign
+      target = node[1]
+      if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) &&
+          target[1][0] == :@ident
+        option_copy?(node[2], vars) ? vars << target[1][1] : vars.delete(target[1][1])
+      end
     when :aref
       # options[:foo]
       traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
+    when :opassign
+      target = node[1]
+      if target.is_a?(Array) && target[0] == :aref_field && option_var?(target[1], vars)
+        traverse_for_symbols(target[2], keys)
+      end
     when :method_add_arg, :command_call
       # `options.fetch(:k)` (parens) and `options.assert_valid_keys :a` (no
       # parens). A bare `:call` (`options.keys`) never carries a key arg.
@@ -3407,11 +3942,26 @@ class ApiExtractor
         members = c.start_with?("::") ? resolve_const_symbol_array(c) : consts[c]
         (members || []).each { |s| keys << s }
       end
+    elsif meth == "values_at"
+      traverse_for_symbols(args, keys)
     elsif OPTION_READER_METHODS.include?(meth)
       syms = []
       traverse_for_symbols(args, syms)
       keys << syms.first if syms.first
     end
+  end
+
+  def option_copy?(node, vars)
+    return false unless node.is_a?(Array)
+    node = node[1] if node[0] == :method_add_block
+    call = node[0] == :method_add_arg ? node[1] : node
+    return option_var?(call, vars) unless call.is_a?(Array) && call[0] == :call
+    meth = ident_name(call[3])
+    return false unless OPTION_COPY_METHODS.include?(meth)
+    return true if option_copy?(call[1], vars)
+    meth == "merge" && node[0] == :method_add_arg && node[2].is_a?(Array) &&
+      node[2][0] == :arg_paren && node[2][1].is_a?(Array) && node[2][1][0] == :args_add_block &&
+      node[2][1][1].is_a?(Array) && node[2][1][1].any? { |arg| option_copy?(arg, vars) }
   end
 
   # `options` / `opts` (a local or param, `:@ident`) and `@options` / `@opts`
@@ -3576,6 +4126,36 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
+  # `Promise.new(...)`, `Promise::Complete.new(...)` and `Promise.wrap(...)` port
+  # to the value itself: the native JS promise is the port of
+  # `ActiveRecord::Promise` (CLAUDE.md § "`ActiveRecord::Promise` is the native
+  # promise"), and an awaited body answers one whatever it returns. Like
+  # `Proc.new`, the verdict is per SITE and by RECEIVER, so a body's other `new`
+  # sites still record.
+  NATIVE_PROMISE_CONSTANTS = %w[
+    Promise Promise::Complete ActiveRecord::Promise ActiveRecord::Promise::Complete
+  ].freeze
+  NATIVE_PROMISE_CALLS = %w[new wrap].freeze
+
+  def native_promise_call?(name, recv)
+    NATIVE_PROMISE_CALLS.include?(name) && NATIVE_PROMISE_CONSTANTS.include?(const_name(recv))
+  end
+
+  LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array].freeze
+
+  def core_new_kind(recv, args, has_block)
+    return nil unless recv.is_a?(Array) && %i[var_ref const_path_ref].include?(recv[0])
+    return nil if has_block
+
+    const = const_name(recv)
+    return nil if const.nil?
+
+    no_args = args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] }
+    return "literal-new" if no_args && LITERAL_NEW_CONSTANTS.include?(const)
+
+    "string-new" if !no_args && const == "String"
+  end
+
   # `weak` collects the occurrences whose receiver was inert; a name only
   # becomes a weak CALL when no non-inert occurrence exists (collect_method_calls).
   def walk_for_calls(node, calls, weak)
@@ -3584,7 +4164,8 @@ class ApiExtractor
     case node[0]
     when :method_add_arg, :fcall, :vcall, :call, :command, :command_call
       callee, args = split_call_node(node)
-      walk_call_in_order(callee, args, calls, weak)
+      walk_call_in_order(callee, args, calls, weak, node.equal?(@block_call),
+                         value_used: !@void_statements&.include?(node))
       return
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
@@ -3600,6 +4181,7 @@ class ApiExtractor
       # Same order as the plain child walk this used to fall through to — the
       # call first, then its block body — but the body is walked knowing whose
       # `self` it runs under (module_eval_self_call?).
+      @block_call = node[1]
       walk_for_calls(node[1], calls, weak)
       with_module_eval(module_eval_block?(node[1])) do
         node.drop(2).each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
@@ -3637,7 +4219,7 @@ class ApiExtractor
   # That is the port's order too — Rails' `xs.each do … end` is normally a
   # `for` loop, whose body follows the iterated expression — and the TS side
   # defers function-expression arguments for exactly this reason.
-  def walk_call_in_order(callee, args, calls, weak)
+  def walk_call_in_order(callee, args, calls, weak, has_block = false, value_used: true)
     name = nil
     recv = nil
     case callee[0]
@@ -3666,10 +4248,20 @@ class ApiExtractor
     name = nil if name == "call" && recv && attr_reader_receiver_name(recv)
 
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
-       !(name == "new" && recv && proc_new_receiver?(recv))
+       !(name == "new" && recv && proc_new_receiver?(recv)) &&
+       !(recv && native_promise_call?(name, recv))
       calls << name
-      (@call_receivers[name] ||= Set.new) << receiver_kind(recv)
+      kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
+      (@call_receivers[name] ||= Set.new) << kind
+      if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
+        formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||
+                   (value_used && name == "delete")
+        (@call_receiver_names[name] ||= Set.new) << ((!formless && receiver_tail_name(recv)) || "?")
+      end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
+      if STRING_EVAL_CALLS.include?(name) && string_literal_arg?(args)
+        @string_eval_calls&.add(name)
+      end
     end
 
     lambdas.each { |lambda_node| walk_for_calls(lambda_node, calls, weak) }
@@ -3842,6 +4434,8 @@ class ApiExtractor
     # would let the argument gate flag a site the other extractor says is gone.
     name = nil if name == "new" && (callee[0] == :call || callee[0] == :command_call) &&
                   proc_new_receiver?(callee[1])
+    name = nil if (callee[0] == :call || callee[0] == :command_call) &&
+                  native_promise_call?(name, callee[1])
     name = nil if name && attr_reader_read?(callee, args, flags)
     if name == "call" && (callee[0] == :call || callee[0] == :command_call)
       name = attr_reader_receiver_name(callee[1]) || name
@@ -3950,7 +4544,7 @@ class ApiExtractor
     when :symbol_literal then "sym:#{ident_name(node[1]) || "?"}"
     when :dyna_symbol
       literal = describe_string(node[1])
-      literal.start_with?("str:") ? "sym:#{literal.delete_prefix("str:")}" : "?"
+      literal.match?(/\Ar?str:/) ? literal.sub("str:", "sym:") : "?"
     when :vcall, :fcall then "id:#{ident_name(node[1]) || "?"}"
     when :call, :command, :command_call, :method_add_arg, :method_add_block
       name = nested_call_name(node)
@@ -3958,11 +4552,30 @@ class ApiExtractor
     when :array then "array"
     when :hash then describe_hash(node[1], flags)
     when :bare_assoc_hash then describe_kwargs(node[1], flags) || "hash"
-    when :binary then "binop:#{node[2]}"
+    when :binary then describe_binary(node, flags)
     when :unary then describe_unary(node, flags)
     when :ifop then "ternary"
     when :paren then describe_args(node[1], flags).first || "?"
     else "?"
+    end
+  end
+
+  def describe_binary(node, flags)
+    factors = product_factors(node)
+    flags << "product=#{factors.join("*")}" if factors
+    "binop:#{node[2]}"
+  end
+
+  def product_factors(node)
+    if node.is_a?(Array) && node[0] == :binary
+      return nil unless node[2] == :*
+
+      left = product_factors(node[1])
+      right = product_factors(node[3])
+      left && right ? left + right : nil
+    else
+      factor = describe_arg(node, [])
+      factor.start_with?("num:", "id:") ? [factor] : nil
     end
   end
 
@@ -4001,7 +4614,11 @@ class ApiExtractor
     return "?" unless parts.is_a?(Array)
     return "str:" if parts.empty?
     return "str-interp" unless parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
-    "str:#{escape_descriptor_text(parts.map { |p| p[1] }.join)}"
+    text = parts.map { |p| p[1] }.join
+    return "str:#{escape_descriptor_text(text)}" unless text.include?("\\")
+    opener = string_opener_at(parts[0][2])&.delete_prefix(":")
+    opener = nil unless opener && raw_string_opener?(opener)
+    "rstr:#{escape_descriptor_text(opener.to_s).gsub(":", "%3A")}:#{escape_descriptor_text(text)}"
   end
 
   # The four grammar delimiters, so a string VALUE carrying one does not read as
@@ -4109,6 +4726,7 @@ class ApiExtractor
       file: @current_file,
       includes: [],
       extends: [],
+      prepends: [],
       instanceMethods: [],
       classMethods: [],
     }
@@ -4150,6 +4768,17 @@ class ApiExtractor
     else
       nil
     end
+  end
+
+  def delegate_class_target(node)
+    return nil unless node.is_a?(Array) && node[0] == :method_add_arg
+    fcall = node[1]
+    return nil unless fcall.is_a?(Array) && fcall[0] == :fcall && fcall[1].is_a?(Array) &&
+                      fcall[1][1] == "DelegateClass"
+    args = node[2]
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    args.is_a?(Array) ? args[0] : nil
   end
 
   def find_params(def_node)
@@ -4278,8 +4907,11 @@ class ApiExtractor
       return ident_name(inner) if inner.is_a?(Array) && inner[0] == :symbol
       inner.is_a?(Array) ? ident_name(inner[1]) : nil
     when :dyna_symbol
-      # Dynamic symbols — skip
-      nil
+      content = node[1]
+      content = content[1..] if content.is_a?(Array) && content[0] == :string_content
+      return nil unless content.is_a?(Array) && content.length == 1
+      part = content[0]
+      part.is_a?(Array) && part[0] == :@tstring_content ? part[1] : nil
     else
       nil
     end
@@ -4419,7 +5051,12 @@ def normalize_class_info(info)
     extends: info[:extends].uniq,
     instanceMethods: tag_internal(info[:instanceMethods]),
     classMethods: tag_internal(info[:classMethods]),
-  }.tap { |out| out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods] }
+  }.tap do |out|
+    out[:delegateClass] = true if info[:delegateClass]
+    out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods]
+    out[:prepends] = info[:prepends].uniq if info[:prepends]&.any?
+    out[:mixinOrder] = info[:mixinOrder] if info[:mixinOrder]&.any?
+  end
 end
 
 run if __FILE__ == $PROGRAM_NAME

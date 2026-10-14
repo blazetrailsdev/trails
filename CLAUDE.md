@@ -4,7 +4,12 @@ The rules and conventions for working in this repo. For the Rails-port
 methodology — working principles, the `@internal` JSDoc convention, and how to
 measure progress — see [CONTRIBUTING.md](CONTRIBUTING.md). For project overview,
 package list, and the `declare` / associations / enums / schema reference, see
-[README.md](README.md).
+[README.md](README.md). Rules that bind only inside one package live in that
+package's `packages/<pkg>/CLAUDE.md`; every heading moved there is kept below as
+a pointer, so a `CLAUDE.md, "Section title"` citation in code still resolves.
+The history behind each ratified decision — alternatives tried, measurements,
+the PRs that settled it — is in
+[docs/claude-md-decision-history.md](docs/claude-md-decision-history.md).
 
 ## Fidelity is the job
 
@@ -25,8 +30,7 @@ Mirror, method by method and line by line:
   from the Ruby name, you have a bug, not a preference.
 - **Locals and parameters.** A local or parameter keeps the Rails identifier,
   camelCased — Ruby `stmt` is `stmt`, not `statement`; `klass` is `klass`, not
-  `modelClass`. Same for parameter _order_ and defaults. This is free fidelity
-  and it is most of what makes a body readable next to the Ruby.
+  `modelClass`. Same for parameter _order_ and defaults.
 - **Control flow.** Same branches, in the same order, with the same guards and
   early returns. Do not collapse two Rails branches into one, invert a guard,
   reorder side-effect-free calls, or drop a check you believe is unreachable.
@@ -35,10 +39,10 @@ Mirror, method by method and line by line:
   method.
 - **No extra abstraction.** Do not add a helper, wrapper, indirection layer, or
   "cleaner" rewrite that Rails does not have. Extra surface is measured —
-  `pnpm parity:api:extra` reports every public TS name with no Ruby counterpart. If
-  you genuinely need one, declare it with a `@noRailsEquivalent` JSDoc tag; that
-  tag is the only sanctioned exception. A receipt has exactly two shapes and
-  carries no prose: `PERMANENT`, where the token is the whole receipt, and
+  `pnpm parity:api:extra` reports every public TS name with no Ruby counterpart.
+  If you genuinely need one, declare it with a `@noRailsEquivalent` JSDoc tag;
+  that tag is the only sanctioned exception. A receipt has exactly two shapes
+  and carries no prose: `PERMANENT`, where the token is the whole receipt, and
   `CONVERGEABLE <story-id>`, where the story IS the receipt and the tag only
   points at it. `no-freeform-comments` strips anything else.
 - **Errors.** Same error class, same message string, same raise site.
@@ -53,6 +57,11 @@ Rails name. There is almost always a way around:
   `@blazetrails/activesupport`, or `this`-typed functions assigned to the class
   (see "Module mixins" below), so the code still lives in the Rails file at the
   Rails name.
+- Ruby `obj.clone` / `obj.dup` → `rbObjClone(obj)` / `rbObjDup(obj)` from
+  `@blazetrails/ruby-compat` (MRI `rb_obj_clone` / `rb_obj_dup`): they copy
+  the ivars and dispatch the class's `initializeClone` / `initializeDup` (else
+  `initializeCopy`), ported at their Rails names. Never open-code the
+  `Object.create` + copy at a call site.
 - Ruby kwargs, blocks, and `method_missing` each have a settled trails idiom.
   Find it and use it; don't invent a new shape.
 
@@ -67,9 +76,9 @@ Convergence is the goal. Every deviation register in this repo — the
 `call-mismatches-exclude` baselines, `arity-exclude.json`, `@noRailsEquivalent`,
 `@missingRailsCall`, `SKIP_GROUPS`, and every story in a
 `<package>-surfaced-deviations` bucket — is a **burndown ledger**, not a settled
-decision. A row in one of them says "we know this is wrong and haven't fixed it yet." It is
-never a licence to leave it, to copy the pattern into new code, or to add a
-sibling row next to it.
+decision. A row in one of them says "we know this is wrong and haven't fixed it
+yet." It is never a licence to leave it, to copy the pattern into new code, or
+to add a sibling row next to it.
 
 So:
 
@@ -79,9 +88,15 @@ So:
   you already have in front of you. Do not silently propagate the shape.
 - **A deviation-convergence story always converges.** Do not close one by
   writing a better justification for the deviation, by broadening a baseline
-  reason, or by moving it to a different register. If it genuinely cannot
-  converge, `pnpm tasks block` it with the specific blocker — but that is rare,
-  and "it would be a bigger diff" is not one.
+  reason, or by moving it to a different register. `pnpm tasks block` is for a
+  story waiting on something that can change: another story, an unported
+  package, an upstream release, an owner decision. Name that thing, and prefer
+  a `deps` edge when it is a story. A story that can never converge is not
+  blocked: once the limit is ratified in this file or ruled on by the repo
+  owner, `pnpm tasks close` it with a reason that starts `PERMANENT:` and
+  stands alone, after its receipts in the code are `PERMANENT` too. A story
+  whose premise or acceptance criteria turned out wrong closes with
+  `FALSIFIED:`. Both are rare, and "it would be a bigger diff" is neither.
 - **Never widen an allowlist to cover new work.** Baselines are only-shrink by
   construction; adding a row for code you are writing right now inverts the
   entire mechanism.
@@ -103,12 +118,42 @@ port a body:
 - **`fetch` vs `??`.** `h.fetch(:k, default)` returns the _stored_ value
   whenever the key exists — including a stored `nil` or `false`. `h.k ?? default`
   substitutes the default for `null`/`undefined`. They differ, and Rails
-  relation readers depend on the difference.
+  relation readers depend on the difference. `fetch` has no native form, so it
+  is always ruby-compat's `fetch` (see the next bullet).
+- **Hash calls on a plain object.** Where the receiver is a plain object, write
+  the JS form and not the ruby-compat helper. The call gates credit the form on
+  the receiver Rails names, and `parity:api:calls:args` checks a literal key.
+
+  | Ruby                                       | Native form                               | Keeps the helper where                                                                                                    |
+  | ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+  | `h.key?(:k)` / `has_key?`                  | `"k" in h`; `Object.hasOwn(h, k)`         | the object can hold `{ k: undefined }` for an absent keyword                                                              |
+  | `h[k]` / `h[k] = v`                        | `h[k]` / `h[k] = v`                       | a miss must read `null`; `k` is caller-supplied (`"__proto__"`, an `Object.prototype` name); a test asserts `FrozenError` |
+  | `h.delete(:k)`                             | `delete h.k`                              | the removed value is used, or a block is passed                                                                           |
+  | `h.merge!(other)` / `update`               | `Object.assign(h, other)`                 | a conflict block is passed                                                                                                |
+  | `h.merge(other)`                           | `{ ...h, ...other }`                      | a conflict block is passed; the result must have no prototype                                                             |
+  | `h.each_pair { \|k, v\| }`                 | `for (const [k, v] of Object.entries(h))` | the call's return value is used                                                                                           |
+  | `fetch`, `delete_if`, `keep_if`, `replace` | none                                      | always                                                                                                                    |
+
+  `in` is for a literal key that is not an `Object.prototype` member name;
+  a computed or caller-supplied key is `Object.hasOwn(h, k)`, since `in` walks
+  the prototype chain and `"toString" in options` is true. Every row also keeps
+  the helper where the receiver may be a `Map`, a `Hash`, or an object that
+  answers the call itself (`isKey`, `get`, `set`, `each`), because the helper
+  dispatches and the form does not. A member call (`headers.hasKey(k)` for
+  `Rack::Headers#key?`) is a ported Rails method, not a helper, and stays.
+
 - **`present?` / `blank?` / `presence`.** Use the ActiveSupport analogues, not
   `!!x` or `x?.length`. `" "` is blank in Ruby and truthy in JS.
 - **kwargs.** A TS default parameter swallows an explicitly-passed `undefined`,
   so a caller forwarding an absent kwarg silently gets the default where Ruby
   would have seen `nil`. Match Ruby's kwarg semantics explicitly when it matters.
+- **An optional positional before trailing options or a block.** Ruby tells
+  `remove_foreign_key(from_table, to_table = nil, **options)` apart by syntax;
+  JS has only position. Keep every Rails parameter in its own slot, with the
+  Rails default, and have the caller pass `undefined` for a positional it
+  skips: `removeForeignKey("astronauts", undefined, { column: "rocket_id" })`,
+  `withExampleTable(connection, "ex", undefined, block)`. Never overload the
+  slot on `typeof`, which is an arm Rails does not have.
 - **Predicates.** A Ruby predicate returns a value, not necessarily a boolean;
   a value-returning predicate ported as a `boolean` breaks every call site that
   used the value.
@@ -121,6 +166,9 @@ port a body:
   turns on `Symbol === key`, or it meets a hash already carrying `":name"`
   keys. `symbolize_keys` is in `NO_JS_CALL_FORM`, so the call gate will not
   catch a wrong omission. Check these three cases yourself.
+- **A Ruby Hash is a plain object unless it needs a `Hash` feature.** The
+  features, each with its MRI citation, are in
+  [packages/ruby-compat/README.md](packages/ruby-compat/README.md#when-a-ruby-hash-is-a-hash-and-when-it-is-an-object).
 - **Symbols vs strings.** Where Rails accepts a Symbol _or_ a String, port both
   arms — dropping the string arm is a common silent gap.
 - **A Ruby Symbol is a JS string, never a JS `Symbol`.** `:short` is `"short"`.
@@ -148,9 +196,9 @@ as convergence classes.
 - **The Rails source of truth is vendored at `vendor/rails/`** (populated in
   every worktree by `start-worktree.sh`; refresh with `pnpm vendor:fetch` from
   the main worktree; bumping a `ref` follows the procedure in
-  [vendor/README.md § "Upgrading a source"](vendor/README.md#upgrading-a-source-bumping-ref)). Before porting or fixing anything, read the
-  corresponding Rails code and test there — e.g.
-  `vendor/rails/v8.0.2/activerecord/lib/active_record/...` and
+  [vendor/README.md § "Upgrading a source"](vendor/README.md#upgrading-a-source-bumping-ref)).
+  Before porting or fixing anything, read the corresponding Rails code and test
+  there — e.g. `vendor/rails/v8.0.2/activerecord/lib/active_record/...` and
   `vendor/rails/v8.0.2/activerecord/test/cases/...`. The canonical test schema is
   `vendor/rails/v8.0.2/activerecord/test/schema/schema.rb`, which
   `packages/activerecord/src/test-helpers/test-schema.ts` mirrors — when a
@@ -192,11 +240,11 @@ as convergence classes.
   `docs/` trees are not policed and stay live until their own cutover.
 - **The `tasks` CLI itself lives in the tasks repo** (`src/cli.ts`, entered
   through its `bin/tasks`). trails' `pnpm tasks` is a shim,
-  `scripts/tasks/tasks.sh`, that finds a tasks checkout and hands off; it does
-  not set `$TASKS_DIR`, so the CLI still resolves the working tree it acts on
-  from your cwd — your worktree's own `tasks/` symlink. `tasks` is also on the
-  `PATH` (installed by `start-worktree.sh`) and works from any cwd. Fix CLI
-  bugs in the tasks repo, not here.
+  `scripts/tasks/tasks.sh`, that finds a tasks checkout and hands off; the CLI
+  resolves the working tree it acts on from your cwd — your worktree's own
+  `tasks/` symlink — and `tasks where` prints what it resolved. `tasks` is also
+  on the `PATH` (installed by `start-worktree.sh`) and works from any cwd. Fix
+  CLI bugs in the tasks repo, not here.
 - Do NOT add "Co-Authored-By" lines to commits or "Generated with Claude
   Code" lines to PR descriptions.
 - After opening a PR, run the `/link` skill with the PR number so webhook
@@ -232,12 +280,14 @@ frontmatter field has exactly one authority, and the two sets are disjoint —
 which is why `tasks ingest` (git → DB) and `tasks export` (DB → git) can both
 run without ever fighting over a field.
 
-| Owner        | Fields                                                                                       | Changed by                     |
-| ------------ | -------------------------------------------------------------------------------------------- | ------------------------------ |
-| **Markdown** | `title`, `rfc`, `cluster`, `deps`, `deps-rfc`, `est-loc`, `priority`, `packages`, body prose | edit the file, open a PR       |
-| **Database** | `status`, `pr`, `claim`, `assignee`, `blocked-by`, `closed-reason`, `updated`                | a `tasks` verb — never by hand |
+| Owner        | Fields                                                                                    | Changed by                     |
+| ------------ | ----------------------------------------------------------------------------------------- | ------------------------------ |
+| **Markdown** | `title`, `rfc`, `cluster`, `deps`, `deps-rfc`, `est-loc`, `packages`, body prose          | edit the file, open a PR       |
+| **Database** | `status`, `pr`, `claim`, `assignee`, `blocked-by`, `closed-reason`, `priority`, `updated` | a `tasks` verb — never by hand |
 
-Two rules of thumb cover every field, including ones this table forgets:
+The authoritative list is `DB_OWNED` in the tasks repo's `src/ingest.ts`; when
+this table and that constant disagree, the constant wins. Two rules of thumb
+cover every field, including ones this table forgets:
 
 - **Rewriting what the work IS** — retitling, resizing `est-loc`, adding a
   dependency, rewriting acceptance criteria — is a markdown edit. Edit the file,
@@ -247,13 +297,13 @@ Two rules of thumb cover every field, including ones this table forgets:
   main, refuses a dangling reference or a cycle, commits, pushes and ingests —
   use it instead of hand-editing `deps:` and asking to push to main.
 - **Recording what HAPPENED to the work** — claimed, in progress, done, blocked,
-  closed — is a verb: `tasks claim <id>` (`--assignee <name>` for `assignee`),
-  `tasks in-progress <id> --pr trails#N`, `tasks done <id> --pr trails#N`
-  (the PR is `repo#N` — `tasks#94`, `trailmap#22` for other repos; a bare
-  number is refused),
+  closed, reprioritized — is a verb: `tasks claim <id>` (`--assignee <name>` for
+  `assignee`), `tasks in-progress <id> --pr trails#N`,
+  `tasks done <id> --pr trails#N` (the PR is `repo#N` — `tasks#94`,
+  `trailmap#22` for other repos; a bare number is refused),
   `tasks block <id> <reason>`, `tasks close <id> <reason>`,
-  `tasks status-set <id> <status>` for anything else. `updated` is stamped by
-  whichever verb you ran.
+  `tasks priority <id> <n>`, `tasks status-set <id> <status>` for anything
+  else. `updated` is stamped by whichever verb you ran.
 
 **Hand-editing a DB-owned field is the one failure worth spelling out**, because
 it is silent rather than loud: ingest skips DB-owned columns by design, so
@@ -264,14 +314,14 @@ point, not the guard, and the guard only judges stories your PR _modified_.
 
 Two traps follow from the DB being a real, _shared_ database:
 
-- **`tasks ingest` is a sync verb, not an inspection verb.** It publishes what
-  is on your branch into the shared DB. Do not reach for it to check that a
+- **`tasks ingest` is a sync verb, not an inspection verb.** It publishes
+  main's markdown into the shared DB. Do not reach for it to check that a
   branch's stories parse — that is `pnpm tasks show` / `pnpm tasks list` /
-  `pnpm validate`. Running ingest from a worktree published 10 unmerged stories
-  into the shared DB once already.
+  `pnpm validate` in the tasks worktree.
 - **A worktree's `.git` is a pointer file into the main checkout**, so the
   `.git/tasks.db` your worktree resolves IS the shared database — every other
-  agent reads and writes the same rows. Gitignored does not mean local.
+  agent reads and writes the same rows, and the read verbs answer from it, not
+  from your branch's markdown. Gitignored does not mean local.
 
 **Creating a story is authoring, so it is markdown**: `pnpm tasks new <rfc>
 <slug> --body-file <path>` writes the file, commits it, and ingests it to create
@@ -295,33 +345,24 @@ and not added ones.
   `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
   (`.md` files are excluded because docs-only changes are exempt; subtract them
   manually if your PR mixes code and docs).
-  Tests and fixtures count. The historical 20-method rule is a soft guide; the
-  prompt's LOC ceiling is the hard one — review-cycle data shows PRs ≥400 LOC
-  need 4–6 rounds minimum and ≥700 LOC need 13+, which is the band the ceiling
-  is tuned within. **Do NOT fan out into
-  sibling PRs yourself.** Keep each PR scoped to the single story you claimed;
-  ship the portion that fits and register the rest as new stories. If the work
-  is larger than one PR, or you discover additional work that belongs in a
-  separate PR, do NOT open it yourself — add a new story to the epic with
+  Tests and fixtures count. **Do NOT fan out into sibling PRs yourself.** Keep
+  each PR scoped to the single story you claimed; ship the portion that fits
+  and register the rest as new stories. If the work is larger than one PR, or
+  you discover additional work that belongs in a separate PR, do NOT open it
+  yourself — add a new story to the epic with
   `pnpm tasks new <rfc-slug> <story-slug> --body-file <path>` so it gets
   scheduled and owned separately. **Capture the context you have right now:**
   `tasks new` refuses an empty/skeleton-only body, so pass `--body-file` with
   the `## Context` (the trails/Rails `file:line` you just read) and
   `## Acceptance criteria` — a title-only stub forces an expensive re-derivation
-  later. (`--allow-empty` exists as an escape hatch but avoid it: the bare
-  placeholder it creates is exactly the debt this rule and the guard prevent.)
-  This keeps the one-agent-per-PR ownership model intact (a single
-  agent fanning out N PRs and then dying orphans all of them — this happened).
-  The only exception is a single mechanical rename — note it in the PR body.
-- **Do NOT stack PRs.** Each PR branches from `main` and stands alone.
-  We don't have spare CI runners or review bandwidth — stacked branches
-  (`<base>b` off `<base>`, `<base>c` off `<base>b`, etc.) re-run CI on
-  every parent rebase and force the reviewer to re-review the same
-  diff multiple times. They also produce file-overlap conflicts with
-  sibling agents working in parallel. If a feature needs splitting,
-  open each split PR from `main` with **non-overlapping files**; if
-  true ordering is required, ship the first PR, wait for merge, then
-  open the next from updated `main`.
+  later. The only exception is a single mechanical rename — note it in the PR
+  body.
+- **Do NOT stack PRs.** Each PR branches from `main` and stands alone. Stacked
+  branches re-run CI on every parent rebase, force the reviewer to re-review
+  the same diff, and conflict with sibling agents working in parallel. If a
+  feature needs splitting, open each split PR from `main` with
+  **non-overlapping files**; if true ordering is required, ship the first PR,
+  wait for merge, then open the next from updated `main`.
 - Open new PRs in **draft** status.
 - Do NOT reply to PR comments — replies are invisible to reviewers. Address
   feedback via code changes or PR description edits instead, or discuss with
@@ -362,10 +403,9 @@ The compare tools live under the `parity:*` script namespace — `parity:api`,
 `parity:test`, `parity:fixtures`, `parity:schema`, plus their sub-commands
 (`parity:api:calls`, `parity:api:extra`, `parity:test:assertions`, …). The
 older `api:*` / `test:compare` / `test:assertions:*` aliases are deprecated and
-undocumented: they still delegate so a stale prompt or a muscle-memory
-invocation keeps working, but they are scheduled for deletion. Never spell one
-in a doc, a comment, a script, or a CI step — `parity:*` is the only name to
-write.
+undocumented: they still delegate so a stale prompt keeps working, but they are
+scheduled for deletion. Never spell one in a doc, a comment, a script, or a CI
+step — `parity:*` is the only name to write.
 
 1. **Size.**
    `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
@@ -382,47 +422,38 @@ write.
 
    The lint reads an artifact on disk and regenerates it first, so a plain
    gating run is enough — gating a stale artifact reports movement that never
-   happened, which is how a sibling PR's deleted method surfaces as a STALE row
-   on a branch that never touched it. `compare.ts` writes
-   `call-mismatches.json` only under `--calls`, so if you need to
-   force past a warm cache (it under-reports vs CI):
+   happened. `compare.ts` writes `call-mismatches.json` only under `--calls`,
+   so if you need to force past a warm cache (it under-reports vs CI):
 
    ```bash
    API_COMPARE_FORCE=1 pnpm parity:api --calls
    ```
 
-   (RFC 0084 folded the narrow RFC 0044 ratchet — a second gate over its own
-   artifact — into this one, whose population subsumed it. There is one
-   artifact and one baseline now, and since the rename one `parity:api:calls` script.)
-
    **New mismatch?** The right fix is almost always to make the TS body call
    what Rails calls. Baselining is the fallback, and it costs a reviewed
    one-line `reason` for the row **you** add — never leave the seeded
-   placeholder there. But the debt metric for this baseline is the **row
-   count**, not the unreviewed-reason count: rows converge by deletion, and
-   inherited seed strings in rows your PR did not add are not yours to
-   wordsmith and are not grounds to block a PR (RFC 0084; see
-   [CONTRIBUTING.md](CONTRIBUTING.md#row-count-is-the-debt-metric-the-unreviewed-count-is-not)). A single justified omission can also carry a `@missingRailsCall`
-   JSDoc tag at the call site instead.
+   placeholder there. The debt metric for this baseline is the **row count**,
+   not the unreviewed-reason count: rows converge by deletion, and inherited
+   seed strings in rows your PR did not add are not yours to wordsmith and are
+   not grounds to block a PR (RFC 0084; see
+   [CONTRIBUTING.md](CONTRIBUTING.md#row-count-is-the-debt-metric-the-unreviewed-count-is-not)).
+   A single justified omission can also carry a `@missingRailsCall` JSDoc tag
+   at the call site instead.
 
    **Converged something?** The baseline is **only-shrink**: fixing a real
    divergence makes its baseline row stale and turns the gate red. Delete that
    one row by hand. Do **not** `--write`/reseed — a reseed rewrites the whole
    exclude tree and buries the one row you meant to retire in an unreviewable
-   diff.
-
-   Deleting the row lowers that source's unreviewed count below its committed
-   high-water mark, so the gate then reports a **STALE high-water mark**. The
-   remedy for that is narrow, not a reseed:
+   diff. Deleting the row lowers that source's unreviewed count below its
+   committed high-water mark, so the gate then reports a **STALE high-water
+   mark**; the remedy is narrow:
 
    ```bash
    pnpm parity:api:calls:tighten <package>/<tsFile .ts→.json>   # e.g. activerecord/insert-all.json
    pnpm parity:api:calls:tighten                                # every stale shard
    ```
 
-   It rewrites only the named mark shards — never the exclude tree, never a
-   shard you did not converge. `parity:api:calls:reseed` remains for a genuine
-   reseed and is not the answer here.
+   It rewrites only the named mark shards — never the exclude tree.
 
    **Also run the call-ARGUMENT gate**, which the call-set one cannot see past
    — a body that calls what Rails calls, with a different argument list, is
@@ -437,24 +468,55 @@ write.
    argument list in the key, and each gate reads only its own kind. It gates
    `shape` rows — count, order, literal values, kwarg keys. `naming` rows (a
    `ref:` identifier spelled differently) are never baselined: in every
-   package of the AR require-closure (resolved from `ar-closure.ts`, so a moved
-   `require` moves the gate) and in any other package listed in
-   `NAMING_ENROLLED_PACKAGES` (only-grow, per RFC 0153, in
-   `lint-call-args.ts`) every differing identifier is renamed to the Rails
+   package of the AR require-closure (resolved from `ar-closure.ts`) and in any
+   other package listed in `NAMING_ENROLLED_PACKAGES` (only-grow, per RFC 0153,
+   in `lint-call-args.ts`) every differing identifier is renamed to the Rails
    one or, when `classifyPair` files that pair permanent, receipted with
    `@missingRailsName <ruby_identifier> — PERMANENT|CONVERGEABLE <story-id>` on
    the enclosing declaration. A receipt on a convergeable pair, or one matching
-   no row, reds the same gate. Everywhere else (the actionpack family, rack,
-   trailties) they remain report-only via `pnpm parity:api:calls:args:report`. New `shape` row? Pass what Rails passes;
-   baselining is the fallback and costs a one-line `reason` on the baseline row.
-   A single argument-shape deviation can instead carry a
+   no row, reds the same gate. Everywhere else they remain report-only via
+   `pnpm parity:api:calls:args:report`. New `shape` row? Pass what Rails
+   passes; baselining is the fallback and costs a one-line `reason` on the
+   baseline row. A single argument-shape deviation can instead carry a
    `@missingRailsArgs <ruby_call> — PERMANENT|CONVERGEABLE <story-id>` JSDoc tag
-   at the call site — the call-ARGUMENT twin of
-   `@missingRailsCall` — which suppresses the flag with no baseline row. Its
-   tag must open with `PERMANENT` or `CONVERGEABLE`, the same permanence
-   discipline `parity:api:extra` enforces on `@noRailsEquivalent`; a tag
-   claiming neither is an error, not an assumed PERMANENT, and a bare
-   `CONVERGEABLE` with no story id is only half a receipt.
+   at the call site — the call-ARGUMENT twin of `@missingRailsCall`. Its tag
+   must open with `PERMANENT` or `CONVERGEABLE`; a tag claiming neither is an
+   error, and a bare `CONVERGEABLE` with no story id is only half a receipt.
+
+   **An arm or call your body ADDS to Rails'** — a branch Rails' method does
+   not take, or a call it does not make — is invisible to both call gates, which
+   flag only what Rails does and the port omits. Converge it away; where a
+   ratified language shortcoming forces it, receipt it on the declaration with
+   `@inventedArm <token> — PERMANENT|CONVERGEABLE <story-id>`, one tag per
+   token: a control token the arms report files as invented for the pair (`if`,
+   `loop`, `try`, `rescue`, `throw`), or the name of the call only the TS body
+   makes. A receipt is per TOKEN, not per occurrence: one `if` receipt speaks
+   for every invented `if` on the pair, and goes stale only when the pair
+   invents no `if` at all. A call-name receipt discharges nothing, since no
+   gate flags an extra call; it records the deviation at the declaration and
+   goes stale when the body stops making the call. `pnpm parity:api:arms:throws`
+   reds on a stale receipt and on one sitting on a declaration no skeleton row
+   was written for.
+
+   **Did you touch a constructor that inlines a Rails body?** Its
+   `@inlinedFrom` tags are gated both ways (RFC 0188; see § "A module's
+   `initialize` is inlined into the constructor"):
+
+   ```bash
+   pnpm parity:api:inlined       # the inlined-from staleness gate
+   pnpm parity:api:inlined:fix   # rewrite a stale citation from the manifest
+   ```
+
+   It reds on a tag naming a module with no `initialize` (or a `ClassMethods`
+   with no `new`), a module the Rails class does not include, prepend or
+   extend, a `def` in the constructor's own mirrored Ruby file, a tag written
+   twice or out of Ruby's chain order, or a citation that differs from the
+   `def` span in `rails-api.json`. Only the last has an autofix. A nested
+   `ClassMethods` counts as extended only through an explicit `extend` or a
+   module that extends `ActiveSupport::Concern`. The reverse arm, a constructor missing the tag for a cross-file
+   body its Rails class reaches, gates the packages in `MISSING_TAG_PACKAGES`
+   of `scripts/api-compare/lint-inlined-from.ts`. That set is **only-grow**: a
+   package joins in the PR that converts its constructors.
 
 3. **Did you touch a signature?** Parameter NAMES are gated too (RFC 0126) —
    `parity:api` prints a `params N/M` figure beside `arity`, `--params` lists
@@ -464,11 +526,12 @@ write.
    pnpm parity:api:params   # the parameter-name ratchet
    ```
 
-   fails on any increase over the committed per-package/per-file mark. arel is
-   enrolled (at 0); other packages are measured and reported and join by their
-   own story. A parameter keeps the Rails identifier, camelCased — so the fix is
-   the rename, never the mark. Converged one? `pnpm parity:api:params:tighten`
-   writes the mark DOWN; there is no reseed.
+   fails on any increase over the committed per-package/per-file mark for the
+   packages in `GATED_PACKAGES` of `scripts/api-compare/param-name-mark.ts`;
+   other packages are measured and reported and join by their own story. A
+   parameter keeps the Rails identifier, camelCased — so the fix is the rename,
+   never the mark. Converged one? `pnpm parity:api:params:tighten` writes the
+   mark DOWN; there is no reseed.
 
    **Did you port a Ruby predicate?** `foo?` is answered by `isFoo` (or a
    member whose type holds a boolean), never by a value-typed `foo` getter.
@@ -491,58 +554,44 @@ write.
    says "known extra surface, not yet removed", and someone will come back for
    it.
 
-   **`arel`, `activerecord` and `ruby-compat` are gated**, by the RFC 0117
-   extra-surface ratchet:
+   The extra-surface ratchet (RFC 0117) gates the packages recorded in
+   `scripts/api-compare/extra-surface-mark.json`, with the pinned/rowless
+   regimes implemented in `scripts/api-compare/extra-surface-mark.ts`:
 
    ```bash
    pnpm parity:api:extra:gate
    ```
 
-   It reads the committed marks in `scripts/api-compare/extra-surface-mark.json`
-   and is **only-shrink** for every gated package, like the two call gates: a
+   It is **only-shrink** for every gated package, like the two call gates: a
    new public name with no Ruby counterpart raises `novel` or `total` and turns
    it red, and the fix is to remove the name — never to raise the mark.
-   **Converged something?** The mark then sits above the measurement; narrow it
-   with `pnpm parity:api:extra:tighten`, which writes each dimension DOWN and
-   never up. There is **no reseed**, for the same reason the call baselines
-   forbid one.
+   **Converged something?** Narrow the mark with
+   `pnpm parity:api:extra:tighten`, which writes each dimension DOWN and never
+   up. There is **no reseed**. Three regimes exist, and the mark file is the
+   record of which package is in which:
+   - **Gated with a row**: `novel` and `total` ratchet down from the row.
+     A member carrying its `@noRailsEquivalent PERMANENT` receipt is subtracted
+     from both, so a receipted addition is mark-neutral (ruby-compat's
+     inventory grows this way). The receipt does not prove a call site; that
+     package's rule 1 is not enforced by this gate (see
+     [its README](packages/ruby-compat/README.md#1-only-what-trails-actually-calls)).
+   - **Pinned**: a package that has burnt its untagged novel surface to zero has
+     `novel` pinned at the constant 0 regardless of its row, so widening the row
+     cannot clear a red run. The only remedies are a
+     `@noRailsEquivalent PERMANENT|CONVERGEABLE <story-id>` receipt at the
+     declaration, or deleting the name. Being pinned does **not** exempt
+     `total`: a moved-not-novel extra is a name Rails defines in another `.rb`,
+     and nothing else in the repo catches that cross-file relocation.
+   - **Rowless**: a package that burns `total` to zero as well carries no row,
+     both dimensions are the constant 0, and the gate fails if a row is
+     re-added. Every extra there — novel or moved — needs a receipt at its
+     declaration, a deletion, or a relocation to the file mirroring the `.rb`
+     that defines it.
 
-   `ruby-compat` is no exception, although its surface is inventory rather
-   than debt: every move story adds MRI surface. A member carrying its
-   `@noRailsEquivalent PERMANENT` receipt (the package's rule 2) is subtracted
-   from both `novel` and `total`, so a receipted addition moves neither and
-   growth is mark-neutral. An unreceipted one reds the gate and wants the
-   receipt, not a bigger mark. The receipt does not prove a call site: the
-   package's rule 1 is not enforced by this gate (see
-   [its README](packages/ruby-compat/README.md#1-only-what-trails-actually-calls)).
-
-   A package that has burnt its untagged novel surface to zero (`arel` today)
-   is additionally **pinned**: its `novel` is the constant 0 regardless of what
-   its row says, so widening the row cannot clear a red run. The only two
-   remedies are a `@noRailsEquivalent PERMANENT|CONVERGEABLE <story-id>`
-   receipt at the declaration, or deleting the name. That is where every gated
-   package is headed — a receipt lives in the file you are already editing, so
-   it never conflicts the way a shared counter does.
-
-   Being pinned does **not** exempt `total`. A moved-not-novel extra is a name
-   Rails does define, just in another `.rb`, and nothing else in the repo
-   catches that: `rails-file-structure-method-order` orders members within one
-   file and cannot see a cross-file relocation, and `parity:api:moves` only
-   reports. So `total` stays gated in both modes.
-
-   A package that burns `total` to zero as well (`activerecord` today) is
-   **rowless**: both `novel` and `total` are the constant 0, it carries **no
-   row** in the mark file, and the gate fails if one is re-added. Every extra
-   there — novel or moved — needs a receipt at its declaration, a deletion, or
-   a relocation to the file mirroring the `.rb` that defines it.
-
-   A package gets pinned as a reviewed step of its own burndown (the
-   `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342 novel
-   and 396 moved, now rowless;
-   RFC 0129 for ruby-compat's 4). That direction is **only-grow**: no package
-   is ever un-pinned to turn a red run green. Other packages are still measured
-   and ungated; widening `GATED_PACKAGES` is a separate decision with its own
-   burndown, not a mechanical step.
+   A package is pinned or made rowless as a reviewed step of its own burndown
+   RFC. That direction is **only-grow**: no package is ever un-pinned to turn a
+   red run green, and widening `GATED_PACKAGES` is a separate decision with its
+   own burndown, not a mechanical step.
 
 5. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
    it holds a member out of the generated API reference — but it also drops the
@@ -618,7 +667,8 @@ callbacks keyed by the exported `included` / `extended` symbols
 `included do ... end` block. Because they are symbol-keyed they are not public
 string-named members, so they never collide with the `SKIP_GROUPS` entry above.
 Only `inherited` has no equivalent — JS has no hook that fires when a subclass
-is defined, so its Rails semantics have to be deferred some other way.
+is defined, so its Rails semantics have to be deferred some other way (see
+§ "`inherited` is deferred to own-property memo guards").
 
 The class-method half of a Concern is `extend()` / `Extended<>`, the mirror of
 Ruby `extend SomeModule` — reach for it instead of hand-assigning
@@ -626,6 +676,82 @@ Ruby `extend SomeModule` — reach for it instead of hand-assigning
 is `classAttribute()` from `@blazetrails/activesupport`, which already gives
 Rails' semantics (reads walk the constructor chain, writes are local to the
 class); do not hand-roll copy-on-first-write per call site.
+
+## A module's `initialize` is inlined into the constructor (`@inlinedFrom`)
+
+Ruby lets a module define `initialize` and reach the next one up the ancestor
+chain through `super`. A JS constructor has no such chain through a mixin.
+**trails has no `initialize` methods**: Ruby's `new` / `initialize` chain is
+written as JS constructors, by two rules.
+
+- **A Rails class that inherits from a class uses JS `super()`.** Statements
+  that only compute arguments stay ahead of it. Where Ruby does work on `self`
+  and then calls `super`, and the parent's body does not read that work,
+  `super()` is hoisted to the first line. JS forbids `this` before `super()`,
+  so that reorder is forced by the language and is the sanctioned spelling.
+- **A module's `initialize`, or a parent's that reads the child's setup, is
+  inlined.** The body is written into the constructor at the position Ruby's
+  `super` occupies, line for line, in the constructor of each class that
+  includes or prepends the module. A `new` that arrives through a
+  `ClassMethods` module the class extends is inlined at the head of the
+  constructor the same way. A class's own `def self.new` is not an inlining:
+  `Klass.new` and `new Klass` are one operation, so it is the first part of
+  the constructor and takes no tag (see § "A record is built with `new Klass`
+  only").
+
+A parent constructor never calls an overridable hook to let a subclass run
+early. JS runs a subclass's field initializers after `super()` returns, so a
+field such as `history = []` overwrites whatever the hook set.
+
+The worked example is `Base`. `ActiveModel::API#initialize`
+(`activemodel/lib/active_model/api.rb:80-84`) is
+`assign_attributes(attributes) if attributes`, then `super()`.
+`ActiveRecord::Core#initialize`
+(`activerecord/lib/active_record/core.rb:471-477`) sets `@new_record` and
+`@attributes`, calls `init_internals` and `initialize_internals_callback`, and
+only then calls `super`, which lands in `API#initialize` because
+`ActiveRecord::Base` includes `ActiveModel::API` directly
+(`activerecord/lib/active_record/base.rb:283`). So `Base`'s constructor is
+`Core#initialize`'s body with `API#initialize`'s line at the `super` position:
+
+```ts
+/**
+ * @inlinedFrom ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78
+ * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482
+ * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
+ */
+constructor(attributes = null) { … }
+```
+
+`@inlinedFrom` names the Ruby body a segment of a constructor came from:
+
+- **Where.** On a class constructor's JSDoc and nowhere else, one tag per
+  inlined segment, in chain order.
+- **Value.** Exactly one shape: a Ruby `Module#initialize` or
+  `Mod::ClassMethods#new`, then its citation
+  `<source>/<version>/<file>:<first>-<last>`, the span of the `def`, relative
+  to `vendor/` and not spelling it. No prose, no story id, no `PERMANENT`.
+- **The tag follows the file.** Only a body whose `def` lives in a different
+  Ruby file from the one the constructor's file mirrors is tagged. A module
+  defined in the same `.rb` as the class that includes it is inlined the same
+  way and carries no tag, and a tag on one is an error.
+- **The citation is derived, never hand-edited.** It comes from
+  `rails-api.json`: `pnpm parity:api:inlined:fix` rewrites the path and line
+  span, and `pnpm vendor:recite` rewrites a stale version. It is there for the
+  reader. It does not detect a changed Rails body; the body pins
+  (`pnpm parity:api:pins`) do.
+- **It is not a licence for arel's `inlined-from` bucket.** That bucket is the
+  general case, a module member whose body sits on an including class's file,
+  and it is pinned at 0. The tag admits a constructor segment from the closed
+  list of hooks in `eslint/inlined-from-only-on-constructors.mjs` and nothing
+  else.
+
+`parity:api` credits a tagged module hook to the constructor, both call gates
+compare the constructor against the tagged bodies in chain order, and
+`pnpm parity:api:inlined` reds on a stale or unfounded tag (see "Before you
+open the PR"). `initialize_copy` / `initialize_dup` / `initialize_clone` are
+the `rbObjDup` / `rbObjClone` protocol and stay methods. This rule was set by
+the repo owner on 2026-10-08 (RFC 0188).
 
 ## Generated attribute readers are properties (`define_method_attribute`)
 
@@ -672,9 +798,9 @@ true)` must be true in trails wherever it is false in Ruby. Only ActiveRecord
   its `instance_method_already_implemented?` override.
 
 This is a genuine language shortcoming, not a preference. Code implementing any
-of the three cites **this section** — `@noRailsEquivalent` there is a pointer to
-a ratified repo-wide rule, not a local justification, and a new instance is not
-a new decision to argue.
+of these cites **this section** — `@noRailsEquivalent` there is a pointer to a
+ratified repo-wide rule, not a local justification, and a new instance is not a
+new decision to argue.
 
 ## Serialization's dual sync/async hash (`serializable_hash` / `as_json`)
 
@@ -696,111 +822,31 @@ in-line `to_ary` load lands. `asJsonThenable` is the same shape for
 `serializableHash`'s third parameter is the module-private sync re-entry flag
 the Proxy calls back through.
 
-**The alternative — `serializableHash` / `asJson` returning `Promise`
-unconditionally, the way RFC 0063 made `isValid()` return `Promise<boolean>` —
-was considered and rejected, because an async `asJson` propagates through the
-whole JSON encoder and takes `to_json` with it.** `asJson` is not one method;
-it is the recursive dispatcher at
-`activesupport/src/core-ext/object/json.ts:256`, standing in for Ruby's
-`as_json` method lookup, and there are ~19 `asJson` definitions feeding it.
-`Array.asJson` recurses per element back through that dispatcher (`:125-137`)
-and `Enumerable.asJson` delegates to `Array.asJson` (`:85-89`), so any
-collection containing a model goes async. `JSONGemEncoder#jsonify`
-(`activesupport/src/json/encoding.ts:40`, Rails'
-`activesupport/lib/active_support/json/encoding.rb`) recurses through `asJson`
-for every nested node, so the encoder goes async; `Encoding#encode`
-(`encoding.ts:19`) and its call sites follow, and **`to_json` returns a
-Promise** where Rails' returns a String
-(`activesupport/lib/active_support/core_ext/object/json.rb:35-43`). That is a
-fidelity loss at a more prominent Rails surface than the thenable it would
-remove. And it does not even buy the simplification: `jsonify` would still need
-a synchronous path for the `JSON.stringify` case, so the same sync/async split
-survives — relocated out of one contained Proxy and duplicated across every
-`asJson` definition in the repo.
-
-**The `JSON.stringify` → `toJSON` path is not the binding constraint.**
-`JSON.stringify` does call `toJSON` synchronously and never awaits, and trails'
-`toJSON` (`activesupport/src/core-ext/object/json.ts:47-60`, the port of
-`ActiveSupport::ToJsonWithActiveSupportEncoder#to_json`) returns
-`this.asJson()` from inside that synchronous call — but on that path `toJSON`
-receives only the property key and calls `asJson()` with **no options**, so
-there is no `include:` to load and nothing to await. It is a fixable coupling,
-not a wall; do not mistake it for the decision's foundation. There is also no
-third shape: `to_json` is Rails-facing API, so it cannot be dropped to buy the
-uniform Promise.
+The alternative — `serializableHash` / `asJson` returning `Promise`
+unconditionally — was rejected because `asJson` is the recursive dispatcher
+behind the whole JSON encoder (`activesupport/src/core-ext/object/json.ts`,
+standing in for Ruby's `as_json` method lookup, with ~19 definitions feeding
+it): an async `asJson` makes every collection containing a model async, the
+encoder async, and **`to_json` a `Promise`** where Rails' returns a String — a
+fidelity loss at a more prominent surface than the thenable it would remove,
+and one that still needs a synchronous path for `JSON.stringify`. The
+`JSON.stringify` → `toJSON` path is not the binding constraint: on that path
+`toJSON` calls `asJson()` with no options, so there is no `include:` to load.
+There is no third shape, because `to_json` is Rails-facing API.
 
 This is a genuine language shortcoming — JS has no synchronous await and no
 lazily-loading collection read — and it is ratified repo-wide here.
-`thenableHash`, `asJsonThenable` and `preloadIncludes` carry
-`@noRailsEquivalent PERMANENT` receipts against this section, and the
+`thenableHash` and `asJsonThenable` carry `@noRailsEquivalent PERMANENT`
+receipts against this section, and the module-private `preloadIncludes`, the
 `SerializableHash` type and the `sync` re-entry parameter exist to serve them.
 Do not re-derive the decision per call site, and do not file a story to make
 them `Promise`.
 
 ## `Relation` is evaluated by an async query (`records`, and the predicates it carries)
 
-Ruby's `Relation` is an Enumerable, and every call that needs the records
-themselves reaches them through `records`
-(`activerecord/lib/active_record/relation.rb:342-345`), which calls `load`
-(`:1179-1186`) and runs the query **synchronously**. Some terminal calls answer
-without materializing anything — an unloaded `size` is `count(:all)` and an
-unloaded `empty?` is `!exists?` (`:352-369`) — but those run a query
-synchronously too. Nothing in Rails' relation surface is a promise, so a
-`Relation` is both the query and its result, and a predicate that needs a
-second query to build itself can just run it in place.
-
-In trails the query is `await`ed, and that costs three shapes Rails has no
-counterpart for:
-
-- **`applyThenable` / `stripThenable`** (`relation/thenable.ts`). `await rel`
-  has to evaluate the relation, so `Relation.prototype` carries `then` /
-  `catch` / `finally` forwarding to `toArray()`. That makes every `Relation` a
-  thenable, which JS then unwraps automatically anywhere one is _returned_ from
-  an `async` body — so a builder that returns a relation would evaluate it.
-  `stripThenable` is the `then`-hiding Proxy view that lets a relation be
-  returned without being run. This is the same language shortcoming
-  § "Serialization's dual sync/async hash" ratifies for `serializable_hash`,
-  one layer down.
-- **`DeferredIdsIn` / `DeferredIdsNotIn`**
-  (`relation/predicate-builder/deferred-distinct-pk-in.ts`). Two predicate
-  builders need ids that only a query can produce, and both are reached from
-  synchronous Rails bodies: `RelationHandler#call`
-  (`relation/predicate_builder/relation_handler.rb:5-25`) reads `value.arel`
-  after `apply_join_dependency`, and `Relation#excluding`
-  (`relation/query_methods.rb`) builds a `NOT IN` over records. Where Rails runs
-  that query in line, trails parks an `Arel::Nodes::In` / `NotIn` subclass
-  carrying the thunks, and `Relation#_materializeDeferredDistinctPkPredicates`
-  drains them on the way to SQL. The pair exists so `invert()` keeps working
-  (`WhereClause#invert`) while the ids are still unresolved.
-- **The synchronous eager builders behind `toSql`** — `Relation#toSql`,
-  `_buildEagerOperandManager`, `_applyEagerJoinDependency`,
-  `_materializeDeferredDistinctPkPredicates` (all `relation.ts`), and the
-  `ConnectionPool#withConnectionSync` call `toSql` runs them through. Rails'
-  `Relation#to_sql` (`relation.rb:1210-1221`) returns a String: its
-  `eager_loading?` arm goes through `apply_join_dependency`, the other through
-  `model.with_connection { |conn| conn.unprepared_statement { conn.to_sql(arel) } }`.
-  Two independent constraints keep trails' `toSql(): string` synchronous. First,
-  `_buildEagerOperandManager` reads `this._model.primaryKey`, a synchronous
-  reader because a JS constructor cannot await — the reader § "Schema
-  reflection peeks at a warm cache" ratifies — so an async builder would force
-  that reader async and break `new Post()`. Second, an async builder turns a
-  prominent Rails String API into `Promise<string>`, and `toSql` is also read
-  from sync paths that have nothing to do with construction: the relation `==`
-  (`other.toSql() === this.toSql()`) and the query-cache key
-  (`computeCacheKey`). Nor is a synchronous `with_connection` seam expressible:
-  `ConnectionPool#withConnection` is `async`, so a sync seam can only serve an
-  already-leased connection — which is exactly the lease `withConnectionSync`
-  hands `toSql`. That is the settled shape, not a gap. This ratifies the sync
-  builders and `toSql`'s sync surface only; the synchronous _lease_ behind
-  `withConnectionSync` stays under § "Schema reflection peeks at a warm
-  cache"'s scope boundary.
-
-This is a genuine language shortcoming — JS has no synchronous await — and it is
-ratified repo-wide here. Those names carry `@noRailsEquivalent PERMANENT`
-receipts against this section, and `toSql`'s omitted `apply_join_dependency` /
-`with_connection` calls carry `@missingRailsCall … — PERMANENT`; do not
-re-derive the decision per call site, and do not file a story to remove them or
-to make `toSql` async.
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#relation-is-evaluated-by-an-async-query-records-and-the-predicates-it-carries).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
 ## Override arity (Ruby does not check it; TypeScript does)
 
@@ -814,30 +860,12 @@ No arity check runs, so all three are legal and all three are read as the same
 method.
 
 TypeScript checks a derived member against the base member and rejects a
-derived signature that requires MORE arguments than the base publishes:
-
-```text
-TS2416: Property 'fetchTypeMetadata' in type 'SchemaStatements' is not
-assignable to the same property in base type 'SchemaStatements'.
-  Target signature provides too few arguments. Expected 4 or more, but got 1.
-```
-
-Every route around it was tried and each one loses more fidelity than it buys:
-
-- **An overload set** compiles, because TypeScript checks the override against
-  the WHOLE list — but the only arrangement that type-checks makes
-  `PostgreSQLAdapter` publish a 1-argument signature its body never answers.
-- **Optional parameters** on the override (`sqlType?: string`) satisfy the
-  arity check by declaring parameters Rails declares as required, and force
-  `undefined` narrowing into a body that is otherwise line-for-line.
-- **Defaults** on the override are worse still: they invent values Rails has no
-  counterpart for.
-- **Breaking the inheritance edge** — porting the override as a `this`-typed
-  module function, or as a class property — does not help: the check follows
-  any inheritance path, `override` keyword or not.
-
-So the base declares the Rails signature plus a rest parameter that carries the
-overrides' extra arguments and nothing else:
+derived signature that requires MORE arguments than the base publishes
+(`TS2416 ... Target signature provides too few arguments`). An overload set,
+optional parameters, defaults, and breaking the inheritance edge were each
+tried and each loses more fidelity than it buys (details in the decision
+history). So the base declares the Rails signature plus a rest parameter that
+carries the overrides' extra arguments and nothing else:
 
 ```ts
 fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata
@@ -846,11 +874,8 @@ fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata
 The rest parameter is named `_rest` and is never read. It is not extra API
 surface (`parity:api:extra` scores members, not parameters) and it is not a
 renamed Rails parameter (`parity:api:params` compares the positions Rails
-declares, which still spell Rails' identifiers), which is why none of the three
-existing JSDoc receipts — `@noRailsEquivalent` for extra surface,
-`@missingRailsCall` for an omitted call, `@missingRailsArgs` for a call site's
-argument shape — fits it: there is nothing for them to suppress. This section
-is its receipt.
+declares), which is why none of the JSDoc receipts fits it: there is nothing
+for them to suppress. This section is its receipt.
 
 This is a genuine language shortcoming, not a preference, and it is ratified
 repo-wide here. Code carrying an override-arity rest parameter cites **this
@@ -873,372 +898,140 @@ module-eval edge. When that edge closes a cycle whose participants include a
 with `Super` still in TDZ and the module throws
 `Cannot access 'Super' before initialization`.
 
-**The settled answer is a zero-import slot module**: a file with no runtime
-imports at all (so it cannot join any cycle) exporting a mutable binding plus a
-`_setX()` setter, which the defining module calls at the bottom of its own
-body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Two instances exist and are the only ones, plus the namespace
-modules converged onto `Autoload`:
+Two shapes are sanctioned, and only these:
 
-- `arel/src/namespaces.ts` — not a slot: the `Arel` / `Arel::Attributes` /
-  `Arel::Nodes` / `Arel::Visitors` namespace objects, extended with
-  `ActiveSupport::Autoload` (RFC 0151). Each constant is `autoload`ed there,
-  seated by its defining module (`Nodes.Not = Not`) and read as a property at
-  call time (`new Nodes.Not(this)`). `Nodes` and `Visitors` are also the
-  public `Arel.Nodes` / `Arel.Visitors` exports: every class seats itself on
-  them in its defining module, and a type-only `declare namespace` of the same
-  name carries the type side. This is the shape the remaining slots
-  converge onto.
-- `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
-  `actionpack/src/namespaces.ts` — not slots: the `ActiveSupport`, `ActionView`
-  and `ActionDispatch` namespace objects, shaped like arel's.
-  `ActionView.Base` (`action_view.rb:37`, read by `handlers/erb.rb:86`,
-  `log_subscriber.rb:59`, `digestor.rb:39`); `ActionDispatch.Request`
-  (`action_dispatch.rb:63`, read by `http/headers.rb:55`,
-  `content_security_policy.rb:46`, `permissions_policy.rb:42`,
-  `middleware/cookies.rb:705`). A constant Rails `require`s rather than
-  autoloads is seated on its namespace with no `autoload` call:
-  `ActiveSupport.BroadcastLogger` (`active_support.rb:30`, read at
-  `logger.rb:21`), and `Attribute.UserProvidedDefault` on the class Rails nests
-  it in (`attribute_registration.rb:5`).
-- `activesupport/src/namespaces.ts`'s `TopLevel` — not a slot: Ruby's
-  top-level `Object`, where a top-level constant lives when the gem reading it
-  does not depend on the gem defining it, or when it is `::Rails` itself. The
-  defining gem seats it (`TopLevel.Trails = Trails` in `trailties/src/rails.ts`,
-  `TopLevel.ActionDispatch` / `TopLevel.ActionController` in
-  `actionpack/src/namespaces.ts`, which are actionpack's own namespace objects),
-  and a reader names it at call time: `TopLevel.Trails!.env` for `Rails.env.local?`
-  (`engine.rb:592`), `new TopLevel.ActionDispatch!.Request(env)`
-  (`shard_selector.rb:41`, `database_selector.rb:64`),
-  `TopLevel.ActionController!.Parameters` and
-  `TopLevel.ActionDispatch!.Routing.PolymorphicRoutes.HelperMethodBuilder`
-  (`routing_url_for.rb:92,109`). A read carries a guard only where Rails has a
-  `defined?`: `TopLevel.Trails?.logger` (`deprecation/behaviors.rb:27`,
-  `testing/tagged_logging.rb:23`, `log_subscriber.rb:94`) and
-  `TopLevel.Trails !== undefined` (`action_controller/log_subscriber.rb:40`).
-  A `globalThis` seat was the alternative; it was rejected because a
-  `declare global` in a published `.d.ts` puts `Trails` and `ActionDispatch` in
-  every consumer's global scope. `ActionView::RoutingUrlFor#url_for`'s `super`
-  (`routing_url_for.rb:80-136`) is a real `super`: the
-  `on_load(:action_controller)` hook (`railtie.rb:97-101`) includes UrlFor as a
-  live `Module`, whose link is spliced into `RoutingUrlFor`'s ancestry, because
-  `include()` flattens a plain-object module beneath the class's own methods.
-- `activerecord/src/namespaces.ts` — not a slot: the `ActiveRecord`,
-  `ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters` and
-  `ActiveRecord::Encryption` namespace objects, extended with
-  `ActiveSupport::Autoload` exactly like arel's (RFC 0151). Autoloaded there,
-  mirroring `active_record.rb:43-112`, `associations.rb:15,29-41` and
-  `encryption.rb:14`: `ActiveRecord.Base`, `.Encryption`, `.Associations` and
-  `.ConnectionAdapters` (each seated by the module defining it — encryption.ts,
-  associations.ts, connection-adapters.ts),
-  `.ConnectionHandling` (`DEFAULT_ENV`, `connection_handling.rb:7`),
-  `.ModelSchema` (`derive_join_table_name`, `migration/join_table.rb:12`),
-  `.Fixture` (Rails has no `autoload :Fixture`: it is defined in `active_record/fixtures.rb`,
-  which `active_record.rb:54`'s `autoload :FixtureSet` loads; its `Fixture::FixtureError`
-  (`fixtures.rb:809`) is raised at
-  `abstract/database_statements.rb:615`), and `.Relation`, `.AssociationRelation` and
-  `.DisableJoinsAssociationRelation`, which `Delegation.delegated_classes` reads
-  (`relation/delegation.rb:7-15`); the six
-  concrete association ctors `AssociationReflection#association_class` returns
-  (`reflection.rb:889-923`), `Associations.CollectionProxy` and
-  `Associations.DisableJoinsAssociationScope` (`associations/association.rb:107-115`);
-  `Encryption.Configurable`, which encryption.ts `extend`s onto `Encryption`
-  itself with `Contexts`, as `encryption.rb:47-48` does `include Configurable` /
-  `include Contexts`, so readers spell `Encryption.config.x` and
-  `Encryption.withoutEncryption(...)`; `Encryption.Cipher`, itself `extend`ed
-  with `Autoload` for `Cipher.Aes256Gcm` (`encryption.rb:39-45`), which
-  `Encryption.eagerLoadBang` loads after `super` (`encryption.rb:50-54`);
-  `ConnectionAdapters.ConnectionPool`
-  (`connection_adapters.rb:107-110`, read by `abstract/query_cache.rb:100` for
-  `ConnectionPool::WeakThreadKeyMap`), and `ConnectionAdapters.register` /
-  `.resolve`, the module's singleton methods (`connection_adapters.rb:22-50`,
-  read by `database_config.rb:17`), seated by connection-adapters.ts;
-  `ActiveRecord.Migration` (`active_record.rb:60`). `Migration.Compatibility`
-  (`migration.rb:573`, read at `:629-631` and `schema.rb:72`) is autoloaded on
-  the `Migration` class itself, which migration.ts `extend`s with `Autoload`,
-  and seated by compatibility.ts. `CommandRecorder`, `JoinTable`, `ExecutionStrategy` and
-  `DefaultStrategy` (`migration.rb:572-576`) are autoloaded beside it and seated
-  by migration.ts, which imports all four; command-recorder.ts reads
-  `ActiveRecord.IrreversibleMigration` (seated by migration.ts) at call time, so
-  it takes no edge back into migration.ts. `Encryption` autoloads the whole
-  `encryption.rb:10-35` `eager_autoload` list, each seated by its defining module. `ActiveRecord` registers
-  itself with `constantize`, which walks each further segment through the
-  constant seated on its namespace, as `Object.const_get` does
-  (`inflector/methods.rb:289-291`). `ActiveRecord.Point`
-  (`postgresql/oid/point.rb:4`) is required, not autoloaded, and is seated with
-  no `autoload` call. The cycles they break are the ones the deleted slots broke:
-  `base.ts` importing every `self == Base` reader; `class SingularAssociation` /
-  `CollectionAssociation extends Association` reaching `reflection.ts`; `class
-AssociationRelation extends Relation`; `V8_0 = Current`; and
-  `schema-statements.ts -> join-table.ts -> model-schema.ts ->
-connection-handling.ts -> … -> abstract-adapter.ts`, whose module-scope
-  `include(AbstractAdapter, SchemaStatements)` reads `SchemaStatements` in TDZ,
-  and `query-cache.ts -> connection-pool.ts -> abstract-adapter.ts`, whose
-  `include(AbstractAdapter, QueryCacheMixin)` reads `QueryCacheMixin` in TDZ.
-  `connection-adapters/abstract-adapter.ts` reads `ActiveRecord.Base?.logger ?? null` in the constructor
-  (`abstract_adapter.rb:132,140`). That read on a standalone adapter's own
-  path is one of the two guarded autoload reads, falling back to the value Rails'
-  autoloaded `active_record.rb` would hold. The other is
-  `connection-adapters/abstract/query-cache.ts`'s `dirties_query_cache` arm,
-  `ActiveRecord.Base?.connectionHandler` (`abstract/query_cache.rb:24-25`,
-  `connection_handling.rb:258-262`), which a standalone adapter's `execute`
-  reaches. An
-  adapter is a standalone public entry point, constructed and queried with no
-  model layer loaded at all (the whole `sqlite-drivers` lane), so an unseated
-  `Base` there is not a load-order bug but a legitimate configuration. A read
-  is added to this exception only when that lane is shown to reach it. A seat that
-  has moved onto the `ActiveRecord` module (`active-record.ts`) needs no guard:
-  the module is a plain import, and it holds the Rails default
-  itself — which is how `queryTransformers()` in `preprocessQuery`,
-  `disablePreparedStatements()` in the adapter constructor,
-  `lazilyLoadSchemaCache()` in `ConnectionPool#new_connection`, and
-  `asyncQueryExecutor()` in `abstract-adapter.ts` and
-  `ConnectionPool#build_async_executor` left the slot.
-  Every `ActiveRecord` singleton config seat (`active_record.rb:182-491`'s
-  `singleton_class.attr_*` block) and its `def self.` methods live on the
-  `ActiveRecord` module in `active-record.ts`, where `parity:api` records them
-  against `active_record.rb` itself, and `Base` holds none of them.
-- `activerecord/src/reflection-slot.ts` — the `Reflection` module, read by
-  `associations/builder/association.ts` for `Builder::Association.create_reflection`
-  (`associations/builder/association.rb:40-51` names `ActiveRecord::Reflection.create`
-  at call time). The cycle is `builder/singular-association.ts ->
-builder/association.ts -> reflection.ts -> associations.ts -> builder/has-one.ts`,
-  whose `class HasOne extends SingularAssociation` reads `SingularAssociation` in
-  TDZ when a builder is the entry module.
-- `activerecord/src/tasks/database-tasks-slot.ts` — `DatabaseTasks`, read by
-  `migration.ts` for `ActiveRecord::Tasks::DatabaseTasks`
-  (`migration.rb:151-183,696,750,1037-1041,1361-1365`). `database-tasks.ts`
-  imports `migration.ts` and `connection-handling.ts`, so a plain import back
-  re-enters the `schema-statements.ts -> migration/command-recorder.ts ->
-migration.ts` cycle `ActiveRecord.ConnectionHandling` breaks.
+- **A namespace object extended with `ActiveSupport::Autoload`** (RFC 0151),
+  mirroring Rails' `autoload` lists: each autoloaded constant is seated by its
+  defining module with `rbModConstSet(Namespace, "Name", Klass)` — the constant
+  binding is what paths it, as Ruby's `const_set` does — and read as a property
+  at call time (`new Nodes.Not(this)`, `ActiveRecord.Base`). A constant Rails
+  `require`s rather than autoloads is seated with no `autoload` call. Ruby's
+  top-level `Object` is `TopLevel` in `activesupport/src/namespaces.ts`: the
+  defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at
+  call time (`TopLevel.Trails!.env`), carrying a guard only where Rails has a
+  `defined?`. A `globalThis` seat was rejected because a `declare global` in a
+  published `.d.ts` reaches every consumer.
+- **A zero-import slot module**: a file with no runtime imports at all (so it
+  cannot join any cycle) exporting a mutable binding plus a `_setX()` setter,
+  which the defining module calls at the bottom of its own body. Readers import
+  the binding from the slot and use it at call time. No instance remains:
+  every slot has converged onto a namespace seat, which is the shape to reach
+  for first.
+
+The per-package inventories of namespace objects, seats and the cycles they
+break live in [packages/arel/CLAUDE.md](packages/arel/CLAUDE.md#call-time-constant-resolution-arel),
+[packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#call-time-constant-resolution-activesupport-actionview-actionpack)
+and [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#call-time-constant-resolution-activerecord).
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do
 not reach for a slot when a plain import does not actually close a cycle.
 Verify both directions with a plain-node import of the **built** `dist/**.js`
 modules as entry modules; a vitest run enters the funnel module first and masks
-the TDZ, so a green suite proves nothing here.
-
-Deferring the subclass edges instead (a slot per `extends` site) is the
-alternative that looks smaller and does not work: nothing then loads the
+the TDZ, so a green suite proves nothing here. Deferring the subclass edges
+instead (a slot per `extends` site) does not work: nothing then loads the
 subclass modules at all, so their self-registration never runs.
 
-**A slot read carries no guard**, because the Ruby body it mirrors carries none:
-`Arel::Nodes::Node#not` is `Nodes::Not.new self` (`arel/nodes/node.rb:122`) and
-raises `NameError` if the constant will not resolve. So a reader is written
-`new _Not!(this)`, and an unset slot surfaces as a plain `TypeError` at the call
-site — the JS analogue of that `NameError`. A `throw` explaining that the caller
-deep-imported the module is invented surface: it is a guard Rails does not have,
-in a body that is otherwise line-for-line. This is the one place the decision is
-recorded; do not re-derive it per slot or per call site.
+**A slot or seat read carries no guard**, because the Ruby body it mirrors
+carries none: `Arel::Nodes::Node#not` is `Nodes::Not.new self`
+(`arel/nodes/node.rb:122`) and raises `NameError` if the constant will not
+resolve. So a reader is written `new _Not!(this)`, and an unset slot surfaces as
+a plain `TypeError` at the call site — the JS analogue of that `NameError`. A
+`throw` explaining that the caller deep-imported the module is invented
+surface. The two guarded reads of `ActiveRecord.Base?.` on a standalone
+adapter's own path are the one exception, recorded in the activerecord file.
 
 ## The pool monitor guards only sections that span an `await` (`ConnectionPool`'s `MonitorMixin`)
 
-Rails' `ConnectionPool` is a monitor (`include MonitorMixin`,
-`activerecord/lib/active_record/connection_adapters/abstract/connection_pool.rb:217`),
-and trails' takes that monitor through ruby-compat's `synchronize`, which keys
-it on the receiver — `synchronize.call(this, block)` is Ruby's bare
-`synchronize do` self-call, with no extra member on the class. A monitor
-excludes other callers only while its holder is
-suspended, and a JS body with no `await` cannot be suspended: nothing else runs
-until it returns. So a `synchronize do` whose body is synchronous in trails is
-already atomic, and wrapping it would change nothing but its return type.
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#the-pool-monitor-guards-only-sections-that-span-an-await-connectionpools-monitormixin).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
-That is the whole constraint, and it splits Rails' sections in two:
-
-- **Ported onto the monitor**: `checkout`'s pinned branch (`:550-567`), whose body
-  awaits `verify!`. It nests inside the pinned connection's `lock` exactly as
-  Rails nests it, and keeps the `:553` re-check. `disconnect` (`:454`),
-  `discard!` (`:485`) and `clear_reloadable_connections` (`:507`) are on it too:
-  their bodies await each connection's `disconnect!` / close, and
-  `with_exclusively_acquired_all_connections` is async, because
-  `checkout_for_exclusive_access` (`:802-820`) awaits `checkout` inside the
-  monitor exactly as Rails' `attempt_to_checkout_all_existing_connections`
-  (`:753-800`) calls it.
-- **Not wrapped**: `connections` (`:443`) and the queue's `synchronize`
-  (`connection_pool/queue.rb:80-81`, a bare `block()` in `queue.ts`). Their
-  trails bodies contain no `await`, and `connections` is a synchronous reader in
-  Rails, so it could not await the monitor even if it needed to. The same holds
-  outside the pool for `Engine#app`'s `@app_build_lock`
-  (`railties/lib/rails/engine.rb:448,516-524`): trails' `app()` builds the
-  stack with no `await`, so its `@app ||` memo is already a single build and
-  the `Mutex#synchronize` double-check is not ported.
-
-This is a genuine language shortcoming, ratified repo-wide here. If one of those
-bodies ever gains an `await`, it gains the monitor in the same change.
-
-## Method visibility is a side table (`Module#private`, `basic_obj_respond_to`'s `pub`)
+## Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)
 
 Ruby's `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864-2879`) takes a
 `pub` flag and hands it to `method_boundp` (`:1788-1818`), so `respond_to?(:m)`
-and `respond_to?(:m, true)` can answer differently for the same receiver: a
-PRIVATE entry, and under `BOUND_RESPONDS` a PROTECTED one, answers `0` when
-`pub` is set and falls through to `respond_to_missing?`. Visibility is a
-property of the method entry, readable at run time.
+and `respond_to?(:m, true)` can answer differently for the same receiver, and
+`Kernel#public_send` (`vm_eval.c:1350`) raises `NoMethodError` "private method
+'…' called for …" where `send` dispatches. Visibility is a property of the
+method entry, readable at run time.
 
-JS has no such fact of its own, and both of its would-be carriers fail in
-opposite directions:
+JS has no such fact of its own: a `#private` member is not a string-named
+property at all (invisible at both `pub` values), and a TS `private` /
+`protected` member is a compile-time annotation with no runtime residue
+(visible at both). **trails has no runtime privates.** A Rails-private method
+is marked `private` / `protected` in TypeScript, and `@internal` per
+`blazetrails/rails-private-jsdoc`, and that is the whole port. No side table,
+no `#private` emulation, no Proxy. A ruby-compat side table was built and
+removed: it cost ~70% on every `public_send` (one per mass-assigned
+attribute), almost nothing used it, and it could not make `topic.title` raise
+where `send(:title)` succeeds.
 
-- A `#private` field or method is not a string-named property at all, so
-  `"#x" in obj` is false — it is invisible at BOTH `pub` values, where Ruby
-  reports it at `pub = 0`.
-- A TS `private` / `protected` member is a compile-time annotation with no
-  runtime residue: it is emitted as an ordinary property, so `in` reports it at
-  BOTH `pub` values, where Ruby hides it at `pub = 1`.
+As a consequence:
 
-**The carrier is a side table in ruby-compat.** `rbModPrivate(klass, ...mids)` /
-`rbModProtected(klass, ...mids)` (`packages/ruby-compat/src/object.ts`, the
-ports of `rb_mod_private` / `rb_mod_protected`, `vm_method.c:2482-2516`) record
-`(klass.prototype, mid) → visibility`, raising `NameError` for a name the class
-does not answer as `check_and_export_method` does; a JS accessor's setter
-answers the writer `name=`. The TS `private` / `protected` keyword stays beside
-the call for the type checker; the call is what Ruby sees. Two readers consult
-the table:
+- Ruby `private` / `protected` ports as the TS keyword plus `@internal`. Nothing
+  is recorded at run time, and `Module#private` / `Module#protected` /
+  `private_constant` are not ported.
+- `respond_to?(m)` and `respond_to?(m, true)` answer the same for a defined
+  method. `basicObjRespondTo`'s `pub` and `rbObjRespondTo`'s `priv` stay, and
+  reach only `respondToMissing` / an overridden `isRespondTo`, so
+  `ActiveModel::AttributeMethods`' two `super` calls
+  (`attribute_methods.rb:528-533`) are still ported as two calls.
+- `rbFPublicSend` dispatches a defined method exactly as `rbFSend` does. It still
+  raises `NoMethodError` for an undefined name and still goes to `methodMissing`,
+  so a Rails `public_send` keeps its `rbFPublicSend` spelling and its rescue.
+  `rbModPublicMethodDefined` (`Module#public_method_defined?`) answers "defined".
+- A Rails test whose assertions turn on private / protected visibility at run
+  time is permanently unportable for that arm: `assert_not_respond_to` on a
+  private method, `assert_raise(NoMethodError)` on a private call, a `public_send`
+  refused by a private writer ("attribute readers/writers/predicates respect
+  access control" and "bulk updates respect access control",
+  `activerecord/test/cases/attribute_methods_test.rb:998-1033`). Port the
+  assertions that do not depend on it; park the rest as `it.skip` under a
+  `PERMANENT-SKIP:` line citing this section.
+- Code whose Rails body branches on visibility (Thor's `public_method?` /
+  `private_method?` deciding what is a command) needs an explicit mechanism
+  decided per class, not a general visibility table. Until one is decided the
+  branch reads "defined": `Mapping#build_conditions`' `public_method_defined?`
+  (`action_dispatch/routing/mapper.rb:198-204`) keeps a constraint named after a
+  private `Request` method, filed as
+  `mapper-build-conditions-keeps-request-private-method-constraints`.
+- `ActiveRecord::Core#to_ary` (`activerecord/lib/active_record/core.rb:822-832`)
+  is not ported. It is private and answers `nil`, there only to keep
+  `Array#flatten` off a record's `method_missing`, so a Rails record does not
+  `respond_to?(:to_ary)`. A `toAry` member would answer "defined", and
+  `serializable_hash` (`activemodel/lib/active_model/serialization.rb:141`) and
+  `fields_for_with_nested_attributes`
+  (`actionview/lib/action_view/helpers/form_helper.rb:2713-2718`) would read a
+  single record as a collection. Its scoped skip for `core.rb` / `base.rb` is
+  permanent, ruled by the repo owner on trails#8750.
+- `defineModule`'s section record (`ruby-compat/src/include.ts`), read by
+  `publicInstanceMethods`, is such a mechanism and stays. It is read once at
+  load, where a Rails body enumerates `public_instance_methods`
+  (`relation/delegation.rb:19`, `associations/collection_proxy.rb:1132-1133`),
+  and never at dispatch.
 
-- `basicObjRespondTo` walks the chain as before, but an entry recorded in the
-  table is the entry at that owner, and under `pub` a non-public one sends the
-  name to `respondToMissing`, exactly `method_boundp`'s `0`.
-- `rbFPublicSend` (`Kernel#public_send`, `vm_eval.c:1350`) raises
-  `NoMethodError` "private method '…' called for …" off the same table, so
-  `ActiveModel::AttributeAssignment#_assign_attribute`
-  (`attribute_assignment.rb:67-76`) is a `public_send` with its Rails rescue.
-
-The table does NOT reach a plain property access. `topic.title` carries no
-caller context, so it cannot raise while `send(:title)` succeeds; the
-`assert_raise(NoMethodError) { topic.title }` arms of "attribute
-readers/writers/predicates respect access control"
-(`activerecord/test/cases/attribute_methods_test.rb:998-1026`) remain a
-separate decision (`activerecord-private-attribute-methods-are-still-public`).
-The `pub` parameter is therefore live, and `ActiveModel::AttributeMethods`'
-two `super` calls (`attribute_methods.rb:528-533`) differ in it as in Rails.
+This is a genuine language shortcoming, ratified repo-wide here. There is no
+story to add a runtime visibility carrier, and a new instance is not a new
+decision to argue.
 
 ## Schema reflection peeks at a warm cache (`load_schema!`'s `schema_cache.columns_hash`)
 
-Rails' `ModelSchema#load_schema!`
-(`activerecord/lib/active_record/model_schema.rb:587-597`) reads
-`schema_cache.columns_hash(table_name)` at `:592` synchronously, and a cold
-cache is no special case: the schema cache runs the reflection query in line,
-because in Ruby every query is synchronous. So every caller that needs
-`columns_hash`, `primary_key` or `table_exists?` can reach the database from a
-plain method body.
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#schema-reflection-peeks-at-a-warm-cache-load_schemas-schema_cachecolumns_hash).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
-In trails a cold cache needs a query, and a query is `await`ed. A warm cache
-needs nothing. So the divergence is confined to the cold path, and the settled
-shape splits it the same way:
+## Adapter facts are prewarmed and peeked (`lookup_cast_type`, `max_identifier_length`, `quote_string`)
 
-- **Warming is an explicit async step.** `SchemaCache#columnsHash`,
-  `#primaryKeys` and `#dataSourceExists` are the async ports, and
-  `loadSchemaFromAdapter` (`model-schema.ts`) warms all three inside a
-  `withConnection` scope and then enters the single `loadSchemaBang` body.
-  `SchemaReflection#loadAllBang` / `BoundSchemaReflection#loadAllBang` and
-  `SchemaReflection.eagerLoadSchemaCache` warm a whole pool up front.
-- **A booted app warms before user code runs.** Rails loads a model's schema
-  lazily, on first touch (`activerecord/lib/active_record/model_schema.rb:587-597`);
-  its `active_record.define_attribute_methods` initializer
-  (`activerecord/lib/active_record/railtie.rb:145-185`) is only an eager
-  optimisation, taken only under the guard at `:169`
-  (`!check_schema_cache_dump_version && app.config.eager_load && !Rails.env.local?`),
-  and skips development and test on purpose (`:154-168`). A synchronous trails `new` cannot make the
-  first-touch load, so trailties' `active_record.initialize_database` awaits
-  `loadAllBang` — `SchemaCache#add_all` (`schema_cache.rb:396-404`) — on the
-  pool it has just established, in every env but test. It runs in development
-  and ignores Rails' `eager_load` / `check_schema_cache_dump_version` arms,
-  because in trails first touch IS a cold `new` in every env; it skips test for
-  the reason `railtie.rb:159-160` gives, that db:test:prepare may still change
-  the schema. Like `railtie.rb:175-180`, an `ActiveRecordError` only warns, so
-  the app still boots against an unhealthy database; the adapters wrap driver
-  failures (a refused PostgreSQL connection is a `DatabaseConnectionError`).
-- **Synchronous readers peek.** `SchemaCache#getCachedColumnsHash`,
-  `#getCachedDataSourceExists`, `#getCachedPrimaryKeys`, `#setColumns` and
-  `SchemaReflection#loadedCache` read or seed the memo maps and never query.
-  The warm precondition is that one of the async steps above has already run
-  for that table on that pool.
-- **A cold peek answers `undefined`, never a query.** Each sync reader treats
-  it as "not reflected yet": `loadSchemaFromCacheSync` (`model-schema.ts`)
-  returns `false` and leaves the model unloaded, `cachedTableExists` returns
-  `undefined` (unknown), and `getPrimaryKey`
-  (`attribute-methods/primary-key.ts`) falls through to the `"id"` convention —
-  the same answer its `table_exists?` arm gives an absent table. The one exception is `warmColumnsHashSync`, which
-  seeds the cache when the adapter's `columns` itself answers synchronously (a
-  fake test adapter); a real adapter's promise is dropped with its rejection
-  handled, and the cold answer stands.
-
-The alternatives each lose more than they buy:
-
-- **Making every reader async** propagates through `columns_hash`,
-  `attribute_types`, `type_for_attribute`, Arel type-casting and
-  `Relation#to_sql`, which are synchronous Rails-facing API — the same cascade
-  § "Serialization's dual sync/async hash" rejects for `as_json`.
-- **Blocking on the query** is not available: JS has no synchronous await.
-- **Answering a cold column read with an empty column set** makes a cold model
-  silently attribute-less where Rails would have reflected it; `undefined`
-  keeps it unloaded so the async warm can still load it.
-
-**Scope boundary.** This ratifies the schema-cache PEEK only. It does **not**
-bless the synchronous _lease_ a peek may sit behind — `withConnectionSync`
-(`reflectionAdapter`, `model-schema.ts:27-30`), `acquireConnectionSync`
-(`abstract/connection-pool.ts`), or the promise arm in
-`abstract/connection-pool/queue.ts`'s internal poll. Those stay CONVERGEABLE and are owned by their own RFC: a
-synchronous lease is permanent, and it trips the
-`permanent_connection_checkout = :disallowed` flag #7781 armed, which is exactly
-why `loadSchemaFromAdapter` wraps its warm in `withConnection` (see its JSDoc).
-Nothing here is a receipt for a new sync lease.
-
-This is a genuine language shortcoming, ratified repo-wide here. The sync
-schema-cache readers carry `@noRailsEquivalent PERMANENT` receipts against this
-section, and a cold-cache `undefined` at a sync reader is the designed answer,
-not a bug to re-derive per call site.
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#adapter-facts-are-prewarmed-and-peeked-lookup_cast_type-max_identifier_length-quote_string).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
 ## The adapter lock defaults to a monitor, not `NullLock`
 
-Rails' `AbstractAdapter#initialize` ends with `self.lock_thread = nil`
-(`activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:157`),
-and `lock_thread=` (`:181-191`) maps `nil` to
-`ActiveSupport::Concurrency::NullLock`. Only a pinned connection gets a real
-monitor (`connection_pool.rb:335`). That is safe in Ruby because the pool leases
-a connection per execution context
-(`@leases[ActiveSupport::IsolatedExecutionState.context]`,
-`connection_pool.rb:710-712`), and a thread runs one statement at a time: the
-concurrency unit and the serialization unit are the same object.
-
-In JS they are not. trails' lease registry is keyed the same way
-(`connectionLease`, `abstract/connection-pool.ts`, over `IsolatedExecutionState.context()`),
-faithfully — but one async context can hold many in-flight promises, so
-`Promise.all([Post.count(), Post.first()])` hands one adapter to two concurrent
-statements. Nothing in the lease model serializes them.
-
-The alternatives were tried:
-
-- **Porting `self.lock_thread = nil` verbatim** reds all three tests named in
-  `abstract-adapter-null-lock-breaks-concurrent-async-statements`.
-- **An adapter-local statement queue** (SQLite's former `_statementLock`,
-  since retired onto `withRawConnection`) does not cover it: it wrapped only
-  `performQuery`, not `withRawConnection`'s `connectBang` (three concurrent
-  opens) nor the post-`rawExecute` `_lastInsertRowid` read, and it existed on
-  one adapter only.
-- **Leasing per promise** has no Ruby counterpart and no JS hook to key on.
-
-So trails' `lock` field initializer is `new LoadInterlockAwareMonitor()`
-(`abstract-adapter.ts`), where Rails' constructor leaves `NullLock`, and
-`setLockThread` itself stays a faithful port of `lock_thread=` — a caller that
-passes `null` still gets `NullLock`. The constructor simply does not make that
-call.
-
-The same gap reaches the monitor's reentrant arm. Ruby's monitor is owned by a
-thread, so a re-entry is always nested in the holder's own call; a
-`Promise.all` inside `withinNewTransaction` starts sibling calls that share
-the holder's async context. So ruby-compat's `synchronize` (`monitor.ts`) runs
-each entry under an owner of its own and serializes re-entries under one
-holder: a nested call re-enters at once, siblings take turns. For the same
-reason `SQLite3Adapter#disconnectBang` closes the handle under `lock`, where
-Rails' `disconnect!` (`sqlite3_adapter.rb:221-226`) closes it after `super`
-releases `@lock`: a statement can be in flight on the adapter from the same
-async context, which a Ruby thread never is.
-
-This is a genuine language shortcoming, ratified repo-wide here. Stories that
-serialize adapter access (retiring SQLite's statement lock onto
-`withRawConnection`, the server-version barrier, `FutureResult`'s mutex) build
-on the monitor default; none of them is a story to restore `NullLock`.
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#the-adapter-lock-defaults-to-a-monitor-not-nulllock).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
 ## Records are not Proxies (`method_missing`)
 
@@ -1249,28 +1042,18 @@ time (`activerecord/test/cases/attribute_methods_test.rb:641-645`), and a read
 off an existing record after `undefine_attribute_methods` redefines the reader
 (`attribute_methods_test.rb:1098`).
 
-trails enforces both halves at **compile** time instead: #7222 removed
-`[key: string]: unknown` from `ActiveModel::Model`, so `topic.mumbo` does not
+trails enforces both halves at **compile** time instead: `ActiveModel::Model`
+has no `[key: string]: unknown` index signature, so `topic.mumbo` does not
 type-check. An `as any` cast or a plain-JS caller still evades it, and there it
 reads `undefined` / creates an own property.
 
 The only JS read/write hook on an arbitrary name is a `Proxy` trap, and the
 converged shape would be a Proxy returned from the constructor standing in for
-`self`. Identity must be the object callers hold, or `errors.base`,
-`association.owner`, WeakMap-keyed state and `has_secure_password`'s ivars land
-on a second object. **The blocker is cost**, measured best-of-5 over 200k
-iterations on #7208, on every ActiveModel instance:
-
-| trap | operation              | slowdown |
-| ---- | ---------------------- | -------- |
-| get  | attribute read         | 3.7×     |
-| get  | internal `_field` read | 64×      |
-| set  | attribute write        | 1.5×     |
-| set  | construction           | 1.7×     |
-
-A proxied object defeats the property-read inlining those reads get, and the
-internal-field number lands on every framework read, not only user code.
-**Records are not Proxies.** As a consequence:
+`self`. **The blocker is cost**, measured on every ActiveModel instance: a
+`get` trap makes an attribute read 3.7× slower and an internal `_field` read
+64× slower, because a proxied object defeats the property-read inlining those
+reads get, and the internal-field number lands on every framework read, not
+only user code. **Records are not Proxies.** As a consequence:
 
 - An undefined name on a record is a type error, not a `NoMethodError`, and
   untyped access reads `undefined` or silently creates an own property.
@@ -1283,21 +1066,131 @@ internal-field number lands on every framework read, not only user code.
 **The Migration half.** Rails' `Migration#method_missing`
 (`activerecord/lib/active_record/migration.rb:1044-1059`) wraps every DSL
 statement (`create_table`, `add_column`, …) in `say_with_time` and sends it to
-`execution_strategy`. trails has no
-such dispatch, so `migration.ts` declares typed forwarders, each a
-`this.methodMissing(name, ...args)` call (`createTable` at `:352` onward). They
+`execution_strategy`. trails has no such dispatch, so `migration.ts` declares
+typed forwarders, each a `this.methodMissing(name, ...args)` call. They
 **stay**. A Proxy would not buy back extra surface either: typing the proxied
 statements needs a declaration-merged `interface Migration` in the same file,
-whose members `parity:api:extra` counts exactly as it counts the class members,
-so `moved` / `total` do not drop. The criterion is unreachable in TS either way.
+whose members `parity:api:extra` counts exactly as it counts the class members.
 
 This is a genuine language shortcoming, ratified repo-wide here. Tests mirroring
 the Rails `NoMethodError` arms port the assertions that do not depend on the
-hook (e.g. the first four of
-`#undefine_attribute_methods undefines alias attribute methods`), and there is
-no story to proxy records or to replace the Migration forwarders. It does not
-rule out a `Proxy` on some other non-record object whose Rails counterpart
-dispatches through `method_missing`; that is decided per class.
+hook, and there is no story to proxy records or to replace the Migration
+forwarders. It does not rule out a `Proxy` on some other non-record object whose
+Rails counterpart dispatches through `method_missing`; that is decided per class
+(see § "Ruby protocol methods with a different JS mechanism").
+
+## Ruby Strings are JS string primitives (no mutable String carrier)
+
+A Ruby `String` is a mutable object with identity. `str << "x"` and
+`str.replace("y")` change the receiver in place, `str.dup` is a second object
+with the same content, and `frozen?` is a per-object fact. ActiveModel leans on
+all three:
+
+- **Identity across `dup`.** `Attribute#initialize_dup`
+  (`activemodel/lib/active_model/attribute.rb:155-159`) dups a duplicable
+  `@value`, so `attribute.value` and `attribute.dup.value` are two objects
+  (`activemodel/test/cases/attribute_test.rb:134-138`), and a mutation made
+  through a deep-duped `AttributeSet` does not reach the original
+  (`attribute_set_test.rb:53-68`) while one made through a shallow dup does
+  (`:35-50`).
+- **An unfrozen copy out of the cast.** `Type::String#cast_value`
+  (`activemodel/lib/active_model/type/string.rb:33-40`) answers a `::String`
+  with `::String.new(value)` — a new, unfrozen String even for a frozen input
+  (`activemodel/test/cases/type/string_test.rb:23-43`) — where
+  `ImmutableString#cast_value` (`type/immutable_string.rb:62-68`) answers
+  `value.to_s.freeze`.
+- **In-place mutation feeding dirty tracking.** `Type::String#changed_in_place?`
+  (`type/string.rb:16-20`) exists because the cast value can be mutated after
+  it is read: `Attribute#changed_in_place?` (`attribute.rb:70-72`) compares the
+  original database value with the live one, so `attribute.value << "!"`
+  (`attribute_test.rb:271-277`) and `@model.name.replace("Hadad")`
+  (`activemodel/test/cases/attributes_dirty_test.rb:67-73`) mark the attribute
+  changed with no assignment, and `Attribute#with_type` (`attribute.rb:91-97`)
+  carries the mutation across (`attribute_test.rb:325-330`).
+
+A JS string is a primitive value: no identity, no in-place mutation, and
+`Object.isFrozen` is `true` for every one of them. None of the three facts above
+has a JS value to hold it. **A Ruby String is a JS string primitive,
+everywhere.** trails has no mutable String carrier. A ruby-compat carrier class
+was considered and rejected: every `:string` / `:text` attribute read would
+change type and break `===`, `typeof`, Map keys and the 197 `typeof x ===
+"string"` arms in activemodel and activerecord; it would still have to re-declare
+`String.prototype`; and it measured 2–4× on `JSON.stringify` and template
+interpolation, to buy eight ActiveModel tests. This is the same trade
+§ "Records are not Proxies" records. As a consequence:
+
+- `Type::String#cast_value` returns a primitive. Its `::String.new(value)` is
+  ruby-compat's `rbStrSNew`, which answers the string itself: the value is its
+  own copy.
+- `Attribute#initializeDup` keeps Rails' `duplicable?` guard and `dup` call,
+  and `rbObjDup` answers a string unchanged. `attribute.value()` and
+  `attribute.dup().value()` are the same value.
+- `ImmutableString#cast_value`'s `.freeze` is a no-op on a string, and
+  `frozen?` is `true` of every cast result, `Type::String`'s included.
+- `Type::String#changed_in_place?` stays ported, and is still reached when a
+  type's `deserialize` and `serialize` do not round-trip. Its in-place-mutation
+  arm is unreachable: no caller can mutate a string a record holds, so a string
+  attribute becomes dirty by assignment or `name_will_change!` only.
+
+A Rails test whose assertions turn on String identity, frozenness or in-place
+mutation is permanently unportable for that arm. Port the assertions that do
+not depend on it; where those leave a running test short of Rails' count, drop
+each missing one with a row in `scripts/test-compare/assertion-receipts.ts`
+citing this section. A test with nothing left is parked as `it.skip` under a
+`PERMANENT-SKIP:` line citing this section, its body kept as the Rails body.
+
+This is a genuine language shortcoming, ratified repo-wide here. There is no
+story to add a mutable String carrier, and a new instance is not a new decision
+to argue.
+
+### A String has no encoding tag either
+
+`str.encoding`, `force_encoding` and `String#b` read or change a per-object
+encoding. A JS string has none, and trails adds none: the carrier that would
+hold it is the carrier this section rejects. ruby-compat tags a `Uint8Array`
+only. A Rails body that branches on a String's encoding ports the UTF-8 arm,
+and a test asserting `str.encoding` is permanently unportable for that
+assertion.
+
+## Runtime facts Node does not expose
+
+Each of these is a Ruby or C-library fact with no Node source. They are
+ratified here so no port re-derives them.
+
+- **`fork`.** Ruby's `fork` copies the parent's heap; `child_process.fork`
+  starts a fresh process. A Rails test that asserts on per-pid state after a
+  fork is permanently unportable.
+- **Allocated-object count.** `Event#now_allocations`
+  (`activesupport/lib/active_support/notifications/instrumenter.rb:229-236`)
+  reads `GC.stat(:total_allocated_objects)`, which only grows. V8's heap
+  statistics report occupancy, which a collection lowers. `nowAllocations`
+  answers 0, the arm Rails takes where `GC.stat` has no such key.
+- **Arity -1.** `Function.length` cannot express a method that takes any number
+  of arguments, so an assertion on `arity == -1` is dropped.
+- **The errno behind a failed `IO#noecho`.** Node exposes termios only as
+  `setRawMode`, and `stty` reports libc- and locale-dependent text, never the
+  number. ruby-compat raises a bare `SystemCallError` where Ruby raises the
+  specific `Errno` class. A native termios binding is not taken on.
+- **A `self.new` that answers `nil` or `false`.** A JS constructor that returns
+  a primitive answers `this` instead, so a Rails `self.new` ported as the
+  constructor (RFC 0188) cannot answer `nil`: `DeprecationProxy`'s
+  `return object unless object` (`deprecation/proxy_wrappers.rb:6-11`) and
+  `TimeZone.new`'s unknown-name `self[name]` (`values/time_zone.rb:216-218`)
+  drop that arm. An unknown zone name reaches `create`, which raises
+  `TZInfo::InvalidTimezoneIdentifier`. Ruled by the repo owner on 2026-10-14.
+- **SQLite's double-quoted-string setting.** better-sqlite3 compiles with
+  `SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
+  `strict: false` cannot re-enable double-quoted string literals on that
+  driver.
+
+A test that depends on one of these ports the assertions that do not, and parks
+the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
+
+## Fixtures load from `.ts` modules as well as YAML (`FixtureSet::File`)
+
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#fixtures-load-from-ts-modules-as-well-as-yaml-fixturesetfile).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
 ## Ruby protocol methods with a different JS mechanism
 
@@ -1312,8 +1205,7 @@ the capability, in a different place. Each is decided here, and each but
   `Time`, not a method on `TimeWithZone`. Skipped for name scoring. The one TS
   member, `Duration#isA`, answers `this instanceof klass` where Rails'
   `duration.rb:330-332` answers `value.is_a?(klass)`, and is filed for
-  convergence. `HashObject` (`serialized-attribute.test.ts`) is the
-  existing `hasInstance` hook.
+  convergence.
 - **`hash` / `eql?` — live, scored by their consumers.** `Map` and `Set` call no
   hook, but ruby-compat's `rbHash` and `rbEqual` dispatch to a TS `hash()` /
   `eql()`, and so do `Deduplicable#deduplicate` and the preloader's batch
@@ -1341,7 +1233,7 @@ the capability, in a different place. Each is decided here, and each but
 | `migration/default_strategy.rb`                       | typed forwarders      |
 | `active_record/migration.rb`                          | typed forwarders      |
 | `relation/delegation.rb`                              | Proxy                 |
-| `active_record/test_fixtures.rb`                      | nothing               |
+| `active_record/test_fixtures.rb`                      | Proxy (proto chain)   |
 | `active_support/array_inquirer.rb`                    | Proxy                 |
 | `active_support/broadcast_logger.rb`                  | Proxy                 |
 | `core_ext/module/delegation.rb`                       | nothing (no file)     |
@@ -1349,7 +1241,7 @@ the capability, in a different place. Each is decided here, and each but
 | `active_support/delegation.rb`                        | Proxy                 |
 | `deprecation/proxy_wrappers.rb`                       | Proxy                 |
 | `active_support/duration.rb`                          | nothing               |
-| `log_subscriber/test_helper.rb`                       | nothing (no file)     |
+| `log_subscriber/test_helper.rb`                       | typed forwarders      |
 | `multibyte/chars.rb`                                  | nothing (no file)     |
 | `active_support/option_merger.rb`                     | Proxy                 |
 | `active_support/ordered_options.rb`                   | Proxy                 |
@@ -1358,98 +1250,86 @@ the capability, in a different place. Each is decided here, and each but
 | `rails/railtie.rb`                                    | Proxy (class chain)   |
 | `rails/engine/lazy_route_set.rb`                      | Proxy (module chain)  |
 | `rails/railtie/configuration.rb`                      | Proxy                 |
+| `abstract_controller/collector.rb`                    | Proxy (proto chain)   |
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
 | `action_dispatch/http/mime_type.rb`                   | Proxy (`is…` names)   |
+| `action_dispatch/testing/assertions/routing.rb`       | Proxy (proto chain)   |
+| `action_dispatch/testing/integration.rb`              | Proxy (proto chain)   |
+| `thor/core_ext/hash_with_indifferent_access.rb`       | Proxy (proto chain)   |
 
-A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
-name only when that predicate answers it (`broadcast_logger.rb:235-251`): a
-`typeof x.m === "function"` probe is JS's `respond_to?`, and TaggedLogging's
-`flush` and rack's `CommonLogger` probe a wrapped logger exactly that way, so
-handing every name a raising function would turn Ruby's skipped arm into a
-raise. The `method_missing` `super` arm stays in the port; an unanswered name
-reads `undefined`, and calling it is a `TypeError` where Ruby raises
-`NoMethodError`.
+Rules that apply across the table:
 
-`action_dispatch/http/mime_type.rb`'s `Mime::Type` and `Mime::NullType` answer
-every `…?` name from `method_missing` (`mime_type.rb:336-346,379-385`). trails
-spells a Ruby predicate `foo?` as `isFoo`, so their trap reads an `is…` name that
-missed the class as the Ruby name `foo?` (`isUrlEncodedForm` is
-`url_encoded_form?`), skipping `KERNEL_METHODS` / `PROTOCOL_PROBES`, which Ruby
-finds on the receiver first. A defined predicate (`isHtml`, `isAll`, `isNil`) is
-found before the trap, as Ruby finds `html?` before `method_missing`.
-
-A "named method, no trap" row answers only an explicit `methodMissing` call.
-These rows are decided per class, not ratified: a "nothing" row with a
-dispatch-dependent Rails test is a gap, filed against its package.
-
-`active_record/dynamic_matchers.rb` is `extend`ed onto the model CLASS
-(`base.rb:292`), so its Proxy is not returned in place of anything: `base.ts`
-splices one into `Base`'s static prototype chain, directly above `Base`, so
-`Topic.findByTitle("x")` reaches `DynamicMatchers#method_missing` with no prior
-relation call. The trap forwards only a read that missed every class below it,
-only for `Base` or a subclass as receiver, and only a name `respond_to_missing?`
-claims. A static read that hits `Base` or a subclass never crosses it; one
-inherited from above `Base` (ActiveModel's class methods) does, and costs ~10×
-per read in a 200k-iteration microbenchmark (~1.5 → ~14 ms), with no measurable
-wall-time change across `persistence`, `validations`, `callbacks` and `finder`
-test files (~22 s either way). Placing it at the chain's root instead would tax
-only misses, but its identity then replaces `Function.prototype` as the root's
-parent, which ~20 chain walkers terminate on. The name is untyped (a static
-`findBy${string}` index signature breaks subclass assignability to
-`typeof Base`), so a call site reaches it through a cast — `(Topic as any).findByTitle(...)`,
-or a narrower structural type where the file bans `any` — and `in`
-still cannot see it (`finder-respond-to-dynamic-finders-invisible-to-in`).
-
-`rails/railtie.rb`'s class-level pair (`railtie.rb:216-230`) is the same
-splice, directly above `Trailtie` in `trailtie.ts`: a static read that missed
-every class below it forwards to `instance()` when the railtie is not abstract
-and the instance answers the name, so `Blog::Engine.routes` reaches
-`Engine#routes`. `Function.prototype.call` answers `call` before the trap can,
-so `Engine` forwards that one name with an explicit `static call`.
-
-`rails/engine/lazy_route_set.rb`'s `method_missing_module` (`:92-110`) is
-prepended onto `named_routes.url_helpers_module` / `path_helpers_module`
-(`:52-53`). A trails `Module` copies its carrier into each includer's link, so
-a Proxy there would reach no includer. Instead, `LazyRouteSet#generateUrlHelpers`
-splices the Proxy directly beneath the generated module, the one object that
-reaches those modules through `extend`. This row is not converged yet. The
-reload is async, so `respondToMissing` starts it and answers `super`,
-`method_missing`'s in-line re-send is unported, and test_help's integration
-`before_setup` awaits the reload. All three are debt tracked by
-`lazy-route-set-method-missing-resends-in-line`, not a ratified shape.
+- A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
+  name only when that predicate answers it (`broadcast_logger.rb:235-251`): a
+  `typeof x.m === "function"` probe is JS's `respond_to?`, so handing every
+  name a raising function would turn Ruby's skipped arm into a raise. The
+  `method_missing` `super` arm stays in the port; an unanswered name reads
+  `undefined`, and calling it is a `TypeError` where Ruby raises
+  `NoMethodError`.
+- A Proxy spliced into a prototype chain wraps `Object.create(parent)`, not the
+  parent prototype itself, so `instanceof` the parent keeps working.
+- Where the trap answers `…?` names (`mime_type.rb:336-346,379-385`,
+  `hash_with_indifferent_access.rb:93-104`), it reads an `is…` name that missed
+  the class as the Ruby predicate `foo?` (`isUrlEncodedForm` is
+  `url_encoded_form?`), skipping `KERNEL_METHODS` / `PROTOCOL_PROBES`; a defined
+  predicate is found before the trap, as Ruby finds `html?` before
+  `method_missing`. Thor's HWIA reads a missed name as `self[method]` with
+  Ruby truthiness, and a missed assignment as `[]=` (so a frozen hash raises
+  `FrozenError`); its one-argument compare arm is reached only by `rbFSend`.
+- A "named method, no trap" row answers only an explicit `methodMissing` call.
+  A "nothing" row with a dispatch-dependent Rails test is a gap, filed against
+  its package; the rows are decided per class, not ratified.
+- A class-level pair `extend`ed onto a class (`dynamic_matchers.rb`,
+  `railtie.rb:216-230`) is a Proxy spliced into the static prototype chain
+  directly above `Base` / `Trailtie`: it forwards only a read that missed every
+  class below it, and only a name `respond_to_missing?` claims. The name is
+  untyped (a static `findBy${string}` index signature breaks subclass
+  assignability), so a call site reaches it through a cast, and `in` still
+  cannot see it. `Function.prototype.call` answers `call` before the trap can,
+  so `Engine` forwards that one name with an explicit `static call`.
+- `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
+  the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since a
+  trails `Module` copies its carrier into each includer and a Proxy on the
+  module itself would reach no includer. That row is not converged: the reload
+  is async, so `respondToMissing` starts it and answers `super`, the in-line
+  re-send is unported, and test_help's integration `before_setup` awaits the
+  reload — debt tracked by `lazy-route-set-method-missing-resends-in-line`.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 
-§ "Module mixins" says only `inherited` has no JS equivalent and its semantics
-"have to be deferred some other way". For `ModelSchema` this is that way.
-Rails' `ModelSchema.inherited`
-(`activerecord/lib/active_record/model_schema.rb:574-580`) runs at
-class-definition time and gives the child a fresh load-schema monitor, calls
-`reload_schema_from_cache(false)` — a non-recursive reset of the child's
-schema memos — and clears `@ignored_columns`. So a subclass never observes its
-parent's `@columns_hash`, `@schema_loaded` or attribute builder.
+§ "Module mixins" says only `inherited` has no JS equivalent. JS has no hook
+that fires when `class Child extends Parent` is evaluated, so wherever Rails'
+`inherited` resets or seeds per-class state, trails defers it to the first read
+or first write on the subclass: a memo is answered only when it is an own
+property of the class being asked (`Object.prototype.hasOwnProperty.call(host,
+key)`), so an inherited memo reads as unset — the observable state `inherited`'s
+reset leaves behind — with nothing running at definition time. A lazy reset at
+first read would clobber memos written to the child before it, and a decorator
+or registration step on every model is invented Rails-facing surface. This is
+a genuine language shortcoming, ratified repo-wide; an own-property memo guard
+is the port of `inherited`, not a deviation to retire, and there is no story to
+port `inherited` as a hook.
 
-JS has no hook that fires when `class Child extends Parent` is evaluated, and a
-static field read on the child walks the prototype chain to the parent's memo.
-**The settled deferral is the own-property guard**: `ownSchemaMemo`
-(`model-schema.ts`) answers a memo only when it is an own property of the class
-being asked (`Object.prototype.hasOwnProperty.call(host, key)`), so an inherited
-memo reads as unset — the observable state `inherited`'s reset leaves behind —
-without anything running at definition time. `_schemaLoaded`, `_columnsHash`,
-`_columns`, `_attributesBuilder` and `_yamlEncoder` are all read through it.
+`ActiveRecord::Base`'s chain, all eight modules that define `inherited` under
+it, is in
+[packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#inherited-is-deferred-to-own-property-memo-guards-modelschemainherited);
+the `Class#subclasses` seat is in
+[packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#classsubclasses-is-seated-on-a-classs-first-own-write-callbacksclassmethodsset_callbacks);
+`ParamsWrapper` is in
+[packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#paramswrapperclassmethodsinherited-runs-at-a-subclasss-first-_wrapper_options-read);
+Thor's is in [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#thor-commands-register-through-an-explicit-methodadded).
 
-The alternatives lose:
+### `Class#subclasses` is seated on a class's first own write (`Callbacks::ClassMethods#set_callbacks`)
 
-- **A lazy reset at the child's first schema read** would clobber memos written
-  to the child _before_ that read — `applyColumnsHash`, attribute declarations —
-  which Rails' definition-time reset runs ahead of by construction.
-- **A decorator or explicit registration step** on every model (`@model class
-Post`, `Post.register()`) would fire at the right moment, but it is invented
-  surface imposed at a Rails-facing API on every trails user.
+Moved to [packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#classsubclasses-is-seated-on-a-classs-first-own-write-callbacksclassmethodsset_callbacks).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
-This is a genuine language shortcoming, ratified repo-wide here. An own-property
-memo guard in `model-schema.ts` is the port of `inherited`, not a deviation to
-retire, and there is no story to port `inherited` as a hook.
+### `ParamsWrapper::ClassMethods#inherited` runs at a subclass's first `_wrapper_options` read
+
+Moved to [packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#paramswrapperclassmethodsinherited-runs-at-a-subclasss-first-_wrapper_options-read).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
 ## `singleton_class` is a per-object subclass (`rbObjSingletonClass`)
 
@@ -1465,10 +1345,10 @@ JS has no per-object class. `rbObjSingletonClass(obj)`
 `obj.constructor` on first call and makes it `obj`'s prototype. Its
 `prototype.constructor` is set back to the real class, so `obj.constructor`
 keeps answering Ruby's `obj.class`. `rbModSingletonP` is
-`Module#singleton_class?`. Rails code that
-branches on `singleton_class?` ports the branch as it is:
-`ClassAttribute.redefine`'s instance-reader arm (`class_attribute.rb:7-13`), and
-`UniquenessValidator#initialize`'s `@klass.superclass` (`uniqueness.rb:16`).
+`Module#singleton_class?`. Rails code that branches on `singleton_class?` ports
+the branch as it is: `ClassAttribute.redefine`'s instance-reader arm
+(`class_attribute.rb:7-13`), and `UniquenessValidator#initialize`'s
+`@klass.superclass` (`uniqueness.rb:16`).
 
 Because a Ruby singleton class never fires `inherited`, the own-property memo
 guards (§ "`inherited` is deferred") treat it as an unreset subclass. Do not
@@ -1481,79 +1361,115 @@ body reaches a class's singleton class keeps working on the class itself, and
 `ClassAttribute.redefine` does not port its `attached_object.is_a?(Module)`
 arm.
 
+## A record is built with `new Klass` only (`Inheritance::ClassMethods#new`)
+
+Ruby has one way to build a record, `Klass.new(attributes, &block)`, and
+`Inheritance::ClassMethods#new`
+(`activerecord/lib/active_record/inheritance.rb:56-78`) overrides it: it raises
+`NotImplementedError` for an abstract class or `Base`, resolves an STI subclass
+through `subclass_from_attributes`, and calls `subclass.new` or `super`.
+
+JS builds an object with the `new` expression, and that is the only spelling
+trails has. **There is no static `Klass.new`.** `new Klass(attributes, block)`
+is Rails' `Klass.new(attributes, &block)`, so the body of
+`Inheritance::ClassMethods#new` runs in `Base`'s constructor
+(`packages/activerecord/src/base.ts`): the abstract raise, then the three
+`subclass_from_attributes` arms in Rails' order, then
+`new subclass(attributes, block)` or the rest of the constructor, which is
+`Class#new`. A static `new` beside the constructor was rejected by the repo
+owner (trails#8659): it leaves two spellings for one operation, and either the
+bare `new` silently skips the abstract check and the STI dispatch, or the
+constructor has to re-enter the static method through a marker and run twice.
+
+As a consequence:
+
+- A Rails `klass.new(attributes, &block)` ports as
+  `new klass(attributes, block)`, in source and in tests. Generated application
+  code says `new Post(params)` too (`trailties/src/generators/active-model.ts`).
+- `inheritance.rb`'s `new` has no member in `inheritance.ts`. Do not add one,
+  and do not file a story to move the body out of the constructor.
+- `Persistence#becomes` (`persistence.rb:487-500`) is `klass.allocate` +
+  `initialize`, which skips `Inheritance::ClassMethods#new`. It reaches the
+  constructor with `_suppressAbstractCheck` and `_suppressStiNewDispatch` set.
+- `Relation#new` and `CollectionProxy#new` are instance methods with no `new`
+  expression to stand in for them, and stay.
+- A record loaded from the database is built with `new` too. Rails'
+  `instantiate_instance_of` is `klass.allocate.init_with_attributes(attributes,
+&block)` (`persistence.rb:313`), which skips `initialize`. The JS spelling of
+  `allocate`, `Object.create`, also skips every class-field initializer, so a
+  model field such as `history = []` would be unset on a record `find`
+  returns. That was tried on trails#8661 and reddened
+  `TransactionCallbacksTest` on all three adapters. `Base.allocate` therefore
+  goes through the constructor and carries `@noRailsEquivalent PERMANENT`, and
+  the arm in `Core`'s constructor that recognises an allocation carries
+  `@inventedArm if — PERMANENT`.
+
+This is ratified repo-wide here by the repo owner.
+
 ## A create path awaits its block before saving (`create`'s `&block`)
 
-Rails' create paths yield the caller's block synchronously while building the
-record and save only afterwards: `Persistence::ClassMethods#create` /
-`create!` (`activerecord/lib/active_record/persistence.rb:33-58`) call
-`new(attributes, &block)` before `save`,
-`CollectionAssociation#_create_record`
-(`associations/collection_association.rb:353-373`) calls
-`build_record(attributes, &block)` before opening `transaction`, and
-`SingularAssociation#_create_record` (`associations/singular_association.rb:67-73`)
-calls it before `record.save`. So a block that queries — `assert_equal 5,
-Client.count` inside `first_or_create`
-(`test/cases/associations/has_many_associations_test.rb:2727-2745`) — sees the
-pre-INSERT state, and a block that assigns sees its writes saved.
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-create-path-awaits-its-block-before-saving-creates-block).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
-In trails a block that does I/O returns a promise, and the build it runs inside
-is synchronous (a constructor, or `build_record`), so the promise escapes it.
-Left un-awaited, the block races the save: its query can land after the
-INSERT, and its writes after the record is persisted. **The settled shape is
-the captured-and-awaited block**: each async create path wraps the block to
-capture its return value (`yielded = block(record)`) and `await`s it after the
-build and before the save. That is `create` / `createBang` in `persistence.ts`,
-`CollectionAssociation#_createRecord`, `SingularAssociation#_createRecord`, and
-the `Association#_createRecord` fallback they override. Each of these types its
-block `(record) => void | Promise<void>`.
-`Relation#create` reaches the first through `currentScopeRestoringBlock`, which
-returns the block's value as `relation.rb:1344-1350` does.
+## Thor commands register through an explicit `methodAdded`
 
-The alternatives lose:
+Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#thor-commands-register-through-an-explicit-methodadded).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
-- **Passing the block straight through**, as Rails does, is the race above.
-- **Awaiting inside the build** would make `new` / `build` async, and a JS
-  constructor cannot await — the same wall § "Schema reflection peeks at a warm
-  cache" records for `new Post()`.
+## Thor dispatch is async
 
-The synchronous builders (`new`, `build`) do not await: they have nothing to
-order a promise against. This is a genuine language shortcoming — JS has no
-synchronous await — ratified repo-wide here. This section is the
-wrapper's receipt: the wrapper raises no call or argument row, so no JSDoc tag
-applies.
+Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#thor-dispatch-is-async).
+The decision is unchanged; the heading stays here so code citing it still
+resolves.
 
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
-`Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of
-`Zeitwerk::Loader` instances, `main` and `once`. Zeitwerk's entire mechanism is
-Ruby constant resolution at reference time: it maps file paths to constant names
-and registers `Module#autoload` so the file loads when the constant is first
-named. `Rails.autoloaders.main.ignore` (`application/configuration.rb:479-480`),
-`Zeitwerk::Loader.eager_load_all`, `Rails.eager_load!`, and
-`reloader.after_class_unload { … eager_load }` all hang off that graph
-(`application/configuration.rb:471-493`, `application/finisher.rb:76-87`).
+Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#trails-has-no-autoloader-railsautoloaders--zeitwerk).
+The decision is unchanged; the heading stays here so code citing it still
+resolves. It is about the application loader only; framework-internal
+call-time constant resolution is § "Call-time constant resolution" above.
 
-ESM resolves nothing from a constant name and offers no hook for an unresolved
-identifier, so there is no loader graph for a `Trails.autoloaders` to hold. And
-**Zeitwerk is not vendored under `vendor/`**, so a port would be invented surface
-with no Ruby source to mirror — there is nothing to be faithful to.
+## An action's name is its method's name (`AbstractController::Base#action_methods`)
 
-**Trails has no autoloader.** Application constants come from explicit imports
-and trails' eager directory scan: `loadControllers` in
-`trailties/src/application/finisher.ts`, which walks every existent
-`app/controllers` directory, dynamically `import()`s each `*_controller` /
-`*-controller` `.ts`/`.js` file, and registers each exported `…Controller`
-function under its underscored, namespace-prefixed name. That scan is the port.
-As a consequence:
+Moved to [packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#an-actions-name-is-its-methods-name-abstractcontrollerbaseaction_methods).
+The decision is unchanged; the heading stays here so code citing it still
+resolves. actionview's template lookups and trailties' generators follow that
+section; the one-line rule is that an action goes by its method's camelCase
+name everywhere, and a file or locale key named for an action is kebab-case.
 
-- The finisher's `eager_load!` initializer runs only its portable arms. The three
-  Zeitwerk calls carry `@missingRailsCall … — PERMANENT`.
-- `Configuration#autoloadLib` pushes its paths and has no loader to hand
-  `ignore` to.
-- There is no `Trails.autoloaders`, `autoloadLibOnce`, class-unload
-  re-eager-load, or `autoload_lib` line emitted by `trails new`.
+## Trilogy is out of scope (`trilogy_adapter.rb`, `adapters/trilogy/`)
 
-This is ratified repo-wide here, and there is no story to port Zeitwerk. It is
-about the application loader only: framework-internal call-time constant
-resolution (Ruby's `ActiveSupport::Autoload` / `Module#autoload` inside the gems)
-is § "Call-time constant resolution" above.
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#trilogy-is-out-of-scope-trilogy_adapterrb-adapterstrilogy).
+The decision is unchanged; the heading stays here so code citing it still
+resolves. The one-line rule: Trilogy is never ported, its unported-files rows
+are permanent, and a Trilogy-only test arm is dropped.
+
+## An adapter file is loaded by an awaited step (`ConnectionAdapters.resolve`'s `require`)
+
+Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require).
+The one-line rule: ESM has no synchronous `require`, so
+`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`. The
+one other `require` ported that way is `active_support/message_pack`, awaited
+at boot ([packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#active_supportmessage_pack-is-loaded-by-an-awaited-step-at-boot-serializerwithfallbacks-require)).
+
+## A migration file is loaded by `Kernel#load` (`MigrationProxy#load_migration`)
+
+Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-migration-file-is-loaded-by-kernelload-migrationproxyload_migration).
+The one-line rule: `Kernel#load` is ruby-compat's `rbFLoad`, an awaited
+`import()` that evaluates the file again and seats its constant-named exports.
+
+## A dumped statement wraps its trailing options in braces (`SchemaDumper`'s `parts.join(", ")`)
+
+Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-dumped-statement-wraps-its-trailing-options-in-braces-schemadumpers-partsjoin-).
+The one-line rule: a dumped TypeScript call needs `{ }` around its options only
+when it has any, and that one arm is permanent.
+
+## `ActiveRecord::Promise` is the native promise (`promise.rb`, `Promise::Complete`)
+
+Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#activerecordpromise-is-the-native-promise-promiserb-promisecomplete).
+The decision is unchanged; the heading stays here so code citing it still
+resolves. The one-line rule: every `async_*` reader returns a native promise,
+`promise.rb` is not ported, and a `Promise.new` / `Promise.wrap` call is
+omitted without a receipt.

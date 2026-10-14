@@ -1,4 +1,4 @@
-import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelCatch, kernelThrow, rbEnsure } from "@blazetrails/ruby-compat";
 import * as I18n from "./i18n.js";
 import type { ExceptionHandlerLike } from "./config.js";
 import type { Base } from "./backend/base.js";
@@ -257,11 +257,9 @@ export function withLocale<T>(tmpLocale: Locale | false | null | undefined, bloc
   } else {
     const currentLocale = locale();
     setLocale(tmpLocale);
-    try {
-      return block();
-    } finally {
+    return rbEnsure(block, () => {
       setLocale(currentLocale);
-    }
+    });
   }
 }
 

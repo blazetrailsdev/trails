@@ -18,6 +18,8 @@ export const NilClass: Readonly<Record<string, (...args: unknown[]) => unknown>>
     toH: () => ({}),
     /** `vendor/ruby/v3.3.11/object.c:4418` `nil_inspect`. */
     inspect: () => "nil",
+    /** `vendor/ruby/v3.3.11/object.c:4419` `nil_match`. */
+    matchOperator: () => null,
     /** `vendor/ruby/v3.3.11/object.c:4425` `NilClass#nil?`. */
     isNil: () => true,
   }),

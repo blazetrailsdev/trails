@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Comment } from "./test-helpers/models/comment.js";
 
 describe("select alias dynamic reader (trails)", () => {
@@ -32,5 +32,22 @@ describe("select alias dynamic reader (trails)", () => {
     });
     expect(record.bumped_id).toEqual(record.readAttribute("bumped_id"));
     expect(record.bumped_id).not.toBeUndefined();
+  });
+
+  it("loads a record without materializing its attribute set", async () => {
+    const record = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id"))[0];
+    const attributes = (record as unknown as { _attributes: { _attributes: object } })._attributes;
+    expect(Object.keys(attributes._attributes)).toEqual([]);
+    expect((record as Comment & { bumped_id: unknown }).bumped_id).not.toBeUndefined();
+  });
+
+  it("keeps the alias reader on a record loaded through marshal_load", async () => {
+    const record = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id"))[0];
+    const loaded = Comment.allocate() as Comment & { bumped_id: unknown };
+    const state = (record as unknown as { _marshalDump71(): unknown[] })._marshalDump71();
+    expect(state).toHaveLength(2);
+    loaded.marshalLoad(state);
+    expect(loaded.bumped_id).toEqual(record.readAttribute("bumped_id"));
+    expect(loaded.bumped_id).not.toBeUndefined();
   });
 });

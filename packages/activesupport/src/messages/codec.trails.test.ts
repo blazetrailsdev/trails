@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import "../message-pack.js";
 
 import { InvalidMessage, MessageEncryptor } from "../message-encryptor.js";
 import { InvalidSignature, MessageVerifier } from "../message-verifier.js";

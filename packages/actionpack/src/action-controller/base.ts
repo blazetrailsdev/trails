@@ -1,150 +1,185 @@
 import {
-  Benchmark,
-  Notifications,
   SafeBuffer,
-  classAttribute,
-  mattrAccessor,
-  extend,
   include,
+  type CacheStore,
+  type Configuration,
+  type Included,
+  type Rescuable,
+  type Module,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { File, getCrypto } from "@blazetrails/ruby-compat";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { StatusSymbol } from "@blazetrails/rack";
+import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
+import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
-import { FlashHash } from "../action-dispatch/middleware/flash.js";
+import type { FlashHash } from "../action-dispatch/middleware/flash.js";
 import {
   RequestForgeryProtection,
   commitCsrfToken,
-  protectFromForgery,
+  type protectFromForgery,
   resetCsrfToken,
-  skipForgeryProtection,
+  type skipForgeryProtection,
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
+import type { MimeType } from "../action-dispatch/http/mime-type.js";
 import { respondTo } from "./metal/mime-responds.js";
+import type { head } from "./metal/head.js";
+import {
+  ConditionalGet,
+  type ClassMethods as ConditionalGetClassMethods,
+  type Etagger,
+  type combineEtags,
+  type expiresIn,
+  type expiresNow,
+  type freshWhen,
+  type httpCacheForever,
+  type isStale,
+  type noStore,
+} from "./metal/conditional-get.js";
+import { EtagWithTemplateDigest } from "./metal/etag-with-template-digest.js";
+import { EtagWithFlash } from "./metal/etag-with-flash.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
-import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
-import { _computeRedirectToLocation, redirectBack, redirectBackOrTo } from "./metal/redirecting.js";
-import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
-import { MissingFile } from "./metal/exceptions.js";
-import { defaultRender } from "./metal/implicit-render.js";
+import { ParameterEncoding, type ParameterEncodingHost } from "./metal/parameter-encoding.js";
+import {
+  type addFlashTypes,
+  Flash,
+  type RedirectToResponseOptionsAndFlash,
+} from "./metal/flash.js";
+import type {
+  _computeRedirectToLocation,
+  redirectBack,
+  redirectBackOrTo,
+  urlFrom,
+  RedirectToOptions,
+} from "./metal/redirecting.js";
+import {
+  Callbacks,
+  type ActionCallbackHost,
+  type beforeAction,
+  type prependBeforeAction,
+  type skipBeforeAction,
+  type appendBeforeAction,
+  type afterAction,
+  type prependAfterAction,
+  type skipAfterAction,
+  type appendAfterAction,
+  type aroundAction,
+  type prependAroundAction,
+  type skipAroundAction,
+  type appendAroundAction,
+} from "../abstract-controller/callbacks.js";
+import { Rescue, type isShowDetailedExceptions } from "./metal/rescue.js";
+import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
   AroundCallback,
   CallbackOptions,
 } from "../abstract-controller/callbacks.js";
 import {
-  LookupContext,
-  ViewPathsClassMethods,
-  _defaultLayout,
-  _impliedLayoutName,
-  _isConditionalLayout,
-  _isIncludeLayout,
-  _layoutForOption,
-  _normalizeLayout,
-  _prefixes,
-  _processRenderTemplateOptions,
-  _writeLayoutMethod,
-  isActionHasLayout,
-  layout,
-  detailsForLookup,
-  isAnyTemplates,
-  lookupContext,
-  templateExists,
-  viewPathsPrependViewPath,
-  viewPathsFormats,
-  viewPathsLocale,
-  viewPathsSetFormats,
-  viewPathsSetLocale,
+  Layouts,
+  type LookupContext,
+  type _prefixes,
+  type detailsForLookup,
+  type isAnyTemplates,
+  type templateExists,
+  type _defaultLayout,
+  type _impliedLayoutName,
+  type _isConditionalLayout,
+  type _isIncludeLayout,
+  type _layoutForOption,
+  type _normalizeLayout,
+  type _processRenderTemplateOptions,
+  type renderedFormat,
+  type _writeLayoutMethod,
+  type isActionHasLayout,
+  type layout,
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
-  Rendering as ActionViewRendering,
-  _normalizeArgs,
-  _processFormat,
+  type _normalizeArgs,
+  type _processFormat,
   buildViewContextClass,
   isInheritViewContextClass,
-  renderToBody as actionViewRenderToBody,
   viewContext,
   viewContextClass,
   viewRenderer,
 } from "@blazetrails/actionview";
-import { _renderTemplate } from "./metal/streaming.js";
+import { Streaming, type _renderTemplate } from "./metal/streaming.js";
 import type {
   PathSet,
   ViewPathsInput,
   ViewContextHost,
   ViewContextRoutes,
 } from "@blazetrails/actionview";
-import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
-import { permissionsPolicy } from "./metal/permissions-policy.js";
-import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
-import { logAt } from "./metal/logging.js";
+import {
+  AllowBrowser,
+  type ClassMethods as AllowBrowserClassMethods,
+} from "./metal/allow-browser.js";
+import {
+  PermissionsPolicy,
+  type ClassMethods as PermissionsPolicyClassMethods,
+} from "./metal/permissions-policy.js";
+import {
+  RateLimiting,
+  type ClassMethods as RateLimitingClassMethods,
+} from "./metal/rate-limiting.js";
+import { Logging, type logAt } from "./metal/logging.js";
 import type { LoggerHost } from "../abstract-controller/logger.js";
 import { AssetPaths } from "../abstract-controller/asset-paths.js";
-import { Instrumentation, logProcessAction } from "./metal/instrumentation.js";
+import { Instrumentation, type logProcessAction } from "./metal/instrumentation.js";
 import { Redirecting } from "./metal/redirecting.js";
 import {
-  contentSecurityPolicy,
-  contentSecurityPolicyNonce,
-  contentSecurityPolicyReportOnly,
-  currentContentSecurityPolicy,
-  isContentSecurityPolicy,
+  ContentSecurityPolicy,
+  type contentSecurityPolicy,
+  type contentSecurityPolicyNonce,
+  type contentSecurityPolicyReportOnly,
+  type currentContentSecurityPolicy,
+  type isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
-import { helperMethod, type HelperMethodsModule } from "../abstract-controller/helpers.js";
-import { defaultFormBuilder } from "./form-builder.js";
+import { type Resolution, type HelpersClass } from "../abstract-controller/helpers.js";
+import { Helpers, type helperAttr, type modulesForHelpers } from "./metal/helpers.js";
+import { FormBuilder, type defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
-  ConfigMethods,
-  cache,
-  viewCacheDependencies,
-  viewCacheDependency,
+  Caching,
+  type cache,
   type CachingClassMethods,
+  type LookupStoreArgument,
+  type viewCacheDependencies,
+  type viewCacheDependency,
 } from "../abstract-controller/caching.js";
-import {
+import type {
   combinedFragmentCacheKey,
   expireFragment,
   fragmentCacheKey,
   fragmentExist,
   readFragment,
   writeFragment,
-  type FragmentsClassMethods,
 } from "../abstract-controller/caching/fragments.js";
-import {
-  authenticateOrRequestWithHttpBasic,
-  authenticateWithHttpBasic,
-  httpBasicAuthenticateOrRequestWith,
-  httpBasicAuthenticateWith,
-  requestHttpBasicAuthentication,
-  authenticateOrRequestWithHttpDigest,
-  authenticateWithHttpDigest,
-  requestHttpDigestAuthentication,
-} from "./metal/http-authentication.js";
-import {
-  sendFileHeadersBang,
-  type SendDataOptions,
-  type SendFileOptions,
-} from "./metal/data-streaming.js";
+import { HttpAuthentication } from "./metal/http-authentication.js";
+import { DataStreaming, type sendFileHeadersBang } from "./metal/data-streaming.js";
 import {
   Options as ParamsWrapperOptions,
-  _defaultWrapModel,
-  _performParameterWrapping,
-  _wrapperEnabled,
-  type ParamsWrapperHost,
+  ParamsWrapper,
+  type _setWrapperOptions,
+  type wrapParameters,
 } from "./metal/params-wrapper.js";
 import {
   _processOptions,
-  _renderInPriorities,
   _setHtmlContentType,
   _setRenderedContentType,
   _setVaryHeader,
   _processVariant,
   _normalizeOptions,
-  processAction as _processAction,
+  Rendering,
   renderToString,
 } from "./metal/rendering.js";
-import { _renderToBodyWithRenderer } from "./metal/renderers.js";
-import { urlOptions } from "./metal/url-for.js";
-import { UrlFor, type UrlForOptions } from "../action-dispatch/routing/url-for.js";
+import type { Renderer, RendererController } from "./renderer.js";
+import { Renderers, _renderToBodyWithRenderer } from "./metal/renderers.js";
+import { UrlFor, type urlOptions } from "./metal/url-for.js";
+import type { UrlForOptions } from "../action-dispatch/routing/url-for.js";
 import type {
   PolymorphicArg,
   PolymorphicOptions,
@@ -154,8 +189,8 @@ import {
   appendInfoToPayload,
   cleanupViewRuntime,
   haltedCallbackHook,
-  processAction as _instrumentProcessAction,
-  redirectTo as _instrumentRedirectTo,
+  sendData,
+  sendFile,
 } from "./metal/instrumentation.js";
 import {
   Parameters as StrongParameters,
@@ -165,36 +200,67 @@ import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
   Rendering as AbstractControllerRendering,
-  render as abstractRender,
   viewAssigns,
   _normalizeRender,
 } from "../abstract-controller/rendering.js";
+import {
+  Translation,
+  type l,
+  type localize,
+  type t,
+  type translate,
+} from "../abstract-controller/translation.js";
 
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
 
-export type RenderOptions = {
+export interface RenderOptions {
   json?: unknown;
-  plain?: string;
-  html?: string | SafeBuffer;
-  body?: string;
+  js?: unknown;
+  xml?: unknown;
+  plain?: string | number | boolean | null;
+  html?: string | SafeBuffer | boolean | null;
+  body?: string | Buffer | boolean | null;
   action?: string;
   template?: string;
+  file?: string | { toPath(): string };
   inline?: string;
+  type?: string;
+  renderable?: { renderIn(...args: never[]): unknown };
   partial?: string;
   locals?: Record<string, unknown>;
-  collection?: unknown[];
+  object?: unknown;
+  collection?: readonly unknown[];
   as?: string;
+  spacerTemplate?: string;
+  cached?: boolean | ((...args: never[]) => unknown);
   callback?: string;
-  status?: number | string;
-  contentType?: string;
-  layout?: boolean | string;
-  formats?: string;
+  status?: number | StatusSymbol | `:${StatusSymbol}` | `${number}` | `${number} ${string}`;
+  contentType?: string | MimeType;
+  location?: UrlForOptions;
+  layout?: boolean | string | null | ((...args: never[]) => unknown);
+  prefixes?: string[];
+  formats?: string | string[];
+  variants?: string | string[];
+  handlers?: string | string[];
+  locale?: string | string[];
   stream?: boolean;
-};
+}
+
+type RenderOptionsFor<P extends string> = Omit<RenderOptions, "partial" | "locals"> & {
+  partial?: P;
+} & (P extends keyof TemplateRegistry
+    ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+      {} extends TemplateLocals<TemplateRegistry[P]>
+      ? { locals?: TemplateLocals<TemplateRegistry[P]> }
+      : { locals: TemplateLocals<TemplateRegistry[P]> }
+    : { locals?: Record<string, unknown> });
+
+type RenderArgs<P extends string> =
+  | []
+  | [RenderOptionsFor<P> | StrongParameters]
+  | [string | ToModel | NonNullable<RenderOptions["renderable"]>, RenderOptionsFor<P>?];
 
 type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
-
-export type RescueHandler = (error: Error) => void | Promise<void>;
 
 export const MODULES: readonly string[] = [
   "AbstractController::Rendering",
@@ -254,75 +320,146 @@ export const PROTECTED_IVARS: readonly string[] = [
   "_renderedFormat",
 ];
 
+declare class RequestForgeryProtectionPrivate {
+  /** @internal */
+  protected verifyAuthenticityToken(): void;
+  /** @internal */
+  protected verifySameOriginRequest(): void;
+  /** @internal */
+  protected formAuthenticityToken(options?: {
+    formOptions?: { action?: string; method?: string };
+  }): string;
+  /** @internal */
+  protected isProtectAgainstForgery(): boolean;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base {
+export interface Base
+  extends
+    Included<typeof HttpAuthentication.Basic.ControllerMethods>,
+    Included<typeof HttpAuthentication.Digest.ControllerMethods>,
+    Included<typeof HttpAuthentication.Token.ControllerMethods>,
+    RequestForgeryProtectionPrivate {
+  render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void>;
+  /** @internal */
+  renderToBody(options?: Record<string, unknown>): unknown;
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
+  viewRuntime: number | null;
+  config(): Configuration & Pick<CachingClassMethods, "performCaching">;
+  get cacheStore(): CacheStore | null;
+  set cacheStore(store: LookupStoreArgument);
+  get formats(): ReadonlyArray<string | symbol>;
+  set formats(values: ReadonlyArray<string | symbol> | null);
+  helpers(): ActionViewBase;
   urlFor(options?: UrlForOptions): string;
   fullUrlFor(options?: UrlForOptions): string;
   routeFor(name: string, ...args: unknown[]): string;
   polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
   polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
-  redirectTo(options?: unknown, responseOptionsAndFlash?: Record<string, unknown>): unknown;
-  redirectBack: typeof redirectBack;
-  redirectBackOrTo: typeof redirectBackOrTo;
+  redirectTo<FlashType extends string = never>(
+    options?: RedirectToOptions,
+    responseOptionsAndFlash?: RedirectToResponseOptionsAndFlash<FlashType>,
+  ): number;
+  redirectBack: OmitThisParameter<typeof redirectBack>;
+  redirectBackOrTo: OmitThisParameter<typeof redirectBackOrTo>;
+  urlFrom: OmitThisParameter<typeof urlFrom>;
   _computeRedirectToLocation: typeof _computeRedirectToLocation;
   allowForgeryProtection: boolean;
-  isProtectAgainstForgery(): boolean;
-  verifyAuthenticityToken(): void;
-  formAuthenticityToken(options?: { formOptions?: { action?: string; method?: string } }): string;
+  csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
   resetCsrfToken: typeof resetCsrfToken;
   commitCsrfToken: typeof commitCsrfToken;
-  verifySameOriginRequest(): void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Metal {
-  get flash(): FlashHash {
-    return this.request.flash!;
+  static {
+    this.abstractBang();
   }
 
-  static _viewPaths: {
+  declare readonly flash: FlashHash;
+  declare static addFlashTypes: typeof addFlashTypes;
+
+  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
+  declare static setCallback: ActionCallbackHost["setCallback"];
+  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static raiseOnMissingCallbackActions: boolean;
+  declare static beforeAction: OmitThisParameter<typeof beforeAction>;
+  declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
+  declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
+  declare static appendBeforeAction: OmitThisParameter<typeof appendBeforeAction>;
+  declare static afterAction: OmitThisParameter<typeof afterAction>;
+  declare static prependAfterAction: OmitThisParameter<typeof prependAfterAction>;
+  declare static skipAfterAction: OmitThisParameter<typeof skipAfterAction>;
+  declare static appendAfterAction: OmitThisParameter<typeof appendAfterAction>;
+  declare static aroundAction: OmitThisParameter<typeof aroundAction>;
+  declare static prependAroundAction: OmitThisParameter<typeof prependAroundAction>;
+  declare static skipAroundAction: OmitThisParameter<typeof skipAroundAction>;
+  declare static appendAroundAction: OmitThisParameter<typeof appendAroundAction>;
+
+  declare static _viewPaths: {
     (): PathSet;
     (paths: PathSet): void;
-  } = ViewPathsClassMethods._viewPaths;
-  static appendViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.appendViewPath;
-  static prependViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.prependViewPath;
-  static viewPaths: {
+  };
+  /** @internal */
+  declare static _prefixes: () => string[];
+  /** @internal */
+  declare static _buildViewPaths: (paths: ViewPathsInput) => PathSet;
+  /** @internal */
+  declare static localPrefixes: () => string[];
+  declare static appendViewPath: (path: ViewPathsInput) => void;
+  declare static prependViewPath: (path: ViewPathsInput) => void;
+  declare static viewPaths: {
     (): PathSet;
     (paths: ViewPathsInput): void;
-  } = ViewPathsClassMethods.viewPaths;
+  };
 
-  static layout = layout;
-  static _writeLayoutMethod = _writeLayoutMethod;
+  declare static layout: OmitThisParameter<typeof layout>;
+  declare static _writeLayoutMethod: OmitThisParameter<typeof _writeLayoutMethod>;
   /** @internal */
-  static _impliedLayoutName = _impliedLayoutName;
+  declare static _impliedLayoutName: OmitThisParameter<typeof _impliedLayoutName>;
   declare static _layout: Parameters<typeof layout>[0];
   declare static _layoutConditions: Record<string, string[]>;
   declare static _flashTypes: string[];
-  static addFlashTypes = addFlashTypes;
-  static override actionMethods = actionMethods;
 
-  static _routes: ViewContextRoutes | null = null;
+  static _routes: (ViewContextRoutes & NonNullable<RendererController["_routes"]>) | null = null;
 
-  declare static helpersPath: string[];
+  declare static etaggers: Etagger[];
+  declare static isEtaggers: boolean;
+  declare etaggers: Etagger[];
+  declare isEtaggers: boolean;
+  declare static etagWithTemplateDigest: boolean;
+  declare static isEtagWithTemplateDigest: boolean;
+  declare etagWithTemplateDigest: boolean;
+  declare isEtagWithTemplateDigest: boolean;
+  declare static etag: OmitThisParameter<(typeof ConditionalGetClassMethods)["etag"]>;
+
+  declare static helpersPath: string | string[];
   declare static isHelpersPath: boolean;
   declare static includeAllHelpers: boolean;
+  declare static raiseOnOpenRedirects: boolean;
   declare static isIncludeAllHelpers: boolean;
 
-  declare static _helpers?: HelperMethodsModule;
-  declare static _helperMethods?: string[];
-  static helperMethod = helperMethod;
-
-  constructor(...args: unknown[]) {
-    super(...(args as []));
-    this._urlOptions = null;
-    this._actionHasLayout = true;
-    fireInherited(
-      new.target as unknown as HelpersPathControllerClass,
-      Base as unknown as HelpersPathControllerClass,
-    );
-  }
+  declare static _helpers: Module;
+  declare readonly _helpers: Module;
+  declare static _helperMethods: string[];
+  declare static helperMethod: HelpersClass["helperMethod"];
+  declare static helper: HelpersClass["helper"];
+  declare static clearHelpers: HelpersClass["clearHelpers"];
+  declare static _helpersForModification: HelpersClass["_helpersForModification"];
+  /** @internal */
+  declare static defineHelpersModule: HelpersClass["defineHelpersModule"];
+  /** @internal */
+  declare static defaultHelperModuleBang: HelpersClass["defaultHelperModuleBang"];
+  declare static allHelpersFromPath: (typeof Resolution)["allHelpersFromPath"];
+  declare static helperModulesFromPaths: (typeof Resolution)["helperModulesFromPaths"];
+  declare static helperAttr: OmitThisParameter<typeof helperAttr>;
+  declare static helpers: () => ActionViewBase;
+  declare static modulesForHelpers: OmitThisParameter<typeof modulesForHelpers>;
+  declare static viewCacheDependency: OmitThisParameter<typeof viewCacheDependency>;
+  declare static fragmentCacheKey: OmitThisParameter<typeof fragmentCacheKey>;
+  /** @internal */
+  declare _helperProxy?: ActionViewBase | null;
 
   static isInheritViewContextClass = isInheritViewContextClass;
   static buildViewContextClass = buildViewContextClass;
@@ -344,11 +481,6 @@ export class Base extends Metal {
 
   declare viewRenderer: typeof viewRenderer;
 
-  private static _rescueHandlers: Array<{
-    errorClass: new (...args: any[]) => Error;
-    handler: RescueHandler;
-  }> = [];
-
   static withoutModules(...modules: string[]): readonly string[] {
     const drop = new Set(modules);
     return MODULES.filter((m) => !drop.has(m));
@@ -359,79 +491,38 @@ export class Base extends Metal {
     return PROTECTED_IVARS;
   }
 
-  viewRuntime: number | null = null;
-
-  render(...args: unknown[]): void | Promise<void> {
-    let renderOutput: void | Promise<void>;
-    const viewRuntime = this.cleanupViewRuntime(() =>
-      Benchmark.realtime(":float_millisecond", () => {
-        if (this.performed) throw new DoubleRenderError();
-        return (renderOutput = abstractRender.call(this, ...args));
-      }),
-    ) as number | Promise<number>;
-    if (typeof viewRuntime === "number") {
-      this.viewRuntime = viewRuntime;
-      return renderOutput!;
-    }
-    return viewRuntime.then((ms) => {
-      this.viewRuntime = ms;
-    });
-  }
-
   /** @internal */
-  _prefixes = _prefixes;
-
+  declare _prefixes: typeof _prefixes;
   /** @internal */
-  _lookupContext?: LookupContext;
+  declare _lookupContext?: LookupContext;
+  declare readonly lookupContext: LookupContext;
+  declare detailsForLookup: typeof detailsForLookup;
+  declare readonly viewPaths: PathSet;
+  declare locale: string | null;
+  declare templateExists: typeof templateExists;
+  declare appendViewPath: (path: ViewPathsInput) => void;
+  declare prependViewPath: (path: ViewPathsInput) => void;
+  declare isAnyTemplates: typeof isAnyTemplates;
 
-  get lookupContext(): LookupContext {
-    return lookupContext.call(this as never);
-  }
+  declare defaultRender: typeof defaultRender;
 
-  detailsForLookup = detailsForLookup;
-
-  get formats(): ReadonlyArray<string | symbol> {
-    return viewPathsFormats.call(this as never);
-  }
-  set formats(values: ReadonlyArray<string | symbol> | null) {
-    viewPathsSetFormats.call(this as never, values);
-  }
-
-  get locale(): string | null {
-    return viewPathsLocale.call(this as never);
-  }
-  set locale(value: string | null) {
-    viewPathsSetLocale.call(this as never, value);
-  }
-
-  templateExists = templateExists;
-
-  prependViewPath: (path: ViewPathsInput) => void = viewPathsPrependViewPath;
-
-  isAnyTemplates = isAnyTemplates;
-
-  defaultRender = defaultRender;
-
-  /** @internal */
-  override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
-    await super._dispatchAction(action, ...args);
-    if (!this.performed) await this.defaultRender();
-  }
-
-  /** @internal */
-  renderToBody(options: Record<string, unknown> = {}): unknown {
-    const truthy = (v: unknown): boolean => v != null && v !== false;
-    const renderer = this._renderToBodyWithRenderer(options);
-    if (truthy(renderer)) return renderer;
-    return actionViewRenderToBody
-      .call(this as never, options)
-      .then((body) => this.drainStreamingBody(body))
-      .then((body) => {
-        if (truthy(body)) return body;
-        const priority = _renderInPriorities(options);
-        if (truthy(priority)) return priority;
-        return " ";
-      });
+  /**
+   * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
+   * @inlinedFrom ActionController::RequestForgeryProtection#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/request_forgery_protection.rb:366-369
+   * @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364
+   * @inlinedFrom ActionView::Rendering#initialize rails/v8.0.2/actionview/lib/action_view/rendering.rb:32-35
+   * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
+   * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114
+   * @inventedArm if — CONVERGEABLE url-for-routes-ivar-shares-the-routes-reader-property
+   */
+  constructor() {
+    super();
+    this._actionHasLayout = true;
+    this._renderedFormat = null;
+    if ("_routes" in this) this._routes = null;
+    this._urlOptions = null;
+    this._markedForSameOriginVerification = null;
+    this.viewRuntime = null;
   }
 
   /**
@@ -447,11 +538,12 @@ export class Base extends Metal {
     return body;
   }
 
-  renderedFormat(): unknown {
-    return this._renderedFormat;
-  }
-
   respondTo = respondTo;
+
+  declare translate: OmitThisParameter<typeof translate>;
+  declare t: OmitThisParameter<typeof t>;
+  declare localize: OmitThisParameter<typeof localize>;
+  declare l: OmitThisParameter<typeof l>;
 
   declare readonly notice: unknown;
   declare readonly alert: unknown;
@@ -465,84 +557,46 @@ export class Base extends Metal {
   declare static forgeryProtectionOriginCheck: RequestForgeryProtectionHost["forgeryProtectionOriginCheck"];
   declare static perFormCsrfTokens: RequestForgeryProtectionHost["perFormCsrfTokens"];
   declare static csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
-  static protectFromForgery = protectFromForgery;
-  static skipForgeryProtection = skipForgeryProtection;
+  declare static protectFromForgery: OmitThisParameter<typeof protectFromForgery>;
+  declare static skipForgeryProtection: OmitThisParameter<typeof skipForgeryProtection>;
+  /** @internal */
+  declare static protectionMethodClass: RequestForgeryProtectionHost["protectionMethodClass"];
+  /** @internal */
+  declare static storageStrategy: RequestForgeryProtectionHost["storageStrategy"];
+  /** @internal */
+  declare static isStorageStrategy: RequestForgeryProtectionHost["isStorageStrategy"];
 
-  static allowBrowser(options: {
-    versions: BrowserVersions;
-    block?: ((this: Base) => void | Promise<void>) | string;
-    only?: string[];
-    except?: string[];
-  }): void {
-    const { versions, block } = options;
-    const callbackOptions: CallbackOptions = {};
-    if (options.only) callbackOptions.only = options.only;
-    if (options.except) callbackOptions.except = options.except;
+  declare static allowBrowser: OmitThisParameter<(typeof AllowBrowserClassMethods)["allowBrowser"]>;
 
-    this.beforeAction(async function (controller): Promise<boolean> {
-      const base = controller as Base;
-      const blocker = new BrowserBlocker(base.request, versions);
-      if (!blocker.blocked) return true;
+  declare static permissionsPolicy: OmitThisParameter<
+    (typeof PermissionsPolicyClassMethods)["permissionsPolicy"]
+  >;
 
-      await Notifications.instrument(
-        "browser_block.action_controller",
-        {
-          user_agent: base.request?.userAgent ?? "",
-          method: base.request?.method ?? "GET",
-          path: base.request?.path ?? "/",
-          versions,
-        },
-        async () => {
-          if (typeof block === "function") {
-            await block.call(base);
-          } else if (typeof block === "string" && typeof (base as any)[block] === "function") {
-            await (base as any)[block].call(base);
-          } else {
-            base.head(406);
-          }
-        },
-      );
-      return false;
-    }, callbackOptions);
-  }
+  declare static contentSecurityPolicy: OmitThisParameter<typeof contentSecurityPolicy>;
+  declare static contentSecurityPolicyReportOnly: OmitThisParameter<
+    typeof contentSecurityPolicyReportOnly
+  >;
+  /** @internal */
+  declare isContentSecurityPolicy: OmitThisParameter<typeof isContentSecurityPolicy>;
+  /** @internal */
+  declare contentSecurityPolicyNonce: OmitThisParameter<typeof contentSecurityPolicyNonce>;
+  /** @internal */
+  declare currentContentSecurityPolicy: OmitThisParameter<typeof currentContentSecurityPolicy>;
 
-  static permissionsPolicy = permissionsPolicy;
+  declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 
-  static contentSecurityPolicy = contentSecurityPolicy;
+  declare static logAt: OmitThisParameter<typeof logAt>;
+  declare static logProcessAction: typeof logProcessAction;
+  declare static render: Renderer["render"];
+  declare static renderer: Renderer;
+  declare static setupRendererBang: () => void;
 
-  static contentSecurityPolicyReportOnly = contentSecurityPolicyReportOnly;
+  declare static _defaultFormBuilder: unknown;
+  declare static defaultFormBuilder: OmitThisParameter<typeof defaultFormBuilder>;
+  declare defaultFormBuilder: () => unknown;
 
   /** @internal */
-  isContentSecurityPolicy(): boolean {
-    return isContentSecurityPolicy.call(this as never);
-  }
-  /** @internal */
-  contentSecurityPolicyNonce(): string | null {
-    return contentSecurityPolicyNonce.call(this as never);
-  }
-  /** @internal */
-  currentContentSecurityPolicy(): ReturnType<typeof currentContentSecurityPolicy> {
-    return currentContentSecurityPolicy.call(this as never);
-  }
-
-  static rateLimit = rateLimit;
-
-  static logAt = logAt;
-  static logProcessAction = logProcessAction;
-
-  /** @internal */
-  async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
-    return rateLimiting.call(this, args);
-  }
-
-  static defaultFormBuilder = defaultFormBuilder;
-
-  defaultFormBuilder(): unknown {
-    return defaultFormBuilder.call(this);
-  }
-
-  /** @internal */
-  instrumentPayload(key: unknown): { controller: string; action: string; key: unknown } {
+  instrumentPayload(key: unknown): { controller: string | null; action: string; key: unknown } {
     return instrumentPayload.call(this, key);
   }
 
@@ -551,162 +605,45 @@ export class Base extends Metal {
     return instrumentName.call(this);
   }
 
+  declare static _parameterEncodings: ParameterEncodingHost["_parameterEncodings"];
+  /** @internal */
+  declare static setupParamEncode: typeof ParameterEncoding.ClassMethods.setupParamEncode;
+  /** @internal */
+  declare static actionEncodingTemplate: typeof ParameterEncoding.ClassMethods.actionEncodingTemplate;
+  declare static skipParameterEncoding: typeof ParameterEncoding.ClassMethods.skipParameterEncoding;
+  declare static paramEncoding: typeof ParameterEncoding.ClassMethods.paramEncoding;
+
   declare static _wrapperOptions: ParamsWrapperOptions;
-  declare static is_wrapperOptions: boolean;
   declare _wrapperOptions: ParamsWrapperOptions;
+  /** @internal */
+  declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
+  declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
 
-  static {
-    classAttribute.call(this, "_wrapperOptions", {
-      default: ParamsWrapperOptions.fromHash({ format: [] }),
-    });
-  }
+  declare static httpBasicAuthenticateWith: OmitThisParameter<
+    typeof HttpAuthentication.Basic.ControllerMethods.ClassMethods.httpBasicAuthenticateWith
+  >;
 
-  static wrapParameters(
-    nameOrModelOrOptions:
-      | string
-      | false
-      | Record<string, unknown>
-      | (new (...args: never[]) => unknown),
-    options: Record<string, unknown> = {},
-  ): void {
-    let model: unknown = null;
-    let opts: Record<string, unknown> = options;
-    if (nameOrModelOrOptions === false) {
-      opts = { ...opts, format: [] };
-    } else if (typeof nameOrModelOrOptions === "string") {
-      opts = { ...opts, name: nameOrModelOrOptions };
-    } else if (
-      typeof nameOrModelOrOptions === "object" &&
-      nameOrModelOrOptions !== null &&
-      !Array.isArray(nameOrModelOrOptions)
-    ) {
-      opts = nameOrModelOrOptions;
-    } else {
-      model = nameOrModelOrOptions;
-    }
-    const current = this._wrapperOptions;
-    const merged = { format: current.format ?? [], ...opts };
-    const newOpts = ParamsWrapperOptions.fromHash(merged);
-    newOpts.model = model;
-    newOpts.klass = this;
-    if ((newOpts.format?.length ?? 0) > 0 && !newOpts.name) {
-      newOpts.name = _defaultWrapModel.call({ _wrapperOptions: newOpts });
-    }
-    this._wrapperOptions = newOpts;
-  }
+  declare static rescueHandlers: unknown[][];
+  declare static rescueFrom: OmitThisParameter<typeof Rescuable.ClassMethods.rescueFrom>;
+  declare static rescueWithHandler: OmitThisParameter<
+    typeof Rescuable.ClassMethods.rescueWithHandler
+  >;
+  declare static handlerForRescue: OmitThisParameter<
+    typeof Rescuable.ClassMethods.handlerForRescue
+  >;
+
+  declare freshWhen: typeof freshWhen;
+  declare isStale: typeof isStale;
+  declare expiresIn: typeof expiresIn;
+  declare expiresNow: typeof expiresNow;
+  declare httpCacheForever: typeof httpCacheForever;
+  declare noStore: typeof noStore;
+  /** @internal */
+  declare combineEtags: typeof combineEtags;
+  declare head: OmitThisParameter<typeof head>;
 
   /** @internal */
-  static inheritedParamsWrapper(): void {
-    const inherited = this._wrapperOptions;
-    if (!inherited.format || inherited.format.length === 0) return;
-    const dup = ParamsWrapperOptions.fromHash({
-      format: inherited.format,
-      include: inherited.include,
-      exclude: inherited.exclude,
-    });
-    dup.model = inherited.model;
-    dup.klass = this;
-    if (inherited.nameSet) {
-      dup.name = inherited.name;
-      dup.nameSet = true;
-    } else {
-      dup.name = _defaultWrapModel.call({ _wrapperOptions: dup });
-    }
-    this._wrapperOptions = dup;
-  }
-
-  static httpBasicAuthenticateWith = httpBasicAuthenticateWith;
-  httpBasicAuthenticateOrRequestWith = httpBasicAuthenticateOrRequestWith;
-  authenticateOrRequestWithHttpBasic = authenticateOrRequestWithHttpBasic;
-  authenticateWithHttpBasic = authenticateWithHttpBasic;
-  requestHttpBasicAuthentication = requestHttpBasicAuthentication;
-
-  authenticateOrRequestWithHttpDigest = authenticateOrRequestWithHttpDigest;
-  authenticateWithHttpDigest = authenticateWithHttpDigest;
-  requestHttpDigestAuthentication = requestHttpDigestAuthentication;
-
-  static rescueFrom(errorClass: new (...args: any[]) => Error, handler: RescueHandler): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_rescueHandlers")) {
-      (this as any)._rescueHandlers = [];
-    }
-    (this as any)._rescueHandlers.push({ errorClass, handler });
-  }
-
-  /** @internal */
-  async processAction(action: string, ...args: unknown[]): Promise<void> {
-    await _instrumentProcessAction.call(this as never, async () => {
-      try {
-        _processAction.call(this as never, action, ...args);
-        if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
-          _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
-          this.params = new StrongParameters({
-            ...this.request.params,
-            ...this.request.pathParameters,
-          });
-        }
-        await super.processAction(action, ...args);
-      } catch (error) {
-        if (error instanceof Error) {
-          const match = this._findRescueHandler(error);
-          if (match) {
-            await match.handler.call(this, match.error);
-            return;
-          }
-        }
-        throw error;
-      }
-    });
-  }
-
-  freshWhen(options: {
-    etag?: string;
-    lastModified?: Date | Temporal.Instant;
-    public?: boolean;
-  }): void {
-    if (options.etag) {
-      const etag = this._generateEtag(options.etag);
-      this.headers.set("etag", etag);
-    }
-    if (options.lastModified) {
-      // boundary: Realm-safe Date check (instanceof breaks across vm/iframe
-      const isDate = Object.prototype.toString.call(options.lastModified) === "[object Date]";
-      // boundary: bridge Temporal.Instant input → Date for toUTCString rendering.
-      const lm = isDate
-        ? (options.lastModified as Date)
-        : new Date((options.lastModified as Temporal.Instant).epochMilliseconds);
-      this.headers.set("last-modified", lm.toUTCString());
-    }
-    if (options.public) {
-      this.headers.set("cache-control", "public");
-    }
-
-    if (this._isFresh()) {
-      this.head(304);
-    }
-  }
-
-  stale(options: {
-    etag?: string;
-    lastModified?: Date | Temporal.Instant;
-    public?: boolean;
-  }): boolean {
-    this.freshWhen(options);
-    return !this.performed;
-  }
-
-  expiresIn(seconds: number, options: { public?: boolean; mustRevalidate?: boolean } = {}): void {
-    const parts = [`max-age=${seconds}`];
-    if (options.public) parts.push("public");
-    if (options.mustRevalidate) parts.push("must-revalidate");
-    this.headers.set("cache-control", parts.join(", "));
-  }
-
-  expiresNow(): void {
-    this.headers.set("cache-control", "no-cache");
-  }
-
-  /** @internal */
-  _actionHasLayout?: boolean;
+  declare _actionHasLayout?: boolean;
   /** @internal */
   declare _layoutConditions: Record<string, string[]>;
   /** @internal */
@@ -726,6 +663,7 @@ export class Base extends Metal {
   /** @internal */
   declare _normalizeOptions: typeof _normalizeOptions;
   declare renderToString: typeof renderToString;
+  declare renderedFormat: OmitThisParameter<typeof renderedFormat>;
   /** @internal */
   declare _setHtmlContentType: typeof _setHtmlContentType;
   /** @internal */
@@ -734,7 +672,7 @@ export class Base extends Metal {
   declare _setVaryHeader: typeof _setVaryHeader;
   declare _renderToBodyWithRenderer: typeof _renderToBodyWithRenderer;
   /** @internal */
-  _renderedFormat?: unknown;
+  declare _renderedFormat: unknown;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
   declare _isConditionalLayout: typeof _isConditionalLayout;
@@ -765,6 +703,10 @@ export class Base extends Metal {
   declare urlOptions: typeof urlOptions;
   /** @internal */
   declare _urlOptions: Readonly<Record<string, unknown>> | null;
+  /** @internal */
+  declare _routes: unknown;
+  /** @internal */
+  declare _markedForSameOriginVerification: boolean | null;
   declare defaultUrlOptions: Record<string, unknown>;
 
   /** @internal */
@@ -776,179 +718,54 @@ export class Base extends Metal {
   /** @internal */
   declare haltedCallbackHook: typeof haltedCallbackHook;
 
-  sendFile(path: string, options: SendFileOptions = {}): void {
-    if (!(File.isFile(path) && File.isReadable(path))) {
-      throw new MissingFile(`Cannot read file ${path}`);
-    }
+  declare sendFile: typeof sendFile;
+  declare sendData: typeof sendData;
+  declare isShowDetailedExceptions: typeof isShowDetailedExceptions;
 
-    if (!options.urlBasedFilename) options.filename ??= File.basename(path);
-    this.sendFileHeadersBang(options);
-
-    this.status = options.status ?? 200;
-    if (Object.hasOwn(options, "contentType")) this.contentType = options.contentType!;
-    this.response.sendFile(path);
-  }
-
-  /** @missingRailsCall merge — PERMANENT */
-  sendData(data: string | Buffer, options: SendDataOptions = {}): void | Promise<void> {
-    this.sendFileHeadersBang(options);
-    return this.render({
-      status: options.status,
-      contentType: options.contentType,
-      body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
-    });
-  }
-
-  private _findRescueHandler(error: Error): { handler: RescueHandler; error: Error } | null {
-    const hierarchy: Array<typeof Base> = [];
-    let klass = this.constructor as typeof Base;
-    while (klass && klass !== (Object as unknown)) {
-      hierarchy.unshift(klass);
-      klass = Object.getPrototypeOf(klass);
-    }
-
-    const matchHandler = (err: Error): RescueHandler | null => {
-      for (let i = hierarchy.length - 1; i >= 0; i--) {
-        const k = hierarchy[i];
-        if (Object.prototype.hasOwnProperty.call(k, "_rescueHandlers")) {
-          const handlers = (k as any)._rescueHandlers as Array<{
-            errorClass: new (...args: any[]) => Error;
-            handler: RescueHandler;
-          }>;
-          for (let j = handlers.length - 1; j >= 0; j--) {
-            if (err instanceof handlers[j].errorClass) return handlers[j].handler;
-          }
-        }
-      }
-      return null;
-    };
-
-    let current: Error | undefined = error;
-    const seen = new Set<Error>();
-    while (current) {
-      if (seen.has(current)) break;
-      seen.add(current);
-      const handler = matchHandler(current);
-      if (handler) return { handler, error: current };
-      current = (current as any).cause instanceof Error ? (current as any).cause : undefined;
-    }
-
-    return null;
-  }
-
-  private _generateEtag(seed: string): string {
-    const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
-    return `W/"${hash}"`;
-  }
-
-  private _isFresh(): boolean {
-    if (!this.request) return false;
-    const ifNoneMatch = this.request.getHeader("if-none-match");
-    const ifModifiedSince = this.request.getHeader("if-modified-since");
-    const etag = this.headers.get("etag");
-    const lastModified = this.headers.get("last-modified");
-
-    if (ifNoneMatch && etag) {
-      return ifNoneMatch === etag;
-    }
-    if (ifModifiedSince && lastModified) {
-      // boundary: HTTP If-Modified-Since / Last-Modified are RFC 7231 date
-      return new Date(ifModifiedSince) >= new Date(lastModified);
-    }
-    return false;
-  }
+  declare rescueWithHandler: Rescuable["rescueWithHandler"];
+  declare handlerForRescue: Rescuable["handlerForRescue"];
 }
 
 include(Base, AbstractControllerRendering);
-include(Base, ActionViewRendering);
-include(Base, ConfigMethods);
+include(Base, Translation);
 include(Base, AssetPaths);
-include(Base, Cookies);
-Base.prototype.redirectBack = redirectBack;
-Base.prototype.redirectBackOrTo = redirectBackOrTo;
-Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
-include(Base, Flash);
-Base.prototype.redirectTo = _instrumentRedirectTo;
-include(Base, StrongParametersModule);
-Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
-Base.prototype._processOptions = _processOptions;
-Base.prototype._renderTemplate = _renderTemplate;
-Base.prototype._processVariant = _processVariant;
-Base.prototype._normalizeOptions = _normalizeOptions;
-Base.prototype.renderToString = renderToString;
-Base.prototype._setHtmlContentType = _setHtmlContentType;
-Base.prototype._setRenderedContentType = _setRenderedContentType;
-Base.prototype._setVaryHeader = _setVaryHeader;
-Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
-Base.prototype.isActionHasLayout = isActionHasLayout;
-Base.prototype._isConditionalLayout = _isConditionalLayout;
-Base.prototype._layoutForOption = _layoutForOption;
-Base.prototype._normalizeLayout = _normalizeLayout;
-Base.prototype._defaultLayout = _defaultLayout;
-Base.prototype._isIncludeLayout = _isIncludeLayout;
-classAttribute.call(Base, "_layout", { instanceAccessor: false });
-classAttribute.call(Base, "_layoutConditions", {
-  instanceAccessor: false,
-  instanceReader: true,
-  default: {},
-});
-Base._writeLayoutMethod();
-Base.prototype.viewCacheDependencies = viewCacheDependencies;
-Base.prototype.cache = cache;
-Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;
-Base.prototype.writeFragment = writeFragment;
-Base.prototype.readFragment = readFragment;
-Base.prototype.fragmentExist = fragmentExist;
-Base.prototype.expireFragment = expireFragment;
-(
-  Base as unknown as FragmentsClassMethods & { fragmentCacheKey: typeof fragmentCacheKey }
-).fragmentCacheKey = fragmentCacheKey;
-(
-  Base as unknown as CachingClassMethods & { viewCacheDependency: typeof viewCacheDependency }
-).viewCacheDependency = viewCacheDependency;
-
-classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
-Base.helperMethod("combinedFragmentCacheKey");
-
-extend(Base, ConfigMethods);
-extend(Base, DefaultHeaders.ClassMethods);
+include(Base, Helpers);
+include(Base, UrlFor);
 include(Base, Redirecting);
-include(Base, Instrumentation);
+include(Base, Layouts);
+include(Base, Rendering);
+include(Base, Renderers.All);
+include(Base, ConditionalGet);
+include(Base, EtagWithTemplateDigest);
+include(Base, EtagWithFlash);
+include(Base, Caching);
+include(Base, ImplicitRender);
+include(Base, StrongParametersModule);
+include(Base, ParameterEncoding);
+include(Base, Cookies);
+include(Base, Flash);
+include(Base, FormBuilder);
 include(Base, RequestForgeryProtection);
+include(Base, ContentSecurityPolicy);
+include(Base, PermissionsPolicy);
+include(Base, RateLimiting);
+include(Base, AllowBrowser);
+include(Base, Streaming);
+include(Base, DataStreaming);
+include(Base, HttpAuthentication.Basic.ControllerMethods);
+include(Base, HttpAuthentication.Digest.ControllerMethods);
+include(Base, HttpAuthentication.Token.ControllerMethods);
+include(Base, DefaultHeaders);
+include(Base, Logging);
+include(Base, Callbacks);
+include(Base, Rescue);
+include(Base, Instrumentation);
+include(Base, ParamsWrapper);
+Base.setupRendererBang();
 
-const _Configurable = Base as unknown as {
-  configAccessor(...names: string[]): void;
-} & CachingClassMethods;
-
-_Configurable.configAccessor("defaultStaticExtension");
-_Configurable.defaultStaticExtension ??= ".html";
-
-_Configurable.configAccessor("performCaching");
-if (_Configurable.performCaching == null) _Configurable.performCaching = true;
-
-mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
-
-classAttribute.call(Base, "helpersPath", { default: [] });
-classAttribute.call(Base, "includeAllHelpers", { default: true });
-
-_Configurable.configAccessor("enableFragmentCacheLogging");
-_Configurable.enableFragmentCacheLogging = false;
-
-classAttribute.call(Base, "_viewCacheDependencies", { default: [] });
-Base.helperMethod("viewCacheDependencies");
+rbModConstSet(ActionController, "Base", Base);
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
-
-include(Base, UrlFor);
-Base.prototype.urlOptions = urlOptions;
-
-Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
-
-Base.prototype.appendInfoToPayload = appendInfoToPayload;
-Base.prototype.cleanupViewRuntime = cleanupViewRuntime;
-Base.prototype.haltedCallbackHook = haltedCallbackHook;
-
-Base.helperMethod("isContentSecurityPolicy", "contentSecurityPolicyNonce");
 
 export { DoubleRenderError };

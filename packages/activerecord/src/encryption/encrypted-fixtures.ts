@@ -1,11 +1,13 @@
 import { Encryption } from "../namespaces.js";
-import type { PrependModule } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat";
 import type { ValueType } from "@blazetrails/activemodel";
 
 type FixtureRow = Record<string, unknown>;
 
 interface EncryptedFixtureHost {
   cleanValues: Record<string, unknown>;
+  encryptFixtureData(fixture: FixtureRow, modelClass: FixtureModelClass): void;
+  processPreservedOriginalColumns(fixture: FixtureRow, modelClass: FixtureModelClass): void;
 }
 
 type FixtureModelClass = {
@@ -14,50 +16,62 @@ type FixtureModelClass = {
   typeForAttribute(name: string): ValueType;
 } | null;
 
-/** @internal */
-function encryptFixtureData(
-  this: EncryptedFixtureHost,
-  fixture: FixtureRow,
-  modelClass: FixtureModelClass,
-): void {
-  for (const attributeName of modelClass?.encryptedAttributes ?? []) {
-    const cleanValue = fixture[attributeName];
-    if (cleanValue != null && cleanValue !== false) {
-      this.cleanValues[attributeName] = cleanValue;
+export const EncryptedFixtures: Module = new Module((mod) => {
+  mod.defineMethod(
+    "initialize",
+    function (
+      this: EncryptedFixtureHost,
+      fixture: FixtureRow,
+      modelClass: FixtureModelClass,
+    ): unknown {
+      this.cleanValues = {};
+      this.encryptFixtureData(fixture, modelClass);
+      this.processPreservedOriginalColumns(fixture, modelClass);
+      return EncryptedFixtures.superMethod(this, "initialize")!(fixture, modelClass);
+    },
+  );
 
-      const type = modelClass!.typeForAttribute(attributeName);
-      const encryptedValue = type.serialize(cleanValue);
-      fixture[attributeName] = encryptedValue;
-    }
-  }
-}
+  /** @internal */
+  mod.defineMethod(
+    "encryptFixtureData",
+    function (
+      this: EncryptedFixtureHost,
+      fixture: FixtureRow,
+      modelClass: FixtureModelClass,
+    ): void {
+      for (const attributeName of modelClass?.encryptedAttributes ?? []) {
+        const cleanValue = fixture[attributeName];
+        if (cleanValue != null && cleanValue !== false) {
+          this.cleanValues[attributeName] = cleanValue;
 
-/** @internal */
-function processPreservedOriginalColumns(
-  this: EncryptedFixtureHost,
-  fixture: FixtureRow,
-  modelClass: FixtureModelClass,
-): void {
-  for (const attributeName of modelClass?.encryptedAttributes ?? []) {
-    const sourceAttributeName = modelClass!.sourceAttributeFromPreservedAttribute(attributeName);
-    if (sourceAttributeName !== undefined) {
-      const cleanValue = this.cleanValues[sourceAttributeName];
-      const type = modelClass!.typeForAttribute(attributeName);
-      const encryptedValue = type.serialize(cleanValue);
-      fixture[attributeName] = encryptedValue;
-    }
-  }
-}
+          const type = modelClass!.typeForAttribute(attributeName);
+          const encryptedValue = type.serialize(cleanValue);
+          fixture[attributeName] = encryptedValue;
+        }
+      }
+    },
+  );
 
-export const EncryptedFixtures: PrependModule = {
-  initialize(super_: (...args: unknown[]) => unknown, ...args: never[]): unknown {
-    const [fixture, modelClass] = args as unknown as [FixtureRow, FixtureModelClass];
-    const host = this as unknown as EncryptedFixtureHost;
-    host.cleanValues = {};
-    encryptFixtureData.call(host, fixture, modelClass);
-    processPreservedOriginalColumns.call(host, fixture, modelClass);
-    return super_(fixture, modelClass);
-  },
-};
+  /** @internal */
+  mod.defineMethod(
+    "processPreservedOriginalColumns",
+    function (
+      this: EncryptedFixtureHost,
+      fixture: FixtureRow,
+      modelClass: FixtureModelClass,
+    ): void {
+      for (const attributeName of modelClass?.encryptedAttributes ?? []) {
+        const sourceAttributeName =
+          modelClass!.sourceAttributeFromPreservedAttribute(attributeName);
+        if (sourceAttributeName != null) {
+          const cleanValue = this.cleanValues[sourceAttributeName];
+          const type = modelClass!.typeForAttribute(attributeName);
+          const encryptedValue = type.serialize(cleanValue);
+          fixture[attributeName] = encryptedValue;
+        }
+      }
+    },
+  );
+});
 
 Encryption.EncryptedFixtures = EncryptedFixtures;

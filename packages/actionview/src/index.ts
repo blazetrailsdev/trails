@@ -37,6 +37,7 @@ export {
   _renderTemplate,
   _processFormat,
   _normalizeArgs,
+  renderedFormat,
   Rendering,
   buildViewContextClass,
   renderToBody,
@@ -46,25 +47,21 @@ export {
   viewContextClass,
 } from "./rendering.js";
 
-export {
-  ClassMethods as ViewPathsClassMethods,
+export type {
   _prefixes,
   lookupContext,
   detailsForLookup,
   templateExists,
   isAnyTemplates,
-  prependViewPath as viewPathsPrependViewPath,
-  formats as viewPathsFormats,
-  setFormats as viewPathsSetFormats,
-  locale as viewPathsLocale,
-  setLocale as viewPathsSetLocale,
 } from "./view-paths.js";
-export type { ViewPaths, ViewPathsClass, ViewPathsInput } from "./view-paths.js";
+export { ViewPaths } from "./view-paths.js";
+export type { ViewPathsClass, ViewPathsInput } from "./view-paths.js";
 
 export * from "./layouts.js";
 
 export { Renderer, RenderedTemplate } from "./renderer.js";
 export type { ViewContext, RenderOptions as RendererOptions } from "./renderer.js";
+export { PartialIteration } from "./renderer/collection-renderer.js";
 
 export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } from "./buffers.js";
 
@@ -89,6 +86,7 @@ export {
 } from "./template-details.js";
 
 export * from "./helpers/index.js";
+export { FormBuilder } from "./helpers/form-helper.js";
 
 export { deprecator, Deprecator } from "./deprecator.js";
 export type { TemplateRegistry, TemplateLocals } from "./template-registry.js";

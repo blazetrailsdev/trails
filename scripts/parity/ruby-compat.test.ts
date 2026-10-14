@@ -89,13 +89,25 @@ describe("rubyCompatExport", () => {
   });
 
   it("credits a receiver-keyed export forward when the receiver is unproven", () => {
-    expect(rubyCompatAliases("delete", ["expr"])).toEqual(["hashDelete", "stringDelete"]);
+    expect(rubyCompatAliases("delete", ["expr"])).toEqual([
+      "aryDelete",
+      "hashDelete",
+      "stringDelete",
+    ]);
     expect(rubyCompatAliases("delete", ["hash", "expr"])).toEqual(["hashDelete"]);
-    expect(rubyCompatAliases("delete", ["array"])).toEqual([]);
+    expect(rubyCompatAliases("delete", ["array"])).toEqual(["aryDelete"]);
+    expect(rubyCompatAliases("delete", ["numeric"])).toEqual([]);
     expect(rubyCompatAliases("delete")).toEqual([]);
     expect(jsEnumerableAliases("delete", ["expr"])).toContain("hashDelete");
     expect(rubyCompatExport("delete", ["expr"])).toBeUndefined();
-    expect(rubyCompatAliases("include?", ["expr"])).toEqual([]);
+    expect(rubyCompatAliases("include?", ["expr"])).toEqual(["aryIncludes"]);
+  });
+
+  it("credits String.new on a constant receiver only through rbStrSNew", () => {
+    expect(rubyCompatAliases("new", ["const"])).toEqual(["rbStrSNew"]);
+    expect(rubyCompatAliases("new", ["string-new"])).toEqual(["rbStrSNew"]);
+    expect(rubyCompatExport("new", ["const"])).toBeUndefined();
+    expect(rubyCompatAliases("new")).toEqual([]);
   });
 
   it("forwards the receiver through jsEnumerableAliases", () => {

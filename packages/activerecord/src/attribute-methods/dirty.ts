@@ -1,4 +1,4 @@
-import { RuntimeError, type Hash } from "@blazetrails/ruby-compat";
+import { Module, RuntimeError, rbObjAsString, type Hash } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   type HashWithIndifferentAccess,
@@ -20,10 +20,10 @@ interface DirtyRecord {
 
 export function isSavedChangeToAttribute(
   record: DirtyRecord,
-  attrName: string,
+  attrName: string | string[],
   options?: DirtyOptions,
-): boolean {
-  return record.mutationsBeforeLastSave.isChanged(attrName, options);
+): boolean | undefined {
+  return record.mutationsBeforeLastSave.isChanged(rbObjAsString(attrName), options);
 }
 
 export function savedChangeToAttribute(
@@ -45,7 +45,7 @@ export function isWillSaveChangeToAttribute(
   record: DirtyRecord,
   attrName: string,
   options?: DirtyOptions,
-): boolean {
+): boolean | undefined {
   return record.mutationsFromDatabase.isChanged(attrName, options);
 }
 
@@ -69,43 +69,44 @@ interface DirtyIncludeHost {
   ): void;
 }
 
-export class Dirty {
-  static [included](base: DirtyIncludeHost): void {
-    if (isModuleIncluded(base, Timestamp.InstanceMethods)) {
-      throw new RuntimeError("You cannot include Dirty after Timestamp");
-    }
+export const Dirty: Module & { [included]?: (base: DirtyIncludeHost) => void } =
+  new Module().include({
+    get savedChanges(): Hash<string, [unknown, unknown]> {
+      return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
+    },
 
-    classAttribute.call(base, "partialUpdates", { instanceWriter: false, default: true });
-    classAttribute.call(base, "partialInserts", { instanceWriter: false, default: true });
+    get hasChangesToSave(): boolean {
+      return (this as unknown as DirtyRecord).mutationsFromDatabase.anyChanges();
+    },
 
-    base.attributeMethodAffix({ prefix: "isSavedChangeTo", parameters: "**options" });
-    base.attributeMethodPrefix("savedChangeTo", { parameters: false });
-    base.attributeMethodSuffix("BeforeLastSave", { parameters: false });
+    get changesToSave(): HashWithIndifferentAccess<[unknown, unknown]> {
+      return (this as unknown as DirtyRecord).mutationsFromDatabase.changes();
+    },
 
-    base.attributeMethodAffix({ prefix: "isWillSaveChangeTo", parameters: "**options" });
-    base.attributeMethodSuffix("ChangeToBeSaved", "InDatabase", { parameters: false });
+    get changedAttributeNamesToSave(): string[] {
+      return (this as unknown as DirtyRecord).mutationsFromDatabase.changedAttributeNames();
+    },
+
+    get attributesInDatabase(): HashWithIndifferentAccess<unknown> {
+      return (this as unknown as DirtyRecord).mutationsFromDatabase.changedValues();
+    },
+  });
+
+Dirty[included] = function (base: DirtyIncludeHost): void {
+  if (isModuleIncluded(base, Timestamp.Timestamp)) {
+    throw new RuntimeError("You cannot include Dirty after Timestamp");
   }
 
-  get savedChanges(): Hash<string, [unknown, unknown]> {
-    return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
-  }
+  classAttribute.call(base, "partialUpdates", { instanceWriter: false, default: true });
+  classAttribute.call(base, "partialInserts", { instanceWriter: false, default: true });
 
-  get hasChangesToSave(): boolean {
-    return (this as unknown as DirtyRecord).mutationsFromDatabase.anyChanges();
-  }
+  base.attributeMethodAffix({ prefix: "isSavedChangeTo", parameters: "**options" });
+  base.attributeMethodPrefix("savedChangeTo", { parameters: false });
+  base.attributeMethodSuffix("BeforeLastSave", { parameters: false });
 
-  get changesToSave(): HashWithIndifferentAccess<[unknown, unknown]> {
-    return (this as unknown as DirtyRecord).mutationsFromDatabase.changes();
-  }
-
-  get changedAttributeNamesToSave(): string[] {
-    return (this as unknown as DirtyRecord).mutationsFromDatabase.changedAttributeNames();
-  }
-
-  get attributesInDatabase(): HashWithIndifferentAccess<unknown> {
-    return (this as unknown as DirtyRecord).mutationsFromDatabase.changedValues();
-  }
-}
+  base.attributeMethodAffix({ prefix: "isWillSaveChangeTo", parameters: "**options" });
+  base.attributeMethodSuffix("ChangeToBeSaved", "InDatabase", { parameters: false });
+};
 
 interface DirtyPrivateHost {
   _attributes: { keys(): Iterable<string> };
@@ -131,9 +132,16 @@ interface DirtyPrivateHost {
   };
 }
 
+export async function reload<T extends DirtyPrivateHost>(this: T, ...args: unknown[]): Promise<T> {
+  const record = (await Dirty.superMethod(this, "reload")!(...args)) as T;
+  this._mutationsBeforeLastSave = null;
+  this._mutationsFromDatabase = null;
+  return record;
+}
+
 /** @internal */
-export function initInternals(this: DirtyPrivateHost, super_: () => void): void {
-  super_();
+export function initInternals(this: DirtyPrivateHost): void {
+  Dirty.superMethod(this, "initInternals")!();
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
   this._touchAttrNames = null;
@@ -225,5 +233,8 @@ export function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[
     return true;
   });
 }
+
+Dirty.defineMethod("initInternals", initInternals);
+Dirty.defineMethod("reload", reload);
 
 AttributeMethods.Dirty = Dirty;

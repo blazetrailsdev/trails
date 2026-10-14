@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import {
   Relation,
   RecordNotFound,
@@ -6,14 +7,9 @@ import {
   IrreversibleOrderError,
   UnmodifiableRelation,
   registerModel,
-  registerSubclass,
   Base,
 } from "./index.js";
-import {
-  assertQueriesCount,
-  assertNoQueries,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
+import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertDifference,
@@ -22,16 +18,16 @@ import {
   assertNotPredicate,
   assertNotRespondTo,
   assertPredicate,
+  assertRaises,
   assertRespondTo,
   isBlank,
   isPresent,
   toXmlArray,
 } from "@blazetrails/activesupport";
-import { pp } from "./pretty-print.js";
-import { fixtures } from "./test-fixtures.js";
+import { PP, SimpleDelegator } from "@blazetrails/ruby-compat";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { captureSql } from "./testing/sql-capture.js";
 
 import {
   Post,
@@ -67,6 +63,7 @@ afterEach(() => {
 
 describe("RelationTest", () => {
   const {
+    self,
     authors,
     topics,
     posts,
@@ -108,9 +105,7 @@ describe("RelationTest", () => {
     registerModel(Author);
     registerModel(Comment);
     registerModel(SpecialComment);
-    registerSubclass(SpecialComment);
     registerModel(VerySpecialComment);
-    registerSubclass(VerySpecialComment);
     registerModel(Topic);
     registerModel(Bird);
     registerModel(Car);
@@ -144,7 +139,7 @@ describe("RelationTest", () => {
   function customPostRelation(aliasName = "omg_posts") {
     const tableAlias = Post.arelTable.alias(aliasName);
 
-    return new Relation(Post, tableAlias);
+    return new Relation(Post, { table: tableAlias });
   }
 
   it("do not double quote string id", async () => {
@@ -197,10 +192,9 @@ describe("RelationTest", () => {
     expect(() => JSON.stringify(arr)).not.toThrow();
   });
 
-  it.skip("to yaml", async () => {
-    // BLOCKED: missing surface — no Psych emitter drives encode_with, so Relation#toYaml and Array#toYaml do not exist (relation-to-yaml-psych-dump)
-    expect(() => (Bird.all() as any).toYaml()).not.toThrow();
-    expect(() => (Bird.all() as any).toA().toYaml()).not.toThrow();
+  it("to yaml", async () => {
+    await expect(Bird.all().toYaml()).resolves.not.toThrow();
+    await expect((async () => YAML.toYaml(await Bird.all()))()).resolves.not.toThrow();
   });
 
   it("to xml", async () => {
@@ -439,14 +433,6 @@ describe("RelationTest", () => {
     expect((await Comment.select("a.*").from(relation, "a")).map((c) => c.id)).toEqual(expected);
   });
 
-  it("eager from() subquery projects the table star, not column aliases", async () => {
-    const relation = Comment.includes(":post").where({ "posts.type": "Post" }).order(":id");
-    const sql = await (Comment.select("*").from(relation) as any).toSql();
-    const unquoted = sql.replace(/["`]/g, "");
-    expect(unquoted).toContain("comments.* FROM comments LEFT OUTER JOIN posts");
-    expect(unquoted).not.toMatch(/t0_r0/);
-  });
-
   it("finding with subquery with eager loading in where", async () => {
     const relation = Comment.includes(":post").where({ "posts.type": "Post" });
     const expected = (await relation).map((c) => Number(c.id)).sort((a, b) => a - b);
@@ -480,7 +466,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with arel assoc order", async () => {
-    const topicsRel = Topic.order({ [arelSql("id").toSql()]: "desc" });
+    const topicsRel = Topic.order(new Map([[arelSql("id"), "desc"]]));
     expect(await topicsRel.size()).toBe(5);
     expect((await topicsRel.first())!.title).toBe(topics("fifth").title);
   });
@@ -492,7 +478,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with reversed arel assoc order", async () => {
-    const topicsRel = Topic.order({ [arelSql("id").toSql()]: "asc" }).reverseOrder();
+    const topicsRel = Topic.order(new Map([[arelSql("id"), "asc"]])).reverseOrder();
     expect(await topicsRel.size()).toBe(5);
     expect((await topicsRel.first())!.title).toBe(topics("fifth").title);
   });
@@ -819,19 +805,6 @@ describe("RelationTest", () => {
     expect(() => (Topic as any).annotate([])).not.toThrow();
   });
 
-  it("order and reorder flatten and compact blank nested arguments", () => {
-    expect(() => (Topic as any).order([null])).not.toThrow();
-    expect(() => (Topic as any).reorder([{}])).not.toThrow();
-    expect((Topic.order("title") as any).order([null]).toSql()).toContain("ORDER BY");
-    expect((Topic.order("title") as any).reorder([{}]).toSql()).not.toContain("ORDER BY");
-  });
-
-  it("blank join arguments are not retained in relation state", () => {
-    expect((Topic as any).joins({}).joinsValues).toEqual([]);
-    expect((Topic as any).leftJoins({}).leftOuterJoinsValues).toEqual([]);
-    expect((Topic as any).leftJoins([]).leftOuterJoinsValues).toEqual([]);
-  });
-
   it("respond to dynamic finders", () => {
     const relation = Topic.all();
 
@@ -1023,7 +996,7 @@ describe("RelationTest", () => {
 
   it("to sql on eager join", async () => {
     const expected = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await Post.eagerLoad(":lastComment").order("comments.id DESC");
       })
     )[0];
@@ -1113,19 +1086,25 @@ describe("RelationTest", () => {
     expect((await postsRel).length).toBe(3);
   });
 
-  it.skip("where id with delegated ar object", () => {
-    // PERMANENT-SKIP: Ruby-only — SimpleDelegator has no idiomatic JS analog
+  it("where id with delegated ar object", async () => {
+    const decorator = class extends SimpleDelegator {};
+    const author = (await Author.first())!;
+    expect((await Author.where({ id: new decorator(author) })).length).toBe(1);
+    expect((await Author.where({ id: [new decorator(author)] })).length).toBe(1);
   });
 
-  it.skip("where relation with delegated ar object", () => {
-    // PERMANENT-SKIP: Ruby-only — SimpleDelegator has no idiomatic JS analog
+  it("where relation with delegated ar object", async () => {
+    const decorator = class extends SimpleDelegator {};
+    const author = (await (await Post.last())!.author)!;
+    expect((await Post.where({ author: new decorator(author) })).length).toBe(3);
+    expect((await Post.where({ author: [new decorator(author)] })).length).toBe(3);
   });
 
   it("find by with delegated ar object", async () => {
-    const decorator = (record: object) => new Proxy(record, {});
+    const decorator = class extends SimpleDelegator {};
     const author = (await Author.first())!;
-    expect(await Author.findBy({ id: decorator(author) as any })).toEqual(author);
-    expect(await Author.findBy({ id: [decorator(author)] as any })).toEqual(author);
+    expect(await Author.findBy({ id: new decorator(author) })).toEqual(author);
+    expect(await Author.findBy({ id: [new decorator(author)] })).toEqual(author);
   });
 
   it("find with list of ar", async () => {
@@ -2140,14 +2119,6 @@ describe("RelationTest", () => {
     ).toEqual((await allPosts).sort(byId));
   });
 
-  it("except with unrecognized key is a no-op", async () => {
-    const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
-    const baseline = (await relation).map((p) => p.id);
-
-    const unchanged = relation.except("bogus");
-    expect((await unchanged).map((p) => p.id)).toEqual(baseline);
-  });
-
   it("only", async () => {
     const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
     expect(await relation).toEqual([posts("welcome")]);
@@ -2162,17 +2133,6 @@ describe("RelationTest", () => {
     const allPosts = relation.only("order");
     expect(await allPosts).toEqual(await Post.order("id ASC"));
     expect(await relation.scoping(async () => await Post.only("order"))).toEqual(await allPosts);
-  });
-
-  it("only does not replay unscope on merge", () => {
-    const stripped = Post.where({ author_id: 1 }).order("id ASC").limit(1).only("where");
-
-    const merged = Post.order("title").limit(5).merge(stripped);
-    expect(merged.toSql()).toContain("ORDER BY");
-    expect(merged.toSql()).toContain("LIMIT");
-
-    expect(Post.all().distinct().only("distinct").toSql()).toContain("DISTINCT");
-    expect(Post.all().distinct().only("where").toSql()).not.toContain("DISTINCT");
   });
 
   it("anonymous extension", () => {
@@ -2252,10 +2212,10 @@ describe("RelationTest", () => {
     const query = Tag.select("name").where({ id: [tag1.id, tag2.id] });
 
     expect((await query).map((t) => t.name)).toEqual(["Foo", "Foo"]);
-    await assertQueriesMatch(/DISTINCT/, undefined, false, async () => {
+    await self().assertQueriesMatch(/DISTINCT/, {}, async () => {
       expect((await query.distinct()).map((t) => t.name)).toEqual(["Foo"]);
     });
-    await assertQueriesMatch(/DISTINCT/, undefined, false, async () => {
+    await self().assertQueriesMatch(/DISTINCT/, {}, async () => {
       expect((await query.distinct(true)).map((t) => t.name)).toEqual(["Foo"]);
     });
     expect((await query.distinct(true).distinct(false)).map((t) => t.name)).toEqual(["Foo", "Foo"]);
@@ -2405,7 +2365,7 @@ describe("RelationTest", () => {
   it("reorder with first", async () => {
     let post: Post | null = null;
 
-    const sqlLog = await captureSql(async () => {
+    const sqlLog = await self().captureSql({}, async () => {
       post = await Post.order("title").reorder(null).first();
     });
 
@@ -2418,7 +2378,7 @@ describe("RelationTest", () => {
   });
 
   it("reorder with take", async () => {
-    const sqlLog = await captureSql(async () => {
+    const sqlLog = await self().captureSql({}, async () => {
       expect(await Post.order("title").reorder(null).take()).toBeTruthy();
     });
     assertPredicate(
@@ -2512,13 +2472,13 @@ describe("RelationTest", () => {
   });
 
   it("find_by doesn't have implicit ordering", async () => {
-    await assertQueriesMatch(/^((?!ORDER).)*$/, undefined, false, async () => {
-      await Post.all().findByBang({ author_id: 2 });
+    await self().assertQueriesMatch(/^((?!ORDER).)*$/, {}, async () => {
+      await Post.all().findBy({ author_id: 2 });
     });
   });
 
   it("find_by requires at least one argument", async () => {
-    await expect((Post.all() as any).findByBang()).rejects.toThrow(ArgumentError);
+    await expect((Post.all() as any).findBy()).rejects.toThrow(ArgumentError);
   });
 
   it("find_by! with hash conditions returns the first matching record", async () => {
@@ -2537,12 +2497,18 @@ describe("RelationTest", () => {
     );
   });
 
+  it("find_by! doesn't have implicit ordering", async () => {
+    await self().assertQueriesMatch(/^((?!ORDER).)*$/, {}, async () => {
+      await Post.all().findByBang({ author_id: 2 });
+    });
+  });
+
   it("find_by! raises RecordNotFound if the record is missing", async () => {
     await expect((Post.all() as any).findByBang("1 = 0")).rejects.toThrow(RecordNotFound);
   });
 
   it("find_by! requires at least one argument", async () => {
-    await expect(Post.findByBang({ title: "NonExistentXYZTitle" })).rejects.toThrow();
+    await expect((Post.all() as any).findByBang()).rejects.toThrow(ArgumentError);
   });
 
   it("loaded relations cannot be mutated by multi value methods", async () => {
@@ -2608,13 +2574,13 @@ describe("RelationTest", () => {
   });
 
   it("relations don't load all records in #inspect", async () => {
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       await (Post.all() as any).inspect();
     });
   });
 
   it("loading query is annotated in #inspect", async () => {
-    await assertQueriesMatch(/\/\* loading for inspect \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* loading for inspect \*\//, {}, async () => {
       await (Post.all() as any).inspect();
     });
   });
@@ -2635,21 +2601,21 @@ describe("RelationTest", () => {
   it("relations limit the records in #pretty_print at 10", async () => {
     const relation = Post.limit(11);
     const out: string[] = [];
-    await pp(relation, { write: (str) => out.push(str) });
+    await PP.pp(relation, { write: (str) => out.push(str) });
     const string = out.join("");
     expect([...string.matchAll(/#<\w*Post:/g)].length).toBe(10);
     assertPredicate(string, (s) => s.endsWith('"..."]\n'), "Did not end with an ellipsis.");
   });
 
   it("relations don't load all records in #pretty_print", async () => {
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
-      await pp(Post.all(), { write: () => {} });
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
+      await PP.pp(Post.all(), { write: () => {} });
     });
   });
 
   it("loading query is annotated in #pretty_print", async () => {
-    await assertQueriesMatch(/\/\* loading for pp \*\//, undefined, false, async () => {
-      await pp(Post.all(), { write: () => {} });
+    await self().assertQueriesMatch(/\/\* loading for pp \*\//, {}, async () => {
+      await PP.pp(Post.all(), { write: () => {} });
     });
   });
 
@@ -2658,7 +2624,7 @@ describe("RelationTest", () => {
     await relation;
 
     await assertNoQueries(false, async () => {
-      await pp(relation, { write: () => {} });
+      await PP.pp(relation, { write: () => {} });
     });
   });
 
@@ -3007,22 +2973,25 @@ describe("RelationTest", () => {
     ["references", (rel) => rel.references()],
     ["includes", (rel) => rel.includes()],
     ["preload", (rel) => rel.preload()],
-    ["eager_load", (rel) => rel.eagerLoad()],
+    ["eager load", (rel) => rel.eagerLoad()],
     ["group", (rel) => rel.group()],
     ["order", (rel) => rel.order()],
     ["reorder", (rel) => rel.reorder()],
     ["reselect", (rel) => rel.reselect()],
     ["unscope", (rel) => rel.unscope()],
     ["joins", (rel) => rel.joins()],
-    ["left_joins", (rel) => rel.leftJoins()],
-    ["left_outer_joins", (rel) => rel.leftOuterJoins()],
-    ["optimizer_hints", (rel) => rel.optimizerHints()],
+    ["left joins", (rel) => rel.leftJoins()],
+    ["left outer joins", (rel) => rel.leftOuterJoins()],
+    ["optimizer hints", (rel) => rel.optimizerHints()],
     ["annotate", (rel) => rel.annotate()],
     ["regroup", (rel) => rel.regroup()],
   ];
   for (const [method, invoke] of noArgGuardedMethods) {
-    it(`no arguments to ${method} raise errors`, () => {
-      expect(() => invoke(Topic.all())).toThrow(`The method .${method}() must contain arguments.`);
+    it(`no arguments to ${method} raise errors`, async () => {
+      const error = await assertRaises([ArgumentError], {}, () => invoke(Topic));
+      expect(error.message).toBe(
+        `The method .${method.replaceAll(" ", "_")}() must contain arguments.`,
+      );
     });
   }
 

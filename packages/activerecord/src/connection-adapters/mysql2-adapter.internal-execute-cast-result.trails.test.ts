@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Result } from "../result.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
-import type { Mysql2RawResult } from "./mysql2/database-statements.js";
+import { mysql2Client } from "../mysql2/client.js";
+import type { Mysql2Result } from "../mysql2/client.js";
 
 describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () => {
   afterEach(() => {
@@ -27,10 +28,11 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
   }
 
   function makeAdapter(): Mysql2Adapter {
-    const adapter = new Mysql2Adapter({ host: "localhost", _fakeConnection: true } as never);
+    const adapter = new Mysql2Adapter({ host: "localhost" } as never);
     const fakeConn = { query: driverQuery, end: () => Promise.resolve() };
-    (adapter as unknown as { _connection: unknown })._connection = fakeConn;
+    (adapter as unknown as { _rawConnection: unknown })._rawConnection = mysql2Client(fakeConn);
     (adapter as unknown as { _verified: boolean })._verified = true;
+    adapter._rawConnection!.queryOptions.as = "array";
     return adapter;
   }
 
@@ -39,12 +41,12 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
 
     const rawResult = (await adapter.internalExecute("SELECT 1 AS a, 2 AS a", "SQL", [], {
       materializeTransactions: false,
-    })) as Mysql2RawResult;
+    })) as Mysql2Result;
 
-    expect(rawResult.fields.map((f) => f.name)).toEqual(["a", "a"]);
-    expect(rawResult.rows).toEqual([[1, 2]]);
+    expect(rawResult.fields).toEqual(["a", "a"]);
+    expect(rawResult.toA()).toEqual([[1, 2]]);
 
-    const result = (adapter as unknown as { castResult(r: Mysql2RawResult): Result }).castResult(
+    const result = (adapter as unknown as { castResult(r: Mysql2Result): Result }).castResult(
       rawResult,
     );
     expect(result).toBeInstanceOf(Result);

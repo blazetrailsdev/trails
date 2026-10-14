@@ -1,7 +1,16 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
-import { isBlank } from "@blazetrails/activesupport";
-import { except, hasKey, rbModSingletonP } from "@blazetrails/ruby-compat";
+import { kernelArray } from "@blazetrails/activesupport";
+import {
+  except,
+  rbClassSuperclass,
+  rbModSingletonP,
+  rbObjAsString,
+  rbObjRespondTo,
+  rtest,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
+import { stripThenable } from "@blazetrails/activesupport";
 
 export function validatesUniquenessOf(
   this: {
@@ -22,230 +31,110 @@ export class UniquenessValidator extends EachValidator {
   /** @internal */
   declare isCoveredByUniqueIndex: typeof isCoveredByUniqueIndex;
 
-  constructor(options: Record<string, unknown> = {}) {
-    if (options.conditions != null && typeof options.conditions !== "function") {
+  constructor(options: Record<string, unknown>) {
+    if (rtest(options.conditions) && !rbObjRespondTo(options.conditions, "call")) {
       throw new ArgumentError(
-        `${options.conditions} was passed as :conditions but is not callable. ` +
+        `${rbObjAsString(options.conditions)} was passed as :conditions but is not callable. ` +
           "Pass a callable instead: `conditions: -> { where(approved: true) }`",
       );
     }
-    const scopes =
-      options.scope == null ? [] : Array.isArray(options.scope) ? options.scope : [options.scope];
-    if (!scopes.every((scope) => typeof scope === "string")) {
-      let scopeRepr: string;
-      try {
-        scopeRepr = JSON.stringify(options.scope) ?? String(options.scope);
-      } catch {
-        scopeRepr = String(options.scope);
-      }
+    if (!kernelArray(options.scope).every((scope) => typeof scope === "string")) {
       throw new ArgumentError(
-        `${scopeRepr} is not supported format for :scope option. ` +
+        `${rbObjAsString(options.scope)} is not supported format for :scope option. ` +
           "Pass a symbol or an array of symbols instead: `scope: :user_id`",
       );
     }
-    if (
-      Object.prototype.hasOwnProperty.call(options, "caseSensitive") &&
-      typeof options.caseSensitive !== "boolean"
-    ) {
-      throw new Error(
-        `${options.caseSensitive} is not a supported value for :caseSensitive option. ` +
-          "Pass a boolean instead: `caseSensitive: false`",
-      );
-    }
     super(options);
-    this._klass = options.class ?? null;
-    if (rbModSingletonP(this._klass)) this._klass = Object.getPrototypeOf(this._klass);
-  }
-
-  /** @internal */
-  protected override readAttributeForValidation(record: any, attribute: string): unknown {
-    const refl = record?.constructor?._reflectOnAssociation?.(attribute);
-    if (refl) {
-      const fk = Array.isArray(refl.foreignKey()) ? refl.foreignKey()[0] : refl.foreignKey();
-      return record.readAttribute(fk);
-    }
-    return super.readAttributeForValidation(record, attribute);
+    this._klass = options.class;
+    if (rbModSingletonP(this._klass)) this._klass = rbClassSuperclass(this._klass);
   }
 
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
-    if (value === undefined) return;
-    const o = this.options as { allowNil?: unknown; allowBlank?: unknown };
-    if (value == null && o.allowNil === true) return;
-    if (isBlank(value) && o.allowBlank === true) return;
-
-    const finderClass = this.findFinderClassFor(record) ?? record.constructor;
-    if (!finderClass.where) return;
-
+    const finderClass = this.findFinderClassFor(record);
     value = mapEnumAttribute(finderClass, attribute, value);
 
-    if (
-      record.isPersisted?.() &&
-      !(await isValidationNeeded(this, finderClass, record, attribute))
-    ) {
+    if (record.isPersisted() && !(await isValidationNeeded(this, finderClass, record, attribute))) {
       return;
     }
 
-    const opts = this.options as any;
-
-    let [relation] = await this.buildRelation(finderClass, attribute, value);
-
-    if (record.isPersisted?.()) {
-      const pk = finderClass.primaryKey;
-      if (pk == null) {
+    let relation = await this.buildRelation(finderClass, attribute, value);
+    if (record.isPersisted()) {
+      if (finderClass.primaryKey != null) {
+        relation = relation.where().not(new Map([[finderClass.primaryKey, [record.idInDatabase]]]));
+      } else {
         throw new UnknownPrimaryKey(
           finderClass,
           "Cannot validate uniqueness for persisted record without primary key.",
         );
       }
-      if (Array.isArray(pk)) {
-        const dbVals = pk.map((col: string) =>
-          record.attributeChanged(col) ? record.attributeWas(col) : record.readAttribute(col),
-        );
-        relation = relation.where().not(new Map([[pk, [dbVals]]]));
-      } else {
-        const dbVal = record.attributeChanged(pk)
-          ? record.attributeWas(pk)
-          : record.readAttribute(pk);
-        relation = relation.where().not({ [pk]: [dbVal] });
-      }
+    }
+    relation = await this.scopeRelation(record, relation);
+
+    if (rtest(this.options.conditions)) {
+      const conditions = this.options.conditions as (this: any, record?: any) => any;
+      relation =
+        conditions.length === 0 ? conditions.call(relation) : conditions.call(relation, record);
     }
 
-    relation = this.scopeRelation(record, relation);
-
-    if (opts?.conditions && typeof opts.conditions === "function") {
-      const conditioned =
-        opts.conditions.length === 0
-          ? opts.conditions.call(relation)
-          : opts.conditions.call(relation, record);
-      if (conditioned != null) relation = conditioned;
-    }
-
-    const exists = await relation.isExists();
-    if (exists) {
-      const errorOpts: Record<string, unknown> = except(
-        opts ?? {},
+    if (await relation.isExists()) {
+      const errorOptions: Record<string, unknown> = except(
+        this.options,
         "caseSensitive",
         "scope",
         "conditions",
-        "class",
       );
-      errorOpts.value = value;
+      errorOptions.value = value;
 
-      record.errors.add(attribute, ":taken", errorOpts);
+      record.errors.add(attribute, ":taken", errorOptions);
     }
   }
 
   /** @internal */
   private findFinderClassFor(record: any): any {
-    let current = record.constructor;
-    let lastConcrete: any = null;
-    while (current) {
-      if (!current.abstractClass && typeof current.where === "function") {
-        lastConcrete = current;
-      }
-      if (current === this._klass) break;
-      const parent = Object.getPrototypeOf(current);
-      if (!parent || parent === Function.prototype || parent === Object) break;
-      if (typeof parent.where !== "function") break;
-      current = parent;
+    let currentClass = record.constructor;
+    let foundClass = null;
+    for (;;) {
+      if (!currentClass.abstractClass) foundClass = currentClass;
+      if (currentClass === this._klass) break;
+      currentClass = rbClassSuperclass(currentClass);
     }
-    return lastConcrete ?? record.constructor;
+    return foundClass;
   }
 
   /** @internal */
-  protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<[any]> {
-    const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
+  protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<any> {
+    const relation = klass.unscoped();
+    let none = null;
+    const comparison = await klass.withConnection((connection: any) =>
+      relation.bindAttribute(attribute, value, (attr: any, bind: any) => {
+        if (bind.isUnboundable()) {
+          none = relation.noneBang();
+          return null;
+        }
 
-    attribute = (klass.attributeAliases?.[attribute] as string) ?? attribute;
-
-    const refl = klass._reflectOnAssociation?.(attribute);
-    if (refl) {
-      const fk = Array.isArray(refl.foreignKey()) ? refl.foreignKey()[0] : refl.foreignKey();
-      if (
-        value != null &&
-        typeof value === "object" &&
-        typeof (value as any).readAttribute === "function"
-      ) {
-        const pk = refl.klass?.primaryKey ?? "id";
-        value = (value as any).readAttribute(Array.isArray(pk) ? pk[0] : pk);
-      }
-      attribute = fk;
-    }
-
-    if (value == null) {
-      return [base.whereBang({ [attribute]: null })];
-    }
-
-    const arel = klass.arelTable as { get?: (n: string) => any } | null;
-    const pb = (
-      base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } }
-    ).predicateBuilder;
-    const hasCsKey = hasKey(this.options, "caseSensitive");
-    const typeObj =
-      typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
-
-    if (typeObj?.supportUnencryptedData) {
-      return [base.whereBang({ [attribute]: value })];
-    }
-
-    if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
-      const attr = arel.get(attribute);
-      const bind = pb.buildBindAttribute(attribute, value);
-      const comparison: any = await klass.withConnection(async (adapter: any) => {
-        let comparison: any = null;
-        if (!hasCsKey || value == null) {
-          comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
+        if (!("caseSensitive" in this.options) || bind.isNil()) {
+          return connection.defaultUniquenessComparison(attr, bind);
         } else if (this.options.caseSensitive) {
-          comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
+          return connection.caseSensitiveComparison(attr, bind);
         } else {
-          const colType =
-            typeObj == null
-              ? null
-              : typeof typeObj.type === "function"
-                ? typeObj.type()
-                : typeObj.type;
-          if (colType !== "uuid") {
-            comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
-            if (comparison == null && typeof value === "string") {
-              const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
-              comparison = attr.lower().eq(lowerBind);
-            }
-          }
+          return connection.caseInsensitiveComparison(attr, bind);
         }
-        return comparison;
-      });
-      if (comparison != null && typeof base.where === "function") {
-        return [base.whereBang(comparison)];
-      }
-    }
-    return [base.whereBang({ [attribute]: value })];
+      }),
+    );
+
+    return stripThenable(none ?? relation.whereBang(comparison));
   }
 
   /** @internal */
-  private scopeRelation(record: any, relation: any): any {
-    const scope = this.options.scope;
-    if (scope == null) return relation;
-    const scopes = Array.isArray(scope) ? (scope as string[]) : [scope as string];
-    let r = relation;
-    for (const rawItem of scopes) {
-      const ctor = record.constructor;
-      const item = (ctor.attributeAliases?.[rawItem] as string) ?? rawItem;
-      const refl = ctor._reflectOnAssociation?.(item);
-      if (refl) {
-        const isPoly =
-          typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
-        const fks = Array.isArray(refl.foreignKey()) ? refl.foreignKey() : [refl.foreignKey()];
-        for (const fk of fks) {
-          r = r.where({ [fk]: record.readAttribute?.(fk) });
-        }
-        if (isPoly && refl.foreignType) {
-          r = r.where({ [refl.foreignType]: record.readAttribute?.(refl.foreignType) });
-        }
-      } else {
-        r = r.where({ [item]: record.readAttribute?.(item) });
-      }
+  private async scopeRelation(record: any, relation: any): Promise<any> {
+    for (const scopeItem of kernelArray(this.options.scope as string | string[])) {
+      const scopeValue = record.constructor._reflectOnAssociation(scopeItem)
+        ? await record.association(scopeItem).reader
+        : record.readAttribute(scopeItem);
+      relation = relation.where({ [scopeItem]: scopeValue });
     }
-    return r;
+
+    return stripThenable(relation);
   }
 }
 
@@ -335,11 +224,11 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
 
 /** @internal */
 function mapEnumAttribute(klass: any, attribute: string, value: unknown): unknown {
-  const enums = klass?.definedEnums?.[String(attribute)];
-  if (value != null && enums && Object.prototype.hasOwnProperty.call(enums, String(value))) {
-    return (enums as Record<string, unknown>)[String(value)];
-  }
+  const mapping = klass.definedEnums[toS(attribute)];
+  if (value != null && value !== false && mapping != null) value = mapping.get(value);
   return value;
 }
 
 UniquenessValidator.prototype.isCoveredByUniqueIndex = isCoveredByUniqueIndex;
+
+export const ClassMethods = { validatesUniquenessOf };

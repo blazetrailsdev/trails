@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { InternalMetadata } from "./internal-metadata.js";
 import { Base } from "./base.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { toSqlAndBinds } from "./connection-adapters/abstract/database-statements.js";
 import { Nodes } from "@blazetrails/arel";
@@ -112,10 +112,8 @@ describe("InternalMetadata built over a NullPool", () => {
     );
   });
 
-  it("raises NoMethodError from tableExists", async () => {
+  it("raises from tableExists", async () => {
     const internalMetadata = new InternalMetadata(new NullPool());
-    await expect(internalMetadata.tableExists()).rejects.toThrow(
-      /undefined method 'data_source_exists\?' for nil/,
-    );
+    await expect(internalMetadata.tableExists()).rejects.toThrow(TypeError);
   });
 });

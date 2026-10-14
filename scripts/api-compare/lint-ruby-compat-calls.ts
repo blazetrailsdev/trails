@@ -31,6 +31,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 import {
   type Artifact,
   type ExcludeEntry,
@@ -42,6 +43,7 @@ import {
 import { listJsonFiles } from "./baseline-json.js";
 import { BASELINE_DIR } from "./lint-call-mismatches.js";
 import { type RubyCompatKey, reverseRows } from "./report-ruby-compat.js";
+import { NATIVE_FORM_ANALOGUES, NATIVE_HASH_FORM_SPELLINGS } from "./enumerable-idioms.js";
 import {
   NO_REGEN_FLAG,
   artifactIsStale,
@@ -82,14 +84,19 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "actiondispatch",
   "actionpackversion",
   "actionview",
+  "activejob",
   "activemodel",
   "activerecord",
   "activerecord-test-support",
   "activesupport",
   "arel",
+  "bcrypt",
   "did-you-mean",
   "globalid",
   "i18n",
+  "msgpack",
+  "mysql2",
+  "pg",
   "rack",
   "rack-session",
   "rack-test",
@@ -100,9 +107,12 @@ export const ENROLLED_PACKAGES: readonly string[] = [
 
 /** One row as the gate prints it — the shard key plus the export the body
  *  should have called, which is not part of the identity since one Ruby call
- *  resolves to one export. */
+ *  resolves to one export. A Hash call a native form also ports (RFC 0190)
+ *  names that form beside the export: either converges the row. */
 export function renderKey(k: RubyCompatKey): string {
-  return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call} → ${k.tsExport}`;
+  const form = NATIVE_HASH_FORM_SPELLINGS.get(NATIVE_FORM_ANALOGUES.get(k.call)?.form ?? "");
+  const native = form === undefined ? "" : ` (or \`${form}\` on the same receiver)`;
+  return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call} → ${k.tsExport}${native}`;
 }
 
 const enrolled = <T extends { package: string }>(rows: T[]): T[] =>
@@ -124,10 +134,18 @@ export async function loadBaseline(dir: string = BASELINE_DIR): Promise<ExcludeE
  * The scope check is the RFC 0044 determinism guard the other two gates carry:
  * an artifact covering fewer packages than CI must not pass a gate.
  */
-export async function main(): Promise<number> {
+export async function main(scope: string | null = null): Promise<number> {
   const artifact = JSON.parse(await fs.readFile(ARTIFACT_PATH, "utf-8")) as Artifact;
 
-  const absent = missingScope({ packages: artifact.packages, mismatches: [] });
+  if (scope !== null) {
+    const mismatch = scopeMismatch("ruby-compat call ratchet", artifact.packages, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent =
+    scope === null ? missingScope({ packages: artifact.packages, mismatches: [] }) : [];
   if (absent.length > 0) {
     console.error(
       `\nruby-compat call ratchet: artifact compared a PARTIAL scope — missing ` +
@@ -138,7 +156,7 @@ export async function main(): Promise<number> {
   }
 
   const current = enrolled(reverseRows(artifact));
-  const baseline = await loadBaseline();
+  const baseline = inScope(await loadBaseline(), scope);
   const { added, stale } = diffAgainstBaseline(current, baseline);
 
   if (added.length === 0 && stale.length === 0) {
@@ -153,7 +171,8 @@ export async function main(): Promise<number> {
     console.error(`\nruby-compat call ratchet: ${added.length} NEW unconverged row(s).`);
     console.error(
       "A ported TS body hand-rolls a Ruby primitive `@blazetrails/ruby-compat` already " +
-        "exports. Import the export — or, if the deviation is justified, add the row " +
+        "exports. Import the export, or write the native form a row names — or, if the " +
+        "deviation is justified, add the row " +
         '(with a one-line reason, `kind: "rubyCompat"`) to its per-source baseline file ' +
         `under\n  ${path.relative(ROOT_DIR, BASELINE_DIR)}/  (<package>/<tsFile .ts→.json>).\n`,
     );
@@ -190,7 +209,7 @@ async function runAsScript(): Promise<void> {
     console.error(staleArtifactMessage("ruby-compat call ratchet", ARTIFACT_PATH));
     process.exit(2);
   }
-  process.exit(await main());
+  process.exit(await main(scopeOf(argv)));
 }
 
 void runAsScript();

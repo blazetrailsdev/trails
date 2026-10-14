@@ -1,6 +1,6 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: databaseExists, open. */
 import { createRequire } from "node:module";
-import { File } from "@blazetrails/ruby-compat";
+import { File, LoadError } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
@@ -72,7 +72,15 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
   private boundParams: SqliteBinds | undefined;
 
   bindParams(binds: SqliteBinds): void {
-    this.boundParams = binds;
+    this.boundParams = Array.isArray(binds)
+      ? binds.map((value: unknown) =>
+          value instanceof Number
+            ? value.valueOf()
+            : typeof value === "number" && Number.isInteger(value)
+              ? BigInt(value)
+              : (value as SqliteBindValue),
+        )
+      : binds;
   }
 
   step(): null {
@@ -135,6 +143,11 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     return this._open;
   }
 
+  filename(dbName = "main"): string | null {
+    const list = this.pragma("database_list") as { name: string; file: string }[];
+    return list.find(({ name }) => name === dbName)?.file ?? null;
+  }
+
   exec(sql: string): void {
     try {
       this.raw.exec(sql);
@@ -165,6 +178,11 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     } finally {
       stmt.close();
     }
+  }
+
+  rollback(): true {
+    this.execute("rollback transaction");
+    return true;
   }
 
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
@@ -224,7 +242,7 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
 /** @internal */
 function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseSync {
   if (!nodeSqlite) {
-    throw new Error(
+    throw new LoadError(
       "node:sqlite is not available. Node 22.5+ is required. " +
         "On Node 22.5–22.9 you may also need --experimental-sqlite.",
     );
@@ -234,7 +252,6 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
     readOnly: config.readOnly ?? false,
     enableForeignKeyConstraints: false,
   };
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
   try {
     return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
@@ -271,10 +288,6 @@ export const nodeSqliteDriver: SqliteDriver = {
     return new NodeSqliteConnection(openDatabase(config));
   },
 
-  openSync(config: SqliteOpenConfig): SyncSqliteConnection {
-    return new NodeSqliteConnection(openDatabase(config));
-  },
-
   databaseExists(config: SqliteOpenConfig): boolean {
     const path = resolveUriDatabasePath(config.database);
     if (path === null) return true;
@@ -287,7 +300,7 @@ export const nodeSqliteDriver: SqliteDriver = {
 
   async restoreFromPath(sourcePath: string, destination: string): Promise<void> {
     if (!nodeSqlite) {
-      throw new Error(
+      throw new LoadError(
         "node:sqlite is not available. Node 22.5+ is required. " +
           "On Node 22.5–22.9 you may also need --experimental-sqlite.",
       );

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { Base, Rollback } from "../../index.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -52,7 +52,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("change table supports json", async () => {
       try {
         await connection.transaction(async () => {
-          await connection.changeTable("citexts", async (t) => {
+          await connection.changeTable("citexts", {}, async (t) => {
             await t.citext("username");
           });
           await Citext.resetColumnInformation();
@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write", async () => {
-      const x = Citext.new({ cival: "Some CI Text" });
+      const x = new Citext({ cival: "Some CI Text" });
       await x.saveBang();
       const citext = await Citext.first();
       expect(citext!.cival).toBe("Some CI Text");
@@ -92,7 +92,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "citexts");
+      const output = await dumpTableSchema("citexts");
       expect(output).toMatch(/t\.citext\("cival"\)/);
     });
   });

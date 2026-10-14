@@ -1,7 +1,9 @@
 import { connect } from "./support/connection.js";
 import { getEnv } from "@blazetrails/activesupport";
+import { RuntimeError, getOs } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 
 const { adapter, envConfig } = await connect();
 
@@ -27,7 +29,9 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   await stampCanonicalSchema(conn, undefined, intact ? laid : undefined);
   await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn));
 } else {
-  if (ownsDatabase) {
+  if (adapter === "sqlite" && ownsDatabase) {
+    await new SQLiteDatabaseTasks(envConfig, getOs().cwd()).purge();
+  } else if (ownsDatabase) {
     await DatabaseTasks.purge(envConfig);
   } else {
     await dropAllTables(await Base.leaseConnection());
@@ -38,6 +42,8 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   await recordBootOutcome("fullLoad", await canonicalSchemaUpToDate(canonicalConn));
 }
 
+await Base.connectionPool().schemaMigration.createTable();
+
 const _conn = (await Base.leaseConnection()) as unknown as {
   tableExists(n: string): Promise<boolean>;
 };
@@ -46,7 +52,7 @@ for (const t of ["accounts", "topics", "posts", "defaults"]) {
   if (!(await _conn.tableExists(t))) missingTables.push(t);
 }
 if (missingTables.length > 0) {
-  throw new Error(
+  throw new RuntimeError(
     `[test-setup-dy] schema load incomplete — missing tables: ${missingTables.join(", ")}`,
   );
 }

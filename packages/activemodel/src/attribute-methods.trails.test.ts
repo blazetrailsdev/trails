@@ -5,13 +5,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  type AttributeMethod,
-  InstanceMethods,
+  AttrNames,
+  AttributeMethods,
+  MissingAttributeError,
   defineMethodAttribute,
 } from "./attribute-methods.js";
+import { Attribute } from "./attribute.js";
+import { StringType } from "./type/string.js";
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
+import { NoMethodError } from "./attribute-assignment.js";
 
 describe("AttributeMethodsTest (trails)", () => {
   it("generating alias attribute methods clears the attribute method patterns cache", () => {
@@ -34,11 +38,108 @@ describe("AttributeMethodsTest (trails)", () => {
 
     Person.attributeMethodSuffix("Short");
     Person.attributeMethodPatternsMatching("nameShort");
-    expect(Person.attributeMethodPatternsCache().size).toBeGreaterThan(0);
+    expect(Person.attributeMethodPatternsCache().size()).toBeGreaterThan(0);
 
     Person.aliasAttribute("nickname", "name");
 
-    expect(Person.attributeMethodPatternsCache().size).toBe(0);
+    expect(Person.attributeMethodPatternsCache().size()).toBe(0);
+  });
+
+  it("an alias of a reader property is a property carrying both halves", () => {
+    class Person extends Model {
+      declare name: string | null;
+      declare nickname: string | null;
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.aliasAttribute("nickname", "name");
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+
+    class Plain {
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static defineAttributeMethods: AttributesClassHalf["defineAttributeMethods"];
+      declare nickname: () => unknown;
+
+      static {
+        include(this, AttributeMethods);
+        this.defineAttributeMethods("name");
+        this.aliasAttribute("nickname", "name");
+      }
+      attributes(): Record<string, unknown> {
+        return { name: "plain" };
+      }
+      attribute(name: string): unknown {
+        return this.attributes()[name];
+      }
+    }
+
+    const person = new Person({ name: "Alexander" });
+    expect(person.nickname).toBe("Alexander");
+    person.nickname = "Alex";
+    expect(person.name).toBe("Alex");
+    expect(new Plain().nickname()).toBe("plain");
+  });
+
+  it("two classes sharing a canonical name each get the shape their own pattern asks for", () => {
+    class Getter {
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static defineAttributeMethods: AttributesClassHalf["defineAttributeMethods"];
+      declare name_shape_probe: unknown;
+
+      static {
+        include(this, AttributeMethods);
+        this.attributeMethodSuffix("_shape_probe", { parameters: false });
+        this.defineAttributeMethods("name");
+      }
+      attribute_shape_probe(attr: string): string {
+        return `getter ${attr}`;
+      }
+    }
+
+    class Method {
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static defineAttributeMethods: AttributesClassHalf["defineAttributeMethods"];
+      declare name_shape_probe: (...args: unknown[]) => unknown;
+
+      static {
+        include(this, AttributeMethods);
+        this.attributeMethodSuffix("_shape_probe");
+        this.defineAttributeMethods("name");
+      }
+      attribute_shape_probe(attr: string, extra: string): string {
+        return `method ${attr} ${extra}`;
+      }
+    }
+
+    expect(new Getter().name_shape_probe).toBe("getter name");
+    expect(new Method().name_shape_probe("x")).toBe("method name x");
+  });
+
+  it("an alias of a method that is not an attribute sends the target and its writer", () => {
+    class Person extends Model {
+      declare shout: string;
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+
+      static {
+        include(this, Attributes);
+        this.aliasAttribute("shout", "yell");
+      }
+      yell(): string {
+        return "AHOY";
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person();
+    expect(person.shout).toBe("AHOY");
+    expect(() => {
+      person.shout = "quiet";
+    }).toThrow(NoMethodError);
   });
 
   it("alias attribute overrides a method inherited from a parent class", () => {
@@ -138,6 +239,41 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Employee.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length + 1);
   });
 
+  it("inherited leaves a subclass without its parent's method caches and generated module", () => {
+    class Person extends Model {
+      declare name: string;
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static aliasesByAttributeName: AttributesClassHalf["aliasesByAttributeName"];
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeMethodPatternsCache: AttributesClassHalf["attributeMethodPatternsCache"];
+      declare static attributeMethodPatternsMatching: AttributesClassHalf["attributeMethodPatternsMatching"];
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static generatedAttributeMethods: AttributesClassHalf["generatedAttributeMethods"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+        this.attributeMethodSuffix("Short");
+      }
+    }
+    interface Person extends Attributes {}
+
+    Person.aliasesByAttributeName().set("name", ["nickname"]);
+    Person.attributeMethodPatternsMatching("nameShort");
+    expect(Person.attributeMethodPatternsCache().size()).toBeGreaterThan(0);
+    const generated = Person.generatedAttributeMethods();
+
+    class Employee extends Person {}
+
+    expect(Employee.attributeMethodPatternsCache()).not.toBe(Person.attributeMethodPatternsCache());
+    expect(Employee.attributeMethodPatternsCache().size()).toBe(0);
+    expect(Employee.aliasesByAttributeName()).not.toBe(Person.aliasesByAttributeName());
+    expect(Employee.aliasesByAttributeName().size).toBe(0);
+    expect(Employee.generatedAttributeMethods()).not.toBe(generated);
+    expect(Person.generatedAttributeMethods()).toBe(generated);
+    expect(Person.aliasesByAttributeName().get("name")).toEqual(["nickname"]);
+  });
+
   it("_read_attribute raises for a name with no reader, as __send__ does", () => {
     class Person extends Model {
       declare name: string;
@@ -217,13 +353,13 @@ describe("AttributeMethodsTest (trails)", () => {
     interface Person extends Attributes {}
 
     const p = new Person({ name: "test" });
-    const stack = "custom backtrace line";
+    const stack = ["at custom (backtrace.ts:1:1)"];
     const call = () =>
       (
-        InstanceMethods.missingAttribute as (
+        AttributeMethods.missingAttribute as (
           this: unknown,
           attrName: string,
-          stack?: string,
+          stack: string[],
         ) => never
       ).call(p, "title", stack);
     let caught: Error | undefined;
@@ -233,7 +369,68 @@ describe("AttributeMethodsTest (trails)", () => {
       caught = err as Error;
     }
     expect(caught?.message).toContain("missing attribute 'title'");
-    expect(caught?.stack).toBe(stack);
+    expect(caught?.stack).toBe(
+      "MissingAttributeError: missing attribute 'title' for Person\n    at custom (backtrace.ts:1:1)",
+    );
+  });
+
+  it("a generated reader raises an uninitialized attribute through #missing_attribute with the caller's frames", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person();
+    person._attributes.set("name", Attribute.uninitialized("name", new StringType()));
+    const readName = function readName() {
+      return (person as unknown as { name: unknown }).name;
+    };
+    let caught: Error | undefined;
+    try {
+      readName();
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).toBeInstanceOf(MissingAttributeError);
+    expect(caught?.message).toBe("missing attribute 'name' for Person");
+    const frames = caught!.stack!.split("\n");
+    expect(frames[0]).toBe("MissingAttributeError: missing attribute 'name' for Person");
+    expect(frames[1]).toContain("readName");
+  });
+
+  it("forwards a named parameter through a proxy call and through its alias", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static attributeAliases: AttributesClassHalf["attributeAliases"];
+      declare static attributeMethodPatterns: AttributesClassHalf["attributeMethodPatterns"];
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static aliasesByAttributeName: AttributesClassHalf["aliasesByAttributeName"];
+      declare nameJoined: (other: string) => string;
+      declare nicknameJoined: (other: string) => string;
+
+      static {
+        include(this, Attributes);
+        this.attributeMethodSuffix("Joined", { parameters: "other" });
+        this.attribute("name", "string");
+        this.aliasAttribute("nickname", "name");
+      }
+      attributeJoined(attrName: string, other: string): string {
+        return `${attrName} ${other}`;
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person({ name: "Alexander" });
+    expect(person.nameJoined("x")).toBe("name x");
+    expect(person.nicknameJoined("x")).toBe("name x");
+    expect(Person.aliasesByAttributeName().get("name")).toEqual(["nickname"]);
+    expect(Person.aliasesByAttributeName().get("age")).toEqual([]);
   });
 });
 
@@ -248,8 +445,8 @@ describe("attribute method prefix/suffix/affix", () => {
 
       static {
         include(this, Attributes);
-        this.attribute("name", "string");
         this.attributeMethodPrefix("clear_");
+        this.attribute("name", "string");
       }
       clear_attribute(attr: string): unknown {
         return this._readAttribute(attr);
@@ -261,6 +458,25 @@ describe("attribute method prefix/suffix/affix", () => {
     expect((u as any)["clear_name"]()).toBe("Alice");
   });
 
+  it("binds a trailing null as a prefix or suffix, not as the keywords", () => {
+    class User extends Model {
+      declare static attributeMethodPrefix: AttributesClassHalf["attributeMethodPrefix"];
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+
+      static {
+        include(this, Attributes);
+      }
+    }
+
+    for (const bind of [
+      () => User.attributeMethodPrefix("clear_", null as never),
+      () => User.attributeMethodSuffix(null as never),
+    ]) {
+      expect(bind).toThrow(TypeError);
+      expect(bind).not.toThrow(/parameters/);
+    }
+  });
+
   it("defines suffixed methods for attributes", () => {
     class User extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
@@ -268,8 +484,8 @@ describe("attribute method prefix/suffix/affix", () => {
 
       static {
         include(this, Attributes);
-        this.attribute("name", "string");
         this.attributeMethodSuffix("_before_type_cast");
+        this.attribute("name", "string");
       }
       attribute_before_type_cast(attr: string): unknown {
         return this._readAttribute(attr);
@@ -288,8 +504,8 @@ describe("attribute method prefix/suffix/affix", () => {
 
       static {
         include(this, Attributes);
-        this.attribute("name", "string");
         this.attributeMethodAffix({ prefix: "reset_", suffix: "_to_default" });
+        this.attribute("name", "string");
       }
       reset_attribute_to_default(attr: string): unknown {
         return this._readAttribute(attr);
@@ -368,32 +584,6 @@ describe("attributeMissing", () => {
     const u = new User({ name: "Alice" });
     expect(u.attribute("nonexistent")).toBeNull();
   });
-
-  it("can be overridden to provide custom behavior", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-
-      static {
-        include(this, Attributes);
-      }
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-      attributeMissing(match: AttributeMethod): unknown {
-        return `intercepted:${match.proxyTarget}:${match.attrName}`;
-      }
-    }
-    interface User extends Attributes {}
-    User.attributeMethodSuffix("Contrived");
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    expect((u as unknown as { nameContrived(): string }).nameContrived()).toBe(
-      "intercepted:attributeContrived:name",
-    );
-    expect(u._readAttribute("name")).toBe("Alice");
-  });
 });
 
 describe("attributeNames (instance)", () => {
@@ -417,5 +607,59 @@ describe("attributeNames (instance)", () => {
     expect(u.attributeNames()).toEqual(User.attributeNames());
     expect(u.attributeNames()).toContain("name");
     expect(u.attributeNames()).toContain("age");
+  });
+});
+
+describe("AttrNames.defineAttributeAccessorMethod (attribute_methods.rb:577-589)", () => {
+  const yielded = (attrName: string, writer: boolean): [string, string] => {
+    let seen: [string, string] | undefined;
+    AttrNames.defineAttributeAccessorMethod(null, attrName, { writer }, (name, expr) => {
+      seen = [name, expr];
+    });
+    return seen!;
+  };
+
+  it("yields the method name and a quoted literal for a def-safe name", () => {
+    expect(yielded("title", false)).toEqual(["title", "'title'"]);
+    expect(yielded("title", true)).toEqual(["title=", "'title'"]);
+  });
+
+  it("yields a __temp__ name and a constant reference for any other name", () => {
+    const [reader, expr] = yielded("my_column(omg)", false);
+    expect(reader).toBe("__temp__d697f536f6c657d6e682f6d67692");
+    expect(expr).toBe(
+      `::ActiveModel::AttributeMethods::AttrNames::ATTR_${reader.slice("__temp__".length)}`,
+    );
+    expect(yielded("my_column(omg)", true)[0]).toBe(`${reader}=`);
+  });
+
+  it("sets the ATTR_ constant the expression names, once", () => {
+    const constants = AttrNames as unknown as Record<string, string>;
+    const [, expr] = yielded("my other column", false);
+    const constName = expr.split("::").at(-1)!;
+    expect(constants[constName]).toBe("my other column");
+
+    constants[constName] = "already defined";
+    yielded("my other column", true);
+    expect(constants[constName]).toBe("already defined");
+  });
+
+  it("generates a working reader and writer for a name that is not def-safe", () => {
+    class Odd extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("foo-bar", "string");
+        this.attribute("\u00e9", "integer");
+      }
+    }
+    const odd = new Odd({ "foo-bar": "a" }) as unknown as Record<string, unknown>;
+
+    expect(odd["foo-bar"]).toBe("a");
+    odd["foo-bar"] = "b";
+    odd["\u00e9"] = "7";
+    expect(odd["foo-bar"]).toBe("b");
+    expect(odd["\u00e9"]).toBe(7);
   });
 });

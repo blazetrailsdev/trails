@@ -1,25 +1,26 @@
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import type { Column } from "../column.js";
+import { compact, isPresent } from "@blazetrails/activesupport";
+import { rbInspect, rtest } from "@blazetrails/ruby-compat";
 
 export class SchemaDumper extends BaseSchemaDumper {
   static readonly DEFAULT_DATETIME_PRECISION = 6;
 
   static override create<T extends typeof BaseSchemaDumper>(
     this: T,
-    connection: SchemaSource | DatabaseAdapter,
+    connection: DatabaseAdapter,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
     return new (this as unknown as new (
-      connection: SchemaSource | DatabaseAdapter,
+      connection: DatabaseAdapter,
       options: Record<string, unknown>,
     ) => InstanceType<T>)(connection, options);
   }
 
   /** @internal */
   protected async columnSpec(column: Column): Promise<[string, Record<string, unknown>]> {
-    return [this.schemaTypeWithVirtual(column), await this.prepareColumnOptions(column)];
+    return [await this.schemaTypeWithVirtual(column), await this.prepareColumnOptions(column)];
   }
 
   /** @internal */
@@ -42,19 +43,14 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected async prepareColumnOptions(column: Column): Promise<Record<string, unknown>> {
     const spec: Record<string, unknown> = {};
-    const limit = this.schemaLimit(column);
-    if (limit !== undefined) spec["limit"] = limit;
-    const precision = this.schemaPrecision(column);
-    if (precision !== undefined) spec["precision"] = precision;
-    const scale = this.schemaScale(column);
-    if (scale !== undefined) spec["scale"] = scale;
-    const def = this.schemaDefault(column);
-    if (def !== undefined) spec["default"] = def;
-    if (column.null === false) spec["null"] = "false";
-    const collation = await this.schemaCollation(column);
-    if (collation !== undefined) spec["collation"] = collation;
-    if (column.comment) spec["comment"] = JSON.stringify(column.comment);
-    return spec;
+    spec["limit"] = this.schemaLimit(column);
+    spec["precision"] = this.schemaPrecision(column);
+    spec["scale"] = this.schemaScale(column);
+    spec["default"] = this.schemaDefault(column);
+    if (!column.null) spec["null"] = "false";
+    spec["collation"] = await this.schemaCollation(column);
+    if (isPresent(column.comment)) spec["comment"] = rbInspect(column.comment);
+    return compact(spec);
   }
 
   /** @internal */
@@ -68,9 +64,12 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected schemaTypeWithVirtual(column: Column): string {
-    if (this.supportsVirtualColumns && column.isVirtual()) return ":virtual";
-    return this.schemaType(column);
+  protected async schemaTypeWithVirtual(column: Column): Promise<string> {
+    if ((await this.connection.supportsVirtualColumns()) && column.isVirtual()) {
+      return ":virtual";
+    } else {
+      return this.schemaType(column);
+    }
   }
 
   /** @internal */
@@ -81,16 +80,15 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
-    if (this.isBigint(column)) return undefined;
-    const limit = column.limit;
-    if (limit == null) return undefined;
-    const nativeLimit = (
-      this._adapter()?.nativeDatabaseTypes?.()?.[column.type ?? ""] as
-        | { limit?: unknown }
-        | undefined
-    )?.limit;
-    if (limit === nativeLimit) return undefined;
-    return String(limit);
+    const limit = this.isBigint(column) ? undefined : column.limit;
+    if (
+      rtest(limit) &&
+      limit !==
+        (this.connection.nativeDatabaseTypes()[column.type as string] as { limit?: unknown }).limit
+    ) {
+      return rbInspect(limit);
+    }
+    return undefined;
   }
 
   /** @internal */
@@ -113,7 +111,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaDefault(column: Column): unknown {
     if (!column.hasDefault) return undefined;
-    const type = this._adapter().lookupCastTypeFromColumn(column);
+    const type = this.connection.lookupCastTypeFromColumn(column);
     const default_ = type.deserialize(column.default);
     if (default_ == null) {
       return this.schemaExpression(column);
@@ -137,14 +135,5 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected isBigint(column: Column): boolean {
     return column.type === "bigint" || column.isBigint();
-  }
-
-  /** @internal */
-  protected validType(type: string | null | undefined): boolean {
-    const adapter = this._adapter();
-    if (adapter && typeof adapter.isValidType === "function") {
-      return adapter.isValidType(type);
-    }
-    return true;
   }
 }

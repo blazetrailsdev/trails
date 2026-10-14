@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Notifications, NotificationEvent as Event } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
 
 describe("write-path prepared-statement binds", () => {

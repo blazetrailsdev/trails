@@ -28,6 +28,30 @@ describe("TableTest (trails)", () => {
     expect(() => users.join(new Nodes.SqlLiteral(""))).toThrow(EmptyJoinError);
   });
 
+  it("takes a Symbol's name as the table name", () => {
+    expect(new Table(":users").name).toBe("users");
+  });
+
+  it("takes a Symbol's name as the attribute name", () => {
+    expect(users.get(":id").name).toBe("id");
+  });
+
+  it("resolves an attribute alias for a Symbol's name", () => {
+    const klass = { attributeAliases: { title: "name" }, typeCaster: () => null };
+    expect(new Table("users", { klass }).get(":title").name).toBe("name");
+  });
+
+  it("does not read an inherited property as an attribute alias", () => {
+    const klass = { attributeAliases: {}, typeCaster: () => null };
+    expect(new Table("users", { klass }).get("constructor").name).toBe("constructor");
+  });
+
+  it("does not default an explicit null type caster from klass", () => {
+    const klass = { attributeAliases: {}, typeCaster: () => ({}) };
+    expect(new Table("users", { klass }).isAbleToTypeCast()).toBe(true);
+    expect(new Table("users", { klass, typeCaster: null }).isAbleToTypeCast()).toBe(false);
+  });
+
   it("does not raise on a whitespace-only relation", () => {
     expect(() => users.join(" ")).not.toThrow();
   });
@@ -37,7 +61,7 @@ describe("TableTest (trails)", () => {
     expect(aliased).toBeInstanceOf(Nodes.As);
     expect(aliased.left).toBe(users);
     expect(aliased.right).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((aliased.right as Nodes.SqlLiteral).value).toBe("u");
+    expect((aliased.right as Nodes.SqlLiteral).toString()).toBe("u");
     expect(users.alias("u")).toBeInstanceOf(Nodes.TableAlias);
   });
 });
@@ -78,7 +102,7 @@ describe("TableTest", () => {
 
   it("star returns an Attribute that compiles to table.*", () => {
     expect(users.get(star())).toBeInstanceOf(Attributes.Attribute);
-    expect(users.get(star()).toSql()).toBe('"users".*');
+    expect(new Visitors.ToSql(testConnection).compile(users.get(star()))).toBe('"users".*');
   });
 
   it("star splits schema-qualified name", () => {
@@ -154,14 +178,18 @@ describe("TableTest", () => {
 
   describe("attribute_aliases", () => {
     it("resolves an aliased attribute name", () => {
-      const t = new Table("users", { klass: { attributeAliases: { nickname: "name" } } });
+      const t = new Table("users", {
+        klass: { attributeAliases: { nickname: "name" }, typeCaster: () => null },
+      });
       const attr = t.get("nickname");
       expect(attr).toBeInstanceOf(Attributes.Attribute);
       expect(attr.name).toBe("name");
     });
 
     it("passes through an unaliased attribute name", () => {
-      const t = new Table("users", { klass: { attributeAliases: { nickname: "name" } } });
+      const t = new Table("users", {
+        klass: { attributeAliases: { nickname: "name" }, typeCaster: () => null },
+      });
       const attr = t.get("name");
       expect(attr.name).toBe("name");
     });

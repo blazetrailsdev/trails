@@ -1,4 +1,5 @@
-import { Autoload, extend, registerConstant, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";
@@ -22,12 +23,14 @@ import type { Serialization } from "./attribute-methods/serialization.js";
 import type { TimeZoneConversion } from "./attribute-methods/time-zone-conversion.js";
 import type { Write } from "./attribute-methods/write.js";
 import type { Base } from "./base.js";
+import type { TestCase } from "./cases/test-case.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import type { register, resolve } from "./connection-adapters.js";
+import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
+import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
 import type { Cipher } from "./encryption/cipher.js";
-import type { Configurable } from "./encryption/configurable.js";
+import type { Configurable, DeclarationListener } from "./encryption/configurable.js";
 import type { Contexts } from "./encryption/contexts.js";
 import type { AutoFilteredParameters } from "./encryption/auto-filtered-parameters.js";
 import type { Config } from "./encryption/config.js";
@@ -42,6 +45,7 @@ import type { Encryptor } from "./encryption/encryptor.js";
 import type { EnvelopeEncryptionKeyProvider } from "./encryption/envelope-encryption-key-provider.js";
 import type * as Errors from "./encryption/errors.js";
 import type { ExtendedDeterministicQueries } from "./encryption/extended-deterministic-queries.js";
+import type { Validations } from "./validations.js";
 import type { ExtendedDeterministicUniquenessValidator } from "./encryption/extended-deterministic-uniqueness-validator.js";
 import type { Key } from "./encryption/key.js";
 import type { KeyGenerator } from "./encryption/key-generator.js";
@@ -52,14 +56,20 @@ import type { NullEncryptor } from "./encryption/null-encryptor.js";
 import type { Properties } from "./encryption/properties.js";
 import type { ReadOnlyNullEncryptor } from "./encryption/read-only-null-encryptor.js";
 import type { Scheme } from "./encryption/scheme.js";
-import type { Fixture } from "./fixtures.js";
+import type { Fixture, FixtureSet } from "./fixtures.js";
 import type { Optimistic } from "./locking/optimistic.js";
-import type * as Pessimistic from "./locking/pessimistic.js";
+import type { Pessimistic } from "./locking/pessimistic.js";
 import type { IrreversibleMigration, Migration } from "./migration.js";
 import type * as ModelSchema from "./model-schema.js";
+import type * as Reflection from "./reflection.js";
 import type { Relation } from "./relation.js";
+import type { Result } from "./result.js";
 import type { Default } from "./scoping/default.js";
 import type * as Named from "./scoping/named.js";
+import type { DatabaseTasks } from "./tasks/database-tasks.js";
+import type { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
+import type { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
+import type { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -68,15 +78,35 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/associations": () => import("./associations.js"),
   "active_record/attribute_methods": () => import("./attribute-methods.js"),
   "active_record/connection_adapters": () => import("./connection-adapters.js"),
+  "active_record/connection_adapters/abstract_adapter": () =>
+    import("./connection-adapters/abstract-adapter.js"),
+  "active_record/connection_adapters/better_sqlite3_adapter": () =>
+    import("./connection-adapters/better-sqlite3-adapter.js"),
+  "active_record/connection_adapters/node_sqlite_adapter": () =>
+    import("./connection-adapters/node-sqlite-adapter.js"),
+  "active_record/connection_adapters/expo_sqlite_adapter": () =>
+    import("./connection-adapters/expo-sqlite-adapter.js"),
+  "active_record/connection_adapters/libsql_adapter": () =>
+    import("./connection-adapters/libsql-adapter.js"),
+  "active_record/connection_adapters/libsql_remote_adapter": () =>
+    import("./connection-adapters/libsql-remote-adapter.js"),
+  "active_record/connection_adapters/libsql_replica_adapter": () =>
+    import("./connection-adapters/libsql-replica-adapter.js"),
+  "active_record/connection_adapters/mysql2_adapter": () =>
+    import("./connection-adapters/mysql2-adapter.js"),
+  "active_record/connection_adapters/postgresql_adapter": () =>
+    import("./connection-adapters/postgresql-adapter.js"),
   "active_record/encryption": () => import("./encryption.js"),
   "active_record/connection_handling": () => import("./connection-handling.js"),
   "active_record/fixtures": () => import("./fixtures.js"),
   "active_record/model_schema": () => import("./model-schema.js"),
+  "active_record/reflection": () => import("./reflection.js"),
   "active_record/scoping": () => import("./scoping.js"),
   "active_record/association_relation": () => import("./association-relation.js"),
   "active_record/disable_joins_association_relation": () =>
     import("./disable-joins-association-relation.js"),
   "active_record/relation": () => import("./relation.js"),
+  "active_record/result": () => import("./result.js"),
   "active_record/associations/collection_proxy": () => import("./associations/collection-proxy.js"),
   "active_record/associations/belongs_to_association": () =>
     import("./associations/belongs-to-association.js"),
@@ -150,18 +180,26 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./encryption/read-only-null-encryptor.js"),
   "active_record/encryption/scheme": () => import("./encryption/scheme.js"),
   "active_record/migration": () => import("./migration.js"),
+  "active_record/tasks/database_tasks": () => import("./tasks/database-tasks.js"),
+  "active_record/tasks/mysql_database_tasks": () => import("./tasks/mysql-database-tasks.js"),
+  "active_record/tasks/postgresql_database_tasks": () =>
+    import("./tasks/postgresql-database-tasks.js"),
+  "active_record/tasks/sqlite_database_tasks": () => import("./tasks/sqlite-database-tasks.js"),
   "active_record/connection_adapters/abstract/connection_pool": () =>
     import("./connection-adapters/abstract/connection-pool.js"),
 };
 
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
+  Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
   Encryption: typeof Encryption;
   Fixture: typeof Fixture;
+  FixtureSet: typeof FixtureSet;
   Migration: typeof Migration;
   IrreversibleMigration: typeof IrreversibleMigration;
   ModelSchema: typeof ModelSchema;
+  Reflection: typeof Reflection;
   AssociationRelation: typeof AssociationRelationClass;
   Associations: typeof Associations;
   AttributeMethods: typeof AttributeMethods;
@@ -169,8 +207,11 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
   Locking: typeof Locking;
   Relation: typeof Relation;
+  Result: typeof Result;
   Scoping: typeof Scoping;
-  Point: new (x: number, y: number) => { x: number; y: number; equals(other: unknown): boolean };
+  Tasks: typeof Tasks;
+  Point: new (x: number, y: number) => { x: number; y: number };
+  TestCase: typeof TestCase;
 };
 registerConstant("ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
@@ -178,8 +219,10 @@ ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
 ActiveRecord.autoload("Encryption");
 ActiveRecord.autoload("Fixture", "active_record/fixtures");
+ActiveRecord.autoload("FixtureSet", "active_record/fixtures");
 ActiveRecord.autoload("Migration");
 ActiveRecord.autoload("ModelSchema");
+ActiveRecord.autoload("Reflection");
 ActiveRecord.autoload("Scoping");
 ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("AssociationRelation");
@@ -188,22 +231,25 @@ ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("ConnectionAdapters");
   ActiveRecord.autoload("DisableJoinsAssociationRelation");
   ActiveRecord.autoload("Relation");
+  ActiveRecord.autoload("Result");
 });
 
-export const Associations = { name: "ActiveRecord::Associations", loadPath } as AutoloadModule & {
-  CollectionProxy: typeof CollectionProxy;
-  BelongsToAssociation: typeof BelongsToAssociation;
-  BelongsToPolymorphicAssociation: typeof BelongsToPolymorphicAssociation;
-  HasManyAssociation: typeof HasManyAssociation;
-  HasManyThroughAssociation: typeof HasManyThroughAssociation;
-  HasOneAssociation: typeof HasOneAssociation;
-  HasOneThroughAssociation: typeof HasOneThroughAssociation;
-  Preloader: typeof Preloader;
-  JoinDependency: typeof JoinDependency;
-  AssociationScope: typeof AssociationScope;
-  DisableJoinsAssociationScope: typeof DisableJoinsAssociationScope;
-  AliasTracker: typeof AliasTracker;
-};
+export const Associations = Object.assign(new Module(), { loadPath }) as Module &
+  AutoloadModule & {
+    CollectionProxy: typeof CollectionProxy;
+    BelongsToAssociation: typeof BelongsToAssociation;
+    BelongsToPolymorphicAssociation: typeof BelongsToPolymorphicAssociation;
+    HasManyAssociation: typeof HasManyAssociation;
+    HasManyThroughAssociation: typeof HasManyThroughAssociation;
+    HasOneAssociation: typeof HasOneAssociation;
+    HasOneThroughAssociation: typeof HasOneThroughAssociation;
+    Preloader: typeof Preloader;
+    JoinDependency: typeof JoinDependency;
+    AssociationScope: typeof AssociationScope;
+    DisableJoinsAssociationScope: typeof DisableJoinsAssociationScope;
+    AliasTracker: typeof AliasTracker;
+  };
+rbModConstSet(ActiveRecord, "Associations", Associations);
 extend(Associations, Autoload);
 Associations.autoload("CollectionProxy");
 Associations.eagerAutoload(() => {
@@ -259,22 +305,43 @@ Locking.eagerAutoload(() => {
 });
 ActiveRecord.Locking = Locking;
 
-export const Scoping = { name: "ActiveRecord::Scoping", loadPath } as AutoloadModule & {
-  Default: typeof Default;
-  Named: typeof Named;
-};
+export const Scoping = Object.assign(new Module(), { loadPath }) as Module &
+  AutoloadModule & {
+    Default: typeof Default;
+    Named: typeof Named;
+  };
 extend(Scoping, Autoload);
 Scoping.eagerAutoload(() => {
   Scoping.autoload("Default");
   Scoping.autoload("Named");
 });
 
+export const TypeCaster = { name: "ActiveRecord::TypeCaster" };
+rbModConstSet(ActiveRecord, "TypeCaster", TypeCaster);
+
+export const Tasks = { name: "ActiveRecord::Tasks", loadPath } as AutoloadModule & {
+  DatabaseTasks: typeof DatabaseTasks;
+  MySQLDatabaseTasks: typeof MySQLDatabaseTasks;
+  PostgreSQLDatabaseTasks: typeof PostgreSQLDatabaseTasks;
+  SQLiteDatabaseTasks: typeof SQLiteDatabaseTasks;
+};
+extend(Tasks, Autoload);
+Tasks.autoload("DatabaseTasks");
+Tasks.autoload("MySQLDatabaseTasks", "active_record/tasks/mysql_database_tasks");
+Tasks.autoload("PostgreSQLDatabaseTasks", "active_record/tasks/postgresql_database_tasks");
+Tasks.autoload("SQLiteDatabaseTasks", "active_record/tasks/sqlite_database_tasks");
+ActiveRecord.Tasks = Tasks;
+
 export const ConnectionAdapters = {
   name: "ActiveRecord::ConnectionAdapters",
   loadPath,
+  adapters: new Map(),
 } as AutoloadModule & {
+  adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
+  PostgreSQLAdapter: typeof PostgreSQLAdapter;
   register: typeof register;
+  load: typeof load;
   resolve: typeof resolve;
 };
 extend(ConnectionAdapters, Autoload);
@@ -309,6 +376,8 @@ export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as Auto
   Properties: typeof Properties;
   ReadOnlyNullEncryptor: typeof ReadOnlyNullEncryptor;
   Scheme: typeof Scheme;
+  config: Config;
+  encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
 } & Omit<typeof Configurable, "prototype"> &
   Omit<typeof Contexts, "prototype">;
 extend(Encryption, Autoload);

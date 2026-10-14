@@ -45,7 +45,7 @@ import {
   UnderscoresToDashes,
 } from "../inflector-test-cases.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../core-ext/string/output-safety.js";
-import { NoMethodError, Range } from "@blazetrails/ruby-compat";
+import { NoMethodError, Range, resetConstants } from "@blazetrails/ruby-compat";
 import { endsWith, startsWith } from "../core-ext/string/starts-ends-with.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../core-ext/tse/util.js";
 import {
@@ -59,7 +59,6 @@ import {
   deconstantize,
   constantize,
   safeConstantize,
-  _resetConstants,
   foreignKey,
   humanize,
   parameterize,
@@ -1037,13 +1036,13 @@ describe("StringInflectionsTest", () => {
   });
 
   it("constantize", () => {
-    _resetConstants();
+    resetConstants();
     registerConstantizeFixtures();
     runConstantizeTestsOn((string) => constantize(string));
   });
 
   it("safe constantize", () => {
-    _resetConstants();
+    resetConstants();
     registerConstantizeFixtures();
     runSafeConstantizeTestsOn((string) => safeConstantize(string));
   });

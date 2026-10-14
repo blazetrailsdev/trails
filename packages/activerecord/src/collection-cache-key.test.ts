@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -118,7 +118,7 @@ describe("CollectionCacheKeyTest", () => {
   it("cache_key for relation with table alias", async () => {
     const tableAlias = Developer.arelTable.alias("omg_developers");
 
-    let developers = new Relation(Developer, tableAlias);
+    let developers = new Relation(Developer, { table: tableAlias });
     developers = developers.where({ salary: 100000 }).order({ updated_at: "desc" });
     const lastDeveloperTimestamp = ((await developers.first()) as Developer).updated_at as RubyTime;
 
@@ -144,7 +144,7 @@ describe("CollectionCacheKeyTest", () => {
     const developers = Developer.where({ name: "David" });
     const cacheKey = await developers.cacheKey();
 
-    await developers.updateAll({ updated_at: Temporal.Now.instant() });
+    await developers.updateAll({ updated_at: RubyTime.now() });
 
     expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
@@ -153,7 +153,7 @@ describe("CollectionCacheKeyTest", () => {
     const developers = Developer.includes(":projects").where({ "projects.name": "Active Record" });
     const cacheKey = await developers.cacheKey();
 
-    await developers.updateAll({ updated_at: Temporal.Now.instant() });
+    await developers.updateAll({ updated_at: RubyTime.now() });
 
     expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
@@ -307,7 +307,7 @@ describe("CollectionCacheKeyTest", () => {
       expect(await developers.cacheVersion()).toBe(await Developer.all().cacheVersion());
 
       await Developer.updateAll({
-        updated_at: Temporal.Now.instant().add({ seconds: 1 }),
+        updated_at: RubyTime.now().plus(1),
       });
       developers.reset();
 

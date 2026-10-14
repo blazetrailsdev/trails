@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Types, BigIntegerType, IntegerType } from "../index.js";
+import * as Types from "../index.js";
+import { BigIntegerType, IntegerType } from "../index.js";
 
 describe("BigIntegerType", () => {
   it("string with no leading digits casts to 0, following String#to_i", () => {
@@ -7,6 +8,13 @@ describe("BigIntegerType", () => {
     expect(type.cast("bad")).toBe(0);
     expect(type.cast("bad1")).toBe(0);
     expect(new IntegerType().cast("bad")).toBe(0);
+  });
+
+  it("a number past the safe-integer range casts to a bigint, following Float#to_i", () => {
+    const type = new BigIntegerType();
+    expect(type.cast(2 ** 62)).toBe(2n ** 62n);
+    expect(type.cast(-(2 ** 62))).toBe(-(2n ** 62n));
+    expect(type.cast(2 ** 53 - 1)).toBe(2 ** 53 - 1);
   });
 
   it("serialize answers null for a non-numeric string, via Integer#serialize", () => {
@@ -17,14 +25,14 @@ describe("BigIntegerType", () => {
 
 describe("BigIntegerType cast and serialize coverage", () => {
   it("BigInteger small values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
+    const type = Types.Type.lookup("big_integer");
     expect(type.cast("0")).toBe(0);
     expect(type.cast("1")).toBe(1);
     expect(type.cast("-1")).toBe(-1);
   });
 
   it("BigInteger large values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
+    const type = Types.Type.lookup("big_integer");
     const large = "9999999999999999999999";
     expect(type.cast(large)).toBe(BigInt(large));
   });

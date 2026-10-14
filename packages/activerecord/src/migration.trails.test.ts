@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { excBacktraceLocations, NoMethodError, StandardError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Migrator } from "./index.js";
@@ -6,6 +7,8 @@ import type { MigrationProxy } from "./migration.js";
 import { Current, Migration, IllegalMigrationNameError } from "./migration.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import { Base } from "./base.js";
+import { RecordNotUnique } from "./errors.js";
+import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { adapterType, checkoutRawTestAdapter } from "./test-adapter.js";
@@ -13,7 +16,7 @@ import { assertQueriesCount } from "./testing/query-assertions.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Table } from "./connection-adapters/abstract/schema-definitions.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import { migrationStrategy, setMigrationStrategy } from "./active-record.js";
@@ -22,7 +25,7 @@ describe("MigrationTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   it("migrate runs a change-only migration in both directions", async () => {
-    class ChangeOnly extends Migration {
+    class ChangeOnly extends Migration.Current {
       directions: string[] = [];
       override write(): void {}
       async change(): Promise<void> {
@@ -35,8 +38,33 @@ describe("MigrationTest", () => {
     expect(m.directions).toEqual(["up", "down"]);
   });
 
+  it("reversible runs a dir.up / dir.down block in line, before the statements after it", async () => {
+    class InLine extends Migration.Current {
+      ran: string[] = [];
+      override write(): void {}
+      async change(): Promise<void> {
+        await this.reversible(async (dir) => {
+          this.ran.push("before");
+          await dir.up(async () => {
+            this.ran.push("up");
+          });
+          await dir.down(async () => {
+            this.ran.push("down");
+          });
+          this.ran.push("after");
+        });
+      }
+    }
+    const m = new InLine();
+    await m.migrate("up");
+    expect(m.ran).toEqual(["before", "up", "after"]);
+    m.ran = [];
+    await m.migrate("down");
+    expect(m.ran).toEqual(["before", "down", "after"]);
+  });
+
   it("migration.connection checks a connection out when none is leased, as migration_connection does", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       async up() {}
       async down() {}
     }
@@ -53,7 +81,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration.connection makes the threaded lease permanent, as migration_connection does", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       async up() {}
       async down() {}
     }
@@ -71,7 +99,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration.connection returns _connectionOverride when set", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       async up() {}
       async down() {}
     }
@@ -124,6 +152,36 @@ describe("MigrationTest", () => {
     expect(await migrator.currentVersion()).toBe(1);
   });
 
+  it("a failed migration's error carries the rescued exception's backtrace and cause", async () => {
+    const adapter = await Base.leaseConnection();
+    await new SchemaMigration(adapter.pool).dropTable();
+    const failure = new Error("boom");
+    const migrator = new Migrator(
+      "up",
+      [
+        migrationProxy({
+          version: 1,
+          name: "Failing",
+          migration: () =>
+            anonymousMigration("Failing", 1, async () => {
+              throw failure;
+            }),
+        }),
+      ],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+    );
+
+    const error = (await migrator.migrate().catch((e: unknown) => e)) as Error;
+    expect(error).toBeInstanceOf(StandardError);
+    expect(error.message).toContain("all later migrations canceled:\n\nboom");
+    expect(error.cause).toBe(failure);
+    expect(excBacktraceLocations(error)!.map(String)).toEqual(
+      excBacktraceLocations(failure)!.map(String),
+    );
+    expect(error.stack).toContain("migration.trails.test.ts");
+  });
+
   it("columnExists forwards type and columnOptionsKeys to the adapter", async () => {
     const conn = await Base.leaseConnection();
     expect(await conn.columnExists("people", "first_name")).toBe(true);
@@ -143,8 +201,8 @@ describe("MigrationTest", () => {
   it("verbose is shared between the class and its instances", async () => {
     const verboseWas = Migration.verbose;
     try {
-      class Quiet extends Migration {}
-      const instance = new (class extends Migration {})();
+      class Quiet extends Migration.Current {}
+      const instance = new (class extends Migration.Current {})();
 
       Migration.verbose = false;
       expect(instance.verbose).toBe(false);
@@ -166,7 +224,7 @@ describe("MigrationTest", () => {
   it("changeTable yields the adapter's updateTableDefinition result", async () => {
     class AdapterTable extends Table {}
     const seen: unknown[] = [];
-    class M extends Migration {}
+    class M extends Migration.Current {}
     const m = new M();
     const connection = {
       quoteColumnName: (n: string) => n,
@@ -176,19 +234,48 @@ describe("MigrationTest", () => {
         seen.push([tableName, base]);
         return new AdapterTable(tableName, base as never);
       },
-      async changeTable(tableName: string, fn: (t: Table) => void | Promise<void>): Promise<void> {
+      async changeTable(
+        tableName: string,
+        _options: object,
+        fn: (t: Table) => void | Promise<void>,
+      ): Promise<void> {
         await fn(this.updateTableDefinition(tableName, this));
       },
     };
     (m as unknown as { _connectionOverride: unknown })._connectionOverride = connection;
 
     let yielded: unknown;
-    await m.changeTable("people", (t) => {
+    await m.changeTable("people", {}, (t) => {
       yielded = t;
     });
 
     expect(yielded).toBeInstanceOf(AdapterTable);
     expect(seen).toEqual([["people", connection]]);
+  });
+
+  it("migration that fails to load escapes the canceled message", async () => {
+    const adapter = await Base.leaseConnection();
+    const loadError = new Error("uninitialized constant MigThatFailsToLoad");
+    const proxy: MigrationProxy = migrationProxy({
+      version: 102,
+      name: "MigThatFailsToLoad",
+      migration: () => Promise.reject(loadError),
+    });
+    const migrator = new Migrator(
+      "up",
+      [proxy],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+    );
+    let err!: Error;
+    try {
+      await migrator.migrate();
+    } catch (e) {
+      err = e as Error;
+    }
+    expect(err).toBe(loadError);
+    const versions = [...(await migrator.migrated())];
+    expect(versions).not.toContain(102);
   });
 });
 
@@ -210,7 +297,7 @@ describe("Migration#createTable id option type", () => {
   });
 
   describe("execution strategy", () => {
-    class StrategyMigration extends Migration {
+    class StrategyMigration extends Migration.Current {
       override get connection(): DatabaseAdapter {
         return { createTable: () => "hi mom!" } as unknown as DatabaseAdapter;
       }
@@ -244,10 +331,26 @@ describe("Migration#createTable id option type", () => {
       expect(await strategy.respondToMissing("createTable")).toBe(true);
       expect(await strategy.respondToMissing("nopeNotHere")).toBe(false);
       expect(await strategy.methodMissing("createTable")).toBe("hi mom!");
-      await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(TypeError);
+      await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(NoMethodError);
     });
 
-    class RecordingMigration extends Migration {
+    it("sends a class-level call to the nearest delegate", async () => {
+      await expect(StrategyMigration.methodMissing("nopeNotHere")).rejects.toThrow(NoMethodError);
+    });
+
+    it("raises NoMethodError for nil when there is no delegate", () => {
+      const previous = Migration.delegate;
+      Migration.delegate = null;
+      try {
+        const send = () => StrategyMigration.methodMissing("nopeNotHere");
+        expect(send).toThrow(NoMethodError);
+        expect(send).toThrow("undefined method 'nopeNotHere' for nil");
+      } finally {
+        Migration.delegate = previous;
+      }
+    });
+
+    class RecordingMigration extends Migration.Current {
       calls: [string, unknown[]][] = [];
       lines: string[] = [];
       revertable = false;
@@ -375,11 +478,13 @@ describe("Migration#createTable id option type", () => {
         const migration = new RecordingMigration();
         await migration.methodMissing("renameTable", "widgets", "gadgets");
         await migration.methodMissing("removeForeignKey", "widgets", "gadgets");
-        await migration.methodMissing("removeForeignKey", "widgets", { column: "gadget_id" });
+        await migration.removeForeignKey("widgets", undefined, { column: "gadget_id" });
+        await migration.removeForeignKey("widgets", null, { column: "gadget_id" });
         expect(migration.calls).toEqual([
           ["renameTable", ["p_widgets_s", "p_gadgets_s"]],
           ["removeForeignKey", ["p_widgets_s", "p_gadgets_s"]],
-          ["removeForeignKey", ["p_widgets_s", { column: "gadget_id" }]],
+          ["removeForeignKey", ["p_widgets_s", undefined, { column: "gadget_id" }]],
+          ["removeForeignKey", ["p_widgets_s", null, { column: "gadget_id" }]],
         ]);
       });
     });
@@ -440,7 +545,7 @@ describe("Migration#removeColumns forwards to the connection", () => {
         t.integer("col_two");
       });
 
-      const mig = new (class extends Migration {
+      const mig = new (class extends Migration.Current {
         override write(): void {}
       })();
 
@@ -458,19 +563,19 @@ describe("Migration#removeColumns forwards to the connection", () => {
 
   it("run constructs each migration class in order and revert reverses them", async () => {
     const order: string[] = [];
-    class RunOrderA extends Migration {
+    class RunOrderA extends Migration.Current {
       override write(): void {}
       async change(): Promise<void> {
         order.push(`A:${this.isReverting() ? "down" : "up"}`);
       }
     }
-    class RunOrderB extends Migration {
+    class RunOrderB extends Migration.Current {
       override write(): void {}
       async change(): Promise<void> {
         order.push(`B:${this.isReverting() ? "down" : "up"}`);
       }
     }
-    const host = new (class extends Migration {
+    const host = new (class extends Migration.Current {
       override write(): void {}
     })();
 
@@ -500,10 +605,10 @@ describe("Migration#removeColumns forwards to the connection", () => {
       await migration.createTable("testings", (t) => {
         yielded.push(t);
       });
-      await migration.changeTable("testings", (t) => {
+      await migration.changeTable("testings", {}, (t) => {
         yielded.push(t);
       });
-      await migration.changeTable("testings", undefined, (t) => {
+      await migration.changeTable("testings", {}, (t) => {
         yielded.push(t);
       });
       await migration.createTable("more_testings", undefined, (t) => {
@@ -555,5 +660,114 @@ describe("Migration#formatArguments", () => {
       '"posts", {:force=>true}',
     );
     expect(m.formatArguments(["posts", { _skipValidateOptions: true }])).toBe('"posts"');
+  });
+
+  it("say_with_time reports rows for an Integer result only", async () => {
+    class Recording extends Migration.Current {
+      lines: string[] = [];
+      override write(text = ""): void {
+        this.lines.push(text);
+      }
+    }
+    const integer = new Recording();
+    expect(await integer.sayWithTime("work", async () => 3)).toBe(3);
+    expect(integer.lines[0]).toBe("-- work");
+    expect(integer.lines[1]).toMatch(/^ {3}-> \d+\.\d{4}s$/);
+    expect(integer.lines[2]).toBe("   -> 3 rows");
+
+    const float = new Recording();
+    expect(await float.sayWithTime("work", async () => 1.5)).toBe(1.5);
+    expect(float.lines).toHaveLength(2);
+  });
+});
+
+describe("Migration index forwarders", () => {
+  async function withTestings(body: () => Promise<void>): Promise<void> {
+    await (
+      await Base.leaseConnection()
+    ).createTable("testings", { force: true }, (t) => {
+      t.string("foo", { limit: 100 });
+      t.string("bar", { limit: 100 });
+    });
+    try {
+      await body();
+    } finally {
+      await (await Base.leaseConnection()).dropTable("testings", { ifExists: true });
+    }
+  }
+
+  it("removeIndex with ifExists does not raise for a missing index", async () => {
+    await withTestings(async () => {
+      const mig = new (class extends Migration.Current {})();
+      await mig.addIndex("testings", "foo");
+      await mig.removeIndex("testings", "foo");
+
+      await expect(mig.removeIndex("testings", "foo")).rejects.toThrow(ArgumentError);
+
+      await mig.removeIndex("testings", "foo", { ifExists: true });
+    });
+  });
+
+  it("removeIndex by name with ifExists removes the index", async () => {
+    await withTestings(async () => {
+      const mig = new (class extends Migration.Current {})();
+      await mig.addIndex("testings", ["foo"], { name: "foo" });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
+
+      await mig.removeIndex("testings", { name: "foo", ifExists: true });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(false);
+    });
+  });
+
+  it("removeIndex by a column array with ifExists keeps a non-matching index", async () => {
+    await withTestings(async () => {
+      const mig = new (class extends Migration.Current {})();
+      await mig.addIndex("testings", ["foo"], { name: "foo" });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
+
+      await mig.removeIndex("testings", { column: ["foo", "bar"], ifExists: true });
+
+      expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
+      expect(await mig.indexExists("testings", ["foo", "bar"], { name: "foo" })).toBe(false);
+    });
+  });
+});
+
+describeIfPostgresqlAdapter("Migration index forwarders (PostgreSQL)", () => {
+  it("addIndex concurrently leaves an invalid index after a unique violation", async () => {
+    const conn = await Base.leaseConnection();
+    await conn.dropTable("ex", { ifExists: true });
+    await conn.createTable("ex", { force: true }, (t) => {
+      t.integer("number");
+    });
+    try {
+      await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
+      const mig = new (class extends Migration.Current {})();
+
+      let error: unknown;
+      try {
+        await mig.addIndex("ex", "number", {
+          unique: true,
+          algorithm: "concurrently",
+          name: "invalid_index",
+        });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(RecordNotUnique);
+
+      expect(await mig.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
+      expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: true })).toBe(
+        false,
+      );
+      expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: false })).toBe(
+        true,
+      );
+    } finally {
+      await conn.dropTable("ex", { ifExists: true });
+    }
   });
 });

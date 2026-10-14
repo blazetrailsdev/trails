@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { fixtures } from "./test-fixtures.js";
+import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { _touchRow as dirtyTouchRow } from "./attribute-methods/dirty.js";
 
@@ -60,5 +61,33 @@ describe("Dirty restore of an in-place mutation", () => {
     };
     expect(internals._touchAttrNames).toBe(null);
     expect(internals._skipDirtyTracking).toBe(null);
+  });
+
+  it("previous changes includes in place serialized attribute mutation", async () => {
+    const topic = await Topic.createBang({ content: { a: "a" } });
+
+    expect(topic.previousChanges.has("content")).toBe(true);
+
+    (topic.content as Record<string, string>)["b"] = "b";
+
+    expect(topic.isChanged).toBeTruthy();
+
+    await topic.saveBang();
+
+    expect(topic.isChanged).toBeFalsy();
+    expect(topic.previousChanges.has("content")).toBe(true);
+    expect(topic.savedChanges.has("content")).toBe(true);
+    expect(
+      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("a"),
+    ).toBe("a");
+    expect(
+      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("b"),
+    ).toBeUndefined();
+    expect(
+      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("a"),
+    ).toBe("a");
+    expect(
+      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("b"),
+    ).toBe("b");
   });
 });

@@ -11,4 +11,10 @@ describe("OpenSSL::Digest", () => {
       expect(OpenSSL.Digest[algorithm].hexdigest("abc")).toBe(Digest[algorithm].hexdigest("abc"));
     }
   });
+
+  it("OpenSSL::Random.random_bytes answers that many bytes, different each call", () => {
+    const bytes = OpenSSL.Random.randomBytes(16);
+    expect(bytes.length).toBe(16);
+    expect(OpenSSL.Random.randomBytes(16).toString("hex")).not.toBe(bytes.toString("hex"));
+  });
 });

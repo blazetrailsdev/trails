@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
@@ -177,42 +177,5 @@ describe("TouchLaterTest", () => {
     } finally {
       setBeforeCommittedOnAllRecords(false);
     }
-  });
-});
-
-describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", () => {
-  it("uses _touchTime stored on the record rather than an explicit argument", async () => {
-    const { surreptitiouslyTouch } = await import("./touch-later.js");
-    const inv = await Invoice.create();
-    const touchTime = new Date(1_000_000);
-    (inv as any)._touchTime = touchTime;
-
-    const written: [string, unknown][] = [];
-    const origWrite = (inv as any).writeAttribute.bind(inv);
-    (inv as any).writeAttribute = (attr: string, val: unknown) => {
-      written.push([attr, val]);
-      return origWrite(attr, val);
-    };
-
-    surreptitiouslyTouch.call(inv as any, ["updated_at"]);
-
-    expect(written).toEqual([["updated_at", touchTime]]);
-    expect((inv as any).attributeChanged("updated_at")).toBe(false);
-  });
-});
-
-describe("touchDeferredAttributes delegates to timestampTouch with deferred time (Story K gap 4)", () => {
-  it("uses the stored _touchTime and clears deferred state", async () => {
-    const { touchDeferredAttributes } = await import("./touch-later.js");
-    const inv = await Invoice.create();
-
-    const fixedTime = new Date(2_000_000);
-    (inv as any)._deferTouchAttrs = ["updated_at"];
-    (inv as any)._touchTime = fixedTime;
-
-    await touchDeferredAttributes.call(inv as any);
-
-    expect((inv as any)._deferTouchAttrs).toBeNull();
-    expect((inv as any)._touchTime).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import type { Membership } from "./membership.js";
 import type { MemberType } from "./member-type.js";
 import type { Organization } from "./organization.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MemberDetail extends Base {
@@ -24,6 +25,7 @@ export class MemberDetail extends Base {
     });
   }
 }
+registerModel(MemberDetail);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface MemberDetail {
   get member(): Member | null | Promise<Member | null>;

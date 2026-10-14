@@ -1,11 +1,12 @@
 import { Nodes } from "../namespaces.js";
+import { isNil, rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
 export class BindParam extends Node {
   readonly value: unknown;
 
-  constructor(value?: unknown) {
+  constructor(value: unknown) {
     super();
     this.value = value;
   }
@@ -19,9 +20,7 @@ export class BindParam extends Node {
   }
 
   isNil(): boolean {
-    if (this.value === null) return true;
-    const v = this.value as { isNil?: () => boolean } | undefined;
-    return typeof v?.isNil === "function" && v.isNil();
+    return isNil(this.value);
   }
 
   valueBeforeTypeCast(): unknown {
@@ -29,17 +28,17 @@ export class BindParam extends Node {
     return typeof v?.valueBeforeTypeCast === "function" ? v.valueBeforeTypeCast() : this.value;
   }
 
-  isInfinite(): 1 | -1 | false {
-    if (this.value === Infinity) return 1;
-    if (this.value === -Infinity) return -1;
-    const v = this.value as { isInfinite?: () => 1 | -1 | false } | null | undefined;
-    return typeof v?.isInfinite === "function" ? v.isInfinite() : false;
+  isInfinite(): 1 | -1 | null | false {
+    return (
+      rbObjRespondTo(this.value, "isInfinite") &&
+      (rbFSend(this.value, "isInfinite") as 1 | -1 | null)
+    );
   }
 
   isUnboundable(): 1 | -1 | false {
-    const v = this.value as { isUnboundable?: () => 1 | -1 | false } | null | undefined;
-    return typeof v?.isUnboundable === "function" ? v.isUnboundable() : false;
+    const value = this.value as { isUnboundable(): 1 | -1 | false };
+    return rbObjRespondTo(value, "isUnboundable") && value.isUnboundable();
   }
 }
 
-Nodes.BindParam = BindParam;
+rbModConstSet(Nodes, "BindParam", BindParam);

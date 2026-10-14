@@ -6,6 +6,7 @@ import type { PetTreasure } from "./pet-treasure.js";
 import type { Toy } from "./toy.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Pet extends Base {
@@ -24,7 +25,7 @@ export class Pet extends Base {
   static afterDestroyOutput: any;
 
   static {
-    this._primaryKey = "pet_id";
+    this.primaryKey = "pet_id";
     this.attribute("current_user", "string");
     this.belongsTo("owner", { touch: true });
     this.hasMany("toys");
@@ -37,6 +38,7 @@ export class Pet extends Base {
     });
   }
 }
+registerModel(Pet);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pet {
   get owner(): Owner | null | Promise<Owner | null>;
@@ -49,11 +51,12 @@ export class PetTouchHappyAt extends Base {
   declare pet_id: number;
 
   static {
-    this._primaryKey = "pet_id";
+    this.primaryKey = "pet_id";
     this.tableName = "pets";
     this.belongsTo("owner", { touch: "happy_at" });
   }
 }
+registerModel(PetTouchHappyAt);
 
 export class PetCounterCacheTouch extends Base {
   declare name: string;
@@ -61,8 +64,9 @@ export class PetCounterCacheTouch extends Base {
   declare pet_id: number;
 
   static {
-    this._primaryKey = "pet_id";
+    this.primaryKey = "pet_id";
     this.tableName = "pets";
     this.belongsTo("owner", { counterCache: "use_count", touch: true });
   }
 }
+registerModel(PetCounterCacheTouch);

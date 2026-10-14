@@ -181,9 +181,9 @@ describe("UrlForTest", () => {
 
   it("named routes", () => {
     const set = new RouteSet();
-    set.draw((r) => {
-      r.get("this/is/verbose", { to: "home#index", as: "no_args" });
-      r.get("home/sweet/home/:user", { to: "home#index", as: "home" });
+    set.draw(function () {
+      this.get("this/is/verbose", { to: "home#index", as: "no_args" });
+      this.get("home/sweet/home/:user", { to: "home#index", as: "home" });
     });
 
     const kls = class {};
@@ -208,8 +208,8 @@ describe("UrlForTest", () => {
 
   it("relative url root is respected for named routes", () => {
     const set = new RouteSet();
-    set.draw((r) => {
-      r.get("/home/sweet/home/:user", { to: "home#index", as: "home" });
+    set.draw(function () {
+      this.get("/home/sweet/home/:user", { to: "home#index", as: "home" });
     });
 
     const kls = class {};

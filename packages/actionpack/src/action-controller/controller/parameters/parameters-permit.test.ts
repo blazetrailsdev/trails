@@ -1,455 +1,668 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { File, Rational, StringIO, type Tempfile } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, it } from "vitest";
+import {
+  Hash,
+  KeyError,
+  STDOUT,
+  StringIO,
+  block,
+  fetch,
+  last,
+  mergeBang,
+  rbInspect,
+  type Tempfile,
+} from "@blazetrails/ruby-compat";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
-import { BigDecimal, assertNil } from "@blazetrails/activesupport";
+import {
+  BigDecimal,
+  HashWithIndifferentAccess,
+  assert,
+  assertEmpty,
+  assertEqual,
+  assertInstanceOf,
+  assertMatch,
+  assertNil,
+  assertNot,
+  assertNotEqual,
+  assertNotKindOf,
+  assertNotPredicate,
+  assertPredicate,
+  assertRaises,
+  assertSame,
+} from "@blazetrails/activesupport";
 import { UploadedFile } from "../../../action-dispatch/http/upload.js";
-import { Parameters, UnfilteredParameters } from "../../metal/strong-parameters.js";
+import {
+  InvalidParameterKey,
+  ParameterMissing,
+  Parameters,
+  UnfilteredParameters,
+} from "../../metal/strong-parameters.js";
 
 const thisFile = new URL(import.meta.url).pathname;
 
-function permittedScalarValues(): unknown[] {
-  return [
-    "a",
-    "a",
-    null,
-    0,
-    1.0,
-    2n ** 128n,
-    new BigDecimal(1),
-    new Rational(1, 2),
-    true,
-    false,
-    Date.today(),
-    Time.now(),
-    DateTime.now(),
-    File.open(thisFile, "r"),
-    new StringIO(),
-    new UploadedFile({ tempfile: thisFile as unknown as Tempfile }),
-    new RackTestUploadedFile(thisFile),
-  ];
-}
-
-const structFields: string[] = [];
-for (const number of ["0", "1", "12"]) {
-  for (const suffix of ["", "i", "f"]) {
-    structFields.push(`sf(${number}${suffix})`);
-  }
-}
-
 describe("ParametersPermitTest", () => {
-  afterEach(() => {
-    Parameters.actionOnUnpermittedParameters = false;
-    Parameters.permitAllParameters = false;
+  function assertFilteredOut(params: Parameters, key: string) {
+    assertNot(params.hasKey(key), `key ${rbInspect(key)} has not been filtered out`);
+  }
+
+  let params: Parameters;
+  let structFields: string[];
+
+  beforeEach(() => {
+    params = new Parameters({
+      person: {
+        age: "32",
+        name: {
+          first: "David",
+          last: "Heinemeier Hansson",
+        },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+    });
+
+    structFields = [];
+    for (const number of ["0", "1", "12"]) {
+      for (const suffix of ["", "i", "f"]) {
+        structFields.push(`sf(${number}${suffix})`);
+      }
+    }
   });
 
+  function walkPermitted(params: Parameters) {
+    params.each(([_k, v]) => {
+      if (v instanceof Parameters) {
+        walkPermitted(v);
+      } else if (Array.isArray(v)) {
+        v.forEach((_x) => walkPermitted(v as unknown as Parameters));
+      }
+    });
+  }
+
   it("iteration should not impact permit", () => {
-    const params = new Parameters({ name: "John", age: "22" });
-    params.each(() => {});
-    const permitted = params.permit("name");
-    expect(permitted.get("name")).toBe("John");
-    expect(permitted.has("age")).toBe(false);
+    const hash = { foo: { bar: { "0": { baz: "hello", zot: "1" } } } };
+    const params = new Parameters(hash);
+
+    walkPermitted(params);
+
+    const sanitized = (params.get("foo") as Parameters).permit({ bar: ["baz"] });
+    assertEqual({ "0": { baz: "hello" } }, (sanitized.get("bar") as Parameters).toUnsafeH());
   });
 
   it("if nothing is permitted, the hash becomes empty", () => {
-    const params = new Parameters({ name: "John" });
+    const params = new Parameters({ id: "1234" });
     const permitted = params.permit();
-    expect(permitted.keys).toEqual([]);
+    assertPredicate(permitted, (p) => p.isPermitted());
+    assertEmpty(permitted);
   });
 
   it("key: permitted scalar values", () => {
-    for (const value of permittedScalarValues()) {
-      const params = new Parameters({ id: value });
-      const permitted = params.permit("id");
-      expect(permitted.get("id")).toBe(value);
+    let values: unknown[] = ["a", "a", null];
+    values = values.concat([0, 1.0, 2n ** 128n, new BigDecimal(1)]);
+    values = values.concat([true, false]);
+    values = values.concat([Date.today(), Time.now(), DateTime.now()]);
+    values = values.concat([
+      STDOUT,
+      new StringIO(),
+      new UploadedFile({ tempfile: thisFile as unknown as Tempfile }),
+      new RackTestUploadedFile(thisFile),
+    ]);
+
+    for (const value of values) {
+      let params = new Parameters({ id: value });
+      let permitted = params.permit("id");
+      if (value === null) {
+        assertNil(permitted.get("id"));
+      } else {
+        assertEqual(value, permitted.get("id"));
+      }
 
       for (const sf of structFields) {
-        const sfParams = new Parameters({ [sf]: value });
-        const sfPermitted = sfParams.permit("sf");
-        expect(sfPermitted.get(sf)).toBe(value);
+        params = new Parameters({ [sf]: value });
+        permitted = params.permit("sf");
+        if (value === null) {
+          assertNil(permitted.get(sf));
+        } else {
+          assertEqual(value, permitted.get(sf));
+        }
       }
     }
   });
 
   it("key: unknown keys are filtered out", () => {
-    const params = new Parameters({ name: "John", admin: true });
-    const permitted = params.permit("name");
-    expect(permitted.has("admin")).toBe(false);
+    const params = new Parameters({ id: "1234", injected: "injected" });
+    const permitted = params.permit("id");
+    assertEqual("1234", permitted.get("id"));
+    assertFilteredOut(permitted, "injected");
   });
 
   it("key: arrays are filtered out", () => {
-    const params = new Parameters({ name: "John", tags: ["a", "b"] });
-    const permitted = params.permit("name");
-    expect(permitted.has("tags")).toBe(false);
+    for (const array of [[], [1], ["1"]]) {
+      let params = new Parameters({ id: array });
+      let permitted = params.permit("id");
+      assertFilteredOut(permitted, "id");
+
+      for (const sf of structFields) {
+        params = new Parameters({ [sf]: array });
+        permitted = params.permit("sf");
+        assertFilteredOut(permitted, sf);
+      }
+    }
   });
 
   it("key: hashes are filtered out", () => {
-    const params = new Parameters({ name: "John", meta: new Parameters({ x: "1" }) });
-    const permitted = params.permit("name");
-    expect(permitted.has("meta")).toBe(false);
+    for (const hash of [{}, { foo: 1 }, { foo: "bar" }]) {
+      let params = new Parameters({ id: hash });
+      let permitted = params.permit("id");
+      assertFilteredOut(permitted, "id");
+
+      for (const sf of structFields) {
+        params = new Parameters({ [sf]: hash });
+        permitted = params.permit("sf");
+        assertFilteredOut(permitted, sf);
+      }
+    }
   });
 
   it("key: non-permitted scalar values are filtered out", () => {
-    const params = new Parameters({ name: "John", admin: true });
-    const permitted = params.permit("name");
-    expect(permitted.has("admin")).toBe(false);
+    let params = new Parameters({ id: new (class {})() });
+    let permitted = params.permit("id");
+    assertFilteredOut(permitted, "id");
+
+    for (const sf of structFields) {
+      params = new Parameters({ [sf]: new (class {})() });
+      permitted = params.permit("sf");
+      assertFilteredOut(permitted, sf);
+    }
   });
 
   it("key: it is not assigned if not present in params", () => {
-    const params = new Parameters({ name: "John" });
-    const permitted = params.permit("name", "age");
-    expect(permitted.has("age")).toBe(false);
+    const params = new Parameters({ name: "Joe" });
+    const permitted = params.permit("id");
+    assertNot(permitted.hasKey("id"));
   });
 
   it("key to empty array: empty arrays pass", () => {
-    const params = new Parameters({ tags: [] });
-    const permitted = params.permit({ tags: [] });
-    expect(permitted.get("tags")).toEqual([]);
+    const params = new Parameters({ id: [] });
+    const permitted = params.permit({ id: [] });
+    assertEqual([], permitted.get("id"));
   });
 
   it("do not break params filtering on nil values", () => {
-    const params = new Parameters({ name: "John", age: null });
-    const permitted = params.permit("name", "age");
-    expect(permitted.get("name")).toBe("John");
-    assertNil(permitted.get("age"));
+    const params = new Parameters({ a: 1, b: [1, 2, 3], c: null });
+
+    const permitted = params.permit("a", { c: [], b: [] });
+    assertEqual(1, permitted.get("a"));
+    assertEqual([1, 2, 3], permitted.get("b"));
+    assertNil(permitted.get("c"));
   });
 
   it("key to empty array: arrays of permitted scalars pass", () => {
-    const params = new Parameters({ tags: ["ruby", "rails"] });
-    const permitted = params.permit({ tags: [] });
-    expect(permitted.get("tags")).toEqual(["ruby", "rails"]);
+    for (const array of [["foo"], [1], ["foo", "bar"], [1, 2, 3]]) {
+      const params = new Parameters({ id: array });
+      const permitted = params.permit({ id: [] });
+      assertEqual(array, permitted.get("id"));
+    }
   });
 
   it("key to empty array: permitted scalar values do not pass", () => {
-    const params = new Parameters({ tags: "not_an_array" });
-    const permitted = params.permit({ tags: [] });
-    expect(permitted.has("tags")).toBe(false);
+    for (const permittedScalar of ["foo", 1]) {
+      const params = new Parameters({ id: permittedScalar });
+      const permitted = params.permit({ id: [] });
+      assertFilteredOut(permitted, "id");
+    }
   });
 
   it("key to empty array: arrays of non-permitted scalar do not pass", () => {
-    const params = new Parameters({ tags: [{ bad: true }, { also_bad: true }] });
-    const permitted = params.permit({ tags: [] });
-    expect(permitted.has("tags")).toBe(false);
+    for (const nonPermittedScalar of [[new (class {})()], [[]], [[1]], [{}], [{ id: "1" }]]) {
+      const params = new Parameters({ id: nonPermittedScalar });
+      const permitted = params.permit({ id: [] });
+      assertFilteredOut(permitted, "id");
+    }
   });
 
   it("key to empty hash: arbitrary hashes are permitted", () => {
-    const params = new Parameters({ prefs: { theme: "dark" } });
-    const permitted = params.permit({ prefs: {} });
-    const prefs = permitted.get("prefs");
-    const raw = prefs instanceof Parameters ? prefs._toRawHash() : prefs;
-    expect(raw).toEqual({ theme: "dark" });
+    const params = new Parameters({
+      username: "fxn",
+      preferences: {
+        scheme: "Marazul",
+        font: {
+          name: "Source Code Pro",
+          size: 12,
+        },
+        tabstops: [4, 8, 12, 16],
+        suspicious: [true, new (class {})(), false, /yo!/],
+        dubious: [{ a: "a", b: /wtf!/ }, { c: "c" }],
+        injected: new (class {})(),
+        nested: [
+          [1, 2],
+          [3, 4],
+        ],
+      },
+      hacked: 1,
+    });
+
+    const permitted = params.permit("username", { preferences: {}, hacked: {} });
+    const preferences = permitted.get("preferences") as Parameters;
+
+    assertEqual("fxn", permitted.get("username"));
+    assertEqual("Marazul", preferences.get("scheme"));
+    assertEqual("Source Code Pro", (preferences.get("font") as Parameters).get("name"));
+    assertEqual(12, (preferences.get("font") as Parameters).get("size"));
+    assertEqual([4, 8, 12, 16], preferences.get("tabstops"));
+    assertEqual([true, false], preferences.get("suspicious"));
+    assertEqual("a", (preferences.get("dubious") as Parameters[])[0].get("a"));
+    assertEqual("c", (preferences.get("dubious") as Parameters[])[1].get("c"));
+    assertEqual(
+      [
+        [1, 2],
+        [3, 4],
+      ],
+      preferences.get("nested"),
+    );
+
+    assertFilteredOut((preferences.get("dubious") as Parameters[])[0], "b");
+    assertFilteredOut(preferences, "injected");
+    assertFilteredOut(permitted, "hacked");
   });
 
-  it("fetch raises ParameterMissing exception", () => {
-    const params = new Parameters({});
-    expect(() => params.fetch("missing")).toThrow(/key not found/);
+  it("fetch raises ParameterMissing exception", async () => {
+    const e = (await assertRaises([ParameterMissing], {}, () => {
+      params.fetch("foo");
+    })) as ParameterMissing;
+    assertEqual("foo", e.param);
   });
 
   it("fetch with a default value of a hash does not mutate the object", () => {
-    const defaults = { a: "1" };
     const params = new Parameters({});
-    params.fetch("missing", defaults);
-    expect(defaults).toEqual({ a: "1" });
+    params.fetch("foo", {});
+    assertNil(params.get("foo"));
   });
 
   it("hashes in array values get wrapped", () => {
-    const params = new Parameters({ items: [{ name: "a" }, { name: "b" }] });
-    const item = (params.get("items") as unknown[])[0];
-    expect(item).toBeInstanceOf(Parameters);
+    const params = new Parameters({ foo: [{}, {}] });
+    (params.get("foo") as Parameters[]).forEach((hash) => {
+      assertNotPredicate(hash, (h) => h.isPermitted());
+    });
   });
 
   it("arrays are converted at most once", () => {
-    const params = new Parameters({ tags: ["a", "b"] });
-    const first = params.get("tags");
-    const second = params.get("tags");
-    expect(first).toEqual(second);
+    const params = new Parameters({ foo: [{}] });
+    assertSame(params.get("foo"), params.get("foo"));
   });
 
   it("mutated arrays are detected", () => {
-    const params = new Parameters({ tags: ["a", "b"] });
-    const tags = params.get("tags") as string[];
-    tags.push("c");
-    expect(params.get("tags")).toContain("c");
+    const params = new Parameters({ users: [{ id: 1 }] });
+
+    const permitted = params.permit({ users: ["id"] });
+    (permitted.get("users") as unknown[]).push({ injected: 1 });
+    assertNotPredicate(last(permitted.get("users") as Parameters[])!, (p) => p.isPermitted());
   });
 
   it("grow until set rehashes", () => {
-    const params = new Parameters({});
-    for (let i = 0; i < 100; i++) {
-      params.set(`key${i}`, `val${i}`);
+    const params = new Parameters({ users: [{ id: 1 }] });
+
+    const permitted = params.permit({ users: ["id"] });
+    (permitted.get("users") as unknown[]).push({ injected: 1 });
+    for (let i = 0; i < 20; i++) {
+      const list = [`foo${i}`];
+      permitted.set("xx", list);
+      assertEqual(permitted.get("xx"), list);
     }
-    expect(params.get("key50")).toBe("val50");
+    assertNotPredicate(last(permitted.get("users") as Parameters[])!, (p) => p.isPermitted());
   });
 
   it("fetch doesn't raise ParameterMissing exception if there is a default", () => {
-    const params = new Parameters({});
-    expect(params.fetch("missing", "default")).toBe("default");
+    assertEqual("monkey", params.fetch("foo", "monkey"));
+    assertEqual(
+      "monkey",
+      params.fetch(
+        "foo",
+        block(() => "monkey"),
+      ),
+    );
   });
 
   it("fetch doesn't raise ParameterMissing exception if there is a default that is nil", () => {
-    const params = new Parameters({});
-    assertNil(params.fetch("missing", null));
+    assertNil(params.fetch("foo", null));
+    assertNil(
+      params.fetch(
+        "foo",
+        block(() => null),
+      ),
+    );
   });
 
-  it("KeyError in fetch block should not be covered up", () => {
-    const params = new Parameters({});
-    expect(() => params.fetch("missing")).toThrow(/key not found/);
+  it("KeyError in fetch block should not be covered up", async () => {
+    const params = new Parameters();
+    const e = (await assertRaises([KeyError], {}, () => {
+      params.fetch(
+        "missing_key",
+        block(() => fetch({}, "also_missing")),
+      );
+    })) as KeyError;
+    assertMatch(/"also_missing"$/, e.message);
   });
 
   it("not permitted is sticky beyond merges", () => {
-    const params = new Parameters({ a: "1" });
-    const merged = params.merge({ b: "2" });
-    expect(merged.permitted).toBe(false);
+    assertNotPredicate(params.merge({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("permitted is sticky beyond merges", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
-    const merged = params.merge({ b: "2" });
-    expect(merged.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.merge({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("merge with parameters", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ y: "2" });
-    const merged = a.merge(b);
-    expect(merged.get("x")).toBe("1");
-    expect(merged.get("y")).toBe("2");
+    const otherParams = new Parameters({ id: "1234" }).permitBang();
+    const mergedParams = params.merge(otherParams);
+
+    assert(mergedParams.get("id"));
   });
 
   it("not permitted is sticky beyond merge!", () => {
-    const params = new Parameters({ a: "1" });
-    params.mergeBang({ b: "2" });
-    expect(params.permitted).toBe(false);
+    assertNotPredicate(params.mergeBang({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("permitted is sticky beyond merge!", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
-    params.mergeBang({ b: "2" });
-    expect(params.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.mergeBang({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("merge! with parameters", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ y: "2" });
-    a.mergeBang(b);
-    expect(a.get("x")).toBe("1");
-    expect(a.get("y")).toBe("2");
+    const otherParams = new Parameters({ id: "1234" }).permitBang();
+    params.mergeBang(otherParams);
+
+    assertEqual("1234", params.get("id"));
+    assertEqual("32", (params.get("person") as Parameters).get("age"));
   });
 
   it("not permitted is sticky beyond deep merges", () => {
-    const params = new Parameters({ a: "1" });
-    const merged = params.deepMerge({ b: "2" });
-    expect(merged.permitted).toBe(false);
+    assertNotPredicate(params.deepMerge({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("permitted is sticky beyond deep merges", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
-    const merged = params.deepMerge({ b: "2" });
-    expect(merged.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.deepMerge({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("not permitted is sticky beyond deep_merge!", () => {
-    const params = new Parameters({ a: "1" });
-    params.deepMergeBang({ b: "2" });
-    expect(params.permitted).toBe(false);
+    assertNotPredicate(params.deepMergeBang({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("permitted is sticky beyond deep_merge!", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
-    params.deepMergeBang({ b: "2" });
-    expect(params.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.deepMergeBang({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("deep_merge with other Hash", () => {
-    const params = new Parameters({ a: { x: "1" } });
-    const merged = params.deepMerge({ a: { y: "2" } });
-    const a = merged._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    const [first, last] = (params.dig("person", "name") as Parameters).valuesAt("first", "last");
+    const mergedParams = params.deepMerge({ person: { name: { last: "A." } } });
+
+    assertEqual(first, mergedParams.dig("person", "name", "first"));
+    assertNotEqual(last, mergedParams.dig("person", "name", "last"));
+    assertEqual("A.", mergedParams.dig("person", "name", "last"));
   });
 
   it("deep_merge! with other Hash", () => {
-    const params = new Parameters({ a: { x: "1" } });
-    params.deepMergeBang({ a: { y: "2" } });
-    const a = params._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    const [first, last] = (params.dig("person", "name") as Parameters).valuesAt("first", "last");
+    params.deepMergeBang({ person: { name: { last: "A." } } });
+
+    assertEqual(first, params.dig("person", "name", "first"));
+    assertNotEqual(last, params.dig("person", "name", "last"));
+    assertEqual("A.", params.dig("person", "name", "last"));
   });
 
   it("deep_merge with other Parameters", () => {
-    const params = new Parameters({ a: { x: "1" } });
-    const other = new Parameters({ a: { y: "2" } });
-    const merged = params.deepMerge(other);
-    const a = merged._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    const [first, last] = (params.dig("person", "name") as Parameters).valuesAt("first", "last");
+    const otherParams = new Parameters({ person: { name: { last: "A." } } }).permitBang();
+    const mergedParams = params.deepMerge(otherParams);
+
+    assertEqual(first, mergedParams.dig("person", "name", "first"));
+    assertNotEqual(last, mergedParams.dig("person", "name", "last"));
+    assertEqual("A.", mergedParams.dig("person", "name", "last"));
   });
 
   it("deep_merge! with other Parameters", () => {
-    const params = new Parameters({ a: { x: "1" } });
-    const other = new Parameters({ a: { y: "2" } });
-    params.deepMergeBang(other);
-    const a = params._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    const [first, last] = (params.dig("person", "name") as Parameters).valuesAt("first", "last");
+    const otherParams = new Parameters({ person: { name: { last: "A." } } }).permitBang();
+    params.deepMergeBang(otherParams);
+
+    assertEqual(first, params.dig("person", "name", "first"));
+    assertNotEqual(last, params.dig("person", "name", "last"));
+    assertEqual("A.", params.dig("person", "name", "last"));
   });
 
   it("#reverse_merge with parameters", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ x: "2", y: "3" });
-    const result = a.reverseMerge(b);
-    expect(result.get("x")).toBe("1");
-    expect(result.get("y")).toBe("3");
+    const defaultParams = new Parameters({ id: "1234", person: {} }).permitBang();
+    const mergedParams = params.reverseMerge(defaultParams);
+
+    assertEqual("1234", mergedParams.get("id"));
+    assertNotPredicate(mergedParams.get("person") as Parameters, (p) => p.isEmpty());
   });
 
   it("#with_defaults is an alias of reverse_merge", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ x: "2", y: "3" });
-    const r1 = a.reverseMerge(b);
-    const r2 = a.withDefaults(b);
-    expect(r1._toRawHash()).toEqual(r2._toRawHash());
+    const defaultParams = new Parameters({ id: "1234", person: {} }).permitBang();
+    const mergedParams = params.withDefaults(defaultParams);
+
+    assertEqual("1234", mergedParams.get("id"));
+    assertNotPredicate(mergedParams.get("person") as Parameters, (p) => p.isEmpty());
   });
 
   it("not permitted is sticky beyond reverse_merge", () => {
-    const params = new Parameters({ a: "1" });
-    const merged = params.reverseMerge({ b: "2" });
-    expect(merged.permitted).toBe(false);
+    assertNotPredicate(params.reverseMerge({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("permitted is sticky beyond reverse_merge", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
-    const merged = params.reverseMerge({ b: "2" });
-    expect(merged.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.reverseMerge({ a: "b" }), (p) => p.isPermitted());
   });
 
   it("#reverse_merge! with parameters", () => {
-    const a = new Parameters({ x: "1" });
-    a.reverseMergeBang({ x: "2", y: "3" });
-    expect(a.get("x")).toBe("1");
-    expect(a.get("y")).toBe("3");
+    const defaultParams = new Parameters({ id: "1234", person: {} }).permitBang();
+    params.reverseMergeBang(defaultParams);
+
+    assertEqual("1234", params.get("id"));
+    assertNotPredicate(params.get("person") as Parameters, (p) => p.isEmpty());
   });
 
   it("#with_defaults! is an alias of reverse_merge!", () => {
-    const a = new Parameters({ x: "1" });
-    a.withDefaultsBang({ y: "2" });
-    expect(a.get("y")).toBe("2");
+    const defaultParams = new Parameters({ id: "1234", person: {} }).permitBang();
+    params.withDefaultsBang(defaultParams);
+
+    assertEqual("1234", params.get("id"));
+    assertNotPredicate(params.get("person") as Parameters, (p) => p.isEmpty());
   });
 
   it("modifying the parameters", () => {
-    const params = new Parameters({ name: "John" });
-    params.set("name", "Jane");
-    expect(params.get("name")).toBe("Jane");
+    (params.get("person") as Parameters).set("hometown", "Chicago");
+    (params.get("person") as Parameters).set("family", { brother: "Jonas" });
+
+    assertEqual("Chicago", (params.get("person") as Parameters).get("hometown"));
+    assertEqual(
+      "Jonas",
+      ((params.get("person") as Parameters).get("family") as Parameters).get("brother"),
+    );
   });
 
   it("permit! is recursive", () => {
-    const inner = new Parameters({ city: "NYC" });
-    const params = new Parameters({ address: inner });
+    params.set("nested_array", [
+      [
+        { x: 2, y: 3 },
+        { x: 21, y: 42 },
+      ],
+    ]);
     params.permitBang();
-    expect(params.permitted).toBe(true);
-    expect((params.get("address") as Parameters).permitted).toBe(true);
+    const person = params.get("person") as Parameters;
+    const nestedArray = params.get("nested_array") as Parameters[][];
+    assertPredicate(params, (p) => p.isPermitted());
+    assertPredicate(person, (p) => p.isPermitted());
+    assertPredicate(person.get("name") as Parameters, (p) => p.isPermitted());
+    assertPredicate((person.get("addresses") as Parameters[])[0], (p) => p.isPermitted());
+    assertPredicate(nestedArray[0][0], (p) => p.isPermitted());
+    assertPredicate(nestedArray[0][1], (p) => p.isPermitted());
   });
 
   it("permitted takes a default value when Parameters.permit_all_parameters is set", () => {
-    Parameters.permitAllParameters = true;
-    const params = new Parameters({ name: "John" });
-    expect(params.permitted).toBe(true);
+    try {
+      Parameters.permitAllParameters = true;
+      const params = new Parameters({
+        person: {
+          age: "32",
+          name: { first: "David", last: "Heinemeier Hansson" },
+        },
+      });
+
+      assertPredicate(params.slice("person"), (p) => p.isPermitted());
+      assertPredicate((params.get("person") as Parameters).get("name") as Parameters, (p) =>
+        p.isPermitted(),
+      );
+    } finally {
+      Parameters.permitAllParameters = false;
+    }
   });
 
   it("permitting parameters as an array", () => {
-    const params = new Parameters({ name: "John", age: 22 });
-    const permitted = params.permit("name", "age");
-    expect(permitted.get("name")).toBe("John");
-    expect(permitted.get("age")).toBe(22);
+    assertEqual("32", (params.get("person") as Parameters).permit(["age"]).get("age"));
   });
 
-  it("to_h raises UnfilteredParameters on unfiltered params", () => {
-    const params = new Parameters({ name: "John" });
-    expect(() => params.toH()).toThrow(UnfilteredParameters);
+  it("to_h raises UnfilteredParameters on unfiltered params", async () => {
+    await assertRaises([UnfilteredParameters], {}, () => {
+      params.toH();
+    });
   });
 
   it("to_h returns converted hash on permitted params", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
-    expect(params.toH()).toEqual({ name: "John" });
+    params.permitBang();
+
+    assertInstanceOf(HashWithIndifferentAccess, params.toH());
+    assertNotKindOf(Parameters, params.toH());
   });
 
   it("to_h returns converted hash when .permit_all_parameters is set", () => {
-    Parameters.permitAllParameters = true;
-    const params = new Parameters({ name: "John" });
-    expect(params.toH()).toEqual({ name: "John" });
+    try {
+      Parameters.permitAllParameters = true;
+      const params = new Parameters({ crab: "Senjougahara Hitagi" });
+
+      assertInstanceOf(HashWithIndifferentAccess, params.toH());
+      assertNotKindOf(Parameters, params.toH());
+      assertEqual({ crab: "Senjougahara Hitagi" }, params.toH());
+    } finally {
+      Parameters.permitAllParameters = false;
+    }
   });
 
-  it("to_hash raises UnfilteredParameters on unfiltered params", () => {
-    const params = new Parameters({ name: "John" });
-    expect(() => params.toHash()).toThrow(UnfilteredParameters);
+  it("to_hash raises UnfilteredParameters on unfiltered params", async () => {
+    await assertRaises([UnfilteredParameters], {}, () => {
+      params.toHash();
+    });
   });
 
   it("to_hash returns converted hash on permitted params", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
-    expect(params.toHash()).toEqual({ name: "John" });
+    params.permitBang();
+
+    assertInstanceOf(Hash, params.toHash());
+    assertNotKindOf(Parameters, params.toHash());
   });
 
   it("parameters can be implicit converted to Hash", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
-    const hash = params.toHash();
-    expect(typeof hash).toBe("object");
-    expect(hash.name).toBe("John");
+    const params = new Parameters();
+    params.permitBang();
+
+    assertEqual({ a: 1 }, mergeBang({ a: 1 }, params));
   });
 
   it("to_hash returns converted hash when .permit_all_parameters is set", () => {
-    Parameters.permitAllParameters = true;
-    const params = new Parameters({ name: "John" });
-    expect(params.toHash()).toEqual({ name: "John" });
+    try {
+      Parameters.permitAllParameters = true;
+      const params = new Parameters({ crab: "Senjougahara Hitagi" });
+
+      assertInstanceOf(Hash, params.toHash());
+      assertNotKindOf(Parameters, params.toHash());
+      assertEqual({ crab: "Senjougahara Hitagi" }, params.toHash());
+    } finally {
+      Parameters.permitAllParameters = false;
+    }
   });
 
   it("to_unsafe_h returns unfiltered params", () => {
-    const params = new Parameters({ name: "John", admin: true });
-    expect(params.toUnsafeHash()).toEqual({ name: "John", admin: true });
+    assertInstanceOf(HashWithIndifferentAccess, params.toUnsafeH());
+    assertNotKindOf(Parameters, params.toUnsafeH());
   });
 
   it("to_unsafe_h returns unfiltered params even after accessing few keys", () => {
-    const params = new Parameters({ name: "John", admin: true });
-    params.get("name");
-    expect(params.toUnsafeHash()).toEqual({ name: "John", admin: true });
+    const params = new Parameters({ f: { language_facet: ["Tibetan"] } });
+    const expected = { f: { language_facet: ["Tibetan"] } };
+
+    assertInstanceOf(Parameters, params.get("f"));
+    assertEqual(expected, params.toUnsafeH());
   });
 
   it("to_unsafe_h does not mutate the parameters", () => {
-    const params = new Parameters({ name: "John" });
-    const hash = params.toUnsafeHash();
-    hash.name = "Jane";
-    expect(params.get("name")).toBe("John");
+    const params = new Parameters({ f: { language_facet: ["Tibetan"] } });
+    params.get("f");
+
+    params.toUnsafeH();
+
+    assertNotPredicate(params, (p) => p.isPermitted());
+    assertNotPredicate(params.get("f") as Parameters, (p) => p.isPermitted());
   });
 
   it("to_h only deep dups Ruby collections", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
-    const h1 = params.toH();
-    const h2 = params.toH();
-    expect(h1).toEqual(h2);
-    expect(h1).not.toBe(h2);
+    const company = new (class {
+      dupped?: boolean;
+      dup() {
+        return (this.dupped = true);
+      }
+    })();
+
+    let params = new Parameters({ prem: { likes: ["dancing"] } });
+    assertEqual({ prem: { likes: ["dancing"] } }, params.permitBang().toH());
+
+    params = new Parameters({ companies: [company, "acme"] });
+    assertEqual({ companies: [company, "acme"] }, params.permitBang().toH());
+    assertNot(company.dupped);
   });
 
   it("to_unsafe_h only deep dups Ruby collections", () => {
-    const params = new Parameters({ name: "John" });
-    const h1 = params.toUnsafeHash();
-    const h2 = params.toUnsafeHash();
-    expect(h1).toEqual(h2);
-    expect(h1).not.toBe(h2);
+    const company = new (class {
+      dupped?: boolean;
+      dup() {
+        return (this.dupped = true);
+      }
+    })();
+
+    let params = new Parameters({ prem: { likes: ["dancing"] } });
+    assertEqual({ prem: { likes: ["dancing"] } }, params.toUnsafeH());
+
+    params = new Parameters({ companies: [company, "acme"] });
+    assertEqual({ companies: [company, "acme"] }, params.toUnsafeH());
+    assertNot(company.dupped);
   });
 
   it("include? returns true when the key is present", () => {
-    expect(new Parameters({ a: "1" }).include("a")).toBe(true);
+    assert(params.include("person"));
+    assert(params.include("person"));
+    assertNot(params.include("gorilla"));
   });
 
   it("scalar values should be filtered when array or hash is specified", () => {
-    const params = new Parameters({ name: "John", tags: "not_array" });
-    const permitted = params.permit("name");
-    expect(permitted.has("tags")).toBe(false);
+    const params = new Parameters({ foo: "bar" });
+
+    assert(params.permit("foo").hasKey("foo"));
+    assertNot(params.permit({ foo: [] }).hasKey("foo"));
+    assertNot(params.permit({ foo: ["bar"] }).hasKey("foo"));
+    assertNot(params.permit({ foo: "bar" }).hasKey("foo"));
   });
 
   it("#permitted? is false by default", () => {
-    expect(new Parameters({}).permitted).toBe(false);
+    const params = new Parameters();
+
+    assertEqual(false, params.isPermitted());
   });
 
-  it("only String and Symbol keys are allowed", () => {
-    const params = new Parameters({ name: "John" });
-    expect(params.get("name")).toBe("John");
+  it("only String and Symbol keys are allowed", async () => {
+    await assertRaises([InvalidParameterKey], {}, () => {
+      new Parameters(new Hash<unknown, unknown>().set({ foo: 1 }, "bar") as Hash<string, unknown>);
+    });
   });
 });

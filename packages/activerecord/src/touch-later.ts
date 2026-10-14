@@ -2,12 +2,12 @@ import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
+import { Module, union } from "@blazetrails/ruby-compat";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
-import {
-  addToTransaction,
-  beforeCommittedBang as transactionsBeforeCommittedBang,
-} from "./transactions.js";
+import { addToTransaction } from "./transactions.js";
+
+export const TouchLater = new Module();
 
 function raiseRecordNotTouchedError(): never {
   throw new ActiveRecordError(
@@ -22,78 +22,69 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   const ctor = this.constructor as typeof Base;
   const self = this as any;
 
-  if (!self._deferTouchAttrs) {
-    self._deferTouchAttrs = [...self.timestampAttributesForUpdateInModel()];
-  }
-
+  self._deferTouchAttrs ??= self.timestampAttributesForUpdateInModel();
   if (names.length > 0) {
-    const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
-    for (const name of names) {
-      const resolved = aliases[name] ?? name;
-      if (!self._deferTouchAttrs.includes(resolved)) self._deferTouchAttrs.push(resolved);
-    }
+    self._deferTouchAttrs = [
+      ...new Set([
+        ...self._deferTouchAttrs,
+        ...names.map((name) => {
+          name = String(name);
+          return ctor.attributeAliases[name] ?? name;
+        }),
+      ]),
+    ];
   }
 
-  self._touchTime = self.currentTimeFromProperTimezone();
-  surreptitiouslyTouch.call(this, self._deferTouchAttrs as string[]);
+  self._touchTime = await self.currentTimeFromProperTimezone();
+  surreptitiouslyTouch.call(this, self._deferTouchAttrs);
 
   await addToTransaction.call(this);
   self._newRecordBeforeLastCommit ||= false;
 
   for (const r of ctor.reflectOnAllAssociations()) {
-    const touch = r.options?.touch;
-    if (!touch) continue;
-    if (r.macro === "belongsTo") {
-      await BelongsToBuilder.touchRecord(
-        this,
-        (this as any).changesToSave,
-        r.foreignKey() ?? r.options?.foreignKey,
-        r.name,
-        touch,
-      );
-    } else if (r.macro === "hasOne") {
-      await HasOneBuilder.touchRecord(this, r.name, touch);
+    const touch = r.options.touch;
+    if (touch != null && touch !== false) {
+      if (r.macro === "belongsTo") {
+        await BelongsToBuilder.touchRecord(
+          this,
+          (this as any).changesToSave,
+          r.foreignKey(),
+          r.name,
+          touch,
+        );
+      } else if (r.macro === "hasOne") {
+        await HasOneBuilder.touchRecord(this, r.name, touch);
+      }
     }
   }
 }
 
-export async function touch(
-  this: Base,
-  args: TouchArgs,
-  superFn: (args: TouchArgs) => Promise<boolean>,
-): Promise<boolean> {
+export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   const self = this as any;
   if (hasDeferTouchAttrs(this)) {
-    const names = args.slice() as unknown[];
-    const { time = null } = extractOptionsBang(names) as TouchOptions;
-    const merged: string[] = [
-      ...new Set([...(names as string[]), ...(self._deferTouchAttrs as string[])]),
-    ];
-    const result = await superFn([...merged, { time }] as TouchArgs);
+    const { time = null } = extractOptionsBang(names as unknown[]) as TouchOptions;
+    names = union(names as string[], self._deferTouchAttrs as string[]);
+    const result = await TouchLater.superMethod(this, "touch")!(...names, { time });
     self._deferTouchAttrs = null;
     self._touchTime = null;
-    return result;
+    return result as boolean;
+  } else {
+    return TouchLater.superMethod(this, "touch")!(...names) as Promise<boolean>;
   }
-  return superFn(args);
 }
 
 export async function beforeCommittedBang(this: Base): Promise<void> {
   if (hasDeferTouchAttrs(this) && this.isPersisted()) {
     await touchDeferredAttributes.call(this);
   }
-  await transactionsBeforeCommittedBang(this);
+  await TouchLater.superMethod(this, "beforeCommittedBang")!();
 }
 
 /** @internal */
-export function surreptitiouslyTouch(this: Base, attrNames: string[]): void {
-  const time = (this as any)._touchTime;
+export function surreptitiouslyTouch(this: Base, attrNames: readonly string[]): void {
   for (const attrName of attrNames) {
-    (this as any).writeAttribute(attrName, time);
-    if (typeof (this as any).clearAttributeChange === "function") {
-      (this as any).clearAttributeChange(attrName);
-    } else if (typeof (this as any).clearAttributeChanges === "function") {
-      (this as any).clearAttributeChanges([attrName]);
-    }
+    this._writeAttribute(attrName, (this as any)._touchTime);
+    this.clearAttributeChange(attrName);
   }
 }
 
@@ -104,16 +95,9 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
   await self.touch({ time: self._touchTime });
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
-  touchLater,
-  touch,
-  beforeCommittedBang,
-};
-
 /** @internal */
-export function initInternals(this: any, super_: () => void): void {
-  super_();
+export function initInternals(this: any): void {
+  TouchLater.superMethod(this, "initInternals")!();
   this._deferTouchAttrs = null;
   this._touchTime = null;
 }
@@ -123,3 +107,8 @@ export function hasDeferTouchAttrs(record: any): boolean {
   const attrs = record._deferTouchAttrs;
   return Array.isArray(attrs) && attrs.length > 0;
 }
+
+TouchLater.defineMethod("beforeCommittedBang", beforeCommittedBang);
+TouchLater.defineMethod("touchLater", touchLater);
+TouchLater.defineMethod("touch", touch);
+TouchLater.defineMethod("initInternals", initInternals);

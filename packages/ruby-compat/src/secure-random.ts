@@ -1,6 +1,7 @@
 import { getCrypto } from "./crypto-adapter.js";
 import type { Bytes } from "./fs-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { strDelete, trTrans } from "./string/tr.js";
 
 /**
  * `SecureRandom` (`vendor/ruby/v3.3.11/lib/securerandom.rb:41`), extended with
@@ -53,6 +54,14 @@ export const SecureRandom = {
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:93 */
   hex(n: number | null = null): string {
     return SecureRandom.randomBytes(n).toString("hex");
+  },
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:146 */
+  urlsafeBase64(n: number | null = null, padding = false): string {
+    let s = SecureRandom.randomBytes(n).toString("base64");
+    s = trTrans(s, "+/", "-_", false);
+    if (!padding) s = strDelete(s, ["="]);
+    return s;
   },
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:170 */

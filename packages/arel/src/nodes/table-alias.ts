@@ -1,23 +1,21 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
 import { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 interface TypeCastable {
   name?: string;
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
-  typeForAttribute(name: string | Node | null): unknown;
+  typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown;
+  typeForAttribute(name: string | ArelNode | null): unknown;
   isAbleToTypeCast?: () => boolean;
 }
 
 export class TableAlias extends Binary {
-  constructor(relation: Node | Table, name: string | SqlLiteral) {
-    super(relation, name);
-  }
-
   get name(): string | SqlLiteral {
     return this.right as string | SqlLiteral;
   }
@@ -38,22 +36,28 @@ export class TableAlias extends Binary {
     return this.name;
   }
 
+  get(name: string): Attribute {
+    return this.relation instanceof Table
+      ? this.relation.get(name, this)
+      : new Attribute(this, name);
+  }
+
   get tableName(): string {
     const rel = this.relation as unknown as TypeCastable;
     return typeof rel?.name === "string" ? rel.name : this.nameString;
   }
 
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
+  typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown {
     return (this.relation as unknown as TypeCastable).typeCastForDatabase(attrName, value);
   }
 
-  typeForAttribute(name: string | Node | null): unknown {
+  typeForAttribute(name: string | ArelNode | null): unknown {
     return (this.relation as unknown as TypeCastable).typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {
-    const rel = this.relation as unknown as TypeCastable;
-    return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
+    const relation = this.relation as unknown as Required<TypeCastable>;
+    return rbObjRespondTo(relation, "isAbleToTypeCast") && relation.isAbleToTypeCast();
   }
 
   toCte(): Cte {
@@ -61,14 +65,8 @@ export class TableAlias extends Binary {
   }
 
   private get nameString(): string {
-    return this.name instanceof SqlLiteral ? this.name.value : this.name;
-  }
-
-  get(name: string): Attribute {
-    return this.relation instanceof Table
-      ? this.relation.get(name, this)
-      : new Attribute(this, name);
+    return this.name instanceof SqlLiteral ? this.name.toString() : this.name;
   }
 }
 
-Nodes.TableAlias = TableAlias;
+rbModConstSet(Nodes, "TableAlias", TableAlias);

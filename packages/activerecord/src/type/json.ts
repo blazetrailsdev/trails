@@ -1,5 +1,6 @@
-import { MutableModule, ValueType, type Mutable } from "@blazetrails/activemodel";
-import { include, registerConstant } from "@blazetrails/activesupport";
+import { Mutable, ValueType } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { StringKeyedHashAccessor } from "../store.js";
 
@@ -56,6 +57,6 @@ export class Json extends ValueType<unknown> {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge carries `include ActiveModel::Type::Helpers::Mutable`'s members onto the class; it declares none of its own.
 export interface Json extends Mutable {}
 
-include(Json, MutableModule);
+include(Json, Mutable);
 
 registerConstant("ActiveRecord::Type::Json", Json);

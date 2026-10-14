@@ -9,7 +9,7 @@ import {
 } from "./test-helpers.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import { Decryption } from "./errors.js";
 
 describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast type", () => {
@@ -153,7 +153,7 @@ describe("EncryptedAttributeType#supportUnencryptedData — global config conjun
   });
 
   it("is true when both the global config and the scheme allow it", () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     const type = new EncryptedAttributeType({
       scheme: new Scheme({ supportUnencryptedData: true }),
     });
@@ -163,7 +163,7 @@ describe("EncryptedAttributeType#supportUnencryptedData — global config conjun
   });
 
   it("is false for a previous type even when everything else allows it", () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     const type = new EncryptedAttributeType({
       scheme: new Scheme({ supportUnencryptedData: true }),
       previousType: true,

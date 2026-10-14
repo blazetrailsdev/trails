@@ -4,9 +4,8 @@ import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test
 import { Base } from "../../base.js";
 import { RangeError as ActiveRecordRangeError } from "../../errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { deprecator } from "../../deprecator.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
@@ -60,7 +59,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema definition can use unsigned as the type", async () => {
-      await adapter.changeTable("unsigned_types", async (t: any) => {
+      await adapter.changeTable("unsigned_types", {}, async (t: any) => {
         await t.unsignedInteger("unsigned_integer_t");
         await t.unsignedBigint("unsigned_bigint_t");
       });
@@ -73,7 +72,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("deprecate unsigned_float and unsigned_decimal", async () => {
-      await adapter.changeTable("unsigned_types", async (t: any) => {
+      await adapter.changeTable("unsigned_types", {}, async (t: any) => {
         await assertDeprecated(deprecator(), async () => {
           await t.unsignedFloat("unsigned_float_t");
         });
@@ -84,7 +83,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dump includes unsigned option", async () => {
-      const schema = await dumpTableSchema(adapter as unknown as SchemaSource, "unsigned_types");
+      const schema = await dumpTableSchema("unsigned_types");
       expect(schema).toMatch(/t\.integer\("unsigned_integer", \{ unsigned: true \}\)/);
       expect(schema).toMatch(/t\.bigint\("unsigned_bigint", \{ unsigned: true \}\)/);
       expect(schema).toMatch(/t\.float\("unsigned_float", \{ unsigned: true \}\)/);

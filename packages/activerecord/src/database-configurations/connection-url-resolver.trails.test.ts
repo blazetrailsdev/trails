@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
 import { InheritableOptions } from "@blazetrails/activesupport";
+import { InvalidURIError } from "@blazetrails/ruby-compat";
 import { protocolAdapters, setProtocolAdapters } from "../active-record.js";
 
 describe("ConnectionUrlResolver", () => {
@@ -56,7 +57,7 @@ describe("ConnectionUrlResolver", () => {
       "postgres://localhost/db?pool=5&reaping_frequency=2",
     ).toHash();
     expect(hash.pool).toBe("5");
-    expect(hash.reaping_frequency).toBe("2");
+    expect(hash.reapingFrequency).toBe("2");
   });
 
   it("parses query parameters on opaque URIs", () => {
@@ -85,9 +86,9 @@ describe("ConnectionUrlResolver", () => {
     expect(() => new ConnectionUrlResolver("")).toThrow(/empty/);
   });
 
-  it("redacts credentials from error messages", () => {
+  it("raises what URI::RFC2396_Parser#parse raises for a malformed URL", () => {
     expect(() => new ConnectionUrlResolver("postgres://user:secret@[invalid]:99/db")).toThrow(
-      /\*\*\*@/,
+      InvalidURIError,
     );
   });
 

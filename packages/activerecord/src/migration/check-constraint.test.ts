@@ -6,12 +6,11 @@ import { NotImplementedError, StatementInvalid } from "../errors.js";
 import type { CheckConstraintDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import type { ValidateConstraintStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { ambientConnection } from "../support/rocket-tables.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
 import { adapterType } from "../test-adapter.js";
 import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;
@@ -113,7 +112,7 @@ describe("Migration", () => {
             'json_schema_valid(_utf8mb4\' { "oneOf": [ { "type": "null" }, { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 0 } } ] }\',`options`)',
           );
         } finally {
-          await connection.removeCheckConstraint("constraint_test", {
+          await connection.removeCheckConstraint("constraint_test", undefined, {
             name: "non_empty_test_array",
             ifExists: true,
           });
@@ -133,7 +132,9 @@ describe("Migration", () => {
           )!;
           expect(constraint.expression).toContain("WHEN price IS NOT NULL");
         } finally {
-          await connection.removeCheckConstraint("trades", { name: "price_is_required" });
+          await connection.removeCheckConstraint("trades", undefined, {
+            name: "price_is_required",
+          });
         }
       }
     });
@@ -314,7 +315,7 @@ describe("Migration", () => {
         validate: false,
       });
 
-      const output = await dumpTableSchema(connection as unknown as SchemaSource, "trades");
+      const output = await dumpTableSchema("trades");
 
       expect(output).toMatch(
         /\s+await ctx\.addCheckConstraint\("trades", "quantity > 0", \{ name: "quantity_check", validate: false \}\);$/m,
@@ -328,7 +329,7 @@ describe("Migration", () => {
         validate: true,
       });
 
-      const output = await dumpTableSchema(connection as unknown as SchemaSource, "trades");
+      const output = await dumpTableSchema("trades");
 
       expect(output).toMatch(
         /\s+t\.checkConstraint\("quantity > 0", \{ name: "quantity_check" \}\);$/m,
@@ -392,7 +393,7 @@ describe("Migration", () => {
       await connection.addCheckConstraint("trades", "quantity > 0", { name: "quantity_check" });
 
       expect((await connection.checkConstraints("trades")).length).toBe(2);
-      await connection.removeCheckConstraint("trades", { name: "quantity_check" });
+      await connection.removeCheckConstraint("trades", undefined, { name: "quantity_check" });
       expect((await connection.checkConstraints("trades")).length).toBe(1);
 
       const constraint = (await connection.checkConstraints("trades"))[0];
@@ -401,7 +402,7 @@ describe("Migration", () => {
 
       verifyPriceExpression(constraint);
 
-      await connection.removeCheckConstraint("trades", { name: "price_check" });
+      await connection.removeCheckConstraint("trades", undefined, { name: "price_check" });
       assertEmpty(await connection.checkConstraints("trades"));
     });
 
@@ -410,15 +411,20 @@ describe("Migration", () => {
       await connection.addCheckConstraint("trades", "quantity > 0", { name: "quantity_check" });
 
       await assertNothingRaised(() =>
-        connection.removeCheckConstraint("trades", { name: "quantity_check", ifExists: true }),
+        connection.removeCheckConstraint("trades", undefined, {
+          name: "quantity_check",
+          ifExists: true,
+        }),
       );
 
       let error: Error | undefined;
       await expect(
-        connection.removeCheckConstraint("trades", { name: "quantity_check" }).catch((e: Error) => {
-          error = e;
-          throw e;
-        }),
+        connection
+          .removeCheckConstraint("trades", undefined, { name: "quantity_check" })
+          .catch((e: Error) => {
+            error = e;
+            throw e;
+          }),
       ).rejects.toThrow(ArgumentError);
 
       expect(error?.message).toBe(
@@ -426,20 +432,23 @@ describe("Migration", () => {
       );
 
       await assertNothingRaised(() =>
-        connection.removeCheckConstraint("trades", { name: "quantity_check", ifExists: true }),
+        connection.removeCheckConstraint("trades", undefined, {
+          name: "quantity_check",
+          ifExists: true,
+        }),
       );
     });
 
     it("remove non existing check constraint", async () => {
       const connection = await ambientConnection();
       await expect(
-        connection.removeCheckConstraint("trades", { name: "nonexistent" }),
+        connection.removeCheckConstraint("trades", undefined, { name: "nonexistent" }),
       ).rejects.toThrow(ArgumentError);
     });
 
     it("add constraint from change table with options", async () => {
       const connection = await ambientConnection();
-      await connection.changeTable("trades", async (t) => {
+      await connection.changeTable("trades", {}, async (t) => {
         await t.checkConstraint("price > 0", { name: "price_check" });
       });
 
@@ -452,7 +461,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.addCheckConstraint("trades", "price > 0", { name: "price_check" });
 
-      await connection.changeTable("trades", async (t) => {
+      await connection.changeTable("trades", {}, async (t) => {
         await t.removeCheckConstraint("price > 0", { name: "price_check" });
       });
 
@@ -473,7 +482,7 @@ describe("Migration", () => {
     it("remove check constraint should be noop", async () => {
       const connection = await ambientConnection();
       await assertNothingRaised(() =>
-        connection.removeCheckConstraint("products", { name: "price_check" }),
+        connection.removeCheckConstraint("products", undefined, { name: "price_check" }),
       );
     });
 

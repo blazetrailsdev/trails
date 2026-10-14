@@ -1,4 +1,5 @@
-import { NameError, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { NameError } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { afterAll, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { ConfigurationError } from "./errors.js";
@@ -6,28 +7,28 @@ import { ConfigurationError } from "./errors.js";
 class UndefinedConstantAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob("UndefinedConstantJob");
+    this.destroyAssociationAsyncJob = "UndefinedConstantJob";
   }
 }
 
 class UnusedBelongsToAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob(null);
+    this.destroyAssociationAsyncJob = null;
   }
 }
 
 class UnusedHasOneAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob(null);
+    this.destroyAssociationAsyncJob = null;
   }
 }
 
 class UnusedHasManyAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob(null);
+    this.destroyAssociationAsyncJob = null;
   }
 }
 
@@ -36,7 +37,7 @@ class ResolvableJob {}
 class ResolvableJobAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob("ResolvableJob");
+    this.destroyAssociationAsyncJob = "ResolvableJob";
   }
 }
 
@@ -66,7 +67,7 @@ describe("DestroyAssociationAsyncJobTest", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(ConfigurationError);
-    expect((error as Error).message).toMatch(/destroyAssociationAsyncJob/);
+    expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("has_one dependent destroy_async requires destroy_association_async_job", () => {
@@ -77,7 +78,7 @@ describe("DestroyAssociationAsyncJobTest", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(ConfigurationError);
-    expect((error as Error).message).toMatch(/destroyAssociationAsyncJob/);
+    expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("has_many dependent destroy_async requires destroy_association_async_job", () => {
@@ -88,12 +89,12 @@ describe("DestroyAssociationAsyncJobTest", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(ConfigurationError);
-    expect((error as Error).message).toMatch(/destroyAssociationAsyncJob/);
+    expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("resolves a job configured by name and caches the class", () => {
     registerConstant("ResolvableJob", ResolvableJob);
-    expect(ResolvableJobAsync.destroyAssociationAsyncJob()).toBe(ResolvableJob);
+    expect(ResolvableJobAsync.destroyAssociationAsyncJob).toBe(ResolvableJob);
     expect(ResolvableJobAsync._destroyAssociationAsyncJob).toBe(ResolvableJob);
     expect(() =>
       ResolvableJobAsync.hasMany("essayDestroyAsyncs", { dependent: "destroyAsync" }),

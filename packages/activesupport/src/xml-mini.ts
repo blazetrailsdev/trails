@@ -120,7 +120,7 @@ export const PARSING: Record<
   string: (string) => toS(string),
   yaml: async (yaml) => {
     try {
-      const { parse: parseYaml } = await import("./yaml.js");
+      const { parse: parseYaml } = await import("@blazetrails/ruby-compat/psych-adapter");
       if (typeof yaml !== "string") {
         // eslint-disable-next-line blazetrails/rails-error-parity
         throw new TypeError("no implicit conversion into String");

@@ -1,4 +1,4 @@
-import { Process, rbObjRespondTo, SecureRandom } from "@blazetrails/ruby-compat";
+import { Process, rbObjRespondTo, SecureRandom, throwDataP } from "@blazetrails/ruby-compat";
 
 export type EventPayload = Record<string, unknown>;
 
@@ -127,6 +127,7 @@ function _classNameOf(e: unknown): string {
 }
 
 function _recordException(payload: EventPayload, e: unknown): void {
+  if (throwDataP(e)) return;
   payload.exception = [_classNameOf(e), e instanceof Error ? e.message : String(e)];
   payload.exception_object = e;
 }

@@ -16,6 +16,7 @@ import {
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
+import { merge } from "@blazetrails/ruby-compat";
 
 export interface SchemaCreationConn extends SchemaQuoter {
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
@@ -42,14 +43,11 @@ export class SchemaCreation {
 
   constructor(protected conn: SchemaCreationConn) {}
 
-  /** @missingRailsCall split — PERMANENT */
   async accept(o: object): Promise<string> {
     const klass = o.constructor as abstract new (...args: never[]) => object;
-    let m = this.cache.get(klass);
-    if (m === undefined) {
-      m = `visit${klass.name}`;
-      this.cache.set(klass, m);
-    }
+    const m =
+      this.cache.get(klass) ||
+      this.cache.set(klass, `visit${klass.name.split("::").at(-1)}`).get(klass)!;
     return (this as unknown as Record<string, (o: object) => Promise<string> | string>)[m](o);
   }
 
@@ -133,7 +131,7 @@ export class SchemaCreation {
     return this.conn.supportsNullsNotDistinct();
   }
 
-  /** @missingRailsCall order:accept,map — PERMANENT */
+  /** @missingRailsCall order:accept,map — CONVERGEABLE schema-creation-visit-alter-table-maps-through-an-awaiting-map */
   protected async visitAlterTable(o: AlterTable): Promise<string> {
     let sql = `ALTER TABLE ${this.conn.quoteTableName(o.name)} `;
 
@@ -208,7 +206,19 @@ export class SchemaCreation {
       }
     }
 
-    statements.push(...(await this.tableConstraintStatements(o)));
+    if (this.supportsExclusionConstraints()) {
+      for (const exc of (o as TableDefinition & { exclusionConstraints: object[] })
+        .exclusionConstraints) {
+        statements.push(await this.accept(exc));
+      }
+    }
+
+    if (this.supportsUniqueConstraints()) {
+      for (const exc of (o as TableDefinition & { uniqueConstraints: object[] })
+        .uniqueConstraints) {
+        statements.push(await this.accept(exc));
+      }
+    }
 
     if (statements.length > 0) createSql += ` (${statements.join(", ")})`;
     createSql = this.addTableOptionsBang(createSql, o);
@@ -308,29 +318,26 @@ export class SchemaCreation {
     return createSql;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
-    return { ...o.options, column: o };
+    return merge(o.options, { column: o });
   }
 
   /** @internal */
-  protected async addColumnOptionsBang(sql: string, options: ColumnOptions): Promise<string> {
+  protected async addColumnOptionsBang(
+    sql: string,
+    options: ColumnOptions & { column?: unknown },
+  ): Promise<string> {
     if (this.optionsIncludeDefault(options)) {
-      sql += ` DEFAULT ${await this.conn.quoteDefaultExpression(
-        options.default,
-        (options as Record<string, unknown>)["column"],
-      )}`;
+      sql += ` DEFAULT ${await this.conn.quoteDefaultExpression(options.default, options.column)}`;
     }
     if (options.null === false) {
       sql += " NOT NULL";
     }
-    if (options.autoIncrement) {
+    if (options.autoIncrement === true) {
       sql += " AUTO_INCREMENT";
     }
-    if (options.primaryKey) {
+    if (options.primaryKey === true) {
       sql += " PRIMARY KEY";
     }
     return sql;
@@ -362,10 +369,5 @@ export class SchemaCreation {
             `Supported values are: :nullify, :cascade, :restrict\n`,
         );
     }
-  }
-
-  /** @internal */
-  protected async tableConstraintStatements(_o: TableDefinition): Promise<string[]> {
-    return [];
   }
 }

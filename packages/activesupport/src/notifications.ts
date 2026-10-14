@@ -142,7 +142,7 @@ export class Notifications {
     return sub as unknown as NotificationSubscriber;
   }
 
-  static unsubscribe(subscriberOrName: NotificationSubscriber | string): void {
+  static unsubscribe(subscriberOrName: NotificationSubscriber | string | null): void {
     this.notifier.unsubscribe(subscriberOrName as unknown as FanoutSubscriber);
   }
 

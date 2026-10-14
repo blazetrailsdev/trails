@@ -5,13 +5,20 @@ import {
   humanize,
   tableize,
   demodulize,
-  safeConstantize,
   isBlank,
   include,
   ToJsonWithActiveSupportEncoder,
   extended,
+  moduleParents,
   type Included,
 } from "@blazetrails/activesupport";
+import {
+  rbModName,
+  rbObjNotMatch,
+  rbObjRespondTo,
+  rbStrMatch,
+  rbStrSend,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
 export interface Naming {
@@ -20,21 +27,14 @@ export interface Naming {
 
 function modelName(this: NamingHost): ModelName {
   if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-    let namespace: { name: string } | null = null;
-    const segments = (this.moduleName ?? "").split("::").filter((segment) => segment !== "");
-    while (segments.length > 0) {
-      const n = safeConstantize(segments.join("::")) as
-        | { name: string; useRelativeModelNaming?: () => unknown }
-        | null
-        | undefined;
-      const relative = n?.useRelativeModelNaming?.();
-      if (relative != null && relative !== false) {
-        namespace = n!;
-        break;
-      }
-      segments.pop();
-    }
-    this._modelName = new ModelName(this as unknown as ModelLike, namespace);
+    const namespace = moduleParents(this).find((n) => {
+      if (!rbObjRespondTo(n, "isUseRelativeModelNaming")) return false;
+      const relative = (
+        n as { isUseRelativeModelNaming: () => unknown }
+      ).isUseRelativeModelNaming();
+      return relative != null && relative !== false;
+    });
+    this._modelName = new ModelName(this as unknown as ModelLike, namespace ?? null);
   }
   return this._modelName;
 }
@@ -50,7 +50,6 @@ function namingExtended(base: NamingHost): void {
 
 interface NamingHost {
   prototype: object;
-  moduleName?: string;
   _modelName?: ModelName | null;
 }
 
@@ -102,13 +101,8 @@ import type { TranslateOptions } from "@blazetrails/i18n";
 /** @internal */
 const MISSING_TRANSLATION = -(2 ** 60);
 
-interface ModulePath {
-  readonly moduleName?: string;
-}
-
 export interface ModelLike {
   readonly name: string;
-  readonly _demodulizedName?: string;
   i18nScope?: string;
   lookupAncestors?: () => Array<ModelLike & { modelName: ModelName }>;
   modelName?: ModelName;
@@ -133,7 +127,7 @@ export class ModelName {
   isUncountable: boolean;
 
   private _human: string;
-  private _klass: ModelLike | null;
+  private _klass: ModelLike;
   private _unnamespaced?: string;
 
   get cacheKey(): string {
@@ -153,6 +147,14 @@ export class ModelName {
     const name = other instanceof ModelName ? other.name : other;
     if (typeof name !== "string") return undefined;
     return this.name === name ? 0 : this.name < name ? -1 : 1;
+  }
+
+  matchOperator(pattern: unknown): unknown {
+    return rbStrMatch(this.name, pattern);
+  }
+
+  notMatchOperator(pattern: unknown): boolean {
+    return rbObjNotMatch(this.name, pattern);
   }
 
   eql(other: unknown): boolean {
@@ -176,29 +178,17 @@ export class ModelName {
     return this.name;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.toPrimitive](_hint: string): string {
-    return this.name;
-  }
-
   asJson(_options?: unknown): string {
     return this.name;
   }
 
   constructor(
-    klass: ModelLike | string,
-    namespace: { name: string } | null = null,
+    klass: ModelLike,
+    namespace: object | null = null,
     name: string | null = null,
     locale = "en",
   ) {
-    const constant = typeof klass === "string" ? null : (klass as ModelLike & ModulePath);
-    this.name =
-      name ??
-      (constant === null
-        ? (klass as string)
-        : constant.moduleName
-          ? `${constant.moduleName}::${constant._demodulizedName ?? constant.name}`
-          : (constant._demodulizedName ?? constant.name));
+    this.name = (name ?? rbModName(klass)) as string;
 
     if (isBlank(this.name))
       throw new ArgumentError(
@@ -206,12 +196,13 @@ export class ModelName {
       );
 
     if (namespace) {
-      const prefix = `${namespace.name}::`;
-      this._unnamespaced = this.name.startsWith(prefix)
-        ? this.name.slice(prefix.length)
-        : this.name;
+      this._unnamespaced = rbStrSend(
+        this.name,
+        "deletePrefix",
+        `${rbModName(namespace)}::`,
+      )[0] as string;
     }
-    this._klass = constant;
+    this._klass = klass;
     this.singular = this._singularize(this.name);
     this.plural = pluralize(this.singular, locale);
     this.isUncountable = this.plural === this.singular;
@@ -253,18 +244,15 @@ export class ModelName {
 
   /** @internal */
   i18nKeys(): string[] {
-    if (this._cachedI18nKeys) return this._cachedI18nKeys;
-    const keys =
-      typeof this._klass?.lookupAncestors === "function"
-        ? this._klass.lookupAncestors().map((k) => k.modelName.i18nKey)
-        : [];
-    this._cachedI18nKeys = keys;
-    return keys;
+    return (this._cachedI18nKeys ||=
+      typeof this._klass.lookupAncestors === "function"
+        ? this._klass.lookupAncestors().map((klass) => klass.modelName.i18nKey)
+        : []);
   }
 
   /** @internal */
   private i18nScope(): string[] {
-    const klassScope = this._klass?.i18nScope;
+    const klassScope = this._klass.i18nScope;
     return typeof klassScope === "string" ? [klassScope, "models"] : [];
   }
 
@@ -273,7 +261,6 @@ export class ModelName {
 
 include(ModelName, ToJsonWithActiveSupportEncoder);
 
-/** @noRailsEquivalent PERMANENT */
 function builtinClassName(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "boolean") return String(value);

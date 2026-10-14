@@ -1,72 +1,63 @@
-import { rbEqual } from "@blazetrails/ruby-compat";
-import { Associations } from "../namespaces.js";
+import {
+  fetch,
+  rbEqual,
+  rbFCaller,
+  rbFPublicSend,
+  rbObjAsString,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
+import { ActiveRecord, Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
-import { underscore } from "@blazetrails/activesupport";
-import { belongsToCounterCacheColumn } from "../reflection.js";
+import { kernelArray } from "@blazetrails/activesupport";
 import { SingularAssociation } from "./singular-association.js";
 import { Rollback } from "../errors.js";
-import { MissingAttributeError } from "@blazetrails/activemodel";
 
 export class BelongsToAssociation extends SingularAssociation {
   private _updated = false;
 
-  /** @missingRailsCall fetch — PERMANENT */
   async handleDependency(): Promise<void> {
-    const target = await this.loadTarget();
-    if (!target) return;
+    if (!(await this.loadTarget())) return;
 
-    const dependent = this.reflection.options.dependent;
-    if (!dependent) return;
-
-    switch (dependent) {
+    switch (this.options.dependent) {
       case "destroy":
-        if (typeof (target as any).destroy === "function") {
-          if ((await (target as any).destroy()) === false) {
-            throw new Rollback();
-          }
-        }
+        if (!(await this.target!.destroy())) throw new Rollback();
         break;
       case "destroyAsync": {
         let primaryKeyColumn: string | string[];
         let id: unknown;
         const foreignKey = this.reflection.foreignKey();
         if (Array.isArray(foreignKey)) {
-          primaryKeyColumn = (this.reflection as any).activeRecordPrimaryKey;
-          id = foreignKey.map((col) => (this.owner as any)[col]);
+          primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
+          id = foreignKey.map((col) => rbFPublicSend(this.owner, col));
         } else {
-          primaryKeyColumn = (this.reflection as any).activeRecordPrimaryKey;
-          id = (this.owner as any)[foreignKey];
+          primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
+          id = rbFPublicSend(this.owner, foreignKey);
         }
 
-        const associationClass = (this.reflection as any).isPolymorphic()
-          ? (this.owner as any)[(this.reflection as any).foreignType as string]
+        const associationClass = this.reflection.isPolymorphic()
+          ? rbFPublicSend(this.owner, this.reflection.foreignType!)
           : this.reflection.klass;
 
         this.enqueueDestroyAssociation({
-          ownerModelName: this.owner.constructor.name,
-          ownerId: (this.owner as any).id,
-          associationClass: String(
-            typeof associationClass === "function" ? associationClass.name : associationClass,
-          ),
+          ownerModelName: rbObjAsString(this.owner.constructor),
+          ownerId: this.owner.id,
+          associationClass: rbObjAsString(associationClass),
           associationIds: [id],
           associationPrimaryKeyColumn: primaryKeyColumn,
-          ensuringOwnerWasMethod:
-            "ensuringOwnerWas" in this.reflection.options
-              ? (this.reflection.options as any).ensuringOwnerWas
-              : null,
+          ensuringOwnerWasMethod: fetch(
+            this.options as Record<string, unknown>,
+            "ensuringOwnerWas",
+            null,
+          ),
         });
         break;
       }
-      case "delete":
-        if (typeof (target as any).delete === "function") {
-          await (target as any).delete();
-        }
-        break;
+      default:
+        await rbFPublicSend(this.target, this.options.dependent);
     }
   }
 
   override inversedFrom(record: Base | null): void {
-    if (record) this.target = record;
     this.replaceKeys(record);
     super.inversedFrom(record);
   }
@@ -95,23 +86,12 @@ export class BelongsToAssociation extends SingularAssociation {
 
   async decrementCountersBeforeLastSave(): Promise<void> {
     let modelWas: any;
-    if (this.reflection.options.polymorphic) {
-      const foreignType =
-        (this.reflection as any).foreignType ??
-        (this.reflection.options as any).foreignType ??
-        `${underscore(this.reflection.name)}_type`;
-      const modelTypeWas =
-        typeof this.owner.attributeBeforeLastSave === "function"
-          ? this.owner.attributeBeforeLastSave(foreignType)
-          : undefined;
-      if (modelTypeWas) {
-        try {
-          modelWas = (this.owner.constructor as typeof Base).polymorphicClassFor(
-            modelTypeWas as string,
-          );
-        } catch {
-          return;
-        }
+    if (this.reflection.isPolymorphic()) {
+      const modelTypeWas = this.owner.attributeBeforeLastSave(this.reflection.foreignType!);
+      if (modelTypeWas != null) {
+        modelWas = (this.owner.constructor as typeof Base).polymorphicClassFor(
+          modelTypeWas as string,
+        );
       }
     } else {
       modelWas = this.klass;
@@ -121,7 +101,7 @@ export class BelongsToAssociation extends SingularAssociation {
       this.reflection.foreignKey() as string,
     );
 
-    if (foreignKeyWas != null && foreignKeyWas !== false && modelWas) {
+    if (foreignKeyWas != null && modelWas.prototype instanceof ActiveRecord.Base) {
       await this.updateCountersViaScope(modelWas, foreignKeyWas, -1);
     }
   }
@@ -129,33 +109,27 @@ export class BelongsToAssociation extends SingularAssociation {
   private async updateCountersViaScope(klass: any, foreignKey: unknown, by: number): Promise<void> {
     const scope = klass.unscoped().whereBang(new Map([[this.primaryKey(klass), foreignKey]]));
     await scope.updateCounters({
-      [this.counterCacheColumn()!]: by,
+      [this.reflection.counterCacheColumn()!]: by,
       touch: (this.reflection.options as any).touch,
     });
   }
 
-  isTargetChanged(): boolean {
-    const changed = this.foreignKeyNames().some((foreignKey) =>
-      this.owner.attributeChanged(foreignKey),
-    );
+  isTargetChanged(): boolean | undefined {
     return (
-      changed || (!this.foreignKeyPresent() && this.target != null && this.target.isNewRecord())
+      this.owner.attributeChanged(this.reflection.foreignKey()) ||
+      (!this.foreignKeyPresent() && this.target?.isNewRecord())
     );
   }
 
-  isTargetPreviouslyChanged(): boolean {
-    return this.foreignKeyNames().some((foreignKey) =>
-      this.owner.attributePreviouslyChanged(foreignKey),
-    );
+  isTargetPreviouslyChanged(): boolean | undefined {
+    return this.owner.attributePreviouslyChanged(this.reflection.foreignKey());
   }
 
-  isSavedChangeToTarget(): boolean {
-    return this.foreignKeyNames().some((foreignKey) =>
-      this.owner.isSavedChangeToAttribute(foreignKey),
-    );
+  isSavedChangeToTarget(): boolean | undefined {
+    return this.owner.isSavedChangeToAttribute(this.reflection.foreignKey());
   }
 
-  protected override replace(record: Base | null): void {
+  protected override replace(record: Base | null): Base | null {
     if (record) {
       this.raiseOnTypeMismatchBang(record);
       this.setInverseInstance(record);
@@ -165,79 +139,35 @@ export class BelongsToAssociation extends SingularAssociation {
     }
 
     this.replaceKeys(record, { force: true });
-    this.target = record;
+
+    return (this.target = record);
   }
 
   protected override staleState(): unknown {
-    const fks = this.foreignKeyNames();
-    if (fks.length !== 1) return null;
-    return typeof (this.owner as any)._readAttribute === "function"
-      ? (this.owner as any)._readAttribute(fks[0], (n: string) => {
-          throw new MissingAttributeError(
-            `missing attribute '${n}' for ${(this.owner.constructor as { name?: string }).name ?? "unknown"}`,
-          );
-        })
-      : (this.owner as any)[fks[0]];
+    const owner = this.owner as unknown as {
+      _readAttribute(n: string, block: (n: string) => unknown): unknown;
+      missingAttribute(n: string, stack: string[]): never;
+    };
+    return owner._readAttribute(this.reflection.foreignKey() as string, (n) =>
+      owner.missingAttribute(n, rbFCaller()),
+    );
   }
 
-  protected override findTargetNeeded(): boolean {
+  /** @internal */
+  override isFindTarget(): boolean {
     return !this.isLoaded() && this.foreignKeyPresent() && !!this.klass;
   }
 
   /** @internal */
   protected override isInvertibleFor(record: Base): boolean {
-    const inverse = this.inverseReflectionOn(record);
-    if (!inverse) return false;
-    const isHasOne =
-      typeof inverse.isHasOne === "function" ? inverse.isHasOne() : inverse.macro === "hasOne";
-    const inverseKlass = inverse.klass;
-    return isHasOne || !!inverseKlass?.hasManyInversing;
-  }
-
-  /** @internal */
-  private inverseReflectionOn(
-    record: Base,
-  ): { macro?: string; isHasOne?: () => boolean; klass?: typeof Base } | null {
-    if ((this.reflection.options as { polymorphic?: boolean }).polymorphic) {
-      return (
-        (this.inverseReflectionFor(record) as {
-          macro?: string;
-          isHasOne?: () => boolean;
-          klass?: typeof Base;
-        }) ?? null
-      );
-    }
-    const inverseName =
-      this.reflection.inverseName?.() ??
-      (this.reflection.options.inverseOf as string | undefined) ??
-      null;
-    if (!inverseName) return null;
-    const recordCtor = record.constructor as {
-      _reflectOnAssociation?: (
-        n: string,
-      ) => { macro?: string; isHasOne?: () => boolean; klass?: typeof Base } | null;
-    };
-    return recordCtor._reflectOnAssociation?.(inverseName) ?? null;
+    const inverse = this.inverseReflectionFor(record);
+    return inverse != null && (inverse.isHasOne() || inverse.klass.hasManyInversing);
   }
 
   protected override foreignKeyPresent(): boolean {
-    return this.foreignKeyNames().every((fk) => {
-      const value =
-        typeof (this.owner as any)._readAttribute === "function"
-          ? (this.owner as any)._readAttribute(fk)
-          : (this.owner as any)[fk];
-      return value != null;
-    });
-  }
-
-  private foreignKeyName(): string {
-    const fk = this.reflection.foreignKey() ?? `${underscore(this.reflection.name)}_id`;
-    return Array.isArray(fk) ? fk[0] : fk;
-  }
-
-  protected foreignKeyNames(): string[] {
-    const fk = this.reflection.foreignKey() ?? `${underscore(this.reflection.name)}_id`;
-    return Array.isArray(fk) ? fk : [fk];
+    return kernelArray(this.reflection.foreignKey()).every(
+      (fk) => this.owner._readAttribute(fk) != null,
+    );
   }
 
   /** @internal */
@@ -249,13 +179,11 @@ export class BelongsToAssociation extends SingularAssociation {
   protected replaceKeys(record: Base | null, { force = false }: { force?: boolean } = {}): void {
     const reflectionFk = this.reflection.foreignKey();
     if (Array.isArray(reflectionFk)) {
-      let targetKeyValues: unknown[] = [];
-      if (record) {
-        const primaryKey = this.primaryKey(record.constructor as typeof Base);
-        targetKeyValues = (Array.isArray(primaryKey) ? primaryKey : [primaryKey]).map((key) =>
-          record._readAttribute(key),
-        );
-      }
+      const targetKeyValues = record
+        ? kernelArray(this.primaryKey(record.constructor as typeof Base)).map((key) =>
+            record._readAttribute(key),
+          )
+        : [];
 
       if (
         force ||
@@ -265,7 +193,7 @@ export class BelongsToAssociation extends SingularAssociation {
         )
       ) {
         reflectionFk.forEach((key, index) => {
-          this.owner.set(key, targetKeyValues[index] ?? null);
+          this.owner.set(key, targetKeyValues[index]);
         });
       }
     } else {
@@ -279,26 +207,16 @@ export class BelongsToAssociation extends SingularAssociation {
     }
   }
 
-  private counterCacheColumn(): string | null {
-    const fromReflection = this.reflection.counterCacheColumn?.();
-    if (fromReflection !== undefined && fromReflection !== null) return fromReflection;
-    return belongsToCounterCacheColumn(
-      this.reflection.options.counterCache,
-      this.owner.constructor.name,
-    );
-  }
-
   private requireCounterUpdate(): boolean {
-    return this.counterCacheColumn() != null && this.owner.isPersisted();
+    return this.reflection.counterCacheColumn() != null && this.owner.isPersisted();
   }
 
   private async updateCounters(by: number): Promise<void> {
     if (this.requireCounterUpdate() && this.foreignKeyPresent()) {
-      const target = this.target as any;
-      if (target && !this.isStaleTarget() && typeof target.incrementBang === "function") {
-        const counterCol = this.counterCacheColumn()!;
-        const touch = (this.reflection.options as any).touch;
-        await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
+      if (this.target && !this.isStaleTarget()) {
+        await this.target.incrementBang(this.reflection.counterCacheColumn()!, by, {
+          touch: this.reflection.options.touch,
+        });
       } else {
         await this.updateCountersViaScope(
           this.klass,
@@ -310,4 +228,4 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 }
 
-Associations.BelongsToAssociation = BelongsToAssociation;
+rbModConstSet(Associations, "BelongsToAssociation", BelongsToAssociation);

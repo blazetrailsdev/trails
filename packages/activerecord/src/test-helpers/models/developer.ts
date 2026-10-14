@@ -15,7 +15,8 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import { Module, Range } from "@blazetrails/ruby-compat";
+import { Module, Range, RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
@@ -184,9 +185,7 @@ export class Developer extends Base {
       return this.where({ name: "Jamis" });
     });
 
-    this.validates("salary", {
-      inclusion: { in: { includes: (v: unknown) => Number(v) >= 50000 && Number(v) <= 200000 } },
-    } as any);
+    this.validatesInclusionOf("salary", { in: new Range(50000, 200000) });
     this.validates("name", { length: { in: new Range(3, 20) } });
 
     this.beforeCreate(async function (developer: Developer) {
@@ -208,6 +207,7 @@ export class Developer extends Base {
     (this as any).auditLogs.build({ message });
   }
 }
+registerModel(Developer);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Developer {
   get mentor(): Mentor | null | Promise<Mentor | null>;
@@ -225,6 +225,7 @@ export interface Developer {
 }
 
 export class SubDeveloper extends Developer {}
+registerModel(SubDeveloper);
 
 export class SpecialDeveloper extends Base {
   declare specialContracts: AssociationProxy<SpecialContract>;
@@ -234,6 +235,7 @@ export class SpecialDeveloper extends Base {
     this.hasMany("specialContracts", { foreignKey: "developer_id" });
   }
 }
+registerModel(SpecialDeveloper);
 
 export class SymbolIgnoredDeveloper extends Base {
   declare last_name: unknown;
@@ -244,6 +246,7 @@ export class SymbolIgnoredDeveloper extends Base {
     this.attribute("last_name");
   }
 }
+registerModel(SymbolIgnoredDeveloper);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuditLog extends Base {
@@ -256,6 +259,7 @@ export class AuditLog extends Base {
     this.belongsTo("unvalidatedDeveloper", { className: "Developer" });
   }
 }
+registerModel(AuditLog);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLog {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -271,6 +275,7 @@ export class AuditLogRequired extends Base {
     this.belongsTo("developer", { required: true });
   }
 }
+registerModel(AuditLogRequired);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLogRequired {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -288,10 +293,11 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
     });
     this.beforeDestroy(async function (developer: DeveloperWithBeforeDestroyRaise) {
       const projects = await (developer as any).projects;
-      if (projects.length === 0) throw new Error();
+      if (projects.length === 0) throw new RuntimeError("unhandled exception");
     });
   }
 }
+registerModel(DeveloperWithBeforeDestroyRaise);
 
 export class DeveloperWithSelect extends Base {
   static {
@@ -301,6 +307,7 @@ export class DeveloperWithSelect extends Base {
     });
   }
 }
+registerModel(DeveloperWithSelect);
 
 export class DeveloperwithDefaultMentorScopeNot extends Base {
   static {
@@ -310,6 +317,7 @@ export class DeveloperwithDefaultMentorScopeNot extends Base {
     });
   }
 }
+registerModel(DeveloperwithDefaultMentorScopeNot);
 
 export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
   static {
@@ -322,6 +330,7 @@ export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
     );
   }
 }
+registerModel(DeveloperWithDefaultMentorScopeAllQueries);
 
 export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
   static {
@@ -335,6 +344,7 @@ export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
     );
   }
 }
+registerModel(DeveloperWithDefaultNilableFirmScopeAllQueries);
 
 export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries extends Base {
   static {
@@ -351,6 +361,9 @@ export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScope
     );
   }
 }
+registerModel(
+  DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries,
+);
 
 export class DeveloperWithIncludes extends Base {
   declare auditLogs: AssociationProxy<AuditLog>;
@@ -363,6 +376,7 @@ export class DeveloperWithIncludes extends Base {
     });
   }
 }
+registerModel(DeveloperWithIncludes);
 
 export class DeveloperFilteredOnJoins extends Base {
   declare projects: AssociationProxy<Project>;
@@ -384,6 +398,7 @@ export class DeveloperFilteredOnJoins extends Base {
     });
   }
 }
+registerModel(DeveloperFilteredOnJoins);
 
 export class DeveloperOrderedBySalary extends Base {
   declare static byName: () => Relation<DeveloperOrderedBySalary>;
@@ -402,6 +417,7 @@ export class DeveloperOrderedBySalary extends Base {
     });
   }
 }
+registerModel(DeveloperOrderedBySalary);
 
 export class DeveloperCalledDavid extends Base {
   static {
@@ -411,6 +427,7 @@ export class DeveloperCalledDavid extends Base {
     });
   }
 }
+registerModel(DeveloperCalledDavid);
 
 export class LazyLambdaDeveloperCalledDavid extends Base {
   static {
@@ -420,6 +437,7 @@ export class LazyLambdaDeveloperCalledDavid extends Base {
     });
   }
 }
+registerModel(LazyLambdaDeveloperCalledDavid);
 
 export class LazyBlockDeveloperCalledDavid extends Base {
   static {
@@ -429,6 +447,7 @@ export class LazyBlockDeveloperCalledDavid extends Base {
     });
   }
 }
+registerModel(LazyBlockDeveloperCalledDavid);
 
 export class CallableDeveloperCalledDavid extends Base {
   static {
@@ -437,6 +456,7 @@ export class CallableDeveloperCalledDavid extends Base {
     this.defaultScope({ call: () => call });
   }
 }
+registerModel(CallableDeveloperCalledDavid);
 
 export class ClassMethodDeveloperCalledDavid extends Base {
   static {
@@ -447,6 +467,7 @@ export class ClassMethodDeveloperCalledDavid extends Base {
     return this.where({ name: "David" });
   }
 }
+registerModel(ClassMethodDeveloperCalledDavid);
 
 export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
   declare static david: () => Relation<ClassMethodReferencingScopeDeveloperCalledDavid>;
@@ -462,6 +483,7 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
     return this.david();
   }
 }
+registerModel(ClassMethodReferencingScopeDeveloperCalledDavid);
 
 export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
   declare static david: () => Relation<LazyBlockReferencingScopeDeveloperCalledDavid>;
@@ -476,6 +498,7 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
     });
   }
 }
+registerModel(LazyBlockReferencingScopeDeveloperCalledDavid);
 
 export class DeveloperCalledJamis extends Base {
   declare legacy_updated_at: any;
@@ -503,6 +526,7 @@ export class DeveloperCalledJamis extends Base {
     });
   }
 }
+registerModel(DeveloperCalledJamis);
 
 export class PoorDeveloperCalledJamis extends Base {
   static {
@@ -512,6 +536,7 @@ export class PoorDeveloperCalledJamis extends Base {
     });
   }
 }
+registerModel(PoorDeveloperCalledJamis);
 
 export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
@@ -521,6 +546,7 @@ export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
     });
   }
 }
+registerModel(InheritedPoorDeveloperCalledJamis);
 
 export class MultiplePoorDeveloperCalledJamis extends Base {
   static {
@@ -536,6 +562,7 @@ export class MultiplePoorDeveloperCalledJamis extends Base {
     });
   }
 }
+registerModel(MultiplePoorDeveloperCalledJamis);
 
 export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
@@ -545,6 +572,7 @@ export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis
     });
   }
 }
+registerModel(ModuleIncludedPoorDeveloperCalledJamis);
 
 export class EagerDeveloperWithDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -566,6 +594,7 @@ export class EagerDeveloperWithDefaultScope extends Base {
     });
   }
 }
+registerModel(EagerDeveloperWithDefaultScope);
 
 export class EagerDeveloperWithClassMethodDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -588,6 +617,7 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
     return this.includes(":projects");
   }
 }
+registerModel(EagerDeveloperWithClassMethodDefaultScope);
 
 export class EagerDeveloperWithLambdaDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -609,6 +639,7 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
     });
   }
 }
+registerModel(EagerDeveloperWithLambdaDefaultScope);
 
 export class EagerDeveloperWithBlockDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -630,6 +661,7 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
     });
   }
 }
+registerModel(EagerDeveloperWithBlockDefaultScope);
 
 export class EagerDeveloperWithCallableDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -650,6 +682,7 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
     this.defaultScope({ call: () => call });
   }
 }
+registerModel(EagerDeveloperWithCallableDefaultScope);
 
 export class ThreadsafeDeveloper extends Base {
   static {
@@ -659,6 +692,7 @@ export class ThreadsafeDeveloper extends Base {
     });
   }
 }
+registerModel(ThreadsafeDeveloper);
 
 export class CachedDeveloper extends Base {
   static {
@@ -670,6 +704,7 @@ export class CachedDeveloper extends Base {
     this.aliasAttribute("updated_on", "legacy_updated_on");
   }
 }
+registerModel(CachedDeveloper);
 
 export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
   declare companies: AssociationProxy<Company>;
@@ -681,12 +716,14 @@ export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
     this.hasMany("contracts", { foreignKey: "developer_id" });
   }
 }
+registerModel(DeveloperWithIncorrectlyOrderedHasManyThrough);
 
 export class DeveloperName extends StringType {
   deserialize(value: unknown): string {
     return `Developer: ${value}`;
   }
 }
+registerConstant("DeveloperName", DeveloperName);
 
 Type.register("developer_name", DeveloperName);
 
@@ -699,6 +736,7 @@ export class AttributedDeveloper extends Base {
     this.ignoredColumns = ["name"];
   }
 }
+registerModel(AttributedDeveloper);
 
 export class ColumnNamesCachedDeveloper extends Base {
   static {
@@ -706,6 +744,7 @@ export class ColumnNamesCachedDeveloper extends Base {
     if (this.columnNames().includes("name")) this.ignoredColumns = [...this.ignoredColumns, "name"];
   }
 }
+registerModel(ColumnNamesCachedDeveloper);
 
 export class AuditRequiredDeveloper extends Base {
   declare requiredAuditLogs: AssociationProxy<AuditLogRequired>;
@@ -715,6 +754,7 @@ export class AuditRequiredDeveloper extends Base {
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
   }
 }
+registerModel(AuditRequiredDeveloper);
 
 export class DevWithAfterTouch extends Base {
   declare afterTouchCalled: boolean | undefined;
@@ -730,6 +770,7 @@ export class DevWithAfterTouch extends Base {
     });
   }
 }
+registerModel(DevWithAfterTouch);
 
 export class MutatingSaveKlass extends Base {
   declare legacy_updated_at: any;
@@ -748,6 +789,7 @@ export class MutatingSaveKlass extends Base {
     });
   }
 }
+registerModel(MutatingSaveKlass);
 
 export class MutatingUpdateKlass extends Base {
   declare legacy_updated_at: any;
@@ -766,6 +808,7 @@ export class MutatingUpdateKlass extends Base {
     });
   }
 }
+registerModel(MutatingUpdateKlass);
 
 export class NonMutatingUpdateKlass extends Base {
   declare legacy_updated_at: any;
@@ -778,3 +821,4 @@ export class NonMutatingUpdateKlass extends Base {
     this.beforeUpdate(function () {});
   }
 }
+registerModel(NonMutatingUpdateKlass);

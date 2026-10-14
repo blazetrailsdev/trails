@@ -346,10 +346,10 @@ describe("RackHeadersTest", () => {
   });
 
   it("key", () => {
-    expect(h.key("1")).toBeUndefined();
+    expect(h.key("1")).toBeNull();
     expect(fh.key("1")).toBe("ab");
     expect(fh.key("2")).toBe("cd");
-    expect(fh.key("3")).toBeUndefined();
+    expect(fh.key("3")).toBeNull();
     expect(fh.key("4")).toBe("3");
   });
 
@@ -377,7 +377,7 @@ describe("RackHeadersTest", () => {
   });
 
   it("compare by identity?", () => {
-    expect(fh.isCompareByIdentity).toBe(false);
+    expect(fh.isCompareByIdentity()).toBe(false);
   });
 
   it("to h", () => {

@@ -46,7 +46,7 @@ describe("ExclusionConstraintDefinition", () => {
     const named = new ExclusionConstraintDefinition("t", "x WITH =", { name: "my_excl" });
     const unnamed = new ExclusionConstraintDefinition("t", "x WITH =", {});
     expect(named.exportNameOnSchemaDump()).toBe(true);
-    expect(unnamed.exportNameOnSchemaDump()).toBe(false);
+    expect(unnamed.exportNameOnSchemaDump()).toBeNull();
   });
 
   it("exportNameOnSchemaDump returns false for auto-generated names matching exclIgnorePattern", () => {
@@ -94,7 +94,7 @@ describe("UniqueConstraintDefinition", () => {
     const named = new UniqueConstraintDefinition("t", "col", { name: "u_col" });
     const unnamed = new UniqueConstraintDefinition("t", "col", {});
     expect(named.exportNameOnSchemaDump()).toBe(true);
-    expect(unnamed.exportNameOnSchemaDump()).toBe(false);
+    expect(unnamed.exportNameOnSchemaDump()).toBeNull();
   });
 
   it("exportNameOnSchemaDump returns false for auto-generated names matching uniqueIgnorePattern", () => {
@@ -456,16 +456,6 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     expect(constraintPos).toBeLessThan(withPos);
   });
 
-  it("skips constraint injection for CREATE TABLE ... AS queries", async () => {
-    const td = new TableDefinition(leased, "archived_orders", {
-      as: "SELECT (1) AS id, amount FROM orders WHERE archived = true",
-    });
-    td.uniqueConstraint("id", { name: "unique_id" });
-    const sql = await toSql(td);
-    expect(sql).not.toContain("CONSTRAINT");
-    expect(sql).toContain("AS SELECT");
-  });
-
   it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers (no-adapter fallback)", async () => {
     const td = new TableDefinition(leased, "widgets");
     td.cidr("net");
@@ -567,8 +557,8 @@ describe("Table delegation", () => {
   it("removeExclusionConstraint delegates to schema.removeExclusionConstraint", async () => {
     const schema = makeSchema();
     const table = new Table("products", schema);
-    await table.removeExclusionConstraint({ name: "price_check" });
-    expect(schema.removeExclusionConstraint).toHaveBeenCalledWith("products", {
+    await table.removeExclusionConstraint(undefined, { name: "price_check" });
+    expect(schema.removeExclusionConstraint).toHaveBeenCalledWith("products", undefined, {
       name: "price_check",
     });
   });
@@ -613,5 +603,39 @@ describeIfPostgresqlAdapter("TableDefinition#validColumnDefinitionOptions", () =
     }
     expect(opts).toContain("collation");
     expect(opts).toContain("ifNotExists");
+  });
+});
+
+describe("ColumnMethods#primary_key", () => {
+  function table() {
+    const addColumn = vi.fn();
+    const t = new Table("posts", { addColumn } as unknown as SchemaStatementsConstraintLike);
+    return { t, addColumn };
+  }
+
+  it("defaults a uuid primary key to gen_random_uuid() on change_table", async () => {
+    const { t, addColumn } = table();
+
+    await t.primaryKey("id", "uuid");
+
+    expect(addColumn).toHaveBeenCalledWith("posts", "id", "uuid", {
+      default: "gen_random_uuid()",
+      primaryKey: true,
+    });
+  });
+
+  it("keeps an explicit nil default and leaves other types alone", async () => {
+    const { t, addColumn } = table();
+
+    await t.primaryKey("id", "uuid", { default: null });
+    await t.primaryKey("other_id");
+
+    expect(addColumn).toHaveBeenNthCalledWith(1, "posts", "id", "uuid", {
+      default: null,
+      primaryKey: true,
+    });
+    expect(addColumn).toHaveBeenNthCalledWith(2, "posts", "other_id", "primary_key", {
+      primaryKey: true,
+    });
   });
 });

@@ -1,18 +1,21 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { afterTeardown } from "./tests-without-assertions.js";
+import { iseqLocationSetup } from "@blazetrails/ruby-compat";
+import { TestCase } from "../test-case.js";
+
+class TestsWithoutAssertionsWarnTest extends TestCase {
+  ["test_without_assertions"](): void {}
+}
+iseqLocationSetup(
+  TestsWithoutAssertionsWarnTest.prototype.test_without_assertions,
+  "packages/activesupport/src/testing/test_without_assertions_test.ts",
+  9,
+);
 
 afterEach(() => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
-    afterTeardown({
-      assertions: 0,
-      skipped: false,
-      error: false,
-      name: "test_without_assertions",
-      sourceLocation: ["packages/activesupport/src/testing/test_without_assertions_test.ts", 9],
-      failures: [],
-    });
+    new TestsWithoutAssertionsWarnTest("test_without_assertions").afterTeardown();
 
     const err = warn.mock.calls.map((c) => String(c[0])).join("\n");
     expect(err).toMatch(

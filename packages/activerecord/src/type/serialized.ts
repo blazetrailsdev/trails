@@ -1,6 +1,12 @@
-import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
-import { include, registerConstant } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
+import { Mutable, ValueType, BinaryData } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
+import {
+  DelegateClass,
+  rbEqual,
+  rbObjInspect,
+  rbObjRespondTo,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 import type { ColumnSerializer } from "../coders/column-serializer.js";
 
@@ -23,23 +29,23 @@ export class Serialized extends DelegateClass(ValueType) {
   }
 
   deserialize(value: unknown): unknown {
-    if (this.isDefaultValue(value)) return value;
-    const deserialized = this.subtype!.deserialize?.(value) ?? value;
-    const forCoder =
-      this.subtype!.type?.() === "binary" && deserialized instanceof Uint8Array
-        ? Buffer.from(deserialized).toString("utf8")
-        : deserialized;
-    return this.coder.load(forCoder);
+    if (this.isDefaultValue(value)) {
+      return value;
+    } else {
+      return this.coder.load(super.deserialize(value));
+    }
   }
 
   serialize(value: unknown): unknown {
-    if (value === null || value === undefined) return null;
-    if (this.isDefaultValue(value)) return null;
-    const dumped = this.coder.dump(value);
-    if (this.subtype?.serialize) {
-      return this.subtype.serialize(dumped);
+    if (value == null) return null;
+    if (!this.isDefaultValue(value)) {
+      return super.serialize(this.coder.dump(value));
     }
-    return dumped;
+    return null;
+  }
+
+  inspect(): string {
+    return rbObjInspect(this);
   }
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
@@ -59,7 +65,7 @@ export class Serialized extends DelegateClass(ValueType) {
   }
 
   override isForceEquality(value: unknown): boolean {
-    return this.coder.objectClass !== undefined && value instanceof this.coder.objectClass;
+    return rbObjRespondTo(this.coder, "objectClass") && value instanceof this.coder.objectClass!;
   }
 
   override isSerialized(): boolean {
@@ -83,6 +89,6 @@ export class Serialized extends DelegateClass(ValueType) {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge carries `include ActiveModel::Type::Helpers::Mutable`'s members onto the class; it declares none of its own.
 export interface Serialized extends Mutable {}
 
-include(Serialized, MutableModule);
+include(Serialized, Mutable);
 
 registerConstant("ActiveRecord::Type::Serialized", Serialized);

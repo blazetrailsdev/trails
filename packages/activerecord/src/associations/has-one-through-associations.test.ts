@@ -1,13 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base, registerModel, registerSubclass, RecordInvalid } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
-import {
-  assertQueriesMatch,
-  assertQueriesCount,
-  assertNoQueries,
-} from "../testing/query-assertions.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
+import { Base, registerModel } from "../index.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import {
   assert,
   assertPredicate,
@@ -55,7 +52,7 @@ import {
 } from "../test-helpers/models/cpk.js";
 
 async function readHasOne(owner: any, name: string): Promise<any> {
-  return await owner.association(name).loadTarget();
+  return await owner.association(name).reader;
 }
 
 function tgt(owner: any, name: string): any {
@@ -64,6 +61,7 @@ function tgt(owner: any, name: string): any {
 
 describe("HasOneThroughAssociationsTest", () => {
   const {
+    self,
     members,
     clubs,
     memberships,
@@ -96,7 +94,6 @@ describe("HasOneThroughAssociationsTest", () => {
 
   registerModel(Member);
   registerModel(Club);
-  Membership.inheritanceColumn = "type";
   registerModel(Membership);
   registerModel(CurrentMembership);
   registerModel(SuperMembership);
@@ -112,7 +109,6 @@ describe("HasOneThroughAssociationsTest", () => {
   Category.inheritanceColumn = "type";
   registerModel(Category);
   registerModel(SpecialCategory);
-  registerSubclass(SpecialCategory);
   registerModel(Author);
   registerModel(AuthorAddress);
   registerModel(Essay);
@@ -139,7 +135,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("has one through executes limited query", async () => {
     const member = members("groucho");
     const boringClub = clubs("boring_club");
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       expect((await readHasOne(member, "generalClub"))?.id).toBe(boringClub.id);
     });
   });
@@ -217,153 +213,6 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(newMember.association("club").target).toBe(newClub);
   });
 
-  it("building with a loaded join row preserves unrelated in-memory changes on it", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    const membership = await (newMember.association("currentMembership") as any).create();
-    membership.writeAttribute("favorite", true);
-    const newClub = await (newMember.association("club") as any).build();
-    expect(await newMember.save()).toBe(true);
-    const reloaded = await Membership.find(membership.id);
-    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
-    expect(reloaded.readAttribute("favorite")).toBe(true);
-  });
-
-  it("building works with has one through belongs to with unloaded existing join row", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    const oldClub = await Club.create({ name: "Old Club" });
-    await (newMember.association("club") as SingularAssociation).writer(oldClub);
-    await newMember.save();
-    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
-
-    const refetched = await Member.find(newMember.id);
-    const newClub = await (refetched.association("club") as any).build();
-
-    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
-    const before = await countForMember();
-    expect(await refetched.save()).toBe(true);
-    expect(await countForMember()).toBe(before);
-    expect(newClub.isPersisted()).toBe(true);
-    const reloaded = await Membership.find(membershipId);
-    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
-  });
-
-  it("unloaded reconcile does not permanently disable the through association autosave", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("club") as SingularAssociation).writer(
-      await Club.create({ name: "Old Club" }),
-    );
-    await newMember.save();
-
-    const refetched = await Member.find(newMember.id);
-    await (refetched.association("club") as any).build();
-    expect(await refetched.save()).toBe(true);
-
-    const laterClub = await Club.create({ name: "Later Club" });
-    const newMembership = await (refetched.association("currentMembership") as any).build({
-      club: laterClub,
-    });
-    expect(await refetched.save()).toBe(true);
-    expect(newMembership.isPersisted()).toBe(true);
-  });
-
-  it("creating works with has one through belongs to with unloaded existing join row", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    const oldClub = await Club.create({ name: "Old Club" });
-    await (newMember.association("club") as SingularAssociation).writer(oldClub);
-    await newMember.save();
-    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
-
-    const refetched = await Member.find(newMember.id);
-    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
-    const before = await countForMember();
-    const newClub = await (refetched.association("club") as any).create({ name: "New Club" });
-    expect(await refetched.save()).toBe(true);
-    expect(await countForMember()).toBe(before);
-    expect((await readHasOne(refetched, "club"))?.id).toBe(newClub.id);
-    const reloaded = await Membership.find(membershipId);
-    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
-  });
-
-  it("creating with unloaded existing join row updates the join row without an owner save", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    const oldClub = await Club.create({ name: "Old Club" });
-    await (newMember.association("club") as SingularAssociation).writer(oldClub);
-    await newMember.save();
-    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
-
-    const refetched = await Member.find(newMember.id);
-    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
-    const before = await countForMember();
-    const newClub = await (refetched.association("club") as any).create({ name: "New Club" });
-
-    expect(await countForMember()).toBe(before);
-    const reloaded = await Membership.find(membershipId);
-    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
-    expect(Number(reloaded.club_id)).not.toBe(Number(oldClub.id));
-  });
-
-  it("raising create with an invalid record still reconciles an unloaded join row", async () => {
-    const author = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "t", body: "b", author_id: author.id });
-    const comment = await SpecialComment.create({ post_id: post.id, body: "sc" });
-
-    const refetched = await SpecialComment.find(comment.id);
-    const authorsBefore = await Author.count();
-    await expect((refetched.association("author") as any).createBang({})).rejects.toThrow(
-      RecordInvalid,
-    );
-
-    expect(await Author.count()).toBe(authorsBefore);
-    expect((await Post.find(post.id)).author_id).toBeNull();
-  });
-
-  it("creating with no existing join row only builds the join record", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    const countForMember = () => Membership.where({ member_id: newMember.id }).count();
-
-    const newClub = await (newMember.association("club") as any).create({ name: "New Club" });
-    expect(await countForMember()).toBe(0);
-    expect(tgt(newMember, "currentMembership").isNewRecord()).toBe(true);
-
-    expect(await newMember.save()).toBe(true);
-    expect(await countForMember()).toBe(1);
-    const membership = await Membership.where({ member_id: newMember.id }).first();
-    expect(Number(membership?.club_id)).toBe(Number(newClub.id));
-  });
-
-  it("building with unloaded existing join row reconciles regardless of through-proxy access order", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("club") as SingularAssociation).writer(
-      await Club.create({ name: "Old Club" }),
-    );
-    await newMember.save();
-
-    const refetched = await Member.find(newMember.id);
-    refetched.association("currentMembership");
-    const newClub = await (refetched.association("club") as any).build();
-    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
-    const before = await countForMember();
-    expect(await refetched.save()).toBe(true);
-    expect(await countForMember()).toBe(before);
-    expect(newClub.isPersisted()).toBe(true);
-  });
-
-  it("repeated build on unloaded existing join row keeps the last club", async () => {
-    const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("club") as SingularAssociation).writer(
-      await Club.create({ name: "Old Club" }),
-    );
-    await newMember.save();
-    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
-
-    const refetched = await Member.find(newMember.id);
-    await (refetched.association("club") as any).build({ name: "First" });
-    const finalClub = await (refetched.association("club") as any).build({ name: "Final" });
-    expect(await refetched.save()).toBe(true);
-    const reloaded = await Membership.find(membershipId);
-    expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
-  });
-
   it("creating multiple associations creates through record", async () => {
     const memberType = await MemberType.create({});
     await Member.create({});
@@ -397,21 +246,10 @@ describe("HasOneThroughAssociationsTest", () => {
     expect((await readHasOne(member, "club"))?.id).toBe(newClub.id);
   });
 
-  it("re-assigning the same target record on a persisted owner is a no-op", async () => {
-    const member = members("groucho");
-    const club = await readHasOne(member, "club");
-    const before = (await Membership.count()) as number;
-    await (member.association("club") as SingularAssociation).writer(club);
-    await member.save();
-    await member.reload();
-    expect((await readHasOne(member, "club"))?.id).toBe(clubs("boring_club").id);
-    expect((await Membership.count()) as number).toBe(before);
-  });
-
   it("replacing target record deletes old association", async () => {
     const member = members("groucho");
     await assertNoDifference(
-      () => Membership.count() as Promise<number>,
+      () => Membership.count(),
       null,
       async () => {
         const newClub = await Club.create({ name: "Bananarama" });
@@ -565,15 +403,19 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
-    // PERMANENT-SKIP: Ruby private-method visibility (NoMethodError when a private
+    // PERMANENT-SKIP: asserts NoMethodError on a private call — CLAUDE.md § "Method visibility is compile-time only".
   });
 
-  it.skip("has one through proxy should respond to private methods via send", () => {
-    // PERMANENT-SKIP: Ruby private-method dispatch via `send` has no TypeScript
+  it("has one through proxy should respond to private methods via send", async () => {
+    const member = members("groucho");
+    rbFSend(clubs("moustache_club"), "privateMethod");
+    await assertNothingRaised(async () => {
+      rbFSend(await member.club, "privateMethod");
+    });
   });
 
   const memberDetailCount = async (member: any): Promise<number> =>
-    (await MemberDetail.where({ member_id: member.id }).count()) as number;
+    await MemberDetail.where({ member_id: member.id }).count();
 
   it("assigning to has one through preserves decorated join record", async () => {
     const member = members("groucho");

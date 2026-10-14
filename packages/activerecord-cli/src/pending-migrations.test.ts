@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
 import {
+  Base,
   DatabaseTasks,
   Migration,
   Migrator,
@@ -28,9 +29,9 @@ async function makeFakeProject(): Promise<string> {
 }
 
 const PROXY_A = new MigrationProxy("CreateUsers", 20240101000001, "", "");
-PROXY_A.migration = async () => new (class extends Migration {})();
+PROXY_A.migration = async () => new (class extends Migration.Current {})();
 const PROXY_B = new MigrationProxy("AddIndex", 20240101000002, "", "");
-PROXY_B.migration = async () => new (class extends Migration {})();
+PROXY_B.migration = async () => new (class extends Migration.Current {})();
 
 describe("PendingMigrationsTest", () => {
   let err: string[];
@@ -52,6 +53,7 @@ describe("PendingMigrationsTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 

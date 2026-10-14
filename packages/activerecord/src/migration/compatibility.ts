@@ -1,12 +1,15 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, reverseMergeBang } from "@blazetrails/activesupport";
 import {
+  Module,
+  except,
   include,
-  prepend,
   rbInspect,
+  rbObjSingletonClass,
+  rtest,
   stringDelete,
-  type PrependModule,
 } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { Current, Migration } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -20,6 +23,7 @@ import type {
   ColumnType,
 } from "../connection-adapters/abstract/schema-definitions.js";
 
+/** @inventedArm if — CONVERGEABLE migration-compatibility-find-stringifies-the-version-in-one-call */
 export function find(version: string | number): unknown {
   version =
     typeof version === "number" && Number.isInteger(version) ? `${version}.0` : `${version}`;
@@ -42,71 +46,77 @@ export class V7_2 extends V8_0 {}
 export class V7_1 extends V7_2 {}
 
 type Options = Record<string, unknown>;
-type Super = (...args: unknown[]) => unknown;
-
-const LegacyIndexName = {
-  legacyIndexName(tableName: string, options: Options | string | string[]): string {
-    if (typeof options === "object" && !Array.isArray(options)) {
-      if (options.column != null) {
-        return `index_${tableName}_on_${[options.column].flat().join("_and_")}`;
-      } else if (options.name != null) {
-        return options.name as string;
-      } else {
-        throw new ArgumentError("You must specify the index name");
-      }
-    } else {
-      return LegacyIndexName.legacyIndexName(tableName, LegacyIndexName.indexNameOptions(options));
-    }
-  },
-
-  indexNameOptions(columnNames: string | string[]): Options {
-    if (LegacyIndexName.isExpressionColumnName(columnNames)) {
-      columnNames = (columnNames as string).match(/\w+/g)!.join("_");
-    }
-
-    return { column: columnNames };
-  },
-
-  isExpressionColumnName(columnName: unknown): boolean {
-    return typeof columnName === "string" && /\W/.test(columnName);
-  },
-};
 
 export class V7_0 extends V7_1 {
-  static LegacyIndexName = LegacyIndexName;
+  static LegacyIndexName = class LegacyIndexName {
+    /** @internal */
+    legacyIndexName(tableName: string, options: Options | string | string[]): string {
+      if (typeof options === "object" && !Array.isArray(options)) {
+        if (rtest(options.column)) {
+          return `index_${tableName}_on_${[options.column].flat().join("_and_")}`;
+        } else if (rtest(options.name)) {
+          return options.name as string;
+        } else {
+          throw new ArgumentError("You must specify the index name");
+        }
+      } else {
+        return this.legacyIndexName(tableName, this.indexNameOptions(options));
+      }
+    }
 
-  static TableDefinition = {
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+    /** @internal */
+    indexNameOptions(columnNames: string | string[]): Options {
+      if (this.isExpressionColumnName(columnNames)) {
+        columnNames = ((columnNames as string).match(/\w+/g) ?? []).join("_");
+      }
+
+      return { column: columnNames };
+    }
+
+    /** @internal */
+    isExpressionColumnName(columnName: unknown): boolean {
+      return typeof columnName === "string" && /\W/.test(columnName);
+    }
+  };
+
+  static TableDefinition: Module = new Module().include(V7_0.LegacyIndexName).include({
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, _skipValidateOptions: true };
-      return super_(name, type, options);
+      return V7_0.TableDefinition.superMethod(this, "column")!(name, type, options);
     },
 
-    change(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+    change(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, _skipValidateOptions: true };
-      return super_(name, type, options);
+      return V7_0.TableDefinition.superMethod(this, "change")!(name, type, options);
     },
 
     index(
-      this: { name: string },
-      super_: Super,
+      this: {
+        name: string;
+        legacyIndexName(tableName: string, options: string | string[]): string;
+      },
       columnName: string | string[],
       options: AddIndexOptions = {},
     ) {
       if (options.name == null) {
-        options = { ...options, name: LegacyIndexName.legacyIndexName(this.name, columnName) };
+        options = { ...options, name: this.legacyIndexName(this.name, columnName) };
       }
-      return super_(columnName, options);
+      return V7_0.TableDefinition.superMethod(this, "index")!(columnName, options);
     },
 
-    references(super_: Super, ...args: unknown[]) {
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
       options = { ...options, _skipValidateOptions: true };
-      return super_(...args, options);
+      return V7_0.TableDefinition.superMethod(this, "references")!(...args, options);
     },
 
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
-  } as unknown as PrependModule;
+    /** @internal */
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
+
+  /** @internal */
+  declare legacyIndexName: (tableName: string, options: Options | string | string[]) => string;
 
   override async addColumn(
     tableName: string,
@@ -122,11 +132,11 @@ export class V7_0 extends V7_1 {
     tableName: string,
     columnName: string | string[],
     options: AddIndexOptions = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (options.name == null) {
-      options = { ...options, name: LegacyIndexName.legacyIndexName(tableName, columnName) };
+      options = { ...options, name: this.legacyIndexName(tableName, columnName) };
     }
-    await super.addIndex(tableName, columnName, options);
+    return await super.addIndex(tableName, columnName, options);
   }
 
   override async addReference(
@@ -175,7 +185,7 @@ export class V7_0 extends V7_1 {
     options = { ...options, _skipValidateOptions: true };
     const connection = await this.connection;
     if (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") {
-      options.collation ??= "no_collation";
+      if (!rtest(options.collation)) options.collation = "no_collation";
     }
     await super.changeColumn(tableName, columnName, type, options);
   }
@@ -213,30 +223,25 @@ export class V7_0 extends V7_1 {
     await super.addForeignKey(fromTable, toTable, options);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V7_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V7_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
 
-include(V7_0, LegacyIndexName);
-
-class PostgreSQLCompat {
-  static compatibleTimestampType(type: ColumnType, connection: AbstractAdapter): ColumnType {
-    if (connection.adapterName === "PostgreSQL") {
-      return type === "datetime" ? "timestamp" : type;
-    } else {
-      return type;
-    }
-  }
-}
+include(V7_0, V7_0.LegacyIndexName);
 
 export class V6_1 extends V7_0 {
-  static PostgreSQLCompat = PostgreSQLCompat;
+  static PostgreSQLCompat = class PostgreSQLCompat {
+    static compatibleTimestampType(type: ColumnType, connection: AbstractAdapter): ColumnType {
+      if (connection.adapterName === "PostgreSQL") {
+        return type === "datetime" ? "timestamp" : type;
+      } else {
+        return type;
+      }
+    }
+  };
 
   override async addColumn(
     tableName: string,
@@ -245,10 +250,10 @@ export class V6_1 extends V7_0 {
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
     if (type === "datetime") {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
     }
 
-    type = PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
+    type = V6_1.PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
     await super.addColumn(tableName, columnName, type, options);
   }
 
@@ -259,73 +264,72 @@ export class V6_1 extends V7_0 {
     options: ColumnOptions = {},
   ): Promise<void> {
     if (type === "datetime") {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
     }
 
-    type = PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
+    type = V6_1.PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
     await super.changeColumn(tableName, columnName, type, options);
   }
 
-  static override TableDefinition = {
+  static override TableDefinition: Module = new Module().include({
     newColumnDefinition(
       this: { conn: AbstractAdapter },
-      super_: Super,
       name: string,
       type: ColumnType,
       options: Options = {},
     ) {
-      type = PostgreSQLCompat.compatibleTimestampType(type, this.conn);
-      return super_(name, type, options);
+      type = V6_1.PostgreSQLCompat.compatibleTimestampType(type, this.conn);
+      return V6_1.TableDefinition.superMethod(this, "newColumnDefinition")!(name, type, options);
     },
 
-    change(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
-      return super_(name, type, options);
+    change(this: object, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
+      return V6_1.TableDefinition.superMethod(this, "change")!(name, type, options);
     },
 
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
-      return super_(name, type, options);
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
+      return V6_1.TableDefinition.superMethod(this, "column")!(name, type, options);
     },
 
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
-  } as unknown as PrependModule;
+    /** @internal */
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V6_1.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V6_1.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
 
-class V6_0ReferenceDefinition extends ConnectionAdaptersReferenceDefinition {
-  protected override indexOptions(_tableName: string): AddIndexOptions {
-    return this.asOptions(this.index);
-  }
-}
-
 export class V6_0 extends V6_1 {
-  static ReferenceDefinition = V6_0ReferenceDefinition;
+  static ReferenceDefinition: typeof ConnectionAdaptersReferenceDefinition = class ReferenceDefinition extends ConnectionAdaptersReferenceDefinition {
+    override indexOptions(_tableName: string): AddIndexOptions {
+      return this.asOptions(this.index);
+    }
+  };
 
-  static override TableDefinition = {
-    references(super_: Super, ...args: unknown[]) {
+  static override TableDefinition: Module = new Module().include({
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
       options = { ...options, _usesLegacyReferenceIndexName: true };
-      return super_(...args, options);
+      return V6_0.TableDefinition.superMethod(this, "references")!(...args, options);
     },
 
-    belongsTo(super_: Super, ...args: unknown[]) {
-      return (V6_0.TableDefinition.references as Super).call(this, super_, ...args);
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
+      return V6_0.TableDefinition.superMethod(this, "column")!(name, type, options);
     },
 
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
-      return super_(name, type, options);
-    },
+    /** @internal */
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
-  } as unknown as PrependModule;
+  static {
+    V6_0.TableDefinition.aliasMethod("belongsTo", "references");
+  }
 
   override async addReference(
     tableName: string,
@@ -350,62 +354,62 @@ export class V6_0 extends V6_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V6_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V6_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
 
-const V5_2CommandRecorder = {
-  invertTransaction(_super: unknown, args: unknown[], block?: unknown) {
-    return ["transaction", args, block];
-  },
-
-  invertChangeColumnComment(_super: unknown, args: unknown[]) {
-    return ["changeColumnComment", args];
-  },
-
-  invertChangeTableComment(_super: unknown, args: unknown[]) {
-    return ["changeTableComment", args];
-  },
-} as unknown as PrependModule;
-
 export class V5_2 extends V6_0 {
-  static override TableDefinition = {
-    timestamps(super_: Super, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
-      return super_(options);
+  static override TableDefinition: Module = new Module().include({
+    timestamps(this: object, options: Options = {}) {
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
+      return V5_2.TableDefinition.superMethod(this, "timestamps")!(options);
     },
 
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
-      return super_(name, type, options);
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
+      return V5_2.TableDefinition.superMethod(this, "column")!(name, type, options);
     },
 
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
+    /** @internal */
+    raiseOnIfExistOptions(_options: Options): void {},
 
-    raiseOnDuplicateColumn(_super: unknown, _name: string): void {},
-  } as unknown as PrependModule;
+    /** @internal */
+    raiseOnDuplicateColumn(_name: string): void {},
+  });
 
-  static CommandRecorder = V5_2CommandRecorder;
+  static override CommandRecorder: Module = new Module().include({
+    invertTransaction(args: unknown[], block?: (...args: unknown[]) => unknown) {
+      return ["transaction", args, block];
+    },
+
+    invertChangeColumnComment(args: unknown[]) {
+      return ["changeColumnComment", args];
+    },
+
+    invertChangeTableComment(args: unknown[]) {
+      return ["changeTableComment", args];
+    },
+  });
 
   override async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    options = { ...options, precision: options.precision ?? null } as ColumnOptions;
+    options = {
+      ...options,
+      precision: rtest(options.precision) ? options.precision : null,
+    } as ColumnOptions;
     await super.addTimestamps(tableName, options);
   }
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V5_2.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V5_2.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override async commandRecorder(): Promise<MigrationCommandRecorder> {
     const recorder = await super.commandRecorder();
-    prepend(recorder, V5_2.CommandRecorder);
+    prepend(rbObjSingletonClass(recorder), V5_2.CommandRecorder);
     return recorder;
   }
 }
@@ -419,8 +423,12 @@ export class V5_1 extends V5_2 {
   ): Promise<void> {
     const connection = await this.connection;
     if (connection.adapterName === "PostgreSQL") {
-      const { default: _d, null: _n, comment: _c, ...except } = options;
-      await super.changeColumn(tableName, columnName, type, except);
+      await super.changeColumn(
+        tableName,
+        columnName,
+        type,
+        except(options as Options, "default", "null", "comment"),
+      );
       if (Object.hasOwn(options, "default")) {
         await connection.changeColumnDefault(tableName, columnName, options.default);
       }
@@ -455,29 +463,28 @@ export class V5_1 extends V5_2 {
 }
 
 export class V5_0 extends V5_1 {
-  static override TableDefinition = {
-    primaryKey(
-      super_: Super,
-      name: string,
-      type: ColumnType = "primary_key",
-      options: Options = {},
-    ) {
+  static override TableDefinition: Module = new Module().include({
+    primaryKey(name: string, type: ColumnType = "primary_key", options: Options = {}) {
       if (type === "primary_key") type = "integer";
-      return super_(name, type, options);
+      return V5_0.TableDefinition.superMethod(this, "primaryKey")!(name, type, options);
     },
 
-    references(super_: Super, ...args: unknown[]) {
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return super_(...args, { type: "integer", ...options });
+      return V5_0.TableDefinition.superMethod(this, "references")!(...args, {
+        type: "integer",
+        ...options,
+      });
     },
 
-    belongsTo(super_: Super, ...args: unknown[]) {
-      return (V5_0.TableDefinition.references as Super).call(this, super_, ...args);
-    },
+    /** @internal */
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
-  } as unknown as PrependModule;
+  static {
+    V5_0.TableDefinition.aliasMethod("belongsTo", "references");
+  }
 
   override async createTable(
     tableName: string,
@@ -493,14 +500,9 @@ export class V5_0 extends V5_1 {
       }
     }
 
-    if (
-      !(
-        (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") &&
-        options.id === "bigint"
-      )
-    ) {
+    if (!(["Mysql2", "Trilogy"].includes(connection.adapterName) && options.id === "bigint")) {
       if (
-        (options.id === "integer" || options.id === "bigint") &&
+        (["integer", "bigint"] as unknown[]).includes(options.id) &&
         !Object.hasOwn(options, "default")
       ) {
         options.default = null;
@@ -520,8 +522,12 @@ export class V5_0 extends V5_1 {
     options?: Parameters<Current["createJoinTable"]>[2],
     fn?: Parameters<Current["createJoinTable"]>[3],
   ): Promise<void> {
-    if (typeof options === "function") [options, fn] = [{}, options];
-    const columnOptions = { type: "integer", ...options?.columnOptions };
+    if (typeof options === "function") {
+      fn = options;
+      options = undefined;
+    }
+    const columnOptions = options?.columnOptions ?? {};
+    reverseMergeBang(columnOptions, { type: "integer" });
     await super.createJoinTable(table1, table2, { ...options, columnOptions }, fn);
   }
 
@@ -535,7 +541,7 @@ export class V5_0 extends V5_1 {
       type = "integer";
       options = { ...options, primaryKey: true };
     } else if (type === "datetime") {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
     }
     await super.addColumn(tableName, columnName, type, options);
   }
@@ -558,7 +564,7 @@ export class V5_0 extends V5_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V5_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V5_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
@@ -566,31 +572,35 @@ export class V5_0 extends V5_1 {
 type RemoveIndexOptions = { column?: string | string[]; name?: string; ifExists?: boolean };
 
 export class V4_2 extends V5_0 {
-  static override TableDefinition = {
-    references(super_: Super, ...args: unknown[]) {
+  static override TableDefinition: Module = new Module().include({
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return super_(...args, { ...options, index: options.index || false });
+      return V4_2.TableDefinition.superMethod(this, "references")!(...args, {
+        ...options,
+        index: options.index ?? false,
+      });
     },
 
-    belongsTo(super_: Super, ...args: unknown[]) {
-      return (V4_2.TableDefinition.references as Super).call(this, super_, ...args);
-    },
-
-    timestamps(super_: Super, options: Options = {}) {
+    timestamps(this: object, options: Options = {}) {
       if (options.null == null) options = { ...options, null: true };
-      return super_(options);
+      return V4_2.TableDefinition.superMethod(this, "timestamps")!(options);
     },
 
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
-  } as unknown as PrependModule;
+    /** @internal */
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
+
+  static {
+    V4_2.TableDefinition.aliasMethod("belongsTo", "references");
+  }
 
   override async addReference(
     tableName: string,
     refName: string,
     options: Parameters<Current["addReference"]>[2] = {},
   ): Promise<void> {
-    options = { ...options, index: options.index || false };
+    options = { ...options, index: options.index ?? false };
     await super.addReference(tableName, refName, options);
   }
 
@@ -626,19 +636,19 @@ export class V4_2 extends V5_0 {
     tableName: string,
     columnName: string | string[] | RemoveIndexOptions | null = null,
     options: RemoveIndexOptions = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
       columnName = null;
     }
 
     options = { ...options, name: await this.indexNameForRemove(tableName, columnName, options) };
-    await super.removeIndex(tableName, columnName ?? undefined, options);
+    return await super.removeIndex(tableName, columnName ?? undefined, options);
   }
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V4_2.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V4_2.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 
@@ -653,7 +663,7 @@ export class V4_2 extends V5_0 {
 
     if (!(await connection.indexNameExists(tableName, indexName))) {
       if (Object.hasOwn(options, "name")) {
-        const { column: _column, ...optionsWithoutColumn } = options;
+        const optionsWithoutColumn = except(options, "column");
         const indexNameWithoutColumn = connection.indexName(tableName, optionsWithoutColumn);
 
         if (await connection.indexNameExists(tableName, indexNameWithoutColumn)) {

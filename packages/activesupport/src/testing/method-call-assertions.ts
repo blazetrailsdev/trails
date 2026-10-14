@@ -11,10 +11,12 @@ interface MockCall {
   args: unknown[];
 }
 
-class Mock {
+/** @noRailsEquivalent PERMANENT */
+export class Mock {
   #expectedCalls = new Map<string, MockCall[]>();
   #actualCalls = new Map<string, MockCall[]>();
 
+  /** @noRailsEquivalent PERMANENT */
   expect(name: string, retval: unknown, args: unknown[] = []): this {
     if (!Array.isArray(args)) throw new ArgumentError("args must be an array");
     const expected = this.#expectedCalls.get(name) ?? [];
@@ -29,6 +31,7 @@ class Mock {
     return `${name}(${args}) => ${rbInspect(data.retval)}`;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   verify(): true {
     for (const [name, expected] of this.#expectedCalls) {
       const actual = this.#actualCalls.get(name) ?? null;
@@ -42,6 +45,7 @@ class Mock {
     return true;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   call(...args: unknown[]): unknown {
     const sym = ":call";
     const actualCalls = this.#actualCalls.get("call") ?? [];
@@ -105,6 +109,7 @@ export function assertCalled<T extends object>(
       timesCalled += 1;
       return returns;
     },
+    undefined,
     block,
   );
   if (result) return result.then(check);
@@ -122,7 +127,13 @@ export function assertCalledWith<T extends object>(
   const mock = new Mock();
   expectCalledWith(mock, args, { returns });
 
-  const result = stub(object, methodName, (...called: unknown[]) => mock.call(...called), block);
+  const result = stub(
+    object,
+    methodName,
+    (...called: unknown[]) => mock.call(...called),
+    undefined,
+    block,
+  );
 
   if (result) return result.then(() => assertMock(mock));
   assertMock(mock);
@@ -233,32 +244,54 @@ export function stubAnyInstance<T>(
   }
 }
 
-function stub<T extends object>(
+/** @noRailsEquivalent PERMANENT */
+export function stub<T extends object, R extends void | Promise<void> = void>(
   object: T,
-  methodName: keyof T & string,
-  replacement: (...args: unknown[]) => unknown,
-  block?: () => void | Promise<void>,
-): Promise<void> | undefined {
-  const original = object[methodName];
-  const restore = () => {
-    (object as Record<string, unknown>)[methodName] = original;
+  name: keyof T & string,
+  valOrCallable: unknown,
+  blockArgs: unknown[] = [],
+  block?: (object: T) => R,
+): R extends Promise<void> ? Promise<void> : undefined {
+  type Result = R extends Promise<void> ? Promise<void> : undefined;
+  const original = Object.getOwnPropertyDescriptor(object, name);
+  let inherited = original;
+  for (let p = Object.getPrototypeOf(object); !inherited && p; p = Object.getPrototypeOf(p)) {
+    inherited = Object.getOwnPropertyDescriptor(p, name);
+  }
+  const stubbed = (...args: unknown[]) => {
+    if (typeof valOrCallable === "function") return valOrCallable(...args);
+    if (valOrCallable instanceof Mock) return valOrCallable.call(...args);
+    const blk = args.at(-1);
+    if (typeof blk === "function") blk(...blockArgs);
+    return valOrCallable;
   };
-  (object as Record<string, unknown>)[methodName] = replacement;
-  let result: void | Promise<void>;
+  Object.defineProperty(
+    object,
+    name,
+    inherited?.get
+      ? { configurable: true, get: () => stubbed(), set: inherited.set }
+      : { configurable: true, writable: true, value: stubbed },
+  );
+  const restore = () => {
+    if (original) Object.defineProperty(object, name, original);
+    else delete (object as Record<string, unknown>)[name];
+  };
+  let result: R | undefined;
   try {
-    result = block?.();
+    result = block?.(object);
   } catch (e) {
     restore();
     throw e;
   }
   if (result && typeof result.then === "function") {
-    return result.finally(restore);
+    return result.finally(restore) as Result;
   }
   restore();
-  return undefined;
+  return undefined as Result;
 }
 
-function assertMock(mock: Mock): void {
+/** @noRailsEquivalent PERMANENT */
+export function assertMock(mock: Mock): void {
   try {
     assert(mock.verify());
   } catch (e) {
@@ -289,3 +322,13 @@ function assertEqual(expected: unknown, actual: unknown, message: string): void 
     () => `${message}.\nExpected: ${expected}\n  Actual: ${actual}`,
   );
 }
+
+export const MethodCallAssertions = {
+  assertCalled,
+  assertCalledWith,
+  assertNotCalled,
+  expectCalledWith,
+  assertCalledOnInstanceOf,
+  assertNotCalledOnInstanceOf,
+  stubAnyInstance,
+};

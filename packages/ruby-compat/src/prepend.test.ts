@@ -191,4 +191,62 @@ describe("prepend", () => {
     });
     expect(new Greeter().hi()).toBe("b-a-base");
   });
+
+  it("skips a module that is already prepended", () => {
+    class Greeter {
+      hi(): string {
+        return "base";
+      }
+    }
+    const a = {
+      hi(super_: (...args: unknown[]) => unknown) {
+        return `a-${super_.call(this)}`;
+      },
+    };
+    const b = {
+      hi(super_: (...args: unknown[]) => unknown) {
+        return `b-${super_.call(this)}`;
+      },
+    };
+    prepend(Greeter.prototype, a);
+    prepend(Greeter.prototype, b);
+    prepend(Greeter.prototype, a);
+    expect(new Greeter().hi()).toBe("b-a-base");
+  });
+
+  it("puts a class module's included methods ahead of the target's own", () => {
+    const target = { mark: () => "?", greet: (name: string) => `hi ${name}` };
+    class Marks {
+      mark(): string {
+        return ".";
+      }
+    }
+    class Punctuation extends Marks {
+      override mark(): string {
+        return "!";
+      }
+    }
+    class Loud extends Punctuation {
+      greet(super_: (...args: unknown[]) => unknown, name: string) {
+        return `${String(super_(name))}${this.mark()}`;
+      }
+    }
+    prepend(target, Loud);
+    prepend(target, Loud);
+
+    expect(target.mark()).toBe("!");
+    expect(target.greet("ada")).toBe("hi ada!");
+  });
+
+  it("rejects a class module whose entry is an accessor, without reading it", () => {
+    let read = false;
+    class Lazy {
+      get greet(): string {
+        read = true;
+        return "hi";
+      }
+    }
+    expect(() => prepend({}, Lazy)).toThrow(TypeError);
+    expect(read).toBe(false);
+  });
 });

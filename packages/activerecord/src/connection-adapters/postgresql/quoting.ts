@@ -1,9 +1,4 @@
-import {
-  BinaryData,
-  DateInfinity,
-  DateNegativeInfinity,
-  type ValueType,
-} from "@blazetrails/activemodel";
+import { BinaryData, type ValueType } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import {
   quote as abstractQuote,
@@ -14,15 +9,13 @@ import {
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Temporal } from "@blazetrails/date";
-import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { format, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
+import { escapeBytea as pgEscapeBytea, type PGConnection } from "../../pg/connection.js";
+import { format, rbFSend, toS, rbObjRespondTo, Range, Rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
-import { ConnectionNotEstablished } from "../../errors.js";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {
@@ -30,9 +23,6 @@ export class IntegerOutOf64BitRange extends Error {
     this.name = "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting::IntegerOutOf64BitRange";
   }
 }
-
-const PG_INT64_MIN = BigInt("-9223372036854775808");
-const PG_INT64_MAX = BigInt("9223372036854775807");
 
 export interface BinaryBind {
   value: string;
@@ -52,45 +42,24 @@ export interface CastTypeLookupHost {
   lookupCastType(sqlType: string | null): ValueType;
 }
 
-const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
-const QUOTED_TABLE_NAMES = new Map<unknown, string>();
+const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
+const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
-export function escapeBytea(value: Buffer | Uint8Array | string): string {
-  const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
-  return `\\x${buffer.toString("hex")}`;
+export function escapeBytea(value: Uint8Array | string | null | undefined): string | undefined {
+  if (value != null) return pgEscapeBytea(value);
 }
 
-export function unescapeBytea(value: string): Buffer {
-  if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
-
-  const bytes: number[] = [];
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    if (ch === "\\") {
-      const next = value[i + 1];
-      if (next === "\\") {
-        bytes.push(0x5c);
-        i += 1;
-        continue;
-      }
-      const octal = value.slice(i + 1, i + 4);
-      if (/^[0-7]{3}$/.test(octal)) {
-        const byte = parseInt(octal, 8);
-        if (byte <= 0o377) {
-          bytes.push(byte);
-          i += 3;
-          continue;
-        }
-      }
-    }
-    bytes.push(ch.charCodeAt(0));
+export async function unescapeBytea(
+  this: { validRawConnection(): unknown },
+  value: string | null | undefined,
+): Promise<Uint8Array | undefined> {
+  if (value != null) {
+    return ((await this.validRawConnection()) as PGConnection).unescapeBytea(value);
   }
-  return Buffer.from(bytes);
 }
 
 export function checkIntInRange(value: bigint | number): void {
-  const bigVal = typeof value === "bigint" ? value : BigInt(Math.trunc(value));
-  if (bigVal > PG_INT64_MAX || bigVal < PG_INT64_MIN) {
+  if (value > 9223372036854775807n || value < -9223372036854775808n) {
     const exception = `Provided value outside of the range of a signed 64bit integer.
 
 PostgreSQL will treat the column type in question as a numeric.
@@ -121,14 +90,10 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
     return null;
   }
   if (typeof value === "number" || typeof value === "bigint" || value instanceof BigDecimal) {
-    if (
-      value instanceof BigDecimal
-        ? value.isFinite()
-        : typeof value === "bigint" || Number.isFinite(value)
-    ) {
+    if (rbFSend(value, "isFinite")) {
       return abstractQuote.call(this, value);
     } else {
-      return `'${String(value)}'`;
+      return `'${toS(value)}'`;
     }
   }
   if (value instanceof ArrayData) {
@@ -140,7 +105,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
   return abstractQuote.call(this, value);
 }
 
-/** @missingRailsCall with_raw_connection — CONVERGEABLE pg-quote-string-escapes-without-with-raw-connection */
+/** @missingRailsCall with_raw_connection — PERMANENT */
 export function quoteString(s: string): string {
   return s.replace(/'/g, "''");
 }
@@ -153,16 +118,17 @@ export function quoteSchemaName(schemaName: string): string {
   return quoteColumnName(schemaName);
 }
 
-export function quotedDate(value: TemporalDateLike): string {
-  if (yearOf(value) <= 0) {
-    const bceYear = format("%04d", -yearOf(value) + 1);
-    return `${abstractQuotedDate(value).replace(/^-?\d+/, bceYear)} BC`;
+export function quotedDate(this: { defaultTimezone: string }, value: TemporalDateLike): string {
+  if (year(value) <= 0) {
+    const bceYear = format("%04d", -year(value) + 1);
+    return abstractQuotedDate.call(this, value).replace(/^-?\d+/, bceYear) + " BC";
+  } else {
+    return abstractQuotedDate.call(this, value);
   }
-  return abstractQuotedDate(value);
 }
 
 export function quotedBinary(value: BinaryData): string {
-  return `'${escapeBytea(value.bytes)}'`;
+  return `'${escapeBytea(value.toString())}'`;
 }
 
 export function quoteDefaultExpression(
@@ -183,11 +149,8 @@ export function quoteDefaultExpression(
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (value === DateInfinity) return "infinity";
-  if (value === DateNegativeInfinity) return "-infinity";
   if (value instanceof BinaryData) {
-    const u8 = value.bytes;
-    return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
+    return { value: value.toString(), format: 1 };
   }
   if (value instanceof XmlData || value instanceof BitData) {
     return value.toString();
@@ -198,21 +161,25 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof Range) {
     return encodeRange.call(this, value);
   }
+  if (value instanceof Rational) {
+    return value.toF();
+  }
   return abstractTypeCast.call(this, value);
 }
 
+/** @inventedArm try — PERMANENT */
 export function lookupCastTypeFromColumn(
-  this: { typeMap: LookupableTypeMap | null },
+  this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,
 ): ValueType {
-  if (this.typeMap == null) throw new ConnectionNotEstablished();
+  if (this.typeMap == null) this.verifyBang().catch(() => {});
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 
 /**
  * @internal
- * @missingRailsCall query_value — CONVERGEABLE pg-lookup-cast-type-resolves-only-warmed-type-names
- * @missingRailsCall quote — CONVERGEABLE pg-lookup-cast-type-resolves-only-warmed-type-names
+ * @missingRailsCall query_value — PERMANENT
+ * @missingRailsCall quote — PERMANENT
  */
 export function lookupCastType(this: RegtypeOidHost, sqlType: string | null): ValueType {
   return abstractLookupCastType.call(this as never, regtypeOid.call(this, sqlType));
@@ -267,8 +234,8 @@ function typeCastRangeValue(this: QuotingDispatchHost, value: unknown): unknown 
 }
 
 /** @internal */
-function isInfinity(value: unknown): boolean {
-  return value === Infinity || value === -Infinity;
+function isInfinity(value: unknown): 1 | -1 | null | false {
+  return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
 }
 
 export function columnNameMatcher(): RegExp {
@@ -293,21 +260,13 @@ export function columnNameWithOrderMatcher(): RegExp {
 }
 
 export function quoteColumnName(name: unknown): string {
-  let quoted = QUOTED_COLUMN_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `"${toS(name).replace(/"/g, '""')}"`;
-    QUOTED_COLUMN_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (QUOTED_COLUMN_NAMES[name as string] ||= `"${toS(name).replace(/"/g, '""')}"`);
 }
 
 export function quoteTableName(name: unknown): string {
-  let quoted = QUOTED_TABLE_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = Utils.extractSchemaQualifiedName(toS(name)).quoted();
-    QUOTED_TABLE_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (QUOTED_TABLE_NAMES[name as string] ||= Utils.extractSchemaQualifiedName(
+    toS(name),
+  ).quoted());
 }
 
 function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | number | null {
@@ -320,7 +279,9 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
   return this._regtypeOids?.get(name) ?? this._regtypeOids?.get(bare) ?? bare;
 }
 
-function yearOf(value: TemporalDateLike): number {
-  if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(defaultSqlTimezone()).year;
-  return value.year;
+function year(value: TemporalDateLike): number {
+  if ("year" in value) return value.year;
+  // boundary: a JS `Date` a caller still holds is a local Ruby `Time`.
+  if (value instanceof Date) return value.getFullYear();
+  return value.toZonedDateTimeISO("UTC").year;
 }

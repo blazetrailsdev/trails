@@ -5,7 +5,8 @@ import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,
 } from "../connection-adapters/abstract-adapter.js";
-import { SchemaCache, type Pool } from "../connection-adapters/schema-cache.js";
+import { NullPool, type ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import { SchemaCache, SchemaReflection, type Pool } from "../connection-adapters/schema-cache.js";
 import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
 import { supportsExpressionIndex } from "./schema-types.js";
 import { TEMP_DB_PREFIX } from "./sqlite-template.js";
@@ -29,12 +30,12 @@ export async function dumpTemplateSchemaCache(
   pool: Pool,
   runToken: string,
 ): Promise<{ filename: string; fingerprint: string } | null> {
-  const cache = adapter.internalSchemaCache;
-  if (!cache) return null;
-  await cache.addAll(pool);
+  const reflection = adapter.pool.schemaReflection;
+  await reflection.loadAllBang(pool);
   for (const table of BOOKKEEPING_TABLE_NAMES) {
-    cache.clearDataSourceCacheBang(adapter, table);
+    await reflection.clearDataSourceCacheBang(pool, table);
   }
+  const cache = reflection.loadedCache!;
   const filename = await schemaCacheDumpPathFor(runToken);
   await cache.dumpTo(filename);
   return {
@@ -143,3 +144,28 @@ export async function templateSchemaCache(): Promise<SchemaCache | null> {
 }
 
 let loaded: SchemaCache | null | undefined;
+
+export async function eagerWarmSchemaCache(adapter: DatabaseAdapter): Promise<void> {
+  const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
+  if (pool === null) return;
+  try {
+    const dumped = await templateSchemaCache();
+    if (dumped && (await replaySchemaCacheDump(adapter, pool, dumped))) return;
+    await pool.schemaReflection.loadAllBang(pool);
+  } catch {}
+}
+
+async function replaySchemaCacheDump(
+  adapter: DatabaseAdapter,
+  pool: ConnectionPool,
+  dumped: SchemaCache,
+): Promise<boolean> {
+  const cached = dumpedTables(dumped.marshalDump());
+  const shapes = await schemaShapes(adapter);
+  if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
+  pool.schemaReflection = new SchemaReflection(null, dumped.initializeDup());
+  for (const table of shapes.keys()) {
+    if (!cached.has(table)) await pool.schemaReflection.add(pool, table);
+  }
+  return true;
+}

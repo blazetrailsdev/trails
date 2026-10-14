@@ -1,4 +1,3 @@
-import { Temporal } from "@blazetrails/date";
 import * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue, type ValueType } from "@blazetrails/activemodel";
@@ -9,10 +8,30 @@ import type { Base } from "./base.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
-import { isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
-import { isPresent, many, reverseMerge } from "@blazetrails/activesupport";
+import {
+  type Hash,
+  isEmpty,
+  isSymbol,
+  rbEqual,
+  rbFArray,
+  rbObjAsString,
+  rtest,
+  sort,
+  symbolToS,
+  toSym,
+} from "@blazetrails/ruby-compat";
+import {
+  filterMap,
+  indexWith,
+  isPresent,
+  many,
+  reverseMerge,
+  reverseMergeBang,
+  stringifyKeys,
+  transformKeys,
+} from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
-import { first } from "@blazetrails/ruby-compat";
+import { aryJoin, first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
@@ -39,9 +58,10 @@ async function resolveConnectionFacts(
   connection: any,
 ): Promise<ResolvedConnectionFacts> {
   const cache = connection.schemaCache;
+  await connection.databaseVersion;
   const supportsInsertReturning =
     typeof connection.supportsInsertReturning === "function"
-      ? await connection.supportsInsertReturning()
+      ? connection.supportsInsertReturning()
       : false;
   const supportsInsertOnDuplicateSkip =
     typeof connection.supportsInsertOnDuplicateSkip === "function"
@@ -90,7 +110,7 @@ export class InsertAll {
   private _facts: ResolvedConnectionFacts;
 
   static async execute(
-    relation: Relation<any>,
+    relation: Relation<any, boolean>,
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<Result> {
@@ -107,7 +127,7 @@ export class InsertAll {
   }
 
   constructor(
-    relation: Relation<any>,
+    relation: Relation<any, boolean>,
     connection: NonNullable<Awaited<ModelClass["connection"]>>,
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
@@ -179,7 +199,7 @@ export class InsertAll {
     return (this._updatableColumns ??= [...this.keys].filter((k) => !exclude.has(k)));
   }
 
-  /** @missingRailsCall table_name — CONVERGEABLE insert-all-constructor-reads-the-schema-cache-at-its-rails-call-sites */
+  /** @missingRailsCall table_name — PERMANENT */
   primaryKeys(): string[] {
     return this._facts.primaryKeys;
   }
@@ -192,18 +212,15 @@ export class InsertAll {
     return this.onDuplicate === ":update";
   }
 
-  mapKeyWithValue<T>(fn: (key: string, value: unknown) => T): T[][] {
-    const timestamps = this.recordTimestamps() ? this.timestampsForCreate() : undefined;
-    const keysList = [...this.keysIncludingTimestamps()];
-    return this.inserts.map((row) => {
-      const attributes = { ...row, ...this.scopeAttributes };
-      if (timestamps) {
-        for (const [col, val] of Object.entries(timestamps)) {
-          if (!(col in attributes)) attributes[col] = val;
-        }
-      }
+  mapKeyWithValue<T>(block: (key: string, value: unknown) => T): T[][] {
+    return this.inserts.map((attributes) => {
+      attributes = stringifyKeys(attributes);
+      Object.assign(attributes, this.scopeAttributes);
+      if (this.recordTimestamps()) reverseMergeBang(attributes, this.timestampsForCreate());
+
       this.verifyAttributes(attributes);
-      return keysList.map((key) => fn(key, attributes[key]));
+
+      return [...this.keysIncludingTimestamps()].map((key) => block(key, attributes[key]));
     });
   }
 
@@ -242,19 +259,9 @@ export class InsertAll {
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
       );
     }
-    if (
-      onDuplicate !== undefined &&
-      onDuplicate !== ":update" &&
-      !this.isCustomUpdateSqlProvided() &&
-      isPresent(this.updateOnly)
-    ) {
-      throw new Error("Cannot use both onDuplicate and updateOnly");
-    }
 
     if (isPresent(this.updateOnly)) {
-      this._updatableColumns = Array.isArray(this.updateOnly)
-        ? this.updateOnly
-        : [this.updateOnly as string];
+      this._updatableColumns = rbFArray(this.updateOnly) as string[];
       this.onDuplicate = ":update";
     } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
@@ -271,8 +278,7 @@ export class InsertAll {
 
   /** @internal */
   private uniqueByColumns(): string[] {
-    if (!(this.uniqueBy instanceof IndexDefinition)) return [];
-    return Array.isArray(this.uniqueBy.columns) ? this.uniqueBy.columns : [this.uniqueBy.columns];
+    return rbFArray((this.uniqueBy as IndexDefinition | undefined)?.columns) as string[];
   }
 
   /** @internal */
@@ -304,9 +310,7 @@ export class InsertAll {
 
   /** @internal */
   private hasAttributeAliases(attributes: Record<string, unknown>): boolean {
-    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
-    if (!aliases) return false;
-    return Object.keys(attributes).some((attr) => attr in aliases);
+    return Object.keys(attributes).some((attribute) => this.model.isAttributeAlias(attribute));
   }
 
   /** @internal */
@@ -321,75 +325,68 @@ export class InsertAll {
   /** @internal */
   private resolveAttributeAliases(): void {
     if (!this.hasAttributeAliases(first(this.inserts) ?? {})) return;
-    this.inserts = this.inserts.map((insert) => {
-      const resolved: Record<string, unknown> = {};
-      for (const [attribute, val] of Object.entries(insert)) {
-        resolved[this.resolveAttributeAlias(attribute)] = val;
-      }
-      return resolved;
-    });
-    if (this.updateOnly !== undefined) {
-      const cols = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
-      this.updateOnly = cols.map((attribute) => this.resolveAttributeAlias(attribute));
+    this.inserts = this.inserts.map((insert) =>
+      transformKeys(insert, (attribute) => this.resolveAttributeAlias(attribute)),
+    );
+    if (rtest(this.updateOnly)) {
+      this.updateOnly = (rbFArray(this.updateOnly) as string[]).map((attribute) =>
+        this.resolveAttributeAlias(attribute),
+      );
     }
-    if (typeof this.uniqueBy === "string") {
-      this.uniqueBy = this.resolveAttributeAlias(this.uniqueBy);
-    } else if (Array.isArray(this.uniqueBy)) {
-      this.uniqueBy = this.uniqueBy.map((attribute) => this.resolveAttributeAlias(attribute));
+    if (rtest(this.uniqueBy)) {
+      this.uniqueBy = (rbFArray(this.uniqueBy) as string[]).map((attribute) =>
+        this.resolveAttributeAlias(attribute),
+      );
     }
   }
 
   /** @internal */
   private resolveAttributeAlias(attribute: string): string {
-    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
-    return aliases?.[attribute] ?? attribute;
+    return this.model.attributeAlias(attribute) || attribute;
   }
 
   /** @internal */
   private findUniqueIndexFor(
     uniqueBy: string | string[] | IndexDefinition | undefined,
   ): IndexDefinition | undefined {
-    if (uniqueBy instanceof IndexDefinition) return uniqueBy;
-    const conn = this.connection as { constructor?: { name?: string } };
     if (!this._facts.supportsInsertConflictTarget) {
       if (uniqueBy == null) return undefined;
+
       throw new ArgumentError(
-        `${(conn as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
+        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
       );
     }
-    const modelPk = this.model.primaryKey;
-    const modelPrimaryKeys =
-      modelPk == null || modelPk === "" ? [] : Array.isArray(modelPk) ? modelPk : [modelPk];
-    const nameOrCols =
-      uniqueBy == null ? modelPrimaryKeys : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
-    const match = nameOrCols.map(String);
-    const sortedMatch = [...match].sort().join(",");
-    const idx = this.uniqueIndexes().find(
-      (i: any) =>
-        match.includes(i.name) ||
-        (Array.isArray(i.columns) && [...i.columns].sort().join(",") === sortedMatch),
-    ) as { name: string; columns: string[]; where?: string } | undefined;
-    const tableName = this.model.tableName!;
-    if (idx) {
-      return idx instanceof IndexDefinition
-        ? idx
-        : new IndexDefinition(tableName, idx.name, true, idx.columns, { where: idx.where });
-    }
-    const dbPrimaryKeys = this.primaryKeys().map(String);
-    if (match.join(",") === dbPrimaryKeys.join(",")) {
+
+    const nameOrColumns = rtest(uniqueBy) ? uniqueBy : this.model.primaryKey;
+    const match = rbFArray(nameOrColumns).map((column) => rbObjAsString(column));
+    const sortedMatch = sort(match);
+
+    let index: IndexDefinition | undefined;
+    if (
+      (index = this.uniqueIndexes().find(
+        (i) => match.includes(i.name) || rbEqual(sort(rbFArray(i.columns)), sortedMatch),
+      )) != null
+    ) {
+      return index;
+    } else if (rbEqual(match, this.primaryKeys())) {
       return uniqueBy == null
         ? undefined
-        : new IndexDefinition(tableName, `${tableName}_primary_key`, true, [...match]);
+        : new IndexDefinition(
+            this.model.tableName!,
+            `${this.model.tableName}_primary_key`,
+            true,
+            match,
+          );
+    } else {
+      throw new ArgumentError(`No unique index found for ${rbObjAsString(nameOrColumns)}`);
     }
-    const display = Array.isArray(uniqueBy)
-      ? `[${match.join(", ")}]`
-      : (uniqueBy ?? nameOrCols.join(", "));
-    throw new ArgumentError(`No unique index found for ${display}`);
   }
 
   /** @internal */
-  private uniqueIndexes(): unknown[] {
-    return this._facts.indexes(this.model.tableName!).filter((i: any) => i.unique);
+  private uniqueIndexes(): IndexDefinition[] {
+    return (this._facts.indexes(this.model.tableName!) as IndexDefinition[]).filter(
+      (i) => i.unique,
+    );
   }
 
   /** @internal */
@@ -410,13 +407,11 @@ export class InsertAll {
   }
 
   /** @internal */
-  private timestampsForCreate(): Record<string, unknown> {
-    const now = Temporal.Now.instant();
-    const result: Record<string, unknown> = {};
-    for (const col of this.model.allTimestampAttributesInModel()) {
-      result[col] = now;
-    }
-    return result;
+  private timestampsForCreate(): Hash<string, unknown> {
+    return indexWith(
+      this.model.allTimestampAttributesInModel(),
+      this.connection.highPrecisionCurrentTimestamp(),
+    );
   }
 }
 
@@ -454,17 +449,16 @@ export class Builder implements InsertBuilder {
   private async extractTypesFromColumnsOn(
     tableName: string,
     keys: string[],
-  ): Promise<Record<string, ValueType | null>> {
-    const columns = (await this.model.schemaCache().columnsHash(tableName)) ?? {};
+  ): Promise<Hash<string, ValueType | null>> {
+    const columns = await this.model.schemaCache().columnsHash(tableName);
 
-    const unknownColumn = keys.find((key) => !(key in columns));
+    const columnsKeys = Object.keys(columns);
+    const unknownColumn = first(keys.filter((key) => !columnsKeys.includes(key)));
     if (unknownColumn !== undefined) {
-      throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
+      throw new UnknownAttributeError(new this.model(), unknownColumn);
     }
 
-    const types: Record<string, ValueType | null> = {};
-    for (const key of keys) types[key] = this.model.typeForAttribute(key);
-    return types;
+    return indexWith(keys, (key) => this.model.typeForAttribute(key));
   }
 
   /** @internal */
@@ -482,22 +476,30 @@ export class Builder implements InsertBuilder {
     return this._connection.quoteColumnName(column);
   }
 
+  /**
+   * @inventedArm toSym — PERMANENT
+   * @inventedArm symbolToS — PERMANENT
+   */
   returning(): string | undefined {
-    const ret = this._insertAll.returning;
-    if (!ret) return undefined;
-    if (ret instanceof Nodes.SqlLiteral) return ret.value;
-    const cols = Array.isArray(ret) ? ret : [ret];
-    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
-    return cols
-      .map((attribute: string) => {
-        const attr = isSymbol(attribute) ? symbolToS(attribute) : attribute;
-        const physical = aliases?.[attr];
-        if (physical) {
-          return `${this.quoteColumn(physical)} AS ${this.quoteColumn(attr)}`;
-        }
-        return this.quoteColumn(attr);
-      })
-      .join(",");
+    if (!rtest(this._insertAll.returning)) return undefined;
+
+    if (
+      this._insertAll.returning instanceof Nodes.SqlLiteral ||
+      (typeof this._insertAll.returning === "string" && !isSymbol(this._insertAll.returning))
+    ) {
+      return this._insertAll.returning.toString();
+    } else {
+      return (rbFArray(this._insertAll.returning) as string[])
+        .map((attribute) => {
+          attribute = symbolToS(toSym(attribute));
+          if (this.model.isAttributeAlias(attribute)) {
+            return `${this.quoteColumn(this.model.attributeAlias(attribute)!)} AS ${this.quoteColumn(attribute)}`;
+          } else {
+            return this.quoteColumn(attribute);
+          }
+        })
+        .join(",");
+    }
   }
 
   skipDuplicates(): boolean {
@@ -523,7 +525,7 @@ export class Builder implements InsertBuilder {
 
     const valuesList = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
-      const type = types[key];
+      const type = types.get(key);
       value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });
@@ -550,18 +552,17 @@ export class Builder implements InsertBuilder {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
-    return this.model
-      .timestampAttributesForUpdateInModel()
-      .filter((columnName) => this.touchTimestampAttribute(columnName))
-      .map(
-        (columnName) =>
-          `${columnName}=(CASE WHEN (${this.updatableColumns()
+    return aryJoin(
+      filterMap(this.model.timestampAttributesForUpdateInModel(), (columnName) => {
+        if (this.touchTimestampAttribute(columnName)) {
+          return `${columnName}=(CASE WHEN (${this.updatableColumns()
             .map(block)
             .join(" AND ")}) THEN ${this.model.quotedTableName()}.${columnName} ELSE ${String(
             this._connection.highPrecisionCurrentTimestamp(),
-          )} END),`,
-      )
-      .join("");
+          )} END),`;
+        }
+      }),
+    );
   }
 
   /** @internal */

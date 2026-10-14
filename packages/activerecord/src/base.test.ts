@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
 import {
   TableNotSpecified,
@@ -15,6 +15,7 @@ import {
   Logger,
   TimeWithZone,
   assert,
+  assertEqual,
   assertNot,
   assertNotEmpty,
   assertNotPredicate,
@@ -26,9 +27,8 @@ import {
   assertDifference,
 } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { fixtures } from "./test-fixtures.js";
-import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
-import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { IntegerType, ValueType, ArgumentError, Lint } from "@blazetrails/activemodel";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { Company, Client, AbstractCompany } from "./test-helpers/models/company.js";
 import { Post, PostRecord } from "./test-helpers/models/post.js";
@@ -48,6 +48,7 @@ import { Car } from "./test-helpers/models/car.js";
 import { Bulb, CustomBulb } from "./test-helpers/models/bulb.js";
 import { Edge } from "./test-helpers/models/edge.js";
 import { Joke, GoodJoke } from "./test-helpers/models/joke.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { ColumnName } from "./test-helpers/models/column-name.js";
 import { AutoId } from "./test-helpers/models/auto-id.js";
 import { Default } from "./test-helpers/models/default.js";
@@ -56,7 +57,15 @@ import { Bird } from "./test-helpers/models/bird.js";
 import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
-import { Hash, Range as ArRange, RuntimeError, sort } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  Range as ArRange,
+  RuntimeError,
+  sort,
+  rbModConstSet,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -94,18 +103,28 @@ class ThirdAbstractClass extends SecondAbstractClass {
 class Photo extends SecondAbstractClass {}
 class Smarts extends Base {}
 class CreditCard extends Base {}
+registerModel(CreditCard);
 class PinNumber extends Base {
-  static moduleName = "CreditCard";
+  static {
+    rbModConstSet(CreditCard, "PinNumber", this);
+  }
 }
 class CvvCode extends Base {
-  static moduleName = "CreditCard::PinNumber";
+  static {
+    rbModConstSet(PinNumber, "CvvCode", this);
+  }
 }
-class SubPinNumber extends PinNumber {}
+class SubPinNumber extends PinNumber {
+  static {
+    rbModConstSet(CreditCard, "SubPinNumber", this);
+  }
+}
 class Brand extends Category {
-  static moduleName = "CreditCard";
+  static {
+    rbModConstSet(CreditCard, "Brand", this);
+  }
 }
 class MasterCreditCard extends Base {}
-registerModel(CreditCard);
 registerModel("CreditCard::PinNumber", PinNumber);
 class NonExistentTable extends Base {}
 
@@ -145,6 +164,8 @@ class ReadonlyAuthorPost extends Post {
   }
 }
 
+registerModel([ReadonlyTitlePost, NonRaisingPost, ReadonlyAuthorPost]);
+
 class Weird extends Base {}
 
 function timeToA(time: any): unknown[] {
@@ -162,8 +183,42 @@ function timeToA(time: any): unknown[] {
   ];
 }
 
+describe("LintTest", () => {
+  class LintModel extends Base {}
+
+  let model: LintModel;
+
+  beforeEach(() => {
+    model = new LintModel();
+  });
+
+  it("to key", () => {
+    Lint.Tests.testToKey(model);
+  });
+
+  it("to param", () => {
+    Lint.Tests.testToParam(model);
+  });
+
+  it("to partial path", () => {
+    Lint.Tests.testToPartialPath(model);
+  });
+
+  it("persisted?", () => {
+    Lint.Tests.testPersisted(model);
+  });
+
+  it("model naming", () => {
+    Lint.Tests.testModelNaming(model);
+  });
+
+  it("errors aref", () => {
+    Lint.Tests.testErrorsAref(model);
+  });
+});
+
 describe("BasicsTest", async () => {
-  const { topics, posts, authors, developers, cpkBooks } = fixtures([
+  const { self, topics, posts, authors, developers, cpkBooks } = fixtures([
     "topics",
     "companies",
     "developers",
@@ -185,6 +240,16 @@ describe("BasicsTest", async () => {
     while (cleanupConnections.length > 0) await cleanupConnections.pop()!();
   });
 
+  it("generated association methods module name", () => {
+    const mod = Post.generatedAssociationMethods();
+    assertEqual("Post::GeneratedAssociationMethods", mod.inspect());
+  });
+
+  it("generated relation methods module name", () => {
+    const mod = Post.generatedRelationMethods();
+    assertEqual("Post::GeneratedRelationMethods", mod.inspect());
+  });
+
   it("arel attribute normalization", () => {
     expect(Post.arelTable.get("body")).toEqual(Post.arelTable.get("body"));
     expect(Post.arelTable.get("text")).toEqual(Post.arelTable.get("body"));
@@ -197,8 +262,7 @@ describe("BasicsTest", async () => {
 
     await Topic.resetColumnInformation();
 
-    const adapter = (await Topic.leaseConnection()) as any;
-    vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
+    vi.spyOn(Topic.connectionPool(), "schemaCache", "get").mockImplementation(() => {
       throw new RuntimeError("Some Error");
     });
     await assertRaises([RuntimeError], {}, () => (Topic as any).columnsHash());
@@ -264,6 +328,11 @@ describe("BasicsTest", async () => {
     expect(topicIds).toEqual(((await Topic.pluck("id")) as number[]).sort());
   });
 
+  it("table exists", async () => {
+    assertNot(await NonExistentTable.tableExists());
+    assert(await Topic.tableExists());
+  });
+
   it("preserving date objects", async () => {
     expect(
       ((await Topic.find(1)) as any).last_read,
@@ -314,8 +383,8 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with local time conversion to default timezone utc", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "utc" }, async () => {
         const time = RubyTime.local(2000);
         const topic = (await Topic.create({ written_on: time })) as any;
         const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -327,9 +396,9 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with time with zone conversion to default timezone utc", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "utc" }, async () => {
-        await withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "utc" }, async () => {
+        await self().withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
           const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
           const topic = (await Topic.create({ written_on: time })) as any;
           const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -342,8 +411,8 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with utc time conversion to default timezone local", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "local" }, async () => {
         const time = RubyTime.utc(2000);
         const topic = (await Topic.create({ written_on: time })) as any;
         const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -355,9 +424,9 @@ describe("BasicsTest", async () => {
   });
 
   it("preserving time objects with time with zone conversion to default timezone local", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ default: "local" }, async () => {
-        await withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig({ default: "local" }, async () => {
+        await self().withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
           const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
           const topic = (await Topic.create({ written_on: time })) as any;
           const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
@@ -370,14 +439,17 @@ describe("BasicsTest", async () => {
   });
 
   it("time zone aware attribute with default timezone utc on utc can be created", async () => {
-    await withEnvTz(easternTimeZone(), async () => {
-      await withTimezoneConfig({ awareAttributes: true, default: "utc", zone: "UTC" }, async () => {
-        const pet = (await Pet.create({ name: "Bidu" })) as any;
-        assertPredicate(pet, (p: any) => p.isPersisted());
-        const savedPet = (await Pet.find(pet.id)) as any;
-        expect(savedPet.created_at).not.toBeNull();
-        expect(savedPet.updated_at).not.toBeNull();
-      });
+    await self().withEnvTz(easternTimeZone(), async () => {
+      await self().withTimezoneConfig(
+        { awareAttributes: true, default: "utc", zone: "UTC" },
+        async () => {
+          const pet = (await Pet.create({ name: "Bidu" })) as any;
+          assertPredicate(pet, (p: any) => p.isPersisted());
+          const savedPet = (await Pet.find(pet.id)) as any;
+          expect(savedPet.created_at).not.toBeNull();
+          expect(savedPet.updated_at).not.toBeNull();
+        },
+      );
     });
   });
 
@@ -612,7 +684,7 @@ describe("BasicsTest", async () => {
   });
 
   it("utc as time zone", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       const attributes = { bonus_time: "5:42:00AM" };
       const topic = (await Topic.find(1)) as any;
       await topic.assignAttributes(attributes);
@@ -621,7 +693,7 @@ describe("BasicsTest", async () => {
   });
 
   it("utc as time zone and new", async () => {
-    await withTimezoneConfig({ default: "utc" }, () => {
+    await self().withTimezoneConfig({ default: "utc" }, () => {
       const attributes = {
         "bonus_time(1i)": "2000",
         "bonus_time(2i)": "1",
@@ -1025,7 +1097,7 @@ describe("BasicsTest", async () => {
   });
 
   it("attributes on dummy time", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const attributes = { bonus_time: "5:42:00AM" };
       const topic = (await Topic.find(1)) as any;
       await topic.assignAttributes(attributes);
@@ -1083,6 +1155,32 @@ describe("BasicsTest", async () => {
     expect((await ((await Topic.first()) as any).delete()).isPreviouslyPersisted()).toEqual(true);
   });
 
+  it("dup", async () => {
+    const topic = (await Topic.find(1)) as any;
+    let dupedTopic: any = null;
+    await assertNothingRaised(() => {
+      dupedTopic = topic.dup();
+    });
+    expect(dupedTopic.title).toEqual(topic.title);
+    assertNotPredicate(dupedTopic, (t: any) => t.isPersisted());
+
+    topic.title = "a";
+    dupedTopic.title = "b";
+    expect(topic.title).toEqual("a");
+    expect(dupedTopic.title).toEqual("b");
+
+    dupedTopic = topic.dup();
+    expect(topic.title).toEqual("a");
+
+    expect(dupedTopic.author_email_address).toEqual(topic.author_email_address);
+
+    await dupedTopic.save();
+    assertPredicate(dupedTopic, (t: any) => t.isPersisted());
+    expect(dupedTopic.id).not.toEqual(topic.id);
+
+    await dupedTopic.reload();
+  });
+
   it("dup for a composite primary key model", async () => {
     const book = (await cpkBooks("cpk_great_author_first_book")) as any;
     const newBook = book.dup();
@@ -1094,13 +1192,15 @@ describe("BasicsTest", async () => {
   class DeveloperSalary {
     constructor(public amount: number) {}
   }
+  registerConstant("BasicsTest::DeveloperSalary", DeveloperSalary);
+  afterAll(() => unregisterConstant("BasicsTest::DeveloperSalary", DeveloperSalary));
 
   it("dup with aggregate of same name as attribute", async () => {
     const developerWithAggregate = class extends Base {
       static {
         this.tableName = "developers";
         this.composedOf("salary", {
-          className: DeveloperSalary,
+          className: "BasicsTest::DeveloperSalary",
           mapping: [["salary", "amount"]],
         });
       }
@@ -1212,7 +1312,7 @@ describe("BasicsTest", async () => {
   });
 
   it("default in utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, () => {
+    await self().withTimezoneConfig({ default: "utc" }, () => {
       const defaultRecord = new Default() as any;
 
       expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
@@ -1227,7 +1327,7 @@ describe("BasicsTest", async () => {
   });
 
   it("default in utc with time zone", async () => {
-    await withTimezoneConfig({ default: "utc", zone: "Central Time (US & Canada)" }, () => {
+    await self().withTimezoneConfig({ default: "utc", zone: "Central Time (US & Canada)" }, () => {
       const defaultRecord = new Default() as any;
 
       expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
@@ -1305,17 +1405,13 @@ describe("BasicsTest", async () => {
   it("switching between table name", async () => {
     const k = class extends Joke {};
 
-    await assertDifference(
-      new Map([[() => GoodJoke.count() as Promise<number>, 1]]),
-      null,
-      async () => {
-        k.tableName = "cold_jokes";
-        await k.create();
+    await assertDifference(new Map([[() => GoodJoke.count(), 1]]), null, async () => {
+      k.tableName = "cold_jokes";
+      await k.create();
 
-        k.tableName = "funny_jokes";
-        await k.create();
-      },
-    );
+      k.tableName = "funny_jokes";
+      await k.create();
+    });
   });
 
   it("clear cache when setting table name", async () => {
@@ -1323,11 +1419,11 @@ describe("BasicsTest", async () => {
     try {
       Joke.tableName = "funny_jokes";
       const beforeColumns = await Joke.columns();
-      const beforeSeq = Joke.sequenceName;
+      const beforeSeq = await Joke.sequenceName;
 
       Joke.tableName = "cold_jokes";
       const afterColumns = await Joke.columns();
-      const afterSeq = Joke.sequenceName;
+      const afterSeq = await Joke.sequenceName;
 
       expect(afterColumns).not.toEqual(beforeColumns);
       if (!(beforeSeq == null && afterSeq == null)) expect(afterSeq).not.toEqual(beforeSeq);
@@ -1336,14 +1432,14 @@ describe("BasicsTest", async () => {
     }
   });
 
-  it("dont clear sequence name when setting explicitly", () => {
+  it("dont clear sequence name when setting explicitly", async () => {
     const k = class extends Joke {};
     k.sequenceName = "black_jokes_seq";
     k.tableName = "cold_jokes";
-    const beforeSeq = k.sequenceName;
+    const beforeSeq = await k.sequenceName;
 
     k.tableName = "funny_jokes";
-    const afterSeq = k.sequenceName;
+    const afterSeq = await k.sequenceName;
 
     // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' trailing `unless before_seq.nil? && after_seq.nil?` (base_test.rb:1322)
     if (!(beforeSeq == null && afterSeq == null)) expect(afterSeq).toEqual(beforeSeq);
@@ -1389,23 +1485,18 @@ describe("BasicsTest", async () => {
     expect(k.tableName).toBe("foosks");
   });
 
-  it("sequence name with abstract class", () => {
-    class AbstractModel extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    class ConcreteModel extends AbstractModel {}
-    expect(ConcreteModel.sequenceName).toBe("concrete_models_id_seq");
+  it("sequence name with abstract class", async (ctx) => {
+    const ak = class extends Base {};
+    ak.abstractClass = true;
+    const k = class extends ak {};
+    k.tableName = "projects";
+    const origName = await k.sequenceName;
+    ctx.skip(origName == null, "sequences not supported by db");
+    expect(origName).toEqual(await k.resetSequenceName());
   });
 
-  it("sequence name for cpk model", () => {
-    class CpkModel extends Base {
-      static {
-        this.primaryKey = ["store_id", "department_id"] as any;
-      }
-    }
-    expect(CpkModel.sequenceName).toBeNull();
+  it("sequence name for cpk model", async () => {
+    expect(await CpkBook.sequenceName).toBeNull();
   });
 
   const QUOTED_TYPE = async () => ((await Base.leaseConnection()) as any).quoteColumnName("type");
@@ -1437,6 +1528,12 @@ describe("BasicsTest", async () => {
       .distinct()
       .count();
     expect(res7).toEqual(res6);
+  });
+
+  it("last", async () => {
+    expect(await Developer.last()).toEqual(
+      await Developer.all().mergeBang({ order: "id desc" }).first(),
+    );
   });
 
   it("no limit offset", async () => {
@@ -1563,20 +1660,34 @@ describe("BasicsTest", async () => {
   });
 
   it("clear cache!", async () => {
-    const conn = await Base.leaseConnection();
-    let cache = conn.internalSchemaCache;
-    const c1 = await cache.columns(conn.pool, "posts");
-    expect(cache.size).not.toBe(0);
+    const c1 = await Post.schemaCache().columns("posts");
+    expect(await Post.schemaCache().size()).not.toBe(0);
 
     Base.clearCacheBang();
-    cache = conn.internalSchemaCache;
-    expect(cache.size).toBe(0);
+    expect(await Post.schemaCache().size()).toBe(0);
 
-    const c2 = await cache.columns(conn.pool, "posts");
-    expect(cache.size).not.toBe(0);
+    const c2 = await Post.schemaCache().columns("posts");
+    expect(await Post.schemaCache().size()).not.toBe(0);
     expect(c2.map((column, i) => column.equals(c1[i]))).toEqual(new Array(c1.length).fill(true));
 
-    await cache.addAll(conn.pool);
+    await Post.schemaCache().loadAllBang();
+  });
+
+  it("attribute names", async () => {
+    const expected = [
+      "id",
+      "type",
+      "firm_id",
+      "firm_name",
+      "name",
+      "client_of",
+      "rating",
+      "account_id",
+      "description",
+      "status",
+      "metadata",
+    ];
+    expect(Company.attributeNames()).toEqual(expected);
   });
 
   it("has attribute", async () => {
@@ -1701,11 +1812,7 @@ describe("BasicsTest", async () => {
   });
 
   it("ignored columns are not present in columns_hash", async () => {
-    const conn = await Base.leaseConnection();
-    const cacheColumns = await conn.internalSchemaCache.columnsHash(
-      conn.pool,
-      Developer.tableName!,
-    );
+    const cacheColumns = await Developer.schemaCache().columnsHash(Developer.tableName!);
     expect(Object.keys(cacheColumns ?? {})).toContain("first_name");
     expect(Object.keys(Developer.columnsHash())).not.toContain("first_name");
     expect(Object.keys(SubDeveloper.columnsHash())).not.toContain("first_name");
@@ -1932,13 +2039,14 @@ describe("BasicsTest", async () => {
 });
 
 describe("BasicsTest", () => {
+  const { self } = fixtures([]);
   const cleanupConnections: Array<() => unknown> = [];
   afterEach(async () => {
     while (cleanupConnections.length > 0) await cleanupConnections.pop()!();
   });
 
   it.skipIf(inMemoryDb())("connection in local time", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
         defaultTimezone: "local",
@@ -1965,7 +2073,7 @@ describe("BasicsTest", () => {
   });
 
   it.skipIf(inMemoryDb())("connection in utc time", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
         defaultTimezone: "utc",

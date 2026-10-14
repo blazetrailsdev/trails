@@ -139,6 +139,18 @@ describe("Array#max", () => {
   });
 });
 
+describe("Array#max with a block", () => {
+  it("returns the element the block ranks highest, the first of a tie", () => {
+    const byLength = (a: string, b: string) => cmp(a.length, b.length);
+    expect(max(["0", "000", "00", "abc"], byLength)).toBe("000");
+    expect(max([] as string[], byLength)).toBeNull();
+  });
+
+  it("raises rb_cmperr's ArgumentError when the block answers nil", () => {
+    expect(() => max([1, 2], () => null)).toThrow("comparison of Integer with 1 failed");
+  });
+});
+
 describe("Array#min", () => {
   it("returns nil for an empty array, as rb_ary_min does", () => {
     expect(min([])).toBeNull();
@@ -165,5 +177,16 @@ describe("Array#<=>", () => {
   it("answers nil for a non-Array operand or an uncomparable element pair", () => {
     expect(cmp(["a"], "a")).toBeNull();
     expect(cmp(["a", 1], ["a", "x"])).toBeNull();
+  });
+});
+
+describe("Float#<=>", () => {
+  it("sends coerce to an operand that is not a Numeric and compares the pair it answers", () => {
+    const twoSeconds = { coerce: (other: unknown) => [other, 2] };
+    expect(cmp(1.5, twoSeconds)).toBe(-1);
+    expect(cmp(2.5, twoSeconds)).toBe(1);
+    expect(cmp(1.5, { coerce: () => null })).toBeNull();
+    expect(cmp(1.5, {})).toBeNull();
+    expect(() => cmp(1.5, { coerce: () => [1] })).toThrow("coerce must return [x, y]");
   });
 });

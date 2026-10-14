@@ -5,7 +5,11 @@ import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "../abstract/schema-definitions.js";
-import { Table as PgTable } from "./schema-definitions.js";
+import {
+  ExclusionConstraintDefinition,
+  Table as PgTable,
+  UniqueConstraintDefinition,
+} from "./schema-definitions.js";
 import { Name } from "./utils.js";
 import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
@@ -40,7 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await setup(adapter);
   });
 
@@ -282,7 +286,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("drop database removes the database", { timeout: 30000 }, async () => {
       const tmpDb = "trails_test_drop_db_tmp";
-      const rootAdapter = new PostgreSQLAdapter(postgresUrl());
+      const rootAdapter = new PostgreSQLAdapter({ connectionString: postgresUrl() });
       try {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
@@ -307,7 +311,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("recreate database drops and creates", { timeout: 30000 }, async () => {
       const tmpDb = "trails_test_recreate_tmp";
-      const rootAdapter = new PostgreSQLAdapter(postgresUrl());
+      const rootAdapter = new PostgreSQLAdapter({ connectionString: postgresUrl() });
       try {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
@@ -704,6 +708,72 @@ describe("SchemaStatements constraint name digests", () => {
       "my_uniq",
     );
   });
+
+  it("derives the name when the name option is forwarded as undefined", async () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    const execute = vi.fn(async (_sql: string) => []);
+    Object.assign(ss, { execute });
+    await ss.addExclusionConstraint("invoices", "daterange(start_date, end_date) WITH &&", {
+      name: undefined,
+      using: undefined,
+      where: undefined,
+      deferrable: undefined,
+    });
+    await ss.addUniqueConstraint("sections", ["position"], {
+      name: undefined,
+      usingIndex: undefined,
+      deferrable: undefined,
+    });
+    expect(execute.mock.calls.map(([sql]) => sql)).toEqual([
+      'ALTER TABLE "invoices" ADD CONSTRAINT "excl_rails_74c9160f55" EXCLUDE (daterange(start_date, end_date) WITH &&)',
+      'ALTER TABLE "sections" ADD CONSTRAINT "uniq_rails_1e07660b77" UNIQUE ("position")',
+    ]);
+    expect(
+      ss.exclusionConstraintName("invoices", {
+        name: undefined,
+        expression: "daterange(start_date, end_date) WITH &&",
+      }),
+    ).toBe("excl_rails_74c9160f55");
+    expect(ss.uniqueConstraintName("sections", { name: undefined, column: ["position"] })).toBe(
+      "uniq_rails_1e07660b77",
+    );
+  });
+
+  it("looks a constraint up by the derived name when the name option is forwarded as undefined", async () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    const excl = new ExclusionConstraintDefinition("invoices", "x WITH &&", {
+      name: "excl_rails_74c9160f55",
+    });
+    const uniq = new UniqueConstraintDefinition("sections", ["position"], {
+      name: "uniq_rails_79b901ffb4",
+    });
+    const other = new UniqueConstraintDefinition("sections", ["title"], { name: "other" });
+    vi.spyOn(ss, "exclusionConstraints").mockResolvedValue([excl]);
+    vi.spyOn(ss, "uniqueConstraints").mockResolvedValue([other, uniq]);
+    expect(
+      await ss.exclusionConstraintFor("invoices", {
+        name: undefined,
+        expression: "daterange(start_date, end_date) WITH &&",
+      }),
+    ).toBe(excl);
+    expect(
+      await ss.uniqueConstraintFor("sections", { name: undefined, usingIndex: "unique_index" }),
+    ).toBe(uniq);
+    expect(await ss.uniqueConstraintFor("sections", { name: "other", column: null })).toBe(other);
+  });
+
+  it("names the options in the exclusion ForBang message when expression is false", async () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    vi.spyOn(ss, "exclusionConstraints").mockResolvedValue([]);
+    await expect(
+      ss.exclusionConstraintForBang("invoices", { expression: false, name: "excl" }),
+    ).rejects.toThrow("Table 'invoices' has no exclusion constraint for {:name=>\"excl\"}");
+  });
+
+  it("raises KeyError naming the :expression key when neither name nor expression is given", () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    expect(() => ss.exclusionConstraintName("invoices", {})).toThrow("key not found: :expression");
+  });
 });
 
 describe("SchemaStatements sequence helpers warn without a sequence", () => {
@@ -864,7 +934,7 @@ describe("SchemaStatements#changeTable", () => {
     const { adapter } = makeAdapter();
     const ss = withSchemaStatements(adapter);
     let yielded: unknown;
-    await ss.changeTable("things", (t) => {
+    await ss.changeTable("things", {}, (t) => {
       yielded = t;
     });
     expect(yielded).toBeInstanceOf(PgTable);
@@ -956,39 +1026,47 @@ function makeFakeAdapter() {
 }
 
 describe("SchemaStatements#dropTable", () => {
+  it("ignores a trailing block and an undefined options slot", async () => {
+    const { adapter, executed } = makeFakeAdapter();
+    const ss = withSchemaStatements(adapter);
+    await ss.dropTable("widgets", undefined, () => {});
+    await ss.dropTable("gadgets", { ifExists: true }, () => {});
+    expect(executed).toEqual([`DROP TABLE "widgets"`, `DROP TABLE IF EXISTS "gadgets"`]);
+  });
+
   it("emits a single DROP TABLE statement with all table names joined", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", "comments");
-    expect(executed).toEqual([`DROP TABLE "posts", "comments"`]);
+    await ss.dropTable("widgets", "gadgets");
+    expect(executed).toEqual([`DROP TABLE "widgets", "gadgets"`]);
   });
 
   it("appends CASCADE when force: 'cascade'", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", { force: "cascade" });
-    expect(executed).toEqual([`DROP TABLE "posts" CASCADE`]);
+    await ss.dropTable("widgets", { force: "cascade" });
+    expect(executed).toEqual([`DROP TABLE "widgets" CASCADE`]);
   });
 
   it("appends IF EXISTS when ifExists: true", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", { ifExists: true });
-    expect(executed).toEqual([`DROP TABLE IF EXISTS "posts"`]);
+    await ss.dropTable("widgets", { ifExists: true });
+    expect(executed).toEqual([`DROP TABLE IF EXISTS "widgets"`]);
   });
 
   it("combines IF EXISTS, multiple tables, and CASCADE", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", "comments", { ifExists: true, force: "cascade" });
-    expect(executed).toEqual([`DROP TABLE IF EXISTS "posts", "comments" CASCADE`]);
+    await ss.dropTable("widgets", "gadgets", { ifExists: true, force: "cascade" });
+    expect(executed).toEqual([`DROP TABLE IF EXISTS "widgets", "gadgets" CASCADE`]);
   });
 
   it("clears the schema cache for each table", async () => {
     const { adapter, clearedTables } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", "comments");
-    expect(clearedTables).toEqual(["posts", "comments"]);
+    await ss.dropTable("widgets", "gadgets");
+    expect(clearedTables).toEqual(["widgets", "gadgets"]);
   });
 
   it("issues no statement when called with no table names", async () => {

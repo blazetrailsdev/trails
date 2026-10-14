@@ -1,0 +1,31 @@
+{
+  "name": "@blazetrails/activejob",
+  "version": "0.1.0",
+  "description": "Job framework with pluggable queue adapters for Trails, mirroring the activejob gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*",
+    "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/i18n": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  }
+}

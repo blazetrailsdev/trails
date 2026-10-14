@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { NoMethodError, TypeError, rbObjClass, rbFSend } from "@blazetrails/ruby-compat";
+import { Temporal } from "@blazetrails/date";
 import { Node } from "../nodes/node.js";
+import { SqlLiteral } from "../nodes/sql-literal.js";
+import { Not } from "../nodes/unary.js";
 import { Visitor } from "./visitor.js";
 import { UnsupportedVisitError } from "./to-sql.js";
 
@@ -13,9 +17,6 @@ class TestVisitor extends Visitor {
   visitA(node: A, collector?: unknown): string {
     this.visited.push({ node: node.constructor.name, collector });
     return "A";
-  }
-  static {
-    this.dispatchCache().set(A, "visitA");
   }
 }
 
@@ -43,9 +44,6 @@ describe("Visitor dispatch", () => {
       visitA(_n: A): string {
         return "A";
       }
-      static {
-        this.dispatchCache().set(A, "visitA");
-      }
     }
     expect(FreshVisitor.dispatchCache().has(B)).toBe(false);
     new FreshVisitor().accept(new B());
@@ -55,8 +53,15 @@ describe("Visitor dispatch", () => {
   it("throws TypeError for nodes with no handler", () => {
     const v = new TestVisitor();
     expect(() => v.accept(new C())).toThrow(TypeError);
-    expect(() => v.accept(new C())).toThrow(/Cannot visit Arel::Nodes::C/);
+    expect(() => v.accept(new C())).toThrow(/Cannot visit C/);
     expect(() => v.accept(new C())).not.toThrow(UnsupportedVisitError);
+  });
+
+  it("raises TypeError for an anonymous class with no handler, and walks its ancestors for one", () => {
+    const v = new TestVisitor();
+    expect(() => v.accept(new (class extends C {})())).toThrow(TypeError);
+    expect(() => v.accept(new (class extends C {})())).toThrow(/Cannot visit #<Class:0x[0-9a-f]+>/);
+    expect(v.accept(new (class extends A {})())).toBe("A");
   });
 
   it("falls through to an ancestor's handler when its own dispatch entry names a missing method", () => {
@@ -65,7 +70,6 @@ describe("Visitor dispatch", () => {
         return "A";
       }
       static {
-        this.dispatchCache().set(A, "visitA");
         this.dispatchCache().set(B, "visitTypoed");
       }
     }
@@ -86,6 +90,61 @@ describe("Visitor dispatch", () => {
     expect(() => v.accept(new A())).not.toThrow(UnsupportedVisitError);
   });
 
+  it("re-raises a NoMethodError raised inside a visit method it responds to", () => {
+    class RaisingVisitor extends Visitor {
+      visitA(o: A): unknown {
+        return rbFSend(o, "mumbo");
+      }
+      visitC(o: C): unknown {
+        return (o as unknown as { mumbo(): unknown }).mumbo();
+      }
+    }
+    const v = new RaisingVisitor();
+    expect(() => v.accept(new A())).toThrow(NoMethodError);
+    expect(() => v.accept(new B())).toThrow(NoMethodError);
+    expect(() => v.accept(new C())).toThrow(globalThis.TypeError);
+    expect(() => v.accept(new C())).not.toThrow(/Cannot visit/);
+  });
+
+  it("walks a core class's ancestors: a DateTime reaches visit_Date", () => {
+    class DateVisitor extends Visitor {
+      visitDate(): string {
+        return "Date";
+      }
+    }
+    expect(new DateVisitor().accept(Temporal.PlainDateTime.from("2024-01-02T03:04:05"))).toBe(
+      "Date",
+    );
+    expect(() => new DateVisitor().accept(1)).toThrow(/Cannot visit Integer/);
+  });
+
+  it("walks a String subclass's ancestors: a SqlLiteral reaches visit_String", () => {
+    class StringVisitor extends Visitor {
+      visitString(): string {
+        return "String";
+      }
+    }
+    expect(new StringVisitor().accept(new SqlLiteral("x"))).toBe("String");
+  });
+
+  it("names the method Rails' visit_Some_Thing translates to, and visit_ for an anonymous class", () => {
+    class Some_Thing {}
+    class UnderscoreVisitor extends Visitor {}
+    expect(UnderscoreVisitor.dispatchCache().get(Some_Thing)).toBe("visitSomeThing");
+    expect(UnderscoreVisitor.dispatchCache().get(class {})).toBe("visit_");
+    expect(UnderscoreVisitor.dispatchCache().get(Not)).toBe("visitArelNodesNot");
+  });
+
+  it("keys the dispatch cache by identity and names a method after the class path", () => {
+    class NamingVisitor extends Visitor {}
+    const cache = NamingVisitor.dispatchCache();
+    expect(cache.isCompareByIdentity()).toBe(true);
+    expect(cache.get(Node)).toBe("visitArelNodesNode");
+    expect(cache.get(class {})).toBe("visit_");
+    expect(cache.get(rbObjClass(1))).toBe("visitInteger");
+    expect(NamingVisitor.dispatchCache()).toBe(cache);
+  });
+
   it("propagates the collector argument from accept through to the visit method", () => {
     const v = new TestVisitor();
     const collector = { sentinel: true };
@@ -93,19 +152,18 @@ describe("Visitor dispatch", () => {
     expect(v.visited[0]?.collector).toBe(collector);
   });
 
-  it("each subclass has its own cache seeded from the parent", () => {
+  it("each subclass has its own cache", () => {
     class Sub extends TestVisitor {
       visitC(_n: C): string {
         return "C";
-      }
-      static {
-        this.dispatchCache().set(C, "visitC");
       }
     }
     const sub = new Sub();
     expect(sub.accept(new A())).toBe("A");
     expect(sub.accept(new C())).toBe("C");
-    expect(TestVisitor.dispatchCache().has(C)).toBe(false);
+    expect(Sub.dispatchCache()).not.toBe(TestVisitor.dispatchCache());
+    expect(TestVisitor.dispatchCache().get(C)).toBe("visitC");
+    expect(() => new TestVisitor().accept(new C())).toThrow(TypeError);
   });
 
   describe("raw values dispatch on their Ruby class", () => {
@@ -138,9 +196,6 @@ describe("Visitor dispatch", () => {
       }
       visitTime(): string {
         return "Time";
-      }
-      static {
-        this.dispatchCache().set(Registered, "visitRegistered");
       }
     }
 

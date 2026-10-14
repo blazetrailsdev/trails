@@ -22,6 +22,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "typescript-5": "npm:typescript@5.9.3"
   },

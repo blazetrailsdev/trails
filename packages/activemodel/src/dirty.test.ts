@@ -8,15 +8,12 @@ import {
   assertNotNil,
   assertPredicate,
   assertNotPredicate,
-  asJson as objectAsJson,
   include,
-  prepend,
-  InstanceVariablesObject,
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
 import * as AttributeMethods from "./attribute-methods.js";
-import { Dirty, asJson as dirtyAsJson, initializeDup as dirtyInitializeDup } from "./dirty.js";
+import { Dirty } from "./dirty.js";
 import { API } from "./api.js";
 
 expect.addEqualityTesters([
@@ -101,12 +98,6 @@ class DirtyModel {
     duped.initializeDup(this);
     return duped;
   }
-
-  initializeDup(_other: this): void {}
-
-  asJson(options?: Record<string, unknown>): unknown {
-    return objectAsJson(InstanceVariablesObject.instanceValues(this), options);
-  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -117,6 +108,8 @@ interface DirtyModel extends API, Dirty {
   size: unknown;
   status: unknown;
 
+  initializeDup(other: this): void;
+  asJson(options?: Record<string, unknown>): unknown;
   nameWillChange(): void;
   colorWillChange(): void;
   statusWillChange(): void;
@@ -148,11 +141,6 @@ DirtyModelClass.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { param
 DirtyModelClass.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
 DirtyModelClass.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
 include(DirtyModel, ToJsonWithActiveSupportEncoder);
-
-prepend(DirtyModel.prototype, {
-  asJson: dirtyAsJson,
-  initializeDup: dirtyInitializeDup,
-});
 
 DirtyModelClass.defineAttributeMethods("name", "color", "size", "status");
 

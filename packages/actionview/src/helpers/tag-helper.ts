@@ -13,12 +13,6 @@ import {
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
 import {
-  raw as _raw,
-  safeJoin as _safeJoin,
-  toSentence as _toSentence,
-  type ToSentenceOptions,
-} from "./output-safety-helper.js";
-import {
   ArgumentError,
   BigDecimal,
   eachPair,
@@ -26,9 +20,8 @@ import {
   Module,
   rbInspect,
 } from "@blazetrails/ruby-compat";
-import * as CaptureHelper from "./capture-helper.js";
-import { capture, type CaptureHelperHost } from "./capture-helper.js";
-import * as OutputSafetyHelper from "./output-safety-helper.js";
+import { CaptureHelper, capture, type CaptureHelperHost } from "./capture-helper.js";
+import { OutputSafetyHelper, safeJoin } from "./output-safety-helper.js";
 
 export interface TagHelperHost extends CaptureHelperHost {
   _tagBuilder?: TagBuilder;
@@ -573,21 +566,6 @@ export class TagBuilder {
 /** @internal */
 export function tagBuilder(this: TagHelperHost): TagBuilder {
   return (this._tagBuilder ??= createTagBuilderProxy(this));
-}
-
-export function raw(stringish: unknown): SafeBuffer {
-  return _raw(stringish);
-}
-
-export function safeJoin(
-  array: unknown[] | Hash<unknown, unknown> | Record<string, unknown>,
-  sep?: string | SafeBuffer | null,
-): SafeBuffer {
-  return _safeJoin(array, sep);
-}
-
-export function toSentence(array: unknown[], options?: ToSentenceOptions): SafeBuffer {
-  return _toSentence(array, options);
 }
 
 function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {

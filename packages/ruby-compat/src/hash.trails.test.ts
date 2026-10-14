@@ -1,3 +1,5 @@
+import { ArgumentError } from "./argument-error.js";
+import { Enumerator } from "./enumerator.js";
 import { describe, expect, it } from "vitest";
 import {
   Hash,
@@ -11,19 +13,31 @@ import {
   inspect,
   except,
   fetch,
+  rbBlockGivenP,
+  rbHashSRuby2KeywordsHash,
+  rbHashSRuby2KeywordsHashP,
   hasKey,
+  hashAref,
+  hashAset,
   hashDelete,
+  hashReplace,
+  isInclude,
   keepIf,
   merge,
   mergeBang,
   reject,
+  size,
   slice,
+  keys,
   transformValues,
   update,
+  valuesAt,
 } from "./hash.js";
+import { coreHashMergeKwd } from "./keyword-splat.js";
 import { KeyError } from "./key-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { IndexError } from "./index-error.js";
+import { RuntimeError } from "./runtime-error.js";
 
 describe("Hash#fetch", () => {
   it("looks up an object key in a Map, keeping a stored nil or false", () => {
@@ -35,7 +49,7 @@ describe("Hash#fetch", () => {
 
   it("returns a stored null rather than the default", () => {
     expect(fetch({ offset: null }, "offset", 0)).toBeNull();
-    expect(fetch({ offset: undefined }, "offset", 0)).toBeUndefined();
+    expect(fetch({ offset: undefined }, "offset", 0)).toBe(0);
   });
 
   it("returns a stored false rather than the default", () => {
@@ -89,14 +103,22 @@ describe("Hash#fetch with a block", () => {
     expect(keys).toEqual(["b"]);
   });
 
-  it("does not yield when the key is stored, even for a stored undefined", () => {
+  it("yields for an undefined-valued key, which is an absent keyword", () => {
     expect(
       fetch(
         { a: undefined },
         "a",
         block(() => "yielded"),
       ),
-    ).toBeUndefined();
+    ).toBe("yielded");
+    expect(hasKey({ a: undefined }, "a")).toBe(false);
+    expect(hasKey({ a: null }, "a")).toBe(true);
+    expect(hasKey(Object.assign(Object.create(null), { a: undefined }), "a")).toBe(false);
+    expect(coreHashMergeKwd({ name: "n" }, { name: undefined, column: null })).toEqual({
+      name: "n",
+      column: null,
+    });
+    expect(coreHashMergeKwd({ name: "n" }, { name: "kw" })).toEqual({ name: "kw" });
   });
 
   it("keeps a callable default as a default when it is not marked a block", () => {
@@ -105,10 +127,107 @@ describe("Hash#fetch with a block", () => {
   });
 });
 
+describe("Hash#[] and Hash#[]= on a non-Hash receiver", () => {
+  class Store {
+    seen: Record<string, unknown> = {};
+    get(key: string): unknown {
+      return `got ${key}`;
+    }
+    set(key: string, value: unknown): void {
+      this.seen[key] = value;
+    }
+    eachValue(block: (value: unknown) => void): void {
+      block("each");
+    }
+    transformValues(block: (value: unknown) => unknown): Record<string, unknown> {
+      return { a: block("value") };
+    }
+    except(...keys: string[]): Record<string, unknown> {
+      return { excepted: keys };
+    }
+  }
+
+  it("sends [] and []= to the receiver's own get and set", () => {
+    const store = new Store();
+    expect(hashAref(store, "a")).toBe("got a");
+    expect(hashAset(store, "a", 1)).toBe(1);
+    expect(store.seen).toEqual({ a: 1 });
+  });
+
+  it("sends each_value, transform_values and except to the receiver", () => {
+    const store = new Store();
+    const yielded: unknown[] = [];
+    eachValue(store, (value) => yielded.push(value));
+    expect(yielded).toEqual(["each"]);
+    expect(transformValues(store, (value) => `${String(value)}!`)).toEqual({ a: "value!" });
+    expect(except(store, "x", "y")).toEqual({ excepted: ["x", "y"] });
+  });
+
+  it("answers nil for a plain-object miss, an Object.prototype member included", () => {
+    for (const key of ["b", "toString", "constructor", "__proto__"]) {
+      expect(hashAref({ a: 1 }, key)).toBeNull();
+      expect(hashAref(Object.create(null) as object, key)).toBeNull();
+    }
+  });
+
+  it("lets a receiver's get read its own plain store through hashAref", () => {
+    class Wrapper {
+      store: Record<string, unknown> = { get: "data" };
+      get(key: string): unknown {
+        return hashAref(this.store, key);
+      }
+    }
+    expect(hashAref(new Wrapper(), "get")).toBe("data");
+    expect(hashAref(new Wrapper(), "missing")).toBeNull();
+  });
+
+  it("reads a plain hash's own get and set keys as data", () => {
+    const hash: Record<string, unknown> = { get: () => "no", set: 1 };
+    expect(hashAref(hash, "missing")).toBeNull();
+    expect(hashAset(hash, "set", 2)).toBe(2);
+    expect(hash.set).toBe(2);
+  });
+});
+
+describe("Hash#[] with a binary String key", () => {
+  it("finds a 7-bit String by the binary String that spells it, and the reverse", () => {
+    const h = new Hash<string | Uint8Array, number>();
+    h.set("ab12", 1);
+    h.set(Uint8Array.of(0x63, 0x64), 2);
+    expect(h.get(Uint8Array.of(0x61, 0x62, 0x31, 0x32))).toBe(1);
+    expect(h.get("cd")).toBe(2);
+    expect(h.get(Uint8Array.of(0xe9))).toBeUndefined();
+    expect(h.get("é")).toBeUndefined();
+  });
+
+  it("finds a String by a binary String too long to spread as arguments", () => {
+    const h = new Hash<string | Uint8Array, number>();
+    h.set("a".repeat(300000), 1);
+    expect(h.get(new Uint8Array(300000).fill(0x61))).toBe(1);
+  });
+});
+
 describe("Hash#key?", () => {
   it("is true for a stored null and false for an absent key", () => {
     expect(hasKey({ offset: null }, "offset")).toBe(true);
     expect(hasKey({}, "offset")).toBe(false);
+  });
+
+  it("reads a Map-backed Hash's table, as each_key walks it", () => {
+    const hash = new Map<string, unknown>([["offset", null]]);
+    expect(hasKey(hash, "offset")).toBe(true);
+    expect(hasKey(hash, "size")).toBe(false);
+    expect(eachKey(hash as never)).toEqual(["offset"]);
+    const seen: string[] = [];
+    expect(eachKey(hash as never, (key) => seen.push(key))).toBe(hash);
+    expect(seen).toEqual(["offset"]);
+  });
+});
+
+describe("Hash#include?", () => {
+  it("is Hash#key?", () => {
+    expect(isInclude({ offset: null }, "offset")).toBe(true);
+    expect(isInclude({}, "toString")).toBe(false);
   });
 });
 
@@ -150,6 +269,22 @@ describe("Hash#update", () => {
     update(defaults, options);
     expect(defaults).toEqual({ type: "submit", class: "extra" });
   });
+
+  it("converts an argument that answers to_hash, as rb_hash_update_call does", () => {
+    class Params {
+      permitted = true;
+      toHash(): Hash<string, number> {
+        return new Hash<string, number>().set("b", 2);
+      }
+    }
+    expect(mergeBang({ a: 1 }, new Params())).toEqual({ a: 1, b: 2 });
+  });
+
+  it("raises TypeError for an argument with no to_hash, as rb_convert_type does", () => {
+    expect(() => mergeBang({ a: 1 }, new Date(0) as never)).toThrow(
+      new TypeError("no implicit conversion of Time into Hash"),
+    );
+  });
 });
 
 describe("Hash#merge! with a conflict block", () => {
@@ -172,7 +307,9 @@ describe("Hash#merge! with a conflict block", () => {
     const hash = { a: 1 };
     const unmarked = ((_key: string, left: number): number =>
       left) as unknown as ConflictBlock<number>;
-    update(hash, { a: 2 }, unmarked);
+    expect(() => update(hash, { a: 2 }, unmarked)).toThrow(
+      new TypeError("no implicit conversion of Proc into Hash"),
+    );
     expect(hash).toEqual({ a: 2 });
   });
 
@@ -264,6 +401,18 @@ describe("Hash#reject", () => {
 });
 
 describe("Hash#each_pair", () => {
+  it("sends a receiver that is not a Hash its own each", () => {
+    class Wrapper {
+      each(block: (key: string, value: number) => void): void {
+        block("foo", 0);
+      }
+    }
+    const wrapper = new Wrapper() as unknown as Record<string, number>;
+    const seen: [string, number][] = [];
+    expect(eachPair(wrapper, (k, v) => seen.push([k, v]))).toBe(wrapper);
+    expect(seen).toEqual([["foo", 0]]);
+  });
+
   it("yields each key and value and returns the receiver", () => {
     const hash = { foo: 0, bar: 1 };
     const seen: [string, number][] = [];
@@ -282,6 +431,11 @@ describe("Hash#each_key", () => {
     expect(eachKey(hash, (k) => seen.push(k))).toBe(hash);
     expect(seen).toEqual(["foo", "bar"]);
   });
+
+  it("enumerates the keys when no block is given", () => {
+    const hash = { foo: 0, bar: 1 };
+    expect(eachKey(hash).filter((k) => hash[k as keyof typeof hash] > 0)).toEqual(["bar"]);
+  });
 });
 
 describe("Hash#transform_values", () => {
@@ -289,6 +443,80 @@ describe("Hash#transform_values", () => {
     const hash = { foo: 0, bar: 1, baz: 2 };
     expect(transformValues(hash, (v) => v * 100)).toEqual({ foo: 0, bar: 100, baz: 200 });
     expect(hash).toEqual({ foo: 0, bar: 1, baz: 2 });
+  });
+
+  it("answers a bare Hash for a Hash receiver, without its default", () => {
+    const hash = new Hash<string, number>(7);
+    hash.set("foo", 1);
+    const result = transformValues(hash, (v) => v * 100);
+    expect(result).toBeInstanceOf(Hash);
+    expect([...result]).toEqual([["foo", 100]]);
+    expect(result.get("bar")).toBeUndefined();
+  });
+});
+
+describe("a Hash send to a receiver that defines the method itself", () => {
+  class Row {
+    constructor(private readonly row: Record<string, unknown>) {}
+    isKey(column: string): boolean {
+      return column.toLowerCase() in this.row;
+    }
+    keys(): string[] {
+      return Object.keys(this.row);
+    }
+    eachKey(block: (key: string) => void): void {
+      this.keys().forEach(block);
+    }
+    fetch(column: string, fallback?: () => unknown): unknown {
+      return this.isKey(column) ? this.row[column.toLowerCase()] : fallback?.();
+    }
+  }
+  const row = new Row({ id: 1, name: null });
+
+  it("reaches the receiver's own fetch, key?, keys and each_key", () => {
+    let missed = false;
+    const miss = block(() => {
+      missed = true;
+    });
+    expect(fetch(row, "NAME", miss)).toBeNull();
+    expect(missed).toBe(false);
+    expect(fetch(row, "age", miss)).toBeUndefined();
+    expect(missed).toBe(true);
+    expect([hasKey(row, "ID"), hasKey(row, "age")]).toEqual([true, false]);
+    expect(keys(row)).toEqual(["id", "name"]);
+    const seen: string[] = [];
+    expect(eachKey(row, (key) => seen.push(key))).toBeUndefined();
+    expect(seen).toEqual(["id", "name"]);
+  });
+
+  it("reads a plain object's fetch, isKey and keys entries as Hash data", () => {
+    const hash = { fetch: () => 1, isKey: () => true, keys: () => [] };
+    expect(hasKey(hash, "missing")).toBe(false);
+    expect(keys(hash)).toEqual(["fetch", "isKey", "keys"]);
+    expect(fetch(hash, "missing", 2)).toBe(2);
+  });
+
+  it("reads keys off an object that answers keys as a reader", () => {
+    class Params {
+      marker = true;
+      get keys(): string[] {
+        return ["title"];
+      }
+    }
+    expect(keys(new Params())).toEqual(["title"]);
+    expect(keys({ keys: ["a"] })).toEqual(["keys"]);
+  });
+
+  it("answers the keys of a Map", () => {
+    expect(keys(new Map([["a", 1]]))).toEqual(["a"]);
+  });
+});
+
+describe("Hash and JSON.stringify", () => {
+  it("writes each pair, where a bare Map stringifies as {}", () => {
+    const hash = new Hash<string, number[]>();
+    hash.set("name", [1]);
+    expect(JSON.stringify({ errors: hash })).toBe('{"errors":{"name":[1]}}');
   });
 });
 
@@ -305,8 +533,8 @@ describe("Hash#slice", () => {
     expect(hasKey(slice(hash, "__proto__"), "__proto__")).toBe(true);
   });
 
-  it("ignores keys that are not found, and keeps a stored undefined", () => {
-    expect(slice({ foo: undefined }, "foo", "nope")).toEqual({ foo: undefined });
+  it("ignores keys that are not found, an undefined-valued key among them", () => {
+    expect(slice({ foo: undefined, bar: null }, "foo", "bar", "nope")).toEqual({ bar: null });
     expect(hasKey(slice({ foo: undefined }, "foo", "nope"), "nope")).toBe(false);
   });
 });
@@ -321,6 +549,59 @@ describe("Hash#except", () => {
   it("keeps a __proto__ key as an ordinary key", () => {
     const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
     expect(hasKey(except(hash, "nope"), "__proto__")).toBe(true);
+  });
+});
+
+describe("Hash#except on a Map-backed Hash", () => {
+  it("returns a new bare Hash excluding the given keys", () => {
+    class Sub<K, V> extends Hash<K, V> {}
+    const hash = new Sub<string, number>();
+    hash.setDefault(7);
+    hash.set("a", 100).set("b", 200).set("c", 300);
+    const result = except(hash, "a", "nope");
+    expect(result.default()).toBe(new Hash().default());
+    expect(result.constructor).toBe(Hash);
+    expect([...result]).toEqual([
+      ["b", 200],
+      ["c", 300],
+    ]);
+    expect(hash.size).toBe(3);
+  });
+
+  it("keeps the receiver's compare_by_identity table", () => {
+    const hash = new Hash<unknown, number>().compareByIdentity();
+    const key = ["a"];
+    hash.set(key, 1);
+    expect(except(hash, ["a"]).size).toBe(1);
+    expect(except(hash, key).size).toBe(0);
+  });
+});
+
+describe("Hash#dup on a Map-backed Hash", () => {
+  it("copies the receiver's own table into a new hash of its class", () => {
+    class Sub<K, V> extends Hash<K, V> {}
+    const hash = new Sub<string, number>();
+    hash.set("a", 1).set("b", 2);
+    const copy = dup(hash);
+    expect(copy).not.toBe(hash);
+    expect(copy).toBeInstanceOf(Sub);
+    expect([...copy]).toEqual([...hash]);
+  });
+});
+
+describe("Hash#each_value on a Map-backed Hash", () => {
+  it("yields each value alone and returns the receiver", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1).set("b", 2);
+    const seen: number[] = [];
+    expect(eachValue(hash, (v) => seen.push(v))).toBe(hash);
+    expect(seen).toEqual([1, 2]);
+  });
+
+  it("enumerates the values when no block is given", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1).set("b", 2);
+    expect([...eachValue(hash)]).toEqual([1, 2]);
   });
 });
 
@@ -375,6 +656,75 @@ describe("Hash#default", () => {
     const copy = dup(hash);
     expect(copy.get("x")).toBe("made x");
     expect(copy.default()).toBeUndefined();
+  });
+
+  class Upcased extends Hash<string, number> {
+    override set(key: string, value: number): this {
+      return super.set(key.toUpperCase(), value);
+    }
+  }
+
+  it("dups a Hash subclass into its own class without going through its []=, as rb_hash_dup does", () => {
+    const hash = new Upcased();
+    Hash.prototype.set.call(hash, "a", 1);
+
+    expect(dup(hash)).toBeInstanceOf(Upcased);
+    expect([...dup(hash)]).toEqual([["a", 1]]);
+    expect(hash.toH().constructor).toBe(Hash);
+  });
+
+  it("builds a bare Hash from the pairs a to_h block returns, as rb_hash_to_h_block does", () => {
+    const hash = new Upcased();
+    Hash.prototype.set.call(hash, "a", 1);
+    const result = hash.toH((key, value) => [`${key}_modified`, value + 1]);
+
+    expect(result.constructor).toBe(Hash);
+    expect([...result]).toEqual([["a_modified", 2]]);
+  });
+
+  it("raises for a to_h block result that is not a pair, as rb_hash_set_pair does", () => {
+    const hash = new Hash<string, number>().set("a", 1);
+
+    expect(() => hash.toH((key) => key as never)).toThrow(
+      new TypeError("wrong element type String (expected array)"),
+    );
+    expect(() => hash.toH((key, value) => [key, value, 3] as never)).toThrow(
+      new ArgumentError("element has wrong array length (expected 2, was 3)"),
+    );
+  });
+
+  it("replaces the table and the default without going through a subclass's []=, as rb_hash_replace does", () => {
+    const hash = new Upcased().set("stale", 0);
+    const other = new Hash<string, number>(7).set("a", 1);
+
+    expect(hash.replace(other)).toBe(hash);
+    expect([[...hash], hash.default()]).toEqual([[["a", 1]], 7]);
+    expect([...hash.replace({ b: 2 })]).toEqual([["b", 2]]);
+    expect(() => hash.freeze().replace(other)).toThrow(FrozenError);
+  });
+
+  it("slices and updates a Hash receiver, the conflict block included", () => {
+    const hash = new Hash<string, number>().set("a", 1).set("b", 2);
+
+    const result = slice(hash, "b", "missing", "a");
+    expect([result.constructor, [...result]]).toEqual([
+      Hash,
+      [
+        ["b", 2],
+        ["a", 1],
+      ],
+    ]);
+    expect(update(hash, { a: 2, c: 3 })).toBe(hash);
+    update(
+      hash,
+      new Map([["a", 10]]),
+      block((_key: string, oldValue: number, newValue: number) => oldValue + newValue),
+    );
+    expect([...hash]).toEqual([
+      ["a", 12],
+      ["b", 2],
+      ["c", 3],
+    ]);
   });
 
   it("dups a plain object into a new object", () => {
@@ -440,6 +790,25 @@ describe("eachValue", () => {
     expect(eachValue(h, (v) => seen.push(v))).toBe(h);
     expect(seen).toEqual([1, 2]);
   });
+
+  it("enumerates the values when no block is given", () => {
+    const enumerator = eachValue({ a: 1, b: null });
+    expect(enumerator).toBeInstanceOf(Enumerator);
+    expect([...enumerator]).toEqual([1, null]);
+  });
+});
+
+describe("hashReplace", () => {
+  it("empties the receiver, copies the other hash, and returns the receiver", () => {
+    const hash: Record<string, unknown> = { foo: 0, bar: 1 };
+    expect(hashReplace(hash, { baz: 2 })).toBe(hash);
+    expect(hash).toEqual({ baz: 2 });
+    expect(hashReplace(hash, hash)).toEqual({ baz: 2 });
+  });
+
+  it("raises FrozenError on a frozen receiver", () => {
+    expect(() => hashReplace(Object.freeze({ foo: 0 }), {})).toThrow(/can't modify frozen Hash/);
+  });
 });
 
 describe("hashDelete", () => {
@@ -458,7 +827,61 @@ describe("hashDelete", () => {
   });
 });
 
+describe("hashDelete on a Map", () => {
+  it("removes the entry and returns its stored value, or nil for an absent key", () => {
+    const hash = new Map<string, number>([["foo", 0]]);
+    expect(hashDelete(hash, "foo")).toBe(0);
+    expect(hashDelete(hash, "foo")).toBeNull();
+    expect(hashDelete(hash, "foo", (key) => `no ${key}`)).toBe("no foo");
+    expect(hash.size).toBe(0);
+  });
+});
+
+describe("hashAref / hashAset", () => {
+  it("reads a stored value and answers nil for an absent key, on either hash", () => {
+    const key = () => {};
+    expect(hashAref({ foo: 0 }, "foo")).toBe(0);
+    expect(hashAref({ foo: 0 }, "toString")).toBeNull();
+    expect(hashAref(new Map<unknown, unknown>([[key, "v"]]), key)).toBe("v");
+    expect(hashAref(new Map(), "foo")).toBeNull();
+  });
+
+  it("stores the pair on either hash and returns the value", () => {
+    const hash: Record<string, number> = {};
+    const map = new Map<unknown, unknown>();
+    expect(hashAset(hash, "foo", 1)).toBe(1);
+    expect(hashAset(map, "foo", 1)).toBe(1);
+    expect(hash).toEqual({ foo: 1 });
+    expect([...map]).toEqual([["foo", 1]]);
+  });
+
+  it("raises FrozenError storing into a frozen hash", () => {
+    expect(() => hashAset(Object.freeze({}), "foo", 1)).toThrow(FrozenError);
+  });
+});
+
+describe("Array#values_at", () => {
+  it("reads each index, counting a negative one from the end", () => {
+    expect(valuesAt("a.b".split("."), -2, -1)).toEqual(["a", "b"]);
+    expect(valuesAt("b".split("."), -2, -1)).toEqual([undefined, "b"]);
+    expect(valuesAt([1, 2, 3], 0, 5, -4, -1)).toEqual([1, undefined, undefined, 3]);
+  });
+});
+
 describe("Hash keys by eql?", () => {
+  it("finds an Integer key through either of its JS seats", () => {
+    const h = new Hash<unknown, string>();
+    h.set(1n, "one");
+    expect(h.get(1)).toBe("one");
+    expect(h.has(1n)).toBe(true);
+    h.set(1, "uno");
+    expect(h.size).toBe(1);
+    h.set([2, 3], "pair");
+    expect(h.get([2n, 3])).toBe("pair");
+    expect(h.delete(1n)).toBe("uno");
+    expect(h.has(1)).toBe(false);
+  });
+
   it("collapses equal Array keys into one entry and keeps the first key", () => {
     const first = ["a", 1];
     const h = new Hash<unknown[], string>();
@@ -470,5 +893,409 @@ describe("Hash keys by eql?", () => {
     expect(h.has(["a", 1])).toBe(true);
     expect(h.delete(["a", 1])).toBe("y");
     expect(h.has(first)).toBe(false);
+  });
+});
+
+class EqlKey {
+  constructor(readonly id: number) {}
+  hash(): number {
+    return this.id;
+  }
+  eql(other: unknown): boolean {
+    return other instanceof EqlKey && other.id === this.id;
+  }
+}
+
+describe("Hash keyed on an object answering hash / eql?", () => {
+  it("finds the entry through a different but eql? key", () => {
+    const h = new Hash<EqlKey, string>();
+    h.set(new EqlKey(1), "one");
+    expect(h.get(new EqlKey(1))).toBe("one");
+    expect(h.has(new EqlKey(2))).toBe(false);
+  });
+
+  it("separates keys that share a hash but are not eql?", () => {
+    const h = new Hash<unknown, string>();
+    h.set(new EqlKey(1), "key");
+    h.set({ hash: () => 1, eql: () => false }, "other");
+    expect(h.size).toBe(2);
+    expect(h.get(new EqlKey(1))).toBe("key");
+  });
+
+  it("counts eql? keys together under Hash.new(0)", () => {
+    const h = new Hash<EqlKey, number>(0);
+    for (const key of [new EqlKey(1), new EqlKey(1), new EqlKey(2)]) {
+      h.set(key, h.get(key)! + 1);
+    }
+    expect(h.get(new EqlKey(1))).toBe(2);
+    expect(h.get(new EqlKey(2))).toBe(1);
+    expect(h.get(new EqlKey(3))).toBe(0);
+    expect(h.size).toBe(2);
+  });
+
+  it("populates one entry per eql? key from a default_proc", () => {
+    const h = new Hash<EqlKey, number[]>((hash, key) => {
+      const made: number[] = [];
+      hash.set(key, made);
+      return made;
+    });
+    h.get(new EqlKey(1))!.push(1);
+    h.get(new EqlKey(1))!.push(2);
+    expect(h.size).toBe(1);
+    expect(h.get(new EqlKey(1))).toEqual([1, 2]);
+  });
+});
+
+describe("Hash#shift", () => {
+  it("removes the first entry and returns it, nil once the hash is empty", () => {
+    const first = [1];
+    const h = new Hash<unknown, string>("default");
+    h.set(first, "a");
+    h.set("b", "b");
+    expect(h.shift()).toEqual([first, "a"]);
+    expect(h.has([1])).toBe(false);
+    h.set([1], "again");
+    expect(h.size).toBe(2);
+    expect(h.shift()).toEqual(["b", "b"]);
+    expect(h.shift()).toEqual([[1], "again"]);
+    expect(h.shift()).toBeUndefined();
+  });
+
+  it("removes the first entry without looking its key up, so a key mutated since is shifted", () => {
+    const key = [1];
+    const h = new Hash<unknown[], string>();
+    h.set(key, "a");
+    key.push(2);
+    expect(h.shift()).toEqual([[1, 2], "a"]);
+    expect(h.size).toBe(0);
+    h.set([1], "b");
+    h.set([1], "c");
+    expect(h.size).toBe(1);
+  });
+
+  it("shifts while the hash is being iterated", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    h.set("b", 2);
+    const yielded: string[] = [];
+    for (const [key] of h) {
+      yielded.push(key);
+      expect(h.shift()).toEqual(["a", 1]);
+      break;
+    }
+    expect(yielded).toEqual(["a"]);
+    expect(h.keys()).toEqual(["b"]);
+  });
+
+  it("raises FrozenError on a frozen hash, even an empty one", () => {
+    expect(() => new Hash().freeze().shift()).toThrow(FrozenError);
+  });
+});
+
+describe("Hash#compare_by_identity", () => {
+  it("returns the receiver and answers compare_by_identity?", () => {
+    const h = new Hash<unknown, number>();
+    expect(h.isCompareByIdentity()).toBe(false);
+    expect(h.compareByIdentity()).toBe(h);
+    expect(h.isCompareByIdentity()).toBe(true);
+  });
+
+  it("keeps eql? keys as separate entries", () => {
+    const first = [1];
+    const h = new Hash<unknown, number>().compareByIdentity();
+    h.set(first, 1);
+    h.set([1], 2);
+    expect(h.size).toBe(2);
+    expect(h.get(first)).toBe(1);
+    expect(h.get([1])).toBeUndefined();
+    expect(h.has([1])).toBe(false);
+    expect(h.delete([1])).toBeUndefined();
+    expect(h.delete(first)).toBe(1);
+    expect(h.size).toBe(1);
+  });
+
+  it("rehashes the stored keys, so an eql? key no longer finds them", () => {
+    const stored = new EqlKey(1);
+    const h = new Hash<EqlKey, number>(0);
+    h.set(stored, 5);
+    h.compareByIdentity();
+    expect(h.get(new EqlKey(1))).toBe(0);
+    expect(h.get(stored)).toBe(5);
+    expect(h.delete(stored)).toBe(5);
+    expect(h.size).toBe(0);
+  });
+
+  it("returns the default value for an eql? but not identical key", () => {
+    const stored = new EqlKey(1);
+    const h = new Hash<EqlKey, number>(0).compareByIdentity();
+    h.set(stored, h.get(stored)! + 1);
+    h.set(stored, h.get(stored)! + 1);
+    expect(h.get(stored)).toBe(2);
+    expect(h.get(new EqlKey(1))).toBe(0);
+  });
+
+  it("runs the default_proc once per identity", () => {
+    const h = new Hash<EqlKey, number[]>((hash, key) => {
+      const made: number[] = [];
+      hash.set(key, made);
+      return made;
+    }).compareByIdentity();
+    const stored = new EqlKey(1);
+    h.get(stored)!.push(1);
+    h.get(new EqlKey(1))!.push(2);
+    expect(h.size).toBe(2);
+    expect(h.get(stored)).toEqual([1]);
+  });
+
+  it("raises FrozenError on a frozen hash, and returns an identity hash as it is", () => {
+    expect(() => new Hash().freeze().compareByIdentity()).toThrow(FrozenError);
+    const h = new Hash().compareByIdentity().freeze();
+    expect(h.compareByIdentity()).toBe(h);
+  });
+
+  it("raises RuntimeError during iteration, and not once the iteration has ended", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    eachPair(h, () => {
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+      expect(() => h.compareByIdentity()).toThrow("compare_by_identity during iteration");
+    });
+    h.forEach(() => {
+      h.forEach(() => {});
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+    });
+    for (const _pair of h) {
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+    }
+    for (const _pair of h.entries()) {
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+    }
+    expect(h.isCompareByIdentity()).toBe(false);
+    expect(() =>
+      eachPair(h, () => {
+        throw new IndexError("stop");
+      }),
+    ).toThrow(IndexError);
+    expect(h.compareByIdentity().isCompareByIdentity()).toBe(true);
+  });
+
+  it("lowers the level when a for…of breaks, and keeps it for a suspended iterator", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    h.set("b", 2);
+    for (const _pair of h) break;
+    const [first] = h;
+    expect(first).toEqual(["a", 1]);
+    const enumerator = h[Symbol.iterator]();
+    enumerator.next();
+    expect(() => h.compareByIdentity()).toThrow("compare_by_identity during iteration");
+    enumerator.return(undefined);
+    expect(h.compareByIdentity().isCompareByIdentity()).toBe(true);
+  });
+
+  it("raises FrozenError rather than RuntimeError while iterating a frozen hash", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    h.freeze();
+    eachPair(h, () => {
+      expect(() => h.compareByIdentity()).toThrow(FrozenError);
+    });
+  });
+
+  it("carries over a dup, as hash_copy copies the table's type", () => {
+    const h = new Hash<unknown, number>().compareByIdentity();
+    const copy = dup(h);
+    expect(copy.isCompareByIdentity()).toBe(true);
+    copy.set([1], 1);
+    copy.set([1], 2);
+    expect(copy.size).toBe(2);
+  });
+
+  it("stays an identity hash across clear", () => {
+    const h = new Hash<unknown, number>().compareByIdentity();
+    h.clear();
+    h.set([1], 1);
+    h.set([1], 2);
+    expect(h.size).toBe(2);
+  });
+});
+
+describe("block (a marked `&block`)", () => {
+  it("keeps the block's arity and passes the receiver an instance_exec gives it", () => {
+    const receiver = { name: "david" };
+    const blk = block(function (this: { name: string }, greeting: string) {
+      return `${greeting} ${this.name}`;
+    });
+    expect(blk.length).toBe(1);
+    expect(blk.call(receiver, "hello")).toBe("hello david");
+  });
+
+  it("reports the block's arity at every arity and passes every argument through", () => {
+    const fns = [
+      (...args: number[]) => args,
+      (a: number, ...args: number[]) => [a, ...args],
+      (a: number, b: number, ...args: number[]) => [a, b, ...args],
+      (a: number, b: number, c: number, ...args: number[]) => [a, b, c, ...args],
+    ];
+    fns.forEach((fn, arity) => {
+      const blk = block(fn);
+      expect(blk.length).toBe(arity);
+      expect(blk(1, 2, 3, 4)).toEqual([1, 2, 3, 4]);
+      expect(rbBlockGivenP(blk)).toBe(true);
+      expect(rbBlockGivenP(fn)).toBe(false);
+    });
+  });
+
+  it("passes exactly the arguments it was called with, at every arity", () => {
+    const counts = [
+      function () {
+        return arguments.length;
+      },
+      function (_a: unknown) {
+        return arguments.length;
+      },
+      function (_a: unknown, _b: unknown) {
+        return arguments.length;
+      },
+      function (_a: unknown, _b: unknown, _c: unknown) {
+        return arguments.length;
+      },
+    ] as ((...args: unknown[]) => number)[];
+    for (const fn of counts) {
+      const blk = block(fn) as unknown as (...args: unknown[]) => number;
+      expect(blk()).toBe(0);
+      expect(blk(1)).toBe(1);
+      expect(blk(1, 2)).toBe(2);
+      expect(blk(1, 2, 3, 4)).toBe(4);
+    }
+  });
+
+  it("is not called by a fetch that finds the key, on a plain hash or a Map", () => {
+    const blk = block(() => {
+      throw new Error("yielded");
+    });
+    expect(fetch({ id: null }, "id", blk)).toBeNull();
+    expect(fetch(new Map([["id", 1]]), "id", blk)).toBe(1);
+    expect(() => fetch({}, "toString")).toThrow(KeyError);
+  });
+
+  it("hashAref answers a Hash's default on a miss, as rb_hash_default_value does", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1);
+    expect(hashAref(hash, "missing")).toBe(null);
+    hash.setDefault(7);
+    expect(hashAref(hash, "a")).toBe(1);
+    expect(hashAref(hash, "missing")).toBe(7);
+    expect(hashAref(new Hash<string, string>((_h, key) => `no ${key}`), "x")).toBe("no x");
+    expect(hashAref(new Hash<string, string | undefined>(() => undefined), "x")).toBe(null);
+  });
+
+  it("rbHashSRuby2KeywordsHash returns a flagged copy and leaves its argument unflagged", () => {
+    const h = { k: 1 };
+    const flagged = rbHashSRuby2KeywordsHash(h);
+    expect(flagged).not.toBe(h);
+    expect({ ...flagged }).toEqual({ k: 1 });
+    expect(rbHashSRuby2KeywordsHashP(flagged)).toBe(true);
+    expect(rbHashSRuby2KeywordsHashP(h)).toBe(false);
+    expect(rbHashSRuby2KeywordsHashP({ k: 1 })).toBe(false);
+    expect(rbHashSRuby2KeywordsHashP(dup(flagged))).toBe(false);
+  });
+
+  it("the ruby2_keywords flag is invisible to key enumeration and JSON", () => {
+    const flagged = rbHashSRuby2KeywordsHash({ k: 1 });
+    expect(Object.keys(flagged)).toEqual(["k"]);
+    expect(Reflect.ownKeys(flagged)).toEqual(["k"]);
+    expect(JSON.stringify(flagged)).toBe('{"k":1}');
+  });
+
+  it("rbHashSRuby2KeywordsHash flags a Hash, keeping its class and compare_by_identity", () => {
+    const hash = new Hash<string, number>();
+    hash.set("k", 1);
+    const flagged = rbHashSRuby2KeywordsHash(hash);
+    expect(flagged).toBeInstanceOf(Hash);
+    expect(flagged.get("k")).toBe(1);
+    expect(rbHashSRuby2KeywordsHashP(flagged)).toBe(true);
+    expect(rbHashSRuby2KeywordsHashP(hash)).toBe(false);
+    const empty = new Hash<string, number>().compareByIdentity();
+    expect(rbHashSRuby2KeywordsHash(empty).isCompareByIdentity()).toBe(true);
+    expect(rbHashSRuby2KeywordsHashP(rbHashSRuby2KeywordsHash(empty))).toBe(true);
+    const identity = new Hash<object, number>().compareByIdentity();
+    identity.set({}, 1);
+    expect(rbHashSRuby2KeywordsHash(identity).isCompareByIdentity()).toBe(true);
+  });
+
+  it("the ruby2_keywords functions raise TypeError for a non-Hash", () => {
+    expect(() => rbHashSRuby2KeywordsHashP([] as object)).toThrow(
+      new TypeError("wrong argument type Array (expected Hash)"),
+    );
+    expect(() => rbHashSRuby2KeywordsHash(null as unknown as object)).toThrow(
+      new TypeError("wrong argument type nil (expected Hash)"),
+    );
+  });
+});
+
+describe("Hash#size", () => {
+  it("counts the pairs of a hash and the elements of an array", () => {
+    expect(size({ a: 1, b: 2 })).toBe(2);
+    expect(size(new Map([["a", 1]]))).toBe(1);
+    expect(size(["a", "b", "c"])).toBe(3);
+    expect(size({})).toBe(0);
+  });
+});
+
+describe("Hash#key and Hash#has_value?", () => {
+  it("key answers the first key whose value is ==, else nil", () => {
+    const hash = new Hash<string, unknown>();
+    hash.set("foo", 0).set("bar", 2).set("baz", 2).set("pair", [1, "a"]);
+
+    expect(hash.key(0)).toBe("foo");
+    expect(hash.key(2)).toBe("bar");
+    expect(hash.key([1, "a"])).toBe("pair");
+    expect(hash.key(3)).toBeNull();
+  });
+
+  it("hasValue compares each value with ==", () => {
+    const hash = new Hash<string, unknown>();
+    hash.set("foo", 0).set("pair", [1, "a"]).set("none", null);
+
+    expect(hash.hasValue(0)).toBe(true);
+    expect(hash.hasValue([1, "a"])).toBe(true);
+    expect(hash.hasValue(null)).toBe(true);
+    expect(hash.hasValue("0")).toBe(false);
+  });
+});
+
+describe("Hash#merge (Hash receiver)", () => {
+  it("answers a new Hash and leaves the receiver alone", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1);
+    const other = new Hash<string, number>();
+    other.set("a", 2).set("b", 3);
+
+    const merged = hash.merge(other, { c: 4 });
+
+    expect(merged).toBeInstanceOf(Hash);
+    expect([...merged]).toEqual([
+      ["a", 2],
+      ["b", 3],
+      ["c", 4],
+    ]);
+    expect([...hash]).toEqual([["a", 1]]);
+  });
+
+  it("yields a conflicting key to the block", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1);
+
+    const merged = hash.merge(
+      { a: 2 },
+      { b: 3 },
+      block((_key: string, oldValue: number, newValue: number) => oldValue + newValue),
+    );
+
+    expect([...merged]).toEqual([
+      ["a", 3],
+      ["b", 3],
+    ]);
   });
 });

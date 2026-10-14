@@ -18,13 +18,13 @@ other differences below follow from that.
 
 ## Status
 
-As of 2026-09-27 (`main` at `91245b796a`; not regenerated since):
+As of 2026-10-14 (`main` at `bff6cb85f6`):
 
 | measure                                      | result              |
 | -------------------------------------------- | ------------------- |
-| Rails public methods with a TS counterpart   | 4748 / 4888 (97.1%) |
-| Rails methods, including private / protected | 6685 / 6721 (99.5%) |
-| Rails ActiveRecord test cases ported         | 8501 / 8630 (98.5%) |
+| Rails public methods with a TS counterpart   | 5010 / 5119 (97.9%) |
+| Rails methods, including private / protected | 6980 / 6980 (100%)  |
+| Rails ActiveRecord test cases ported         | 8883 / 8900 (99.8%) |
 
 Regenerate with `pnpm parity:api --package activerecord --public-only`,
 `pnpm parity:api --package activerecord`, and `pnpm parity:test`. CI runs the
@@ -36,19 +36,14 @@ The packages are not on npm yet. Build them from a checkout and link them into
 your project, as the [root README's quickstart](../../README.md#quickstart)
 shows. The runtime has no CLI and bundles no driver. You add a driver yourself:
 
-| optional peer    | for                                                |
-| ---------------- | -------------------------------------------------- |
-| `better-sqlite3` | the `sqlite3` adapter                              |
-| `pg`             | `postgresql`                                       |
-| `mysql2`         | `mysql2`                                           |
-| `libsql`         | `libsql`, `libsql-remote`, `libsql-replica`        |
-| `expo-sqlite`    | `expo-sqlite` (React Native)                       |
-| none             | `node-sqlite` (Node's built-in `node:sqlite`)      |
-| `typescript`     | only the `./type-virtualization/*` subpath (below) |
-
-`typescript` is pinned to `7.1.0-dev.20260920.1`, the build the
-type-virtualization engine behind `trails-tsc` was verified against. Nothing in
-the runtime imports the compiler.
+| optional peer    | for                                           |
+| ---------------- | --------------------------------------------- |
+| `better-sqlite3` | the `sqlite3` adapter                         |
+| `pg`             | `postgresql`                                  |
+| `mysql2`         | `mysql2`                                      |
+| `libsql`         | `libsql`, `libsql-remote`, `libsql-replica`   |
+| `expo-sqlite`    | `expo-sqlite` (React Native)                  |
+| none             | `node-sqlite` (Node's built-in `node:sqlite`) |
 
 ## Quickstart
 

@@ -11,86 +11,21 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     pattern: "promise.rb",
     reason:
-      "Rails Promise wraps a thread-backed FutureResult with a blocking #value. " +
-      "JS is single-threaded; native Promise covers #then. Async methods return Promise<T> directly.",
+      "PERMANENT: the native JS promise is the port of ActiveRecord::Promise, whose " +
+      'blocking #value has no JS counterpart. See CLAUDE.md § "`ActiveRecord::Promise` ' +
+      'is the native promise".',
   },
   {
     testFile: "relation/load_async_test.rb",
-    tests: [
-      "scheduled?",
-      "null scheduled?",
-      "reset",
-      "load async has many association",
-      "load async has many through association",
-      "load async instrumentation is thread safe",
-      "simple query",
-      "load async from transaction",
-      "eager loading query",
-      "contradiction",
-      "pluck",
-      "count",
-      "size",
-      "empty?",
-      "load async pluck with query cache",
-      "load async count with query cache",
-      "async query executor and configuration",
-    ],
+    className: "LoadAsyncTest",
+    tests: ["load async instrumentation is thread safe"],
     reason:
-      "SOURCE NOW PORTED (future_result.rb — story " +
-      "call-args-ar-select-all-empty-async-row); this is a test-only entry, narrowed " +
-      "from the whole file by story enroll-load-async-notification-forwarding, which " +
-      "ported `test_notification_forwarding` now that FutureResult::EventBuffer stamps " +
-      "`payload[:lock_wait]` (future_result.rb:43). The tests still named here assert " +
-      "`scheduled?`, thread interleaving and thread-pool sizing, which have no " +
-      "observable analogue on a single-threaded event loop where " +
-      "`await relation.toArray()` is the async surface.",
-  },
-  {
-    testFile: "asynchronous_queries_test.rb",
-    reason:
-      "SOURCE NOW PORTED (asynchronous_queries_tracker.rb — story " +
-      "call-args-ar-select-all-empty-async-row); this is a test-only entry. The tests " +
-      "assert Concurrent::ThreadPoolExecutor sizing (min/max threads, max queue) and " +
-      "cross-thread session barriers, none of which exist without threads.",
-  },
-  {
-    pattern: "marshalling.rb",
-    testFile: "marshal_serialization_test.rb",
-    reason:
-      "Ruby's Marshal binary format (Marshal.dump/load). No JS equivalent; " +
-      "JS cache/session layers use JSON or structured clone.",
-  },
-  {
-    testFile: "attributes_test.rb",
-    className: "AttributesTest",
-    tests: ["attributes with proc defaults can be marshalled"],
-    reason:
-      "Round-trips a model through Marshal.load(Marshal.dump(data)) " +
-      "(activemodel/test/cases/attributes_test.rb:136-143). Ruby marshals any object graph by " +
-      "its ivars and resolves classes by constant name on load; JS has no such serializer to " +
-      "call, and the per-class marshal_dump/marshal_load hooks trails does port " +
-      "(LazyAttributeHash, UserProvidedDefault) have no engine driving them. A dup() round " +
-      "trip would assert something else under Rails' name.",
-  },
-  {
-    testFile: "errors_test.rb",
-    className: "ErrorsTest",
-    tests: ["errors are marshalable", "errors are compatible with YAML dumped from Rails 6.x"],
-    reason:
-      "Both deserialize an ActiveModel::Errors from a Ruby wire format: Marshal.dump/load " +
-      "(activemodel/test/cases/errors_test.rb:670-678) and a literal Rails-6 Psych dump with " +
-      "!ruby/object: tags loaded by YAML.unsafe_load (:680-703). Errors defines neither " +
-      "marshal_dump nor init_with, so both run Ruby's generic ivar-by-ivar object " +
-      "reconstruction, which JS has no counterpart for; trails has no Marshal and no Psych, " +
-      "and no Ruby-written dump can reach a trails process.",
-  },
-  {
-    pattern: "message_pack.rb",
-    testFile: "message_pack_test.rb",
-    reason:
-      "Rails-integrated MessagePack (:nodoc:) registers AR records with " +
-      "ActiveSupport::MessagePack encoder/decoder. Ruby-only coupling; " +
-      "MessagePack-the-format exists in JS but this file is the Marshal bridge, not a reusable impl.",
+      "Parks a thread inside the connection's `log` on a Concurrent::CountDownLatch " +
+      "(load_async_test.rb:161-195) while a second thread runs `Post.count`. A JS " +
+      "event loop has no thread to block, and trails' adapter monitor serializes " +
+      "the two statements, so the interleaving the test asserts cannot occur. " +
+      "Every other case in the file asserts the Relation#load_async surface and " +
+      "is enrolled in relation/load-async.test.ts.",
   },
   {
     pattern: "legacy_yaml_adapter.rb", // no test counterpart
@@ -107,31 +42,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       '`store :col, coder: "YAML"`), but the Psych-specific safe-LOAD machinery ' +
       "(permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those " +
       "test cases stay Ruby-only.",
-  },
-  {
-    pattern: "/fixtures.rb",
-    reason:
-      "Rails-specific YAML fixtures (test/fixtures/*.yml loaded once into the DB " +
-      "with named-row references and ERB preprocessing). The JS/TS ecosystem uses " +
-      "factories or ad-hoc Model.create instead; Trails users won't ship YAML fixtures. " +
-      "Anchored: unanchored, this pattern also swallowed test_fixtures.rb, " +
-      "encryption/encrypted_fixtures.rb and activesupport's testing/file_fixtures.rb, " +
-      "which carry (or need) their own rows. Source-only since story " +
-      "port-fixtures-test-cases-first-half: fixtures_test.rb is enrolled per case " +
-      "by the rows below.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: [
-      "bulk insert with multi statements disabled",
-      "bulk insert with multi statements enabled",
-    ],
-    reason:
-      "Reconnect with flags MULTI_STATEMENTS / [] and assert a two-statement execute succeeds / " +
-      "raises (fixtures_test.rb:156-251). trails' Mysql2Adapter always opens the driver with " +
-      "multipleStatements: true, so there is no disabled connection to observe. CONVERGEABLE " +
-      "mysql2-honour-multi-statements-flag.",
   },
   {
     testFile: "fixtures_test.rb",
@@ -194,16 +104,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "SameNameDifferentDatabaseFixturesTest",
-    tests: ["fixtures are properly loaded"],
-    reason:
-      'Loads dogs and other_dogs, both table "dogs", where OtherDog < ARUnit2Model lives on ' +
-      "the arunit2 database (models/other_dog.rb). trails' fixtures() loads every set through " +
-      "one connection, so the two sets land in one dogs table and useFixtures rejects the " +
-      "colliding primary keys.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "FixtureWithSetModelClassPrevailsOverNamingConventionTest",
     tests: ["model class in fixture file is respected"],
     reason:
@@ -247,124 +147,13 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "LoadAllFixturesTest",
-    tests: ["all there"],
-    reason:
-      "fixtures :all scans fixture_paths on disk and asserts the .yml layout under " +
-      "test/fixtures/all (fixtures_test.rb:1237-1247). trails has no fixture_paths and no " +
-      "fixtures :all; the corpus is TS modules, as in the YAML-path row above.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "LoadAllFixturesWithArrayTest",
-    tests: ["all there"],
-    reason: "Same as LoadAllFixturesTest (fixtures_test.rb:1250-1260), with two fixture_paths.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "LoadAllFixturesWithPathnameTest",
     tests: ["all there"],
-    reason: "Same as LoadAllFixturesTest (fixtures_test.rb:1263-1273), with a Pathname.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FasterFixturesTest",
-    tests: ["cache"],
     reason:
-      "Asserts FixtureSet.fixture_is_cached? and setup_fixture_accessors " +
-      "(fixtures_test.rb:1276-1297). trails' fixtures() reloads every set per test and " +
-      "keeps no connection-keyed fixture cache, so there is nothing cached to assert.",
-  },
-
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: ["complete instantiation", "fixtures from root yml with instantiation"],
-    reason:
-      "Both read an ivar that use_instantiated_fixtures = true assigns per fixture row — " +
-      "@first.title, @unknown.credit_limit (fixtures_test.rb:43,511,515). trails never " +
-      "instantiates ivars: useFixtures (test-fixtures.ts:189-206) returns an accessor " +
-      "closure and nothing else, so there is no ivar to read.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesWithoutInstantiationTest",
-    tests: [
-      "fixtures from root yml without instantiation",
-      "visibility of accessor method",
-      "without complete instantiation",
-    ],
-    reason:
-      "The mirror image of the row above: these assert the ABSENCE of those ivars under " +
-      "use_instantiated_fixtures = false, and that the accessor is private — " +
-      "defined?(@first), respond_to?(:topics, false) (fixtures_test.rb:756-773). trails has " +
-      "only the non-instantiating mode, so the flag selects nothing and there is no ivar " +
-      "whose absence could be observed; JS also has no runtime method visibility to test " +
-      "(see CLAUDE.md, 'Method visibility is a side table'). 'accessor " +
-      "methods', the case in this class that asserts the accessor itself, IS ported.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesWithoutInstanceInstantiationTest",
-    tests: ["without instance instantiation"],
-    reason:
-      "Asserts defined?(@first) is false under use_instantiated_fixtures = :no_instances " +
-      "(fixtures_test.rb:796-803) — the third value of a flag trails does not have. Same " +
-      "missing surface as the two rows above.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: [
-      "fixture method and private alias",
-      "fixture method does not clash with a test case method",
-      "fixtures are set up with database env variable",
-    ],
-    reason:
-      "Each builds an anonymous Class.new(ActiveRecord::TestCase), declares fixtures inside " +
-      "it, and calls test_case.new(:test_fixtures).run to assert the result passed " +
-      "(fixtures_test.rb:604-646). Minitest's runnable-per-instance model has no vitest " +
-      "counterpart: a describe is registered at collection time and cannot be constructed " +
-      "and run from inside another test.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesResetPkSequenceTest",
-    tests: ["create fixtures resets sequences when not cached"],
-    reason:
-      "Reads create_fixtures(table_name).first.fixtures after FixtureSet.reset_cache " +
-      "(fixtures_test.rb:713-716,740-745); trails' FixtureSet has no instance form, " +
-      "fixture-set cache or reset_cache. " +
-      "CONVERGEABLE fixture-set-instance-form-and-all-loaded-fixtures.",
-  },
-  {
-    testFile: "fixture_set/file_test.rb",
-    tests: ["render context lookup scope"],
-    reason:
-      "Asserts Ruby constant-lookup scope inside the rendering context — " +
-      "`defined? ActiveRecord`, `defined? ActiveRecord::FixtureSet::File`, `File.name` " +
-      "(file_test.rb:97-116). Constants are resolved lexically against the enclosing " +
-      "Ruby module nesting; an ESM module has no nesting to resolve against and no " +
-      "`defined?`, so there is nothing to assert. The other 13 cases are ported in " +
-      "fixture-set/file.test.ts.",
-  },
-  {
-    testFile: "test_fixtures_test.rb",
-    className: "TestFixturesTest",
-    tests: ["doesnt rely on active support test case specific methods"],
-    reason:
-      "Builds a `Class.new(Minitest::Test)` at run time, points its fixture_paths at a " +
-      "tmpdir holding a zines.yml, and runs it through Minitest's own runner, asserting " +
-      "the result passed? (test_fixtures_test.rb:33-72). Vitest has no runnable-per-" +
-      "instance test object to construct and run from inside another test, and trails' " +
-      "fixture corpus is TS modules rather than .yml on disk, so neither half of the " +
-      "setup has a counterpart. The other 3 cases are ported in test-fixtures.test.ts.",
-  },
-  {
-    pattern: "encryption/encrypted_fixtures.rb",
-    reason:
-      "Encrypts YAML fixture rows on load. Behavior ported inline into FixtureSet.createFixtures() " +
-      "(define-fixtures.ts) rather than as a separate module. Tests live in encrypted-fixtures.test.ts.",
+      'Sets fixture_paths to [Pathname.new(FIXTURES_ROOT).join("all")] ' +
+      "(fixtures_test.rb:1263-1273). ruby-compat's Pathname has no #join, and File.join " +
+      "does not take a Pathname, so `fixtures :all` cannot glob one. CONVERGEABLE " +
+      "ruby-compat-pathname-join-and-file-join-to-path.",
   },
   {
     pattern: "destroy_association_async_job.rb", // no test counterpart
@@ -373,95 +162,30 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "ported ActiveJob; async destroy is out of scope until a job framework lands.",
   },
   {
-    pattern: "dynamic_matchers.rb", // no test counterpart
-    reason:
-      "Ruby `method_missing` magic that synthesizes `find_by_<attr>` / `find_or_*_by_<attr>` " +
-      "at call time. No TS analog — Proxy-based dispatch can't infer attribute lists at " +
-      "compile time, and `findBy({ ... })` already covers the use case idiomatically. " +
-      "`respond_to_missing?` alone is ported, in dynamic-matchers.ts, with `Method.match` / " +
-      "`Method#valid?` standing in as module-private functions there: the `Method` / `FindBy` / " +
-      "`FindByBang` classes exist only to serve `Method#define`'s `class_eval` codegen, which is " +
-      "the part with no TS analog.",
-  },
-  {
-    pattern: "railties/controller_runtime.rb",
-    testFile: "controller_runtime_test.rb",
-    reason:
-      "Railties ActionController integration that logs DB runtime per request. " +
-      "Trails has not ported Railties / ActionController; reintroduce when a web " +
-      "framework integration lands.",
-  },
-  {
     pattern: "adapters/trilogy",
     testFile: "adapters/trilogy/",
     reason:
-      "Trilogy is a C extension for Ruby with no Node.js equivalent. MySQL connections " +
-      "go through Mysql2Adapter instead.",
+      "Trilogy is a C extension for Ruby with no Node.js equivalent, and wrapping the " +
+      "mysql2 npm driver under Rails' TrilogyAdapter name would invent a second " +
+      "Mysql2Adapter. MySQL connections go through Mysql2Adapter instead. PERMANENT: " +
+      'CLAUDE.md § "Trilogy is out of scope".',
   },
   {
     pattern: "trilogy_adapter.rb",
     testFile: "trilogy_adapter_test.rb",
-    reason: "Trilogy adapter implementation; excluded along with adapters/trilogy.",
-  },
-  // --- Permanently not-portable: GVL / thread-model ---
-  {
-    testFile: "schema_loading_test.rb",
     reason:
-      "Tests ActiveSupport.on_load / Zeitwerk autoload hooks triggered from background threads. " +
-      "No Node.js equivalent; ES module loading is synchronous and non-concurrent.",
+      "Trilogy adapter implementation; excluded along with adapters/trilogy. " +
+      'PERMANENT: CLAUDE.md § "Trilogy is out of scope".',
   },
+  // --- Permanently not-portable: class reloading ---
   {
     testFile: "reload_models_test.rb",
     reason:
-      "Tests class reloading via ActiveSupport::Dependencies / Zeitwerk in a forked process. " +
-      "No Node.js equivalent; ES modules are cached for the process lifetime.",
-  },
-  {
-    testFile: "adapter_test.rb",
-    className: "AdapterConnectionTest",
-    tests: ["transaction restores after remote disconnection"],
-    reason:
-      "These tests call the `remote_disconnect` helper, which only supports " +
-      'PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip("remote_disconnect ' +
-      'unsupported")`, so Rails never runs them on SQLite. A genuine remote ' +
-      "disconnect cannot be simulated against in-memory SQLite (closing the handle " +
-      "discards the database), which is also why the surrounding suite is gated " +
-      "`unless in_memory_db?`. Trails always uses :memory: SQLite.",
-  },
-  {
-    testFile: "adapter_test.rb",
-    className: "AdapterThreadSafetyTest",
-    tests: ["#active? is synchronized", "#verify! is synchronized"],
-    reason:
-      "AdapterThreadSafetyTest exercises Ruby Thread.new/Thread.pass concurrency " +
-      "on a single shared connection, asserting mutex-style serialization of " +
-      "#active?/#verify!/#disconnect! under the GVL. Node Worker threads use " +
-      "isolated heaps and structured-clone message passing, not the " +
-      "shared-memory Thread.new model this test relies on, so the GVL interleaving " +
-      "this test pins has no equivalent in our runtime target.",
-  },
-  // --- Permanently not-portable: single-process SQLite driver limits ---
-  {
-    testFile: "adapters/sqlite3/sqlite3_adapter_test.rb",
-    tests: ["supports extensions", "respond to enable extension", "respond to disable extension"],
-    reason:
-      "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the " +
-      "sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION " +
-      "entry points, so supports_extensions? / enable_extension / disable_extension cannot " +
-      "be implemented against the driver Trails uses.",
+      "Removes the Owner constant and `Kernel.load`s models/owner.rb again, simulating " +
+      "development class reloading. An ES module is evaluated once per process and trails has " +
+      'no class unload to re-evaluate it after (CLAUDE.md § "Trails has no autoloader").',
   },
   // --- Permanently not-portable: Ruby Module namespace / constant-path semantics ---
-  {
-    testFile: "reflection_test.rb",
-    tests: [
-      "symbol for class name",
-      "name error from incidental code is not converted to name error for association",
-      "automatic inverse does not suppress name error from incidental code",
-    ],
-    reason:
-      "Ruby Symbol type for class_name and const_missing hook for NameError discrimination " +
-      "have no JavaScript equivalent.",
-  },
   {
     testFile: "inheritance_test.rb",
     className: "InheritanceTest",
@@ -472,17 +196,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     ],
     reason:
       "Registers an Object.autoload for a model whose file raises during require, so the " +
-      "exception surfaces from constantize inside compute_type. JS has no autoload/require " +
-      "hook — a module either resolves at import time or the constant simply doesn't exist.",
-  },
-  {
-    testFile: "inheritance_test.rb",
-    className: "InheritanceTest",
-    tests: ["base class activerecord error"],
-    reason:
-      "Asserts `Class.new { include ActiveRecord::Inheritance }` raises ActiveRecordError via " +
-      "Ruby's Module#included hook. Trails mixes modules in statically; there is no runtime " +
-      "include on an arbitrary class to guard.",
+      "exception surfaces from constantize inside compute_type. Naming a constant loads no " +
+      "file in ESM, so there is no load for the exception to come from (CLAUDE.md § " +
+      '"Trails has no autoloader").',
   },
   {
     testFile: "inheritance_test.rb",
@@ -490,30 +206,18 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     tests: ["new with autoload paths"],
     reason:
       "Stands up a Zeitwerk loader at runtime so STI dispatch resolves a constant from an " +
-      "autoload path. JS has no runtime constant autoloading; trails resolves subclasses via " +
-      "explicit registerSubclass.",
+      "autoload path. Zeitwerk is not ported and trails has no loader graph to push a " +
+      'directory onto (CLAUDE.md § "Trails has no autoloader").',
   },
   {
     testFile: "inheritance_test.rb",
     className: "InheritanceComputeTypeTest",
     tests: ["instantiation doesnt try to require corresponding file"],
     reason:
-      "Exercises Ruby constant-lookup/dependencies integration: a DB type with no top-level " +
-      "constant raises RecordNotFound, then const_set on the test class vs on Firm changes " +
-      "which constant compute_type sees. JS has no const_missing/autoload namespace walk.",
-  },
-  {
-    testFile: "modules_test.rb",
-    tests: [
-      "module spanning associations",
-      "module spanning has and belongs to many associations",
-      "associations spanning cross modules",
-      "find account and include company",
-      "eager loading in modules",
-    ],
-    reason:
-      "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. " +
-      "No JS equivalent for namespace-scoped class discovery.",
+      "Not loader residue: the SubclassNotFound arm needs a Firm subclass that compute_type " +
+      "cannot reach from Firm's lexical scope, and trails' instantiate finds any tracked " +
+      "descendant by sti_name before it tries the constant. Portable once story " +
+      "discriminate-class-for-record-should-call-find-sti-class lands.",
   },
   // --- Permanently not-portable: per-test GVL / serialization in mixed files ---
   {
@@ -528,42 +232,14 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "connection_pool_test.rb",
-    tests: [
-      "lock thread allow fiber reentrency",
-      "released connection moves between threads",
-      "inactive are returned from dead thread",
-      "remove connection for thread",
-      "concurrent connection establishment",
-      "non bang disconnect and clear reloadable connections throw exception if threads dont return their conns",
-      "disconnect and clear reloadable connections attempt to wait for threads to return their conns",
-      "bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway",
-      "disconnect and clear reloadable connections are able to preempt other waiting threads",
-      "clear reloadable connections creates new connections for waiting threads if necessary",
-      "public connections access threadsafe",
-      "reap inactive",
-      "full pool blocking shares load interlock",
-      "checkout fairness",
-      "checkout fairness by group",
-      "pin connection synchronize the connection",
-      "pin connection nesting lock",
-      "pin connection nesting lock inverse",
-    ],
+    tests: ["full pool blocking shares load interlock"],
     reason:
-      "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js.",
-  },
-  {
-    testFile: "connection_management_test.rb",
-    tests: [
-      "connections are cleared even if inside a non-joinable transaction",
-      "cancel asynchronous queries if an exception is raised",
-    ],
-    reason:
-      "GVL / Ruby Thread semantics — first test pins across threads; second uses FutureResult (thread-based async queries).",
+      "connection_pool_test.rb:151-188 takes `ActiveSupport::Dependencies.interlock.running` and " +
+      "`.loading`; `ActiveSupport::Dependencies::Interlock` (dependencies/interlock.rb) is not " +
+      "ported. Tracked by story " +
+      "pool-test-full-pool-blocking-shares-load-interlock-needs-owner-ruling.",
   },
   // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
-  // (load_async / FutureResult itself is already fully excluded above via the
-  //  future_result.rb / relation/load_async_test.rb entry — these are the
-  //  scattered thread/fork cases that live in otherwise-portable test files.)
   {
     testFile: "query_cache_test.rb",
     tests: [
@@ -578,44 +254,24 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache " +
       "visibility cannot translate to single-threaded Node.js.",
   },
-  {
-    testFile: "connection_adapters/connection_handlers_multi_db_test.rb",
-    tests: ["multiple connections works in a threaded environment"],
-    reason:
-      "GVL / Ruby Thread semantics — concurrent multi-db connection access on shared " +
-      "objects has no single-threaded Node.js equivalent.",
-  },
-  // --- Permanently not-portable: Ruby SimpleDelegator (Delegator/method_missing) ---
-  {
-    testFile: "relations_test.rb",
-    tests: ["where id with delegated ar object", "where relation with delegated ar object"],
-    reason:
-      "Rails wraps the AR object in Class.new(SimpleDelegator) and where() unwraps it via the " +
-      "delegator protocol (relations_test.rb:835-847). No idiomatic JS analog: a Proxy could " +
-      "forward method_missing, but the bespoke query-builder unwrapping isn't warranted for this " +
-      "niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched " +
-      "by a plain-object trails test, so it stays counted — its delegation behavior is untested.)",
-  },
   // --- Permanently not-portable: residual-skip-tail-sweep (RFC 0030) ---
   {
     testFile: "associations/has_one_associations_test.rb",
-    tests: [
-      "has one proxy should not respond to private methods",
-      "has one proxy should respond to private methods via send",
-    ],
+    tests: ["has one proxy should not respond to private methods"],
     reason:
-      "Ruby private-method visibility / `send` private dispatch on association proxies " +
-      "has no TypeScript runtime equivalent.",
+      "Asserts NoMethodError on a direct call of a private method " +
+      "(has_one_associations_test.rb:492-495). trails carries no method visibility at run " +
+      "time (see CLAUDE.md, 'Method visibility is compile-time only'); the via-send " +
+      "sibling IS ported.",
   },
   {
     testFile: "associations/has_one_through_associations_test.rb",
-    tests: [
-      "has one through proxy should not respond to private methods",
-      "has one through proxy should respond to private methods via send",
-    ],
+    tests: ["has one through proxy should not respond to private methods"],
     reason:
-      "Ruby private-method visibility / `send` private dispatch on association proxies " +
-      "has no TypeScript runtime equivalent.",
+      "Asserts NoMethodError on a direct call of a private method " +
+      "(has_one_through_associations_test.rb:241-244). trails carries no method visibility at run " +
+      "time (see CLAUDE.md, 'Method visibility is compile-time only'); the via-send " +
+      "sibling IS ported.",
   },
   {
     testFile: "scoping/default_scoping_test.rb",
@@ -635,8 +291,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     testFile: "query_cache_test.rb",
     tests: ["query cache does not allow sql key mutation"],
     reason:
-      "Asserts Ruby FrozenError on in-place mutation of the frozen sql payload string; " +
-      "JS strings are immutable by value, so the mutation cannot exist.",
+      "A subscriber calls `payload[:sql].downcase!` and the test asserts FrozenError " +
+      "(query_cache_test.rb:508-522). A JS string has no in-place mutation and no frozen " +
+      'state to raise on. PERMANENT: CLAUDE.md § "Ruby Strings are JS string primitives".',
   },
   {
     testFile: "query_cache_test.rb",
@@ -646,51 +303,13 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "no JS YAML AR-record (un)safe-load equivalent.",
   },
   {
-    testFile: "core_test.rb",
-    tests: ["inspect singleton instance"],
-    reason:
-      "Ruby per-object singleton class rendering (`#<Class:#<Topic:0x...>>`); JS has " +
-      "no singleton-class concept and no AR code participates in that rendering.",
-  },
-  {
     testFile: "inherited_test.rb",
     tests: ["super before filter attributes", "super after filter attributes"],
     reason:
-      "Ruby `inherited` lifecycle-hook `super` ordering around filter_attributes; TS has " +
-      "no class-inheritance hook (ruby-module-semantics, see api-compare conventions.ts).",
-  },
-  {
-    testFile: "tasks/database_tasks_test.rb",
-    tests: ["raises an error when called with protected environment which name is a symbol"],
-    reason:
-      "Ruby Symbol env names (symbol→string coercion in protected_environments); env " +
-      "names are plain strings in TS.",
-  },
-  {
-    testFile: "scoping/named_scoping_test.rb",
-    tests: ["find all should behave like select"],
-    reason:
-      "Asserts Ruby Array#select == Array#find_all alias equivalence on the materialized " +
-      "relation; JS arrays have only .filter, so there is no distinct method to compare.",
-  },
-  {
-    testFile: "relation/where_test.rb",
-    tests: ["where with rational for string column"],
-    reason: "Ruby Rational literal cast to a string column; JS has no Rational.",
-  },
-  {
-    testFile: "relation/with_test.rb",
-    tests: ["common table expressions are unsupported"],
-    reason:
-      "Rails' else-branch for adapters lacking CTE support; every adapter trails " +
-      "exercises (SQLite/PG/MySQL) supports CTEs, so the branch is unreachable.",
-  },
-  {
-    testFile: "connection_adapters/standalone_connection_test.rb",
-    tests: ["async fallback"],
-    reason:
-      "select_all(async: true) returns a FutureResult::Complete from the thread-backed " +
-      "load_async infrastructure, which is excluded (see the future_result.rb entry).",
+      "Each defines `self.inherited(subclass)` on a model and asserts the filter_attributes " +
+      "it sets around `super` (inherited_test.rb:11-29). JS has no hook that fires when a " +
+      'subclass is defined. PERMANENT: CLAUDE.md § "`inherited` is deferred to own-property ' +
+      'memo guards".',
   },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
@@ -745,11 +364,17 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "base_test.rb",
     tests: [
-      // GVL
       "new threads get default the default connection handler",
       "changing a connection handler in a main thread does not poison the other threads",
-      "connection_handler can be overridden", // Thread.new overrides the handler in a child thread and asserts isolation
-      // Ruby Marshal serialization
+      "connection_handler can be overridden",
+    ],
+    reason:
+      "Each starts a Thread.new and asserts the connection handler it sees is isolated from " +
+      "the main thread's. Ruby's shared-memory Thread model has no Node.js equivalent.",
+  },
+  {
+    testFile: "base_test.rb",
+    tests: [
       "marshal round trip",
       "marshal inspected round trip",
       "marshal new record round trip",
@@ -757,40 +382,22 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "marshalling with associations 7 1",
       "marshal between processes",
       "marshalling new record round trip with associations",
-      // Ruby string encoding
-      "respect internal encoding",
-      // with_env_tz — process-level TZ change (ENV["TZ"]); Node.js cannot reload TZ after startup
-      "default in local time",
-      "switching default time zone",
-      "mutating time objects",
-      // Ruby Module#inspect — assert generated mixin Module's #inspect returns
-      // "Post::GeneratedAssociationMethods" / "Post::GeneratedRelationMethods".
-      // TS has no Module objects with namespaced #inspect; generated method bags
-      // are plain prototype-extension objects with no inspectable class name.
-      "generated association methods module name",
-      "generated relation methods module name",
     ],
-    reason:
-      "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal, " +
-      'with_env_tz (process-level ENV["TZ"] reload), and Ruby Module#inspect for ' +
-      "namespaced generated-method modules — all Ruby-only with no Node.js equivalent.",
+    reason: "Ruby Marshal binary serialization of a record — no Node.js equivalent.",
   },
   {
-    testFile: "hstore_test.rb",
-    tests: [
-      // ActionController::Parameters#to_unsafe_h — Ruby-only ProtectedParams API
-      "supports to unsafe h values",
-    ],
+    testFile: "base_test.rb",
+    tests: ["respect internal encoding"],
     reason:
-      "ActionController::Parameters#to_unsafe_h is a Ruby-only ProtectedParams API; " +
-      "no equivalent in Node.js request-parameter handling.",
+      "Sets Encoding.default_internal and asserts the encoding of the column names read back. " +
+      'PERMANENT: CLAUDE.md § "A String has no encoding tag either".',
   },
   {
-    testFile: "adapters/postgresql/quoting_test.rb",
-    tests: ["quote rational"],
+    testFile: "base_test.rb",
+    tests: ["default in local time", "switching default time zone", "mutating time objects"],
     reason:
-      'Ruby Rational(3, 4) quotes to the string "3/4"; JavaScript has no Rational ' +
-      "literal or stdlib type, so there is nothing to quote.",
+      'Each runs under with_env_tz, which reassigns ENV["TZ"] mid-process; Node.js does not ' +
+      "re-read TZ after startup.",
   },
   {
     testFile: "has_and_belongs_to_many_associations_test.rb",
@@ -823,6 +430,22 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Ruby fork() + Marshal — process forking and binary serialization have no Node.js equivalent.",
   },
   // --- Permanently not-portable: Ruby serialization formats ---
+  {
+    testFile: "attribute_methods_test.rb",
+    className: "AttributeMethodsTest",
+    tests: [
+      "attribute readers respect access control",
+      "attribute writers respect access control",
+      "attribute predicates respect access control",
+      "bulk updates respect access control",
+    ],
+    reason:
+      "Each `privatize`s a reader, writer or predicate and asserts Ruby's visibility on it: " +
+      "`assert_not_respond_to`, `assert_raise(NoMethodError)` on the direct call, and " +
+      "`public_send` refused by a private writer so mass assignment raises " +
+      "UnknownAttributeError (attribute_methods_test.rb:998-1033). trails carries no method " +
+      "visibility at run time (see CLAUDE.md, 'Method visibility is compile-time only').",
+  },
   {
     testFile: "attribute_methods_test.rb",
     className: "AttributeMethodsTest",
@@ -975,29 +598,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   // source-verified against vendor/rails before reclassifying — the portable
   // siblings in the same files stay counted.
 
-  // --- Ruby Marshal of association/extension caches ---
-  {
-    testFile: "associations/extension_test.rb",
-    tests: ["marshalling extensions", "marshalling named extensions"],
-    reason:
-      "Marshal.dump/load round-trip of an AR record carrying an extended " +
-      "association proxy (extension_test.rb:46-65). Ruby Marshal binary " +
-      "serialization has no Node.js equivalent.",
-  },
-  {
-    testFile: "associations/has_many_through_associations_test.rb",
-    tests: ["marshal dump"],
-    reason:
-      "Marshal.load(Marshal.dump(preloaded)) of a loaded has-many-through " +
-      "collection. Ruby Marshal binary serialization has no Node.js equivalent.",
-  },
-  {
-    testFile: "associations/has_one_associations_test.rb",
-    tests: ["can marshal has one association with nil target"],
-    reason:
-      "Marshal.load(Marshal.dump(firm)) of an AR record with a loaded has-one " +
-      "association cache. Ruby Marshal binary serialization has no Node.js equivalent.",
-  },
   // --- globalid: Ruby-Marshal exact-token assertion ---
   {
     testFile: "verifier_test.rb",
@@ -1014,14 +614,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "uses JSON serialization (the default for our MessageVerifier), so the " +
       "encoded payload differs structurally and that byte string is " +
       "unreproducible in principle, not merely unported.",
-  },
-  {
-    testFile: "associations_test.rb",
-    tests: ["pretty print does not reload a not yet loaded target"],
-    reason:
-      "Uses Ruby's PP.pp / pretty_print over a not-yet-loaded collection proxy " +
-      "(associations_test.rb). Ruby's pretty-printer has no Node.js equivalent; " +
-      "the inspect-without-reload behavior is covered by the inspect test.",
   },
   // --- Cross-version Psych/YAML schema-cache deserialization ---
   {
@@ -1059,36 +651,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "shared-memory Thread model have no Node.js equivalent.",
   },
   {
-    testFile: "transactions_test.rb",
-    tests: [
-      "throw from transaction commits",
-      "deprecation on ruby timeout outside inner transaction",
-    ],
-    reason:
-      "Ruby throw/catch is non-exceptional control flow that commits the " +
-      "transaction (unlike JS throw, which always causes rollback). " +
-      "There is no JS equivalent for throw/catch semantics.",
-  },
-  {
-    testFile: "transactions_test.rb",
-    tests: ["after current transaction commit multidb nested transactions"],
-    reason:
-      "Requires the ARUnit2Model secondary database connection (multi-database " +
-      "setup). The test asserts afterAllTransactionsCommit fires only after the " +
-      "outermost cross-database transaction commits — not available in the " +
-      "single-database test environment.",
-  },
-  {
-    testFile: "dirty_test.rb",
-    tests: ["string attribute should compare with typecast symbol after update"],
-    reason:
-      "The test's whole point is that a Ruby symbol (`create!(catchphrase: " +
-      ':foo)` / `update_column :catchphrase, :foo`) type-casts to the string "foo" ' +
-      "and so compares clean against the persisted value. JS has no " +
-      'auto-coercing symbol; substituting "foo" would test "foo" == "foo" ' +
-      "vacuously, exercising no cast.",
-  },
-  {
     testFile: "dirty_test.rb",
     tests: [
       "in place mutation detection",
@@ -1096,19 +658,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "mutating and then assigning doesn't remove the change",
     ],
     reason:
-      'All three mutate a string in place (`catchphrase << " matey!"`, ' +
-      '`data << "bar"` on a serialized binary; dirty_test.rb:668/689/799). ' +
-      "JS strings are immutable — there is no in-place string mutation to detect.",
-  },
-  {
-    testFile: "dirty_test.rb",
-    tests: ["getters with side effects are allowed"],
-    reason:
-      "The overridden reader persists as a side effect (`update_attribute` " +
-      "inside `def catchphrase`, dirty_test.rb:807) and the assertion relies " +
-      "on that write completing before the reader returns. trails persistence " +
-      "is async; a JS getter cannot await, so the persist would float as an " +
-      "unawaited promise — no faithful sync equivalent.",
+      'All three mutate a String in place (`catchphrase << " matey!"`, `data << "bar"`; ' +
+      "dirty_test.rb:668/689/799) and assert the attribute reads changed with no assignment. " +
+      'PERMANENT: CLAUDE.md § "Ruby Strings are JS string primitives".',
   },
   {
     testFile: "database_selector_test.rb",
@@ -1124,14 +676,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Encrypts/decrypts records across concurrent Ruby Threads to assert the " +
       "encryption context is thread-local. The entire file is a Thread.new " +
       "concurrency test with no single-threaded JS equivalent.",
-  },
-  {
-    testFile: "adapters/abstract_mysql_adapter/transaction_test.rb",
-    tests: ["raises Deadlocked when a deadlock is encountered"],
-    reason:
-      "Provokes a MySQL deadlock across two Ruby Threads " +
-      "(transaction_test.rb:38-60). A deadlock requires genuine concurrency; " +
-      "single-threaded JS cannot reproduce it.",
   },
   // --- fork() / pid ---
   // Both the SQLite and PostgreSQL statement_pool files define this fork test;
@@ -1157,17 +701,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   // (SQLite) variant is portable and already implemented+passing
   // (adapter-prevent-writes.test.ts:60); only the PG `assert_raises` variant is
   // skipped, and that is an adapter behavior, not a JS-runtime impossibility.
-  // --- Documented JS-vs-Ruby divergence (workplan Wave 0) ---
-  {
-    testFile: "database_configurations/resolver_test.rb",
-    tests: ["url missing scheme"],
-    reason:
-      "DIVERGES (documented): Rails parses every string config arg as a URL and " +
-      'raises InvalidConfigurationError for a bare `"foo"`; Trails treats ' +
-      "non-URL strings as environment-name lookups (the role Ruby Symbols play " +
-      'in Rails), so `"foo"` is a missing-env lookup, not a malformed URL. ' +
-      "See packages/activerecord/src/database-configurations/resolver.test.ts.",
-  },
   {
     testFile: "i18n_test.rb",
     tests: ["exposes its VERSION constant"],
@@ -1222,13 +755,28 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "rest of the file stays counted.",
   },
   {
-    pattern: "/version.rb",
+    testFile: "attribute_test.rb",
+    className: "AttributeTest",
+    tests: [
+      "duping dups the value",
+      "an attribute is changed if it has been mutated",
+      "with_type preserves mutations",
+    ],
     reason:
-      "`Module.version` / `VERSION` returns the gem version as a Gem::Version " +
-      "(e.g. active_record/version.rb:8). Every trails package carries its " +
-      "version in package.json, which is the JS ecosystem's registry for it, so " +
-      "there is nothing to port. Anchored (leading `/`) so it cannot also " +
-      "exclude `gem_version.rb`, which IS ported and owns real surface " +
-      "(`ActionPack.gem_version`).",
+      "Each asserts Ruby String identity or in-place mutation (`dup` yielding a second " +
+      'object, `value << "!"` marking the attribute changed). A JS string is an ' +
+      'immutable primitive with no identity (CLAUDE.md, "Ruby Strings are JS string ' +
+      'primitives"); the stubs stay `it.skip` under PERMANENT-SKIP in attribute.test.ts. ' +
+      "`className` keeps the other *attribute_test.rb files counted.",
+  },
+  {
+    testFile: "type/string_test.rb",
+    className: "StringTest",
+    tests: ["cast strings are mutable"],
+    reason:
+      "Asserts `Type::String#cast` answers an unfrozen copy of a frozen String. A JS " +
+      'string is an immutable primitive (CLAUDE.md, "Ruby Strings are JS string ' +
+      'primitives"); the stub stays `it.skip` under PERMANENT-SKIP in type/string.test.ts. ' +
+      "`className` keeps activerecord's StringTypeTest counted.",
   },
 ];

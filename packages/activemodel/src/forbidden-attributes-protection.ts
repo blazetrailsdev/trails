@@ -1,27 +1,26 @@
-export class ForbiddenAttributesError extends globalThis.Error {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ForbiddenAttributesError";
-  }
-}
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
-interface PermittedAttributes {
-  permitted?: boolean | (() => boolean);
-  toH?(): Record<string, unknown>;
+export class ForbiddenAttributesError extends globalThis.Error {}
+ForbiddenAttributesError.prototype.name = "ForbiddenAttributesError";
+
+export interface PermittedAttributes {
+  isPermitted(): boolean;
+  readonly keys: string[] | (() => string[]);
+  toH(): Record<string, unknown> | Map<string, unknown>;
 }
 
 /** @internal */
 export function sanitizeForMassAssignment(
-  attributes: Record<string, unknown>,
-): Record<string, unknown> {
-  const attrs = attributes as Record<string, unknown> & PermittedAttributes;
-  if (respondToPermitted(attrs)) {
-    if (!readPermitted(attrs)) {
+  attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+): Record<string, unknown> | Map<string, unknown> {
+  const attrs = attributes as Record<string, unknown> & Partial<PermittedAttributes>;
+  if (rbObjRespondTo(attrs, "isPermitted")) {
+    if (!attrs.isPermitted!()) {
       throw new ForbiddenAttributesError();
     }
     return attrs.toH!();
   }
-  return attributes;
+  return attrs;
 }
 
 /** @internal */
@@ -31,15 +30,3 @@ export const ForbiddenAttributesProtection = {
   sanitizeForMassAssignment,
   sanitizeForbiddenAttributes,
 };
-
-function readPermitted(attrs: PermittedAttributes): boolean {
-  const permitted = attrs.permitted;
-  return typeof permitted === "function" ? permitted.call(attrs) : Boolean(permitted);
-}
-
-function respondToPermitted(attrs: object): boolean {
-  if (typeof attrs !== "object" || attrs === null) return false;
-  const proto = Object.getPrototypeOf(attrs);
-  if (proto === Object.prototype || proto === null) return false;
-  return "permitted" in attrs;
-}

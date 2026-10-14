@@ -33,7 +33,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // The sanctioned surface — fixtures({}) — is never flagged.
     {
       filename: FILENAME,
-      code: 'import { fixtures } from "./test-fixtures.js";',
+      code: 'import { fixtures } from "./test-helpers/use-fixtures.js";',
     },
     // The loaders' own unit test may import them directly — via the real
     // same-directory specifier it actually uses.

@@ -1,4 +1,6 @@
-import { NoMethodError, extend } from "@blazetrails/ruby-compat";
+import type { PermittedAttributes } from "@blazetrails/activemodel";
+import { NoMethodError, extend, rbModConstSet } from "@blazetrails/ruby-compat";
+import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { QueryMethods } from "../relation/query-methods.js";
@@ -9,17 +11,17 @@ import {
   callbacksFor as assocCallbacksFor,
   type CallbackHost,
 } from "./collection-association.js";
-import type { PrettyPrinter } from "../pretty-print.js";
+import type { PP, Set } from "@blazetrails/ruby-compat";
 import { relationClassFor } from "../relation/delegation.js";
 
-import { stripThenable } from "../relation/thenable.js";
+import { stripThenable } from "@blazetrails/activesupport";
 import {
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,
   FinderMethods,
 } from "../relation/finder-methods.js";
 import type * as Arel from "@blazetrails/arel";
-import type { Nodes } from "@blazetrails/arel";
+import type { Nodes, ArelNode } from "@blazetrails/arel";
 import {
   singularize,
   camelize,
@@ -27,7 +29,6 @@ import {
   publicInstanceMethods,
 } from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
-import { autoloadModel } from "../associations.js";
 import { Associations } from "../namespaces.js";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
@@ -67,24 +68,8 @@ function sameRecordList(a: Base[], b: Base[]): boolean {
   return a.length === b.length && a.every((record, i) => record.equals(b[i]));
 }
 
-/** @internal */
-interface ThroughAssociationHandle {
-  _throughScope?: unknown;
-  concat(...records: Base[]): Promise<Base[] | undefined>;
-  insertRecord(
-    record: Base,
-    validate?: boolean,
-    raise?: boolean,
-    block?: (record: Base) => void,
-  ): Promise<boolean>;
-  transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class CollectionProxy<T extends Base = Base> extends Relation<T> {
-  /** @internal */
-  static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
-
+export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean> {
   private _association!: CollectionAssociation;
   private _assocName: string;
   private get _target(): T[] {
@@ -128,7 +113,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   get target(): T[] {
-    return this._target;
+    return this._association.target as T[];
   }
 
   /** @internal */
@@ -146,11 +131,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     };
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.iterator](): IterableIterator<T> {
-    return this.target[Symbol.iterator]();
-  }
-
   /** @internal */
   static _targetModelFor(
     record: Base,
@@ -163,7 +143,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     };
     const richKlass = ownerCtor._reflectOnAssociation?.(assocName)?.klass;
     if (richKlass) return richKlass;
-    autoloadModel(className);
     return constantize(className) as typeof Base;
   }
 
@@ -188,20 +167,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   constructor(klass: typeof Base, association: CollectionAssociation) {
-    super(klass, klass.arelTable);
+    super(klass);
     this._association = association;
     this._assocName = association.reflection.name;
 
     const extensions = association.extensions;
-    if (extensions.length > 0) {
-      for (const mod of [...extensions].reverse()) {
-        if (typeof mod === "function") {
-          (mod as (rel: unknown) => void)(this);
-        } else {
-          extend(this, mod as object);
-        }
-      }
-    }
+    if (extensions.length > 0) extend(this, ...extensions);
   }
 
   protected override async execQueries(): Promise<T[]> {
@@ -209,25 +180,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
   build(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): T;
+  build(
+    attributes:
+      | Record<string, unknown>
+      | Map<string, unknown>
+      | PermittedAttributes
+      | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    const association = this._association.owner.association(
-      this._assocName,
-    ) as unknown as CollectionAssociation;
-    return (
-      Array.isArray(attributes)
-        ? association.build(attributes, block as (record: Base) => void)
-        : association.build(attributes, block as (record: Base) => void)
-    ) as T | T[];
+    return this._association.build(attributes, block as (record: Base) => void) as T | T[];
   }
 
   new(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
-  new(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
+  new(attributes?: Record<string, unknown> | PermittedAttributes, block?: (r: T) => void): T;
   new(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     return Array.isArray(attributes)
@@ -236,9 +207,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async create(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async create(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async create(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     return (await this._association.create(
@@ -261,18 +235,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this);
     }
 
-    const assoc = this._association.owner.association(this._assocName) as unknown as {
-      concat: (...records: Base[]) => Promise<Base[] | undefined>;
-    };
-    const concatResult = await assoc.concat(...(records as unknown as Base[]));
+    const concatResult = await this._association.concat(...(records as unknown as Base[]));
     if (!concatResult) return false;
     return stripThenable(this);
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
-    const assoc = this._association.owner.association(
-      this._assocName,
-    ) as unknown as ThroughAssociationHandle;
+    const assoc = this._association as HasManyThroughAssociation;
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
@@ -357,20 +326,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override find(...ids: unknown[]): Promise<T | T[]>;
   override async find(...args: unknown[]): Promise<T | T[] | null> {
     if (typeof args[args.length - 1] === "function") return super.find(...args);
-    const assoc = this._association.owner.association(this._assocName) as unknown as {
-      find(...args: unknown[]): Promise<Base | Base[] | null>;
-    };
-    return (await assoc.find(...args)) as T | T[];
+    return (await this._association.find(...args)) as T | T[];
   }
 
   override async pluck(
     ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
-    if (this.isNullScope()) return this.scope().pluck(...columnNames);
-    if (this.reflection.options.disableJoins) {
-      return this.scope().pluck(...columnNames);
-    }
-    return super.pluck(...columnNames);
+    return this.isNullScope() ? this.scope().pluck(...columnNames) : super.pluck(...columnNames);
   }
 
   async reload(): Promise<Omit<this, "then">> {
@@ -389,10 +351,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    const assoc = this._association.owner.association(this._assocName) as unknown as {
-      scope(): unknown;
-    };
-    return (this._scope ??= assoc.scope() as any);
+    return (this._scope ??= this._association.scope());
   }
   async loadTarget(): Promise<T[]> {
     return (await this._association.loadTarget()) as T[];
@@ -408,34 +367,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._association.isFindFromTarget();
   }
 
-  async inspect(): Promise<string> {
+  override async inspect(): Promise<string> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    const limitValue = (this as any).limitValue as number | null;
-    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
-    const subject = this._targetLoaded
-      ? this._target
-      : await this.annotate("loading for inspect").limit(take);
-    const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
-    if (entries.length === 11) entries[10] = "...";
-    return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
+    return super.inspect();
   }
 
-  async prettyPrint(pp: PrettyPrinter): Promise<void> {
+  override async prettyPrint(pp: PP): Promise<void> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    const limitValue = (this as any).limitValue as number | null;
-    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
-    const subject = this._targetLoaded
-      ? this._target
-      : await this.annotate("loading for pp").limit(take);
-    const entries = subject.slice(0, take) as (T | string)[];
-    if (entries.length === 11) entries[10] = "...";
-    await pp.pp(entries);
+    return super.prettyPrint(pp);
   }
 
   async createBang(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async createBang(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async createBang(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async createBang(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     return (await this._association.createBang(
@@ -456,7 +404,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): Promise<number | Map<unknown, number>>;
   override async calculate(
     operation: "sum",
-    column: string | Nodes.Node | number | null,
+    column: string | ArelNode | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
   override async calculate(
     operation: "average" | "minimum" | "maximum",
@@ -464,13 +412,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): Promise<unknown | null | Map<unknown, unknown>>;
   override async calculate(
     operation: string,
-    columnName?: string | Nodes.Node | number | null,
+    columnName?: string | ArelNode | number | null,
   ): Promise<unknown> {
-    if (this.isNullScope()) return this.scope().calculate(operation, columnName);
-    if (this.reflection.options.disableJoins) {
-      return this.scope().calculate(operation, columnName);
-    }
-    return super.calculate(operation, columnName);
+    return this.isNullScope()
+      ? this.scope().calculate(operation, columnName)
+      : super.calculate(operation, columnName);
   }
 
   get proxyAssociation(): CollectionAssociation {
@@ -479,6 +425,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   async records(): Promise<T[]> {
     return this.loadTarget();
+  }
+
+  override get _isRecordsSynchronous(): boolean {
+    return super._isRecordsSynchronous || !this._association.isFindTarget();
   }
 
   override async equals(other: unknown): Promise<boolean | undefined> {
@@ -506,14 +456,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._take = undefined;
     this._scope = undefined;
     return this;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
-    const records = await this.loadTarget();
-    for (const record of records) {
-      yield record;
-    }
   }
 }
 
@@ -567,4 +509,4 @@ for (const name of delegateMethods) {
   });
 }
 
-Associations.CollectionProxy = CollectionProxy;
+rbModConstSet(Associations, "CollectionProxy", CollectionProxy);

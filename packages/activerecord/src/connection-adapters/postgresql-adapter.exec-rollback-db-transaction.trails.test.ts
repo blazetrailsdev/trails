@@ -19,21 +19,19 @@ async function inTransaction(adapter: PostgreSQLAdapter): Promise<boolean> {
 }
 
 function client(adapter: PostgreSQLAdapter): unknown {
-  return (adapter as unknown as { _client: unknown })._client;
+  return (adapter as unknown as { _rawConnectionForTest(): unknown })._rawConnectionForTest();
 }
 
 describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
-  it("releases the transaction client so the next statement is not left mid-transaction", async () => {
+  it("rolls back so the next statement is not left mid-transaction", async () => {
     const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       await adapter.beginDbTransaction();
       expect(await inTransaction(adapter)).toBe(true);
-      expect(client(adapter)).not.toBeNull();
 
       await adapter.execRollbackDbTransaction();
 
       expect(await inTransaction(adapter)).toBe(false);
-      expect(client(adapter)).toBeNull();
 
       await adapter.execute("SELECT 1");
     } finally {
@@ -41,18 +39,15 @@ describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
     }
   });
 
-  it("releases the transaction client when the socket was severed under it", async () => {
+  it("reconnects for the next statement when the socket was severed under it", async () => {
     const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       await adapter.beginDbTransaction();
       await (client(adapter) as { end(): Promise<void> }).end();
 
-      await expect(adapter.execRollbackDbTransaction()).rejects.toThrow(
-        /Client was closed and is not queryable/,
-      );
+      await expect(adapter.execRollbackDbTransaction()).rejects.toThrow(/connection is closed/);
 
       expect(await inTransaction(adapter)).toBe(false);
-      expect(client(adapter)).toBeNull();
 
       await adapter.execute("SELECT 1");
     } finally {

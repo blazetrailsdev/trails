@@ -1,4 +1,4 @@
-import { ArgumentError, hasKey } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
@@ -31,10 +31,9 @@ for (const [exp, name] of Object.entries(DECIMAL_UNITS)) {
 }
 
 export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions> {
-  static override namespace = "human";
-
-  protected get validateFloat(): boolean {
-    return true;
+  static {
+    this.namespace = "human";
+    this.validateFloat = true;
   }
 
   protected convert(): string {
@@ -42,7 +41,7 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
     this.number = kernelFloat(this.number);
 
     const options = this.options;
-    if (!hasKey(options, "stripInsignificantZeros")) {
+    if (!("stripInsignificantZeros" in options)) {
       options.stripInsignificantZeros = true;
     }
 

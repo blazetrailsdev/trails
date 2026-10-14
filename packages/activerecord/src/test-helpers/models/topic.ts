@@ -6,8 +6,9 @@ import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
+import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
 export interface Topic {
@@ -190,7 +191,7 @@ export class Topic extends Base {
   }
 
   static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
-    stats.count = (await this.count()) as number;
+    stats.count = await this.count();
     return this;
   }
 
@@ -218,7 +219,7 @@ export class Topic extends Base {
   /** @internal */
   private async defaultWrittenOn() {
     if (!(this as any).attributePresent("written_on")) {
-      this.writeAttribute("written_on", Temporal.Now.instant());
+      this.writeAttribute("written_on", RubyTime.now());
     }
   }
 
@@ -252,6 +253,7 @@ export class Topic extends Base {
     }
   }
 }
+registerModel(Topic);
 
 export class DefaultRejectedTopic extends Topic {
   static {
@@ -260,19 +262,25 @@ export class DefaultRejectedTopic extends Topic {
     });
   }
 }
+registerModel(DefaultRejectedTopic);
 
 export class BlankTopic extends Topic {
   blank() {
     return true;
   }
 }
+registerModel(BlankTopic);
 
 export class TitlePrimaryKeyTopic extends Topic {
   static {
-    this._primaryKey = "title";
+    this.primaryKey = "title";
     this.aliasAttribute("id_value", "id");
   }
 }
+registerModel(TitlePrimaryKeyTopic);
+
+export const Web = new Module();
+registerConstant("Web", Web);
 
 export class WebTopic extends Base {
   declare replies: AssociationProxy<WebReply>;
@@ -280,14 +288,11 @@ export class WebTopic extends Base {
   static _tableName = "topics";
 
   static {
+    registerModel(rbModConstSet(Web, "Topic", this));
     this.hasMany("replies", {
       dependent: "destroy",
       foreignKey: "parent_id",
-      className: "WebReply",
+      className: "Web::Reply",
     });
   }
-}
-
-for (const klass of [DefaultRejectedTopic, BlankTopic, TitlePrimaryKeyTopic]) {
-  registerSubclass(klass);
 }

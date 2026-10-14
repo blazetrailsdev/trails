@@ -1,12 +1,13 @@
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { foreignKey } from "@blazetrails/activesupport";
+import { foreignKey, include, kernelArray } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isInstanceMethodAlreadyImplemented as attributeMethodsIsInstanceMethodAlreadyImplemented,
 } from "../attribute-methods.js";
 import { baseClass, isBaseClass } from "../inheritance.js";
 import type { Base } from "../base.js";
-import { AttributeMethods } from "../namespaces.js";
+import { ActiveRecord, AttributeMethods } from "../namespaces.js";
 
 /** @internal */
 export interface PrimaryKeyRecord {
@@ -22,8 +23,7 @@ export interface PrimaryKeyRecord {
 
 export function toKey(this: PrimaryKeyRecord): unknown[] | null {
   const key = this.id;
-  if (key == null || key === false) return null;
-  return Array.isArray(key) ? key : [key];
+  return rtest(key) ? kernelArray(key) : null;
 }
 
 function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {
@@ -102,43 +102,30 @@ export class PrimaryKey {
 }
 
 interface CachedSchemaSource {
-  internalSchemaCache?: {
-    getCachedPrimaryKeys?(table: string): string | string[] | null | undefined;
-  };
+  getCachedPrimaryKeys?(table: string | null | undefined): string | string[] | null | undefined;
 }
 
 interface PrimaryKeyHost {
   primaryKey: string | string[];
-  _primaryKey?: string | string[];
+  _primaryKey?: string | string[] | null;
+  _compositePrimaryKey: boolean;
+  _attributesBuilder?: unknown;
   name: string;
   tableName?: string | null;
-  connectionPool?(): {
-    activeConnection?: CachedSchemaSource | null;
-    poolConfig?: {
-      schemaReflection: { loadedCache: CachedSchemaSource["internalSchemaCache"] | null };
-    };
-  };
+  connectionPool?(): { schemaCache?: CachedSchemaSource | null };
 }
 
-function cachedSchemaCacheFor(
-  host: PrimaryKeyHost,
-): CachedSchemaSource["internalSchemaCache"] | undefined {
-  const pool = host.connectionPool?.();
-  return (
-    pool?.activeConnection?.internalSchemaCache ??
-    pool?.poolConfig?.schemaReflection.loadedCache ??
-    undefined
-  );
+function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefined {
+  return host.connectionPool?.().schemaCache ?? undefined;
 }
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
  *
- * Honors an explicitly-configured primary key — read through the prototype
- * chain, so an STI subclass inherits the value its base set with `primary_key=`
- * (Rails copies base_class.primary_key into the subclass; the chain is the
- * equivalent here). When nothing is configured anywhere up the chain, mirror
- * Rails' get_primary_key: consult the schema cache so a key-less data source
+ * Rails' `inherited` (primary_key.rb:143-150) resets a subclass's
+ * `@primary_key`, so a configured key is answered only when it is an own
+ * property; any other class takes `reset_primary_key`, whose base-class arm
+ * consults the schema cache so a key-less data source
  * (e.g. a view) resolves to `null` rather than the "id" convention. The lookup
  * is query-free — it reads only what `loadSchema` already warmed — so a cold
  * cache falls back to "id". The `null` it can return matches Rails'
@@ -158,40 +145,66 @@ function cachedSchemaCacheFor(
  * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; a cold-cache read does not latch because table_exists? is async.
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
-  const configured = this._primaryKey;
-  if (configured !== undefined) return configured;
-  const base = baseClass.call(this as unknown as typeof Base) as unknown as PrimaryKeyHost & {
-    primaryKeyPrefixType?: string | null;
-  };
-  let reflected = base.primaryKeyPrefixType != null;
-  try {
-    const tableName = base.tableName;
-    reflected ||=
-      tableName != null &&
-      cachedSchemaCacheFor(base)?.getCachedPrimaryKeys?.(tableName) !== undefined;
-  } catch {}
-  if (reflected) {
+  if (Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+    return this._primaryKey as string | string[] | null;
+  }
+  if (isPrimaryKeyReflected(this)) {
     resetPrimaryKey.call(this);
     return this._primaryKey as string | string[] | null;
   }
-  return getPrimaryKey.call(this, (base as unknown as typeof Base).name);
+  if (isBaseClass(this as unknown as typeof Base)) {
+    return getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name);
+  }
+  return baseClass.call(this as unknown as typeof Base).primaryKey;
+}
+
+function isPrimaryKeyReflected(host: PrimaryKeyHost): boolean {
+  const base = baseClass.call(host as unknown as typeof Base) as unknown as PrimaryKeyHost & {
+    primaryKeyPrefixType?: string | null;
+  };
+  if (base.primaryKeyPrefixType != null) return true;
+  try {
+    const tableName = base.tableName;
+    return (
+      tableName != null &&
+      cachedSchemaCacheFor(base)?.getCachedPrimaryKeys?.(tableName) !== undefined
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key=
- *
- * `Base` already exposes the Rails-named `static set primaryKey` accessor
- * (base.ts:1157) that delegates here, so this export is redundant public
- * surface; unexporting it is RFC 0081 shape-1 work, not a seam.
+ * (attribute_methods/primary_key.rb:130-140), as a this-typed function behind
+ * the Rails-named `static set primaryKey` accessor on `Base`.
  * @internal
  * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (attribute_methods/primary_key.rb:130) as a this-typed function behind the Rails-named Base accessor.
  */
-export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]): void {
-  this._primaryKey = key;
+export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[] | null): void {
+  if (Array.isArray(value)) {
+    include(this, AttributeMethods.CompositePrimaryKey);
+    this._primaryKey = Object.freeze(value.map((v) => String(v))) as string[];
+  } else if (value != null) {
+    this._primaryKey = String(value);
+  } else {
+    this._primaryKey = null;
+  }
+
+  this._compositePrimaryKey = Array.isArray(value);
+  this._attributesBuilder = undefined;
 }
 
+/**
+ * @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
+ * @inventedArm isArray — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
+ */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
-  return Array.isArray(getPrimaryKeyAttr.call(this));
+  if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+    if (!isPrimaryKeyReflected(this)) return Array.isArray(getPrimaryKeyAttr.call(this));
+    resetPrimaryKey.call(this);
+  }
+  return this._compositePrimaryKey;
 }
 
 export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): string | string[] {
@@ -234,8 +247,10 @@ export function isDangerousAttributeMethod(this: PrimaryKeyHost, methodName: str
   return dangerousAttributeMethods().has(methodName) && !ID_ATTRIBUTE_METHODS.has(methodName);
 }
 
-export function quotedPrimaryKey(this: PrimaryKeyHost & { adapterClass(): unknown }): string {
-  return (this.adapterClass() as typeof AbstractAdapter).quoteColumnName(this.primaryKey);
+export function quotedPrimaryKey(
+  this: PrimaryKeyHost & { adapterClass(): typeof AbstractAdapter },
+): string {
+  return this.adapterClass().quoteColumnName(this.primaryKey);
 }
 
 export function resetPrimaryKey(this: PrimaryKeyHost): void {
@@ -258,8 +273,8 @@ export function resetPrimaryKey(this: PrimaryKeyHost): void {
  * The `ActiveRecord::Base != self && table_exists?` arm reads the already-warmed
  * schema cache through `cachedSchemaCacheFor` (below), which resolves it without
  * leasing a connection; a cold cache falls through to the "id" convention.
- * `ActiveRecord::Base != self` is carried by the `tableName` guard — `Base`
- * itself has none.
+ * The cache peek answering `undefined` is the `table_exists?` test, and the
+ * second read is `schema_cache.primary_keys(table_name)`.
  *
  * @missingRailsCall table_exists? — CONVERGEABLE: `tableExists` is async in
  *   trails, and its synchronous cache-only view (`cachedTableExists`) leases a
@@ -283,15 +298,17 @@ export function getPrimaryKey(
     return foreignKey(baseName, false);
   } else if (baseName != null && this.primaryKeyPrefixType === "table_name_with_underscore") {
     return foreignKey(baseName);
+  } else if (
+    ActiveRecord.Base !== (this as unknown) &&
+    cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) !== undefined
+  ) {
+    return cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) as
+      | string
+      | string[]
+      | null;
+  } else {
+    return "id";
   }
-  try {
-    const tableName = this.tableName;
-    if (tableName != null) {
-      const primaryKeys = cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(tableName);
-      if (primaryKeys !== undefined) return primaryKeys;
-    }
-  } catch {}
-  return "id";
 }
 
 /** @internal */

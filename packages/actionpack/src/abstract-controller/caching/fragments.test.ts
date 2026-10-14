@@ -13,6 +13,7 @@ import {
   combinedFragmentCacheKey,
   expireFragment,
   fragmentCacheKey,
+  Fragments,
   fragmentExist,
   instrumentFragmentCache,
   readFragment,
@@ -76,6 +77,19 @@ describe("class config", () => {
       return 42;
     });
     expect(cls.fragmentCacheKeys!.map((f) => f.call({} as FragmentsHost))).toEqual(["a", "b", 42]);
+  });
+});
+
+describe("included", () => {
+  it("gives a class its own fragment_cache_keys through class_attribute", () => {
+    class Parent {}
+    include(Parent, Fragments);
+    class Child extends Parent {}
+    const parent = Parent as unknown as { fragmentCacheKeys: unknown[] };
+    const child = Child as unknown as { fragmentCacheKeys: unknown[] };
+    child.fragmentCacheKeys = ["child"];
+    expect(parent.fragmentCacheKeys).toEqual([]);
+    expect(child.fragmentCacheKeys).toEqual(["child"]);
   });
 });
 

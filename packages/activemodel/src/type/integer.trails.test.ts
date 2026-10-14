@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { dump, unsafeLoad } from "@blazetrails/activesupport/yaml";
-import { Types } from "../index.js";
+import { Psych } from "@blazetrails/ruby-compat/psych";
+import * as Types from "../index.js";
 
 const type = new Types.IntegerType();
 
@@ -57,10 +57,10 @@ describe("IntegerType", () => {
     expect(tinyType.serialize(127)).toBe(127);
     expect(tinyType.serialize(-128)).toBe(-128);
     expect(() => tinyType.serialize(128)).toThrowError(
-      /out of range for IntegerType with limit 1 bytes/,
+      /out of range for ActiveModel::Type::Integer with limit 1 bytes/,
     );
     expect(() => tinyType.serialize(-129)).toThrowError(
-      /out of range for IntegerType with limit 1 bytes/,
+      /out of range for ActiveModel::Type::Integer with limit 1 bytes/,
     );
   });
 
@@ -95,7 +95,7 @@ describe("IntegerType", () => {
     expect(bigint.cast("9223372036854775807")).toBe(9223372036854775807n);
     expect(bigint.serialize("9223372036854775807")).toBe(9223372036854775807n);
     expect(() => bigint.serialize("9223372036854775808")).toThrow(
-      "9223372036854775808 is out of range for IntegerType with limit 8 bytes",
+      "9223372036854775808 is out of range for ActiveModel::Type::Integer with limit 8 bytes",
     );
   });
 
@@ -110,14 +110,14 @@ describe("IntegerType", () => {
     const bigint = new Types.IntegerType({ limit: 8 });
     expect(bigint.serialize(-9223372036854775808n)).toBe(-9223372036854775808n);
     expect(() => bigint.serialize(-9223372036854775809n)).toThrow(
-      "-9223372036854775809 is out of range for IntegerType with limit 8 bytes",
+      "-9223372036854775809 is out of range for ActiveModel::Type::Integer with limit 8 bytes",
     );
   });
 
   it("dumps and loads its @range through YAML", () => {
-    const yaml = dump(new Types.IntegerType());
+    const yaml = Psych.dump(new Types.IntegerType());
     expect(yaml).toContain("range: !ruby/range");
-    const loaded = unsafeLoad(yaml) as InstanceType<typeof Types.IntegerType>;
+    const loaded = Psych.unsafeLoad(yaml) as InstanceType<typeof Types.IntegerType>;
     expect(loaded.serialize(2147483647)).toBe(2147483647);
     expect(() => loaded.serialize(2147483648)).toThrow("out of range");
   });

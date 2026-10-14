@@ -4,7 +4,7 @@ import { Author } from "../test-helpers/models/author.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Post } from "../test-helpers/models/post.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import type { Base } from "../base.js";
 
 interface ThroughAssociationLike {

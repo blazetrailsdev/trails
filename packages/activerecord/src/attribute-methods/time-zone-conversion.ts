@@ -1,17 +1,20 @@
 import { ValueType } from "@blazetrails/activemodel";
-import {
-  actsLike,
-  TimeWithZone,
-  zone as timeZone,
-  registerConstant,
-} from "@blazetrails/activesupport";
+import { actsLike, zone as timeZone } from "@blazetrails/activesupport";
 import {
   type DateOrTime,
   inTimeZone,
 } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { type Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  DelegateClass,
+  rbEqual,
+  rbFSend,
+  rbObjRespondTo,
+  registerConstant,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { AttributeMethods } from "../namespaces.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
@@ -61,28 +64,19 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
     const subtype = this.__getobj__() as TimeValueSubtype;
     if (isPlainObject(value)) {
       return setTimeZoneWithoutConversion(super.cast(value));
-    }
-    if (value instanceof TimeWithZone || value instanceof RubyTime) {
-      const casted = super.cast(subtype.userInputInTimeZone(value));
-      return casted != null && casted !== false ? casted : super.cast(value);
-    }
-    if (value instanceof Temporal.ZonedDateTime) {
-      return this.convertTimeToTimeZone(value.toInstant());
-    }
-    if (value instanceof Temporal.Instant) {
-      return this.convertTimeToTimeZone(super.cast(value));
-    }
-    if (value instanceof Temporal.PlainDateTime) {
-      return setTimeZoneWithoutConversion(value.toZonedDateTime("UTC").toInstant());
-    }
-    if (typeof value === "string") {
-      const casted = super.cast(subtype.userInputInTimeZone(value));
-      return casted != null && casted !== false ? casted : super.cast(value);
-    }
-    if (isInfinite(value)) {
+    } else if (rbObjRespondTo(value, "inTimeZone")) {
+      try {
+        const casted = super.cast(subtype.userInputInTimeZone(value));
+        return rtest(casted) ? casted : super.cast(value);
+      } catch (e) {
+        if (e instanceof ArgumentError) return null;
+        throw e;
+      }
+    } else if (rbObjRespondTo(value, "isInfinite") && rtest(rbFSend(value, "isInfinite"))) {
       return value;
+    } else {
+      return this.map(super.cast(value), (v) => this.cast(v));
     }
-    return this.map(super.cast(value), (v) => this.cast(v));
   }
 
   override equals(other: ValueType): boolean {
@@ -94,22 +88,12 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
 
     if (actsLike.call(value, "time")) {
       return inTimeZone(value as DateOrTime);
-    } else if (isInfinite(value)) {
+    } else if (rbObjRespondTo(value, "isInfinite") && rtest(rbFSend(value, "isInfinite"))) {
       return value;
     } else {
       return this.map(value, (v) => this.convertTimeToTimeZone(v));
     }
   }
-}
-
-/** @internal */
-function isInfinite(value: unknown): boolean {
-  const fn = (value as { isInfinite?: unknown }).isInfinite;
-  if (typeof fn === "function") {
-    const result = (fn as () => unknown).call(value);
-    return result != null && result !== false;
-  }
-  return value === Infinity || value === -Infinity;
 }
 
 /** @internal */

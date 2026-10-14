@@ -1,4 +1,4 @@
-import { setVerbose, verbose } from "@blazetrails/ruby-compat";
+import { rbEnsure, setVerbose, verbose } from "@blazetrails/ruby-compat";
 
 export function silenceWarnings<T>(block: () => T): T {
   return withWarnings(null, block);
@@ -11,9 +11,7 @@ export function enableWarnings<T>(block: () => T): T {
 export function withWarnings<T>(flag: unknown, block: () => T): T {
   const oldVerbose = verbose();
   setVerbose(flag);
-  try {
-    return block();
-  } finally {
+  return rbEnsure(block, () => {
     setVerbose(oldVerbose);
-  }
+  });
 }

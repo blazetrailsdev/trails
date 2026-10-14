@@ -6,7 +6,7 @@ export function anonymousMigration(
   up: (m: Migration) => Promise<void> = async () => {},
   down: (m: Migration) => Promise<void> = async () => {},
 ): Migration {
-  return new (class extends Migration {
+  return new (class extends Migration.Current {
     override async up(): Promise<void> {
       await up(this);
     }

@@ -1,13 +1,15 @@
 import { describe, it, expect } from "vitest";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors, type ArelEngine } from "../index.js";
+import { assertNotSame } from "../test-helpers/assertions.js";
 
 describe("TestNode", () => {
   const users = new Table("users");
   it("is equal with equal ivars (checks left/right)", () => {
     const a = users.get("name").as("n");
     const b = users.get("name").as("n");
-    expect((a.right as Nodes.SqlLiteral).value).toBe((b.right as Nodes.SqlLiteral).value);
+    expect((a.right as Nodes.SqlLiteral).toString()).toBe((b.right as Nodes.SqlLiteral).toString());
   });
 
   it("sets default case from else", () => {
@@ -83,7 +85,6 @@ describe("Node base polymorphic defaults", () => {
 
   describe("isEquality", () => {
     it("returns false on base Node subclasses", () => {
-      expect(new Nodes.SqlLiteral("x").isEquality()).toBe(false);
       expect(new Nodes.Quoted(1).isEquality()).toBe(false);
       expect(new Nodes.GreaterThan(users.get("id"), new Nodes.Quoted(1)).isEquality()).toBe(false);
     });
@@ -200,5 +201,29 @@ describe("Table.engine", () => {
     } finally {
       Table.engine = previous;
     }
+  });
+});
+
+describe("Arel::Nodes::Node#dup", () => {
+  it("copies a node with no initialize_copy shallowly, sharing its children", () => {
+    const users = new Table("users");
+    const extract = users.get("timestamp").extract("date");
+    const dolly = rbObjDup(extract);
+    expect(dolly).toBeInstanceOf(Nodes.Extract);
+    assertNotSame(extract, dolly);
+    expect(dolly.expr).toBe(extract.expr);
+    expect(dolly.field).toBe(extract.field);
+  });
+
+  it("runs initialize_copy, copying the cores of a SelectStatement", () => {
+    const statement = new Nodes.SelectStatement();
+    const dolly = rbObjDup(statement);
+    expect(dolly.cores).toEqual(statement.cores);
+    assertNotSame(statement.cores, dolly.cores);
+  });
+
+  it("does not carry the receiver's frozen state", () => {
+    const node = Object.freeze(new Nodes.SelectStatement());
+    expect(Object.isFrozen(rbObjDup(node))).toBe(false);
   });
 });

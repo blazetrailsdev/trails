@@ -1,9 +1,11 @@
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class UnencryptedBook extends Base {
   static _tableName = "encrypted_books";
 }
+registerModel(UnencryptedBook);
 
 export class EncryptedBook extends Base {
   declare author_id: number;
@@ -20,6 +22,7 @@ export class EncryptedBook extends Base {
     this.encrypts("name", { deterministic: true });
   }
 }
+registerModel(EncryptedBook);
 
 export class EncryptedBookWithUniquenessValidation extends Base {
   static _tableName = "encrypted_books";
@@ -29,6 +32,7 @@ export class EncryptedBookWithUniquenessValidation extends Base {
     this.encrypts("name", { deterministic: true });
   }
 }
+registerModel(EncryptedBookWithUniquenessValidation);
 
 export class EncryptedBookWithDowncaseName extends Base {
   static _tableName = "encrypted_books";
@@ -38,6 +42,7 @@ export class EncryptedBookWithDowncaseName extends Base {
     this.encrypts("name", { deterministic: true, downcase: true });
   }
 }
+registerModel(EncryptedBookWithDowncaseName);
 
 function _downcaseLikeRails(v: unknown): unknown {
   if (v == null) return v;
@@ -62,6 +67,7 @@ export class EncryptedBookNormalizedFirst extends Base {
     this.encrypts("logo");
   }
 }
+registerModel(EncryptedBookNormalizedFirst);
 
 export class EncryptedBookNormalizedSecond extends Base {
   static _tableName = "encrypted_books";
@@ -73,6 +79,7 @@ export class EncryptedBookNormalizedSecond extends Base {
     this.normalizes("logo", { with: _downcaseLikeRails });
   }
 }
+registerModel(EncryptedBookNormalizedSecond);
 
 export class EncryptedBookAttribute extends Base {
   declare name: Temporal.PlainDate;
@@ -84,6 +91,7 @@ export class EncryptedBookAttribute extends Base {
     this.encrypts("name");
   }
 }
+registerModel(EncryptedBookAttribute);
 
 export class EncryptedBookThatIgnoresCase extends Base {
   static _tableName = "encrypted_books";
@@ -92,6 +100,7 @@ export class EncryptedBookThatIgnoresCase extends Base {
     this.encrypts("name", { deterministic: true, ignoreCase: true });
   }
 }
+registerModel(EncryptedBookThatIgnoresCase);
 
 export class EncryptedBookWithUnencryptedDataOptedOut extends Base {
   static _tableName = "encrypted_books";
@@ -101,6 +110,7 @@ export class EncryptedBookWithUnencryptedDataOptedOut extends Base {
     this.encrypts("name", { deterministic: true, supportUnencryptedData: false });
   }
 }
+registerModel(EncryptedBookWithUnencryptedDataOptedOut);
 
 export class EncryptedBookWithUnencryptedDataOptedIn extends Base {
   static _tableName = "encrypted_books";
@@ -110,6 +120,7 @@ export class EncryptedBookWithUnencryptedDataOptedIn extends Base {
     this.encrypts("name", { deterministic: true, supportUnencryptedData: true });
   }
 }
+registerModel(EncryptedBookWithUnencryptedDataOptedIn);
 
 export class EncryptedBookWithBinary extends Base {
   declare logo: Uint8Array | null;
@@ -119,6 +130,7 @@ export class EncryptedBookWithBinary extends Base {
     this.encrypts("logo");
   }
 }
+registerModel(EncryptedBookWithBinary);
 
 export class EncryptedBookWithSerializedFirstBinary extends Base {
   static _tableName = "encrypted_books";
@@ -128,6 +140,7 @@ export class EncryptedBookWithSerializedFirstBinary extends Base {
     this.encrypts("logo");
   }
 }
+registerModel(EncryptedBookWithSerializedFirstBinary);
 
 export class EncryptedBookWithSerializedSecondBinary extends Base {
   static _tableName = "encrypted_books";
@@ -137,6 +150,7 @@ export class EncryptedBookWithSerializedSecondBinary extends Base {
     this.serialize("logo", { coder: JSON });
   }
 }
+registerModel(EncryptedBookWithSerializedSecondBinary);
 
 export class EncryptedBookWithSerializedDeterministicName extends Base {
   declare name: unknown;
@@ -158,6 +172,7 @@ export class EncryptedBookWithSerializedDeterministicName extends Base {
     });
   }
 }
+registerModel(EncryptedBookWithSerializedDeterministicName);
 
 export class EncryptedBookWithCustomCompressor extends Base {
   static _tableName = "encrypted_books";
@@ -166,8 +181,9 @@ export class EncryptedBookWithCustomCompressor extends Base {
     this.encrypts("name", {
       compressor: {
         deflate: (value: string): Buffer => Buffer.from(`[compressed] ${value}`),
-        inflate: (data: Buffer | Uint8Array): string => Buffer.from(data).toString(),
+        inflate: (data: Buffer | Uint8Array): Buffer => Buffer.from(data),
       },
     });
   }
 }
+registerModel(EncryptedBookWithCustomCompressor);

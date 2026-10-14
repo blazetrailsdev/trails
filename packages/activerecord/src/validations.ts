@@ -1,17 +1,16 @@
-import type { AttrNameArg, ValidationContext } from "@blazetrails/activemodel";
-import { I18n } from "@blazetrails/activemodel";
+import type { AttrNameArg } from "@blazetrails/activemodel";
+import { I18n, Model } from "@blazetrails/activemodel";
+import { Module, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "./errors.js";
+import { ActiveRecord } from "./namespaces.js";
 
-export type ValidationContextArg = string | string[] | ValidationContext | null;
+export type ValidationContextArg = string | string[] | null;
 import { AbsenceValidator } from "./validations/absence.js";
 import { AssociatedValidator, validatesAssociated } from "./validations/associated.js";
 import { LengthValidator } from "./validations/length.js";
 import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { UniquenessValidator, validatesUniquenessOf } from "./validations/uniqueness.js";
-import { associationInstanceGet } from "./associations.js";
-import type { Association } from "./associations/association.js";
-import type { Base } from "./base.js";
 
 export {
   AbsenceValidator,
@@ -44,6 +43,19 @@ export class RecordInvalid extends ActiveRecordError {
   }
 }
 
+export const Validations = new Module((mod) => {
+  mod.defineMethod("validate", validate);
+  mod.defineMethod("customValidationContext", customValidationContext);
+});
+
+rbModConstSet(ActiveRecord, "Validations", Validations);
+rbModConstSet(Validations, "AbsenceValidator", AbsenceValidator);
+rbModConstSet(Validations, "AssociatedValidator", AssociatedValidator);
+rbModConstSet(Validations, "LengthValidator", LengthValidator);
+rbModConstSet(Validations, "NumericalityValidator", NumericalityValidator);
+rbModConstSet(Validations, "PresenceValidator", PresenceValidator);
+rbModConstSet(Validations, "UniquenessValidator", UniquenessValidator);
+
 export interface Validations {
   validate(context?: ValidationContextArg): Promise<boolean>;
   isValid(context?: ValidationContextArg): Promise<boolean>;
@@ -69,32 +81,29 @@ interface ValidationsHost {
   readAttribute(name: string): unknown;
 }
 
-let _superIsValid: ((context?: ValidationContextArg) => Promise<boolean>) | null = null;
+export async function save<T>(
+  this: ValidationsHost,
+  options: { validate?: boolean; context?: string } | undefined,
+  superFn: () => Promise<T>,
+): Promise<T | false> {
+  return (await performValidations.call(this, options)) ? superFn() : false;
+}
 
-/** @internal */
-export function _setSuperIsValid(fn: (context?: ValidationContextArg) => Promise<boolean>): void {
-  _superIsValid = fn;
+export async function saveBang<T>(
+  this: ValidationsHost,
+  options: { validate?: boolean; context?: string } | undefined,
+  superFn: () => Promise<T>,
+): Promise<T> {
+  return (await performValidations.call(this, options)) ? superFn() : raiseValidationError(this);
 }
 
 export async function isValid(
   this: ValidationsHost,
-  context?: ValidationContextArg,
+  context: ValidationContextArg = null,
 ): Promise<boolean> {
-  const effectiveContext =
-    context ?? this._validationContext ?? defaultValidationContext.call(this);
-  if (_superIsValid == null) {
-    throw new ActiveRecordError(
-      "ActiveRecord::Validations#isValid called before Base registered the super isValid",
-    );
-  }
-  const previousContext = this._validationContext;
-  this._validationContext = effectiveContext;
-  try {
-    const result = await _superIsValid.call(this, effectiveContext);
-    return this.errors.isEmpty() && result;
-  } finally {
-    this._validationContext = previousContext;
-  }
+  context ??= defaultValidationContext.call(this);
+  const output = await Model.prototype.isValid.call(this, context);
+  return this.errors.isEmpty() && output;
 }
 
 export function validate(this: ValidationsHost, context?: ValidationContextArg): Promise<boolean> {
@@ -112,67 +121,12 @@ export function defaultValidationContext(this: ValidationsHost): string {
 }
 
 /** @internal */
-export function performValidations(
+export async function performValidations(
   this: ValidationsHost,
-  options?: { validate?: boolean; context?: string },
+  options: { validate?: boolean; context?: string } = {},
 ): Promise<boolean> {
-  if (options?.validate === false) return Promise.resolve(true);
-  return this.isValid(options?.context);
+  return options.validate === false || (await this.isValid(options.context));
 }
-
-/** @noRailsEquivalent PERMANENT */
-export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
-  if (typeof this.association === "function") {
-    try {
-      const assoc = this.association(attribute);
-      if (assoc && (assoc.loaded === true || assoc.target != null)) return assoc.target;
-    } catch {}
-  }
-  const holder = associationInstanceGet.call(
-    this as unknown as Base,
-    attribute,
-  ) as Association | null;
-  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-    return holder.target ?? null;
-  }
-  return this.readAttribute(attribute);
-}
-
-interface HelperMethodHost {
-  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
-}
-
-export function validatesPresenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesAbsenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesLengthOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesSizeOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
-}
-
-/** @noRailsEquivalent PERMANENT */
-export const ClassMethods = {
-  validatesAssociated,
-  validatesUniquenessOf,
-  validatesPresenceOf,
-  validatesAbsenceOf,
-  validatesLengthOf,
-  validatesSizeOf,
-  validatesNumericalityOf,
-};
 
 /** @internal */
 export function raiseValidationError(record: unknown): never {

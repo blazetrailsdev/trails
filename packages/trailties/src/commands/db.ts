@@ -1,6 +1,8 @@
 import { Command } from "commander";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { Trails } from "../rails.js";
+import { Actions } from "../command/actions.js";
 import {
   env,
   setExitCode,
@@ -21,8 +23,9 @@ import {
   InternalMetadata,
   MigrationContext,
   Migrator,
-  SchemaDumper,
+  NoDatabaseError,
   SchemaMigration,
+  UrlConfig,
   dumpSchemaAfterMigration,
   eachCurrentEnvironment,
   schemaFormat,
@@ -101,7 +104,7 @@ interface DatabaseEntry {
 
 async function taskableDatabaseEntries(
   opts: DatabaseOpts,
-  envName: string = DatabaseTasks.env,
+  envName: string = DatabaseTasks.env.toString(),
 ): Promise<DatabaseEntry[]> {
   const dbName = validateDatabaseFlag(opts);
   const allConfigs = await loadAllDatabaseConfigs(envName);
@@ -112,7 +115,7 @@ async function taskableDatabaseEntries(
       return {
         name,
         raw,
-        hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>),
+        hashConfig: buildHashConfig(envName, name, raw),
       };
     }),
   );
@@ -220,9 +223,14 @@ function inferAdapterFromUrl(url: string): string | undefined {
   }
 }
 
-function toDbConfig(raw: RawConfig, envName: string = DatabaseTasks.env): HashConfig {
-  const normalized = normalizeRawConfig(raw);
-  return new HashConfig(envName, "primary", normalized as Record<string, unknown>);
+function buildHashConfig(envName: string, name: string, raw: RawConfig): HashConfig {
+  const { url, ...configWithoutUrl } = raw as Record<string, unknown>;
+  if (url) return new UrlConfig(envName, name, url as string, configWithoutUrl);
+  return new HashConfig(envName, name, configWithoutUrl);
+}
+
+function toDbConfig(raw: RawConfig, envName: string = DatabaseTasks.env.toString()): HashConfig {
+  return buildHashConfig(envName, "primary", normalizeRawConfig(raw));
 }
 
 async function withRegisteredConfiguration<T>(
@@ -238,58 +246,43 @@ async function withRegisteredConfigurations<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
-  const previousTasksConfig = DatabaseTasks.databaseConfiguration;
+  const previousConfigurations = Base.configurations();
   const previousEnv = DatabaseTasks.env;
-  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations(configs);
+  Base.configurations(new DatabaseConfigurations(configs));
   DatabaseTasks.env = envName;
+  if (!Trails.application) {
+    DatabaseTasks.root = getFs().cwd();
+    DatabaseTasks.dbDir = "db";
+  }
   try {
     return await fn();
   } finally {
-    DatabaseTasks.databaseConfiguration = previousTasksConfig;
+    Base.configurations(previousConfigurations);
     DatabaseTasks.env = previousEnv;
   }
 }
 
 async function runProtectedEnvCheck(config: HashConfig, envName: string): Promise<void> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
-  const previousTasksConfig = DatabaseTasks.databaseConfiguration;
-  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations([config]);
+  const previousConfigurations = Base.configurations();
+  Base.configurations(new DatabaseConfigurations([config]));
   try {
     await DatabaseTasks.checkProtectedEnvironmentsBang(envName);
   } finally {
-    DatabaseTasks.databaseConfiguration = previousTasksConfig;
-  }
-}
-
-async function withResolvedSchemaFormat<T>(
-  opts: { format?: string },
-  block: () => Promise<T>,
-): Promise<T> {
-  const previousFormat = schemaFormat();
-  const previousLanguage = SchemaDumper.language;
-  try {
-    const format = await resolveSchemaFormat(opts);
-    if (format === "sql") {
-      setSchemaFormat("sql");
-    } else {
-      setSchemaFormat("ruby");
-      SchemaDumper.language = format;
-    }
-    return await block();
-  } finally {
-    setSchemaFormat(previousFormat);
-    SchemaDumper.language = previousLanguage;
+    Base.configurations(previousConfigurations);
   }
 }
 
 async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): Promise<void> {
   if (!dumpSchemaAfterMigration()) return;
   const config = hashConfig ?? toDbConfig(raw);
-  await withResolvedSchemaFormat({}, () => DatabaseTasks.dumpSchema(config));
-}
-
-interface RunOptions {
-  skipDump?: boolean;
+  const schemaFormatWas = schemaFormat();
+  try {
+    setSchemaFormat(await resolveSchemaFormat({}));
+    await DatabaseTasks.dumpSchema(config);
+  } finally {
+    setSchemaFormat(schemaFormatWas);
+  }
 }
 
 function migrationContextFor(adapter: DatabaseAdapter, dirs: string[]): MigrationContext {
@@ -300,19 +293,50 @@ function migrationContextFor(adapter: DatabaseAdapter, dirs: string[]): Migratio
   );
 }
 
-async function runMigrate(
-  adapter: DatabaseAdapter,
-  raw: RawConfig,
-  targetVersion?: string,
-  options: RunOptions = {},
-): Promise<void> {
-  const migrationContext = migrationContextFor(adapter, await migrationsDirsForConfig(raw));
-  await migrationContext.migrate(targetVersion ?? null);
+interface MigrateStateBefore {
+  schemaFileToLoad: string | null;
+  upToDate: boolean;
+}
 
-  const pending = await migrationContext.open().pendingMigrations();
-  if (pending.length === 0) console.log("All migrations are up to date.");
+async function captureMigrateState(
+  hashConfig: HashConfig,
+  dirs: string[],
+): Promise<MigrateStateBefore> {
+  const schemaDumpPath = DatabaseTasks.schemaDumpPath(hashConfig);
+  const schemaFile =
+    schemaDumpPath != null && (await getFs().exists(schemaDumpPath)) ? schemaDumpPath : null;
+  try {
+    return await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
+      const adapter = await pool.leaseConnection();
+      await adapter.execute("SELECT 1");
+      const migrationContext = migrationContextFor(adapter, dirs);
+      if (await new SchemaMigration(adapter.pool).tableExists()) {
+        const pending = await migrationContext.open().pendingMigrations();
+        return { schemaFileToLoad: null, upToDate: pending.length === 0 };
+      }
+      return {
+        schemaFileToLoad: schemaFile,
+        upToDate: schemaFile == null && migrationContext.migrations.length === 0,
+      };
+    });
+  } catch (error) {
+    if (!(error instanceof NoDatabaseError)) throw error;
+    return { schemaFileToLoad: schemaFile, upToDate: false };
+  }
+}
 
-  if (!options.skipDump) await dumpSchemaAfterMigrate(raw);
+function reportMigrateOutcome(
+  prefix: string,
+  before: MigrateStateBefore,
+  pendingAfter: number,
+): void {
+  if (before.schemaFileToLoad != null) {
+    console.log(`${prefix}Loaded schema from ${before.schemaFileToLoad}`);
+    return;
+  }
+  if (before.upToDate && pendingAfter === 0) {
+    console.log(`${prefix}All migrations are up to date.`);
+  }
 }
 
 async function runTestLoadSchema(options: {
@@ -356,6 +380,7 @@ async function structureLoadReachesDatabase(
 
 let _seedImportCounter = 0;
 async function runSeed(prefix = ""): Promise<void> {
+  await Actions.bootApplicationBang();
   const fs = getFs();
   const path = getPath();
   const cwd = fs.cwd();
@@ -457,14 +482,25 @@ async function withMigrationTasksForDb(
     config: HashConfig;
   },
   operation: () => Promise<void>,
-  opts?: { afterPending?: (pending: number) => void },
+  opts?: { report?: boolean },
 ): Promise<void> {
+  let before: MigrateStateBefore | null = null;
+  if (opts?.report) {
+    const dirs = await migrationsDirsForConfig(ctx.raw);
+    before = await withRegisteredConfiguration(ctx.config, () =>
+      captureMigrateState(ctx.config, dirs),
+    );
+  }
   await withPrefixedStdout(ctx.prefix, async () => {
     await withRegisteredConfiguration(ctx.config, operation);
   });
-  if (opts?.afterPending) {
+  if (before) {
     const migrationContext = DatabaseTasks.migrationConnectionPool().migrationContext;
-    opts.afterPending((await migrationContext.pendingMigrationVersions()).length);
+    reportMigrateOutcome(
+      ctx.prefix,
+      before,
+      (await migrationContext.pendingMigrationVersions()).length,
+    );
   }
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
@@ -484,7 +520,7 @@ async function withTargetVersionEnv(
 }
 
 async function runMigrateAll(): Promise<void> {
-  const envName = DatabaseTasks.env;
+  const envName = DatabaseTasks.env.toString();
   const entries = await taskableDatabaseEntries({}, envName);
   const migrationsDirsFor = new Map<string, string[]>();
   for (const { name, raw } of entries) {
@@ -507,6 +543,13 @@ async function runMigrateAll(): Promise<void> {
 
   await withRegisteredConfigurations(configs, envName, () =>
     DatabaseTasks.withTemporaryPool(primary.hashConfig, async () => {
+      const stateBefore = new Map<string, MigrateStateBefore>();
+      for (const { name, hashConfig } of entries) {
+        stateBefore.set(
+          name,
+          await captureMigrateState(hashConfig, migrationsDirsFor.get(name) ?? []),
+        );
+      }
       await withPrefixedStdout(currentDbPrefix, () => DatabaseTasks.migrateAll());
       for (const { name, raw, hashConfig } of entries) {
         const prefix = multiDb ? `[${name}] ` : "";
@@ -514,7 +557,7 @@ async function runMigrateAll(): Promise<void> {
           const adapter = await pool.leaseConnection();
           const migrationContext = migrationContextFor(adapter, migrationsDirsFor.get(name) ?? []);
           const pending = await migrationContext.open().pendingMigrations();
-          if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
+          reportMigrateOutcome(prefix, stateBefore.get(name)!, pending.length);
           await dumpSchemaAfterMigrate(raw, hashConfig);
         });
       }
@@ -523,17 +566,24 @@ async function runMigrateAll(): Promise<void> {
 }
 
 async function establishTaskConnection(): Promise<void> {
-  const envName = DatabaseTasks.env;
+  const envName = DatabaseTasks.env.toString();
   const loaded = await loadDatabaseConfigModule();
   if (!loaded || (loaded.module as Record<string, unknown>)[envName] === undefined) return;
   const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
   await Base.establishConnection(toDbConfig(raw, envName));
 }
 
+/** @noRailsEquivalent PERMANENT */
+async function releaseTaskConnections(): Promise<void> {
+  const { Base } = await import("@blazetrails/activerecord");
+  await Base.connectionHandler.clearAllConnectionsBang();
+}
+
 export function dbCommand(): Command {
   const cmd = new Command("db");
   cmd.description("Database management commands");
   cmd.hook("preSubcommand", establishTaskConnection);
+  cmd.hook("postAction", releaseTaskConnections);
 
   cmd
     .command("migrate")
@@ -549,13 +599,7 @@ export function dbCommand(): Command {
           return;
         }
         await forEachDatabase(opts, async (ctx) => {
-          await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate(), {
-            afterPending: (pending) => {
-              if (pending === 0) {
-                console.log(`${ctx.prefix}All migrations are up to date.`);
-              }
-            },
-          });
+          await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate(), { report: true });
         });
       });
     });
@@ -617,7 +661,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, prefix }) => {
-        const envName = DatabaseTasks.env;
+        const envName = DatabaseTasks.env.toString();
         const internalMetadata = new InternalMetadata(adapter.pool);
         if (!internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
@@ -634,7 +678,7 @@ export function dbCommand(): Command {
       "Abort if the stored schema environment is protected or does not match the current environment",
     )
     .action(async () => {
-      const envName = DatabaseTasks.env;
+      const envName = DatabaseTasks.env.toString();
       const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
       const config = toDbConfig(raw, envName);
       try {
@@ -711,9 +755,15 @@ export function dbCommand(): Command {
     .description("Run database seeds")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ prefix }) => {
-        await runSeed(prefix);
-      });
+      const entries = await taskableDatabaseEntries(opts);
+      if (entries.length === 0) return;
+      const seedTarget =
+        entries.find((entry) => entry.hashConfig.isPrimary())?.hashConfig ?? entries[0].hashConfig;
+      await withRegisteredConfigurations(
+        entries.map((entry) => entry.hashConfig),
+        entries[0].hashConfig.envName,
+        () => DatabaseTasks.withTemporaryPool(seedTarget, () => runSeed()),
+      );
     });
 
   cmd
@@ -748,10 +798,10 @@ export function dbCommand(): Command {
       "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
     )
     .action(async () => {
-      const envName = DatabaseTasks.env;
+      const envName = DatabaseTasks.env.toString();
       const entriesByEnv: Awaited<ReturnType<typeof taskableDatabaseEntries>>[] = [];
       await eachCurrentEnvironment(envName, async (environment) => {
-        entriesByEnv.push(await taskableDatabaseEntries({}, environment));
+        entriesByEnv.push(await taskableDatabaseEntries({}, environment.toString()));
       });
       const entries = entriesByEnv[0];
       if (entries.length === 0) {
@@ -772,15 +822,16 @@ export function dbCommand(): Command {
           });
         },
       };
+      const schemaFormatWas = schemaFormat();
       try {
-        await withResolvedSchemaFormat({}, () =>
-          withRegisteredConfigurations(
-            allEntries.map((entry) => entry.hashConfig),
-            envName,
-            () => DatabaseTasks.prepareAll(),
-          ),
+        setSchemaFormat(await resolveSchemaFormat({}));
+        await withRegisteredConfigurations(
+          allEntries.map((entry) => entry.hashConfig),
+          envName,
+          () => DatabaseTasks.prepareAll(),
         );
       } finally {
+        setSchemaFormat(schemaFormatWas);
         DatabaseTasks.seedLoader = previousSeedLoader;
       }
     });
@@ -840,13 +891,7 @@ export function dbCommand(): Command {
             await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
             await DatabaseTasks.migrate();
           },
-          {
-            afterPending: (pending) => {
-              if (pending === 0) {
-                console.log(`${ctx.prefix}All migrations are up to date.`);
-              }
-            },
-          },
+          { report: true },
         );
       });
     });
@@ -885,11 +930,16 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async ({ config, prefix }) => {
-        await withResolvedSchemaFormat(opts, async () => {
-          const filename = DatabaseTasks.schemaDumpPath(config);
+        const schemaFormatWas = schemaFormat();
+        let filename: string | null;
+        try {
+          setSchemaFormat(await resolveSchemaFormat(opts));
+          filename = DatabaseTasks.schemaDumpPath(config);
           await DatabaseTasks.dumpSchema(config);
-          console.log(`${prefix}Schema dumped to ${filename ?? "(skipped — schemaDump disabled)"}`);
-        });
+        } finally {
+          setSchemaFormat(schemaFormatWas);
+        }
+        console.log(`${prefix}Schema dumped to ${filename ?? "(skipped — schemaDump disabled)"}`);
       });
     });
 
@@ -904,40 +954,39 @@ export function dbCommand(): Command {
       const fs = getFs();
       await forEachDatabase(opts, async ({ config, prefix }) => {
         await runProtectedEnvCheck(config, config.envName);
-        await withResolvedSchemaFormat(opts, async () => {
-          const filename = DatabaseTasks.schemaDumpPath(config);
-          if (!filename || !(await fs.exists(filename))) {
-            console.error(`${prefix}No schema file found at ${filename ?? "(none)"}`);
-            setExitCode(1);
-            return;
-          }
-          if (schemaFormat() === "sql" && !(await structureLoadReachesDatabase(config))) {
-            console.error(
-              `${prefix}Loading a structure.sql is not meaningful for an in-memory database: ` +
-                `the sqlite3 child process loads it into its own throwaway database. ` +
-                `Use --format ts/js, or point the config at a file.`,
+        const format = await resolveSchemaFormat(opts);
+        const filename = DatabaseTasks.schemaDumpPath(config, format);
+        if (!filename || !(await fs.exists(filename))) {
+          console.error(`${prefix}No schema file found at ${filename ?? "(none)"}`);
+          setExitCode(1);
+          return;
+        }
+        if (format === "sql" && !(await structureLoadReachesDatabase(config))) {
+          console.error(
+            `${prefix}Loading a structure.sql is not meaningful for an in-memory database: ` +
+              `the sqlite3 child process loads it into its own throwaway database. ` +
+              `Use --format ts/js, or point the config at a file.`,
+          );
+          setExitCode(1);
+          return;
+        }
+        try {
+          console.log(`${prefix}Loading schema from ${filename}...`);
+          await DatabaseTasks.loadSchema(config, format);
+          console.log(`${prefix}Schema loaded.`);
+        } catch (error: unknown) {
+          if (filename.endsWith(".ts")) {
+            const enhanced = new Error(
+              `Failed to load schema file "${filename}". ` +
+                `Ensure a TypeScript loader (tsx, ts-node) is configured, ` +
+                `or choose a different schema format with --format js/sql, ` +
+                `SCHEMA_FORMAT=js/sql, or config.schemaFormat.`,
             );
-            setExitCode(1);
-            return;
+            (enhanced as { cause?: unknown }).cause = error;
+            throw enhanced;
           }
-          try {
-            console.log(`${prefix}Loading schema from ${filename}...`);
-            await DatabaseTasks.loadSchema(config);
-            console.log(`${prefix}Schema loaded.`);
-          } catch (error: unknown) {
-            if (filename.endsWith(".ts")) {
-              const enhanced = new Error(
-                `Failed to load schema file "${filename}". ` +
-                  `Ensure a TypeScript loader (tsx, ts-node) is configured, ` +
-                  `or choose a different schema format with --format js/sql, ` +
-                  `SCHEMA_FORMAT=js/sql, or config.schemaFormat.`,
-              );
-              (enhanced as { cause?: unknown }).cause = error;
-              throw enhanced;
-            }
-            throw error;
-          }
-        });
+          throw error;
+        }
       });
     });
 
@@ -947,11 +996,10 @@ export function dbCommand(): Command {
       "Dump db/schema_cache.yml for every database configuration in the current environment",
     )
     .action(async () => {
-      const envName = DatabaseTasks.env;
+      const envName = DatabaseTasks.env.toString();
       const named = await loadAllDatabaseConfigs(envName);
-      const configs = named.map(
-        ({ name, config }) =>
-          new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
+      const configs = named.map(({ name, config }) =>
+        buildHashConfig(envName, name, normalizeRawConfig(config)),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor({ envName })) {
@@ -972,11 +1020,10 @@ export function dbCommand(): Command {
     )
     .action(async () => {
       const fs = getFs();
-      const envName = DatabaseTasks.env;
+      const envName = DatabaseTasks.env.toString();
       const named = await loadAllDatabaseConfigs(envName);
-      const configs = named.map(
-        ({ name, config }) =>
-          new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
+      const configs = named.map(({ name, config }) =>
+        buildHashConfig(envName, name, normalizeRawConfig(config)),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor({ envName })) {

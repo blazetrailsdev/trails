@@ -1,5 +1,6 @@
 import type { DogLover } from "./dog-lover.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Dog extends Base {
@@ -18,6 +19,7 @@ export class Dog extends Base {
     });
   }
 }
+registerModel(Dog);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Dog {
   get breeder(): DogLover | null | Promise<DogLover | null>;

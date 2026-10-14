@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { type SqliteConnection, SQLite3Constants } from "../sqlite-adapter.js";
 import { isExpoSqliteAvailable, expoSqliteDriver } from "./expo-sqlite.js";
 
@@ -30,6 +30,15 @@ describe.skipIf(!isExpoSqliteAvailable)("SqliteDriver — expo-sqlite round-trip
     const row = (await select.get(["sprocket"])) as Record<string, unknown>;
     expect(row["name"]).toBe("sprocket");
     expect(row["qty"]).toBe(42);
+  });
+
+  it("rollback() rolls the open transaction back and answers true, as the gem's Database#rollback does", async () => {
+    const before = await conn.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear");
+    await conn.exec("BEGIN");
+    await conn.execute("UPDATE widgets SET qty = qty + 1 WHERE name = ?", ["gear"]);
+    expect(await conn.rollback()).toBe(true);
+    expect(await conn.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear")).toBe(before);
+    await expect((async () => conn.rollback())()).rejects.toThrow();
   });
 
   it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
@@ -119,9 +128,10 @@ describe.skipIf(!isExpoSqliteAvailable)("SqliteDriver — expo-sqlite round-trip
     await conn.exec("DROP TABLE IF EXISTS fk_parent");
   });
 
-  it("columns() returns empty array (expo-sqlite has no column metadata API)", async () => {
-    const stmt = await conn.prepare("SELECT id, name, qty FROM widgets");
-    expect(stmt.columns()).toEqual([]);
+  it("columns() answers the prepared statement's column names", async () => {
+    const stmt = await conn.prepare("SELECT id, name, qty FROM widgets WHERE 0");
+    expect(stmt.columns().map((c) => c.name)).toEqual(["id", "name", "qty"]);
+    expect(await stmt.toA()).toEqual([]);
   });
 
   it("setReadBigInts does not throw (documented no-op on this driver)", async () => {
@@ -202,3 +212,292 @@ describe.skipIf(!isExpoSqliteAvailable)(
     });
   },
 );
+
+describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classes", () => {
+  const readonly = (message: string) =>
+    Object.assign(new Error(message), { code: "ERR_INTERNAL_SQLITE_ERROR" });
+
+  const openWith = async (native: Error, open?: Error) => {
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => {
+          if (open) throw open;
+          return database;
+        },
+      }),
+    }));
+    const database = {
+      prepareAsync: async () => ({
+        executeAsync: async () => {
+          throw native;
+        },
+        executeForRawResultAsync: async () => {
+          throw native;
+        },
+        getColumnNamesAsync: async () => [],
+        finalizeAsync: async () => {},
+      }),
+      execAsync: async () => {
+        throw new Error("attempt to write a readonly database");
+      },
+    };
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const errors = await import("./errors.js");
+      return { conn: await driver.open({ database: ":memory:" }), errors };
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  };
+
+  it("a readonly write surfaces as SQLite3::ReadOnlyException on iOS", async () => {
+    const native = readonly(
+      "Calling the 'executeAsync' function has failed\n→ Caused by: Error code 8: attempt to write a readonly database",
+    );
+    const { conn, errors } = await openWith(native);
+    const error = await Promise.resolve(
+      conn.execute("INSERT INTO widgets (name) VALUES ('x')"),
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(errors.ReadOnlyException);
+    expect((error as InstanceType<typeof errors.ReadOnlyException>).code).toBe(8);
+    expect((error as Error).message).toBe("attempt to write a readonly database");
+    expect((error as Error).cause).toBe(native);
+  });
+
+  it("a readonly write surfaces as SQLite3::ReadOnlyException on Android", async () => {
+    const { conn, errors } = await openWith(
+      readonly("Error code \b: attempt to write a readonly database"),
+    );
+    const stmt = await conn.prepare("INSERT INTO widgets (name) VALUES ('x')");
+    const error = await Promise.resolve(stmt.run()).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(errors.ReadOnlyException);
+    expect((error as Error).message).toBe("attempt to write a readonly database");
+  });
+
+  it("every statement read path raises the gem class", async () => {
+    const { conn, errors } = await openWith(readonly("Error code 5: database is locked"));
+    const stmt = await conn.prepare("SELECT * FROM widgets");
+    const raises = async (fn: () => unknown) =>
+      expect(Promise.resolve().then(fn)).rejects.toBeInstanceOf(errors.BusyException);
+    await raises(() => stmt.get());
+    await raises(() => stmt.all());
+    await raises(() => stmt.toA());
+    await raises(async () => {
+      for await (const _row of stmt.iterate() as AsyncIterable<unknown>) void _row;
+    });
+  });
+
+  it("a failed open raises the gem class", async () => {
+    const native = readonly("Error code 14: unable to open database file");
+    const error = await openWith(native, native).then(
+      () => null,
+      (e: Error) => e,
+    );
+    expect(error!.name).toBe("SQLite3::CantOpenException");
+    expect(error!.cause).toBe(native);
+  });
+
+  it("reads an Android code char through its char code, masked to the primary code", async () => {
+    const { conn, errors } = await openWith(
+      readonly(`Error code ${String.fromCharCode(19)}: UNIQUE constraint failed: widgets.name`),
+    );
+    const stmt = await conn.prepare("INSERT INTO widgets (name) VALUES ('x')");
+    await expect(stmt.run()).rejects.toBeInstanceOf(errors.ConstraintException);
+  });
+
+  it("exec raises the gem class for a failed statement", async () => {
+    const native = readonly("Error code 8: attempt to write a readonly database");
+    const { conn, errors } = await openWith(native);
+    const error = await Promise.resolve(conn.exec("INSERT INTO widgets DEFAULT VALUES")).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(errors.ReadOnlyException);
+    expect((error as InstanceType<typeof errors.ReadOnlyException>).code).toBe(8);
+    expect((error as Error).message).toBe("attempt to write a readonly database");
+    expect((error as Error).cause).toBe(native);
+  });
+
+  it("the pragma write arm raises the gem class", async () => {
+    const { conn, errors } = await openWith(readonly("Error code 5: database is locked"));
+    await expect(Promise.resolve(conn.pragma("journal_mode = WAL"))).rejects.toBeInstanceOf(
+      errors.BusyException,
+    );
+  });
+
+  it("exec prepares and steps each statement of a batch in turn", async () => {
+    const prepared: string[] = [];
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async (sql: string) => {
+            prepared.push(sql);
+            return {
+              executeAsync: async () => ({ changes: 0, lastInsertRowId: 0 }),
+              getColumnNamesAsync: async () => [],
+              finalizeAsync: async () => {},
+            };
+          },
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      await conn.exec(`
+        INSERT INTO widgets (name) VALUES ('a;b'); -- trailing; comment
+        ;
+        CREATE TEMP TRIGGER t AFTER INSERT ON widgets BEGIN
+          UPDATE widgets SET qty = 1; DELETE FROM "x;y";
+        END;
+        /* block; comment */ SELECT [a;b] FROM widgets
+      `);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+    expect(prepared.map((sql) => sql.replace(/\s+/g, " "))).toEqual([
+      "INSERT INTO widgets (name) VALUES ('a;b');",
+      'CREATE TEMP TRIGGER t AFTER INSERT ON widgets BEGIN UPDATE widgets SET qty = 1; DELETE FROM "x;y"; END;',
+      "/* block; comment */ SELECT [a;b] FROM widgets",
+    ]);
+  });
+
+  it("reader is the prepared statement's column count, not its text", async () => {
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async (sql: string) => ({
+            getColumnNamesAsync: async () => (sql.includes("RETURNING") ? [] : ["id"]),
+            finalizeAsync: async () => {},
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      expect((await conn.prepare("INSERT INTO widgets (name) VALUES ('a')")).reader).toBe(true);
+      expect((await conn.prepare("SELECT 1 /* RETURNING */")).reader).toBe(false);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
+  it("prepare finalizes the statement when its column names cannot be read", async () => {
+    let finalized = 0;
+    const native = new Error("Error code 1: SQL logic error");
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            getColumnNamesAsync: async () => {
+              throw native;
+            },
+            finalizeAsync: async () => {
+              finalized++;
+            },
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      const error = await Promise.resolve(conn.prepare("SELECT 1")).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect(finalized).toBe(1);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
+  it("prepare re-raises the original error when the finalize rejects too", async () => {
+    const native = new Error("Error code 1: SQL logic error");
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            getColumnNamesAsync: async () => {
+              throw native;
+            },
+            finalizeAsync: async () => {
+              throw new Error("Error code 21: bad parameter or other API misuse");
+            },
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      await expect(conn.prepare("SELECT 1")).rejects.toThrow("SQL logic error");
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
+  it("columns() answers the names prepare read, with the fields expo cannot report null", async () => {
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            getColumnNamesAsync: async () => ["id", "name"],
+            executeForRawResultAsync: async () => ({ getAllAsync: async () => [] }),
+            finalizeAsync: async () => {},
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      const stmt = await conn.prepare("SELECT id, name FROM widgets WHERE 0");
+      expect(await stmt.toA()).toEqual([]);
+      expect(stmt.columns()).toEqual([
+        { name: "id", column: null, table: null, database: null, type: null },
+        { name: "name", column: null, table: null, database: null, type: null },
+      ]);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
+  it("a closed statement raises SQLite3::Exception, and reads its own text for reader", async () => {
+    const { conn, errors } = await openWith(readonly("unused"));
+    const empty = await conn.prepare("-- nothing; here\n; SELECT 1");
+    expect(empty.closed).toBe(true);
+    expect(empty.reader).toBe(false);
+    const error = await Promise.resolve()
+      .then(() => empty.all())
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect((error as Error).constructor).toBe(errors.Exception);
+    expect((error as Error).message).toBe("cannot use a closed statement");
+
+    const insert = await conn.prepare("INSERT INTO widgets DEFAULT VALUES; SELECT 1");
+    expect(insert.reader).toBe(false);
+  });
+});

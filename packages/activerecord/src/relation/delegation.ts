@@ -1,8 +1,11 @@
 import type { Base } from "../base.js";
+import type { RelationName } from "../relation.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
   type RenameKeyOptions,
+  Concern,
+  Delegation as ActiveSupportDelegation,
   inGroups,
   inGroupsOf,
   publicInstanceMethods,
@@ -10,23 +13,29 @@ import {
   toSentence,
   toFsArray,
   toXmlArray,
+  without,
   type XmlBuilder,
 } from "@blazetrails/activesupport";
 import { NotImplementedError } from "../errors.js";
 import {
   Module,
+  Mutex,
   NoMethodError,
+  ARRAY_METHOD_TABLE,
   Range,
   arySlice,
-  compact,
+  extend,
+  fetch,
   include,
-  rbEql,
+  rbFPublicSend,
+  rbModConstSet,
+  rbClassSuperclass,
+  rbModName,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbObjRespondTo,
-  uniq,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
-
-type AnyCallable = (...args: any[]) => any;
 
 type FamilyCtor = new (...args: any[]) => any;
 
@@ -43,22 +52,22 @@ let _uncacheableMethods: Set<string> | undefined;
 
 /** @missingRailsArgs public_instance_methods — PERMANENT */
 export function uncacheableMethods(): Set<string> {
-  if (_uncacheableMethods) return _uncacheableMethods;
-  const relationMethods = new Set(publicInstanceMethods(ActiveRecord.Relation));
-  return (_uncacheableMethods = new Set(
-    delegatedClasses()
-      .flatMap((klass) => publicInstanceMethods(klass))
-      .filter((n) => !relationMethods.has(n)),
+  return (_uncacheableMethods ??= Object.freeze(
+    new Set(
+      without(
+        delegatedClasses().flatMap((klass) => publicInstanceMethods(klass)),
+        ...publicInstanceMethods(ActiveRecord.Relation),
+      ),
+    ),
   ));
 }
 
 const _relationDelegateCache = new WeakMap<typeof Base, Map<FamilyCtor, FamilyCtor>>();
-const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
-const _includedCarriers = new WeakMap<GeneratedRelationMethods, Record<string, unknown>[]>();
 
 export class DelegateCache {
   static delegateBaseMethods = true;
 
+  /** @inventedArm if — PERMANENT */
   static relationDelegateClass(this: typeof Base, klass: FamilyCtor): FamilyCtor {
     if (!_relationDelegateCache.get(this)?.has(klass)) {
       DelegateCache.initializeRelationDelegateCache.call(this);
@@ -66,15 +75,16 @@ export class DelegateCache {
     return _relationDelegateCache.get(this)!.get(klass)!;
   }
 
-  /** @missingRailsArgs include — PERMANENT */
   static initializeRelationDelegateCache(this: typeof Base): void {
     const cache = new Map<FamilyCtor, FamilyCtor>();
     _relationDelegateCache.set(this, cache);
     for (const klass of delegatedClasses()) {
       const delegate = class extends (klass as new (...args: never[]) => object) {} as FamilyCtor;
       include(delegate, ClassSpecificRelation);
-      Object.defineProperty(delegate, "name", { value: klass.name, configurable: true });
       DelegateCache.includeRelationMethods.call(this, delegate);
+      const mangledName = rbModName(klass)!.replaceAll("::", "_");
+      rbModConstSet(this, mangledName, delegate);
+
       cache.set(klass, delegate);
     }
   }
@@ -91,76 +101,84 @@ export class DelegateCache {
         delegate,
       );
     }
-    const mod = this.generatedRelationMethods();
-    include(delegate, mod);
-    const carriers = _includedCarriers.get(mod) ?? [];
-    carriers.push(Object.getPrototypeOf(delegate.prototype) as Record<string, unknown>);
-    _includedCarriers.set(mod, carriers);
+    include(delegate, this.generatedRelationMethods());
   }
 
   /** @internal */
   static generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
-    let methods = _generatedRelationMethodsByModel.get(this);
-    if (!methods) {
-      methods = new GeneratedRelationMethods();
-      _generatedRelationMethodsByModel.set(this, methods);
-    }
-    return methods;
+    return (rbObjIvarGet(this, "@generated_relation_methods") ??
+      rbObjIvarSet(
+        this,
+        "@generated_relation_methods",
+        rbModConstSet(this, "GeneratedRelationMethods", new GeneratedRelationMethods()),
+      )) as GeneratedRelationMethods;
   }
 }
 
 export class GeneratedRelationMethods extends Module {
-  /**
-   * @missingRailsCall define_method — PERMANENT
-   * @missingRailsCall include? — PERMANENT
-   * @missingRailsCall match? — PERMANENT
-   */
+  static MUTEX = new Mutex();
+
   generateMethod(method: string): void {
-    if (this.moduleEval((mod) => Object.prototype.hasOwnProperty.call(mod, method))) return;
+    void GeneratedRelationMethods.MUTEX.synchronize(() => {
+      if (this.isMethodDefined(method)) return;
 
-    const fn = function (this: any, ...args: any[]) {
-      return this.scoping(() => this._model[method](...args));
-    };
-    this.moduleEval((mod) => {
-      mod[method] = fn;
-    });
-    for (const carrier of _includedCarriers.get(this) ?? []) carrier[method] = fn;
-  }
-}
-
-export class ClassSpecificRelation {
-  methodMissing(this: any, method: string, ...args: any[]): unknown {
-    const model = this._model as typeof Base;
-    if (rbObjRespondTo(model, method)) {
-      if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
-        // @nie disposition=TODO
-        throw new NotImplementedError(
-          "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
-        );
-      } else if (!uncacheableMethods().has(method)) {
-        model.generateRelationMethod(method);
+      if (
+        /^[a-zA-Z_]\w*[!?]?$/.test(method) &&
+        !ActiveSupportDelegation.RESERVED_METHOD_NAMES.has(String(method))
+      ) {
+        this.moduleEval((mod) => {
+          mod[method] = function (this: any, ...args: any[]) {
+            return this.scoping(() => this._model[method](...args));
+          };
+        });
+      } else {
+        this.defineMethod(method, function (this: any, ...args: any[]) {
+          return this.scoping(() => rbFPublicSend(this._model, method, ...args));
+        });
       }
-
-      return this.scoping(() =>
-        method in model
-          ? (model as any)[method](...args)
-          : (model as any).methodMissing(method, ...args),
-      );
-    } else {
-      throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${this.constructor.name}`,
-      );
-    }
+    });
   }
 }
 
-export function create(
-  this: FamilyCtor,
-  model: typeof Base,
-  kwargs: { table?: any; predicateBuilder?: any } = {},
-): any {
-  const { table, predicateBuilder } = kwargs;
-  return new (relationClassFor.call(this, model))(model, table, predicateBuilder);
+export const ClassSpecificRelation = new Module() as Module<{
+  methodMissing(method: string, ...args: any[]): unknown;
+}> & { ClassMethods: typeof ClassMethods };
+extend(ClassSpecificRelation, Concern);
+
+export const ClassMethods = {
+  get name(): string | null {
+    return rbModName(rbClassSuperclass(this as object)!);
+  },
+};
+ClassSpecificRelation.ClassMethods = ClassMethods;
+
+export function methodMissing(this: any, method: string, ...args: any[]): unknown {
+  const model = this._model as typeof Base;
+  if (rbObjRespondTo(model, method)) {
+    if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
+      // @nie disposition=TODO
+      throw new NotImplementedError(
+        "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
+      );
+    } else if (!uncacheableMethods().has(method)) {
+      model.generateRelationMethod(method);
+    }
+
+    return this.scoping(() =>
+      method in model
+        ? (model as any)[method](...args)
+        : (model as any).methodMissing(method, ...args),
+    );
+  } else {
+    throw new NoMethodError(
+      `undefined method '${method}' for an instance of ${this.constructor.name}`,
+    );
+  }
+}
+ClassSpecificRelation.defineMethod("methodMissing", methodMissing);
+
+export function create(this: FamilyCtor, model: typeof Base, ...args: any[]): any {
+  return new (relationClassFor.call(this, model))(model, ...args);
 }
 
 /** @internal */
@@ -171,6 +189,8 @@ export function relationClassFor(this: FamilyCtor, model: typeof Base): FamilyCt
 export interface DelegationHost {
   readonly model: typeof Base;
   readonly isLoaded: boolean;
+  readonly _isRecordsSynchronous: boolean;
+  readonly proxyAssociation?: { loadTarget(): unknown };
   readonly target?: Base[];
   _records?: Base[];
   records(): Promise<Base[]>;
@@ -202,45 +222,18 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   join: (records, separator?: string) => records.join(separator),
   at: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
-  intersection: (records, other: Base[]) =>
-    uniq(records.filter((record) => other.some((o) => rbEql(o, record)))),
-  union: (records, other: Base[]) => uniq([...records, ...other]),
-  plus: (records, other: Base[]) => [...records, ...other],
-  difference: (records, other: Base[]) =>
-    records.filter((record) => !other.some((o) => rbEql(o, record))),
-  isIntersect: (records, other: Base[]) =>
-    records.some((record) => other.some((o) => rbEql(record, o))),
+  intersection: fetch(ARRAY_METHOD_TABLE, "intersection"),
+  union: fetch(ARRAY_METHOD_TABLE, "union"),
+  plus: fetch(ARRAY_METHOD_TABLE, "plus"),
+  difference: fetch(ARRAY_METHOD_TABLE, "difference"),
+  isIntersect: fetch(ARRAY_METHOD_TABLE, "isIntersect"),
   reverse: (records) => [...records].reverse(),
-  compact: (records) => compact(records),
-  index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
-    const found =
-      typeof valueOrFn === "function"
-        ? records.findIndex(valueOrFn as (record: Base) => unknown)
-        : records.indexOf(valueOrFn);
-    return found === -1 ? null : found;
-  },
-  rindex: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
-    if (typeof valueOrFn !== "function") {
-      const found = records.lastIndexOf(valueOrFn);
-      return found === -1 ? null : found;
-    }
-    const predicate = valueOrFn as (record: Base) => unknown;
-    for (let i = records.length - 1; i >= 0; i--) {
-      if (predicate(records[i])) return i;
-    }
-    return null;
-  },
-  sample: (records, n?: number) => {
-    const shuffled = shuffleInPlace([...records]);
-    if (n === undefined) return shuffled.length === 0 ? null : shuffled[0];
-    return shuffled.slice(0, Math.max(0, n));
-  },
-  rotate: (records, count = 1) => {
-    if (records.length === 0) return [];
-    const shift = ((count % records.length) + records.length) % records.length;
-    return records.slice(shift).concat(records.slice(0, shift));
-  },
-  shuffle: (records) => shuffleInPlace([...records]),
+  compact: fetch(ARRAY_METHOD_TABLE, "compact"),
+  index: fetch(ARRAY_METHOD_TABLE, "index"),
+  rindex: fetch(ARRAY_METHOD_TABLE, "rindex"),
+  sample: fetch(ARRAY_METHOD_TABLE, "sample"),
+  rotate: fetch(ARRAY_METHOD_TABLE, "rotate"),
+  shuffle: fetch(ARRAY_METHOD_TABLE, "shuffle"),
   slice: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
   split: (records, valueOrFn: Base | ((record: Base) => boolean)) => split(records, valueOrFn),
@@ -442,6 +435,14 @@ export class Delegation {
   sanitizeSqlLike(this: DelegationHost, value: string, escapeChar?: string): string {
     return this.model.sanitizeSqlLike(value, escapeChar);
   }
+
+  unscoped(this: DelegationHost) {
+    return this.model.unscoped();
+  }
+
+  get name(): RelationName {
+    return (this as unknown as DelegationHost).model.name;
+  }
 }
 
 Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
@@ -456,14 +457,7 @@ Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
 });
 
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
-  if (host.isLoaded) return fn([...(host.target ?? host._records ?? [])]);
-  return host.records().then((records) => fn([...records]));
-}
-
-function shuffleInPlace<T>(array: T[]): T[] {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
+  if (!host._isRecordsSynchronous) return host.records().then((records) => fn([...records]));
+  if (!host.isLoaded) host.proxyAssociation!.loadTarget();
+  return fn([...(host.target ?? host._records ?? [])]);
 }

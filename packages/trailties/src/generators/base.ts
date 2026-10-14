@@ -1,7 +1,6 @@
 import {
   camelize,
   constantize,
-  isRegisteredConstant,
   underscore as _underscore,
   dasherize as _dasherize,
   extractOptionsBang,
@@ -16,11 +15,11 @@ import {
   FileUtils,
   getFs,
   include,
-  hasKey,
   hashDelete,
   rbInspect,
   regexpEscape,
   RuntimeError,
+  isRegisteredConstant,
 } from "@blazetrails/ruby-compat";
 import { Generators, type GeneratorClass } from "../generators.js";
 import { GeneratorError } from "./generated-attribute.js";
@@ -28,6 +27,7 @@ import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "../thor/actions.js";
+import { fromSuperclass } from "../thor/base.js";
 
 export interface GeneratorOptions {
   cwd: string;
@@ -81,6 +81,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   declare static sourcePaths: typeof ThorActions.ClassMethods.sourcePaths;
   declare static sourcePathsForSearch: typeof ThorActions.ClassMethods.sourcePathsForSearch;
+  declare static addRuntimeOptionsBang: typeof ThorActions.ClassMethods.addRuntimeOptionsBang;
 
   static {
     include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
@@ -96,30 +97,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       desc: "Skip collision check",
     });
 
-    this.classOption("force", {
-      type: "boolean",
-      aliases: "-f",
-      group: "runtime",
-      desc: "Overwrite files that already exist",
-    });
-    this.classOption("pretend", {
-      type: "boolean",
-      aliases: "-p",
-      group: "runtime",
-      desc: "Run but do not make any changes",
-    });
-    this.classOption("quiet", {
-      type: "boolean",
-      aliases: "-q",
-      group: "runtime",
-      desc: "Suppress status output",
-    });
-    this.classOption("skip", {
-      type: "boolean",
-      aliases: "-s",
-      group: "runtime",
-      desc: "Skip files that already exist",
-    });
+    this.addRuntimeOptionsBang();
   }
 
   static async sourceRoot(path: string | null = null): Promise<string | null | undefined> {
@@ -143,7 +121,9 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   cwd: string;
-  destinationRoot: string;
+  /** @internal */
+  declare _destinationStack: string[];
+  declare destinationRoot: string;
   output: (msg: string) => void;
   options: GeneratorOptions;
   behavior: "invoke" | "revoke";
@@ -164,6 +144,9 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
   declare sourcePaths: typeof ThorActions.sourcePaths;
   declare findInSourcePaths: typeof ThorActions.findInSourcePaths;
+  declare apply: OmitThisParameter<typeof ThorActions.apply>;
+  /** @internal */
+  declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 
   log = Actions.log;
   generate = Actions.generate;
@@ -203,12 +186,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     this.options = opts as unknown as GeneratorOptions;
   }
 
-  /** @internal */
-  private _cleanupOptionsAndSet(options: Record<string, unknown>, key: string): void {
-    for (const i of ["force", "skip"]) delete options[i];
-    options[key] = true;
-  }
-
   /** @noRailsEquivalent PERMANENT */
   say(message: unknown = "", _color: string | null = null): void {
     if (this.isQuiet()) return;
@@ -241,7 +218,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const asHook = hashDelete(options as Record<string, unknown>, "as") ?? this.generatorName();
 
     for (const name of names as string[]) {
-      if (!hasKey(this.classOptions(), name)) {
+      if (!Object.hasOwn(this.classOptions(), name)) {
         let defaults: ClassOptionConfig;
         if (options.type === "boolean") {
           defaults = {};
@@ -289,7 +266,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         configurable: true,
         writable: true,
       });
-      hashDelete(this.hooks(), name);
+      delete this.hooks()[name];
     }
   }
 
@@ -477,7 +454,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       proto = Object.getPrototypeOf(proto) as GeneratorBase
     )
       commands.unshift(...(proto.constructor as typeof GeneratorBase).commands());
-    if (typeof (this.prototype as { run?: unknown }).run === "function") commands.push("run");
+    const run = (this.prototype as { run?: unknown }).run;
+    if (typeof run === "function" && run !== ThorActions.run) commands.push("run");
     for (const name of Object.keys(this.invocations()))
       commands.push(
         `_invokeFromOption${name.charAt(0).toUpperCase()}${name.slice(1).replace(/\W/g, "_")}`,
@@ -502,11 +480,10 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   private static invokeFromOption(name: string, options: HookForOptions, block?: HookBlock): void {
-    const verbose = hasKey(options, "verbose")
-      ? (options as { verbose?: string | boolean }).verbose!
-      : "white";
+    const verbose =
+      "verbose" in options ? (options as { verbose?: string | boolean }).verbose! : "white";
 
-    if (!hasKey(this.classOptions(), name)) {
+    if (!Object.hasOwn(this.classOptions(), name)) {
       throw new ArgumentError(
         `You have to define the option ${rbInspect(name)} before setting invoke_from_option.`,
       );
@@ -773,11 +750,11 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     let c: Record<string, unknown> | undefined;
     const generatorName = this.generatorName();
     const baseName = this.baseName();
-    if (generatorName && (c = config[generatorName]) && hasKey(c, name)) {
+    if (generatorName && (c = config[generatorName]) && Object.hasOwn(c, name)) {
       return c[name];
-    } else if (baseName && (c = config[baseName]) && hasKey(c, name)) {
+    } else if (baseName && (c = config[baseName]) && Object.hasOwn(c, name)) {
       return c[name];
-    } else if (hasKey(config["rails"], name)) {
+    } else if (Object.hasOwn(config["rails"], name)) {
       return config["rails"][name];
     } else {
       return defaultValue;
@@ -787,6 +764,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   static baseclass(): typeof GeneratorBase {
     return GeneratorBase;
   }
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE rebase-generator-base-onto-thor-group
+   */
+  static fromSuperclass = fromSuperclass;
 
   /** @internal */
   protected static async defaultGeneratorRoot(): Promise<string | undefined> {

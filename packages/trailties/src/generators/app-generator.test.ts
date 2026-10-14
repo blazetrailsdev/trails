@@ -252,6 +252,7 @@ describe("AppGenerator", () => {
     await makeGen().run();
     const tsconfig = JSON.parse(fs.readFileSync(appPath("tsconfig.json"), "utf-8"));
     expect(tsconfig.include).toContain(".trails/template-registry-augmentation.d.ts");
+    expect(tsconfig.include).toContain(".trails/views");
     expect(tsconfig.include).toEqual(expect.arrayContaining(["app", "config", "db"]));
     expect(tsconfig.compilerOptions.rootDir).toBe(".");
     expect(tsconfig.compilerOptions.allowArbitraryExtensions).toBe(true);
@@ -490,8 +491,8 @@ describe("AppGenerator", () => {
     await makeGen().run();
 
     const routes = fs.readFileSync(appPath("config/routes.ts"), "utf-8");
-    expect(routes).toContain(`import type { Mapper } from "@blazetrails/actionpack";`);
-    expect(routes).toContain("export function drawRoutes(mapper: Mapper): void {");
+    expect(routes).toContain(`import { Trails } from "@blazetrails/trailties";`);
+    expect(routes).toContain("Trails.application!.routes().draw(function () {");
     expect(routes).not.toContain(": any");
   });
 

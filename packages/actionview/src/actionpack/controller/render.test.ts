@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
 
 class TestController extends ActionController.Base {
@@ -40,29 +40,37 @@ TestController.viewPaths(
   }),
 );
 
+const SharedTestRoutes = new RouteSet();
+SharedTestRoutes.draw(function () {
+  this.get(":controller(/:action)");
+});
+
 describe("RenderTest", () => {
   let testCase: InstanceType<typeof ActionController.TestCase>;
 
-  beforeEach(() => {
-    testCase = new ActionController.TestCase(TestController);
+  beforeEach(async ({ task }) => {
+    testCase = new ActionController.TestCase(task.name);
+    testCase.controller = new TestController();
+    await testCase.beforeSetup();
+    testCase.routes = SharedTestRoutes;
   });
 
   test("rendered format without format", async () => {
     await testCase.get("inlineRenderedFormatWithoutFormat");
-    expect(testCase.responseBody).toBe("test");
+    expect(testCase.response.body).toBe("test");
     expect(testCase.response.mediaType).toBe("text/html");
   });
 
   test("accessing params in template", async () => {
     await testCase.get("accessingParamsInTemplate", { params: { name: "David" } });
-    expect(testCase.responseBody).toBe("Hello: David");
+    expect(testCase.response.body).toBe("Hello: David");
   });
 
   test("accessing local assigns in inline template", async () => {
     await testCase.get("accessingLocalAssignsInInlineTemplate", {
       params: { local_name: "Local David" },
     });
-    expect(testCase.responseBody).toBe("Goodbye, Local David");
+    expect(testCase.response.body).toBe("Goodbye, Local David");
     expect(testCase.response.mediaType).toBe("text/html");
   });
 });

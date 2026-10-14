@@ -30,6 +30,7 @@ export {
   buildNestedQuery,
   HTTP_STATUS_CODES,
   statusCode,
+  type StatusSymbol,
   InvalidParameterError,
   ParameterTypeError,
   ParamsTooDeepError,

@@ -14,14 +14,31 @@ import {
   assertSame,
   isBlank,
   assertNil,
+  extend,
 } from "@blazetrails/activesupport";
-import { FrozenError } from "@blazetrails/ruby-compat";
+import {
+  FrozenError,
+  Marshal,
+  Module,
+  rbModConstSet,
+  rbObjIvarGet,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { Errors } from "./errors.js";
 import { Error as ModelError } from "./error.js";
 import { I18n } from "./i18n.js";
+import { Naming, type ModelName } from "./naming.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
+const ErrorsTest = new Module();
+registerConstant("ErrorsTest", ErrorsTest);
+
 class Person {
+  static {
+    rbModConstSet(ErrorsTest, "Person", this);
+  }
+  declare modelName: ModelName;
   errors: Errors<Person>;
   name: string | null = null;
   age: number | null = null;
@@ -48,6 +65,7 @@ class Person {
     return [this];
   }
 }
+extend(Person, Naming);
 
 describe("ErrorsTest", () => {
   beforeEach(() => {
@@ -77,7 +95,7 @@ describe("ErrorsTest", () => {
     errors.add("name", ":blank");
     errors.add("gender", ":blank");
 
-    expect(errors.map((e) => e.attribute)).toEqual(["name", "gender"]);
+    expect(errors.map((e) => e.attribute)).toEqual([":name", ":gender"]);
   });
 
   it("any?", () => {
@@ -147,7 +165,7 @@ describe("ErrorsTest", () => {
     errors.add("foo", "omg");
     errors.add("baz", "zomg");
 
-    expect(errors.attributeNames).toEqual(["foo", "baz"]);
+    expect(errors.attributeNames).toEqual([":foo", ":baz"]);
   });
 
   it("attribute_names only returns unique attribute names", () => {
@@ -155,13 +173,13 @@ describe("ErrorsTest", () => {
     errors.add("foo", "omg");
     errors.add("foo", "zomg");
 
-    expect(errors.attributeNames).toEqual(["foo"]);
+    expect(errors.attributeNames).toEqual([":foo"]);
   });
 
   it("attribute_names returns an empty array after try to get a message only", () => {
     const errors = new Errors(new Person());
-    errors.messages.get("foo");
-    errors.messages.get("baz");
+    errors.messages.get(":foo");
+    errors.messages.get(":baz");
 
     expect(errors.attributeNames).toEqual([]);
   });
@@ -181,9 +199,9 @@ describe("ErrorsTest", () => {
 
   it("include? does not add a key to messages hash", () => {
     const person = new Person();
-    person.errors.include("foo");
+    person.errors.isInclude("foo");
 
-    assertNot(person.errors.messages.has("foo"));
+    assertNot(person.errors.messages.has(":foo"));
   });
 
   it("adding errors using conditionals with Person#validate!", () => {
@@ -197,7 +215,7 @@ describe("ErrorsTest", () => {
     const person = new Person();
     const error = person.errors.add("name", ":blank");
 
-    expect(error.attribute).toBe("name");
+    expect(error.attribute).toBe(":name");
     expect(error.type).toBe(":blank");
     expect(person.errors.objects[0]).toBe(error);
   });
@@ -474,7 +492,7 @@ describe("ErrorsTest", () => {
   it("to_hash returns the error messages hash", () => {
     const person = new Person();
     person.errors.add("name", "cannot be blank");
-    expect(Object.fromEntries(person.errors.toHash())).toEqual({ name: ["cannot be blank"] });
+    expect(Object.fromEntries(person.errors.toHash())).toEqual({ ":name": ["cannot be blank"] });
   });
 
   it("to_hash returns a hash without default proc", () => {
@@ -484,20 +502,20 @@ describe("ErrorsTest", () => {
 
   it("as_json returns a hash without default proc", () => {
     const person = new Person();
-    expect((person.errors.asJson() as { defaultProc?: unknown }).defaultProc).toBeUndefined();
+    expect(person.errors.asJson().defaultProc()).toBeUndefined();
   });
 
   it("messages returns empty frozen array when accessed with non-existent attribute", async () => {
     const errors = new Errors(new Person());
 
-    expect(errors.messages.get("foo")).toEqual([]);
+    expect(errors.messages.get(":foo")).toEqual([]);
     await assertRaises([FrozenError], {}, () =>
-      (errors.messages.get("foo") as string[]).push("foo"),
+      (errors.messages.get(":foo") as string[]).push("foo"),
     );
     await assertRaises(
       [FrozenError],
       {},
-      () => ((errors.messages.get("foo") as string[]).length = 0),
+      () => ((errors.messages.get(":foo") as string[]).length = 0),
     );
   });
 
@@ -555,7 +573,7 @@ describe("ErrorsTest", () => {
 
   it("full_message returns the given message when attribute is :base", () => {
     const person = new Person();
-    expect(person.errors.fullMessage("base", "press the button")).toBe("press the button");
+    expect(person.errors.fullMessage(":base", "press the button")).toBe("press the button");
   });
 
   it("full_message returns the given message with the attribute name included", () => {
@@ -570,14 +588,16 @@ describe("ErrorsTest", () => {
     const person = new Person();
     person.validateBang();
 
-    expect(person.errors.asJson()).toEqual({ name: ["cannot be nil"] });
+    expect(Object.fromEntries(person.errors.asJson())).toEqual({ ":name": ["cannot be nil"] });
   });
 
   it("as_json with :full_messages option creates a json formatted representation of the errors containing complete messages", () => {
     const person = new Person();
     person.validateBang();
 
-    expect(person.errors.asJson({ fullMessages: true })).toEqual({ name: ["name cannot be nil"] });
+    expect(Object.fromEntries(person.errors.asJson({ fullMessages: true }))).toEqual({
+      ":name": ["name cannot be nil"],
+    });
   });
 
   it("generate_message works without i18n_scope", async () => {
@@ -591,21 +611,21 @@ describe("ErrorsTest", () => {
   it("details returns added error detail", () => {
     const person = new Person();
     person.errors.add("name", ":invalid");
-    expect(Object.fromEntries(person.errors.details)).toEqual({ name: [{ error: ":invalid" }] });
+    expect(Object.fromEntries(person.errors.details)).toEqual({ ":name": [{ error: ":invalid" }] });
   });
 
   it("details returns added error detail with custom option", () => {
     const person = new Person();
     person.errors.add("name", ":greater_than", { count: 5 });
     expect(Object.fromEntries(person.errors.details)).toEqual({
-      name: [{ error: ":greater_than", count: 5 }],
+      ":name": [{ error: ":greater_than", count: 5 }],
     });
   });
 
   it("details do not include message option", () => {
     const person = new Person();
     person.errors.add("name", ":invalid", { message: "is bad" });
-    expect(Object.fromEntries(person.errors.details)).toEqual({ name: [{ error: ":invalid" }] });
+    expect(Object.fromEntries(person.errors.details)).toEqual({ ":name": [{ error: ":invalid" }] });
   });
 
   it("details retains original type as error", () => {
@@ -616,10 +636,10 @@ describe("ErrorsTest", () => {
     errors.add("age", ":invalid", { count: 3, message: "%{count} is too low" });
 
     expect(Object.fromEntries(errors.details)).toEqual({
-      name: [{ error: "cannot be nil" }],
-      foo: [{ error: "bar" }],
-      baz: [{ error: null }],
-      age: [{ error: ":invalid", count: 3 }],
+      ":name": [{ error: "cannot be nil" }],
+      ":foo": [{ error: "bar" }],
+      ":baz": [{ error: null }],
+      ":age": [{ error: ":invalid", count: 3 }],
     });
   });
 
@@ -628,7 +648,7 @@ describe("ErrorsTest", () => {
     const error = person.errors.add("name", ":invalid", { message: "is bad" });
     const hash = person.errors.groupByAttribute();
 
-    expect(hash).toEqual({ name: [error] });
+    expect(Object.fromEntries(hash)).toEqual({ ":name": [error] });
   });
 
   it("dup duplicates details", () => {
@@ -670,14 +690,14 @@ describe("ErrorsTest", () => {
   it("details returns empty array when accessed with non-existent attribute", async () => {
     const errors = new Errors(new Person());
 
-    expect(errors.details.get("foo")).toEqual([]);
+    expect(errors.details.get(":foo")).toEqual([]);
     await assertRaises([FrozenError], {}, () =>
-      (errors.details.get("foo") as unknown[]).push("foo"),
+      (errors.details.get(":foo") as unknown[]).push("foo"),
     );
     await assertRaises(
       [FrozenError],
       {},
-      () => ((errors.details.get("foo") as unknown[]).length = 0),
+      () => ((errors.details.get(":foo") as unknown[]).length = 0),
     );
   });
 
@@ -715,12 +735,40 @@ describe("ErrorsTest", () => {
     expect(errors.errors).toEqual(errorsBeforeMerge.errors);
   });
 
-  it.skip("errors are marshalable", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — marshal
+  it("errors are marshalable", () => {
+    const errors = new Errors(new Person());
+    errors.add("name", ":invalid");
+    const serialized = Marshal.load(Marshal.dump(errors)) as Errors<Person>;
+
+    expect(rbObjIvarGet(serialized, "@base")!.constructor).toEqual(Person);
+    expect(serialized.messages).toEqual(errors.messages);
+    expect(serialized.details).toEqual(errors.details);
   });
 
-  it.skip("errors are compatible with YAML dumped from Rails 6.x", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — psych
+  it("errors are compatible with YAML dumped from Rails 6.x", () => {
+    const yaml = [
+      "--- !ruby/object:ActiveModel::Errors",
+      "base: &1 !ruby/object:ErrorsTest::Person",
+      "  errors: !ruby/object:ActiveModel::Errors",
+      "    base: *1",
+      "    errors: []",
+      "errors:",
+      "- !ruby/object:ActiveModel::Error",
+      "  base: *1",
+      "  attribute: :name",
+      "  type: :invalid",
+      "  raw_type: :invalid",
+      "  options: {}",
+      "",
+    ].join("\n");
+
+    const errors = Psych.unsafeLoad(yaml) as Errors<Person>;
+    expect(Object.fromEntries(errors.messages)).toEqual({ ":name": ["is invalid"] });
+    expect(Object.fromEntries(errors.details)).toEqual({ ":name": [{ error: ":invalid" }] });
+
+    errors.clear();
+    expect(Object.fromEntries(errors.messages)).toEqual({});
+    expect(Object.fromEntries(errors.details)).toEqual({});
   });
 
   it("inspect", () => {

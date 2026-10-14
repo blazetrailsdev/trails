@@ -3,7 +3,7 @@ import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface AssociationLike {
   isFindFromTarget(): boolean;
@@ -59,13 +59,13 @@ describe("FindFromTarget", () => {
   it("is true for a new target record", async () => {
     const author = (await Author.first())!;
     const assoc = associationOf(author);
-    assoc.target.push(Post.new({ title: "t", body: "b" }));
+    assoc.target.push(new Post({ title: "t", body: "b" }));
 
     expect(assoc.isFindFromTarget()).toBe(true);
   });
 
   it("is true for a new owner", () => {
-    expect(proxyOf(Author.new({ name: "Bill" })).isFindFromTarget()).toBe(true);
+    expect(proxyOf(new Author({ name: "Bill" })).isFindFromTarget()).toBe(true);
   });
 
   it("is true for a strict_loading reflection", async () => {

@@ -1,5 +1,6 @@
-import { Topic, WebTopic } from "./topic.js";
-import { registerSubclass } from "../../inheritance.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Topic, Web, WebTopic } from "./topic.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reply extends Topic {
@@ -33,6 +34,7 @@ export class Reply extends Topic {
     return (this as any).approved();
   }
 }
+registerModel(Reply);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reply {
   get topic(): Topic | null | Promise<Topic | null>;
@@ -44,6 +46,7 @@ export class SillyReply extends Topic {
     this.belongsTo("reply", { foreignKey: "parent_id", counterCache: "replies_count" });
   }
 }
+registerModel(SillyReply);
 
 export class UniqueReply extends Reply {
   static {
@@ -51,12 +54,14 @@ export class UniqueReply extends Reply {
     this.validatesUniquenessOf("content", { scope: "parent_id" });
   }
 }
+registerModel(UniqueReply);
 
 export class SillyUniqueReply extends UniqueReply {
   static {
     this.validates("content", { uniqueness: true });
   }
 }
+registerModel(SillyUniqueReply);
 
 export class WrongReply extends Reply {
   static {
@@ -108,13 +113,17 @@ export class WrongReply extends Reply {
     }
   }
 }
+registerModel(WrongReply);
 
 export class WebReply extends WebTopic {
   static {
-    this.belongsTo("topic", { foreignKey: "parent_id", counterCache: true, className: "WebTopic" });
+    registerModel(rbModConstSet(Web, "Reply", this));
   }
-}
-
-for (const klass of [Reply, SillyReply, UniqueReply, SillyUniqueReply, WrongReply, WebReply]) {
-  registerSubclass(klass);
+  static {
+    this.belongsTo("topic", {
+      foreignKey: "parent_id",
+      counterCache: true,
+      className: "Web::Topic",
+    });
+  }
 }

@@ -8,7 +8,7 @@ import {
 } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { Post } from "../../test-helpers/models/post.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -56,7 +56,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       omgpost.inheritanceColumn = "disabled";
       omgpost.tableName = `${db}.${table}`;
       Object.defineProperty(omgpost, "name", { value: "Post" });
-      await fn(omgpost, db);
+      await fn(omgpost, db!);
     }
 
     it("schema", async () => {

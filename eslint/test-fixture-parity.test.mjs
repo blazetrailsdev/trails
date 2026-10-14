@@ -158,8 +158,25 @@ describe("test-fixture-parity rule", () => {
           filename: AR("associations/eager.test.ts"),
           code: `describe("EagerTest", () => { it("excluded eager test", () => {}); });`,
         },
+        {
+          name: "own test case class declares a set and reads it off the instance → no warning",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it("find single value object", () => { const k = class extends Base { static { this.fixtures("customers"); } run() { this.customers("david"); } }; }); });`,
+        },
       ],
       invalid: [
+        {
+          name: "set declared on one class and read off another → warns",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it("find single value object", () => { const a = class extends Base { static { this.fixtures("customers"); } }; const b = class extends Base { run() { this.customers("david"); } }; }); });`,
+          errors: [{ messageId: "missing" }],
+        },
+        {
+          name: "own test case class declares a set it never reads → warns",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it("find single value object", () => { const k = class extends Base { static { this.fixtures("customers"); } run() { this.other("david"); } }; }); });`,
+          errors: [{ messageId: "missing" }],
+        },
         {
           name: "no useFixtures in scope → warns",
           filename: AR("aggregations.test.ts"),

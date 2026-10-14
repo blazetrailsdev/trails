@@ -1,7 +1,9 @@
 import { Attribute, RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { Nodes } from "@blazetrails/arel";
+import { isPlainObject } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
 import { RangeError as ARRangeError } from "./errors.js";
 import type { Base } from "./base.js";
+import { ActiveRecord } from "./namespaces.js";
 
 export class Substitute {}
 
@@ -24,19 +26,16 @@ export class PartialQuery extends Query {
   constructor(values: unknown[]) {
     super("");
     this._values = values;
-    this._indexes = [];
-    for (let i = 0; i < values.length; i++) {
-      if (values[i] instanceof Substitute) {
-        this._indexes.push(i);
-      }
-    }
+    this._indexes = values
+      .map((thing, i): [unknown, number] => [thing, i])
+      .filter(([thing]) => thing instanceof Substitute)
+      .map(([, i]) => i);
   }
 
   override sqlFor(binds: unknown[], connection: unknown): string {
     const val = [...this._values];
-    const bindsCopy = [...binds];
     for (const i of this._indexes) {
-      let value = bindsCopy.shift();
+      let value = binds.shift();
       if (value instanceof Attribute) {
         value = value.valueForDatabase;
       }
@@ -145,28 +144,21 @@ export class StatementCache {
     return new PartialQueryCollector();
   }
 
-  /** @missingRailsCall call — PERMANENT */
   static create(
     connection: {
       cacheableQuery(klass: unknown, arel: unknown): [unknown, unknown[]];
       preparedStatements?: boolean;
     },
     callable: (params: Params) => {
-      arel: (() => { toSql(): string }) | { toSql(): string };
+      arel(): { toSql(): string };
       model: typeof Base;
     },
   ): StatementCache {
     const relation = callable(new Params());
-    const arel = typeof relation.arel === "function" ? relation.arel() : relation.arel;
-
-    const cacheableQuery = connection.cacheableQuery(StatementCache, arel) as [
+    const [queryBuilder, binds] = connection.cacheableQuery(this, relation.arel()) as [
       Query | PartialQuery,
       unknown[],
     ];
-    const queryBuilder = cacheableQuery[0];
-    let binds = cacheableQuery[1];
-
-    binds = binds.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
     const bindMap = new BindMap(binds);
     return new StatementCache(queryBuilder, bindMap, relation.model);
   }
@@ -174,34 +166,48 @@ export class StatementCache {
   async execute(
     params: unknown[],
     connection: unknown,
-    opts: { allowRetry?: boolean } = {},
+    opts: { allowRetry?: boolean; async?: boolean } = {},
     block?: (record: InstanceType<typeof Base>) => void,
   ): Promise<InstanceType<typeof Base>[]> {
     try {
       const bindValues = this._bindMap.bind(params);
       const sql = this._queryBuilder.sqlFor(bindValues, connection);
       const allowRetry = opts.allowRetry ?? false;
-      if (this._queryBuilder instanceof PartialQuery) {
-        return await this._model.findBySql(sql, [], { allowRetry, preparable: true }, block);
+      const async = opts.async ?? false;
+      if (async) {
+        return await this._model.asyncFindBySql(
+          sql,
+          bindValues,
+          { preparable: true, allowRetry },
+          block,
+        );
+      } else {
+        return await this._model.findBySql(
+          sql,
+          bindValues,
+          { preparable: true, allowRetry },
+          block,
+        );
       }
-      return await this._model.findBySql(sql, bindValues, { allowRetry, preparable: true }, block);
     } catch (e) {
       if (e instanceof ActiveModelRangeError || e instanceof ARRangeError) return [];
       throw e;
     }
   }
 
-  static unsupportedValue(value: unknown): boolean {
-    if (value === null || value === undefined) return true;
-    if (Array.isArray(value)) return true;
-    if (value && typeof value === "object") {
-      const name = (value as any).constructor?.name;
-      if (name === "Range" || name === "Relation") return true;
-      if (value instanceof Map || value instanceof Set) return true;
-      if (Object.getPrototypeOf(value) === Object.prototype) return true;
-      if ("_attributes" in value) return true;
+  static unsupportedValue(value: unknown): true | null {
+    if (
+      value == null ||
+      Array.isArray(value) ||
+      value instanceof Range ||
+      value instanceof Map ||
+      isPlainObject(value) ||
+      value instanceof ActiveRecord.Relation ||
+      value instanceof ActiveRecord.Base
+    ) {
+      return true;
     }
-    return false;
+    return null;
   }
 }
 

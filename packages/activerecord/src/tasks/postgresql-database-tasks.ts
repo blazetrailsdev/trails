@@ -1,15 +1,19 @@
-import { isBlank, Tempfile } from "@blazetrails/activesupport";
+import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
-  getChildProcessAsync,
-  getOsAsync,
-  type SpawnSyncResult,
+  merge,
+  rbEqq,
+  rbFSystem,
+  rbModConstSet,
+  RuntimeError,
 } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
+import { Tasks } from "../namespaces.js";
 import { dumpSchemas } from "../active-record.js";
 
 const DEFAULT_ENCODING_FALLBACK = "utf8";
@@ -36,17 +40,16 @@ export class PostgreSQLDatabaseTasks {
     this.configurationHash = { ...dbConfig.configurationHash };
   }
 
-  /** @missingRailsCall merge — PERMANENT */
-  async create(connectionAlreadyEstablished = false): Promise<void> {
+  async create(connectionAlreadyEstablished = false): Promise<ConnectionPool> {
     if (!connectionAlreadyEstablished) {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
-    await conn.createDatabase(this.dbConfig.database as string, {
-      ...this.configurationHash,
-      encoding: this.encoding(),
-    });
-    await this.establishConnection();
+    await conn.createDatabase(
+      this.dbConfig.database as string,
+      merge(this.configurationHash, { encoding: this.encoding() }),
+    );
+    return await this.establishConnection();
   }
 
   async drop(): Promise<void> {
@@ -69,40 +72,35 @@ export class PostgreSQLDatabaseTasks {
     await this.create(true);
   }
 
-  async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
+  async structureDump(filename: string, extraFlags: string | string[] | null): Promise<void> {
     let searchPath: string | undefined;
     if (dumpSchemas() === "schema_search_path") {
-      const raw = this.configurationHash.schemaSearchPath;
-      searchPath = typeof raw === "string" ? raw : undefined;
+      searchPath = this.configurationHash.schemaSearchPath as string | undefined;
     } else if (dumpSchemas() === "all") {
       searchPath = undefined;
     } else if (typeof dumpSchemas() === "string") {
       searchPath = dumpSchemas();
     }
 
-    const args = ["--schema-only", "--no-privileges", "--no-owner"];
+    let args = ["--schema-only", "--no-privileges", "--no-owner"];
     args.push("--file", filename);
 
-    if (extraFlags) {
-      args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
-    }
+    if (extraFlags != null) args.push(...kernelArray(extraFlags));
 
     if (!isBlank(searchPath)) {
-      args.push(...(searchPath as string).split(",").map((part) => `--schema=${part.trim()}`));
+      args = args.concat(
+        (searchPath as string).split(",").map((part) => `--schema=${part.trim()}`),
+      );
     }
 
     const { SchemaDumper } = await import("../schema-dumper.js");
-    let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
+    let ignoreTables = SchemaDumper.ignoreTables;
     if (ignoreTables.length > 0) {
       const dataSources = await (await this.connection()).dataSources();
       ignoreTables = dataSources.filter((table) =>
-        ignoreTables.some((pattern) => {
-          if (!(pattern instanceof RegExp)) return pattern === table;
-          pattern.lastIndex = 0;
-          return pattern.test(table);
-        }),
+        ignoreTables.some((pattern) => rbEqq(pattern, table)),
       );
-      for (const table of ignoreTables) args.push("-T", table as string);
+      args = args.concat(ignoreTables.flatMap((table) => ["-T", table as string]));
     }
 
     args.push(this.dbConfig.database as string);
@@ -112,22 +110,18 @@ export class PostgreSQLDatabaseTasks {
     File.open(filename, "a", (f) => f.write(`SET search_path TO ${connectionSearchPath};\n\n`));
   }
 
-  async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const os = await getOsAsync();
-    const nullDevice = os.platform() === "win32" ? "NUL" : "/dev/null";
+  async structureLoad(filename: string, extraFlags: string | string[] | null): Promise<void> {
     const args = [
       "--set",
       ON_ERROR_STOP_1,
       "--quiet",
       "--no-psqlrc",
       "--output",
-      nullDevice,
+      File.NULL,
       "--file",
       filename,
     ];
-    if (extraFlags) {
-      args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
-    }
+    if (extraFlags != null) args.push(...kernelArray(extraFlags));
     args.push(this.dbConfig.database as string);
     await this.runCmd("psql", args, "loading");
   }
@@ -140,10 +134,8 @@ export class PostgreSQLDatabaseTasks {
     return (await Base.connectionPool().leaseConnection()) as PostgreSQLAdapter;
   }
 
-  private psqlEnv(): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = {
-      ...((globalThis as { process?: { env?: NodeJS.ProcessEnv } }).process?.env ?? {}),
-    };
+  private psqlEnv(): Record<string, string> {
+    const env: Record<string, string> = {};
     const c = this.configurationHash;
     if (this.dbConfig.host) env.PGHOST = String(this.dbConfig.host);
     if (c.port != null) env.PGPORT = String(c.port);
@@ -157,24 +149,16 @@ export class PostgreSQLDatabaseTasks {
   }
 
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
-    const childProcess = await getChildProcessAsync();
-    const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
-      env: this.psqlEnv(),
-      encoding: "utf8",
-    });
-    if (result.error || result.status !== 0 || result.signal) {
-      const details: string[] = [];
-      if (result.error) details.push(`Error: ${result.error.message}`);
-      if (result.status !== null && result.status !== 0) {
-        details.push(`Exit status: ${result.status}`);
-      }
-      if (result.signal) details.push(`Signal: ${result.signal}`);
-      if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
-      if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-      throw new Error(
-        runCmdError(cmd, args, action) + (details.length ? `${details.join("\n\n")}\n` : ""),
-      );
+    if (!(await rbFSystem(this.psqlEnv(), cmd, ...args))) {
+      throw new RuntimeError(this.runCmdError(cmd, args, action));
     }
+  }
+
+  private runCmdError(cmd: string, args: string[], action: string): string {
+    return (
+      `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
+      `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
+    );
   }
 
   private removeSqlHeaderComments(filename: string): void {
@@ -195,25 +179,15 @@ export class PostgreSQLDatabaseTasks {
   }
 
   /** @internal */
-  private async establishConnection(config?: Record<string, unknown>): Promise<void> {
-    await Base.establishConnection(config ?? this.dbConfig);
+  private async establishConnection(config?: Record<string, unknown>): Promise<ConnectionPool> {
+    return await Base.establishConnection(config ?? this.dbConfig);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   private publicSchemaConfig(): ConfigHash {
-    return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
+    return merge(this.configurationHash, { database: "postgres", schemaSearchPath: "public" });
   }
 }
 
-/** @internal */
-export function runCmdError(cmd: string, args: string[], _action: string): string {
-  return (
-    `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
-    `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
-  );
-}
-
+rbModConstSet(Tasks, "PostgreSQLDatabaseTasks", PostgreSQLDatabaseTasks);
 DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);

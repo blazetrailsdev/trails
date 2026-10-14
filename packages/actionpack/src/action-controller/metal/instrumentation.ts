@@ -1,24 +1,41 @@
 import {
+  attrInternal,
+  Benchmark,
+  Concern,
   ExecutionContext,
+  extend,
   include,
-  included,
+  Module,
   Notifications,
   toF,
 } from "@blazetrails/activesupport";
-import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
+import { Logger } from "../../abstract-controller/logger.js";
 import {
   ExceptionWrapper,
   classNameOf,
 } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
-import { Flash } from "./flash.js";
+import { Exception, merge, StandardError, throwDataP } from "@blazetrails/ruby-compat";
+import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
+import type { redirectTo as flashRedirectTo } from "./flash.js";
 
-export class Instrumentation {
-  static [included](base: LoggerIncludingClass): void {
-    include(base, Logger);
-  }
-}
+export const Instrumentation = new Module((mod) => {
+  extend(mod, Concern);
+
+  include(mod, Logger);
+
+  mod.moduleEval((carrier) => attrInternal.call(carrier, "viewRuntime"));
+
+  mod.defineMethod("render", render);
+  mod.defineMethod("sendFile", sendFile);
+  mod.defineMethod("sendData", sendData);
+  mod.defineMethod("redirectTo", redirectTo);
+  mod.defineMethod("processAction", processAction);
+  mod.defineMethod("haltedCallbackHook", haltedCallbackHook);
+  mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
+  mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
+}) as Module & { ClassMethods: Module };
 
 interface InstrumentationHost {
   actionName?: string;
@@ -27,11 +44,31 @@ interface InstrumentationHost {
   appendInfoToPayload(payload: Record<string, unknown>): void;
 }
 
+export function render(
+  this: { viewRuntime: number | null; cleanupViewRuntime<T>(block: () => T): T },
+  ...args: unknown[]
+): unknown {
+  let renderOutput: unknown = null;
+  const viewRuntime = this.cleanupViewRuntime(() =>
+    Benchmark.realtime(":float_millisecond", () => {
+      return (renderOutput = Instrumentation.superMethod(this, "render")!(...args));
+    }),
+  ) as number | Promise<number>;
+  if (typeof viewRuntime === "number") {
+    this.viewRuntime = viewRuntime;
+    return renderOutput;
+  }
+  return viewRuntime.then((viewRuntime) => {
+    this.viewRuntime = viewRuntime;
+    return renderOutput;
+  });
+}
+
 /** @internal */
 export async function processAction(
   this: InstrumentationHost,
-  block: () => Promise<void>,
-): Promise<void> {
+  ...args: unknown[]
+): Promise<unknown> {
   ExecutionContext.setKey("controller", this);
 
   const rawPayload: Record<string, unknown> = {
@@ -47,16 +84,18 @@ export async function processAction(
 
   Notifications.instrument("start_processing.action_controller", rawPayload);
 
-  await Notifications.instrument(
+  return await Notifications.instrument(
     "process_action.action_controller",
     rawPayload,
     async (payload) => {
       try {
-        const result = await block();
+        const result = await Instrumentation.superMethod(this, "processAction")!(...args);
         payload.response = this.response;
         payload.status = this.response.status;
         return result;
       } catch (error) {
+        if (throwDataP(error)) throw error;
+        if (error instanceof Exception && !(error instanceof StandardError)) throw error;
         payload.status = ExceptionWrapper.statusCodeForException(classNameOf(error as Error));
         throw error;
       } finally {
@@ -66,15 +105,37 @@ export async function processAction(
   );
 }
 
-export function redirectTo(this: InstrumentationHost, ...args: unknown[]): unknown {
+export function sendFile(
+  this: DataStreamingHost,
+  path: string,
+  options: SendFileOptions = {},
+): void {
+  return Notifications.instrument("send_file.action_controller", merge(options, { path }), () =>
+    Instrumentation.superMethod(this, "sendFile")!(path, options),
+  ) as void;
+}
+
+export function sendData(
+  this: DataStreamingHost,
+  data: string | Buffer,
+  options: SendDataOptions = {},
+): void | Promise<void> {
+  return Notifications.instrument(
+    "send_data.action_controller",
+    options as Record<string, unknown>,
+    () => Instrumentation.superMethod(this, "sendData")!(data, options),
+  ) as void | Promise<void>;
+}
+
+export function redirectTo(
+  this: InstrumentationHost,
+  ...args: Parameters<typeof flashRedirectTo>
+): number {
   return Notifications.instrument(
     "redirect_to.action_controller",
     { request: this.request },
     (payload) => {
-      const result = Flash.prototype.redirectTo.call(
-        this as never,
-        ...(args as Parameters<Flash["redirectTo"]>),
-      );
+      const result = Instrumentation.superMethod(this, "redirectTo")!(...args) as number;
       payload.status = this.response.status;
       payload.location = this.response.filteredLocation();
       return result;
@@ -82,13 +143,9 @@ export function redirectTo(this: InstrumentationHost, ...args: unknown[]): unkno
   );
 }
 
-export interface Notifier {
-  instrument(event: string, payload: Record<string, unknown>, block?: () => unknown): void;
-}
-
 /** @internal */
-export function haltedCallbackHook(filter: unknown, _name?: unknown, notifier?: Notifier): void {
-  notifier?.instrument("halted_callback.action_controller", { filter });
+export function haltedCallbackHook(filter: unknown, _: unknown): void {
+  Notifications.instrument("halted_callback.action_controller", { filter });
 }
 
 /** @internal */
@@ -112,3 +169,9 @@ export function logProcessAction(payload: Record<string, unknown>): string[] {
   }
   return messages;
 }
+
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("logProcessAction", logProcessAction);
+});
+
+Instrumentation.ClassMethods = ClassMethods;

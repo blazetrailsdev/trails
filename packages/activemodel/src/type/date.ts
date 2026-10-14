@@ -1,12 +1,12 @@
 import {
   ArgumentError,
   Date as RubyDate,
-  Temporal,
+  type Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { include, registerConstant } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/activesupport";
+import { rbFSend, rbObjRespondTo, StandardError, registerConstant } from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,
@@ -27,8 +27,7 @@ export type { DateInfinityType, DateNegativeInfinityType };
 export type DateCastResult = Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (date.rb:27-28); the class/interface merge is how `include()` surfaces on the type side.
-export interface DateType
-  extends Timezone, Omit<InstanceMethods<DateCastResult>, "valueFromMultiparameterAssignment"> {}
+export interface DateType extends Timezone, InstanceMethods<DateCastResult> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateType extends ValueType<DateCastResult> {
@@ -45,20 +44,8 @@ export class DateType extends ValueType<DateCastResult> {
     if (typeof value === "string") {
       if (value === "") return null;
       return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
-    } else if (value instanceof Temporal.PlainDate) {
-      return value;
-    } else if (value instanceof Temporal.PlainDateTime) {
-      return value.toPlainDate();
-      // boundary: a JS Date assigned to a date attribute is Ruby's ::Time.
-    } else if (value instanceof Date) {
-      if (Number.isNaN(value.getTime())) return null;
-      return Temporal.PlainDate.from({
-        year: value.getUTCFullYear(),
-        month: value.getUTCMonth() + 1,
-        day: value.getUTCDate(),
-      });
     } else if (rbObjRespondTo(value, "toDate")) {
-      return (value as { toDate(): DateCastResult }).toDate();
+      return rbFSend(value, "toDate") as DateCastResult;
     } else {
       return value as DateCastResult;
     }
@@ -91,16 +78,15 @@ export class DateType extends ValueType<DateCastResult> {
     mon: number | null | undefined,
     mday: number | null | undefined,
   ): Temporal.PlainDate | null {
-    if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
-    if (mon == null || mday == null) return null;
-    try {
-      return Temporal.PlainDate.from(
-        { year: Number(year), month: mon, day: mday },
-        { overflow: "reject" },
-      );
-    } catch {
-      return null;
+    if (!(year == null || (year === 0 && mon === 0 && mday === 0))) {
+      try {
+        return new RubyDate(year, mon as number, mday as number).toDate();
+      } catch (error) {
+        if (!(error instanceof StandardError || error instanceof TypeError)) throw error;
+        return null;
+      }
     }
+    return null;
   }
 
   /** @internal */

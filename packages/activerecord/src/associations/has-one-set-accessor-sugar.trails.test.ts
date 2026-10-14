@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import {
-  registerModel,
-  registerSubclass,
-  RecordNotSaved,
-  RecordNotFound,
-  type Base,
-} from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { registerModel, RecordNotSaved, RecordNotFound, type Base } from "../index.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Company,
   Firm,
@@ -48,12 +42,12 @@ describe("has_one set#{Name} awaitable accessor", () => {
     registerModel(Client);
     registerModel(Account);
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
-    registerSubclass(DependentFirm);
-    registerSubclass(ExclusivelyDependentFirm);
-    registerSubclass(RestrictedWithExceptionFirm);
-    registerSubclass(RestrictedWithErrorFirm);
-    registerSubclass(Client);
+    registerModel(Firm);
+    registerModel(DependentFirm);
+    registerModel(ExclusivelyDependentFirm);
+    registerModel(RestrictedWithExceptionFirm);
+    registerModel(RestrictedWithErrorFirm);
+    registerModel(Client);
     registerModel(Pirate);
     registerModel(Ship);
   });
@@ -66,6 +60,14 @@ describe("has_one set#{Name} awaitable accessor", () => {
 
     expect(account.isPersisted()).toBe(true);
     expect((await readHasOne(firm, "account"))?.id).toBe(account.id);
+  });
+
+  it("returns the assigned record, as the writer's replace does", async () => {
+    const firm = (await Firm.find(1)) as Base;
+    const account = new Account({ credit_limit: 1000 });
+
+    expect(await set(firm).setAccount(account)).toBe(account);
+    expect(await set(firm).setAccount(null)).toBeNull();
   });
 
   it("destroys the displaced dependent target inline, not at owner save", async () => {

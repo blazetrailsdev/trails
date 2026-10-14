@@ -1,10 +1,10 @@
 import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { File as FixtureFile } from "../../fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../config.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../index.js";
 import { FixtureSet } from "../../fixtures.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../support/supports.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
@@ -104,7 +104,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
   });
 
   itIfSupports("virtual_columns", "change table with stored generated column", async () => {
-    await adapter.changeTable("virtual_columns", async (t) => {
+    await adapter.changeTable("virtual_columns", {}, async (t) => {
       await t.virtual("decr_column1", { type: "integer", as: "column1 - 1", stored: true });
     });
     await reloadColumnInformation();
@@ -118,7 +118,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
     "virtual_columns",
     "change table with explicit virtual generated column",
     async () => {
-      await adapter.changeTable("virtual_columns", async (t) => {
+      await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("incr_column1", { type: "integer", as: "column1 + 1", stored: false });
       });
       await reloadColumnInformation();
@@ -133,7 +133,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
     "virtual_columns",
     "change table with implicit virtual generated column",
     async () => {
-      await adapter.changeTable("virtual_columns", async (t) => {
+      await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("sqr_column1", { type: "integer", as: "pow(column1, 2)" });
       });
       await reloadColumnInformation();
@@ -145,7 +145,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
   );
 
   itIfSupports("virtual_columns", "schema dumping", async () => {
-    const output = await dumpTableSchema(adapter, "virtual_columns");
+    const output = await dumpTableSchema("virtual_columns");
     expect(output).toMatch(
       /t\.virtual\(\s*"upper_name",\s*\{\s*type:\s*"string",\s*as:\s*"UPPER\(name\)",\s*stored:\s*true\s*\}\s*\);/i,
     );

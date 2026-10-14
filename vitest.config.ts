@@ -114,6 +114,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/message-verifier.ts",
   ),
+  "@blazetrails/activesupport/messages/codec": path.resolve(
+    __dirname,
+    "packages/activesupport/src/messages/codec.ts",
+  ),
   "@blazetrails/activesupport/messages/rotation-configuration": path.resolve(
     __dirname,
     "packages/activesupport/src/messages/rotation-configuration.ts",
@@ -126,6 +130,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/message-encryptor.ts",
   ),
+  "@blazetrails/activesupport/core-ext/kernel/reporting": path.resolve(
+    __dirname,
+    "packages/activesupport/src/core-ext/kernel/reporting.ts",
+  ),
   "@blazetrails/activesupport/core-ext/date/calculations": path.resolve(
     __dirname,
     "packages/activesupport/src/core-ext/date/calculations.ts",
@@ -137,6 +145,10 @@ const alias = {
   "@blazetrails/activesupport/core-ext/date-time/calculations": path.resolve(
     __dirname,
     "packages/activesupport/src/core-ext/date-time/calculations.ts",
+  ),
+  "@blazetrails/activesupport/core-ext/date-time/conversions": path.resolve(
+    __dirname,
+    "packages/activesupport/src/core-ext/date-time/conversions.ts",
   ),
   "@blazetrails/activesupport/core-ext/date-and-time/zones": path.resolve(
     __dirname,
@@ -177,12 +189,15 @@ const alias = {
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
   "@blazetrails/activesupport/message-pack": path.resolve(
     __dirname,
-    "packages/activesupport/src/message-pack/index.ts",
+    "packages/activesupport/src/message-pack.ts",
   ),
-  "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
   "@blazetrails/activesupport/test-case": path.resolve(
     __dirname,
     "packages/activesupport/src/test-case.ts",
+  ),
+  "@blazetrails/activesupport/log-subscriber/test-helper": path.resolve(
+    __dirname,
+    "packages/activesupport/src/log-subscriber/test-helper.ts",
   ),
   "@blazetrails/activesupport/testing/autorun": path.resolve(
     __dirname,
@@ -200,10 +215,6 @@ const alias = {
   "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/src/index.ts"),
   "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
-  "@blazetrails/activemodel/yaml": path.resolve(
-    __dirname,
-    "packages/activemodel/src/attribute-set/codecs/yaml.ts",
-  ),
   "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
   "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js": path.resolve(
     __dirname,
@@ -232,34 +243,6 @@ const alias = {
   "@blazetrails/activerecord/adapters/mysql2-adapter.js": path.resolve(
     __dirname,
     "packages/activerecord/src/adapters/mysql2-adapter.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/virtualize.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/virtualize.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/synthesize.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/synthesize.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/transitive-extends-walker.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/transitive-extends-walker.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/walker.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/walker.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/resolve-target.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/resolve-target.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/ts-api.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/ts-api.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/auto-import.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/auto-import.ts",
   ),
   "@blazetrails/activerecord/fixtures": path.resolve(
     __dirname,
@@ -320,10 +303,16 @@ const alias = {
     "packages/globalid/src/signed-global-id.ts",
   ),
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
+  "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
+  "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
+  "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
+  "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/src") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/src/index.ts"),
+  "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
+  "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
@@ -397,6 +386,21 @@ const COVERAGE_EXCLUDE = [
   "packages/*/virtualized-dx-tests/**",
 ];
 
+const otherResolve = {
+  alias: [
+    ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
+    { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
+  ],
+};
+
+// Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
+// (it runs under activerecord, where the engine is ActiveRecord::Base).
+const otherSetupFiles = [
+  "./packages/activesupport/src/testing/autorun.ts",
+  "./packages/activesupport/src/test-setup-abstract-unit.ts",
+  "./packages/arel/src/test-setup-engine.ts",
+];
+
 export default defineConfig({
   resolve: { alias },
   test: {
@@ -464,6 +468,7 @@ export default defineConfig({
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
+            "./packages/bcrypt/src/index.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
@@ -501,7 +506,7 @@ export default defineConfig({
       },
       {
         // All non-AR packages + scripts: parallel, no DB concerns.
-        resolve: { alias },
+        resolve: otherResolve,
         test: {
           name: "other",
           // Projects do NOT inherit the root `test.globals`, and ESLint's
@@ -518,6 +523,7 @@ export default defineConfig({
             "scripts/schema-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",
             "scripts/*.test.ts",
+            "scripts/ci/*.test.mjs",
             "scripts/test-deps/*.test.ts",
             "scripts/tasks/*.test.ts",
             "scripts/test-compare/*.test.ts",
@@ -526,14 +532,18 @@ export default defineConfig({
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
-          exclude: ["packages/activerecord/**", ...SHARED_EXCLUDE],
-          // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
-          // (it runs under activerecord, where the engine is ActiveRecord::Base).
-          setupFiles: [
-            "./packages/activesupport/src/testing/autorun.ts",
-            "./packages/activesupport/src/test-setup-abstract-unit.ts",
-            "./packages/arel/src/test-setup-engine.ts",
-          ],
+          exclude: ["packages/activerecord/**", "packages/trailties/**", ...SHARED_EXCLUDE],
+          setupFiles: otherSetupFiles,
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "trailties",
+          globals: true,
+          include: ["packages/trailties/src/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: otherSetupFiles,
         },
       },
     ],

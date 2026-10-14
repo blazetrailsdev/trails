@@ -1,14 +1,29 @@
-import { statusCode } from "@blazetrails/rack";
+import { statusCode, type StatusSymbol } from "@blazetrails/rack";
+import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
+import type { UrlOptions } from "../../action-dispatch/http/url.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
-import { include, included } from "@blazetrails/activesupport";
-import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
-
-export class Redirecting {
-  static [included](base: LoggerIncludingClass): void {
-    include(base, Logger);
-  }
-}
+import type { Parameters } from "./strong-parameters.js";
+import type { RedirectToResponseOptionsAndFlash } from "./flash.js";
+import {
+  Concern,
+  Module,
+  extend,
+  include,
+  mattrAccessor,
+  presence,
+  truncate,
+} from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  Error as URIError,
+  URI,
+  rbCheckStringType,
+  rbInspect,
+  stringDelete,
+} from "@blazetrails/ruby-compat";
+import { Logger } from "../../abstract-controller/logger.js";
+import { UrlFor } from "./url-for.js";
 
 export class UnsafeRedirectError extends Error {
   constructor(message?: string) {
@@ -21,18 +36,41 @@ export class UnsafeRedirectError extends Error {
 const ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/;
 const SCHEME_OR_PROTOCOL_RELATIVE_RE = /^([a-z][a-z\d\-+.]*:|\/\/).*/i;
 
+export type RedirectToOptions =
+  | string
+  | ToModel
+  | unknown[]
+  | (UrlOptions & Record<string, unknown>)
+  | Parameters
+  | ((this: never) => RedirectToOptions)
+  | null;
+
+export interface RedirectToResponseOptions {
+  status?: StatusSymbol | `:${StatusSymbol}` | number;
+  allowOtherHost?: boolean;
+}
+
 export interface RedirectingHost {
-  request: { referer?: string | null; host?: string; protocol?: string; hostWithPort?(): string };
-  redirectTo(options: string, responseOptions?: Record<string, unknown>): unknown;
-  urlFor?(options: unknown): string;
+  request: { referer?: string | null; host: string; protocol: string; hostWithPort(): string };
+  redirectTo(
+    options: RedirectToOptions,
+    responseOptionsAndFlash?: RedirectToResponseOptionsAndFlash<string>,
+  ): unknown;
+  urlFor(options: unknown): string;
 }
 
 interface PrivateHost extends RedirectingHost {
   raiseOnOpenRedirects?: boolean;
+  redirectBackOrTo: OmitThisParameter<typeof redirectBackOrTo>;
+  _computeRedirectToLocation: OmitThisParameter<typeof _computeRedirectToLocation>;
+  _allowOtherHost: OmitThisParameter<typeof _allowOtherHost>;
+  _extractRedirectToStatus: OmitThisParameter<typeof _extractRedirectToStatus>;
+  _enforceOpenRedirectProtection: OmitThisParameter<typeof _enforceOpenRedirectProtection>;
+  _urlHostAllowed: OmitThisParameter<typeof _urlHostAllowed>;
+  _ensureUrlIsHttpHeaderSafe: OmitThisParameter<typeof _ensureUrlIsHttpHeaderSafe>;
 }
 
 interface RedirectToHost extends PrivateHost {
-  request: RedirectingHost["request"] & { protocol?: string; hostWithPort?(): string };
   location: string;
   responseBody: unknown;
   status: number | string;
@@ -40,25 +78,25 @@ interface RedirectToHost extends PrivateHost {
 
 export function redirectTo(
   this: RedirectToHost,
-  options: unknown = {},
-  responseOptions: Record<string, unknown> = {},
+  options: RedirectToOptions = {},
+  responseOptions: RedirectToResponseOptions = {},
 ): number {
-  if (options == null || options === false) {
+  if (options == null || (options as unknown) === false) {
     throw new ActionControllerError("Cannot redirect to nil!");
   }
-  if (this.responseBody != null) throw new DoubleRenderError();
+  if (this.responseBody != null && this.responseBody !== false) throw new DoubleRenderError();
 
   const allowOtherHost = Object.hasOwn(responseOptions, "allowOtherHost")
     ? (responseOptions.allowOtherHost as boolean)
-    : _allowOtherHost.call(this);
+    : this._allowOtherHost();
   delete responseOptions.allowOtherHost;
 
-  const proposedStatus = _extractRedirectToStatus.call(this, options, responseOptions);
+  const proposedStatus = this._extractRedirectToStatus(options, responseOptions);
 
-  const redirectToLocation = _computeRedirectToLocation.call(this, this.request, options);
-  _ensureUrlIsHttpHeaderSafe.call(this, redirectToLocation);
+  const redirectToLocation = this._computeRedirectToLocation(this.request, options);
+  this._ensureUrlIsHttpHeaderSafe(redirectToLocation);
 
-  this.location = _enforceOpenRedirectProtection.call(this, redirectToLocation, {
+  this.location = this._enforceOpenRedirectProtection(redirectToLocation, {
     allowOtherHost,
   });
   this.responseBody = "";
@@ -66,66 +104,56 @@ export function redirectTo(
 }
 
 export function redirectBack(
-  this: RedirectingHost,
+  this: PrivateHost,
   {
     fallbackLocation,
-    allowOtherHost = _allowOtherHost.call(this as PrivateHost),
+    allowOtherHost = this._allowOtherHost(),
     ...args
   }: { fallbackLocation: string; allowOtherHost?: boolean } & Record<string, unknown>,
 ): unknown {
-  return redirectBackOrTo.call(this, fallbackLocation, { allowOtherHost, ...args });
+  return this.redirectBackOrTo(fallbackLocation, { allowOtherHost, ...args });
 }
 
 export function redirectBackOrTo(
-  this: RedirectingHost,
+  this: PrivateHost,
   fallbackLocation: string,
-  options: { allowOtherHost?: boolean } & Record<string, unknown> = {},
+  {
+    allowOtherHost = this._allowOtherHost(),
+    ...options
+  }: { allowOtherHost?: boolean } & Record<string, unknown> = {},
 ): unknown {
-  const { allowOtherHost: explicitAllow, ...redirectOptions } = options;
-  const allowOtherHost = Object.hasOwn(options, "allowOtherHost")
-    ? explicitAllow
-    : _allowOtherHost.call(this as PrivateHost);
-  const referer = this.request.referer;
-  if (referer && (allowOtherHost || _urlHostAllowed.call(this, referer))) {
-    return this.redirectTo(referer, { allowOtherHost, ...redirectOptions });
+  if (
+    this.request.referer != null &&
+    (allowOtherHost || this._urlHostAllowed(this.request.referer))
+  ) {
+    return this.redirectTo(this.request.referer, { allowOtherHost, ...options });
   } else {
-    return this.redirectTo(fallbackLocation, redirectOptions);
+    return this.redirectTo(fallbackLocation, options);
   }
 }
 
-export function urlFrom(this: RedirectingHost, location: string | null | undefined): string | null {
-  if (!location || location.trim() === "") return null;
-  return _urlHostAllowed.call(this, location) ? location : null;
+export function urlFrom(this: PrivateHost, location: string | null | undefined): string | null {
+  location = presence(location);
+  return location != null && this._urlHostAllowed(location) ? location : null;
 }
 
 /** @internal */
 export function _computeRedirectToLocation(
-  this: RedirectingHost | void,
-  request: { protocol?: string; hostWithPort?(): string },
+  this: Pick<PrivateHost, "_computeRedirectToLocation" | "urlFor">,
+  request: RedirectingHost["request"],
   options: unknown,
 ): string {
-  let result: string;
-  if (typeof options === "string") {
-    if (SCHEME_OR_PROTOCOL_RELATIVE_RE.test(options)) {
-      result = options;
-    } else {
-      result = `${request.protocol ?? ""}${request.hostWithPort?.() ?? ""}${options}`;
-    }
+  let location: string;
+  if (SCHEME_OR_PROTOCOL_RELATIVE_RE.test(rbCheckStringType(options) ?? "")) {
+    location = rbCheckStringType(options)!;
+  } else if (typeof options === "string") {
+    location = request.protocol + request.hostWithPort() + options;
   } else if (typeof options === "function") {
-    const self = this as RedirectingHost | undefined;
-    const resolved = (options as (this: unknown) => unknown).call(self);
-    return _computeRedirectToLocation.call(self as RedirectingHost, request, resolved);
+    location = this._computeRedirectToLocation(request, options.call(this, this));
   } else {
-    const self = this as RedirectingHost | undefined;
-    if (self && typeof self.urlFor === "function") {
-      result = self.urlFor(options);
-    } else {
-      throw new TypeError(
-        `_computeRedirectToLocation: cannot resolve options of type ${typeof options} without a urlFor() host`,
-      );
-    }
+    location = this.urlFor(options);
   }
-  return result.replace(/[\0\r\n]/g, "");
+  return stringDelete(location, "\0\r\n");
 }
 
 /** @internal */
@@ -137,7 +165,7 @@ export function _allowOtherHost(this: PrivateHost): boolean {
 export function _extractRedirectToStatus(
   this: unknown,
   options: unknown,
-  responseOptions: Record<string, unknown>,
+  responseOptions: RedirectToResponseOptions,
 ): number {
   if (
     options !== null &&
@@ -158,33 +186,32 @@ export function _extractRedirectToStatus(
 
 /** @internal */
 export function _enforceOpenRedirectProtection(
-  this: RedirectingHost,
+  this: PrivateHost,
   location: string,
   { allowOtherHost }: { allowOtherHost: boolean },
 ): string {
-  if (allowOtherHost || _urlHostAllowed.call(this, location)) {
+  if (allowOtherHost || this._urlHostAllowed(location)) {
     return location;
+  } else {
+    throw new UnsafeRedirectError(
+      `Unsafe redirect to ${rbInspect(truncate(location, 100))}, pass allow_other_host: true to redirect anyway.`,
+    );
   }
-  const truncated = location.length > 100 ? `${location.slice(0, 97)}...` : location;
-  throw new UnsafeRedirectError(
-    `Unsafe redirect to ${JSON.stringify(truncated)}, pass allow_other_host: true to redirect anyway.`,
-  );
 }
 
 /** @internal */
 export function _urlHostAllowed(this: RedirectingHost, url: unknown): boolean {
-  const raw = url == null ? "" : String(url);
-  let host: string | null = null;
-  if (/^[a-z][a-z\d\-+.]*:/i.test(raw)) {
-    try {
-      host = new URL(raw).hostname || null;
-    } catch {
-      return false;
-    }
+  try {
+    const host = URI.parse(String(url)).host;
+
+    if (host === this.request.host) return true;
+    if (host != null) return false;
+    if (!String(url).startsWith("/")) return false;
+    return !String(url).startsWith("//");
+  } catch (e) {
+    if (e instanceof ArgumentError || e instanceof URIError) return false;
+    throw e;
   }
-  if (host !== null) return host === (this.request.host ?? "");
-  if (!raw.startsWith("/")) return false;
-  return !raw.startsWith("//");
 }
 
 /** @internal */
@@ -196,3 +223,34 @@ export function _ensureUrlIsHttpHeaderSafe(this: unknown, url: string): void {
     );
   }
 }
+
+type IncludedBlock = { included(base: null, block: (this: object) => void): void };
+
+export const Redirecting = new Module((mod) => {
+  extend(mod, Concern);
+
+  include(mod, Logger);
+  include(mod, UrlFor);
+
+  (mod as unknown as IncludedBlock).included(null, function (this: object) {
+    mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
+  });
+
+  mod.defineMethod("redirectTo", redirectTo);
+  mod.defineMethod("redirectBack", redirectBack);
+  mod.defineMethod("redirectBackOrTo", redirectBackOrTo);
+  mod.defineMethod("_computeRedirectToLocation", _computeRedirectToLocation);
+  mod.defineMethod("urlFrom", urlFrom);
+  mod.defineMethod("_allowOtherHost", _allowOtherHost);
+  mod.defineMethod("_extractRedirectToStatus", _extractRedirectToStatus);
+  mod.defineMethod("_enforceOpenRedirectProtection", _enforceOpenRedirectProtection);
+  mod.defineMethod("_urlHostAllowed", _urlHostAllowed);
+  mod.defineMethod("_ensureUrlIsHttpHeaderSafe", _ensureUrlIsHttpHeaderSafe);
+}) as Module<{
+  redirectTo: typeof redirectTo;
+  redirectBack: typeof redirectBack;
+  redirectBackOrTo: typeof redirectBackOrTo;
+  _computeRedirectToLocation: typeof _computeRedirectToLocation;
+  urlFrom: typeof urlFrom;
+}> & { _computeRedirectToLocation: OmitThisParameter<typeof _computeRedirectToLocation> };
+Redirecting._computeRedirectToLocation = _computeRedirectToLocation;

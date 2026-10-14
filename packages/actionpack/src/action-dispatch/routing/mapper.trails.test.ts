@@ -1,7 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { TopLevel } from "@blazetrails/activesupport";
+import { Engine } from "@blazetrails/trailties/engine";
+import { Trailtie } from "@blazetrails/trailties/trailtie";
 
-import { Constraints, Mapper, Scope, type ConstraintsRequest } from "./mapper.js";
+import {
+  Constraints,
+  Mapper,
+  Scope,
+  type ConstraintsRequest,
+  type MountableApp,
+} from "./mapper.js";
 import { RouteSet } from "./route-set.js";
+import { controllerConstants } from "../http/request.js";
+import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { deprecator } from "../deprecator.js";
@@ -279,8 +290,8 @@ describe("Mapper::Scope", () => {
 describe("ActionDispatch::Routing::Mapper::Resources inflection", () => {
   it("singularizes resources :people through the ActiveSupport inflector (mapper.rb:1228-1230)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("people");
+    routes.draw(function () {
+      this.resources("people");
     });
     expect(routes.namedRoutes.isKey("person")).toBe(true);
     expect(routes.namedRoutes.isKey("people")).toBe(true);
@@ -291,8 +302,8 @@ describe("ActionDispatch::Routing::Mapper::Resources inflection", () => {
 
   it("pluralizes a singleton resource's controller through the ActiveSupport inflector (mapper.rb:1298-1300)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("person");
+    routes.draw(function () {
+      this.resource("person");
     });
     expect(routes.fromRequirements({ controller: "people", action: "show" })?.name).toBe("person");
   });
@@ -303,11 +314,201 @@ describe("Mapper::Mapping#build_conditions", () => {
     const set = new RouteSet();
     new Mapper(set).get("/foo", {
       to: "posts#index",
-      constraints: { ip: "127.0.0.1", checkMethod: "GET", hasOwnProperty: "x" },
+      constraints: { ip: "127.0.0.1", hasOwnProperty: "x" },
     });
     const [route] = set.routes.routes;
     expect(Object.keys(route.conditions)).toContain("ip");
-    expect(Object.keys(route.conditions)).not.toContain("checkMethod");
     expect(Object.keys(route.conditions)).not.toContain("hasOwnProperty");
+  });
+
+  it("keeps a constraint naming a Rails-private Request method", () => {
+    const set = new RouteSet();
+    new Mapper(set).get("/foo", {
+      to: "posts#index",
+      constraints: { checkMethod: "GET" },
+    });
+    const [route] = set.routes.routes;
+    expect(Object.keys(route.conditions)).toContain("checkMethod");
+  });
+});
+
+describe("Mapper#rails_app?", () => {
+  it("answers app < Rails::Railtie (mapper.rb:657-659)", () => {
+    class App extends Trailtie {}
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { Trailtie } as never;
+    try {
+      const mapper = new Mapper(new RouteSet());
+      expect(mapper.isRailsApp(App as unknown as MountableApp)).toBe(true);
+      expect(mapper.isRailsApp(Trailtie as unknown as MountableApp)).toBe(false);
+      expect(mapper.isRailsApp(new App() as unknown as MountableApp)).toBe(false);
+      expect(mapper.isRailsApp(() => [200, {}, []] as never)).toBe(false);
+    } finally {
+      TopLevel.Trails = trails;
+    }
+  });
+});
+
+describe("Mapper#mount", () => {
+  it("names a Rails app mounted with no :as after its railtie_name (mapper.rb:629,661-663)", () => {
+    class ShorthandApp extends Engine {
+      private static _routes?: RouteSet;
+
+      static {
+        Engine.register(this);
+      }
+
+      static routes(): RouteSet {
+        return (this._routes ??= new RouteSet());
+      }
+    }
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { Engine, Trailtie } as never;
+    try {
+      const set = new RouteSet();
+      set.draw(function () {
+        this.mount(ShorthandApp as unknown as MountableApp, { at: "/shorthand_app" });
+      });
+
+      expect(set.namedRoutes.isKey("shorthand_app")).toBe(true);
+      expect(ShorthandApp.routes().mountedHelpers().isMethodDefined("shorthandApp")).toBe(true);
+    } finally {
+      TopLevel.Trails = trails;
+    }
+  });
+
+  it("writes :as and :via to the shorthand hash it was given (mapper.rb:613-616,629-632)", () => {
+    const someRackApp = { call: () => [200, {}, []] };
+    const options = new Map<unknown, unknown>([[someRackApp, "/some_route"]]);
+
+    new RouteSet().draw(function () {
+      this.mount(options);
+    });
+
+    expect([...options]).toEqual([
+      ["as", undefined],
+      ["via", ":all"],
+    ]);
+  });
+
+  it("replaces a false :via, as `options[:via] ||= :all` does (mapper.rb:632)", () => {
+    const options = { at: "/app", via: false as const };
+
+    new RouteSet().draw(function () {
+      this.mount(() => [200, {}, []] as never, options);
+    });
+
+    expect(options).toEqual({ as: undefined, via: ":all" });
+  });
+});
+
+describe("Mapper block receivers", () => {
+  class StubController {}
+
+  const names = ["health", "owners", "reports", "admin/posts", "posts", "pages", "profiles"];
+
+  beforeAll(() => {
+    for (const name of names) {
+      controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    }
+  });
+
+  afterAll(() => {
+    for (const name of names) controllerConstants.delete(name);
+  });
+
+  it("binds a nested constraints block to the mapper, as draw binds its own", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("up", { to: "health#show" });
+
+      this.constraints({ owner: /blazetrailsdev/ }, function () {
+        this.get("/:owner", { to: "owners#show" });
+      });
+    });
+
+    expect(routes.recognizePath("/up").action).toBe("show");
+    expect(routes.recognizePath("/blazetrailsdev").controller).toBe("owners");
+  });
+
+  it("binds a nested scope block to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.scope("admin", function () {
+        this.scope("reports", function () {
+          this.get("daily", { to: "reports#daily" });
+        });
+      });
+    });
+
+    const m = routes.recognizePath("/admin/reports/daily");
+    expect([m.controller, m.action]).toEqual(["reports", "daily"]);
+  });
+
+  it("binds namespace, resources, member and collection blocks to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.namespace("admin", function () {
+        this.resources("posts", function () {
+          this.member(function () {
+            this.get("preview", { to: "posts#preview" });
+          });
+          this.collection(function () {
+            this.get("archive", { to: "posts#archive" });
+          });
+        });
+      });
+    });
+
+    expect(routes.recognizePath("/admin/posts/1/preview").action).toBe("preview");
+    expect(routes.recognizePath("/admin/posts/archive").action).toBe("archive");
+  });
+
+  it("binds controller, defaults and resource blocks to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.controller("pages", function () {
+        this.defaults({ format: "html" }, function () {
+          this.get("about", { action: "about" });
+        });
+      });
+      this.resource("profile", function () {
+        this.get("avatar", { to: "profiles#avatar" });
+      });
+    });
+
+    const about = routes.recognizePath("/about");
+    expect([about.controller, about.action]).toEqual(["pages", "about"]);
+    expect(routes.recognizePath("/profile/avatar").action).toBe("avatar");
+  });
+
+  it("binds shallow, nested and new blocks to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.shallow(function () {
+        this.resources("posts", function () {
+          this.new(function () {
+            this.get("draft", { to: "posts#draft" });
+          });
+          this.nested(function () {
+            this.get("stats", { to: "posts#stats" });
+          });
+        });
+      });
+    });
+
+    expect(routes.recognizePath("/posts/new/draft").action).toBe("draft");
+    expect(routes.recognizePath("/posts/1/stats").action).toBe("stats");
+  });
+
+  it("leaves an arrow block's lexical this alone", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.scope("api", () => {
+        this.get("ping", { to: "health#ping" });
+      });
+    });
+
+    expect(routes.recognizePath("/api/ping").action).toBe("ping");
   });
 });

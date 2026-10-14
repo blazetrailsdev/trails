@@ -1,7 +1,6 @@
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { BigDecimal } from "@blazetrails/ruby-compat";
-import { merge, mergeBang } from "../hash-utils.js";
 import type { NumberToCurrencyOptions } from "../number-helper.js";
 
 const HALF = new BigDecimal("0.5");
@@ -11,7 +10,9 @@ function powerOfTen(precision: number): BigDecimal {
 }
 
 export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyOptions> {
-  static override namespace = "currency";
+  static {
+    this.namespace = "currency";
+  }
 
   protected convert(): string {
     const options = this.options;
@@ -41,9 +42,9 @@ export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyO
 
   protected override get options(): Record<string, unknown> {
     if (!this._options) {
-      const defaults = merge(this.defaultFormatOptions(), this.i18nOpts());
+      const defaults = { ...this.defaultFormatOptions(), ...this.i18nOpts() };
       if (this.opts.format != null) defaults.negativeFormat = `-${this.opts.format}`;
-      this._options = mergeBang(defaults, this.opts as Record<string, unknown>);
+      this._options = Object.assign(defaults, this.opts as Record<string, unknown>);
     }
     return this._options;
   }

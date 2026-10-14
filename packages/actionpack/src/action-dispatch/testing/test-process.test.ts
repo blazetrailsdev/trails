@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { FlashHash } from "../middleware/flash.js";
 import { CookieJar } from "../middleware/cookies.js";
+import { Session } from "../request/session.js";
 import {
   TestProcess,
   cookies,
@@ -22,7 +23,7 @@ function makeHost(overrides: Partial<TestProcessHost> = {}): TestProcessHost {
       env: {},
       getHeader: () => undefined,
       hasHeader: () => false,
-      session: { user: 1 },
+      session: new Session(null, { env: {} }),
       flash: new FlashHash(),
       cookies: { a: "1" },
     },
@@ -49,7 +50,7 @@ describe("TestProcess", () => {
 
   it("session/flash/redirectToUrl delegate to request/response", () => {
     const host = makeHost();
-    expect(session.call(host)).toEqual({ user: 1 });
+    expect(session.call(host)).toBe(host.request.session);
     expect(flash.call(host)).toBeInstanceOf(FlashHash);
     expect(redirectToUrl.call(host)).toBe("/somewhere");
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { activeLane } from "./connection.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { itIfSupports } from "./supports.js";
 import {
   dumpedTables,
@@ -23,7 +23,7 @@ describe("templateSchemaCache", () => {
   });
 
   it("is what the warm left in the pool's cache", async () => {
-    const live = (await Base.leaseConnection()).internalSchemaCache;
+    const live = (await Base.leaseConnection()).pool.schemaReflection.loadedCache!;
     const dumped = (await templateSchemaCache())!;
     expect(Object.keys(live.getCachedColumnsHash("posts") ?? {})).toEqual(
       Object.keys(dumped.getCachedColumnsHash("posts") ?? {}),
@@ -34,7 +34,6 @@ describe("templateSchemaCache", () => {
     const conn = await Base.leaseConnection();
     const installed = conn.pool.schemaReflection.loadedCache;
     expect(installed).not.toBeNull();
-    expect(conn.internalSchemaCache).toBe(installed);
     expect(Base.connectionPool().poolConfig.schemaReflection.loadedCache).toBe(installed);
     expect(installed).not.toBe(await templateSchemaCache());
   });

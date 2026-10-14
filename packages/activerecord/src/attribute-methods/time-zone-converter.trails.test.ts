@@ -3,6 +3,7 @@ import { TimeZoneConverter } from "./time-zone-conversion.js";
 import { DateTime } from "../type/date-time.js";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 describe("TimeZoneConverterTest", () => {
   afterEach(() => {
@@ -20,8 +21,7 @@ describe("TimeZoneConverterTest", () => {
   it("cast wraps Temporal.Instant in TimeWithZone for current zone", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
-    const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
-    const result = converter.cast(instant);
+    const result = converter.cast(RubyTime.utc(2024, 6, 15, 14));
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
     expect(twz.hour).toBe(10);
@@ -82,8 +82,7 @@ describe("TimeZoneConverterTest", () => {
   it("cast returns raw subtype result when no zone is configured", () => {
     setZone(null);
     const converter = new TimeZoneConverter(new DateTime());
-    const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
-    const result = converter.cast(instant);
+    const result = converter.cast(RubyTime.utc(2024, 6, 15, 14));
     expect(result).toBeInstanceOf(RubyTime);
   });
 
@@ -134,5 +133,25 @@ describe("TimeZoneConverterTest", () => {
     expect(converter.cast(Infinity)).toBe(Infinity);
     expect(converter.cast(-Infinity)).toBe(-Infinity);
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("cast returns null when the subtype raises ArgumentError for time-like input", () => {
+    setZone("Eastern Time (US & Canada)");
+    const subtype = new DateTime();
+    vi.spyOn(subtype, "userInputInTimeZone").mockImplementation(() => {
+      throw new ArgumentError("argument out of range");
+    });
+    const converter = new TimeZoneConverter(subtype);
+    expect(converter.cast("2024-06-15 14:00:00")).toBeNull();
+    expect(converter.cast(RubyTime.now())).toBeNull();
+  });
+
+  it("cast lets a non-ArgumentError from the subtype propagate", () => {
+    const subtype = new DateTime();
+    vi.spyOn(subtype, "userInputInTimeZone").mockImplementation(() => {
+      throw new TypeError("boom");
+    });
+    const converter = new TimeZoneConverter(subtype);
+    expect(() => converter.cast("2024-06-15 14:00:00")).toThrow(TypeError);
   });
 });

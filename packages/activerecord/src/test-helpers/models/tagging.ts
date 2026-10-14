@@ -3,6 +3,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { OrderedTag } from "./tag.js";
 import type { Tag } from "./tag.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Tagging extends Base {
@@ -41,6 +42,7 @@ export class Tagging extends Base {
     this.hasMany("things", { through: "taggable" });
   }
 }
+registerModel(Tagging);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Tagging {
   get tag(): Tag | null | Promise<Tag | null>;
@@ -64,3 +66,4 @@ export class IndestructibleTagging extends Tagging {
     this.beforeDestroy(() => kernelThrow(":abort"));
   }
 }
+registerModel(IndestructibleTagging);

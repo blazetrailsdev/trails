@@ -31,6 +31,76 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "activerecord:connection_pool_test.rb › pin connection synchronize the connection": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:906 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+  ],
+  "activerecord:connection_pool_test.rb › pin connection nesting lock": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:954 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+  ],
+  "activerecord:connection_pool_test.rb › pin connection nesting lock inverse": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:971 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'connection_pool_test.rb:974 `assert_equal ActiveSupport::Concurrency::NullLock, @pool.lease_connection.lock` — a connection nothing has pinned holds a monitor, not `NullLock` (packages/activerecord/CLAUDE.md, "The adapter lock defaults to a monitor, not `NullLock`")',
+    },
+  ],
+  "activerecord:attribute_methods_test.rb › AttributeMethodsTest › attribute keys on a new instance":
+    [
+      {
+        kind: "assert_raise",
+        value: null,
+        as: null,
+        reason:
+          'attribute_methods_test.rb:166 `assert_raise(NoMethodError) { t.title2 }` — an undefined name on a record reads `undefined`; the raise comes from `method_missing`, which needs a Proxy (CLAUDE.md, "Records are not Proxies")',
+      },
+    ],
+  "activerecord:attribute_methods_test.rb › AttributeMethodsTest › non-attribute read and write": [
+    {
+      kind: "assert_raise",
+      value: null,
+      as: null,
+      reason:
+        'attribute_methods_test.rb:644 `assert_raise(NoMethodError) { topic.mumbo }` — an undefined name on a record reads `undefined` (CLAUDE.md, "Records are not Proxies")',
+    },
+    {
+      kind: "assert_raise",
+      value: null,
+      as: null,
+      reason:
+        'attribute_methods_test.rb:645 `assert_raise(NoMethodError) { topic.mumbo = 5 }` — an undefined name assigned on a record creates an own property (CLAUDE.md, "Records are not Proxies")',
+    },
+  ],
+  "activerecord:attribute_methods_test.rb › AttributeMethodsTest › undeclared attribute method does not affect respond_to? and method_missing":
+    [
+      {
+        kind: "assert_raise",
+        value: null,
+        as: null,
+        reason:
+          'attribute_methods_test.rb:653 `assert_raise(NoMethodError) { topic.title_hello_world }` — an undefined name on a record reads `undefined` (CLAUDE.md, "Records are not Proxies")',
+      },
+    ],
   "activerecord:attributes_test.rb › CustomPropertiesTest › overloaded properties save": [
     {
       kind: "assert_kind_of",
@@ -44,7 +114,134 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
       value: null,
       as: "assert_equal",
       reason:
-        'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClass(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
+        'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClassname(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
+    },
+  ],
+  "activerecord:asynchronous_queries_test.rb › AsynchronousQueriesTest › async select all": [
+    {
+      kind: "assert_kind_of",
+      value: null,
+      as: null,
+      reason:
+        'asynchronous_queries_test.rb:107 `assert_kind_of ActiveRecord::FutureResult::Complete, future_result` — on an in-memory database the fallback query is a promise, and a promise resolving to a thenable `FutureResult::Complete` unwraps it to the Result (CLAUDE.md, "`ActiveRecord::Promise` is the native promise")',
+    },
+  ],
+  "activerecord:base_test.rb › BasicsTest › dup": [
+    {
+      kind: "assert_equal",
+      value: "s:c",
+      as: null,
+      reason:
+        'base_test.rb:991 `assert_equal("c", duped_topic.title)` — reads the `duped_topic.title.replace "c"` of :979 back after save; a JS string cannot be mutated in place (CLAUDE.md, "Ruby Strings are JS string primitives")',
+    },
+  ],
+  "activerecord:connection_adapters/standalone_connection_test.rb › StandaloneConnectionTest › async fallback":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: null,
+        reason:
+          'connection_adapters/standalone_connection_test.rb:23 `assert_instance_of FutureResult::Complete, result` — the fallback query is awaited, and a promise resolving to a thenable `FutureResult::Complete` unwraps it to the Result (CLAUDE.md, "`ActiveRecord::Promise` is the native promise")',
+      },
+    ],
+  "activemodel:attribute_methods_test.rb › AttributeMethodsTest › should not interfere with respond_to? if the attribute has a private/protected method":
+    [
+      {
+        kind: "assert_not_respond_to",
+        value: null,
+        as: null,
+        reason:
+          'attribute_methods_test.rb:319 `assert_not_respond_to m, :private_method` — a JS method entry carries no visibility, so a defined method answers `respond_to?` at both arities (CLAUDE.md, "Method visibility is compile-time only")',
+      },
+    ],
+  "activemodel:attribute_set_test.rb › AttributeSetTest › duping creates a new hash, but does not dup the attributes":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:foobar",
+        as: null,
+        reason:
+          'attribute_set_test.rb:49 `assert_equal "foobar", attributes[:bar].value` — reads the `duped[:bar].value << "bar"` of :45 through the shared Attribute; a JS string has no in-place append (CLAUDE.md, "Ruby Strings are JS string primitives")',
+      },
+      {
+        kind: "assert_equal",
+        value: "s:foobar",
+        as: null,
+        reason:
+          'attribute_set_test.rb:50 `assert_equal "foobar", duped[:bar].value` — the same in-place append (CLAUDE.md, "Ruby Strings are JS string primitives")',
+      },
+    ],
+  "activemodel:attribute_set_test.rb › AttributeSetTest › deep_duping creates a new hash and dups each attribute":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:foobar",
+        as: null,
+        reason:
+          'attribute_set_test.rb:68 `assert_equal "foobar", duped[:bar].value` — reads the `duped[:bar].value << "bar"` of :63; a JS string has no in-place append (CLAUDE.md, "Ruby Strings are JS string primitives")',
+      },
+    ],
+  "activemodel:attributes_dirty_test.rb › AttributesDirtyTest › attribute mutation": [
+    {
+      kind: "assert_predicate",
+      value: null,
+      as: null,
+      reason:
+        'attributes_dirty_test.rb:72 `assert_predicate @model, :name_changed?` — true only after `@model.name.replace("Hadad")` at :71 mutates the receiver; a JS string cannot be mutated (CLAUDE.md, "Ruby Strings are JS string primitives")',
+    },
+  ],
+  "activemodel:type/string_test.rb › StringTest › values are duped coming out": [
+    {
+      kind: "assert_not_same",
+      value: null,
+      as: null,
+      reason:
+        'type/string_test.rb:39 `assert_not_same s, type.cast(s)` — two equal JS string primitives are one value, with no identity to differ (CLAUDE.md, "Ruby Strings are JS string primitives")',
+    },
+    {
+      kind: "assert_not_same",
+      value: null,
+      as: null,
+      reason:
+        'type/string_test.rb:41 `assert_not_same s, type.deserialize(s)` — the same missing identity (CLAUDE.md, "Ruby Strings are JS string primitives")',
+    },
+  ],
+  "activesupport:core_ext/module_test.rb › ModuleTest › delegation arity to self class": [
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:662 `assert_equal(-1, d.instance_method(:opt).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:663 `assert_equal(-1, d.instance_method(:kwargs).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:664 `assert_equal(-1, d.instance_method(:kwargs_with_block).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:665 `assert_equal(-1, d.instance_method(:opt_kwargs).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+    {
+      kind: "assert_equal",
+      value: "n:-1",
+      as: null,
+      reason:
+        'module_test.rb:666 `assert_equal(-1, d.instance_method(:opt_kwargs_with_block).arity)` — `Function.length` cannot express a method that takes any number of arguments (CLAUDE.md, "Runtime facts Node does not expose")',
     },
   ],
   "activesupport:core_ext/duration_test.rb › DurationTest › is a": [
@@ -99,6 +296,81 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           "safe_buffer_test.rb:195 `assert_kind_of NilClass` — JS `null` is not an instance of any class, and nil is NilClass's only instance, so the check is `assert_nil`",
       },
     ],
+  "actioncontroller:controller/routing_test.rb › LegacyRouteSetTests › id encoding": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'controller/routing_test.rb:112 `assert_equal ::Encoding::UTF_8, hash["id"].encoding` — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+    },
+  ],
+  "actioncontroller:controller/parameter_encoding_test.rb › ParameterEncodingTest › properly transcodes parameters of the action specified by skip_parameter_encoding to ASCII_8BIT":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:ASCII-8BIT",
+        as: null,
+        reason:
+          'parameter_encoding_test.rb:42 `assert_equal "ASCII-8BIT", @response.body` — a JS string carries no encoding tag and ruby-compat has no binary String carrier for a param value: `forceEncoding` returns a string for a string and `rbObjEncoding` answers UTF-8 for every string (packages/ruby-compat/src/string/force-encoding.ts)',
+      },
+    ],
+  "actioncontroller:controller/parameter_encoding_test.rb › ParameterEncodingTest › properly transcodes declared parameters into specified encodings":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:Shift_JIS",
+        as: null,
+        reason:
+          'parameter_encoding_test.rb:49 `assert_equal "Shift_JIS", JSON.parse(@response.body)["baz"]` — a JS string carries no encoding tag and ruby-compat has no binary String carrier for a param value: `forceEncoding` returns a string for a string and `rbObjEncoding` answers UTF-8 for every string (packages/ruby-compat/src/string/force-encoding.ts)',
+      },
+    ],
+  "actioncontroller:controller/parameter_encoding_test.rb › ParameterEncodingTest › properly encodes all ASCII_8BIT parameters into binary":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'parameter_encoding_test.rb:57 `assert_equal ["ASCII-8BIT"], JSON.parse(@response.body).uniq` — a JS string carries no encoding tag and ruby-compat has no binary String carrier for a param value: `forceEncoding` returns a string for a string and `rbObjEncoding` answers UTF-8 for every string (packages/ruby-compat/src/string/force-encoding.ts)',
+      },
+    ],
+  "actioncontroller:controller/parameter_encoding_test.rb › ParameterEncodingTest › does not raise an error when passed a param declared as ASCII-8BIT that contains invalid bytes":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:ASCII-8BIT",
+        as: null,
+        reason:
+          'parameter_encoding_test.rb:64 `assert_equal "ASCII-8BIT", @response.body` — a JS string carries no encoding tag and ruby-compat has no binary String carrier for a param value: `forceEncoding` returns a string for a string and `rbObjEncoding` answers UTF-8 for every string (packages/ruby-compat/src/string/force-encoding.ts)',
+      },
+    ],
+  "activerecord:adapters/sqlite3/sqlite3_adapter_test.rb › SQLite3AdapterTest › type cast should not mutate encoding":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'adapters/sqlite3/sqlite3_adapter_test.rb:485 `assert_equal Encoding::ASCII_8BIT, name.encoding` — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
+  "msgpack:cruby/buffer_spec.rb › doesn't allow #dup or #clone": [
+    {
+      kind: "expect_not_to_respond_to",
+      value: "s:dup",
+      as: "assert_equal",
+      reason:
+        "cruby/buffer_spec.rb:594 `expect(subject).to_not respond_to :dup` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
+    },
+    {
+      kind: "expect_not_to_respond_to",
+      value: "s:clone",
+      as: "assert_equal",
+      reason:
+        "cruby/buffer_spec.rb:595 `expect(subject).to_not respond_to :clone` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
+    },
+  ],
 };
 
 interface ReceiptableTestCase {

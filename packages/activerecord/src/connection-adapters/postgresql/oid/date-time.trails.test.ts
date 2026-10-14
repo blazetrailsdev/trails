@@ -3,11 +3,15 @@ import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 
+import "../../postgresql-adapter.js";
 import { DateTime } from "./date-time.js";
 import { Timestamp } from "./timestamp.js";
 import { TimestampWithTimeZone } from "./timestamp-with-time-zone.js";
-import { quotedDate, typeCast } from "../quoting.js";
+import { quotedDate as quotedDateFn, typeCast } from "../quoting.js";
 import type { QuotingDispatchHost } from "../../abstract/quoting.js";
+
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call({ defaultTimezone: "utc" }, value);
 
 describe("PostgreSQL::OID::DateTime", () => {
   const type = new DateTime();
@@ -65,14 +69,14 @@ describe("PostgreSQL::OID::DateTime", () => {
     expect(type.serialize(DateInfinity)).toBe(DateInfinity);
     expect(type.serialize(DateNegativeInfinity)).toBe(DateNegativeInfinity);
     const host = {} as QuotingDispatchHost;
-    expect(typeCast.call(host, type.serialize(DateInfinity))).toBe("infinity");
-    expect(typeCast.call(host, type.serialize(DateNegativeInfinity))).toBe("-infinity");
+    expect(typeCast.call(host, type.serialize(DateInfinity))).toBe(Infinity);
+    expect(typeCast.call(host, type.serialize(DateNegativeInfinity))).toBe(-Infinity);
   });
 
   it("serialize round-trips the 'infinity' / '-infinity' wire strings", () => {
     const host = {} as QuotingDispatchHost;
-    expect(typeCast.call(host, type.serialize("infinity"))).toBe("infinity");
-    expect(typeCast.call(host, type.serialize("-infinity"))).toBe("-infinity");
+    expect(typeCast.call(host, type.serialize("infinity"))).toBe(Infinity);
+    expect(typeCast.call(host, type.serialize("-infinity"))).toBe(-Infinity);
   });
 
   it("type_cast_for_schema renders infinity sentinels", () => {

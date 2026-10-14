@@ -244,7 +244,21 @@ export class Range<T = unknown> {
 
   /** `vendor/ruby/v3.3.11/range.c:934` `range_each`. */
   *each(): Generator<T> {
+    if (this.begin === null) throw new TypeError("can't iterate from NilClass");
     yield* this.step(1);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/range.c:870` `range_to_a`, whose `rb_call_super` is
+   * `Enumerable#to_a` over {@link each}.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toA(): T[] {
+    if (this.end === null) {
+      throw new RangeError("cannot convert endless range to an array");
+    }
+    return [...this.each()];
   }
 
   /** @noRailsEquivalent PERMANENT */

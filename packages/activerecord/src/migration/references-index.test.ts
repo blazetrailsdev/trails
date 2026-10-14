@@ -90,7 +90,7 @@ describe("Migration", () => {
     it("creates index for existing table", async () => {
       const connection = await ambientConnection();
       await connection.createTable(tableName);
-      await connection.changeTable(tableName, async (t) => {
+      await connection.changeTable(tableName, {}, async (t) => {
         await t.references("foo", { index: true });
       });
 
@@ -102,7 +102,7 @@ describe("Migration", () => {
     it("creates index for existing table even if index option is not passed", async () => {
       const connection = await ambientConnection();
       await connection.createTable(tableName);
-      await connection.changeTable(tableName, async (t) => {
+      await connection.changeTable(tableName, {}, async (t) => {
         await t.references("foo");
       });
 
@@ -114,7 +114,7 @@ describe("Migration", () => {
     it("does not create index for existing table explicit", async () => {
       const connection = await ambientConnection();
       await connection.createTable(tableName);
-      await connection.changeTable(tableName, async (t) => {
+      await connection.changeTable(tableName, {}, async (t) => {
         await t.references("foo", { index: false });
       });
 
@@ -126,7 +126,7 @@ describe("Migration", () => {
     it("creates polymorphic index for existing table", async () => {
       const connection = await ambientConnection();
       await connection.createTable(tableName);
-      await connection.changeTable(tableName, async (t) => {
+      await connection.changeTable(tableName, {}, async (t) => {
         await t.references("foo", { polymorphic: true, index: true });
       });
 
@@ -140,7 +140,7 @@ describe("Migration", () => {
     it("creates polymorphic index for existing table with custom name", async () => {
       const connection = await ambientConnection();
       await connection.createTable(tableName);
-      await connection.changeTable(tableName, async (t) => {
+      await connection.changeTable(tableName, {}, async (t) => {
         await t.references("foo", { polymorphic: true, index: { name: "testings_foo_index" } });
       });
 

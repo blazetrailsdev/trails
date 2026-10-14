@@ -9,9 +9,10 @@ import {
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
   chomp,
+  eachKey,
   except,
   extend,
-  hasKey,
+  type Hash,
   include,
   type Included,
   InvalidURIError,
@@ -56,6 +57,7 @@ import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Response as AdResponse } from "../http/response.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
+import { ActionController } from "../../namespaces.js";
 import { Request as AdRequest } from "../http/request.js";
 import { camelize, NameError, squish } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -84,12 +86,12 @@ function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): b
 export class CustomUrlHelper implements PolymorphicMappingEntry {
   readonly name: string;
   readonly defaults: Record<string, unknown>;
-  readonly block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string;
+  readonly block: (this: PolymorphicHost, ...args: unknown[]) => object | string;
 
   constructor(
     name: string,
     defaults: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
   ) {
     this.name = name;
     this.defaults = defaults;
@@ -114,7 +116,7 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
     t: PolymorphicHost,
     args: unknown[],
     options: Record<string, unknown>,
-  ): Record<string, unknown> | string {
+  ): object | string {
     return this.block.apply(t, [...args, this.mergeDefaults(options)]);
   }
 
@@ -159,7 +161,7 @@ export class Generator {
     if (
       this.recall[key] != null &&
       this.recall[key] !== false &&
-      (!hasKey(this.options, key) || this.options[key] === this.recall[key])
+      (!Object.hasOwn(this.options, key) || this.options[key] === this.recall[key])
     ) {
       if (!this.isNamedRouteExists() || this.segmentKeys().includes(key)) {
         return (this.options[key] = this.recall[key]);
@@ -176,7 +178,7 @@ export class Generator {
       this.options["controller"] = toS(this.options["controller"]);
     }
 
-    if (hasKey(this.options, "action")) {
+    if ("action" in this.options) {
       const action = this.options["action"];
       this.options["action"] = toS(action != null && action !== false ? action : "index");
     }
@@ -235,7 +237,7 @@ export class Generator {
   }
 }
 
-export type DrawCallback = (mapper: Mapper) => void;
+export type DrawCallback = (this: Mapper) => void;
 
 export class Dispatcher extends Endpoint {
   private readonly _raiseOnNameError: boolean;
@@ -319,7 +321,10 @@ export class Config {
   }
 }
 
-export class MountedHelpers {}
+export const MountedHelpers = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(UrlFor);
+});
 
 export class UrlHelper {
   static create(route: Route, options: Record<string, unknown>, routeName: string): UrlHelper {
@@ -356,7 +361,7 @@ export class UrlHelper {
     t: UrlHelperContext,
     methodName: string,
     args: unknown[],
-    innerOptions: Record<string, unknown> | undefined,
+    innerOptions: Record<string, unknown> | Hash<string, unknown> | undefined,
     urlStrategy: UrlStrategy,
   ): string {
     const controllerOptions = t.urlOptions();
@@ -373,7 +378,7 @@ export class UrlHelper {
 
   handlePositionalArgs(
     controllerOptions: Record<string, unknown>,
-    innerOptions: Record<string, unknown>,
+    innerOptions: Record<string, unknown> | Hash<string, unknown>,
     args: unknown[],
     result: Record<string, unknown>,
     pathParams: string[],
@@ -393,10 +398,10 @@ export class UrlHelper {
       } else {
         pathParams = [...pathParams];
       }
-      for (const key of Object.keys(innerOptions)) {
+      eachKey(innerOptions, (key) => {
         const at = pathParams.indexOf(key);
         if (at !== -1) pathParams.splice(at, 1);
-      }
+      });
 
       args.forEach((arg, index) => {
         const param = pathParams[index];
@@ -423,7 +428,7 @@ export class OptimizedUrlHelper extends UrlHelper {
     t: UrlHelperContext,
     methodName: string,
     args: unknown[],
-    innerOptions: Record<string, unknown> | undefined,
+    innerOptions: Record<string, unknown> | Hash<string, unknown> | undefined,
     urlStrategy: UrlStrategy,
   ): string {
     if (args.length === this.argSize && !innerOptions && this.optimizeRoutesGeneration(t)) {
@@ -475,10 +480,7 @@ export class OptimizedUrlHelper extends UrlHelper {
     return params;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — PERMANENT
-   */
+  /** @internal */
   private raiseGenerationError(args: unknown[]): never {
     const missingKeys: string[] = [];
     const params = this.parameterizeArgs(args, (missingKey) => {
@@ -609,7 +611,7 @@ export class NamedRouteCollection {
   addUrlHelper(
     name: string,
     defaults: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
   ): this {
     const helper = new CustomUrlHelper(name, defaults, block);
     const pathName = camelize(`${name}_path`, "lower");
@@ -643,10 +645,12 @@ export class NamedRouteCollection {
   ): void {
     mod.defineMethod(name, function (this: UrlHelperContext, ...args: unknown[]): string {
       const last = args[args.length - 1];
-      const options =
-        (last as object | null)?.constructor === Object
-          ? (args.pop() as Record<string, unknown>)
-          : undefined;
+      let options: Record<string, unknown> | Hash<string, unknown> | undefined;
+      if (isPlainObject(last)) {
+        options = args.pop() as Record<string, unknown>;
+      } else if (last instanceof ActionController.Parameters) {
+        options = (args.pop() as InstanceType<typeof ActionController.Parameters>).toH();
+      }
       return helper.call(this, name, args, options, urlStrategy);
     });
   }
@@ -683,8 +687,8 @@ export class RouteSet {
   /** @internal */
   private _urlHelpersWithoutPaths?: UrlHelpersModule;
   defaultUrlOptions: Record<string, unknown> = {};
-  private readonly _append: Array<(mapper: Mapper) => void> = [];
-  private readonly _prepend: Array<(mapper: Mapper) => void> = [];
+  private readonly _append: DrawCallback[] = [];
+  private readonly _prepend: DrawCallback[] = [];
   private _finalized = false;
   readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
   /** @internal */
@@ -785,7 +789,6 @@ export class RouteSet {
     return (this._urlHelpersWithoutPaths ??= this.generateUrlHelpers(false));
   }
 
-  /** @missingRailsArgs extend — PERMANENT */
   generateUrlHelpers(supportsPath: boolean): UrlHelpersModule {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const routes = this;
@@ -907,33 +910,34 @@ export class RouteSet {
   }
 
   defineMountedHelper(name: string, scriptNamer: ScriptNamer | null = null): void {
-    const proto = MountedHelpers.prototype as Record<string, unknown>;
-    if (Object.hasOwn(proto, name)) return;
-    const cacheKey = `_${name}` as const;
-    const buildProxy = (ctx: Record<string, unknown>): RoutesProxy => {
-      const scope =
-        (ctx as unknown as UrlForHost & { _routesContext?: () => UrlForHost })._routesContext?.() ??
-        (ctx as unknown as UrlForHost);
-      return new RoutesProxy(
-        this._routes,
-        scope,
-        this.urlHelpers() as unknown as Record<string, unknown>,
-        scriptNamer,
-      );
-    };
-    proto[cacheKey] = function (this: Record<string, unknown>): RoutesProxy {
-      return buildProxy(this);
-    };
-    Object.defineProperty(proto, name, {
-      configurable: true,
-      get(this: Record<string, unknown>): RoutesProxy {
-        const memo = `@_${name}` as const;
-        const existing = this[memo] as RoutesProxy | undefined;
-        if (existing) return existing;
-        const built = (this[cacheKey] as () => RoutesProxy).call(this);
-        this[memo] = built;
-        return built;
+    name = camelize(name, "lower");
+    if (MountedHelpers.isMethodDefined(name)) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- `routes = self` (`route_set.rb:514`).
+    const routes = this;
+    const helpers = routes.urlHelpers();
+
+    MountedHelpers.defineMethod(
+      `_${name}`,
+      function (this: UrlForHost & { _routesContext(): UrlForHost }): RoutesProxy {
+        return new RoutesProxy(
+          routes,
+          this._routesContext(),
+          helpers as unknown as Record<string, unknown>,
+          scriptNamer,
+        );
       },
+    );
+
+    MountedHelpers.moduleEval((mod) => {
+      Object.defineProperty(mod, name, {
+        configurable: true,
+        get(this: Record<string, unknown>): RoutesProxy {
+          return (this[`@_${name}`] ??= (this[`_${name}`] as () => RoutesProxy).call(
+            this,
+          )) as RoutesProxy;
+        },
+      });
     });
   }
 
@@ -950,7 +954,11 @@ export class RouteSet {
   /** @internal */
   evalBlock(block: DrawCallback): void {
     const mapper = new Mapper(this);
-    block(mapper);
+    if (this.defaultScope) {
+      mapper.withDefaultScope(this.defaultScope, block);
+    } else {
+      block.call(mapper);
+    }
   }
 
   append(block: DrawCallback): void {
@@ -1029,12 +1037,19 @@ export class RouteSet {
   }
 
   addPolymorphicMapping(
-    klass: string | { name: string },
+    klass: string,
     options: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
   ): void {
-    const key = typeof klass === "string" ? klass : klass.name;
-    this.polymorphicMappings.set(key, new CustomUrlHelper(key, options, block));
+    this.polymorphicMappings.set(klass, new CustomUrlHelper(klass, options, block));
+  }
+
+  addUrlHelper(
+    name: string,
+    options: Record<string, unknown>,
+    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
+  ): NamedRouteCollection {
+    return this.namedRoutes.addUrlHelper(name, options, block);
   }
 
   extraKeys(options: Record<string, unknown>, recall: Record<string, unknown> = {}): string[] {
@@ -1071,13 +1086,13 @@ export class RouteSet {
   }
 
   urlFor(
-    options: Record<string, unknown>,
+    options: Record<string, unknown> | Hash<string, unknown>,
     routeName: string | null = null,
     urlStrategy: UrlStrategy = UNKNOWN,
     methodName: string | null = null,
     reserved: readonly string[] = RESERVED_OPTIONS,
   ): string {
-    options = { ...this.defaultUrlOptions, ...options };
+    options = merge(this.defaultUrlOptions, options) as Record<string, unknown>;
 
     let user: unknown = null;
     let password: unknown = null;
@@ -1226,7 +1241,7 @@ export class RouteSet {
   }
 
   recognizePath(
-    path: string,
+    path: string | null,
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
     const method = String(environment.method ?? "GET").toUpperCase();

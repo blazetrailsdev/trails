@@ -37,7 +37,7 @@ describe("ActiveSupport::Testing::ErrorReporterAssertions", () => {
       assertNoErrorReported(() => {
         ActiveSupport.errorReporter.report(new IOError("Oops"));
       }),
-    ).rejects.toThrow(/to be empty\?/);
+    ).rejects.toThrow(/to satisfy the predicate/);
   });
 
   it("records nested blocks independently", async () => {

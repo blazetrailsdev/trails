@@ -30,6 +30,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     });
     vi.spyOn(tasks, "create").mockImplementation(async (alreadyConnected?: boolean) => {
       calls.push(alreadyConnected ? "create(true)" : "create");
+      return undefined as never;
     });
     await tasks.purge();
     expect(calls).toEqual(["drop", "create(true)"]);
@@ -159,7 +160,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     ).mockResolvedValue(undefined);
 
     try {
-      await tasks.structureDump("/dev/null");
+      await tasks.structureDump("/dev/null", null);
     } finally {
       SchemaDumper.ignoreTables = previous;
       vi.restoreAllMocks();

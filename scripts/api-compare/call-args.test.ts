@@ -6,6 +6,7 @@ import {
   normalizeArg,
   normalizeArgs,
   pairCallSites,
+  resolveCalleeSigs,
 } from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
@@ -57,7 +58,19 @@ describe("normalizeArg", () => {
   });
 
   it("canonicalizes an escape through literals.ts", () => {
-    expect(normalizeArg("str:\\n")).toBe(normalizeArg("str:\n"));
+    expect(normalizeArg("rstr::\\n")).toBe(normalizeArg("str:\n"));
+  });
+
+  it("decodes a Ruby string argument's source text before comparing it", () => {
+    expect(normalizeArg(String.raw`rstr::\\`)).toBe(normalizeArg("str:\\"));
+    expect(normalizeArg(String.raw`rstr::\\n`)).toBe(normalizeArg(String.raw`str:\n`));
+    expect(normalizeArg(String.raw`rstr::\\n`)).not.toBe(normalizeArg("str:\n"));
+    expect(normalizeArg(String.raw`rstr:':\n`)).toBe(normalizeArg(String.raw`str:\n`));
+    expect(normalizeArg(String.raw`rstr:':\n`)).not.toBe(normalizeArg("str:\n"));
+    expect(normalizeArg(String.raw`rstr::\e[0m`)).toBe(normalizeArg("str:\x1b[0m"));
+    expect(normalizeArg(String.raw`rstr:%25q(:a\)b`)).toBe(normalizeArg("str:a)b"));
+    expect(normalizeArg(String.raw`rsym::a\nb`)).toBe(normalizeArg("str:a\nb"));
+    expect(normalizeArg(String.raw`rsym:':a\nb`)).toBe(normalizeArg(String.raw`str:a\nb`));
   });
 
   it("normalizes numbers through one numeric key", () => {
@@ -142,6 +155,27 @@ describe("compareCallArgs colon-kept Symbol spelling", () => {
   });
 });
 
+describe("compareCallArgs marked method-name Symbol", () => {
+  // strong_parameters.rb:911 `return to_enum(:transform_keys!) unless block_given?`.
+  it("reads a bang-named Symbol as the TS spelling of that method", () => {
+    expect(
+      compareCallArgs(
+        site("to_enum", ["sym:transform_keys!"]),
+        site("to_enum", ["str:transformKeysBang"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still mismatches a different method's name", () => {
+    expect(
+      compareCallArgs(
+        site("to_enum", ["sym:transform_keys!"]),
+        site("to_enum", ["str:transformKeys"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+});
+
 describe("compareCallArgs to_s and reserved-word locals", () => {
   // postgresql/schema_statements.rb:436-437 `clear_data_source_cache!(table_name.to_s)`.
   it("reads a Ruby to_s argument as the TS toString call", () => {
@@ -170,6 +204,24 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
     ).toBe("match");
   });
 
+  // metal/conditional_get.rb:137 `fresh_when(..., public: false, ...)`.
+  it("reads a strict-mode reserved Ruby name as the same name with a trailing underscore", () => {
+    expect(
+      compareCallArgs(site("combine_etags", ["id:public"]), site("combineEtags", ["id:public_"]))
+        .verdict,
+    ).toBe("match");
+  });
+
+  // metal/conditional_get.rb:294 `merge!(public: options.delete(:public))`.
+  it("reads a nested Ruby call as its receiver-keyed ruby-compat export", () => {
+    expect(
+      compareCallArgs(site("fetch", ["call:delete"]), site("fetch", ["call:hashDelete"])).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(site("fetch", ["call:delete"]), site("fetch", ["call:remove"])).verdict,
+    ).not.toBe("match");
+  });
+
   // connection_handling.rb:51 `config_or_env ||= DEFAULT_ENV.call.to_sym`.
   it("reads a Ruby to_sym argument as a TS value already held as a string", () => {
     expect(
@@ -196,6 +248,32 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
       site("connectedTo", ["kwargs{shard=id:shardKey}"]),
     );
     expect(result.verdict).toBe("mismatch");
+  });
+
+  // associations/association.rb:250 `strict_loading_violation!(owner: owner.class, …)`.
+  it("classes a kwargs value that differs only by its ref as naming", () => {
+    const result = compareCallArgs(
+      site("strict_loading_violation!", ["kwargs{owner=id:class,reflection=id:reflection}"]),
+      site("strictLoadingViolationBang", ["kwargs{owner=id:constructor,reflection=id:reflection}"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.verdict === "mismatch" && result.class).toBe("naming");
+  });
+
+  it("keeps a kwargs pair with a changed key or literal as shape", () => {
+    const result = compareCallArgs(
+      site("strict_loading_violation!", ["kwargs{owner=id:class,mode=sym:all}"]),
+      site("strictLoadingViolationBang", ["kwargs{owner=id:constructor,mode=sym:none}"]),
+    );
+    expect(result.verdict === "mismatch" && result.class).toBe("shape");
+  });
+
+  it("keeps the same refs swapped between two kwargs keys as shape", () => {
+    const result = compareCallArgs(
+      site("strict_loading_violation!", ["kwargs{owner=id:a,reflection=id:b}"]),
+      site("strictLoadingViolationBang", ["kwargs{owner=id:b,reflection=id:a}"]),
+    );
+    expect(result.verdict === "mismatch" && result.class).toBe("shape");
   });
 
   it("still reports a genuine rename of a non-reserved name", () => {
@@ -261,6 +339,35 @@ describe("compareCallArgs built-in receiver as argument 1", () => {
     // receiver as the inner call, which the port has no spelling for.
     const ruby = { ...site("camelize", []), recv: "call:to_s" };
     expect(compareCallArgs(ruby, site("camelize", ["id:name"])).verdict).toBe("match");
+  });
+
+  it("strips the chained receiver of Hash#merge!", () => {
+    const kwargs = "kwargs{count=id:option_value,value=id:value}";
+    const ruby = { ...site("merge!", [kwargs]), recv: "call:except" };
+    expect(compareCallArgs(ruby, site("mergeBang", ["call:except", kwargs])).verdict).toBe("match");
+    expect(
+      compareCallArgs(ruby, site("mergeBang", ["call:except", "id:extra", kwargs])).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("strips the chained receiver of Enumerable#index_with", () => {
+    // access.rb:9 `methods.flatten.index_with { |method| public_send(method) }`,
+    // ported as `indexWith(methods.flat(), (method) => …)`.
+    const ruby = { ...site("index_with", [], ["block"]), recv: "call:flatten" };
+    expect(compareCallArgs(ruby, site("indexWith", ["call:flat"])).verdict).toBe("match");
+    expect(compareCallArgs(ruby, site("indexWith", ["call:flat", "id:extra"])).verdict).toBe(
+      "mismatch",
+    );
+  });
+
+  it("strips the chained receiver of Array#extract!", () => {
+    // join_association.rb:60 `nodes.children.extract! { |node| … }`, ported as
+    // `extractBang(nodes.children, (node) => …)`.
+    const ruby = { ...site("extract!", [], ["block"]), recv: "call:children" };
+    expect(compareCallArgs(ruby, site("extractBang", ["call:children"])).verdict).toBe("match");
+    expect(compareCallArgs(ruby, site("extractBang", ["call:children", "id:extra"])).verdict).toBe(
+      "mismatch",
+    );
   });
 });
 
@@ -429,6 +536,38 @@ describe("compareCallArgs ported-private receiver argument", () => {
   });
 });
 
+describe("compareCallArgs kwargs-lead nil padding", () => {
+  const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
+  const required = (name: string): ParamInfo => ({ name, kind: "required" });
+  const rubyCall = site("data_source_sql", ["kwargs{type=str:BASE TABLE}"]);
+  const tsCall = site("dataSourceSql", ["nil", "kwargs{type=str:BASE TABLE}"]);
+  const sig = [optional("name"), optional("options")];
+
+  it("ignores the padding when the callee declares the skipped positional optional", () => {
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [sig]).verdict).toBe("match");
+  });
+
+  it("still flags the padding when the callee requires the padded parameter", () => {
+    const valued = [required("name"), optional("options")];
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [valued]).verdict).toBe("mismatch");
+  });
+
+  it("does not fire without a callee signature to prove the padding inert", () => {
+    expect(compareCallArgs(rubyCall, tsCall).verdict).toBe("mismatch");
+  });
+
+  it("does not fire for a non-nil argument ahead of the kwargs", () => {
+    const valued = site("dataSourceSql", ["id:name", "kwargs{type=str:BASE TABLE}"]);
+    expect(compareCallArgs(rubyCall, valued, undefined, [sig]).verdict).toBe("mismatch");
+  });
+
+  it("does not fire when Ruby passes no kwargs", () => {
+    expect(compareCallArgs(site("data_source_sql", []), tsCall, undefined, [sig]).verdict).toBe(
+      "mismatch",
+    );
+  });
+});
+
 describe("compareCallArgs block-tail nil padding", () => {
   const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
   const required = (name: string): ParamInfo => ({ name, kind: "required" });
@@ -456,6 +595,22 @@ describe("compareCallArgs block-tail nil padding", () => {
 
   it("does not fire without a callee signature to prove the padding inert", () => {
     expect(compareCallArgs(rubyCall, tsCall).verdict).toBe("mismatch");
+  });
+
+  it("resolves a callee the calling package does not declare from a dependency package", () => {
+    const ruby = site("instrument", ["str:redirect.action_dispatch"], ["block"]);
+    const ts = site("instrument", ["str:redirect.action_dispatch", "nil"], ["block"]);
+    const inDeps = [[required("name"), optional("payload"), optional("block")]];
+    expect(compareCallArgs(ruby, ts, undefined, resolveCalleeSigs([], inDeps)).verdict).toBe(
+      "match",
+    );
+    expect(compareCallArgs(ruby, ts, undefined, resolveCalleeSigs([], undefined)).verdict).toBe(
+      "mismatch",
+    );
+    const inPkg = [[required("name"), required("payload"), optional("block")]];
+    expect(compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(inPkg, inDeps)).verdict).toBe(
+      "mismatch",
+    );
   });
 
   it("does not fire when neither side carries a block", () => {
@@ -765,6 +920,69 @@ describe("compareCallArgs", () => {
   });
 });
 
+describe("a native-form row's quantity argument (Kernel#sleep)", () => {
+  const sleep = site("sleep", ["binop:*"], ["product=num:0.1*id:counter"]);
+  const timer = (product: string) =>
+    site("setTimeout", ["id:resolve", "binop:*"], [`product=${product}`]);
+
+  it("pairs the Ruby call against the TS call the row names", () => {
+    const pairs = pairCallSites([sleep], [timer("num:0.1*id:counter*num:1000")]);
+    expect(pairs.map((p) => p.ts.name)).toEqual(["setTimeout"]);
+  });
+
+  it("matches an interval scaled by the row's unit factor", () => {
+    const result = compareCallArgs(sleep, timer("num:0.1*id:counter*num:1000"));
+    expect(result.verdict).toBe("match");
+    expect(compareCallArgs(sleep, timer("num:100*id:counter")).verdict).toBe("match");
+  });
+
+  it("fails an interval passed unscaled, 1000x too short", () => {
+    const result = compareCallArgs(sleep, timer("num:0.1*id:counter"));
+    expect(result).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+      rubyArgs: ["qty:100*counter"],
+      tsArgs: ["qty:0.1*counter"],
+    });
+  });
+
+  it("fails an interval over a different operand", () => {
+    const result = compareCallArgs(sleep, timer("num:0.1*id:retries*num:1000"));
+    expect(result.verdict).toBe("mismatch");
+  });
+
+  it("compares a literal and a plain ref interval", () => {
+    const literal = site("sleep", ["num:5"]);
+    expect(compareCallArgs(literal, site("setTimeout", ["id:resolve", "num:5000"])).verdict).toBe(
+      "match",
+    );
+    expect(compareCallArgs(literal, site("setTimeout", ["id:resolve", "num:5"])).verdict).toBe(
+      "mismatch",
+    );
+    const ref = site("sleep", ["id:interval"]);
+    expect(compareCallArgs(ref, site("setTimeout", ["id:resolve", "id:interval"])).verdict).toBe(
+      "mismatch",
+    );
+  });
+
+  it("fails a TS call passing more than the interval", () => {
+    const result = compareCallArgs(
+      site("sleep", ["num:1"]),
+      site("setTimeout", ["id:resolve", "num:1000", "id:extra"]),
+    );
+    expect(result).toMatchObject({
+      verdict: "mismatch",
+      rubyArgs: ["qty:1000"],
+      tsArgs: ["qty:1000", "id:extra"],
+    });
+  });
+
+  it("skips an interval neither side can describe as a product", () => {
+    const result = compareCallArgs(sleep, site("setTimeout", ["id:resolve", "binop:+"]));
+    expect(result).toMatchObject({ verdict: "skip", reason: "opaqueTsArg" });
+  });
+});
+
 describe("pairCallSites", () => {
   it("falls back to source order when the argument lists cannot tell the sites apart", () => {
     const pairs = pairCallSites(
@@ -793,6 +1011,19 @@ describe("pairCallSites", () => {
       [site("call", ["id:headers", "id:CONTENT_TYPE"])],
     );
     expect(pairs).toEqual([]);
+  });
+
+  it("does not pair a receiverless Ruby self-reader against a TS send to a local", () => {
+    // crud.rb:25 `um.offset(offset)` vs crud.ts `um.offset(this.offset)`: the
+    // outer weak `um.offset` is dropped, and the inner `offset` reader has no
+    // TS site because `this.offset` is a getter.
+    const ruby = [
+      { ...site("offset", ["id:offset"], ["weak"]), recv: "id:um" },
+      site("offset", []),
+    ];
+    const ts = [{ ...site("offset", ["id:offset"]), recv: "id:um" }];
+    const comparable = comparableRubySites(ruby, ts, () => false);
+    expect(pairCallSites(comparable, ts)).toEqual([]);
   });
 
   it("pairs same-named sites by argument agreement, not source order", () => {
@@ -1154,5 +1385,246 @@ describe("pairCallSites core_ext receiver as argument 1", () => {
     const result = compareCallArgs(pairs[0].ruby, pairs[0].ts);
     expect(result.rubyArgs).toEqual(["ref:size"]);
     expect(result.tsArgs).toEqual(["ref:length"]);
+  });
+});
+
+describe("compareCallArgs function-form Hash#merge", () => {
+  const ruby = { ...site("merge", ["call:conditional_options"]), recv: "call:as_options" };
+
+  it("aligns the receiver of ruby-compat's merge export", () => {
+    const ts = {
+      ...site("merge", ["call:asOptions", "call:conditionalOptions"]),
+      rubyCompat: "merge",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+    expect(
+      compareCallArgs(
+        { ...site("merge", ["kwargs{column=id:o}"]), recv: "call:options" },
+        { ...site("merge", ["call:options", "kwargs{column=id:o}"]), rubyCompat: "merge" },
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still flags a genuine extra argument past the receiver", () => {
+    const ts = {
+      ...site("merge", ["call:asOptions", "call:conditionalOptions", "id:extra"]),
+      rubyCompat: "merge",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("mismatch");
+  });
+
+  it("does not align a bare merge that is not the ruby-compat export", () => {
+    expect(
+      compareCallArgs(ruby, site("merge", ["call:asOptions", "call:conditionalOptions"])).verdict,
+    ).toBe("mismatch");
+    expect(
+      compareCallArgs(ruby, {
+        ...site("merge", ["call:asOptions", "call:conditionalOptions"]),
+        rubyCompat: "mergeBang",
+      }).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("compares a Relation#merge method call as written", () => {
+    const relation = { ...site("merge", ["id:other"]), recv: "id:relation" };
+    expect(
+      compareCallArgs(relation, { ...site("merge", ["id:other"]), recv: "id:relation" }).verdict,
+    ).toBe("match");
+    const extra = compareCallArgs(relation, {
+      ...site("merge", ["id:other", "id:extra"]),
+      recv: "id:relation",
+    });
+    expect(extra.verdict).toBe("mismatch");
+    expect(extra.class).toBe("shape");
+    expect(
+      compareCallArgs(ruby, {
+        ...site("merge", ["call:asOptions", "call:conditionalOptions"]),
+        recv: "id:scope",
+      }).verdict,
+    ).toBe("mismatch");
+  });
+});
+
+describe("compareCallArgs function-form Hash#fetch", () => {
+  const ruby = { ...site("fetch", ["id:aliaz", "call:default_value"]), recv: "call:column_types" };
+
+  it("aligns the receiver of ruby-compat's fetch export", () => {
+    const ts = {
+      ...site("fetch", ["call:columnTypes", "id:aliaz", "call:defaultValue"]),
+      rubyCompat: "fetch",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+  });
+
+  it("compares a Cache::Store#fetch method call as written", () => {
+    const cache = { ...site("fetch", ["id:key"]), recv: "id:cache" };
+    expect(compareCallArgs(cache, { ...site("fetch", ["id:key"]), recv: "id:cache" }).verdict).toBe(
+      "match",
+    );
+    const extra = compareCallArgs(cache, {
+      ...site("fetch", ["id:key", "id:options"]),
+      recv: "id:cache",
+    });
+    expect(extra.verdict).toBe("mismatch");
+    expect(extra.class).toBe("shape");
+  });
+});
+
+describe("pairCallSites receiver-name tie-break", () => {
+  const rubySites = [
+    { ...site("keys", []), recv: "id:values" },
+    { ...site("keys", []), recv: "id:types" },
+    { ...site("keys", []), recv: "id:@attributes" },
+  ];
+  const indexedRowArm = { ...site("keys", []), recv: "id:values" };
+  const hashArm = site("keys", ["id:values"]);
+  const tail = [site("keys", ["id:types"]), site("keys", ["id:_attributes"])];
+
+  for (const [order, tsSites] of [
+    ["IndexedRow arm first", [indexedRowArm, hashArm, ...tail]],
+    ["Hash arm first", [hashArm, indexedRowArm, ...tail]],
+  ] as const) {
+    it(`pairs @attributes with keys(_attributes), ${order}`, () => {
+      const pairs = pairCallSites(rubySites, tsSites);
+      const attributes = pairs.find((p) => p.ruby.recv === "id:@attributes");
+      expect(attributes?.ts.args).toEqual(["id:_attributes"]);
+      expect(pairs.find((p) => p.ruby.recv === "id:types")?.ts.args).toEqual(["id:types"]);
+    });
+  }
+});
+
+describe("compareCallArgs function-form Array#max", () => {
+  const ruby = { ...site("max", []), recv: "call:map" };
+
+  it("strips the chained receiver of Array#max", () => {
+    expect(compareCallArgs(ruby, site("max", ["call:map"])).verdict).toBe("match");
+    expect(compareCallArgs(ruby, site("max", ["call:map", "id:extra"])).verdict).toBe("mismatch");
+  });
+});
+
+describe("compareCallArgs function-form Module#prepend / include / extend", () => {
+  const ruby = {
+    ...site("prepend", ["const:EncryptedUniquenessValidator"]),
+    recv: "const:UniquenessValidator",
+  };
+
+  it("aligns the receiver of ruby-compat's prepend export", () => {
+    const ts = {
+      ...site("prepend", ["const:UniquenessValidator", "const:EncryptedUniquenessValidator"]),
+      rubyCompat: "prepend",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+    expect(
+      compareCallArgs(
+        { ...site("include", ["const:Definition"]), recv: "id:klass" },
+        { ...site("include", ["id:klass", "const:Definition"]), rubyCompat: "include" },
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        { ...site("extend", ["const:LocalTagStorage"]), recv: "call:formatter" },
+        { ...site("extend", ["call:formatter", "const:LocalTagStorage"]), rubyCompat: "extend" },
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still flags a site that prepends a different module", () => {
+    const ts = {
+      ...site("prepend", ["const:UniquenessValidator", "const:OtherValidator"]),
+      rubyCompat: "prepend",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("mismatch");
+    const wrongReceiver = {
+      ...site("prepend", ["const:Other", "const:EncryptedUniquenessValidator"]),
+      rubyCompat: "prepend",
+    };
+    expect(compareCallArgs(ruby, wrongReceiver).verdict).toBe("mismatch");
+  });
+
+  it("does not align a bare prepend that is not the ruby-compat export", () => {
+    expect(
+      compareCallArgs(
+        ruby,
+        site("prepend", ["const:UniquenessValidator", "const:EncryptedUniquenessValidator"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+});
+
+describe("a native hash form's literal key (RFC 0190)", () => {
+  const on = (name: string, recv: string, args: string[], flags: string[] = []): CallSite => ({
+    ...site(name, args, flags),
+    recv,
+  });
+  const verdict = (ruby: CallSite, ...ts: CallSite[]) =>
+    pairCallSites(
+      comparableRubySites([ruby], ts, () => false),
+      ts,
+    ).map((p) => compareCallArgs(p.ruby, p.ts).verdict);
+  const publicDelete = on("delete", "id:options", ["sym:public"], ["weak"]);
+
+  it("passes options.delete(:public) with delete options.public", () => {
+    expect(verdict(publicDelete, on("@delete", "id:options", ["str:public"]))).toEqual(["match"]);
+  });
+
+  it("reports options.delete(:public) with delete options.private as a shape row", () => {
+    const [pair] = pairCallSites([publicDelete], [on("@delete", "id:options", ["str:private"])]);
+    expect(compareCallArgs(pair.ruby, pair.ts)).toEqual({
+      verdict: "mismatch",
+      class: "shape",
+      rubyArgs: ["str:public"],
+      tsArgs: ["str:private"],
+    });
+  });
+
+  it('passes options.key?(:only_path) with "onlyPath" in options', () => {
+    const ruby = on("key?", "id:@options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:options", ["str:onlyPath"]))).toEqual(["match"]);
+  });
+
+  it("reads a colon-spelled key as the Symbol, and only for a Symbol", () => {
+    const form = on("@delete", "id:env", ["str::params"]);
+    expect(verdict(on("delete", "id:env", ["sym:params"]), form)).toEqual(["match"]);
+    expect(verdict(on("delete", "id:env", ["str:params"]), form)).toEqual(["mismatch"]);
+  });
+
+  it("compares a String key verbatim", () => {
+    const ruby = on("delete", "id:env", ["str:only_path"]);
+    expect(verdict(ruby, on("@delete", "id:env", ["str:only_path"]))).toEqual(["match"]);
+    expect(verdict(ruby, on("@delete", "id:env", ["str:onlyPath"]))).toEqual(["mismatch"]);
+  });
+
+  it.each(["has_key?", "include?", "member?"])("compares the key of %s against @in", (name) => {
+    const ruby = on(name, "id:@options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:options", ["str:onlyPath"]))).toEqual(["match"]);
+    expect(verdict(ruby, on("@in", "id:options", ["str:path"]))).toEqual(["mismatch"]);
+  });
+
+  it("does not compare a computed key on either side", () => {
+    expect(
+      verdict(on("delete", "id:options", ["id:key"]), on("@delete", "id:options", ["str:public"])),
+    ).toEqual(["skip"]);
+    expect(verdict(publicDelete, on("@delete", "id:options", ["id:key"]))).toEqual(["skip"]);
+  });
+
+  it("pairs a form only with the Ruby site on the same receiver name", () => {
+    expect(verdict(publicDelete, on("@delete", "id:other", ["str:private"]))).toEqual([]);
+    expect(
+      verdict(on("delete", "call:env", ["sym:public"]), on("@delete", "id:env", ["str:public"])),
+    ).toEqual(["match"]);
+  });
+
+  it("prefers the form holding the Ruby key over a sibling on the same receiver", () => {
+    const pairs = pairCallSites(
+      [publicDelete],
+      [on("@delete", "id:options", ["str:etag"]), on("@delete", "id:options", ["str:public"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["str:public"]]);
+  });
+
+  it("leaves a weak site dropped when the body has no form on its receiver", () => {
+    expect(
+      comparableRubySites([publicDelete], [site("hashDelete", ["id:options"])], () => false),
+    ).toEqual([]);
   });
 });

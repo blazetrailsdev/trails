@@ -1,7 +1,0 @@
-[
-  "packages/activerecord/src/callbacks.ts#createOrUpdate",
-  "packages/activerecord/src/core.ts#initWithAttributes",
-  "packages/activerecord/src/transactions.ts#beforeCommittedBang",
-  "packages/activerecord/src/transactions.ts#committedBang",
-  "packages/activerecord/src/transactions.ts#rolledbackBang"
-]

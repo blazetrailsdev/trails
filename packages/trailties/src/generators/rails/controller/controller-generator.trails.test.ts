@@ -14,7 +14,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 
@@ -30,21 +30,22 @@ describe("ControllerGenerator view and controller file naming", () => {
   it("writes the view directory the implicit lookup asks for", async () => {
     const gen = makeGen();
     await gen.run("RfcPages", ["show"]);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages/show.html.tse"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages/show.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages"))).toBe(false);
   });
 
-  it("keeps the controller file kebab-cased while its view directory is not", async () => {
+  it("names the controller file and its view directory alike, in kebab-case", async () => {
     const gen = makeGen();
     await gen.run("RfcPages", ["show"]);
     expect(fs.existsSync(path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages"))).toBe(true);
   });
 
   it("draws a multi-word route under the underscored file_name, not a dasherized one", async () => {
     const gen = makeGen();
     await gen.run("AdminUsers", ["index"]);
     const routes = fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf8");
-    expect(routes).toContain('mapper.get("admin_users/index")');
+    expect(routes).toContain('this.get("admin_users/index")');
     expect(routes).not.toContain("admin-users");
   });
 
@@ -56,7 +57,7 @@ describe("ControllerGenerator view and controller file naming", () => {
       "utf8",
     );
     expect(controller).toContain("class RfcPagesController");
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages/show.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages/show.html.tse"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "test/controllers/rfc-pages-controller.test.ts"))).toBe(
       true,
     );

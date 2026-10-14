@@ -1,5 +1,6 @@
 import type { Chef } from "./chef.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DrinkDesigner extends Base {
@@ -10,6 +11,7 @@ export class DrinkDesigner extends Base {
     this.acceptsNestedAttributesFor("chef");
   }
 }
+registerModel(DrinkDesigner);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DrinkDesigner {
   get chef(): Chef | null | Promise<Chef | null>;
@@ -24,6 +26,7 @@ export class DrinkDesignerWithPolymorphicDependentNullifyChef extends Base {
     this.hasOne("chef", { as: "employable", dependent: "nullify" });
   }
 }
+registerModel(DrinkDesignerWithPolymorphicDependentNullifyChef);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DrinkDesignerWithPolymorphicDependentNullifyChef {
   get chef(): Chef | null | Promise<Chef | null>;
@@ -38,6 +41,7 @@ export class DrinkDesignerWithPolymorphicTouchChef extends Base {
     this.hasOne("chef", { as: "employable", touch: true });
   }
 }
+registerModel(DrinkDesignerWithPolymorphicTouchChef);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DrinkDesignerWithPolymorphicTouchChef {
   get chef(): Chef | null | Promise<Chef | null>;
@@ -45,3 +49,4 @@ export interface DrinkDesignerWithPolymorphicTouchChef {
 }
 
 export class MocktailDesigner extends DrinkDesigner {}
+registerModel(MocktailDesigner);

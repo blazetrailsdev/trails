@@ -1,77 +1,87 @@
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { NoMethodError } from "./attribute-assignment.js";
 import {
   underscore,
   tableize,
   demodulize,
   wrap,
-  included,
+  extend,
   classAttribute,
+  Concern,
+  Module,
+  type Included,
 } from "@blazetrails/activesupport";
 
 interface ConversionRecord {
   isPersisted(): boolean;
+  toKey(): unknown[] | null;
+}
+
+export const Conversion = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
+    },
+  );
+
+  mod.defineMethod("toModel", toModel);
+  mod.defineMethod("toKey", toKey);
+  mod.defineMethod("toParam", toParam);
+  mod.defineMethod("toPartialPath", toPartialPath);
+}) as Module<{
+  toModel: typeof toModel;
+  toKey: typeof toKey;
+  toParam: typeof toParam;
+  toPartialPath: typeof toPartialPath;
+}> & {
+  ClassMethods: typeof ClassMethods;
+};
+export type Conversion = Included<typeof Conversion>;
+
+export function toModel<T>(this: T): T {
+  return this;
+}
+
+export function toKey(this: object): unknown[] | null {
+  const key = rbObjRespondTo(this, "id") && (this as unknown as { id: unknown }).id;
+  return key != null && key !== false ? wrap(key) : null;
+}
+
+export function toParam(this: ConversionRecord): string | null {
+  let key: unknown[] | null;
+  return this.isPersisted() &&
+    (key = this.toKey()) &&
+    key.every((part) => part !== null && part !== undefined && part !== false)
+    ? key
+        .map(String)
+        .join((this.constructor as unknown as { paramDelimiter: string }).paramDelimiter)
+    : null;
+}
+
+export function toPartialPath(this: object): string {
+  return (this.constructor as unknown as ConversionHost)._toPartialPath();
 }
 
 export function _toPartialPath(this: ConversionHost): string {
-  if (!this._cachedToPartialPath) {
-    if (this.modelName != null) {
-      const mn = this.modelName;
-      this._cachedToPartialPath = `${mn.collection}/${mn.element}`;
+  return (this._cachedToPartialPath ||= (() => {
+    if (rbObjRespondTo(this, "modelName")) {
+      return `${this.modelName!.collection}/${this.modelName!.element}`;
     } else {
       const element = underscore(demodulize(this.name));
       const collection = tableize(this.name);
-      this._cachedToPartialPath = `${collection}/${element}`;
+      return `${collection}/${element}`;
     }
-  }
-  return this._cachedToPartialPath;
-}
-
-export class Conversion {
-  static [included](base: object): void {
-    classAttribute.call(base, "paramDelimiter", { instanceReader: false, default: "-" });
-  }
-
-  toModel(): this {
-    return this;
-  }
-
-  toKey(): unknown[] | null {
-    const key = rbObjRespondTo(this, "id") ? publicSend(this, "id") : false;
-    return key != null && key !== false ? wrap(key) : null;
-  }
-
-  toParam(): string | null {
-    const self = this as unknown as ConversionRecord;
-    if (!self.isPersisted()) return null;
-    const key = this.toKey();
-    if (!key) return null;
-    if (!key.every((part) => part !== null && part !== undefined && part !== false)) return null;
-    return key
-      .map(String)
-      .join((this.constructor as unknown as { paramDelimiter: string }).paramDelimiter);
-  }
-
-  toPartialPath(): string {
-    return (this.constructor as unknown as ConversionHost)._toPartialPath();
-  }
+  })());
 }
 
 export const ClassMethods = { _toPartialPath };
+Conversion.ClassMethods = ClassMethods;
 
 interface ConversionHost {
   name: string;
   _toPartialPath(): string;
   modelName?: { collection: string; element: string };
   _cachedToPartialPath?: string;
-}
-
-function publicSend(obj: object, method: string): unknown {
-  if (!(method in obj)) {
-    throw new NoMethodError(
-      `undefined method '${method}' for an instance of ${obj.constructor.name}`,
-    );
-  }
-  const value = (obj as Record<string, unknown>)[method];
-  return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }

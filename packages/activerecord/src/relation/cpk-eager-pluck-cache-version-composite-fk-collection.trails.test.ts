@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
-import { nodeAt, nodePaths } from "../test-helpers/join-dependency-paths.js";
+import { nodeAt, nodePaths, aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 import "../associations/collection-proxy.js";
@@ -28,7 +28,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   it("eagerLoad('chapters') builds a composite FK↔PK tuple JOIN node", () => {
     const jd = new JoinDependency(
       CpkBook as unknown as typeof Base,
-      null,
+      CpkBook.arelTable,
       "chapters",
       Nodes.OuterJoin,
     );
@@ -38,11 +38,11 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   it("eagerLoad('order') builds a composite-FK belongsTo JOIN node", () => {
     const jd = new JoinDependency(
       CpkBook as unknown as typeof Base,
-      null,
+      CpkBook.arelTable,
       "order",
       Nodes.OuterJoin,
     );
-    const joins = jd.joinConstraints([]);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     const node = nodeAt(jd, "order");
     expect(node).not.toBeNull();
     const outerJoin = joins[0] as Nodes.OuterJoin;
@@ -100,7 +100,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     await seedBooks();
     const jd = new JoinDependency(
       CpkBook as unknown as typeof Base,
-      null,
+      CpkBook.arelTable,
       { chapters: "book" },
       Nodes.OuterJoin,
     );

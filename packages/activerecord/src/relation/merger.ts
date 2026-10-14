@@ -1,15 +1,11 @@
 import { Nodes } from "@blazetrails/arel";
-import { assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupport";
+import { any, assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupport";
 
 import { Relation } from "../relation.js";
 import type { ValueMethod } from "../relation.js";
 import type { AssociationSpec } from "./query-methods.js";
-import {
-  arelColumns,
-  constructJoinDependency,
-  QueryMethods,
-  structuralUnionEq,
-} from "./query-methods.js";
+import { isEmpty, partition, union } from "@blazetrails/ruby-compat";
+import { arelColumns, constructJoinDependency, QueryMethods } from "./query-methods.js";
 
 export class Merger {
   readonly relation: any;
@@ -63,37 +59,25 @@ export class Merger {
     return rel;
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private mergeSelectValues(rel: any): void {
-    const otherSelect = this.other.selectValues;
-    if (otherSelect == null || otherSelect.length === 0) return;
-    const columns =
-      this.other.model === rel.model ? otherSelect : arelColumns.call(this.other, otherSelect);
-    rel._selectBang(...columns);
-  }
-
-  /** @missingRailsCall empty? — PERMANENT */
-  private mergePreloads(rel: any): void {
-    if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
+    if (isEmpty(this.other.selectValues)) return;
 
     if (this.other.model === rel.model) {
-      if (this.other.preloadValues.length > 0) {
-        const preloadValues = rel.preloadValues;
-        rel.preloadValues = preloadValues.concat(
-          this.other.preloadValues.filter(
-            (v: AssociationSpec) =>
-              !preloadValues.some((seen: unknown) => structuralUnionEq(seen, v)),
-          ),
-        );
+      rel._selectBang(...this.other.selectValues);
+    } else {
+      rel._selectBang(...arelColumns.call(this.other, this.other.selectValues));
+    }
+  }
+
+  private mergePreloads(rel: any): void {
+    if (isEmpty(this.other.preloadValues) && isEmpty(this.other.includesValues)) return;
+
+    if (this.other.model === rel.model) {
+      if (!isEmpty(this.other.preloadValues)) {
+        rel.preloadValues = union(rel.preloadValues, this.other.preloadValues);
       }
-      if (this.other.includesValues.length > 0) {
-        const includesValues = rel.includesValues;
-        rel.includesValues = includesValues.concat(
-          this.other.includesValues.filter(
-            (v: AssociationSpec) =>
-              !includesValues.some((seen: unknown) => structuralUnionEq(seen, v)),
-          ),
-        );
+      if (!isEmpty(this.other.includesValues)) {
+        rel.includesValues = union(rel.includesValues, this.other.includesValues);
       }
       return;
     }
@@ -103,86 +87,77 @@ export class Merger {
       .find((r: { className: string }) => r.className === this.other.model.name);
     if (!reflection) return;
 
-    if (this.other.preloadValues.length > 0) {
+    if (!isEmpty(this.other.preloadValues)) {
       rel.preloadBang({ [`:${reflection.name}`]: this.other.preloadValues });
     }
-    if (this.other.includesValues.length > 0) {
+    if (!isEmpty(this.other.includesValues)) {
       rel.includesBang({ [`:${reflection.name}`]: this.other.includesValues });
     }
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private mergeJoins(rel: any): void {
     const other = this.other;
-    const joinsValues = other.joinsValues ?? [];
-    if (joinsValues.length === 0) return;
-    if (other.model === rel.model) {
-      for (const v of joinsValues) {
-        if (!rel.joinsValues.some((existing: unknown) => structuralUnionEq(existing, v)))
-          rel.joinsValues = [...rel.joinsValues, v];
-      }
-      return;
-    }
+    if (isEmpty(other.joinsValues)) return;
 
-    const associations: unknown[] = [];
-    const others: unknown[] = [];
-    for (const v of joinsValues) {
-      if (isPlainObject(v) || Array.isArray(v) || (typeof v === "string" && v.startsWith(":"))) {
-        associations.push(v);
-      } else {
-        others.push(v);
-      }
+    if (other.model === rel.model) {
+      rel.joinsValues = union(rel.joinsValues, other.joinsValues);
+    } else {
+      const [associations, others] = partition(other.joinsValues as unknown[], (join) => {
+        if (
+          isPlainObject(join) ||
+          (typeof join === "string" && join.startsWith(":")) ||
+          Array.isArray(join)
+        ) {
+          return true;
+        }
+      });
+
+      const joinDependency = constructJoinDependency.call(
+        other,
+        associations as AssociationSpec[],
+        Nodes.InnerJoin,
+      );
+      QueryMethods.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
     }
-    const joinDependency = constructJoinDependency.call(
-      other,
-      associations as AssociationSpec[],
-      Nodes.InnerJoin,
-    );
-    QueryMethods.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private mergeOuterJoins(rel: any): void {
     const other = this.other;
-    const otherLeft = other.leftOuterJoinsValues ?? [];
-    if (otherLeft.length === 0) return;
-    if (other.model === rel.model) {
-      for (const v of otherLeft) {
-        if (!rel.leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-          rel.leftOuterJoinsValues = [...rel.leftOuterJoinsValues, v];
-      }
-      return;
-    }
+    if (isEmpty(other.leftOuterJoinsValues)) return;
 
-    const associations: unknown[] = [];
-    const others: unknown[] = [];
-    for (const v of otherLeft) {
-      if (isPlainObject(v) || Array.isArray(v) || (typeof v === "string" && v.startsWith(":"))) {
-        associations.push(v);
-      } else {
-        others.push(v);
-      }
+    if (other.model === rel.model) {
+      rel.leftOuterJoinsValues = union(rel.leftOuterJoinsValues, other.leftOuterJoinsValues);
+    } else {
+      const [associations, others] = partition(other.leftOuterJoinsValues as unknown[], (join) => {
+        if (
+          isPlainObject(join) ||
+          (typeof join === "string" && join.startsWith(":")) ||
+          Array.isArray(join)
+        ) {
+          return true;
+        }
+      });
+
+      const joinDependency = constructJoinDependency.call(
+        other,
+        associations as AssociationSpec[],
+        Nodes.OuterJoin,
+      );
+      QueryMethods.leftOuterJoinsBang.call(rel, joinDependency as any, ...(others as any[]));
     }
-    const joinDependency = constructJoinDependency.call(
-      other,
-      associations as AssociationSpec[],
-      Nodes.OuterJoin,
-    );
-    QueryMethods.leftOuterJoinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
-  /** @missingRailsCall any? — PERMANENT */
   private mergeMultiValues(rel: any): void {
     if (this.other.reorderingValue) {
       rel.reorderBang(...this.other.orderValues);
-    } else if (this.other.orderValues.length > 0) {
+    } else if (any(this.other.orderValues)) {
       rel.orderBang(...this.other.orderValues);
     }
 
     const extensions = this.other.extensions.filter(
       (mod: unknown) => !rel.extensions.includes(mod),
     );
-    if (extensions.length > 0) rel.extendingBang(...extensions);
+    if (any(extensions)) rel.extendingBang(...extensions);
   }
 
   private mergeSingleValues(rel: any): void {

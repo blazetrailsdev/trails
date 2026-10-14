@@ -22,9 +22,21 @@
       "types": "./dist/name-error.d.ts",
       "default": "./dist/name-error.js"
     },
+    "./psych": {
+      "types": "./dist/psych.d.ts",
+      "default": "./dist/psych.js"
+    },
+    "./psych-adapter": {
+      "types": "./dist/psych-adapter.d.ts",
+      "default": "./dist/psych-adapter.js"
+    },
     "./range": {
       "types": "./dist/range.d.ts",
       "default": "./dist/range.js"
+    },
+    "./yaml": {
+      "types": "./dist/yaml.d.ts",
+      "default": "./dist/yaml.js"
     }
   },
   "files": [
@@ -32,5 +44,8 @@
   ],
   "scripts": {
     "build": "tsc"
+  },
+  "optionalDependencies": {
+    "yaml": "^2.8.3"
   }
 }

@@ -16,22 +16,23 @@ export interface WatchHandle {
   close(): void;
 }
 
-export function watchViews(opts: WatchViewsOptions = {}): WatchHandle {
+export async function watchViews(opts: WatchViewsOptions = {}): Promise<WatchHandle> {
   const cwd = opts.cwd ?? process.cwd();
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const debounceMs = opts.debounceMs ?? 50;
 
-  const runBuild = (trigger?: string, kind: "initial" | "change" = "change"): void => {
+  const runBuild = async (trigger?: string, kind: "initial" | "change" = "change") => {
     try {
-      const result = buildViews(opts);
+      const result = await buildViews(opts);
       opts.onRebuild?.({ kind, trigger, result });
     } catch (err) {
       opts.onError?.(err instanceof Error ? err : new Error(String(err)), trigger);
     }
   };
 
-  runBuild(undefined, "initial");
-  fs.mkdirSync(viewsDir, { recursive: true });
+  let building = runBuild(undefined, "initial");
+  await building;
+  await fs.promises.mkdir(viewsDir, { recursive: true });
 
   let pending: NodeJS.Timeout | null = null;
   let lastTrigger: string | undefined;
@@ -51,7 +52,7 @@ export function watchViews(opts: WatchViewsOptions = {}): WatchHandle {
       pending = null;
       const trig = lastTrigger;
       lastTrigger = undefined;
-      runBuild(trig);
+      building = building.then(() => runBuild(trig));
     }, debounceMs);
   };
 

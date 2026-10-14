@@ -1,27 +1,37 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { pluralize, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { any, isPresent, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
+import {
+  coreHashMergeKwd,
+  except,
+  hashDelete,
+  rbInspect,
+  rbObjAsString as toS,
+  rbStrScanSubexpCall,
+  slice,
+} from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,
   ForeignKeyDefinition,
-  ForeignKeyLookupOptions,
   RemoveForeignKeyOptions,
 } from "../abstract/schema-definitions.js";
 import { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
-import type { TableDefinition as SQLite3TableDefinition } from "./schema-definitions.js";
+import { TableDefinition as SQLite3TableDefinition } from "./schema-definitions.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ActiveRecord } from "../../namespaces.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
+import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import { quoteTableName } from "./quoting.js";
 
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   /** @internal */
-  extractValueFromDefault(default_: string | null): unknown;
+  extractValueFromDefault(default_: string | null): string | Uint8Array | null;
+  /** @internal */
+  extractDefaultFunction(defaultValue: unknown, default_: string | null): string | null;
   addForeignKey(
     fromTable: string,
     toTable: string,
@@ -29,7 +39,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   ): Promise<void>;
   removeForeignKey(
     fromTable: string,
-    toTable?: string | Record<string, unknown>,
+    toTable?: string | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
   checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
@@ -40,7 +50,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   ): Promise<void>;
   removeCheckConstraint(
     tableName: string,
-    expression?: string | Record<string, unknown>,
+    expression?: string | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
   fetchTypeMetadata(
@@ -57,20 +67,20 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
 }
 
 export async function indexes(
-  adapter: DatabaseAdapter,
+  this: SQLite3SchemaAdapter,
   tableName: string,
 ): Promise<IndexDefinition[]> {
   const rows = (
-    await adapter.internalExecQuery(`PRAGMA index_list(${quoteTableName(tableName)})`, "SCHEMA")
+    await this.internalExecQuery(`PRAGMA index_list(${quoteTableName(tableName)})`, "SCHEMA")
   ).toArray() as Array<{ name: string; unique: number; origin: string }>;
   const result: IndexDefinition[] = [];
   for (const idx of rows) {
     if (idx.name.startsWith("sqlite_")) continue;
 
-    const indexSql = (await adapter.queryValue(
-      `SELECT sql FROM sqlite_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
+    const indexSql = (await this.queryValue(
+      `SELECT sql FROM sqlite_master WHERE name = ${this.quote(idx.name)} AND type = 'index' ` +
         `UNION ALL ` +
-        `SELECT sql FROM sqlite_temp_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index'`,
+        `SELECT sql FROM sqlite_temp_master WHERE name = ${this.quote(idx.name)} AND type = 'index'`,
       "SCHEMA",
     )) as string | null | undefined;
     const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
@@ -79,7 +89,7 @@ export async function indexes(
     if (where != null) where = where.replace(/\s*\/\*.*\*\/$/, "");
 
     const cols = (
-      await adapter.internalExecQuery(`PRAGMA index_info(${adapter.quote(idx.name)})`, "SCHEMA")
+      await this.internalExecQuery(`PRAGMA index_info(${this.quote(idx.name)})`, "SCHEMA")
     ).toArray() as Array<{ name: string | null }>;
     const columnNames = cols.map((c) => c.name);
 
@@ -119,50 +129,41 @@ export async function addForeignKey(
 export async function removeForeignKey(
   this: SQLite3SchemaAdapter,
   fromTable: string,
-  toTable?: string | RemoveForeignKeyOptions,
+  toTable: string | null = null,
   options: RemoveForeignKeyOptions = {},
 ): Promise<void> {
-  if (typeof toTable === "object" && toTable !== null) {
-    options = { ...toTable, ...options };
-    toTable = undefined;
-  } else {
-    options = { ...options };
+  options = { ...options };
+  if (
+    hashDelete<unknown>(options as Record<string, unknown>, "ifExists") === true &&
+    !(await this.foreignKeyExists(fromTable, toTable))
+  ) {
+    return;
   }
-  const ifExists = options.ifExists === true;
-  delete options.ifExists;
 
-  if (ifExists && !(await this.foreignKeyExists(fromTable, toTable))) return;
-
-  toTable ??= options.toTable;
-  let matchOptions: ForeignKeyLookupOptions = { ...options };
-  delete matchOptions.name;
-  delete matchOptions.toTable;
-  delete matchOptions.validate;
-
+  toTable ??= options.toTable ?? null;
+  options = except(options as Record<string, unknown>, "name", "toTable", "validate");
   const foreignKeys = await this.foreignKeys(fromTable);
+
   const fkey = foreignKeys.find((fk) => {
     let table: string;
     if (toTable != null) {
       table = toTable;
     } else {
-      table = toS(matchOptions.column).replace(/_id$/, "");
+      table = toS(options.column).replace(/_id$/, "");
       table = ActiveRecord.Base.pluralizeTableNames ? pluralize(table) : table;
     }
     table = this.stripTableNamePrefixAndSuffix(table);
     const fkOptions = fk.options as Record<string, unknown>;
-    matchOptions = Object.fromEntries(
-      Object.entries(matchOptions).filter(([k]) => k in fkOptions),
-    ) as ForeignKeyLookupOptions;
+    options = slice(options as Record<string, unknown>, ...Object.keys(fkOptions));
     const fkToTable = this.stripTableNamePrefixAndSuffix(fk.toTable);
     return (
-      fkToTable === table &&
-      Object.entries(matchOptions).every(([k, v]) => toS(fkOptions[k]) === toS(v))
+      fkToTable === table && Object.entries(options).every(([k, v]) => toS(fkOptions[k]) === toS(v))
     );
   });
 
   if (!fkey) {
     throw new ArgumentError(
-      `Table '${fromTable}' has no foreign key for ${toTable ?? toS(symbolizeKeys(matchOptions as Record<string, unknown>))}`,
+      `Table '${fromTable}' has no foreign key for ${toTable ?? toS(symbolizeKeys(options as Record<string, unknown>))}`,
     );
   }
 
@@ -170,14 +171,12 @@ export async function removeForeignKey(
   await this.alterTable(fromTable, foreignKeys);
 }
 
-/** @missingRailsCall any? — PERMANENT */
 export async function virtualTableExists(
   this: SQLite3SchemaAdapter,
   tableName: string,
 ): Promise<boolean> {
-  return (
-    (await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
-      .length > 0
+  return any(
+    await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"),
   );
 }
 
@@ -192,21 +191,7 @@ export async function checkConstraints(
     "SCHEMA",
   )) as string | null;
 
-  const sql = String(tableSql ?? "");
-  const scanned: [name: string, expression: string][] = [];
-  for (const match of sql.matchAll(/CONSTRAINT\s+(\w+)\s+CHECK\s+\(/gi)) {
-    const start = match.index + match[0].length;
-    let depth = 1;
-    let i = start;
-    while (i < sql.length && depth > 0) {
-      if (sql[i] === "(") depth++;
-      else if (sql[i] === ")") depth--;
-      i++;
-    }
-    if (depth !== 0) continue;
-    scanned.push([match[1], sql.slice(start, i - 1)]);
-  }
-  return scanned.map(
+  return rbStrScanSubexpCall(toS(tableSql), /CONSTRAINT\s+(?<name>\w+)\s+CHECK\s+\(/i).map(
     ([name, expression]) => new CheckConstraintDefinition(tableName, expression, { name }),
   );
 }
@@ -228,27 +213,17 @@ export async function addCheckConstraint(
 export async function removeCheckConstraint(
   this: SQLite3SchemaAdapter,
   tableName: string,
-  expression?:
-    | string
-    | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-  options: {
-    name?: string;
-    expression?: string;
-    validate?: boolean;
-    ifExists?: boolean;
-  } = {},
+  expression: string | null = null,
+  {
+    ifExists = false,
+    ...options
+  }: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
 ): Promise<void> {
-  const expr = typeof expression === "string" ? expression : undefined;
-  const opts =
-    typeof expression === "object" ? { ...(expression ?? {}), ...options } : { ...options };
-
-  const { ifExists, ...lookupOptions } = opts;
-
-  if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
+  if (ifExists && !(await this.checkConstraintExists(tableName, options))) return;
 
   let checkConstraints = await this.checkConstraints(tableName);
   const chkNameToDelete = (
-    await this.checkConstraintForBang(tableName, { expression: expr, ...lookupOptions })
+    await this.checkConstraintForBang(tableName, coreHashMergeKwd({ expression }, options))
   ).name;
   checkConstraints = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
   await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);
@@ -258,12 +233,25 @@ export function createSchemaDumper(
   this: DatabaseAdapter,
   options: Record<string, unknown>,
 ): AbstractSchemaDumper {
-  return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
+  return SchemaDumper.create(this, options);
+}
+
+export function schemaCreation(this: DatabaseAdapter): SchemaCreation {
+  return new SchemaCreation(this);
 }
 
 /** @internal */
 export function validTableDefinitionOptions(this: DatabaseAdapter): string[] {
   return [...AbstractSchemaStatements.prototype.validTableDefinitionOptions.call(this), "rename"];
+}
+
+/** @internal */
+export function createTableDefinition(
+  this: DatabaseAdapter,
+  name: string,
+  options: Record<string, unknown> = {},
+): SQLite3TableDefinition {
+  return new SQLite3TableDefinition(this, name, options);
 }
 
 /** @internal */
@@ -282,45 +270,41 @@ export function validateIndexLengthBang(
   );
 }
 
-/**
- * @internal
- * @missingRailsArgs extract_value_from_default — PERMANENT
- * @missingRailsArgs extract_default_function — PERMANENT
- */
+/** @internal */
 export function newColumnFromField(
-  adapter: SQLite3SchemaAdapter,
+  this: SQLite3SchemaAdapter,
   _tableName: string,
   field: Record<string, unknown>,
   definitions: Record<string, unknown>[],
 ): Column {
-  const dfltValue = (field["dflt_value"] as string | null) ?? null;
-  const sqlType = String(field["type"] ?? "");
-  const typeMetadata = adapter.fetchTypeMetadata(sqlType) as SqlTypeMetadata;
-  const defaultValue = adapter.extractValueFromDefault(dfltValue);
+  const default_ = field["dflt_value"] as string | null;
+
+  const typeMetadata = this.fetchTypeMetadata(field["type"] as string) as SqlTypeMetadata;
+  const defaultValue = this.extractValueFromDefault(default_);
   const generatedType = extractGeneratedType(field);
 
-  let defaultFunction: string | null = null;
-  if (generatedType) {
-    defaultFunction = dfltValue;
+  let defaultFunction: string | null;
+  if (isPresent(generatedType)) {
+    defaultFunction = default_;
   } else {
-    defaultFunction = extractDefaultFunction(defaultValue, dfltValue);
+    defaultFunction = this.extractDefaultFunction(defaultValue, default_);
   }
 
   const rowid = isColumnTheRowid(field, definitions);
 
   return new Column(
-    String(field["name"]),
+    field["name"] as string,
     defaultValue,
     typeMetadata,
     Number(field["notnull"]) === 0,
+    defaultFunction,
     {
-      defaultFunction: defaultFunction ?? undefined,
-      collation: field["collation"] as string | undefined,
-      autoIncrement: Boolean(field["auto_increment"]),
+      collation: field["collation"] as string | null,
+      autoIncrement: field["auto_increment"] as boolean | undefined,
       rowid,
       generatedType,
     },
-  ).deduplicate();
+  );
 }
 
 const INTEGER_REGEX = /integer/i;
@@ -337,11 +321,12 @@ export function isColumnTheRowid(
 /** @internal */
 export function dataSourceSql(
   this: QuotedScopeHost,
-  name?: string,
+  name: string | null = null,
   { type }: { type?: string } = {},
 ): string {
-  const scope = quotedScope.call(this, name, { type });
-  if (!scope.type) scope.type = "'table','view'";
+  const scope = quotedScope.call(this, name ?? undefined, { type });
+  scope.type ||= "'table','view'";
+
   let sql = "SELECT name FROM pragma_table_list WHERE schema <> 'temp'";
   sql += " AND name NOT IN ('sqlite_sequence', 'sqlite_schema')";
   if (scope.name) sql += ` AND name = ${scope.name}`;
@@ -397,15 +382,4 @@ export function extractGeneratedType(
     default:
       return undefined;
   }
-}
-
-function extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
-  if (
-    defaultValue == null &&
-    dflt != null &&
-    /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(dflt)
-  ) {
-    return dflt;
-  }
-  return null;
 }

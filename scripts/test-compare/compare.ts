@@ -21,7 +21,7 @@
  *
  * Usage:
  *   npx tsx scripts/test-compare/compare.ts [--missing] [--json]
- *     [--incomplete] [--gates] [--check] [--sort-extra] [--min-extra=N]
+ *     [--incomplete] [--gates] [--check] [--sort-extra] [--min-extra=N] [--extra]
  *     [--package activesupport]
  *
  *   --incomplete  In the per-file table, hide files that are fully complete
@@ -63,6 +63,9 @@
  *                 tests — a fidelity smell.
  *   --min-extra=N In the per-file table, only show files whose Extra count is
  *                 >= N. Combine with --sort-extra to triage the worst offenders.
+ *   --extra       Under each file of the per-file table, list the TS tests no
+ *                 Rails test consumed, as `describe > path > name`. Adds them
+ *                 to the JSON artifact as `extraTests`.
  */
 
 import * as fs from "fs";
@@ -81,6 +84,7 @@ import {
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
+import { ROOT_DIR as API_ROOT_DIR, packageSrcDir } from "../api-compare/config.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 
 const SCRIPT_DIR = __dirname;
@@ -125,6 +129,21 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
 };
 
 /**
+ * A Rails test file whose port lives in another compare package, keyed
+ * `<package>:<ruby test file>`. `tsFile` is relative to the hosting package's
+ * source root, as a convention path is.
+ *
+ * A gem's `railtie_test.rb` boots a `Rails::Application`, and trails ports each
+ * gem's railtie in trailties (`packages/trailties/src/trailties/<gem>.ts`,
+ * with its test beside it) because the gem's own package cannot depend on
+ * trailties. Without a row the file can only score against a convention path
+ * in a package that cannot host it.
+ */
+export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile: string }> = {
+  "activemodel:railtie_test.rb": { package: "trailties", tsFile: "trailties/active-model.test.ts" },
+};
+
+/**
  * Maps a Ruby test path to the TS test path our conventions put it at. The
  * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
  * mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`; that leading
@@ -136,14 +155,17 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  * `-behavior.test.ts`.
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
-  if (pkg === "rack-test") {
+  if (pkg === "rack-test" || pkg === "thor" || pkg === "bcrypt" || pkg === "msgpack") {
     // Specs are reported relative to `spec`, so each repeats the gem's
     // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
     // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
     // as rack-session above, so both sides land on `packages/rack-test/src/<x>`.
-    let rest = rubyFile.startsWith("rack/") ? rubyFile.slice("rack/".length) : rubyFile;
-    if (rest.startsWith("test/")) rest = rest.slice("test/".length);
-    const dir = path.dirname(rest);
+    let rest = rubyFile;
+    if (pkg === "rack-test") {
+      if (rest.startsWith("rack/")) rest = rest.slice("rack/".length);
+      if (rest.startsWith("test/")) rest = rest.slice("test/".length);
+    }
+    const dir = path.dirname(rest).replace(/_/g, "-");
     const base = path.basename(rest, ".rb").replace(/_spec$/, "");
     const tsFile = base.replace(/_/g, "-") + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
@@ -169,6 +191,10 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
 
   if (pkg === "i18n" && rubyFile.startsWith("i18n/")) {
     rubyFile = rubyFile.slice("i18n/".length);
+  }
+
+  if (pkg === "activejob" && rubyFile.startsWith("cases/")) {
+    rubyFile = rubyFile.slice("cases/".length);
   }
 
   const dir = path.dirname(rubyFile);
@@ -307,6 +333,25 @@ export function misplacedLocation(
   return undefined;
 }
 
+/**
+ * Whether a TS path is one expansion of a Ruby case's `pattern`: its trailing
+ * segments answer the pattern's one for one, an `<expr>` standing for whatever
+ * the loop bound. The space either side of an `<expr>` is optional, since a
+ * dynamic TS title is compared with its own interpolations dropped. A segment
+ * that is nothing but interpolation names no case and matches none.
+ */
+export function matchesInterpolatedPath(pattern: readonly string[], tsPath: string): boolean {
+  const tsParts = tsPath.split(" > ").slice(-pattern.length);
+  if (tsParts.length < pattern.length) return false;
+  return pattern.every((segment, i) => {
+    const literals = normalizeErb(segment)
+      .split(DYNAMIC_TITLE_PLACEHOLDER)
+      .map((piece) => piece.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (literals.every((piece) => piece === "")) return false;
+    return new RegExp(`^${literals.join("\\s*.*\\s*")}$`).test(tsParts[i]);
+  });
+}
+
 function normPath(ancestors: string[], description: string): string {
   return [...ancestors, description].map(normalizeErb).join(" > ");
 }
@@ -403,6 +448,8 @@ interface ValueMismatch {
 export interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
+  /** Set when `conventionTsFile` is rooted in another package (`CROSS_PACKAGE_TEST_FILES`). */
+  conventionTsPackage?: string;
   tsFileExists: boolean;
   rubyTestCount: number;
   matched: number;
@@ -414,6 +461,7 @@ export interface ConventionFileResult {
   // file (the per-file form of the global "extra (TS only)" concept). A large
   // count flags a file ballooned with bespoke/non-Rails tests — a fidelity smell.
   extra: number;
+  extraTests?: string[];
   missingTests?: string[];
   misplacedTests?: MisplacedTest[];
   wrongDescribeTests?: WrongDescribeTest[];
@@ -502,6 +550,7 @@ export function arClosureResult(
 interface TsTestInfo {
   path: string; // normalized full path
   desc: string; // normalized description
+  title: string; // describe path and name as written, " > "-joined (--extra)
   dynamic: boolean; // name recovered from a template literal — matches only on its collapsed form
   pending: boolean;
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
@@ -613,6 +662,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
   const checkGates = args.includes("--check");
   const showAssertions = args.includes("--assertions");
   const sortExtra = args.includes("--sort-extra");
+  const showExtra = args.includes("--extra");
   const showDynamic = args.includes("--dynamic");
   const showSiblingClasses = args.includes("--sibling-classes");
   let minExtra = 0;
@@ -699,6 +749,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         tests.push({
           path: np,
           desc: nd,
+          title: [...tc.ancestors, tc.description].join(" > "),
           dynamic: !!tc.dynamic,
           pending: !!tc.pending,
           gate: tc.gate,
@@ -798,17 +849,21 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       file.testCases = file.testCases.map((tc) =>
         applyAssertionReceipts(pkg, file.file, tc, ASSERTION_RECEIPTS, consumedReceipts),
       );
-      const conventionTs = rubyToConventionTs(file.file, pkg);
-      const exists = lookup.allFiles.has(conventionTs);
+      const crossPackage = Object.hasOwn(CROSS_PACKAGE_TEST_FILES, `${pkg}:${file.file}`)
+        ? CROSS_PACKAGE_TEST_FILES[`${pkg}:${file.file}`]
+        : undefined;
+      const conventionTs = crossPackage?.tsFile ?? rubyToConventionTs(file.file, pkg);
+      const host = crossPackage ? tsLookup.get(crossPackage.package) : lookup;
+      const exists = host?.allFiles.has(conventionTs) ?? false;
 
       if (exists) tsMapped++;
       else tsUnmapped++;
 
-      const tsTests = lookup.fileTests.get(conventionTs) || [];
-      const pathIndex = lookup.filePathIndex.get(conventionTs) || new Map();
-      const descIndex = lookup.fileDescIndex.get(conventionTs) || new Map();
-      const pathAliasIndex = lookup.filePathAliasIndex.get(conventionTs) || new Map();
-      const descAliasIndex = lookup.fileDescAliasIndex.get(conventionTs) || new Map();
+      const tsTests = host?.fileTests.get(conventionTs) || [];
+      const pathIndex = host?.filePathIndex.get(conventionTs) || new Map();
+      const descIndex = host?.fileDescIndex.get(conventionTs) || new Map();
+      const pathAliasIndex = host?.filePathAliasIndex.get(conventionTs) || new Map();
+      const descAliasIndex = host?.fileDescAliasIndex.get(conventionTs) || new Map();
       const descCandidates = (nd: string, consumed: Set<number>): number[] | undefined => {
         const exact = descIndex.get(nd) as number[] | undefined;
         return exact !== undefined && exact.some((i) => !consumed.has(i))
@@ -988,6 +1043,34 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         }
       }
 
+      for (let ri = 0; ri < file.testCases.length; ri++) {
+        if (matchedRuby.has(ri)) continue;
+        const tc = file.testCases[ri];
+        if (tc.pattern === undefined) continue;
+        if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
+        const expansions = tsTests
+          .map((t, idx) => idx)
+          .filter(
+            (idx) =>
+              !consumedTs.has(idx) && matchesInterpolatedPath(tc.pattern!, tsTests[idx].path),
+          );
+        if (expansions.length === 0) continue;
+        for (const idx of expansions) consumedTs.add(idx);
+        const first = tsTests[expansions.find((idx) => !tsTests[idx].pending) ?? expansions[0]];
+        matchedRuby.add(ri);
+        matched++;
+        totalMatched++;
+        totalRuby++;
+        if (first.pending) {
+          matchedSkipped++;
+          totalMatchedSkipped++;
+        }
+        recordGate(tc, first);
+        recordAssertion(tc, first);
+        recordKind(tc, first);
+        recordValue(tc, first);
+      }
+
       // Pass 2: Description-only matches on remaining Ruby tests.
       // When multiple TS tests share the same description, prefer the one with
       // the longest common ancestor prefix. This prevents tests like
@@ -1091,13 +1174,26 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         }
       }
 
+      for (const tc of file.testCases) {
+        if (!isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
+        const isStub = (i: number) => !consumedTs.has(i) && tsTests[i].pending;
+        const stub =
+          pathIndex.get(normPath(tc.ancestors, tc.description))?.find(isStub) ??
+          (tc.ancestors.length === 0
+            ? descIndex.get(normalizeErb(tc.description))?.find(isStub)
+            : undefined);
+        if (stub !== undefined) consumedTs.add(stub);
+      }
+
       // TS tests in the convention file that no Rails test consumed.
       const extra = tsTests.length - consumedTs.size;
       totalExtra += extra;
+      const extraTests = tsTests.filter((_, i) => !consumedTs.has(i)).map((t) => t.title);
 
       fileResults.push({
         rubyFile: file.file,
         conventionTsFile: conventionTs,
+        ...(crossPackage ? { conventionTsPackage: crossPackage.package } : {}),
         tsFileExists: exists,
         rubyTestCount: file.testCases.length - excludedCount,
         matched,
@@ -1106,6 +1202,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         misplaced,
         missing: file.testCases.length - excludedCount - matched - misplaced,
         extra,
+        ...(showExtra ? { extraTests } : {}),
         ...(showMissing ? { missingTests } : {}),
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
@@ -1462,8 +1559,11 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       if (showIncomplete && isComplete && f.tsFileExists) continue;
       if (f.extra < minExtra) continue;
       const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
+      const conventionTs = f.conventionTsPackage
+        ? `${f.conventionTsPackage}:${f.conventionTsFile}`
+        : f.conventionTsFile;
       console.log(
-        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.extra).padStart(5)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
+        `  ${f.rubyFile.padEnd(45)} ${conventionTs.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.extra).padStart(5)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
       if (showMissing && f.missingTests && f.missingTests.length > 0) {
@@ -1471,6 +1571,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
           console.log(`      - ${m}`);
         }
       }
+      if (showExtra) for (const e of f.extraTests ?? []) console.log(`      + ${e}`);
     }
   }
 
@@ -1533,16 +1634,20 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   rack: "packages/rack/src/",
   "rack-session": "packages/rack-session/src/",
   "rack-test": "packages/rack-test/src/",
+  bcrypt: "packages/bcrypt/src/",
+  msgpack: "packages/msgpack/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
+  activejob: "packages/activejob/src/",
   trailties: "packages/trailties/src/",
   globalid: "packages/globalid/src/",
   "did-you-mean": "packages/did-you-mean/src/",
   i18n: "packages/i18n/src/",
   date: "packages/date/src/",
   "ruby-compat": "packages/ruby-compat/src/",
+  thor: `${path.relative(API_ROOT_DIR, packageSrcDir("thor")).split(path.sep).join("/")}/`,
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {

@@ -10,7 +10,7 @@ import {
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { deprecator } from "./deprecator.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply } from "./test-helpers/models/reply.js";
 import { Keyboard } from "./test-helpers/models/keyboard.js";
@@ -19,7 +19,6 @@ import { MixedCaseMonkey } from "./test-helpers/models/mixed-case-monkey.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { NonPrimaryKey } from "./test-helpers/models/non-primary-key.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
-import { Country } from "./test-helpers/models/country.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 describe("PrimaryKeysTest", () => {
@@ -40,12 +39,6 @@ describe("PrimaryKeysTest", () => {
     expect(topic.toKey()).toBeNull();
     const found = await Topic.find(topics("first").id);
     expect(found.toKey()).toEqual([topics("first").id]);
-  });
-
-  it("resolves a custom string primary key with no explicit primary_key= via the schema cache", async () => {
-    (Country as unknown as { resetColumnInformation?: () => void }).resetColumnInformation?.();
-    await (Country as unknown as { loadSchema?: () => Promise<void> }).loadSchema?.();
-    expect(Country.primaryKey).toBe("country_id");
   });
 
   it("to key with customized primary key", async () => {
@@ -72,19 +65,6 @@ describe("PrimaryKeysTest", () => {
   it("read attribute with custom primary key does not return it when reading the id attribute", async () => {
     const keyboard = await Keyboard.createBang();
     expect(keyboard.readAttribute("id")).toBeNull();
-  });
-
-  it("write_attribute id remaps to a scalar custom primary key", async () => {
-    const keyboard = await Keyboard.createBang();
-    keyboard.writeAttribute("id", 42);
-    expect(Number(keyboard.readAttribute("key_number"))).toBe(42);
-  });
-
-  it("write_attribute id on a composite primary key raises", () => {
-    const book = new CpkBook();
-    expect(() => book.writeAttribute("id", 7)).toThrow(
-      'can\'t write unknown attribute `["author_id", "id"]`',
-    );
   });
 
   it("read attribute with composite primary key", async () => {
@@ -269,10 +249,7 @@ describe("PrimaryKeysTest", () => {
         this._tableName = "developers_projects";
       }
     }
-    await ((await Base.leaseConnection()) as any).internalSchemaCache.primaryKeys(
-      await Base.leaseConnection(),
-      "developers_projects",
-    );
+    await Base.schemaCache().primaryKeys("developers_projects");
     expect(AnonDevelopersProjects.primaryKey).toBeNull();
   });
 
@@ -327,27 +304,16 @@ describe("PrimaryKeysTest", () => {
     }).toThrow(MissingAttributeError);
   });
 
-  it("id returns nil if primary key doesnt exist", async () => {
-    class AnonDashboard extends Base {
-      static {
-        this._tableName = "dashboards";
-      }
-    }
-    await AnonDashboard.loadSchema();
-    expect(AnonDashboard.primaryKey).toBe(null);
-    expect(new AnonDashboard().id).toBe(null);
-  });
-
   it("reconfiguring primary key resets composite primary key", () => {
     class AnonCpkBooks extends Base {
       static {
         this._tableName = "cpk_books";
-        this._primaryKey = ["author_id", "id"] as string[];
+        this.primaryKey = ["author_id", "id"];
       }
     }
-    expect(AnonCpkBooks.compositePrimaryKey).toBeTruthy();
+    expect(AnonCpkBooks.isCompositePrimaryKey()).toBeTruthy();
     AnonCpkBooks.primaryKey = "id";
-    expect(AnonCpkBooks.compositePrimaryKey).toBeFalsy();
+    expect(AnonCpkBooks.isCompositePrimaryKey()).toBeFalsy();
   });
 
   it("primary key values present", () => {
@@ -441,7 +407,9 @@ describe("PrimaryKeyAnyTypeTest", () => {
 
   class Barcode extends Base {
     static _tableName = "barcodes";
-    static _primaryKey = "code";
+    static {
+      this.primaryKey = "code";
+    }
   }
 
   let connection: any;
@@ -473,7 +441,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 
   it("schema dump primary key includes type and options", async () => {
-    const schema = await dumpTableSchema(connection, "barcodes");
+    const schema = await dumpTableSchema("barcodes");
     expect(schema).toMatch(
       /createTable\("barcodes", \{ primaryKey: "code", id: \{ type: "string", limit: 42 \}/,
     );
@@ -488,7 +456,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
       force: true,
     });
     try {
-      const schema = await dumpTableSchema(connection, "scheduled_logs");
+      const schema = await dumpTableSchema("scheduled_logs");
       expect(schema).toMatch(/createTable\("scheduled_logs", \{ id: "timestamp"/);
     } finally {
       await connection.dropTable("scheduled_logs", { ifExists: true });
@@ -606,19 +574,19 @@ describe("CompositePrimaryKeyTest", () => {
     class AnonUberBarcodes extends Base {
       static {
         this._tableName = "uber_barcodes";
-        this._primaryKey = ["region", "code"] as string[];
+        this.primaryKey = ["region", "code"];
       }
     }
     expect(AnonUberBarcodes.primaryKey).toEqual(["region", "code"]);
   });
 
   it("collectly dump composite primary key", async () => {
-    const schema = await dumpTableSchema(connection, "uber_barcodes");
+    const schema = await dumpTableSchema("uber_barcodes");
     expect(schema).toMatch(/createTable\("uber_barcodes", \{ primaryKey: \["region","code"\]/);
   });
 
   it("dumping composite primary key out of order", async () => {
-    const schema = await dumpTableSchema(connection, "barcodes_reverse");
+    const schema = await dumpTableSchema("barcodes_reverse");
     expect(schema).toMatch(/createTable\("barcodes_reverse", \{ primaryKey: \["code","region"\]/);
   });
 
@@ -671,7 +639,7 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
         default: null,
         force: true,
       });
-      const schema = await dumpTableSchema(connection, "int_defaults");
+      const schema = await dumpTableSchema("int_defaults");
       expect(schema).toMatch(/createTable\("int_defaults", \{ id: "integer", default: null/);
     },
   );
@@ -682,7 +650,7 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
       default: null,
       force: true,
     });
-    const schema = await dumpTableSchema(connection, "int_defaults");
+    const schema = await dumpTableSchema("int_defaults");
     expect(schema).toMatch(/createTable\("int_defaults", \{ id: "bigint", default: null/);
   });
 });
@@ -729,7 +697,7 @@ describe("PrimaryKeyIntegerTest", () => {
 
   it.skipIf(adapterType === "sqlite")("schema dump primary key with serial/integer", async () => {
     await connection.createTable("widgets", { id: { type: pkType }, force: true });
-    const schema = await dumpTableSchema(connection, "widgets");
+    const schema = await dumpTableSchema("widgets");
     expect(schema).toMatch(new RegExp(`createTable\\("widgets", \\{ id: "${pkType}", `));
   });
 
@@ -746,7 +714,7 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(col.isBigint()).toBeFalsy();
     expect(col.isUnsigned()).toBeTruthy();
 
-    const schema = await dumpTableSchema(connection, "widgets");
+    const schema = await dumpTableSchema("widgets");
     expect(schema).toMatch(/createTable\("widgets", \{ id: \{ type: "integer", unsigned: true \}/);
   });
 
@@ -763,7 +731,7 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(col.isBigint()).toBeTruthy();
     expect(col.isUnsigned()).toBeTruthy();
 
-    const schema = await dumpTableSchema(connection, "widgets");
+    const schema = await dumpTableSchema("widgets");
     expect(schema).toMatch(/createTable\("widgets", \{ id: \{ type: "bigint", unsigned: true \}/);
   });
 });

@@ -1,5 +1,6 @@
 import { NotImplementedError } from "../errors.js";
 import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -25,14 +26,13 @@ export interface DatabaseConfigOptions {
   url?: string;
   replicaOf?: string;
   replica?: boolean;
-  _hidden?: boolean;
   [key: string]: unknown;
 }
 
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
-  #adapterClass: (new (...args: any[]) => unknown) | null;
+  #adapterClass: typeof AbstractAdapter | null;
 
   constructor(envName: string, name: string) {
     this.envName = envName;
@@ -40,40 +40,22 @@ export class DatabaseConfig {
     this.#adapterClass = null;
   }
 
-  adapterClass(): (new (...args: any[]) => unknown) | Promise<new (...args: any[]) => unknown> {
-    if (this.#adapterClass) return this.#adapterClass;
-    const adapterClass = ConnectionAdapters.resolve(this.adapter);
-    if (!(adapterClass instanceof Promise)) return (this.#adapterClass = adapterClass);
-    return adapterClass.then((klass) => (this.#adapterClass = klass));
+  adapterClass(): typeof AbstractAdapter {
+    return (this.#adapterClass ||= ConnectionAdapters.resolve(this.adapter));
   }
 
   inspect(): string {
-    const adapterClass = this.adapterClass();
-    let rendered: string | undefined;
-    if (adapterClass instanceof Promise) {
-      adapterClass.catch(() => {});
-      rendered = this.adapter;
-    } else {
-      rendered = adapterClass.name;
-    }
-    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${rendered}>`;
+    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${this.adapterClass().name}>`;
   }
 
   newConnection(): unknown {
-    const adapterClass = this.adapterClass();
-    if (adapterClass instanceof Promise) {
-      adapterClass.catch(() => {});
-      throw new Error(
-        `Adapter "${this.adapter}" is still loading — await adapterClass() before newConnection.`,
-      );
-    }
-    const configurationHash = (this as unknown as { configurationHash: DatabaseConfigOptions })
-      .configurationHash;
-    return new (adapterClass as new (config: DatabaseConfigOptions) => unknown)(configurationHash);
+    return new (this.adapterClass())(
+      (this as unknown as { configurationHash: DatabaseConfigOptions }).configurationHash,
+    );
   }
 
-  async validateBang(): Promise<true> {
-    if (this.adapter != null) await this.adapterClass();
+  validateBang(): true {
+    if (this.adapter != null) this.adapterClass();
 
     return true;
   }
@@ -148,7 +130,6 @@ export class DatabaseConfig {
     throw new NotImplementedError();
   }
 
-  /** @missingRailsCall call — PERMANENT */
   get forCurrentEnv(): boolean {
     return this.envName === ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }

@@ -1,8 +1,16 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
-import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import {
+  Cpk,
+  CpkBook,
+  CpkChapter,
+  CpkOrder,
+  CpkCar,
+  CpkCarReview,
+} from "./test-helpers/models/cpk.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
@@ -10,6 +18,7 @@ import { Bird } from "./test-helpers/models/bird.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
 const cols = (record: Base): Record<string, unknown> =>
   record as unknown as Record<string, unknown>;
@@ -92,7 +101,9 @@ describe("nested attributes (trails-only)", () => {
 
   it("builds nested children on a bare CPK subclass with the declaring model's composite foreign key", async () => {
     class CpkSportsCar extends CpkCar {
-      static _demodulizedName = "SportsCar";
+      static {
+        rbModConstSet(Cpk, "SportsCar", this);
+      }
     }
     registerModel(CpkSportsCar);
     CpkSportsCar.acceptsNestedAttributesFor("carReviews");
@@ -140,11 +151,11 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
   });
 
   it("assigns scalar attributes before nested ones within one update", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
     Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (_attrs, record) => cols(record).catchphrase !== "Aye",
+      rejectIf: () => cols(pirate).catchphrase !== "Aye",
     });
 
-    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
     await pirate.update({
       shipAttributes: { name: "Black Pearl" },
       catchphrase: "Aye",
@@ -154,6 +165,32 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     expect(cols(ship as Base).name).toBe("Black Pearl");
 
     Pirate.acceptsNestedAttributesFor("ship");
+  });
+
+  it("converts a permitted? collection and its members with to_h", async () => {
+    Pirate.acceptsNestedAttributesFor("parrots");
+    const params = <T>(hash: T) =>
+      Object.assign(Object.create({ toH: () => hash }), { isPermitted: () => true });
+
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    await (
+      pirate as unknown as { setParrotsAttributes(v: unknown): Promise<void> }
+    ).setParrotsAttributes(params([params({ name: "Polly" })]));
+
+    expect(pirate.parrots.target.map((parrot) => cols(parrot).name)).toEqual(["Polly"]);
+  });
+
+  it("converts a permitted? one-to-one hash with to_h", async () => {
+    Pirate.acceptsNestedAttributesFor("ship");
+    const params = <T>(hash: T) =>
+      Object.assign(Object.create({ toH: () => hash }), { isPermitted: () => true });
+
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    await (pirate as unknown as { setShipAttributes(v: unknown): Promise<void> }).setShipAttributes(
+      params({ name: "Black Pearl" }),
+    );
+
+    expect(cols(pirate.association("ship").target as Base).name).toBe("Black Pearl");
   });
 
   it("assigns constructor nested attributes without the property setter", async () => {
@@ -197,13 +234,13 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     const config = Pirate.nestedAttributesOptions.ship;
     const originalRejectIf = config.rejectIf;
     const observed: unknown[] = [];
-    config.rejectIf = (_attrs: Record<string, unknown>, record: Base) => {
-      observed.push((record as Pirate).catchphrase);
+    const pirate = new Pirate();
+    config.rejectIf = () => {
+      observed.push(pirate.catchphrase);
       return false;
     };
 
     try {
-      const pirate = new Pirate();
       await pirate.assignAttributes({
         shipAttributes: { name: "The Black Rock" },
         catchphrase: "Aye",
@@ -437,5 +474,44 @@ describe("nested attributes existing record lookup (trails-only)", () => {
 
     expect(((await CpkChapter.find([1, 3])) as CpkChapter).title).toBe("New title");
     expect(((await CpkChapter.find([1, 4])) as CpkChapter).title).toBe("Other");
+  });
+
+  it("keeps a blank-string id in the existing-record lookup", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    const bird = await Bird.createBang({ name: "Old", pirate_id: pirate.id });
+    const reloaded = await Pirate.find(pirate.id);
+    expect(reloaded.association("birds").isLoaded()).toBe(false);
+
+    await assertQueriesCount(1, false, async () => {
+      await nested(reloaded).setBirdsAttributes([
+        { id: bird.id, name: "Renamed" },
+        { id: "", name: "Blank" },
+      ]);
+    });
+    await reloaded.save();
+
+    expect((await Bird.where({ pirate_id: pirate.id }).pluck("name")).sort()).toEqual([
+      "Blank",
+      "Renamed",
+    ]);
+  });
+
+  it("makes no existing-record lookup when every id is blank", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    const reloaded = await Pirate.find(pirate.id);
+
+    await assertNoQueries(false, async () => {
+      await nested(reloaded).setBirdsAttributes([{ id: "", name: "Blank" }]);
+    });
+  });
+
+  it("builds a blank-string id's attributes on a record under construction", async () => {
+    const pirate = new Pirate({
+      catchphrase: "Arr",
+      birdsAttributes: [{ id: "", name: "Blank" }],
+    });
+    await pirate.save();
+
+    expect(await Bird.where({ pirate_id: pirate.id }).pluck("name")).toEqual(["Blank"]);
   });
 });

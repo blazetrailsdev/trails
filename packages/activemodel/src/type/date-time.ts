@@ -1,16 +1,15 @@
 import {
   ArgumentError,
   Date as RubyDate,
-  Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { numericMul, rbObjAsString as toS, registerConstant, toI } from "@blazetrails/ruby-compat";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
-import { include, type Included, registerConstant } from "@blazetrails/activesupport";
+import { include, type Included } from "@blazetrails/activesupport";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -25,7 +24,7 @@ export type DateTimeCastResult = RubyTime | DateInfinityType | DateNegativeInfin
 export interface DateTimeType
   extends
     Timezone,
-    Omit<InstanceMethods<DateTimeCastResult>, "valueFromMultiparameterAssignment">,
+    InstanceMethods<DateTimeCastResult>,
     Omit<Included<typeof TimeValue>, "serializeCastValue"> {
   serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null;
 }
@@ -38,21 +37,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   /** @internal */
   protected castValue(value: unknown): DateTimeCastResult | null {
-    let seconds: Rational | null = null;
-    // boundary: a JS `Date`, a `Temporal.Instant`, and the `Temporal.PlainDateTime` / `Temporal.ZonedDateTime` `DateTime.civil` returns each stand for the Ruby ::Time or ::DateTime `cast_value` receives.
-    if (value instanceof Date) {
-      seconds = new Rational(value.getTime(), 1000);
-    } else if (value instanceof Temporal.Instant) {
-      seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
-    } else if (value instanceof Temporal.PlainDateTime) {
-      seconds = new Rational(value.toZonedDateTime("UTC").epochNanoseconds, 1_000_000_000n);
-    } else if (value instanceof Temporal.ZonedDateTime) {
-      seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
-    }
-    if (seconds != null) {
-      const time = RubyTime.at(seconds);
-      value = this.isUtc ? time.getutc() : time.getlocal();
-    }
     if (typeof value !== "string")
       return this.applySecondsPrecision(value) as DateTimeCastResult | null;
     if (value === "") return null;
@@ -62,11 +46,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   /** @internal */
   protected microseconds(time: DateParts): number {
-    const secFraction = time.secFraction;
-    if (secFraction == null) return 0;
-    if (secFraction instanceof Rational) return secFraction.mul(1_000_000).toI();
-    if (typeof secFraction === "bigint") return Number(secFraction * 1_000_000n);
-    return Math.trunc(secFraction * 1_000_000);
+    return time.secFraction != null ? Number(toI(numericMul(time.secFraction, 1_000_000))) : 0;
   }
 
   /** @internal */

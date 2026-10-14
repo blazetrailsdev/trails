@@ -4,7 +4,7 @@ import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface AuthorWithCollections {
   id: unknown;
@@ -59,11 +59,11 @@ describe("collection association and CollectionProxy share one target", () => {
     const proxy = author.posts;
     const assoc = author.association("posts");
 
-    const built = Post.new({ title: "shared", body: "target" });
+    const built = new Post({ title: "shared", body: "target" });
     assoc.addToTarget(built);
 
     expect(proxy.target).toContain(built);
-    const persisted = (await Post.where({ author_id: author.id }).count()) as number;
+    const persisted = await Post.where({ author_id: author.id }).count();
     expect(await proxy.size()).toBe(persisted + 1);
   });
 

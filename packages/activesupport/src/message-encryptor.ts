@@ -4,11 +4,11 @@ import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
   fallBackTo,
-  initialize as initializeRotator,
   onRotation,
   readMessage as readMessageWithRotations,
   rotate,
   type OnRotation,
+  type Rotatable,
   type RotatableOptions,
 } from "./messages/rotator.js";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
@@ -54,6 +54,15 @@ export class MessageEncryptor extends Codec {
     return new Cipher(cipher).keyLen;
   }
 
+  /** @internal */
+  declare protected args: unknown[];
+  /** @internal */
+  declare protected options: Record<string, unknown>;
+  /** @internal */
+  declare protected rotations: Rotatable[];
+  /** @internal */
+  declare protected _onRotation: OnRotation | null;
+
   declare rotate: (...args: unknown[]) => this;
   declare onRotation: (callback: OnRotation) => this;
   declare fallBackTo: (fallback: this) => this;
@@ -65,6 +74,7 @@ export class MessageEncryptor extends Codec {
   private memoLengthOfEncodedIv?: number;
   private memoLengthOfEncodedAuthTag?: number;
 
+  /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
   constructor(
     secret: string | Buffer,
     signSecret?: string | Buffer | MessageEncryptorOptions,
@@ -79,6 +89,8 @@ export class MessageEncryptor extends Codec {
       resolvedSignSecret = signSecret;
       opts = options ?? {};
     }
+    const { onRotation = null, ...rest } = opts;
+    opts = rest;
 
     super({
       serializer: opts.serializer,
@@ -96,11 +108,10 @@ export class MessageEncryptor extends Codec {
         })
       : undefined;
 
-    initializeRotator(
-      this,
-      resolvedSignSecret === undefined ? [secret] : [secret, resolvedSignSecret],
-      opts as Record<string, unknown>,
-    );
+    this.args = resolvedSignSecret === undefined ? [secret] : [secret, resolvedSignSecret];
+    this.options = opts as Record<string, unknown>;
+    this.rotations = [];
+    this._onRotation = onRotation;
   }
 
   encryptAndSign(value: unknown, options: MetadataOptions = {}): string {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyPair,
+  differingRefPairs,
   classifyRow,
   refName,
   JS_RESERVED_WORDS,
@@ -49,12 +50,12 @@ describe("classifyPair", () => {
   });
 
   // core_ext/array/conversions.rb:191 `underscore(first.class.name)` against
-  // array-utils.ts' `underscore(rbObjClass(first))`: the chain records as
-  // `name`, the export as `jsObjClass`.
+  // array-utils.ts' `underscore(rbObjClassname(first))`: the chain records as
+  // `name`, the export as `jsObjClassname`.
   it("names a Ruby call chain spelled as the one ruby-compat export that ports it", () => {
-    expect(classifyPair("name", "jsObjClass")).toBe("no-js-equivalent");
+    expect(classifyPair("name", "jsObjClassname")).toBe("no-js-equivalent");
     expect(classifyPair("name", "klassName")).toBe("burndown");
-    expect(classifyPair("constructor", "jsObjClass")).toBe("burndown");
+    expect(classifyPair("constructor", "jsObjClassname")).toBe("burndown");
   });
 
   it("names what the conventions table itself produces", () => {
@@ -79,6 +80,17 @@ describe("classifyPair", () => {
       "ivar-underscore",
     );
     expect(classifyPair("direction", "_dir")).toBe("burndown");
+  });
+
+  // attribute.rb:56 `type.changed_in_place?(@value_for_database, value)` vs
+  // attribute.ts `this.type!.isChangedInPlace(this.__valueForDatabase, this.value())`:
+  // `_valueForDatabase` is the port of `_value_for_database` (attribute.rb:165).
+  it("names an ivar whose underscore spelling is taken by a Rails _method", () => {
+    expect(classifyPair("value_for_database", "__valueForDatabase")).toBe("ivar-method-collision");
+    expect(classifyPair("valueForDatabase", "__valueForDatabase")).toBe("ivar-method-collision");
+    expect(classifyPair("valueForDatabase", "__cachedValue")).toBe("burndown");
+    // A doubled underscore alone proves no collision — the arm is scoped to the cited ivars.
+    expect(classifyPair("direction", "__direction")).toBe("burndown");
   });
 
   // model_schema.rb:433 `columns_hash.values` vs model-schema.ts:775
@@ -142,6 +154,16 @@ describe("classifyRow", () => {
     expect(classifyRow(["ref:a", "ref:inject"], ["ref:a", "ref:reduce"])).toBe("no-js-equivalent");
   });
 
+  // associations/association.rb:250 `strict_loading_violation!(owner: owner.class, …)`.
+  it("classifies a pair nested under the same kwarg key", () => {
+    expect(
+      classifyRow(
+        ["kwargs{owner=ref:class,reflection=ref:reflection}"],
+        ["kwargs{owner=ref:constructor,reflection=ref:reflection}"],
+      ),
+    ).toBe("js-reserved-word");
+  });
+
   // A row is only closeable when EVERY identifier it differs on is, so one
   // convergeable pair keeps the whole row out of any baseline.
   it("reports a mixed row by its convergeable pair, never as permanent", () => {
@@ -160,6 +182,7 @@ describe("the taxonomy itself", () => {
       "no-js-equivalent",
       "conventions-rename",
       "ivar-underscore",
+      "ivar-method-collision",
       "module-mixin-call",
       "block-idiom",
       "ivar-reflection",
@@ -171,5 +194,17 @@ describe("the taxonomy itself", () => {
     expect(refName("ref:foo")).toBe("foo");
     expect(refName("const:Foo")).toBeUndefined();
     expect(JS_RESERVED_WORDS.has("default")).toBe(true);
+  });
+});
+
+describe("differingRefPairs receiver-dropping conversions", () => {
+  // sqlite3_adapter.rb:128-129 `@config.merge(database: @config[:database].to_s, …)`.
+  it("does not file a nested to_s against the port's toString as a rename", () => {
+    expect(
+      differingRefPairs(
+        ["ref:config", "kwargs{database=ref:toS,resultsAsHash=bool:true}"],
+        ["ref:_config", "kwargs{database=ref:toString,resultsAsHash=bool:true}"],
+      ),
+    ).toEqual([["config", "_config"]]);
   });
 });

@@ -1,17 +1,17 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
+import type { ArelNode } from "../arel.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Unary extends NodeExpression {
-  expr: unknown;
-
-  get value(): unknown {
+export class Unary<E = unknown> extends NodeExpression {
+  get value(): E {
     return this.expr;
   }
 
-  constructor(expr: unknown) {
+  constructor(expr: E) {
     super();
     this.expr = expr;
   }
@@ -47,8 +47,8 @@ export class Limit extends Unary {}
 
 export class Lock extends Unary {}
 export class Not extends Unary {
-  declare expr: Node;
-  constructor(expr: Node) {
+  declare expr: ArelNode;
+  constructor(expr: ArelNode) {
     super(expr);
   }
 }
@@ -60,23 +60,24 @@ export class OptimizerHints extends Unary {
 }
 export class RollUp extends Unary {}
 
-Nodes.Not = Not;
+rbModConstSet(Nodes, "Not", Not);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Unary extends _AliasPredication {}
+export interface Unary<E = unknown> extends _AliasPredication {
+  expr: E;
+}
 
-Nodes.Unary = Unary;
-Nodes.Offset = Offset;
-Nodes.Limit = Limit;
-Nodes.Lock = Lock;
-Nodes.DistinctOn = DistinctOn;
-Nodes.Bin = Bin;
-Nodes.On = On;
-Nodes.Lateral = Lateral;
-Nodes.GroupingElement = GroupingElement;
-Nodes.Cube = Cube;
-Nodes.GroupingSet = GroupingSet;
-Nodes.Group = Group;
-Nodes.OptimizerHints = OptimizerHints;
-Nodes.RollUp = RollUp;
+rbModConstSet(Nodes, "Unary", Unary);
+rbModConstSet(Nodes, "Offset", Offset);
+rbModConstSet(Nodes, "Limit", Limit);
+rbModConstSet(Nodes, "Lock", Lock);
+rbModConstSet(Nodes, "DistinctOn", DistinctOn);
+rbModConstSet(Nodes, "Bin", Bin);
+rbModConstSet(Nodes, "On", On);
+rbModConstSet(Nodes, "Lateral", Lateral);
+rbModConstSet(Nodes, "GroupingElement", GroupingElement);
+rbModConstSet(Nodes, "Cube", Cube);
+rbModConstSet(Nodes, "GroupingSet", GroupingSet);
+rbModConstSet(Nodes, "Group", Group);
+rbModConstSet(Nodes, "OptimizerHints", OptimizerHints);
+rbModConstSet(Nodes, "RollUp", RollUp);

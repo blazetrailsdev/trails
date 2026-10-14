@@ -3,15 +3,15 @@ import { Base } from "./index.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 import { User } from "./test-helpers/models/user.js";
-import { fixtures } from "./test-fixtures.js";
-import { pp } from "./pretty-print.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { PP } from "@blazetrails/ruby-compat";
 
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("FilterAttributesTest", () => {
   async function ppString(obj: unknown): Promise<string> {
     let out = "";
-    await pp(obj, { write: (s: string) => (out += s) });
+    await PP.pp(obj, { write: (s: string) => (out += s) });
     return out;
   }
 
@@ -44,7 +44,7 @@ describe("FilterAttributesTest", () => {
 
   it("filter_attributes affects attribute_for_inspect", async () => {
     for (const user of await AdminUser.all()) {
-      expect(user.attributeForInspect("name")).toBe("[FILTERED]");
+      expect(String(user.attributeForInspect("name"))).toBe("[FILTERED]");
     }
   });
 

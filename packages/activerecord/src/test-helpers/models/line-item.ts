@@ -2,6 +2,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Discount } from "./discount.js";
 import type { Invoice } from "./invoice.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LineItem extends Base {
@@ -14,6 +15,7 @@ export class LineItem extends Base {
     this.hasMany("discountApplications", { className: "LineItemDiscountApplication" });
   }
 }
+registerModel(LineItem);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LineItem {
   get invoice(): Invoice | null | Promise<Invoice | null>;
@@ -30,6 +32,7 @@ export class LineItemDiscountApplication extends Base {
     this.belongsTo("discount");
   }
 }
+registerModel(LineItemDiscountApplication);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LineItemDiscountApplication {
   get lineItem(): LineItem | null | Promise<LineItem | null>;

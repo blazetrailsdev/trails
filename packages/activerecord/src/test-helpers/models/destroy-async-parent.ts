@@ -4,6 +4,7 @@ import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
 import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { DlKeyedJoin } from "./dl-keyed-join.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DestroyAsyncParent extends Base {
@@ -14,7 +15,9 @@ export class DestroyAsyncParent extends Base {
   declare parent_id: number;
   declare tags_count: number | null;
 
-  static _primaryKey = "parent_id";
+  static {
+    this.primaryKey = "parent_id";
+  }
 
   static {
     this.hasOne("dlKeyedHasOne", {
@@ -40,6 +43,7 @@ export class DestroyAsyncParent extends Base {
     });
   }
 }
+registerModel(DestroyAsyncParent);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestroyAsyncParent {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;

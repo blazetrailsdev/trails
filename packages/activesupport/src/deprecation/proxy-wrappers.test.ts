@@ -6,7 +6,7 @@ import {
   DeprecatedObjectProxy,
 } from "./proxy-wrappers.js";
 import { extend, include, prepend } from "@blazetrails/ruby-compat/include";
-import { registerConstant } from "../inflector.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { assertPredicate } from "../testing/assertions.js";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 
@@ -27,23 +27,28 @@ describe("ProxyWrappersTest", () => {
     deprecator = new Deprecation();
   });
 
-  it("deprecated object proxy doesnt wrap falsy objects", () => {
-    const proxy = DeprecatedObjectProxy.new(null, "message");
+  // PERMANENT-SKIP: a JS constructor cannot answer nil (CLAUDE.md, "Runtime facts Node does not expose").
+  it.skip("deprecated object proxy doesnt wrap falsy objects", () => {
+    // @ts-expect-error -- Ruby passes no deprecator
+    const proxy = new DeprecatedObjectProxy(null, "message");
     expect(proxy).toBeFalsy();
   });
 
-  it("deprecated instance variable proxy doesnt wrap falsy objects", () => {
-    const proxy = DeprecatedInstanceVariableProxy.new(null, "waffles");
+  // PERMANENT-SKIP: a JS constructor cannot answer nil (CLAUDE.md, "Runtime facts Node does not expose").
+  it.skip("deprecated instance variable proxy doesnt wrap falsy objects", () => {
+    const proxy = new DeprecatedInstanceVariableProxy(null, "waffles");
     expect(proxy).toBeFalsy();
   });
 
-  it("deprecated constant proxy doesnt wrap falsy objects", () => {
-    const proxy = DeprecatedConstantProxy.new(Waffles, NewWaffles);
+  // PERMANENT-SKIP: a JS constructor cannot answer nil (CLAUDE.md, "Runtime facts Node does not expose").
+  it.skip("deprecated constant proxy doesnt wrap falsy objects", () => {
+    // @ts-expect-error -- Ruby passes no deprecator
+    const proxy = new DeprecatedConstantProxy(Waffles, NewWaffles);
     expect(proxy).toBeFalsy();
   });
 
   it("including proxy module", async () => {
-    const proxy = DeprecatedConstantProxy.new("OldWaffleModule", "WaffleModule", deprecator);
+    const proxy = new DeprecatedConstantProxy("OldWaffleModule", "WaffleModule", deprecator);
     const klass = class {};
     await assertDeprecated("OldWaffleModule", deprecator, () => {
       include(klass, proxy as never);
@@ -52,7 +57,7 @@ describe("ProxyWrappersTest", () => {
   });
 
   it("prepending proxy module", async () => {
-    const proxy = DeprecatedConstantProxy.new("OldWaffleModule", "WaffleModule", deprecator);
+    const proxy = new DeprecatedConstantProxy("OldWaffleModule", "WaffleModule", deprecator);
     const klass = class {
       isWaffle(): boolean {
         return false;
@@ -65,7 +70,7 @@ describe("ProxyWrappersTest", () => {
   });
 
   it("proxy delegates respond_to? and hash to target without warning", async () => {
-    const proxy = DeprecatedConstantProxy.new("OldWaffleModule", "WaffleModule", deprecator) as {
+    const proxy = new DeprecatedConstantProxy("OldWaffleModule", "WaffleModule", deprecator) as {
       isRespondTo(method: string): boolean;
       hash(): unknown;
     };
@@ -77,7 +82,7 @@ describe("ProxyWrappersTest", () => {
   });
 
   it("extending proxy module", async () => {
-    const proxy = DeprecatedConstantProxy.new("OldWaffleModule", "WaffleModule", deprecator);
+    const proxy = new DeprecatedConstantProxy("OldWaffleModule", "WaffleModule", deprecator);
     const obj = {};
     await assertDeprecated("OldWaffleModule", deprecator, () => {
       extend(obj, proxy as never);

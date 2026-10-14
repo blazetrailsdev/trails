@@ -10,17 +10,13 @@ import {
 } from "./testing/tagged-logging.js";
 import {
   prepended as setupAndTeardownPrepended,
-  setup,
-  teardown,
+  type ClassMethods as SetupAndTeardownClassMethods,
   beforeSetup as setupAndTeardownBeforeSetup,
   afterTeardown as setupAndTeardownAfterTeardown,
 } from "./testing/setup-and-teardown.js";
+import { afterTeardown as testsWithoutAssertionsAfterTeardown } from "./testing/tests-without-assertions.js";
 import {
-  afterTeardown as testsWithoutAssertionsAfterTeardown,
-  type RunningTest,
-} from "./testing/tests-without-assertions.js";
-import { UnexpectedError } from "./testing/assertions.js";
-import {
+  Minitest,
   assertNot,
   assertNotIncludes,
   assertRaises,
@@ -31,7 +27,7 @@ import {
   assertChanges,
   assertNoChanges,
 } from "./testing/assertions.js";
-import { assertErrorReported, assertNoErrorReported } from "./testing/error-reporter-assertions.js";
+import { ErrorReporterAssertions } from "./testing/error-reporter-assertions.js";
 import { stubConst } from "./testing/constant-stubbing.js";
 import {
   assertDeprecated,
@@ -46,14 +42,23 @@ import {
   freezeTime,
   unfreezeTime,
 } from "./testing/time-helpers.js";
+import { FileFixtures } from "./testing/file-fixtures.js";
+import { include, type Extended } from "@blazetrails/ruby-compat/include";
+import { prepend, type PrependMethod } from "@blazetrails/ruby-compat";
 
-export class TestCase {
-  name: string;
-  beforeSetup?(): unknown;
-  afterTeardown?(test: RunningTest): unknown;
+export class TestCase extends Minitest.Test {
+  declare static fileFixturePath: string | null;
+  declare readonly fileFixturePath: string | null;
+  declare static isFileFixturePath: () => boolean;
+  declare isFileFixturePath: () => boolean;
+  declare fileFixture: typeof FileFixtures.fileFixture;
+  declare assertNoErrorReported: typeof ErrorReporterAssertions.assertNoErrorReported;
+  declare assertErrorReported: typeof ErrorReporterAssertions.assertErrorReported;
+  declare static setup: Extended<typeof SetupAndTeardownClassMethods>["setup"];
+  declare static teardown: Extended<typeof SetupAndTeardownClassMethods>["teardown"];
 
-  constructor(name: string) {
-    this.name = name;
+  get methodName(): string {
+    return this.name;
   }
 
   static setTestOrder(newOrder: string | null): void {
@@ -69,22 +74,25 @@ export class TestCase {
   /** @internal */
   static taggedLogger = taggedLogger;
 
-  static setup = setup;
-  static teardown = teardown;
-
-  static beforeSetup(): void {
-    taggedLoggingBeforeSetup();
-    setupAndTeardownBeforeSetup.call(TestCase);
+  override beforeSetup(): unknown {
+    const result = super.beforeSetup();
+    return result instanceof Promise
+      ? result.then(taggedLoggingBeforeSetup)
+      : taggedLoggingBeforeSetup();
   }
 
-  static afterTeardown(test: RunningTest): void {
-    setupAndTeardownAfterTeardown.call(TestCase, test);
-    timeHelpersAfterTeardown();
-    testsWithoutAssertionsAfterTeardown({
-      ...test,
-      error: test.error || test.failures.some((f) => f instanceof UnexpectedError),
-    });
-    if (test.failures.length > 0) throw test.failures[0];
+  override afterTeardown(): unknown {
+    let raised: [unknown] | undefined;
+    try {
+      timeHelpersAfterTeardown();
+    } catch (e) {
+      raised = [e];
+    }
+    const afterSuper = (): void => {
+      if (raised) throw raised[0];
+    };
+    const result = super.afterTeardown();
+    return result instanceof Promise ? result.then(afterSuper) : afterSuper();
   }
 
   static assertNot = assertNot;
@@ -96,9 +104,6 @@ export class TestCase {
   static assertNoDifference = assertNoDifference;
   static assertChanges = assertChanges;
   static assertNoChanges = assertNoChanges;
-
-  static assertErrorReported = assertErrorReported;
-  static assertNoErrorReported = assertNoErrorReported;
 
   static assertDeprecated = assertDeprecated;
   static assertNotDeprecated = assertNotDeprecated;
@@ -113,6 +118,15 @@ export class TestCase {
   static unfreezeTime = unfreezeTime;
 }
 
+include(TestCase, ErrorReporterAssertions);
+include(TestCase, FileFixtures);
+prepend(TestCase.prototype, {
+  beforeSetup: setupAndTeardownBeforeSetup as PrependMethod,
+  afterTeardown: setupAndTeardownAfterTeardown as PrependMethod,
+});
 setupAndTeardownPrepended(TestCase);
+prepend(TestCase.prototype, {
+  afterTeardown: testsWithoutAssertionsAfterTeardown as PrependMethod,
+});
 
 runLoadHooks("active_support_test_case", TestCase);

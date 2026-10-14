@@ -7,7 +7,7 @@ import {
   makeEncryptedBook,
 } from "./test-helpers.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
   let adapter: TestDatabaseAdapter;

@@ -124,10 +124,6 @@ export {
   deconstantize,
   constantize,
   safeConstantize,
-  registerConstant,
-  unregisterConstant,
-  isRegisteredConstant,
-  _resetConstants,
   foreignKey,
   humanize,
   constRegexp,
@@ -176,8 +172,6 @@ export {
   deepMergeBang,
   deepDup,
   slice,
-  merge,
-  mergeBang,
   deepTransformKeys,
   deepCamelizeKeys,
   deepUnderscoreKeys,
@@ -273,6 +267,7 @@ export { isIn, presenceIn } from "./core-ext/object/inclusion.js";
 
 export { atomicWrite } from "./core-ext/file/atomic.js";
 export { sliceBang } from "./core-ext/hash/slice.js";
+export { removePossibleMethod } from "./core-ext/module/remove-method.js";
 export { BASE36_ALPHABET, BASE58_ALPHABET, base36, base58 } from "./core-ext/securerandom.js";
 export {
   nilUuid,
@@ -314,19 +309,9 @@ export {
   subclasses,
   descendants,
 } from "./module-ext.js";
-export { Rescuable, rescueFrom, handleRescue } from "./rescuable.js";
+export { Rescuable } from "./rescuable.js";
 export type { MattrOptions } from "./module-ext.js";
 
-export {
-  defineCallbacks,
-  setCallback,
-  skipCallback,
-  resetCallbacks,
-  runCallbacks,
-  getCallbackChains,
-  peekCallbackChain,
-  CallbacksMixin,
-} from "./callbacks.js";
 export type {
   CallbackKind,
   CallbackCondition,
@@ -388,6 +373,9 @@ export {
 
 export * from "./time-ext.js";
 import "./core-ext/time/calculations.js";
+import "./core-ext/date-time/calculations.js";
+import "./core-ext/date/zones.js";
+import "./core-ext/array/access.js";
 import "./core-ext/enumerable.js";
 export * from "./core-ext/time/conversions.js";
 export { rfc3339 } from "./time-ext.js";
@@ -501,7 +489,9 @@ export {
   Singleton as DuplicableSingleton,
 } from "./core-ext/object/duplicable.js";
 export { CurrentAttributes } from "./current-attributes.js";
+export { SecurityUtils } from "./security-utils.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
+export { stripThenable } from "./strip-thenable.js";
 export { StringIO } from "@blazetrails/ruby-compat";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
 export { Reloader } from "./reloader.js";
@@ -526,7 +516,11 @@ export { WeakSet as DescendantsTrackerWeakSet } from "./descendants-tracker.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";
 export { synchronize, Monitor, type MonitorMixin } from "./concurrency/monitor.js";
-export { LoadInterlockAwareMonitor } from "./concurrency/load-interlock-aware-monitor.js";
+export {
+  LoadInterlockAwareMonitor,
+  LoadInterlockAwareMonitorMixin,
+  ThreadLoadInterlockAwareMonitor,
+} from "./concurrency/load-interlock-aware-monitor.js";
 export { DescendantsTracker, ReloadedClassesFiltering } from "./descendants-tracker.js";
 export { Configurable, Configuration } from "./configurable.js";
 export {
@@ -582,13 +576,17 @@ export {
   SimpleStubs,
 } from "./testing/time-helpers.js";
 export {
+  Mock,
   MockExpectationError,
+  MethodCallAssertions,
+  assertMock,
   assertCalled,
   assertCalledWith,
   assertNotCalled,
   expectCalledWith,
   assertCalledOnInstanceOf,
   assertNotCalledOnInstanceOf,
+  stub,
   stubAnyInstance,
 } from "./testing/method-call-assertions.js";
 export {
@@ -608,6 +606,9 @@ export {
   assertEqual,
   assertNotEqual,
   message,
+  assertInstanceOf,
+  assertKindOf,
+  assertNotKindOf,
   assertMatch,
   assertNoMatch,
   assertSame,
@@ -626,8 +627,9 @@ export {
   BacktraceFilter,
   Minitest,
 } from "./testing/assertions.js";
+export { ConstantLookup } from "./testing/constant-lookup.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
-export { silenceStream, quietly, capture } from "./testing/stream.js";
+export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";
 export * as SetupAndTeardown from "./testing/setup-and-teardown.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";

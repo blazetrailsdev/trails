@@ -283,8 +283,8 @@ export class Encoding {
   }
 
   /**
-   * `Encoding::ASCII_8BIT` and its `BINARY` alias, `Encoding::UTF_8` and
-   * `Encoding::US_ASCII` — the four registry constants trails' callers name.
+   * `Encoding::ASCII_8BIT` and its `BINARY` alias, `Encoding::UTF_8`,
+   * `Encoding::US_ASCII` and `Encoding::SHIFT_JIS` — the five registry constants trails' callers name.
    * MRI defines one per registered name and alias, from `set_encoding_const`
    * (`rb_define_const`, `vendor/ruby/v3.3.11/encoding.c:1753`).
    *
@@ -300,4 +300,7 @@ export class Encoding {
 
   /** @noRailsEquivalent PERMANENT */
   static readonly US_ASCII = Encoding.find("US-ASCII")!;
+
+  /** @noRailsEquivalent PERMANENT */
+  static readonly SHIFT_JIS = Encoding.find("Shift_JIS")!;
 }

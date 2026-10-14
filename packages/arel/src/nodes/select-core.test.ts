@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors } from "../index.js";
 import type { Node } from "./node.js";
@@ -14,7 +15,7 @@ describe("TestSelectCore", () => {
     core.projections = words("d", "e", "f");
     core.wheres = words("g", "h", "i");
 
-    const dolly = core.clone();
+    const dolly = rbObjClone(core);
 
     expect(dolly.froms).toEqual(core.froms);
     expect(dolly.projections).toEqual(core.projections);

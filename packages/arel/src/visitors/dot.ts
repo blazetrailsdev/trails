@@ -3,46 +3,26 @@ import type { Attribute } from "../attributes/attribute.js";
 import { Table } from "../table.js";
 import { Visitor } from "./visitor.js";
 import { Nodes, Visitors } from "../namespaces.js";
-import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { temporalClassName } from "../temporal-tag.js";
-import { isHashAnalogue, rubyConstantName } from "./ruby-class.js";
 import { camelize } from "@blazetrails/activesupport";
-
-type AppendableCollector = { append(s: string): unknown; value: string };
-
-function isAppendableCollector(c: unknown): c is AppendableCollector {
-  if (typeof c !== "object" || c === null) return false;
-  const obj = c as Record<string, unknown>;
-  return typeof obj.append === "function" && typeof obj.value === "string";
-}
+import {
+  rbFSend,
+  rbObjAsString,
+  rbObjClassname,
+  rbObjId,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 
 export class Dot extends Visitor {
   private nodes: Node[] = [];
   private edges: Edge[] = [];
   private nodeStack: Node[] = [];
   private edgeStack: Edge[] = [];
-  private seen: Map<unknown, Node> = new Map();
-  private nextId = 0;
+  private seen: Map<number | bigint, Node> = new Map();
 
-  private static readonly NIL_SENTINEL = Symbol("Dot.NIL_SENTINEL");
-
-  override accept(object: Nodes.Node, collector?: unknown): { value: string } {
-    if (!this.dispatch.has(Table)) {
-      this.dispatch.set(Table, "visitArelTable");
-    }
-
-    this.nodes = [];
-    this.edges = [];
-    this.nodeStack = [];
-    this.edgeStack = [];
-    this.seen = new Map();
-    this.nextId = 0;
-
+  override accept<C extends { append(str: string): C }>(object: unknown, collector: C): C {
     this.visit(object);
-    const sink = isAppendableCollector(collector) ? collector : new PlainString();
-    sink.append(this.toDot());
-    return sink as { value: string };
+    return collector.append(this.toDot());
   }
 
   protected visitArelNodesFunction(o: Nodes.Function): void {
@@ -228,10 +208,7 @@ export class Dot extends Visitor {
   }
 
   protected visitString(o: unknown): void {
-    const top = this.nodeStack[this.nodeStack.length - 1];
-    if (!top) return;
-    const value = o instanceof Nodes.SqlLiteral ? o.value : o;
-    top.fields.push(value == null ? "" : String(value));
+    this.nodeStack[this.nodeStack.length - 1].fields.push(o);
   }
 
   protected visitTime(o: unknown): void {
@@ -312,76 +289,51 @@ export class Dot extends Visitor {
     this.visitEdge(o, "default");
   }
 
+  /** @missingRailsName send — PERMANENT */
   protected visitEdge(o: object, method: string): void {
-    if (!(camelize(method, false) in o)) {
-      const klass = rubyConstantName(o.constructor) ?? "Object";
-      // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
-      throw new TypeError(`undefined method '${method}' for ${klass}`);
-    }
-    this.edge(method, () => this.visit((o as Record<string, unknown>)[camelize(method, false)]));
+    this.edge(method, () => this.visit(rbFSend(o, camelize(method, false))));
   }
 
-  protected override visit(object: unknown, _collector?: unknown): unknown {
-    const seenKey: unknown = (() => {
-      if (object === null || object === undefined) return Dot.NIL_SENTINEL;
-      const t = typeof object;
-      if (t === "object") return object;
-      if (t === "boolean") return `boolean:${object as boolean}`;
-      if (t === "number") {
-        const n = object as number;
-        if (Number.isNaN(n)) return "number:NaN";
-        if (Object.is(n, -0)) return "number:-0";
-        return `number:${n}`;
-      }
-      if (t === "bigint") return `bigint:${(object as bigint).toString()}`;
-      if (t === "symbol") return object;
-      return undefined;
-    })();
-
-    if (seenKey !== undefined) {
-      const seenNode = this.seen.get(seenKey);
-      if (seenNode) {
-        const e = this.edgeStack[this.edgeStack.length - 1];
-        if (e) e.to = seenNode;
-        return undefined;
-      }
+  /**
+   * @missingRailsName name — PERMANENT
+   * @missingRailsName objectId — PERMANENT
+   */
+  protected override visit(o: unknown): unknown {
+    let node = this.seen.get(rbObjId(o));
+    if (node != null) {
+      this.edgeStack[this.edgeStack.length - 1].to = node;
+      return;
     }
 
-    const node = new Node(this.classNameOf(object), this.nextId++);
-    if (seenKey !== undefined) {
-      this.seen.set(seenKey, node);
-    }
+    node = new Node(rbObjClassname(o), rbObjId(o));
+    this.seen.set(node.id, node);
     this.nodes.push(node);
     this.withNode(node, () => {
-      super.visit(object);
+      super.visit(o);
     });
-    return undefined;
   }
 
   protected edge(name: string, block: () => void): void {
     const edge = new Edge(name, this.nodeStack[this.nodeStack.length - 1]);
     this.edgeStack.push(edge);
     this.edges.push(edge);
-    try {
-      block();
-    } finally {
-      this.edgeStack.pop();
-    }
+    block();
+    this.edgeStack.pop();
   }
 
   protected withNode(node: Node, block: () => void): void {
-    const e = this.edgeStack[this.edgeStack.length - 1];
-    if (e) e.to = node;
-    this.nodeStack.push(node);
-    try {
-      block();
-    } finally {
-      this.nodeStack.pop();
+    const edge = this.edgeStack[this.edgeStack.length - 1];
+    if (edge) {
+      edge.to = node;
     }
+
+    this.nodeStack.push(node);
+    block();
+    this.nodeStack.pop();
   }
 
   protected quote(string: unknown): string {
-    return String(string).replace(/"/g, '\\"');
+    return rbObjAsString(string).replace(/"/g, '\\"');
   }
 
   protected toDot(): string {
@@ -397,39 +349,18 @@ export class Dot extends Visitor {
     return [header, ...nodeLines, ...edgeLines, "}"].join("\n");
   }
 
-  compile(node: Nodes.Node): string {
-    return this.accept(node).value;
-  }
-
   protected visitArelNodesExists(o: Nodes.Exists): void {
     this.visitEdge(o, "expressions");
     this.visitEdge(o, "alias");
-  }
-
-  private classNameOf(o: unknown): string {
-    if (o === null) return "NilClass";
-    if (o === undefined) return "NilClass";
-    if (typeof o === "string") return "String";
-    if (typeof o === "number") return Number.isInteger(o) ? "Integer" : "Float";
-    if (typeof o === "boolean") return o ? "TrueClass" : "FalseClass";
-    if (typeof o === "bigint") return "Integer";
-    // boundary: legacy JS Date values stringify to Rails' `Time` class name.
-    if (o instanceof Date) return "Time";
-    const temporalClass = temporalClassName(o);
-    if (temporalClass) return temporalClass;
-    if (isHashAnalogue(o)) return "Hash";
-    const ctor = (o as { constructor?: { name?: string } }).constructor;
-    if (!ctor) return "Object";
-    return rubyConstantName(ctor) ?? ctor.name ?? "Object";
   }
 }
 
 export class Node {
   readonly name: string;
-  readonly id: number;
-  readonly fields: string[];
+  readonly id: number | bigint;
+  readonly fields: unknown[];
 
-  constructor(name: string, id: number, fields: string[] = []) {
+  constructor(name: string, id: number | bigint, fields: unknown[] = []) {
     this.name = name;
     this.id = id;
     this.fields = fields;
@@ -447,4 +378,6 @@ export class Edge {
   }
 }
 
-Visitors.Dot = Dot;
+rbModConstSet(Visitors, "Dot", Dot);
+rbModConstSet(Dot, "Node", Node);
+rbModConstSet(Dot, "Edge", Edge);

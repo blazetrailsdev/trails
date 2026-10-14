@@ -9,6 +9,7 @@ import { Trailtie, type ActionControllerConfig } from "./action-controller.js";
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
+import { extend } from "@blazetrails/ruby-compat";
 
 let deprecators: Deprecators;
 let app: {
@@ -104,10 +105,22 @@ describe("action_controller.set_helpers_path", () => {
     await runTrailtieInitializers(Trailtie, app);
     bootAndInstantiate(base);
 
-    const methods = base._helpers!;
-    expect(typeof methods.bareA).toBe("function");
-    expect(typeof methods.stratego).toBe("function");
-    expect(typeof methods.foobar).toBe("function");
+    const methods = extend({}, base._helpers!);
+    expect("bareA" in methods).toBe(true);
+    expect("stratego" in methods).toBe(true);
+    expect("foobar" in methods).toBe(true);
+  });
+
+  it("keeps a helper exported as a class, which is a Module", async () => {
+    writeFileSync(
+      join(root, "klass-helper.ts"),
+      "export class KlassHelper { fromKlass() { return 'klass'; } }",
+    );
+    const base = receivingController();
+    await runTrailtieInitializers(Trailtie, app);
+    bootAndInstantiate(base);
+
+    expect("fromKlass" in extend({}, base._helpers!)).toBe(true);
   });
 
   it("sets helpersPath on the controller from config.helpersPaths", async () => {
@@ -131,8 +144,8 @@ describe("action_controller.set_helpers_path", () => {
       await runTrailtieInitializers(Trailtie, app);
       bootAndInstantiate(base);
 
-      expect(base._helpers?.bareA).toBeUndefined();
-      expect(typeof base._helpers!.baz).toBe("function");
+      expect("bareA" in extend({}, base._helpers!)).toBe(false);
+      expect("baz" in extend({}, base._helpers!)).toBe(true);
     } finally {
       rmSync(alternate, { recursive: true, force: true });
     }
@@ -145,7 +158,7 @@ describe("action_controller.set_helpers_path", () => {
     await runTrailtieInitializers(Trailtie, app);
 
     expect(() => bootAndInstantiate(base)).toThrow("uninitialized constant TypoHelper");
-    expect(base._helpers?.oops).toBeUndefined();
+    expect("oops" in extend({}, base._helpers!)).toBe(false);
   });
 
   it("includes nothing when includeAllHelpers is false", async () => {
@@ -157,7 +170,7 @@ describe("action_controller.set_helpers_path", () => {
     runLoadHooks("action_controller", ActionController.Base);
     try {
       bootAndInstantiate(base);
-      expect(base._helpers?.bareA).toBeUndefined();
+      expect("bareA" in extend({}, base._helpers!)).toBe(false);
     } finally {
       ActionController.Base.includeAllHelpers = true;
     }
@@ -170,6 +183,6 @@ describe("action_controller.set_helpers_path", () => {
     await runTrailtieInitializers(Trailtie, app);
     bootAndInstantiate(base);
 
-    expect(base._helpers?.bareA).toBeUndefined();
+    expect("bareA" in extend({}, base._helpers!)).toBe(false);
   });
 });

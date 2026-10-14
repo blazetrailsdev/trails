@@ -1,8 +1,9 @@
+import { registeredConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, presence } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { registerModel, modelRegistry } from "./associations.js";
+import { registerModel } from "./associations.js";
 import { merge, SpawnMethods } from "./relation/spawn-methods.js";
 import { reverseSqlOrder, QueryMethods } from "./relation/query-methods.js";
 import { Relation } from "./relation.js";
@@ -15,7 +16,7 @@ import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { AssociationRelation } from "./association-relation.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Company as CanonCompany, Firm as CanonFirm } from "./test-helpers/models/company.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
 import {
@@ -25,8 +26,7 @@ import {
 import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
-import { captureSql } from "./testing/sql-capture.js";
-import { quoteTableName, quoteColumnName } from "./support/quote-regex.js";
+import { quoteColumnName } from "./support/quote-regex.js";
 
 describe("isBlank / isPresent", () => {
   fixtures([]);
@@ -379,8 +379,8 @@ describe("RelationTest", () => {
       expect(sql).toContain("LIMIT 10");
       expect(sql).not.toContain(" IN (SELECT");
     } finally {
-      modelRegistry.delete("Author");
-      modelRegistry.delete("Book");
+      unregisterConstant("Author", registeredConstant("Author"));
+      unregisterConstant("Book", registeredConstant("Book"));
     }
   });
 
@@ -409,8 +409,8 @@ describe("RelationTest", () => {
       expect(sql).toContain(" IN (SELECT");
       expect(sql).toMatch(/IN \(SELECT .* LIMIT 5\)/s);
     } finally {
-      modelRegistry.delete("EagerComment");
-      modelRegistry.delete("EagerArticle");
+      unregisterConstant("EagerComment", registeredConstant("EagerComment"));
+      unregisterConstant("EagerArticle", registeredConstant("EagerArticle"));
     }
   });
 
@@ -483,10 +483,10 @@ describe("RelationTest", () => {
         .limit(5);
       expect((singularNestedJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
     } finally {
-      modelRegistry.delete("JlComment");
-      modelRegistry.delete("JlProfile");
-      modelRegistry.delete("JlAuthor");
-      modelRegistry.delete("JlArticle");
+      unregisterConstant("JlComment", registeredConstant("JlComment"));
+      unregisterConstant("JlProfile", registeredConstant("JlProfile"));
+      unregisterConstant("JlAuthor", registeredConstant("JlAuthor"));
+      unregisterConstant("JlArticle", registeredConstant("JlArticle"));
     }
   });
 });
@@ -597,7 +597,7 @@ describe("Relation#arel build_arel convergence", () => {
 });
 
 describe("RelationTest", () => {
-  const { authors } = fixtures([
+  const { self, authors } = fixtures([
     "authors",
     "posts",
     "comments",
@@ -616,16 +616,16 @@ describe("RelationTest", () => {
   });
 
   it("merging a string join keeps both the association join and the merged string", () => {
-    const joinString = `LEFT OUTER JOIN ${quoteTableName("ratings")} ON ${quoteTableName(
+    const joinString = `LEFT OUTER JOIN ${self().quoteTableName("ratings")} ON ${self().quoteTableName(
       "comments",
-    )}.id = ${quoteTableName("ratings")}.comment_id`;
+    )}.id = ${self().quoteTableName("ratings")}.comment_id`;
     const specialCommentsWithRatings = CanonSpecialComment.joins(joinString);
     const postsWithSpecialCommentsWithRatings = CanonPost.group("posts.id")
       .joins(":specialComments")
       .merge(specialCommentsWithRatings);
     const sql = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings).toSql();
 
-    expect(sql).toContain(`INNER JOIN ${quoteTableName("comments")}`);
+    expect(sql).toContain(`INNER JOIN ${self().quoteTableName("comments")}`);
     expect(sql).toContain(joinString);
   });
 
@@ -633,7 +633,7 @@ describe("RelationTest", () => {
     const subquery = CanonAuthor.eagerLoad(":posts").order({ id: "asc" }).limit(2);
 
     let records: any[] = [];
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       records = await CanonPost.where({ author_id: subquery }).order("id");
     });
 
@@ -651,7 +651,7 @@ describe("RelationTest", () => {
     expect(mainQuery).toBeDefined();
     expect(/IN\s*\(\s*SELECT/i.test(mainQuery!)).toBe(false);
 
-    const literalQueries = await captureSql(async () => {
+    const literalQueries = await self().captureSql({}, async () => {
       await CanonPost.where({ author_id: limitedAuthorIds }).order("id");
     });
     expect(mainQuery).toBe(
@@ -666,7 +666,7 @@ describe("RelationTest", () => {
       .limit(2);
 
     let records: any[] = [];
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       records = await CanonPost.where({ author_id: subquery });
     });
 
@@ -682,8 +682,8 @@ describe("RelationTest", () => {
       .pluck("id");
 
     let count = 0;
-    const countQueries = await captureSql(async () => {
-      count = (await CanonPost.where({ author_id: subquery() }).count()) as number;
+    const countQueries = await self().captureSql({}, async () => {
+      count = await CanonPost.where({ author_id: subquery() }).count();
     });
     expect(count).toBe(expectedPostIds.length);
     expect(countQueries.every((sql) => !/IN\s*\(\s*SELECT/i.test(sql))).toBe(true);
@@ -713,7 +713,7 @@ describe("RelationTest", () => {
 });
 
 describe("inspect wrapper class name", () => {
-  fixtures(["authors", "posts"]);
+  const { self } = fixtures(["authors", "posts"]);
 
   it("renders the qualified Rails class name for a CollectionProxy", async () => {
     const author = await CanonAuthor.first();
@@ -735,6 +735,12 @@ describe("inspect wrapper class name", () => {
     expect(await relation.inspect()).toMatch(/^#<ActiveRecord::Relation \[#<Post /);
   });
 
+  it("renders a Relation subclass under its own name", async () => {
+    class CustomRelation extends Relation<InstanceType<typeof CanonPost>> {}
+    const relation = new CustomRelation(CanonPost).limit(0);
+    expect(await relation.inspect()).toBe("#<CustomRelation []>");
+  });
+
   it("defaults an unordered reverseOrder to the primary key descending", () => {
     expect(CanonPost.all().reverseOrder().toSql()).toContain("ORDER BY");
     expect(CanonPost.all().reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
@@ -749,7 +755,7 @@ describe("inspect wrapper class name", () => {
 
     expect(CpkOrder.all().reverseOrder().toSql()).toContain(`ORDER BY`);
     expect(CpkOrder.all().reverseOrder().toSql()).toContain(
-      `${quoteTableName("cpk_orders")}.${quoteColumnName('["shop_id", "id"]')} DESC`,
+      `${self().quoteTableName("cpk_orders")}.${quoteColumnName('["shop_id", "id"]')} DESC`,
     );
   });
 
@@ -853,8 +859,8 @@ describe("Relation Enumerable surface (trails)", () => {
   });
 
   it("presence returns the relation when records exist and null when none do", async () => {
-    expect(await CanonPost.where({ id: -1 }).presence()).toBeNull();
-    const present = await CanonPost.all().presence();
+    expect(await presence(CanonPost.where({ id: -1 }))).toBeNull();
+    const present = await presence(CanonPost.all());
     expect(present).not.toBeNull();
     expect((await present!.toArray()).length).toBe(await CanonPost.all().count());
   });

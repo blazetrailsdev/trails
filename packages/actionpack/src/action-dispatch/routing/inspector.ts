@@ -1,17 +1,9 @@
 import { underscore } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { RFC2396_PARSER, rbInspect } from "@blazetrails/ruby-compat";
+import { except, RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
-
-export interface InspectedRoute {
-  name: string;
-  verb: string;
-  path: string;
-  controller: string;
-  action: string;
-}
 
 export interface CollectedRoute {
   name: string;
@@ -39,31 +31,28 @@ function formatConstraints(c: Record<string, unknown>): string {
   return `{${parts.join(", ")}}`;
 }
 
-export class RouteWrapper {
-  private readonly route: Route;
-  private _reqs: string | undefined;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- types the names SimpleDelegator forwards to Route (inspector.rb:10).
+export interface RouteWrapper extends Pick<
+  Route,
+  "app" | "requirements" | "parts" | "internal" | "verb" | "sourceLocation"
+> {}
 
-  constructor(route: Route) {
-    this.route = route;
-  }
-
-  get app(): Endpoint {
-    return this.route.app as Endpoint;
-  }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class RouteWrapper extends SimpleDelegator {
+  private _reqs: string | undefined = undefined;
 
   /** @internal */
   isMatchesFilter(filter: string, value: RegExp | string): boolean {
     if (filter === "exact_path_match") {
-      if (typeof value !== "string") return false;
-      return this.route.path.match(value) !== undefined;
+      return (this.__getobj__() as Route).path.match(value as string) !== undefined;
     }
-    const re = value instanceof RegExp ? value : new RegExp(String(value));
-    const target = (this as unknown as Record<string, unknown>)[filter];
-    return typeof target === "string" && re.test(target);
+
+    const target = (this as unknown as Record<string, string | null | undefined>)[filter];
+    return target != null && (value as RegExp).test(target);
   }
 
   get endpoint(): string {
-    if (this.app.dispatcher()) {
+    if ((this.app as Endpoint).dispatcher()) {
       return `${this.controller}#${this.action}`;
     } else if (
       typeof this.rackApp === "function" &&
@@ -76,35 +65,26 @@ export class RouteWrapper {
   }
 
   get constraints(): Record<string, unknown> {
-    const { controller: _c, action: _a, ...rest } = this.requirements;
-    return rest;
-  }
-
-  /** @internal */
-  get requirements(): Record<string, unknown> {
-    return this.route.requirements;
+    return except(this.requirements, "controller", "action");
   }
 
   get rackApp(): unknown {
-    return this.app.rackApp();
+    return (this.app as Endpoint).rackApp();
   }
 
   get path(): string {
-    return this.route.path.spec.toString();
+    return (this.__getobj__() as Route).path.spec.toString();
   }
   get name(): string {
-    return this.route.name ?? "";
-  }
-  get verb(): string {
-    return this.route.verb;
+    return (this.__getobj__() as Route).name ?? "";
   }
   get controller(): string {
-    return this.route.parts.includes("controller")
+    return this.parts.includes("controller")
       ? ":controller"
       : (this.requirements.controller as string);
   }
   get action(): string {
-    return this.route.parts.includes("action") ? ":action" : (this.requirements.action as string);
+    return this.parts.includes("action") ? ":action" : (this.requirements.action as string);
   }
 
   get reqs(): string {
@@ -118,16 +98,11 @@ export class RouteWrapper {
 
   /** @internal */
   isInternal(): boolean {
-    return this.route.internal;
+    return this.internal;
   }
 
   isEngine(): boolean {
-    return this.app.engine();
-  }
-
-  /** @internal */
-  get sourceLocation(): string | undefined {
-    return this.route.sourceLocation ?? undefined;
+    return (this.app as Endpoint).engine();
   }
 }
 
@@ -138,19 +113,6 @@ export class RoutesInspector {
   constructor(routes: readonly Route[]) {
     this.routes = routes;
     this.engines = {};
-  }
-
-  inspect(): InspectedRoute[] {
-    return this.routes.map((route) => {
-      const w = new RouteWrapper(route);
-      return {
-        name: w.name,
-        verb: w.verb,
-        path: w.path,
-        controller: w.controller,
-        action: w.action,
-      };
-    });
   }
 
   format(formatter: RoutesFormatter = new Sheet(), filter: RoutesFilter = {}): string {
@@ -211,7 +173,7 @@ export class RoutesInspector {
           verb: w.verb,
           path: w.path,
           reqs: w.reqs,
-          sourceLocation: w.sourceLocation,
+          sourceLocation: w.sourceLocation ?? undefined,
         };
       });
   }

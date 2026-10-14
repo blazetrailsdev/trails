@@ -12,6 +12,7 @@ import {
   unmeasuredPackages,
   type ArmThrowMarks,
 } from "./arm-throw-mark.js";
+import { staleMarkFailure } from "./param-name-mark.js";
 
 const row = (pkg: string, tsFile: string, missing: string[] = ["throw"]) => ({
   package: pkg,
@@ -75,6 +76,21 @@ describe("staleMarks", () => {
       { package: "arel", dimension: "total", mark: 2, current: 1 },
       { package: "arel", dimension: "a.ts", mark: 2, current: 1 },
     ]);
+  });
+
+  it("fails the gate, naming each row and the tighten script", () => {
+    const marks: ArmThrowMarks = { arel: { total: 2, byFile: { "a.ts": 2 } } };
+    const stale = staleMarks(marks, measure([row("arel", "a.ts")]));
+    const failure = staleMarkFailure("arm-throw gate", "parity:api:arms:throws:tighten", stale)!;
+    expect(failure).toContain("arm-throw gate: 2 STALE mark dimension(s)");
+    expect(failure).toContain("pnpm parity:api:arms:throws:tighten");
+    expect(failure).toContain("arel  total: mark 2 → current 1");
+    expect(failure).toContain("arel  a.ts: mark 2 → current 1");
+  });
+
+  it("passes a mark that sits on the measurement", () => {
+    const marks = measure([row("arel", "a.ts")]);
+    expect(staleMarkFailure("arm-throw gate", "t", staleMarks(marks, marks))).toBeNull();
   });
 });
 

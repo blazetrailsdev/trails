@@ -24,7 +24,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"));
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -57,8 +57,27 @@ describe("ScaffoldGenerator (namespaced)", () => {
       expect(read(`app/views/admin/accounts/${view}.html.tse`)).toContain(
         'linkTo("Back to accounts", adminAccountsPath())',
       );
+    const functionalTest = read("test/controllers/admin/accounts-controller.test.ts");
+    expect(functionalTest).toContain("declare admin_accounts: FixtureSetAccessor<AdminAccount>;");
+    expect(functionalTest).toContain('this["@admin_account"] = await this.admin_accounts("one");');
+    expect(parseTs(functionalTest).diagnostics).toEqual([]);
     const rerun = ScaffoldGenerator.start(["admin/account"], { ...config, force: true });
     await expect(rerun).resolves.toEqual(expect.any(Array));
+  });
+});
+
+describe("ScaffoldGenerator (routes)", () => {
+  it("logs and writes the resource route with the mapper as this", async () => {
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+    const lines: string[] = [];
+    await ScaffoldGenerator.start(["post", "title:string"], {
+      cwd: tmpDir,
+      output: (line: string) => lines.push(line),
+    });
+    expect(lines).toContain('       route  this.resources("posts");');
+    expect(read("config/routes.ts")).toBe(
+      'Trails.application!.routes().draw(function () {\n  this.resources("posts");\n});\n',
+    );
   });
 });
 
@@ -115,6 +134,20 @@ describe("ScaffoldGenerator (type-check)", () => {
         output: () => {},
       });
 
+      fs.writeFileSync(
+        path.join(appDir, "db/schema.ts"),
+        [
+          'import type { DatabaseAdapter } from "@blazetrails/activerecord";',
+          "export default async function defineSchema(ctx: DatabaseAdapter) {",
+          '  await ctx.createTable("posts", { force: "cascade" }, (t) => {',
+          '    t.string("title");',
+          '    t.text("body");',
+          '    t.datetime("created_at", { null: false });',
+          '    t.datetime("updated_at", { null: false });',
+          "  });",
+          "}",
+        ].join("\n"),
+      );
       const code = await run(
         [
           "typecheck",
@@ -130,5 +163,5 @@ describe("ScaffoldGenerator (type-check)", () => {
     } finally {
       fs.rmSync(tmpApps, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });

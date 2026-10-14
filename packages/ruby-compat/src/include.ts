@@ -21,7 +21,37 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import type { abort } from "./process-adapter.js";
 import { NameError } from "./name-error.js";
+import { isRegisteredConstant, registeredConstant } from "./variable.js";
+import { temporalTag } from "./temporal-tag.js";
+import { Enumerable } from "./enumerable.js";
+import { Hash } from "./hash.js";
+import { TypeError } from "./type-error.js";
+import { BigDecimal } from "./big-decimal.js";
+import { Complex } from "./complex.js";
+import { Rational } from "./rational.js";
+import {
+  FL_SINGLETON,
+  T_ICLASS,
+  classpaths,
+  rbSetClassPathString,
+  rbAnyToS,
+  rbCBasicObject,
+  rbCClass,
+  rbClassSuperclass,
+  rbCDate,
+  rbCNumeric,
+  rbObjClass,
+  rbCString,
+  rbCTime,
+  rbModAttrReader,
+  rbModAttrWriter,
+  rbModName,
+  rbModToS,
+  UNDEF_METHOD_TABLES,
+  reopened,
+} from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -29,8 +59,97 @@ type AnyFunction = (...args: never) => unknown;
 type ModuleHooks = {
   [included]?: (klass: unknown) => void;
   [extended]?: (klass: unknown) => void;
-  [initialize]?: (this: object) => void;
+  [initialize]?: (this: object, ...args: never[]) => void | Generator;
 };
+
+/**
+ * Mirrors: Ruby's Module#const_set — vendor/ruby/v3.3.11/object.c:2545
+ * `rb_mod_const_set`, which raises `NameError` for a name that is not a
+ * constant name (`id_for_var`, object.c:2220-2240): an uppercase or titlecase
+ * letter (`rb_sym_constant_char_p`, vendor/ruby/v3.3.11/symbol.c:218-250), then
+ * identifier characters (`is_identchar`, symbol.c:54). It then calls `const_set`
+ * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
+ * owner (variable.c:3648-3668), as it does a class: permanently under a named
+ * owner, and under an anonymous one with the owner's temporary path, until a
+ * named owner re-paths it. `Module#name` and `Module#inspect` read that path.
+ * `rb_namespace_p` (variable.c:83) admits a class or a module: a class here is a function
+ * whose `prototype` is non-writable, which holds for `class` syntax and the
+ * built-in constructors and for no arrow, bound or `function` function — the
+ * test `rbInspect` applies before rendering a value through `rbModToS`.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModConstSet<T>(
+  mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
+  id: string,
+  value: T,
+): T {
+  if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(id)) {
+    throw new NameError(`wrong constant name ${id}`, id);
+  }
+  Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
+  if (
+    value instanceof Module ||
+    (typeof value === "function" &&
+      Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false)
+  ) {
+    const klass = mod as abstract new (...args: never) => unknown;
+    const valPath = classpaths.get(value);
+    if (mod === Object) {
+      if (valPath?.permanent !== true) classpaths.set(value, { path: id, permanent: true });
+      return value;
+    }
+    const parentalPathPermanent =
+      mod instanceof Module ? classpaths.get(mod)?.permanent === true : Boolean(mod.name);
+    const parentalPath = parentalPathPermanent
+      ? mod instanceof Module
+        ? mod.name
+        : rbModName(klass)
+      : mod instanceof Module
+        ? mod.inspect()
+        : rbModToS(klass);
+    if (parentalPathPermanent && valPath?.permanent !== true) {
+      classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: true });
+    } else if (!parentalPathPermanent && valPath === undefined) {
+      classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: false });
+    }
+  }
+  return value;
+}
+
+/**
+ * Mirrors: Ruby's Module#const_defined? — vendor/ruby/v3.3.11/object.c:2596
+ * `rb_mod_const_defined`, which raises `NameError` for a name that is not a
+ * constant name and otherwise answers `rb_const_defined`: the constant on the
+ * module or one of its ancestors, or on the module alone when `recur` is
+ * false. A `::` path is walked a segment at a time, each
+ * later segment read from the namespace before it alone, and the first also
+ * from the top-level table `registerConstant` fills.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModConstDefined(
+  mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
+  name: string,
+  recur: boolean = true,
+): boolean {
+  if (recur && isRegisteredConstant(name)) return true;
+  let c: unknown = mod;
+  for (const [i, part] of name.split("::").entries()) {
+    if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(part)) {
+      throw new NameError(`wrong constant name ${name}`, name);
+    }
+    if (c === null || (typeof c !== "object" && typeof c !== "function")) return false;
+    if (i === 0 && recur ? part in c : Object.prototype.hasOwnProperty.call(c, part)) {
+      c = (c as Record<string, unknown>)[part];
+    } else if (i === 0 && recur && isRegisteredConstant(part)) {
+      c = registeredConstant(part);
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * Ruby's `Module.new` — an anonymous module built at runtime and populated
@@ -55,7 +174,7 @@ type ModuleHooks = {
  *
  * @noRailsEquivalent PERMANENT — a Ruby core class, not a Rails one.
  */
-export class Module {
+export class Module<I extends object = Record<never, never>> {
   /**
    * Mirrors: Ruby's Module.new — vendor/ruby/v3.3.11/object.c:1950
    * `rb_mod_initialize`, which hands a given block the new module
@@ -68,14 +187,49 @@ export class Module {
   }
 
   /**
+   * Mirrors: Ruby's Module#to_s — vendor/ruby/v3.3.11/object.c:1710
+   * `rb_mod_to_s`, the method `Module#inspect` is an alias of
+   * (vendor/ruby/v3.3.11/object.c:4438-4439).
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  toS(): string {
+    return this.name ?? rbAnyToS(this);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#inspect — vendor/ruby/v3.3.11/object.c:1710
+   * `rb_mod_to_s`, which renders `rb_class_name`: the classpath, or the
+   * `#<Klass:0x…>` path `make_temporary_path` (vendor/ruby/v3.3.11/variable.c:320)
+   * gives an anonymous one.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  inspect(): string {
+    return modToS.call(this);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#name — vendor/ruby/v3.3.11/variable.c:122
+   * `rb_mod_name`: the classpath `const_set` gave the module, or `nil` while
+   * it is anonymous.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  get name(): string | null {
+    return classpaths.get(this)?.path ?? null;
+  }
+
+  /**
    * Mirrors: Ruby's Module#module_eval — vendor/ruby/v3.3.11/vm_eval.c:2128
    * `rb_mod_module_eval` — yields the module's method table.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  moduleEval<T>(block: (mod: Record<string, unknown>) => T): T {
-    const carrier = carrierOf(this);
-    const before = Object.getOwnPropertyDescriptors(carrier);
+  moduleEval<T>(block: (mod: Partial<I> & Record<string, unknown>) => T): T {
+    const carrier = carrierOf(this) as Partial<I> & Record<string, unknown>;
+    const before: Record<PropertyKey, PropertyDescriptor | undefined> =
+      Object.getOwnPropertyDescriptors(carrier);
     const result = block(carrier);
     const installed = trackedKeys(carrier);
     for (const key of installed) {
@@ -95,6 +249,16 @@ export class Module {
    * included is skipped (`include_modules_at`, class.c:1281,1291,1296). A
    * module defining `appendFeatures` gets that call instead, then `included`,
    * as `rb_mod_include` sends both (vendor/ruby/v3.3.11/eval.c:1159-1160).
+   * `ensure_includable` (class.c:1168-1176) rejects a Ruby `Class`; a TS class
+   * passed here is a class module, the spelling {@link include} already takes
+   * for a Ruby module that carries accessors, so its prototype methods are
+   * the module's method table.
+   *
+   * A plain-object module's getter and setter are methods too (`def title` /
+   * `def title=`), so the pair is carried as an accessor, uncalled. An ES
+   * module namespace (`import * as Helper`) is the exception: its exports are
+   * functions a bundler may serve through getters, so each is read and
+   * installed as the method it names.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
@@ -102,7 +266,11 @@ export class Module {
     const appendFeatures = featureHook(mod, "appendFeatures");
     if (appendFeatures) {
       appendFeatures(this);
-      featureHook(mod, "included")?.(this);
+      if (typeof (mod as ModuleHooks)[included] === "function") {
+        (mod as ModuleHooks)[included]!(this);
+      } else {
+        featureHook(mod, "included")?.(this);
+      }
       return this;
     }
     const carrier = carrierOf(this);
@@ -115,16 +283,27 @@ export class Module {
         return this;
       }
       const installed = trackedKeys(carrier);
-      const members = mod as Record<string, unknown>;
-      for (const key of Object.keys(members)) {
-        if (/^[A-Z]/.test(key) || typeof members[key] !== "function") continue;
+      const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
+        string,
+        unknown
+      >;
+      const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
+      for (const key of typeof mod === "function"
+        ? Object.getOwnPropertyNames(members)
+        : Object.keys(members)) {
+        if (key === "constructor") continue;
+        const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
+        const accessor = !("value" in descriptor) && namespace !== "Module";
+        if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
         if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
         installed.add(key);
-        Object.defineProperty(carrier, key, {
-          value: members[key],
-          writable: true,
-          configurable: true,
-        });
+        Object.defineProperty(
+          carrier,
+          key,
+          accessor
+            ? { get: descriptor.get, set: descriptor.set, configurable: true }
+            : { value: members[key], writable: true, configurable: true },
+        );
       }
       relinkIncluders(this);
     }
@@ -132,6 +311,18 @@ export class Module {
       (mod as ModuleHooks)[included]!(this);
     }
     return this;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#include? — vendor/ruby/v3.3.11/class.c:1538
+   * `rb_mod_include_p`, which walks the module's ancestry, so a module
+   * included by an included module answers true.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  isInclude(mod2: object): boolean {
+    if (isModuleMethodTablePresent({ prototype: carrierOf(this) }, mod2)) return true;
+    return (nestedModules.get(this) ?? []).some((nested) => nested.isInclude(mod2));
   }
 
   /**
@@ -166,14 +357,47 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#instance_methods — vendor/ruby/v3.3.11/class.c:1889
-   * `rb_class_instance_methods`.
+   * Mirrors: Ruby's Module#ancestors — vendor/ruby/v3.3.11/class.c:1570
+   * `rb_mod_ancestors`: the module, then the modules it includes, most
+   * recently included first, each followed by its own.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  instanceMethods(): string[] {
-    const carrier = carrierOf(this);
-    return Object.getOwnPropertyNames(carrier).filter((name) => !isUndefEntry(carrier, name));
+  ancestors(): object[] {
+    const ary: object[] = [this];
+    const carrier = carrierOf(this) as Record<symbol, unknown>;
+    const mods = Object.prototype.hasOwnProperty.call(carrier, includedModulesKey)
+      ? [...(carrier[includedModulesKey] as Set<object>)]
+      : [];
+    for (const mod of mods.reverse()) {
+      for (const m of mod instanceof Module ? mod.ancestors() : [mod]) {
+        if (!ary.includes(m)) ary.push(m);
+      }
+    }
+    return ary;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#instance_methods — vendor/ruby/v3.3.11/class.c:1889
+   * `rb_class_instance_methods`, whose `include_super` defaults to true: the
+   * methods of the module's ancestors follow its own, and a name a nearer
+   * module undefines stays hidden.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  instanceMethods(includeSuper: boolean = true): string[] {
+    const seen = new Set<string>();
+    const ary: string[] = [];
+    for (const mod of includeSuper ? this.ancestors() : [this]) {
+      if (!(mod instanceof Module)) continue;
+      const carrier = carrierOf(mod);
+      for (const name of Object.getOwnPropertyNames(carrier)) {
+        if (seen.has(name)) continue;
+        seen.add(name);
+        if (!isUndefEntry(carrier, name)) ary.push(name);
+      }
+    }
+    return ary;
   }
 
   /**
@@ -258,18 +482,36 @@ export class Module {
     if (typeof instanceInitializer === "function") {
       trackInstanceInitializer(base.prototype, instanceInitializer);
     }
-    const proto = base.prototype as object;
+    const proto = prependOrigins.get(base.prototype as object) ?? (base.prototype as object);
     const link = Object.create(Object.getPrototypeOf(proto)) as object;
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
     let links = includerCarriers.get(this);
     if (!links) includerCarriers.set(this, (links = []));
     links.push(link);
+    UNDEF_METHOD_TABLES.add(link);
+    Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(proto, link);
   }
 
   /**
    * Mirrors: Ruby's Module#prepend_features — vendor/ruby/v3.3.11/eval.c:1175
    * `rb_mod_prepend_features`, the splice `prepend` runs before `prepended`.
+   * `rb_prepend_module` (vendor/ruby/v3.3.11/class.c:1430) moves the class's
+   * method table to an origin iclass (`ensure_origin`, class.c:1379) and
+   * splices the module between the class and that origin, so `superMethod`
+   * resumes at the class's own method. Here the origin holds the class's
+   * methods of the names the module defines; a later `include` is spliced
+   * beneath it, as `rb_include_module` splices at `RCLASS_ORIGIN`
+   * (class.c:1186). The origin is an iclass owned by the class, so
+   * `rbClassSuperclass` skips it and `methodOwner` answers the class for a
+   * method it holds.
+   *
+   * Two things MRI does have no JS counterpart. A method assigned to the
+   * class after the prepend lands on the class, above the module, where
+   * Ruby's `def` lands in the origin; and a moved method that calls
+   * `super.name()` resumes from the class, its home object, and so re-enters
+   * the module. A class whose own property of one of the module's names
+   * cannot be moved raises `TypeError`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
@@ -279,11 +521,34 @@ export class Module {
     if (typeof instanceInitializer === "function") {
       trackInstanceInitializer(base.prototype, instanceInitializer, prependedInstanceInitializers);
     }
+    const proto = base.prototype as object;
     const source = carrierOf(this);
-    for (const key of Object.getOwnPropertyNames(source)) {
-      const descriptor = Object.getOwnPropertyDescriptor(source, key);
-      if (descriptor) Object.defineProperty(base.prototype, key, descriptor);
+    let origin = prependOrigins.get(proto);
+    if (!origin) {
+      origin = iclassBeneath(proto, Object.getPrototypeOf(proto) as object | null);
+      Object.defineProperty(origin, T_ICLASS, {
+        value: typeof proto === "function" ? proto : proto.constructor,
+      });
+      prependOrigins.set(proto, origin);
+      Object.setPrototypeOf(proto, origin);
     }
+    for (const key of Object.getOwnPropertyNames(source)) {
+      const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+      if (descriptor === undefined) continue;
+      if (!descriptor.configurable) {
+        throw new TypeError(`prepend: cannot move ${key}, a non-configurable own property`);
+      }
+      Object.defineProperty(origin, key, descriptor);
+      delete (proto as Record<string, unknown>)[key];
+    }
+    const link = iclassBeneath(proto, Object.getPrototypeOf(proto) as object | null);
+    Object.defineProperties(link, Object.getOwnPropertyDescriptors(source));
+    let links = includerCarriers.get(this);
+    if (!links) includerCarriers.set(this, (links = []));
+    links.push(link);
+    UNDEF_METHOD_TABLES.add(link);
+    Object.defineProperty(link, T_ICLASS, { value: this });
+    Object.setPrototypeOf(proto, link);
   }
 
   /**
@@ -323,8 +588,10 @@ export class Module {
     if (!links) singletonCarriers.set(this, (links = { members: new WeakSet(), refs: new Set() }));
     const ref = new WeakRef(link);
     links.members.add(link);
+    UNDEF_METHOD_TABLES.add(link);
     links.refs.add(ref);
     singletonReaper.register(link, { mod: this, ref });
+    Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(obj, link);
   }
 
@@ -339,6 +606,10 @@ export class Module {
    * A JS function's `super` is fixed to its home object, which for a carrier
    * method is the module's own table, not the includer's link, so the link is
    * found on the receiver's prototype chain instead.
+   *
+   * Every ancestry ends in `Object`, which includes `Kernel`, so a `super` that
+   * no link beneath the caller answers reaches `Kernel`'s method. No JS object
+   * stands at that root, so the search ends in the `Kernel` module's table.
    *
    * A reader and writer generated as one accessor pair are two Ruby methods,
    * `name` and `name=`, so `name` answers the next getter and `name=` the next
@@ -364,11 +635,34 @@ export class Module {
             ? (descriptor.value as (...args: unknown[]) => unknown).bind(receiver)
             : undefined;
         }
-        return undefined;
+        const root = writer ? undefined : Kernel.instanceMethod(key)?.value;
+        return typeof root === "function"
+          ? (root as (...args: unknown[]) => unknown).bind(receiver)
+          : undefined;
       }
       proto = Object.getPrototypeOf(proto) as object | null;
     }
     return undefined;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#attr_reader — vendor/ruby/v3.3.11/object.c:2279
+   * `rb_mod_attr_reader`.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  attrReader(...argv: string[]): void {
+    this.moduleEval((mod) => rbModAttrReader({ prototype: mod }, ...argv));
+  }
+
+  /**
+   * Mirrors: Ruby's Module#attr_writer — vendor/ruby/v3.3.11/object.c:2335
+   * `rb_mod_attr_writer`.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  attrWriter(...argv: string[]): void {
+    this.moduleEval((mod) => rbModAttrWriter({ prototype: mod }, ...argv));
   }
 
   /**
@@ -408,6 +702,8 @@ export class Module {
   }
 }
 
+const modToS = Module.prototype.toS;
+
 const carriers = new WeakMap<Module, Record<string, unknown>>();
 
 const nestedModules = new WeakMap<Module, Module[]>();
@@ -436,6 +732,14 @@ const singletonCarriers = new WeakMap<
 const singletonReaper = new FinalizationRegistry<{ mod: Module; ref: WeakRef<object> }>(
   ({ mod, ref }) => singletonCarriers.get(mod)?.refs.delete(ref),
 );
+
+const prependOrigins = new WeakMap<object, object>();
+
+function iclassBeneath(obj: object, parent: object | null): object {
+  return typeof obj === "function" && typeof parent === "function" && parent !== Function.prototype
+    ? class extends (parent as new (...args: never[]) => object) {}
+    : (Object.create(parent) as object);
+}
 
 function isLinkOf(mod: Module, proto: object): boolean {
   return (
@@ -508,6 +812,22 @@ export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
  * (`abstract_controller/base.rb`), so it has no `super` site to hook and a
  * mixin included there is seated by whichever subclass root does.
  *
+ * A class module's generator `initialize`, included into a class that has a
+ * superclass, is instead spliced between that class and its superclass, where
+ * `rb_include_module` puts the module: a `super(...)` call, and the implicit
+ * one of a class that declares no constructor, resolves its target through the
+ * class's prototype when it runs. So `ActiveRecord::Type::Internal::Timezone#initialize`
+ * (activerecord/lib/active_record/type/internal/timezone.rb:7-10) wraps its
+ * includer's construction. The value the generator yields is the argument list
+ * of an explicit `super(...)`, and a bare `yield` forwards the arguments it was
+ * called with. A constructor has no `this` until its `super(...)` returns, so
+ * the code before the `yield` runs once with `this` undefined, to read those
+ * arguments, and the whole body then runs against the instance: that code may
+ * only compute the arguments, and one that raises, or a superclass
+ * constructor that does, leaves the code after the `yield` unrun. A `Module`'s
+ * `initialize` that writes to `self` ahead of `super` (thor/actions.rb:72-85)
+ * therefore stays on the root's `super` site.
+ *
  * Symbol-keyed for the same reason `included` is: `initialize` is a Ruby
  * lifecycle name, and a string-named TS method spelled that way is drift.
  *
@@ -530,40 +850,79 @@ const prependedInstanceInitializers = Symbol.for(
  * `include_modules_at` skips a module whose method table it finds in the
  * superclass chain (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
  *
+ * `args` are the arguments a bare `super` forwards
+ * (vendor/ruby/v3.3.11/vm_insnhelper.c:5620 `rb_vm_invokesuper`), which is how
+ * `Thor::Shell#initialize(args, options, config)` (thor/shell.rb:44-48) reads
+ * `config[:shell]`.
+ *
+ * An `initialize` that runs code before its `super`, as
+ * `Thor::Actions#initialize` does (thor/actions.rb:72-85), is a generator
+ * function whose `yield` stands where Ruby's `super` does: the code before the
+ * `yield` runs before every initializer beneath it, the code after it once
+ * they have completed. One that raises closes the generators above it, so an
+ * `ensure` around `super` (a `finally` around the `yield`) runs and the code
+ * after the `yield` does not. Only a synchronous generator function is read
+ * this way: a constructor cannot await, so an async one is never resumed.
+ *
  * Mirrors: the `super` call in a class whose ancestry carries module
  * `initialize` definitions — vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
  *
  * @noRailsEquivalent PERMANENT — Ruby reaches these through `super`;
  * JavaScript has no construction hook a mixin can splice into.
  */
-export function initializeIncludedModules(instance: object): void {
-  const chain: Array<Array<(this: object) => void>> = [];
+export function initializeIncludedModules(instance: object, ...args: unknown[]): void {
+  const chain: Array<Array<(this: object, ...args: unknown[]) => void>> = [];
   for (
     let proto: object | null = Object.getPrototypeOf(instance) as object | null;
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    const level: Array<(this: object) => void> = [];
+    const level: Array<(this: object, ...args: unknown[]) => void> = [];
     for (const registry of [instanceInitializers, prependedInstanceInitializers]) {
       if (!Object.prototype.hasOwnProperty.call(proto, registry)) continue;
       level.push(
-        ...((proto as Record<symbol, unknown>)[registry] as Array<(this: object) => void>),
+        ...((proto as Record<symbol, unknown>)[registry] as Array<
+          (this: object, ...args: unknown[]) => void
+        >),
       );
     }
     if (level.length !== 0) chain.unshift(level);
+    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
   }
-  for (const initializers of chain) {
-    for (const initializer of initializers) initializer.call(instance);
-  }
+  const initializers = chain.flat();
+  const unwind = (index: number): void => {
+    if (index < 0) return;
+    const initializer = initializers[index];
+    if (Object.getPrototypeOf(initializer) === GeneratorFunction) {
+      const body = initializer.call(instance, ...args) as unknown as Generator;
+      body.next();
+      try {
+        unwind(index - 1);
+      } catch (error) {
+        body.return(undefined);
+        throw error;
+      }
+      if (body.next().done !== true) {
+        body.return(undefined);
+        throw new TypeError("an initialize generator yields once, where Ruby calls super");
+      }
+    } else {
+      unwind(index - 1);
+      initializer.call(instance, ...args);
+    }
+  };
+  unwind(initializers.length - 1);
 }
+
+const GeneratorFunction = Object.getPrototypeOf(function* () {}) as object;
 
 function trackInstanceInitializer(
   proto: object,
-  initializer: (this: object) => void,
+  initializer: (this: object, ...args: never[]) => void,
   registry: symbol = instanceInitializers,
 ): void {
   let list = (proto as Record<symbol, unknown>)[registry] as
-    | Array<(this: object) => void>
+    | Array<(this: object, ...args: never[]) => void>
     | undefined;
   if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
     list = [];
@@ -577,18 +936,47 @@ function trackInstanceInitializer(
   list!.push(initializer);
 }
 
+function spliceInstanceInitializer(
+  klass: AnyClass,
+  mod: object,
+  initializer: (this: object, ...args: never[]) => void | Generator,
+): void {
+  const superclass = Object.getPrototypeOf(klass) as new (...args: unknown[]) => object;
+  const link = class extends superclass {
+    constructor(...args: unknown[]) {
+      const zsuper = (
+        initializer.call(undefined as never, ...(args as never[])) as Generator<
+          unknown[] | undefined
+        >
+      ).next();
+      super(...(zsuper.done !== true && zsuper.value !== undefined ? zsuper.value : args));
+      const body = initializer.call(this, ...(args as never[])) as Generator;
+      body.next();
+      if (body.next().done !== true) {
+        body.return(undefined);
+        throw new TypeError("an initialize generator yields once, where Ruby calls super");
+      }
+    }
+  };
+  Object.defineProperty(link, T_ICLASS, { value: mod });
+  Object.setPrototypeOf(klass, link);
+}
+
 const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
+const extendedOwners = new WeakMap<object, Map<string, object>>();
+
+const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
 
 const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
-function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string> {
-  let set = (proto as Record<symbol, unknown>)[registry] as Set<string> | undefined;
+function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string | symbol> {
+  let set = (proto as Record<symbol, unknown>)[registry] as Set<string | symbol> | undefined;
   if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
-    set = new Set<string>();
+    set = new Set<string | symbol>();
     Object.defineProperty(proto, registry, {
       value: set,
       writable: true,
@@ -619,9 +1007,13 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
-    if (((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>).has(mod))
+    if (
+      Object.prototype.hasOwnProperty.call(proto, includedModulesKey) &&
+      ((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>).has(mod)
+    ) {
       return true;
+    }
+    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
   }
   return false;
 }
@@ -636,11 +1028,6 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
  * copies a module's members onto the prototype rather than splicing a link for
  * it. The registry `include()` keeps is that record.
  *
- * Ruby asks it through `included_modules.include?`, and `Array#include?`
- * compares with `==`, which a module may define by value
- * (`AcceptanceValidator::LazilyDefineAttributes#==`, acceptance.rb:71-73), so a
- * module carrying an `equals` is asked that too and not identity alone.
- *
  * Mirrors: Ruby's Module#include? — vendor/ruby/v3.3.11/class.c:1538
  * `rb_mod_include_p`.
  *
@@ -651,19 +1038,7 @@ export function isModuleIncluded(
   klass: { prototype: object },
   mod: ModuleObject | AnyClass | Module,
 ): boolean {
-  if (isModuleMethodTablePresent(klass, mod)) return true;
-  const eq = (mod as { equals?: (other: unknown) => boolean }).equals;
-  if (typeof eq !== "function") return false;
-  for (
-    let proto: object | null = klass.prototype;
-    proto;
-    proto = Object.getPrototypeOf(proto) as object | null
-  ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
-    const mods = (proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>;
-    for (const m of mods) if (eq.call(mod, m)) return true;
-  }
-  return false;
+  return isModuleMethodTablePresent(klass, mod);
 }
 
 /**
@@ -689,6 +1064,240 @@ export function includedModules(mod: { prototype: object }): unknown[] {
     for (const m of mods.reverse()) if (!result.includes(m)) result.push(m);
   }
   return result;
+}
+
+/**
+ * Ruby's `Module#ancestors`: the class, the modules mixed into it most
+ * recently first, and then the same for each superclass up to `Object`.
+ * `rb_mod_ancestors` reads the iclass of an included module off the
+ * superclass chain; the registry `include()` keeps on each prototype is that
+ * record here.
+ *
+ * `Object.prototype` is the seat of `Object`, whose own ancestry
+ * (`Kernel`, `BasicObject`) no JS prototype carries.
+ *
+ * Mirrors: Ruby's Module#ancestors — vendor/ruby/v3.3.11/class.c:1570
+ * `rb_mod_ancestors`.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModAncestors(mod: { prototype: object }): object[] {
+  const ary: object[] = [];
+  for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
+    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+      const klass = (p as { constructor: object }).constructor;
+      if (!ary.includes(reopened(klass))) ary.push(klass);
+    }
+    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+      const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
+      for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
+    }
+    if (p === Uint8Array.prototype) {
+      for (const m of rbModAncestors(rbCString)) if (!ary.includes(m)) ary.push(m);
+      return ary;
+    }
+    if (p === Object.prototype) ary.push(Kernel, rbCBasicObject);
+  }
+  return ary;
+}
+
+/**
+ * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:889`), `Object#kind_of?`
+ * and `Module#===`: whether `c` is in the ancestry of `obj`'s class. A plain
+ * object is a module's seat, as `include()` takes one, and JS's own `Set` is
+ * the seat of the `Set` that reopens it (`class Set extends JsSet`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
+  if (
+    (typeof c === "function" || (typeof c === "object" && c !== null)) &&
+    singletonSearchAncestor(obj, c)
+  ) {
+    return true;
+  }
+  const cl = rbObjClass(obj) as { prototype: object };
+
+  if (cl === c) return true;
+
+  if (typeof c === "function" || (typeof c === "object" && c !== null)) {
+    return classSearchAncestor(cl, c);
+  } else {
+    throw new TypeError("class or module required");
+  }
+}
+
+/**
+ * `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`) over the
+ * singleton class `CLASS_OF(obj)` starts at: the modules `obj` was `extend`ed
+ * with, and for a class those of its superclasses too.
+ */
+function singletonSearchAncestor(obj: unknown, c: object): boolean {
+  if (typeof obj !== "function" && (typeof obj !== "object" || obj === null)) return false;
+  for (
+    let p: object | null = obj;
+    p;
+    p = typeof p === "function" ? (Object.getPrototypeOf(p) as object | null) : null
+  ) {
+    if (!Object.hasOwn(p, extendedKeys) || !Object.hasOwn(p, includedModulesKey)) continue;
+    const mods = (p as Record<symbol, unknown>)[includedModulesKey] as Set<object>;
+    if (mods.has(c)) return true;
+    if (typeof c !== "object") continue;
+    for (const m of mods) {
+      if (typeof m === "object" && Object.prototype.isPrototypeOf.call(c, m)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * `rb_class_inherited_p` (`vendor/ruby/v3.3.11/object.c:1778`), `Module#<=`:
+ * true when `mod` is `arg` or has it in its ancestry, false when `arg` has
+ * `mod` in its own, and nil when the two are unrelated. The class-to-class
+ * arm reads `RCLASS_SUPERCLASS_DEPTH`, a cache no JS class carries, so both
+ * arms search the ancestry.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassInheritedP(mod: unknown, arg: unknown): boolean | null {
+  if (mod === arg) return true;
+
+  if (typeof arg !== "function" && (typeof arg !== "object" || arg === null)) {
+    throw new TypeError("compared with non class/module");
+  }
+  if (classSearchAncestor(mod as { prototype: object }, arg)) {
+    return true;
+  }
+  if (classSearchAncestor(arg as { prototype: object }, mod as object)) {
+    return false;
+  }
+  return null;
+}
+
+/** `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`). */
+function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
+  for (let p: object | null = cl.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
+    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+      const klass = (p as { constructor: object }).constructor;
+      if (klass === c || klass === reopened(c)) return true;
+    }
+    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+      if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
+    }
+    if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
+    if (p === globalThis.Set.prototype && c === registeredConstant("Set")) return true;
+    if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
+  }
+  return false;
+}
+
+/**
+ * `rb_mod_instance_method` (`vendor/ruby/v3.3.11/proc.c:2190`), `Module#instance_method`,
+ * answering the `owner` (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`): the
+ * {@link rbModAncestors} entry that defines `mid`. That is the `Module` an
+ * iclass link stands for, the module `include()` copied the entry from, most
+ * recently included first, or the class the prototype belongs to.
+ *
+ * An `Object.prototype` member raises `NameError`: no Ruby class defines it,
+ * the line `rbModPublicMethodDefined` draws for `Module#method_defined?`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModInstanceMethod(mod: { prototype: object }, mid: string): UnboundMethod {
+  const method = mnewUnbound(mod.prototype, mid);
+  if (method !== null) return method;
+  throw new NameError(
+    `undefined method '${mid}' for class '${rbModToS(mod as unknown as new () => unknown)}'`,
+    mid,
+  );
+}
+
+/**
+ * `rb_mod_public_instance_method` (`vendor/ruby/v3.3.11/proc.c:2207`),
+ * `Module#public_instance_method`. Visibility is compile-time only, so it answers
+ * as {@link rbModInstanceMethod} does.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModPublicInstanceMethod(mod: { prototype: object }, mid: string): UnboundMethod {
+  return rbModInstanceMethod(mod, mid);
+}
+
+/**
+ * Ruby's `UnboundMethod`, as far as trails reads one: `owner`
+ * (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`), `super_method`
+ * (`method_super_method`, `:3391`) and `bind_call` (`umethod_bind_call`, `:2713`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface UnboundMethod {
+  owner: object;
+  superMethod(): UnboundMethod | null;
+  bindCall(recv: object, ...args: unknown[]): unknown;
+}
+
+function mnewUnbound(start: object | null, mid: string): UnboundMethod | null {
+  const entry = methodEntry(start, mid);
+  if (entry === null) return null;
+  return {
+    owner: entryOwner(entry, mid),
+    superMethod: () => mnewUnbound(Object.getPrototypeOf(entry) as object | null, mid),
+    bindCall: (recv, ...args) => {
+      const desc = Object.getOwnPropertyDescriptor(entry, mid)!;
+      if (typeof desc.value === "function") {
+        return (desc.value as (...a: unknown[]) => unknown).apply(recv, args);
+      }
+      return desc.get ? desc.get.call(recv) : desc.value;
+    },
+  };
+}
+
+function methodEntry(start: object | null, mid: string): object | null {
+  for (
+    let link: object | null = start;
+    link && link !== Object.prototype;
+    link = Object.getPrototypeOf(link) as object | null
+  ) {
+    if (Object.hasOwn(link, mid)) return link;
+  }
+  return null;
+}
+
+/**
+ * `method_owner` (`vendor/ruby/v3.3.11/proc.c:1988`) for the entry `mid` names from
+ * `start`, or nil when there is none. An entry `extend()` copied onto an
+ * object is owned by the module it came from, and a class's own static by the
+ * class, which stands for its singleton class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function methodOwner(start: object, mid: string): object | null {
+  const entry = methodEntry(start, mid);
+  return entry === null ? null : entryOwner(entry, mid);
+}
+
+function entryOwner(link: object, mid: string): object {
+  const table = link as Record<symbol, unknown>;
+  if (Object.hasOwn(link, T_ICLASS)) return table[T_ICLASS] as object;
+  if (Object.hasOwn(link, includedKeys) && (table[includedKeys] as Set<string>).has(mid)) {
+    const mods = [...(table[includedModulesKey] as Set<object>)].reverse();
+    const owner = mods.find((m) => {
+      if (m instanceof Module) return false;
+      if (typeof m === "function") return Object.hasOwn(m.prototype as object, mid);
+      return methodEntry(m, mid) !== null;
+    });
+    if (owner !== undefined) return owner;
+  }
+  if (Object.hasOwn(link, extendedKeys) && (table[extendedKeys] as Set<string>).has(mid)) {
+    const defined = extendedOwners.get(link)?.get(mid);
+    if (defined !== undefined) return defined;
+    for (const m of [...(table[includedModulesKey] as Set<object>)].reverse()) {
+      const owner = m instanceof Module ? null : methodEntry(m, mid);
+      if (owner !== null) return owner;
+    }
+  }
+  if (typeof link === "function" && link !== Function.prototype) return link;
+  return link.constructor;
 }
 
 /**
@@ -817,7 +1426,17 @@ type CallableMethods<M extends object> = {
       : never;
 };
 
-export type Included<M extends object> = CallableMethods<M>;
+export type Included<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
+
+/** @noRailsEquivalent PERMANENT */
+export type Initialized<K extends abstract new (...args: never[]) => object, M> = (new (
+  ...args: M extends { [initialize]: (...args: infer A) => unknown } ? A : never
+) => InstanceType<K>) &
+  Pick<K, keyof K>;
+
+function isClass(klass: object): klass is AnyClass {
+  return typeof klass === "function";
+}
 
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
   if (!(mod instanceof Module)) return undefined;
@@ -833,11 +1452,21 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) {
     appendFeatures(klass);
-    featureHook(mod, "included")?.(klass);
+    if (typeof (mod as ModuleHooks)[included] === "function") {
+      (mod as ModuleHooks)[included]!(klass);
+    } else {
+      featureHook(mod, "included")?.(klass);
+    }
+    return;
+  }
+  if (!isClass(klass)) {
+    if (typeof (mod as ModuleHooks)[included] === "function") {
+      (mod as ModuleHooks)[included]!(klass);
+    }
     return;
   }
   if (isModuleMethodTablePresent(klass, mod)) {
@@ -856,7 +1485,15 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
-    trackInstanceInitializer(klass.prototype, instanceInitializer);
+    if (
+      typeof mod === "function" &&
+      Object.getPrototypeOf(instanceInitializer) === GeneratorFunction &&
+      rbClassSuperclass(klass) !== null
+    ) {
+      spliceInstanceInitializer(klass, mod, instanceInitializer);
+    } else {
+      trackInstanceInitializer(klass.prototype, instanceInitializer);
+    }
   }
   const descriptors: PropertyDescriptorMap = {};
   const installed = trackedKeys(klass.prototype);
@@ -896,8 +1533,14 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
       let ancestor: object | null = mod as ModuleObject;
       ancestor && ancestor !== Object.prototype;
     ) {
-      for (const [key, modDesc] of Object.entries(Object.getOwnPropertyDescriptors(ancestor))) {
-        if (key === "constructor" || /^[A-Z]/.test(key)) continue;
+      const modDescs = Object.getOwnPropertyDescriptors(ancestor) as Record<
+        string | symbol,
+        PropertyDescriptor
+      >;
+      for (const key of [...Object.keys(modDescs), Symbol.iterator, Symbol.asyncIterator]) {
+        const modDesc = modDescs[key];
+        if (modDesc === undefined) continue;
+        if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(descriptors, key)) continue;
         if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {
@@ -921,25 +1564,220 @@ export type Extended<M extends object> = CallableMethods<M>;
 /**
  * Mirrors: Ruby's Object#clone — vendor/ruby/v3.3.11/object.c:536 `rb_obj_clone`, via
  * `rb_obj_clone_setup` (:457-527): a new object of the same class carrying a
- * copy of the receiver's singleton class and instance variables, frozen when
- * the receiver is. The singleton class is copied, not shared, so the clone's
- * `extend()` registries are its own.
+ * copy of the receiver's singleton class and instance variables (`init_copy`),
+ * then `initialize_clone(orig)` dispatched on the copy, which is frozen after
+ * that hook runs when the receiver is. The singleton class is copied, not
+ * shared, so the clone's `extend()` registries are its own. A JS primitive is
+ * MRI's `special_object_p` (:380-393) and is returned as is (:539), as is a
+ * Temporal value; an array is allocated as one (`rb_obj_alloc`), so its
+ * elements, which Ruby copies in `Array#initialize_copy` (`array.c:8613`,
+ * `rb_ary_replace`), land on a real array, and so are a JS `Date`, `Map`, `Set`
+ * and `RegExp`. A class with an allocator ({@link rbDefineAllocFunc}) is
+ * allocated through it. The copy hook is found as a method entry.
+ *
+ * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
+ * `initialize_copy` (`rb_obj_init_clone` / `rb_obj_init_dup_clone`, object.c:4382-4383), so a
+ * receiver that defines only `initializeCopy` gets it here. This and
+ * {@link rbObjDup} are the one spelling of Ruby `obj.clone` / `obj.dup`; a
+ * class ports `initialize_clone` / `initialize_dup` / `initialize_copy` at
+ * their Rails names and never open-codes the copy.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function rbObjClone<T extends object>(obj: T): T {
-  const descriptors = Object.getOwnPropertyDescriptors(obj) as Record<
-    string | symbol,
-    PropertyDescriptor
-  >;
+export function rbObjClone<T>(obj: T): T {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
+  if (temporalTag(obj) !== null) return obj;
+  const frozen = Object.isFrozen(obj);
+  const descriptors = copiedDescriptors(obj, frozen);
   for (const registry of [extendedKeys, includedModulesKey]) {
     const table = descriptors[registry];
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
-  const clone = Object.create(Object.getPrototypeOf(obj) as object | null, descriptors) as T;
-  if (Object.isFrozen(obj)) Object.freeze(clone);
-  return clone;
+  const alloc = rbObjAlloc(obj, Object.getPrototypeOf(obj));
+  if (isClassConstructor(obj)) copyMethodTable(obj, alloc, descriptors);
+  const clone = Object.defineProperties(alloc, descriptors);
+  const defined = extendedOwners.get(obj);
+  if (defined) extendedOwners.set(clone, new Map(defined));
+  initCopyHook(clone, "initializeClone", obj);
+  if (frozen) Object.freeze(clone);
+  return clone as T;
+}
+
+/**
+ * Mirrors: Ruby's Object#dup — vendor/ruby/v3.3.11/object.c:591 `rb_obj_dup`, via
+ * `rb_obj_dup_setup` (:543-549): a new object of `rb_obj_class(obj)` — the
+ * singleton class and the modules it was `extend`ed with are not carried —
+ * holding a copy of the instance variables, then `initialize_dup(orig)`
+ * dispatched on the copy. The frozen state is not carried either. A primitive
+ * and an array are handled as in {@link rbObjClone}.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
+ * uses but does not define.
+ */
+export function rbObjDup<T>(obj: T): T {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
+  if (temporalTag(obj) !== null) return obj;
+  const descriptors = copiedDescriptors(obj, true);
+  const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
+    ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
+    : undefined;
+  if (!isClassConstructor(obj)) {
+    for (const key of [extendedKeys, includedModulesKey, ...(singletonKeys ?? [])]) {
+      delete descriptors[key];
+    }
+  }
+  let proto = Object.getPrototypeOf(obj) as object | null;
+  if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+    proto = Object.getPrototypeOf(proto) as object | null;
+  }
+  const alloc = rbObjAlloc(obj, proto);
+  if (isClassConstructor(obj)) copyMethodTable(obj, alloc, descriptors);
+  const dup = Object.defineProperties(alloc, descriptors);
+  initCopyHook(dup, "initializeDup", obj);
+  return dup as T;
+}
+
+const allocFuncs = new WeakMap<object, (klass: never) => object>();
+
+/**
+ * `rb_define_alloc_func` (`vendor/ruby/v3.3.11/vm_method.c:1270`): the allocator
+ * for `klass` and its subclasses (`rb_get_alloc_func`, `:1286`), declared when
+ * instances hold state `Object.create` cannot make (`#private` fields, a Proxy).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbDefineAllocFunc<K extends abstract new (...args: never) => object>(
+  klass: K,
+  func: (klass: K) => InstanceType<K>,
+): void {
+  allocFuncs.set(klass, func);
+}
+
+/**
+ * `rb_get_alloc_func` (`vendor/ruby/v3.3.11/vm_method.c:1286`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | undefined {
+  for (; typeof klass === "function"; klass = Object.getPrototypeOf(klass)) {
+    const allocator = allocFuncs.get(klass);
+    if (allocator) return allocator;
+  }
+}
+
+/**
+ * `rb_class_new_instance` (`vendor/ruby/v3.3.11/object.c:2158`), `Class#new`
+ * with no arguments. A Hash is a plain object (CLAUDE.md, "Ruby idioms that
+ * do not translate literally") and a String a primitive (CLAUDE.md, "Ruby
+ * Strings are JS string primitives"), so `empty_hash_alloc`
+ * (`vendor/ruby/v3.3.11/hash.c:1488`) is `{}` and `empty_str_alloc`
+ * (`vendor/ruby/v3.3.11/string.c:858`) is `""`. `Class.new` is an anonymous
+ * class (`rb_class_initialize`, `vendor/ruby/v3.3.11/object.c:2007`), and
+ * `Regexp.new` takes one to three arguments (`rb_reg_initialize_m`,
+ * `vendor/ruby/v3.3.11/re.c:3957`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassNewInstance(klass: unknown): unknown {
+  if (klass === Hash) return {};
+  if (klass === rbCString) return "";
+  if (klass === rbCClass) return class {};
+  if (klass === RegExp) {
+    throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");
+  }
+  return new (klass as new () => unknown)();
+}
+
+function classAlloc(orig: AnyClass, superclass: object | null): object {
+  const clone = function (...args: never[]): object {
+    if (new.target === undefined) {
+      throw new TypeError("Class constructor cannot be invoked without 'new'");
+    }
+    return Reflect.construct(orig, args, new.target);
+  };
+  return Object.setPrototypeOf(clone, superclass);
+}
+
+function copyMethodTable(
+  orig: AnyClass,
+  clone: object,
+  descriptors: Record<string | symbol, PropertyDescriptor>,
+): void {
+  const mTbl = Object.getOwnPropertyDescriptors(orig.prototype) as Record<
+    string | symbol,
+    PropertyDescriptor
+  >;
+  Object.defineProperty(mTbl, "constructor", {
+    value: { ...Object.getOwnPropertyDescriptor(orig.prototype, "constructor"), value: clone },
+    enumerable: true,
+  });
+  const table = mTbl[includedModulesKey];
+  if (table) mTbl[includedModulesKey] = { ...table, value: new Set(table.value as Set<unknown>) };
+  descriptors["prototype"] = {
+    value: Object.create(Object.getPrototypeOf(orig.prototype) as object | null, mTbl),
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  };
+  descriptors["name"] = { ...descriptors["name"], value: "" };
+}
+
+function isClassConstructor(obj: object): obj is AnyClass {
+  return (
+    typeof obj === "function" &&
+    Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
+  );
+}
+
+function rbObjAlloc(obj: object, proto: object | null): object {
+  if (isClassConstructor(obj)) return classAlloc(obj, proto);
+  const klass = (proto as { constructor?: unknown } | null)?.constructor;
+  const allocator = rbGetAllocFunc(klass);
+  if (allocator) return Object.setPrototypeOf(allocator(klass as never), proto);
+  if (Array.isArray(obj)) return Object.setPrototypeOf([], proto);
+  if (obj instanceof Date) return Object.setPrototypeOf(new Date(obj.getTime()), proto);
+  if (obj instanceof Map) return Object.setPrototypeOf(new Map(obj), proto);
+  if (obj instanceof Set) return Object.setPrototypeOf(new Set(obj), proto);
+  if (obj instanceof RegExp) return Object.setPrototypeOf(new RegExp(obj), proto);
+  return Object.create(proto);
+}
+
+function copiedDescriptors(
+  obj: object,
+  unfreeze: boolean,
+): Record<string | symbol, PropertyDescriptor> {
+  const descriptors = Object.getOwnPropertyDescriptors(obj) as Record<
+    string | symbol,
+    PropertyDescriptor
+  >;
+  if (unfreeze) {
+    for (const key of Reflect.ownKeys(descriptors)) {
+      const descriptor = descriptors[key as string];
+      descriptor.configurable = !(
+        (key === "length" && Array.isArray(obj)) ||
+        (key === "lastIndex" && obj instanceof RegExp)
+      );
+      if (!descriptor.get && !descriptor.set) descriptor.writable = true;
+    }
+  }
+  return descriptors;
+}
+
+function initCopyHook(
+  copy: object,
+  hook: "initializeClone" | "initializeDup",
+  orig: unknown,
+): void {
+  for (const mid of [hook, "initializeCopy"]) {
+    for (let o: object | null = copy; o; o = Object.getPrototypeOf(o) as object | null) {
+      const me = Object.getOwnPropertyDescriptor(o, mid);
+      if (!me) continue;
+      if (typeof me.value !== "function") break;
+      (me.value as (orig: unknown) => unknown).call(copy, orig);
+      return;
+    }
+  }
 }
 
 /**
@@ -969,7 +1807,11 @@ export function rbObjClone<T extends object>(obj: T): T {
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+export function prepend(
+  target: AnyClass | (abstract new (...args: never) => object),
+  mod: ModuleObject | AnyClass | Module,
+): void {
+  const klass = target as AnyClass;
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) return prependFeatures(klass);
   if (isModuleMethodTablePresent(klass, mod)) return;
@@ -1000,9 +1842,17 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
  * the module's member of that name, while a later `extend()` wins over an
  * earlier one. Accessor halves are resolved independently, since Ruby reads a
  * getter (`key`) and a setter (`key=`) as two methods where TypeScript shares
- * one property name between them.
+ * one property name between them. The `name` a class is born with, declared
+ * or an expression, is not a method its body defines: it stands for
+ * `Module#name`, which a module method on the singleton class is found before,
+ * so a module's `name` replaces it. A born `name` is the non-writable one; a
+ * `static name` field or accessor the class body declares is not, and wins.
  *
- * Mirrors: Ruby's Object#extend — vendor/ruby/v3.3.11/eval.c:1778 `rb_obj_extend`.
+ * Mirrors: Ruby's Object#extend — vendor/ruby/v3.3.11/eval.c:1778 `rb_obj_extend`,
+ * which returns the receiver (:1800). `rb_extend_object` (:1713-1716) is
+ * `rb_include_module` on the receiver's singleton class, so the module's
+ * ancestors come with it: a plain-object module's prototype chain is walked,
+ * nearest first, as `include()` walks it.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
@@ -1011,21 +1861,57 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
  */
-export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
-  const extendedHook = featureHook(mod, "extended");
-  if (extendedHook) return extendedHook(klass);
-  if (mod instanceof Module) return mod.extendObject(klass);
-  const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
-  const keys = isClassModule
-    ? Object.getOwnPropertyNames(mod).filter((k) => !STATIC_CLASS_KEYS.has(k))
-    : Object.keys(mod);
-  const installed = trackedKeys(klass, extendedKeys);
+export function extend<T extends AnyClass | object>(
+  klass: T,
+  ...argv: Array<ModuleObject | AnyClass | Module>
+): T {
+  let argc = argv.length;
+  if (argc < 1) {
+    throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1+)`);
+  }
+  while (argc--) {
+    extendObject(klass, argv[argc]);
+  }
+  return klass;
+}
 
-  for (const key of keys) {
-    const modDesc = Object.getOwnPropertyDescriptor(mod, key);
+function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
+  const extendedHook = featureHook(mod, "extended");
+  if (extendedHook) {
+    extendedHook(klass);
+    return;
+  }
+  if (mod instanceof Module) {
+    mod.extendObject(klass);
+    return;
+  }
+  const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
+  const owners = new Map<string, object>();
+  if (isClassModule) {
+    for (const key of Object.getOwnPropertyNames(mod)) {
+      if (!STATIC_CLASS_KEYS.has(key)) owners.set(key, mod);
+    }
+  } else {
+    for (
+      let ancestor: object | null = mod;
+      ancestor && ancestor !== Object.prototype;
+      ancestor = Object.getPrototypeOf(ancestor) as object | null
+    ) {
+      for (const key of Object.keys(ancestor)) {
+        if (!owners.has(key)) owners.set(key, ancestor);
+      }
+    }
+  }
+  const installed = trackedKeys(klass, extendedKeys);
+  let defined = extendedOwners.get(klass);
+  if (!defined) extendedOwners.set(klass, (defined = new Map()));
+
+  for (const [key, owner] of owners) {
+    const modDesc = Object.getOwnPropertyDescriptor(owner, key);
     if (!modDesc || /^[A-Z]/.test(key)) continue;
     if (!modDesc.get && !modDesc.set && typeof modDesc.value !== "function") continue;
-    const existing = Object.getOwnPropertyDescriptor(klass, key);
+    const own = Object.getOwnPropertyDescriptor(klass, key);
+    const existing = key === "name" && own?.writable === false ? undefined : own;
     const writer = `${key}=`;
     const getterIsMixin = installed.has(key);
     const setterIsMixin = installed.has(writer);
@@ -1035,6 +1921,7 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
       : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
     if (!existing) {
       Object.defineProperty(klass, key, descriptor);
+      defined.set(key, owner);
       if (!modIsAccessor || modDesc.get != null) installed.add(key);
       if (modDesc.set != null) installed.add(writer);
       continue;
@@ -1049,10 +1936,14 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
         configurable: true,
         enumerable: false,
       });
-      if (takeGetter) installed.add(key);
+      if (takeGetter) {
+        installed.add(key);
+        defined.set(key, owner);
+      }
       if (takeSetter) installed.add(writer);
     } else if (getterIsMixin && (!existingIsAccessor || existing.set == null || setterIsMixin)) {
       Object.defineProperty(klass, key, descriptor);
+      defined.set(key, owner);
       if (modDesc.set != null) installed.add(writer);
     }
   }
@@ -1062,3 +1953,64 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
     (mod as ModuleHooks)[extended]!(klass);
   }
 }
+
+/**
+ * Ruby's `Kernel`, the module `Object` includes and so the last stop of every
+ * method search. It holds the instance methods a module's `super` reaches when
+ * nothing beneath it in the receiver's ancestry defines one: `initialize_dup`
+ * and `initialize_clone` (vendor/ruby/v3.3.11/object.c:654
+ * `rb_obj_init_dup_clone` and :671 `rb_obj_init_clone`, which send
+ * `initialize_copy`; `initialize_clone`'s `freeze:` keyword is not ported) and `freeze` (vendor/ruby/v3.3.11/object.c:1284
+ * `rb_obj_freeze`), defined at vendor/ruby/v3.3.11/object.c:4382,4385. A gem that reopens
+ * `Object` defines its method here, as ActiveSupport does for `as_json`.
+ * `abort` is the module function `Kernel.abort` (`rb_f_abort`,
+ * vendor/ruby/v3.3.11/process.c:4536), seated by `index.ts`, which loads both modules.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const Kernel = new Module((mod) => {
+  /** @noRailsEquivalent PERMANENT */
+  mod.defineMethod("dup", function (this: object): object {
+    return rbObjDup(this);
+  });
+  /** @noRailsEquivalent PERMANENT */
+  mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
+    const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
+    if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
+    return this;
+  });
+  /** @noRailsEquivalent PERMANENT */
+  mod.defineMethod("initializeClone", function (this: object, orig: unknown): object {
+    const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
+    if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
+    return this;
+  });
+  /** @noRailsEquivalent PERMANENT */
+  mod.defineMethod("freeze", function (this: object): object {
+    return Object.freeze(this);
+  });
+}) as Module & { abort: typeof abort };
+
+classpaths.set(Kernel, { path: "Kernel", permanent: true });
+classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
+
+// `rb_mComparable` (`vendor/ruby/v3.3.11/compar.c:315`).
+const rbMComparable = new Module();
+classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
+
+Object.setPrototypeOf(rbCClass, Module);
+Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
+
+rbDefineAllocFunc(Rational, (klass) => new klass(0, 1));
+classpaths.set(Rational, { path: "Rational", permanent: true });
+rbSetClassPathString(Rational.compatible, Rational, "compatible");
+for (const klass of [Rational, Complex, BigDecimal]) {
+  Object.setPrototypeOf(klass, rbCNumeric);
+  Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
+}
+
+include(rbCNumeric, rbMComparable);
+include(rbCString, rbMComparable);
+include(rbCTime, rbMComparable);
+include(rbCDate, rbMComparable);
+include(Hash, Enumerable);

@@ -37,6 +37,11 @@ describe("redirect()", () => {
     expect(r).toBeInstanceOf(Redirect);
     expect(r.status).toBe(301);
   });
+  it("takes a status with a trailing block", () => {
+    const r = redirect({ status: 302 }, () => "/dyn");
+    expect(r.status).toBe(302);
+    expect(r.path({}, {} as never)).toBe("/dyn");
+  });
 
   it("raises for unsupported arguments", () => {
     expect(() => redirect(123 as unknown as string)).toThrow(/not supported/);
@@ -131,8 +136,8 @@ describe("RouteSet#call through a Redirect endpoint", () => {
 
   it("serves the redirect the mapper attached to the route", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/account", { to: r.redirect("/dashboard") });
+    routes.draw(function () {
+      this.get("/account", { to: this.redirect("/dashboard") });
     });
 
     const [status, headers, body] = await routes.call(env("/account"));
@@ -144,8 +149,8 @@ describe("RouteSet#call through a Redirect endpoint", () => {
 
   it("hands the redirect block the path parameters Journey matched", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old/:id", { to: r.redirect((params) => `/new/${params.id}`) });
+    routes.draw(function () {
+      this.get("/old/:id", { to: this.redirect((params) => `/new/${params.id}`) });
     });
 
     const [status, headers] = await routes.call(env("/old/42"));
@@ -156,8 +161,8 @@ describe("RouteSet#call through a Redirect endpoint", () => {
 
   it("falls through to the Journey 404 when nothing matches", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/account", { to: r.redirect("/dashboard") });
+    routes.draw(function () {
+      this.get("/account", { to: this.redirect("/dashboard") });
     });
 
     const [status, headers] = await routes.call(env("/nope"));

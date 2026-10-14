@@ -7,6 +7,7 @@ import type { DrinkDesigner } from "./drink-designer.js";
 import type { MocktailDesigner } from "./drink-designer.js";
 import type { Recipe } from "./recipe.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Hotel extends Base {
   declare departments: AssociationProxy<Department>;
@@ -44,3 +45,4 @@ export class Hotel extends Base {
     this.hasMany("lostItems", { through: "departments" });
   }
 }
+registerModel(Hotel);

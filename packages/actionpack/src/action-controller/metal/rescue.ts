@@ -1,43 +1,33 @@
-export type RescueHandler = (error: Error) => void | Promise<void>;
+import { Concern, Module, Rescuable, extend, include } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
 
-export class RescueRegistry {
-  private _handlers: Array<{
-    errorClass: new (...args: unknown[]) => Error;
-    handler: RescueHandler;
-  }> = [];
-
-  rescueFrom(errorClass: new (...args: unknown[]) => Error, handler: RescueHandler): void {
-    this._handlers.push({ errorClass, handler });
-  }
-
-  findHandler(error: Error): RescueHandler | null {
-    for (const { errorClass, handler } of [...this._handlers].reverse()) {
-      if (error instanceof errorClass) return handler;
-    }
-    return null;
-  }
-
-  async processWithRescue(fn: () => void | Promise<void>): Promise<void> {
-    try {
-      await fn();
-    } catch (error) {
-      if (error instanceof Error) {
-        const handler = this.findHandler(error);
-        if (handler) {
-          await handler(error);
-          return;
-        }
-      }
-      throw error;
-    }
-  }
+interface RescueHost {
+  request: { env: Record<string, unknown> };
+  isShowDetailedExceptions(): boolean;
+  rescueWithHandler(exception: unknown): unknown;
 }
 
-export function showDetailedExceptions(options?: {
-  considerAllRequestsLocal?: boolean;
-  requestLocal?: boolean;
-}): boolean {
-  if (options?.considerAllRequestsLocal) return true;
-  if (options?.requestLocal) return true;
+export const Rescue: Module = new Module((mod) => {
+  extend(mod, Concern);
+  include(mod, Rescuable);
+
+  mod.defineMethod("isShowDetailedExceptions", isShowDetailedExceptions);
+  mod.defineMethod("processAction", processAction);
+});
+
+export function isShowDetailedExceptions(): boolean {
   return false;
+}
+
+/** @internal */
+export async function processAction(this: RescueHost, ...args: unknown[]): Promise<unknown> {
+  try {
+    return await Rescue.superMethod(this, "processAction")!(...args);
+  } catch (exception) {
+    this.request.env["action_dispatch.show_detailed_exceptions"] ||=
+      this.isShowDetailedExceptions();
+    const handled = await this.rescueWithHandler(exception);
+    if (!rtest(handled)) throw exception;
+    return handled;
+  }
 }

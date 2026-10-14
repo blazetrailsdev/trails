@@ -95,19 +95,32 @@ export class AuthenticationGenerator extends GeneratorBase {
 
   /** @missingRailsArgs route — PERMANENT */
   private async configureAuthenticationRoutes(): Promise<void> {
-    await this.route(`mapper.resources("passwords", { param: "token" });`);
-    await this.route(`mapper.resource("session");`);
+    await this.route(`this.resources("passwords", { param: "token" });`);
+    await this.route(`this.resource("session");`);
   }
 
   private enableBcrypt(): void {
     if (!this.fileExists("package.json")) return;
     const full = File.join(this.cwd, "package.json");
     const json = JSON.parse(File.read(full));
-    if (!json.dependencies?.["bcryptjs"]) {
-      json.dependencies = { ...json.dependencies, bcryptjs: "*" };
+    if (!json.dependencies?.["bcryptjs"] || !json.dependencies?.["@blazetrails/bcrypt"]) {
+      json.dependencies = { ...json.dependencies, bcryptjs: "*", "@blazetrails/bcrypt": "*" };
       File.write(full, JSON.stringify(json, null, 2) + "\n");
     }
     this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
+
+    const application = "config/application.ts";
+    if (!this.fileExists(application)) return;
+    const appFull = File.join(this.cwd, application);
+    const src = File.read(appFull);
+    if (src.includes(BCRYPT_IMPORT)) return;
+    const frameworks = 'import "@blazetrails/trailties/all";\n';
+    File.write(
+      appFull,
+      src.includes(frameworks)
+        ? src.replace(frameworks, frameworks + BCRYPT_IMPORT)
+        : BCRYPT_IMPORT + src,
+    );
   }
 
   private async addMigrations(): Promise<void> {
@@ -136,6 +149,7 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 }
 
+const BCRYPT_IMPORT = `import "@blazetrails/bcrypt";\n`;
 const INCLUDE_IMPORT = `import { include, type Extended, type Included } from "@blazetrails/activesupport";\n`;
 const AUTH_IMPORT = `import { Authentication, type ClassMethods } from "./concerns/authentication.js";\n`;
 const INCLUDED_SURFACE = `export interface ApplicationController extends Included<typeof Authentication> {}\n\n`;

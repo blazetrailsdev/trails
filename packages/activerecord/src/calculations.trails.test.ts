@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import { Base } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies, typeFor } from "./relation/calculations.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 
 // @internal
@@ -15,8 +15,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const intType = { cast: (v: unknown) => Number(v) };
     const fakeNode = { baseKlass: { attributeTypes: () => ({ credit_limit: intType }) } };
     const fakeJd = fakeJoinDependency([fakeNode]);
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const result = lookupCastTypeFromJoinDependencies.call(
+      {} as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "credit_limit",
       [fakeJd],
     );
@@ -25,8 +25,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
 
   it("returns null when name is not in any joined table", () => {
     const fakeNode = { baseKlass: { attributeTypes: () => ({ other: {} }) } };
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const result = lookupCastTypeFromJoinDependencies.call(
+      {} as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "missing",
       [fakeJoinDependency([fakeNode])],
     );
@@ -38,8 +38,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const type2 = { cast: (v: unknown) => Number(v) };
     const node1 = { baseKlass: { attributeTypes: () => ({ name: type1 }) } };
     const node2 = { baseKlass: { attributeTypes: () => ({ name: type2 }) } };
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const result = lookupCastTypeFromJoinDependencies.call(
+      {} as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "name",
       [fakeJoinDependency([node1]), fakeJoinDependency([node2])],
     );
@@ -64,8 +64,8 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
 
   it("resolves joined column cast type through the join-dependency walk", () => {
     const rel = CalcAuthor.joins(":topics");
-    const castType = lookupCastTypeFromJoinDependencies(
-      rel as unknown as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+    const castType = lookupCastTypeFromJoinDependencies.call(
+      rel as unknown as ThisParameterType<typeof lookupCastTypeFromJoinDependencies>,
       "written_on",
     ) as {
       constructor: { name: string };
@@ -95,19 +95,32 @@ describe("multi-field grouped calculation key shape", () => {
 
   it("uniqs repeated group fields and keys by a scalar", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const result = (await Account.group("firm_id", "firm_id").count()) as Map<unknown, number>;
+    const result = await Account.group("firm_id", "firm_id").count();
     expect([...result.keys()].every((k) => !Array.isArray(k))).toBe(true);
     expect(result.get(6)).toBe(2);
   });
 
   it("does not collapse distinct groups sharing their first field", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const single = (await Account.group("firm_id").count()) as Map<unknown, number>;
-    const multi = (await Account.group("firm_id", "credit_limit").count()) as Map<unknown, number>;
+    const single = await Account.group("firm_id").count();
+    const multi = await Account.group("firm_id", "credit_limit").count();
     expect(single.get(6)).toBe(2);
     const firmSix = [...multi.entries()].filter(([k]) => (k as unknown[])[0] === 6);
     expect(firmSix.map(([, v]) => v)).toEqual([1, 1]);
     expect(firmSix.map(([k]) => (k as unknown[])[1]).sort()).toEqual([50, 55]);
+  });
+});
+
+describe("grouped calculation over a group whose aggregate is NULL", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("keys the group and answers null for minimum and maximum", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    await new Account({ firm_id: 9999, credit_limit: null }).save({ validate: false });
+    const scope = Account.where({ firm_id: 9999 }).group("firm_id");
+    expect([...(await scope.maximum("credit_limit")).entries()]).toEqual([[9999, null]]);
+    expect([...(await scope.minimum("credit_limit")).entries()]).toEqual([[9999, null]]);
+    expect([...(await scope.sum("credit_limit")).entries()]).toEqual([[9999, 0]]);
   });
 });
 
@@ -119,9 +132,9 @@ describe("multi-field grouped bigint sum", () => {
     await NumericData.create({ world_population: 2n ** 62n, my_house_population: 1n });
     await NumericData.create({ world_population: 2n ** 62n, my_house_population: 2n });
 
-    const result = (await NumericData.group("my_house_population", "world_population").sum(
+    const result = await NumericData.group("my_house_population", "world_population").sum(
       "atoms_in_universe",
-    )) as Map<unknown, unknown>;
+    );
 
     const keys = [...result.keys()] as unknown[][];
     expect(keys).toHaveLength(2);
@@ -143,15 +156,9 @@ describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
     await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
     await CpkChapter.create({ id: [1, 12], book_id: 2, title: "ch-3" });
 
-    const result = (await CpkChapter.group("book").having("COUNT(*) > 1").count()) as Map<
-      unknown,
-      number
-    >;
-
-    const entries = [...result.entries()] as [{ id: unknown[] } | null, number][];
-    expect(entries).toHaveLength(1);
-    expect(entries[0][0]?.id).toEqual([1, 1]);
-    expect(entries[0][1]).toBe(2);
+    await expect(CpkChapter.group("book").having("COUNT(*) > 1").count()).rejects.toThrow(
+      'Expected corresponding value for ["author_id", "id"] to be an Array',
+    );
   });
 });
 
@@ -160,7 +167,7 @@ describe("ungrouped calculation HAVING", () => {
 
   it("emits HAVING with no GROUP BY and filters the single aggregate row", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const total = (await Account.sum("credit_limit")) as number;
+    const total = await Account.sum("credit_limit");
     expect(total).toBeGreaterThan(100);
     expect(await Account.having("sum(credit_limit) > 100").sum("credit_limit")).toBe(total);
     expect(await Account.having("sum(credit_limit) > 100000").sum("credit_limit")).toBe(0);
@@ -168,8 +175,8 @@ describe("ungrouped calculation HAVING", () => {
 
   it("emits HAVING with no GROUP BY on the count paths", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const total = (await Account.count()) as number;
-    const credited = (await Account.where("credit_limit IS NOT NULL").count()) as number;
+    const total = await Account.count();
+    const credited = await Account.where("credit_limit IS NOT NULL").count();
     expect(total).toBeGreaterThan(1);
     expect(credited).toBeGreaterThan(1);
 
@@ -187,25 +194,25 @@ describe("ungrouped calculation HAVING", () => {
 describe("typeFor", () => {
   it("resolves a bare, qualified and node-shaped field through the model's attribute type", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const rel = Account.all() as unknown as Parameters<typeof typeFor>[0];
+    const rel = Account.all() as unknown as ThisParameterType<typeof typeFor>;
     const expected = Account.typeForAttribute("credit_limit");
 
-    expect(typeFor(rel, "credit_limit")).toBe(expected);
-    expect(typeFor(rel, "accounts.credit_limit")).toBe(expected);
-    expect(typeFor(rel, Account.arelTable.get("credit_limit") as never)).toBe(expected);
+    expect(typeFor.call(rel, "credit_limit")).toBe(expected);
+    expect(typeFor.call(rel, "accounts.credit_limit")).toBe(expected);
+    expect(typeFor.call(rel, Account.arelTable.get("credit_limit") as never)).toBe(expected);
   });
 
   it("returns the model's own type for an enum attribute without unwrapping the subtype", async () => {
     const { Book } = await import("./test-helpers/models/book.js");
     expect(Book.typeForAttribute("status")).toHaveProperty("subtype");
-    expect(typeFor(Book.all() as unknown as Parameters<typeof typeFor>[0], "status")).toBe(
+    expect(typeFor.call(Book.all() as unknown as ThisParameterType<typeof typeFor>, "status")).toBe(
       Book.typeForAttribute("status"),
     );
   });
 });
 
 describe("empty-scope aggregate identities", () => {
-  fixtures(["companies", "accounts"]);
+  const { self } = fixtures(["companies", "accounts"]);
 
   it("sums a bigint column through the column type on a contradictory scope", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
@@ -218,7 +225,7 @@ describe("empty-scope aggregate identities", () => {
 
   it("sums the identity value when no column is given", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const rows = (await Account.count()) as number;
+    const rows = await Account.count();
     expect(await Account.sum()).toBe(0);
     expect(await Account.sum(1000)).toBe(1000 * rows);
     expect(await Account.calculate("sum", 1000)).toBe(1000 * rows);
@@ -228,8 +235,7 @@ describe("empty-scope aggregate identities", () => {
 
   it("async sums the nil identity value when no column is given", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const { captureSql } = await import("./testing/sql-capture.js");
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await expect(Account.asyncSum()).rejects.toThrow();
       await expect(Account.group("firm_id").asyncSum()).rejects.toThrow();
     });
@@ -250,7 +256,7 @@ describe("empty-scope aggregate identities", () => {
 
   it("sums bigint block return values onto the default identity", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const rows = BigInt((await Account.count()) as number);
+    const rows = BigInt(await Account.count());
     expect(await Account.sum(() => 1n)).toBe(rows);
     expect(await Account.sum(1000, () => 1n)).toBe(1000n + rows);
   });
@@ -292,5 +298,42 @@ describe("empty-scope aggregate identities", () => {
   it("returns no ids for a none relation", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     expect(await Account.none().ids()).toEqual([]);
+  });
+});
+
+describe("calculation result type follows group_values", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("types an ungrouped count as the scalar and a grouped one as the Map", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const n: number = await Account.count();
+    const grouped = await Account.where({ firm_id: 6 }).group("firm_id").count();
+    expectTypeOf(grouped).toEqualTypeOf<Map<unknown, number>>();
+    expect(n).toBe(await Account.all().count());
+    expect(grouped.get(6)).toBe(2);
+  });
+
+  it("keeps a grouped relation's Map type through the chainables that follow group", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const grouped = Account.group("firm_id");
+    type GroupedCount = Map<unknown, number>;
+    expectTypeOf(
+      grouped.where({ firm_id: 6 }).count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(
+      grouped.order("firm_id").limit(5).count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(
+      grouped.having("COUNT(*) > 0").invertWhere().count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(Account.all().merge(grouped).count).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(grouped.unscope(":group").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.except("group").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.only("where").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.only("group").count).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expect((await Account.all().merge(grouped).count()).get(6)).toBe(2);
+    expect(await grouped.unscope(":group").count()).toBe(await Account.count());
+    const counts = await grouped.where({ firm_id: 6 }).order("firm_id").limit(5).count();
+    expect(counts.get(6)).toBe(2);
   });
 });

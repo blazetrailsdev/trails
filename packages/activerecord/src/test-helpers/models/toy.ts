@@ -4,6 +4,7 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Pet } from "./pet.js";
 import type { Sponsor } from "./sponsor.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Toy extends Base {
@@ -15,7 +16,9 @@ export class Toy extends Base {
   declare toy_id: number;
   declare updated_at: RubyTime | Temporal.PlainDateTime;
 
-  static _primaryKey = "toy_id";
+  static {
+    this.primaryKey = "toy_id";
+  }
 
   static {
     this.belongsTo("pet");
@@ -25,6 +28,7 @@ export class Toy extends Base {
     });
   }
 }
+registerModel(Toy);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Toy {
   get pet(): Pet | null | Promise<Pet | null>;
@@ -37,8 +41,9 @@ export class ToyTouchPet extends Base {
   declare toy_id: number;
 
   static {
-    this._primaryKey = "toy_id";
+    this.primaryKey = "toy_id";
     this.tableName = "toys";
     this.belongsTo("pet", { touch: true });
   }
 }
+registerModel(ToyTouchPet);

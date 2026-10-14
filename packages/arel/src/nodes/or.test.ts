@@ -14,7 +14,7 @@ describe("Arel", () => {
         expect((node.expr as Nodes.Or).left).toBe(left);
         expect((node.expr as Nodes.Or).right).toBe(right);
 
-        const oror = node.or(right) as Nodes.Grouping;
+        const oror = node.or(right);
         expect((oror.expr as Nodes.Or).left).toBe(node);
         expect((oror.expr as Nodes.Or).right).toBe(right);
       });

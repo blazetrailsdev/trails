@@ -3,6 +3,8 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { defaultValue } from "./type.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { Bulb } from "./test-helpers/models/bulb.js";
 
 class DoublingType extends ValueType {
   override type(): string {
@@ -17,12 +19,13 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
   const cache = {
     isCached: () => true,
     getCachedColumnsHash: () => columns,
+    getCachedPrimaryKeys: () => undefined,
+    getCachedDataSourceExists: () => undefined,
     dataSourceExists: async () => true,
     columnsHash: async () => columns,
     primaryKeys: async () => null,
   };
   return adapterDouble({
-    internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return column.sqlType === "doubling" ? new DoublingType() : defaultValue();
@@ -38,7 +41,7 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     const cols = { payload: { sqlType: "doubling", name: "payload", default: null } };
     await establishConnectionTo(Widget, makeAdapter(cols) as never);
 
-    const rec = Widget._instantiate({ payload: "ab" });
+    const rec = Widget.instantiate({ payload: "ab" });
 
     expect((rec as unknown as { payload: string }).payload).toBe("abab");
   });
@@ -50,7 +53,7 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     const cols = { blob: { sqlType: "unknown", name: "blob", default: null } };
     await establishConnectionTo(Widget, makeAdapter(cols) as never);
 
-    const rec = Widget._instantiate({ blob: "raw" });
+    const rec = Widget.instantiate({ blob: "raw" });
 
     expect((rec as unknown as { blob: string }).blob).toBe("raw");
   });
@@ -90,5 +93,23 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
 
     expect(Object.keys(Widget.columnsHash())).not.toContain("removed");
     expect(Object.getOwnPropertyDescriptor(Widget.prototype, "removed")).toBeUndefined();
+  });
+});
+
+describe("instantiate on a class whose schema is not loaded yet", () => {
+  fixtures(["bulbs"]);
+
+  it("keeps the schema-reflected primary key's default attribute", async () => {
+    await Bulb.ensureSchemaLoaded();
+    class ColdBulb extends Base {
+      static override tableName = "bulbs";
+    }
+
+    const rec = ColdBulb.instantiate({ name: "raw" });
+
+    expect(ColdBulb.primaryKey).toBe("ID");
+    expect(rec.hasAttribute("ID")).toBe(true);
+    expect(rec.hasAttribute("name")).toBe(true);
+    expect(rec.hasAttribute("color")).toBe(false);
   });
 });

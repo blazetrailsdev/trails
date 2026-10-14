@@ -1,5 +1,6 @@
 import type { Attachment } from "./attachment.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Translation extends Base {
@@ -16,6 +17,7 @@ export class Translation extends Base {
     this.validates("value", { presence: true });
   }
 }
+registerModel(Translation);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Translation {
   get attachment(): Attachment | null | Promise<Attachment | null>;

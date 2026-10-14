@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   chmodSync,
+  closeSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
+  statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File } from "./file.js";
+import { Pathname } from "./pathname.js";
 import {
   fsAdapterConfig,
+  getFs,
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
@@ -51,6 +57,7 @@ describe("File", () => {
     const root = fixture();
     expect(File.isExist(join(root, "a.rb"))).toBe(true);
     expect(File.isExist(join(root, "broken"))).toBe(false);
+    expect(File.isExist(new Pathname(join(root, "a.rb")))).toBe(true);
   });
 
   it("join squeezes one separator at the boundary and does not normalize", () => {
@@ -98,6 +105,11 @@ describe("File", () => {
     expect(File.expandPath("b", "/a")).toBe("/a/b");
     expect(File.isAbsolutePath("a")).toBe(false);
     expect(File.isAbsolutePath("/a")).toBe(true);
+    expect(File.isAbsolutePath(new Pathname("/a"))).toBe(true);
+    expect(File.isAbsolutePath(new Pathname("a"))).toBe(false);
+    expect(() => File.isAbsolutePath(1 as never)).toThrow(
+      "no implicit conversion of Integer into String",
+    );
   });
 
   it("read, binread, write and delete round-trip a file", () => {
@@ -136,6 +148,27 @@ describe("File", () => {
     expect(() => File.stat(join(root, "nonexistent"))).toThrow();
   });
 
+  it("mtime truncates a sub-millisecond mtime, as new Date() truncates the clock", () => {
+    const root = fixture();
+    utimesSync(join(root, "a.rb"), 1000.0007, 1000.0007);
+    expect(File.mtime(join(root, "a.rb")).getTime()).toBe(1_000_000);
+  });
+
+  it("mtime truncates toward the epoch on both sides of it, through every stat entry point", async () => {
+    const root = fixture();
+    const path = join(root, "a.rb");
+    utimesSync(path, "-0.0007", "-0.0007");
+    expect(File.mtime(path).getTime()).toBe(0);
+    utimesSync(path, 1000.0007, 1000.0007);
+    const fs = getFs();
+    const fd = openSync(path, "r");
+    expect(fs.fstatSync!(fd).mtime.getTime()).toBe(1_000_000);
+    closeSync(fd);
+    expect(fs.lstatSync(path).mtime.getTime()).toBe(1_000_000);
+    expect((await fs.stat!(path)).mtime.getTime()).toBe(1_000_000);
+    expect((await fs.lstat!(path)).mtime.getTime()).toBe(1_000_000);
+  });
+
   it("readable? is an access check, not the existence check exist? is", () => {
     // vendor/ruby/v3.3.11/file.c:1826 is eaccess(R_OK), not the stat exist? does.
     const root = fixture();
@@ -158,6 +191,13 @@ describe("File", () => {
     withWindowsPath(() => {
       expect(File.ALT_SEPARATOR).toBe("\\");
       expect(File.SEPARATOR).toBe("/");
+    });
+  });
+
+  it("NULL is the null device of the path backend's platform", () => {
+    expect(File.NULL).toBe("/dev/null");
+    withWindowsPath(() => {
+      expect(File.NULL).toBe("NUL");
     });
   });
 
@@ -205,6 +245,62 @@ describe("File", () => {
     expect(File.isIdentical(path, root)).toBe(false);
     file.close();
     expect(File.isIdentical(path, join(root, "missing.txt"))).toBe(false);
+  });
+
+  it("identical? awaited compares device and inode, and reads them off an open stream", async () => {
+    const root = fixture();
+    const path = join(root, "ident.txt");
+    const file = File.open(path, "w+");
+    expect(await File.isIdenticalAsync(file, path)).toBe(true);
+    expect(await File.isIdenticalAsync(path, root)).toBe(false);
+    file.close();
+    expect(await File.isIdenticalAsync(path, join(root, "missing.txt"))).toBe(false);
+  });
+
+  it("symlink and link answer 0 and make the two names identical", async () => {
+    const root = fixture();
+    const source = join(root, "a.rb");
+    expect(await File.isSymlinkAsync(join(root, "broken"))).toBe(true);
+    expect(await File.isSymlinkAsync(join(root, "missing"))).toBe(false);
+    expect(await File.chmodAsync(0o600, source)).toBe(1);
+    expect(statSync(source).mode & 0o777).toBe(0o600);
+
+    expect(await File.symlinkAsync(source, join(root, "soft"))).toBe(0);
+    expect(await File.isSymlinkAsync(join(root, "soft"))).toBe(true);
+    expect(await File.isIdenticalAsync(source, join(root, "soft"))).toBe(true);
+
+    expect(await File.linkAsync(source, join(root, "hard"))).toBe(0);
+    expect(await File.isSymlinkAsync(join(root, "hard"))).toBe(false);
+    expect(await File.isIdenticalAsync(source, join(root, "hard"))).toBe(true);
+
+    await expect(File.symlinkAsync(source, join(root, "soft"))).rejects.toThrow(/EEXIST/);
+  });
+
+  it("exist? follows a symlink, and write takes a String held as its bytes", async () => {
+    const root = fixture();
+    expect(await File.isExistAsync(join(root, "a.rb"))).toBe(true);
+    expect(await File.isExistAsync(join(root, "broken"))).toBe(false);
+
+    expect(await File.writeAsync(join(root, "raw"), Uint8Array.from([0xff, 0x61]))).toBe(2);
+    expect(Array.from(readFileSync(join(root, "raw")))).toEqual([0xff, 0x61]);
+  });
+
+  it("symlink and link raise NotImplementedError on a backend with neither", async () => {
+    const previous = fsAdapterConfig.adapter;
+    registerFsAdapter("linkless", {} as unknown as FsAdapter, posixPath);
+    fsAdapterConfig.adapter = "linkless";
+    try {
+      await expect(File.symlinkAsync("a", "b")).rejects.toThrow(
+        "symlink() function is unimplemented on this machine",
+      );
+      await expect(File.linkAsync("a", "b")).rejects.toThrow(
+        "link() function is unimplemented on this machine",
+      );
+      expect(await File.chmodAsync(0o644, "a", "b")).toBe(2);
+      expect(await File.isSymlinkAsync("a")).toBe(false);
+    } finally {
+      fsAdapterConfig.adapter = previous;
+    }
   });
 });
 

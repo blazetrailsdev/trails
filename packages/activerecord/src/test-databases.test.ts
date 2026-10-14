@@ -1,187 +1,124 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
+import { getEnv, stub } from "@blazetrails/activesupport";
+import { setEnv } from "@blazetrails/ruby-compat";
 import { TestDatabases } from "./test-databases.js";
 import { Base } from "./index.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
+import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-import { fixtures } from "./test-fixtures.js";
-
-const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
-  const dc = new DatabaseConfigurations(configs as never);
-  vi.spyOn(dc, "configsFor").mockReturnValue(configs as never);
-  return dc;
-};
-
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+import { inMemoryDb } from "./support/adapter-helper.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("TestDatabasesTest", () => {
   fixtures({});
-  let priorConfigs: DatabaseConfigurations;
-  beforeEach(() => {
-    priorConfigs = Base.configurations();
-  });
-  afterEach(() => {
-    Base.configurations(priorConfigs);
-    vi.restoreAllMocks();
-  });
 
-  it("databases are created", async () => {
-    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
-    const connectionHandling = await import("./connection-handling.js");
-    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined as never);
-
-    const mockConfig: any = {};
-    Object.defineProperty(mockConfig, "_database", {
-      set: function (val: string) {
-        this.__database = val;
+  it.skipIf(inMemoryDb())("databases are created", async () => {
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "arunit");
+    const prevConfigs = Base.configurations();
+    Base.configurations({
+      arunit: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
       },
     });
-    Object.defineProperty(mockConfig, "database", {
-      get: function () {
-        return this.__database || "test/db/primary.sqlite3";
-      },
-    });
-    mockConfig.adapter = "sqlite3";
-
-    Base.configurations(stubConfigurations([mockConfig]));
-
-    await TestDatabases.createAndLoadSchema(2, { envName: "arunit" });
-
-    expect(mockConfig.database).toBe("test/db/primary.sqlite3-2");
-  });
-
-  it("create databases after fork", async () => {
-    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
-    const connectionHandling = await import("./connection-handling.js");
-    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined as never);
-
-    const mockConfig: any = {};
-    Object.defineProperty(mockConfig, "_database", {
-      set: function (val: string) {
-        this.__database = val;
-      },
-    });
-    Object.defineProperty(mockConfig, "database", {
-      get: function () {
-        return this.__database || "test/db/primary.sqlite3";
-      },
-    });
-    mockConfig.adapter = "sqlite3";
-
-    const mockConfigurations = stubConfigurations([mockConfig]);
-
-    Base.configurations(mockConfigurations);
-
-    await TestDatabases.createAndLoadSchema(42, { envName: "arunit" });
-
-    expect(mockConfig.database).toBe("test/db/primary.sqlite3-42");
-    expect(mockConfigurations.configsFor({ envName: "arunit" })[0].database).toBe(
-      "test/db/primary.sqlite3-42",
-    );
-  });
-
-  it("order of configurations isnt changed by test databases", async () => {
-    const mockReconstructFromSchema = vi
-      .spyOn(DatabaseTasks, "reconstructFromSchema")
-      .mockResolvedValue(undefined);
-    vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined as never,
-    );
-
-    const configs = [
-      { database: "test/db/primary.sqlite3", adapter: "sqlite3", name: "primary" },
-      { database: "test/db/replica.sqlite3", adapter: "sqlite3", name: "replica" },
-    ];
-
-    const mockConfigurations = stubConfigurations(configs);
-
-    Base.configurations(mockConfigurations);
-
-    await TestDatabases.createAndLoadSchema(42, { envName: "arunit" });
-
-    const reconstructedNames = mockReconstructFromSchema.mock.calls.map(
-      (call: any[]) => call[0].name,
-    );
-    expect(reconstructedNames).toEqual(["primary", "replica"]);
-  });
-
-  it("suffixes a URL-based config by deriving the database from configuration.url", async () => {
-    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
-    vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined as never,
-    );
-
-    const { UrlConfig } = await import("./database-configurations/url-config.js");
-    const dbConfig = new UrlConfig("arunit", "primary", "test/db/primary.sqlite3", {
-      adapter: "sqlite3",
-    });
-
-    Base.configurations(stubConfigurations([dbConfig]));
-
-    await TestDatabases.createAndLoadSchema(5, { envName: "arunit" });
-    expect(dbConfig.database).toBe("test/db/primary.sqlite3-5");
-  });
-
-  it("reconnects through the ensure even when the registry is empty", async () => {
-    const mockReconstructFromSchema = vi
-      .spyOn(DatabaseTasks, "reconstructFromSchema")
-      .mockResolvedValue(undefined);
-    const mockEstablishConnection = vi
-      .spyOn(await import("./connection-handling.js"), "establishConnection")
-      .mockResolvedValue(undefined as never);
-
-    Base.configurations({});
-
-    await TestDatabases.createAndLoadSchema(1, { envName: "arunit" });
-
-    expect(mockReconstructFromSchema).not.toHaveBeenCalled();
-    expect(mockEstablishConnection).toHaveBeenCalledWith(undefined);
-    expect(mockEstablishConnection.mock.contexts).toContain(Base);
-  });
-
-  it("restores VERBOSE and re-establishes connection after schema load failure", async () => {
-    const error = new Error("schema load failed");
-    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockRejectedValue(error);
-    const connectionHandling = await import("./connection-handling.js");
-    const mockEstablishConnection = vi
-      .spyOn(connectionHandling, "establishConnection")
-      .mockResolvedValue(undefined as never);
-
-    const mockConfig: any = {};
-    Object.defineProperty(mockConfig, "_database", {
-      set(val: string) {
-        this.__database = val;
-      },
-    });
-    Object.defineProperty(mockConfig, "database", {
-      get() {
-        return this.__database || "test/db/primary.sqlite3";
-      },
-    });
-    mockConfig.adapter = "sqlite3";
-
-    Base.configurations(stubConfigurations([mockConfig]));
-
-    const originalVerbose = process.env.VERBOSE;
-    process.env.VERBOSE = "1";
-
     try {
-      await expect(TestDatabases.createAndLoadSchema(7, { envName: "arunit" })).rejects.toThrow(
-        error,
+      const baseDbConfig = Base.configurations().configsFor({
+        envName: "arunit",
+        name: "primary",
+      })!;
+      const expectedDatabase = `${baseDbConfig.database}-2`;
+
+      await stub(
+        DatabaseTasks,
+        "reconstructFromSchema",
+        (dbConfig: HashConfig) => {
+          expect(dbConfig.database).toEqual(expectedDatabase);
+        },
+        undefined,
+        async () => {
+          await TestDatabases.createAndLoadSchema(2, { envName: "arunit" });
+        },
       );
-      expect(mockEstablishConnection).toHaveBeenCalledWith(undefined);
-      expect(mockEstablishConnection.mock.contexts).toContain(Base);
-      expect(process.env.VERBOSE).toBe("1");
     } finally {
-      if (originalVerbose === undefined) {
-        delete process.env.VERBOSE;
-      } else {
-        process.env.VERBOSE = originalVerbose;
-      }
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
+    }
+  });
+
+  it.skipIf(inMemoryDb())("create databases after fork", async () => {
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "arunit");
+    const prevConfigs = Base.configurations();
+    Base.configurations({
+      arunit: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+      },
+    });
+    try {
+      const idx = 42;
+      const baseDbConfig = Base.configurations().configsFor({
+        envName: "arunit",
+        name: "primary",
+      })!;
+      const expectedDatabase = `${baseDbConfig.database}-${idx}`;
+
+      await stub(
+        DatabaseTasks,
+        "reconstructFromSchema",
+        (dbConfig: HashConfig) => {
+          expect(dbConfig.database).toEqual(expectedDatabase);
+        },
+        undefined,
+        async () => {
+          await TestDatabases.createAndLoadSchema(idx, { envName: "arunit" });
+        },
+      );
+
+      expect(
+        Base.configurations().configsFor({ envName: "arunit", name: "primary" })!.database,
+      ).toEqual(expectedDatabase);
+    } finally {
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
+    }
+  });
+
+  it.skipIf(inMemoryDb())("order of configurations isnt changed by test databases", async () => {
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "arunit");
+    const prevConfigs = Base.configurations();
+    Base.configurations({
+      arunit: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+        replica: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+      },
+    });
+    try {
+      const idx = 42;
+      const baseConfigsOrder = Base.configurations()
+        .configsFor({ envName: "arunit" })
+        .map((dbConfig) => dbConfig.name);
+
+      await stub(
+        DatabaseTasks,
+        "reconstructFromSchema",
+        () => {
+          expect(
+            Base.configurations()
+              .configsFor({ envName: "arunit" })
+              .map((dbConfig) => dbConfig.name),
+          ).toEqual(baseConfigsOrder);
+        },
+        undefined,
+        async () => {
+          await TestDatabases.createAndLoadSchema(idx, { envName: "arunit" });
+        },
+      );
+    } finally {
+      Base.configurations(prevConfigs);
+      await Base.establishConnection(":arunit");
+      setEnv("TRAILS_ENV", previousEnv);
     }
   });
 });

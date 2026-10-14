@@ -2,6 +2,7 @@ import { presence, reverseMerge, TopLevel, trailsRoot } from "@blazetrails/activ
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/ruby-compat";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
+import type { SchemaFormat } from "@blazetrails/activerecord";
 
 /** @noRailsEquivalent PERMANENT */
 export interface DatabaseConfig {
@@ -237,7 +238,7 @@ export async function loadAllDatabaseConfigs(
   return entries.map(([name, sub]) => ({ name, config: sub as DatabaseConfig }));
 }
 
-export type SchemaFormat = "ts" | "js" | "sql";
+export type { SchemaFormat };
 
 export async function resolveSchemaFormat(
   opts: { format?: string } = {},
@@ -328,7 +329,10 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       const { PostgreSQLAdapter } =
         await import("@blazetrails/activerecord/connection-adapters/postgresql-adapter.js");
       if (config.url) {
-        return new PostgreSQLAdapter(config.url);
+        const { UrlConfig } = await import("@blazetrails/activerecord");
+        return new PostgreSQLAdapter(
+          new UrlConfig(resolveEnv(), "primary", config.url).configurationHash,
+        );
       }
       return new PostgreSQLAdapter({
         host: config.host ?? "localhost",
@@ -343,7 +347,10 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       const { Mysql2Adapter } =
         await import("@blazetrails/activerecord/connection-adapters/mysql2-adapter.js");
       if (config.url) {
-        return new Mysql2Adapter(config.url);
+        const { UrlConfig } = await import("@blazetrails/activerecord");
+        return new Mysql2Adapter(
+          new UrlConfig(resolveEnv(), "primary", config.url).configurationHash,
+        );
       }
       return new Mysql2Adapter({
         host: config.host ?? "localhost",

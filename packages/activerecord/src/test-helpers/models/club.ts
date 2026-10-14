@@ -6,6 +6,7 @@ import type { Membership } from "./membership.js";
 import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Club extends Base {
@@ -60,7 +61,12 @@ export class Club extends Base {
     });
     this.acceptsNestedAttributesFor("membership");
   }
+
+  private privateMethod() {
+    return "I'm sorry sir, this is a *private* club, not a *pirate* club";
+  }
 }
+registerModel(Club);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Club {
   get membership(): Membership | null | Promise<Membership | null>;
@@ -83,3 +89,4 @@ export class SuperClub extends Base {
     this.hasMany("members", { through: "memberships" });
   }
 }
+registerModel(SuperClub);

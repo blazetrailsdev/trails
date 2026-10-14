@@ -25,21 +25,23 @@ function poolConfigurationHash(): Record<string, unknown> {
 }
 
 export function inMemoryDb(): boolean {
-  if (!currentAdapter("SQLite3Adapter")) return false;
-  return poolConfigurationHash().database === ":memory:";
+  return currentAdapter("SQLite3Adapter") && poolConfigurationHash().database === ":memory:";
 }
 
 export function sqlite3AdapterStrictStringsDisabled(): boolean {
-  if (!currentAdapter("SQLite3Adapter")) return false;
-  return !poolConfigurationHash().strict;
+  return currentAdapter("SQLite3Adapter") && !poolConfigurationHash().strict;
 }
 
 export async function mysqlEnforcingGtidConsistency(): Promise<boolean> {
-  if (!currentAdapter("Mysql2Adapter", "TrilogyAdapter")) return false;
-  const connection = (await Base.leaseConnection()) as unknown as {
-    showVariable(name: string): Promise<unknown>;
-  };
-  return (await connection.showVariable("enforce_gtid_consistency")) === "ON";
+  return (
+    currentAdapter("Mysql2Adapter", "TrilogyAdapter") &&
+    "ON" ===
+      (await (
+        (await Base.leaseConnection()) as unknown as {
+          showVariable(name: string): Promise<unknown>;
+        }
+      ).showVariable("enforce_gtid_consistency"))
+  );
 }
 
 const mysqlServer = adapterType === "mysql" ? await import("./mysql-server-version.js") : undefined;
@@ -96,7 +98,7 @@ type ExtensionConnection = {
   enableExtension(name: string, options?: Record<string, unknown>): Promise<void>;
   disableExtension(name: string, options?: Record<string, unknown>): Promise<void>;
   reconnectBang(): Promise<void>;
-  commitDbTransaction(): Promise<void>;
+  commitDbTransaction(): Promise<unknown>;
   isTransactionOpen(): boolean;
 };
 
@@ -122,3 +124,16 @@ export async function disableExtensionBang(
   await connection.disableExtension(extension, { force: "cascade" });
   return connection.reconnectBang();
 }
+
+export const AdapterHelper = {
+  currentAdapter,
+  inMemoryDb,
+  sqlite3AdapterStrictStringsDisabled,
+  mysqlEnforcingGtidConsistency,
+  supportsDefaultExpression,
+  supportsNonUniqueConstraintName,
+  supportsTextColumnWithDefault,
+  supportsSqlStandardDropConstraint,
+  enableExtensionBang,
+  disableExtensionBang,
+};

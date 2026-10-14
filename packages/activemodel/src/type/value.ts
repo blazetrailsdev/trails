@@ -1,25 +1,52 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  type Included,
+  include,
+  rbDeclareIvar,
+  rbInspect as inspect,
+  rbEqual,
+  rbHash,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
+import { SerializeCastValue } from "./serialize-cast-value.js";
 
-export interface ValueType<T = unknown> {
-  readonly precision: number | null;
-  readonly scale: number | null;
-  readonly limit: number | null;
+export interface ValueType<T = unknown> extends Included<typeof SerializeCastValue> {
+  serializeCastValue(value: T | null): unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ValueType<T = unknown> {
-  constructor(options?: {
-    precision?: number | null;
-    scale?: number | null;
-    limit?: number | null;
-  }) {
-    const self = this as { -readonly [K in "precision" | "scale" | "limit"]: number | null };
-    const proto = Object.getPrototypeOf(this) as object;
-    if (!("precision" in proto)) self.precision = options?.precision ?? null;
-    if (!("scale" in proto)) self.scale = options?.scale ?? null;
-    if (!("limit" in proto)) self.limit = options?.limit ?? null;
+  declare static serializeCastValueCompatible: () => boolean;
+
+  private _precision: number | null;
+  private _scale: number | null;
+  private __limit: number | null;
+
+  get precision(): number | null {
+    return this._precision;
+  }
+
+  get scale(): number | null {
+    return this._scale;
+  }
+
+  get limit(): number | null {
+    return this.__limit;
+  }
+
+  /** @inlinedFrom ActiveModel::Type::SerializeCastValue#initialize rails/v8.0.2/activemodel/lib/active_model/type/serialize_cast_value.rb:41-44 */
+  constructor(
+    kwargs: {
+      precision?: number | null;
+      limit?: number | null;
+      scale?: number | null;
+    } = {},
+  ) {
+    const { precision = null, limit = null, scale = null } = kwargs;
+    (this.constructor as typeof ValueType).serializeCastValueCompatible();
+    this._precision = precision;
+    this._scale = scale;
+    this.__limit = limit;
   }
 
   isSerializable(value: unknown, _block?: (castValue: unknown) => void): boolean {
@@ -55,7 +82,7 @@ export class ValueType<T = unknown> {
     return !rbEqual(oldValue, newValue);
   }
 
-  isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean {
+  isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean | undefined {
     return false;
   }
 
@@ -80,6 +107,12 @@ export class ValueType<T = unknown> {
     );
   }
 
+  declare eql: ValueType["equals"];
+
+  hash(): number {
+    return rbHash([this.constructor, this.precision, this.scale, this.limit]);
+  }
+
   assertValidValue(_: unknown): void {}
 
   isSerialized(): boolean {
@@ -91,52 +124,21 @@ export class ValueType<T = unknown> {
   }
 
   asJson(): never {
-    throw new NoMethodError("Unimplemented");
+    throw new NoMethodError();
   }
 
   /** @internal */
   protected castValue(value: unknown): T | null {
     return value as T | null;
   }
-
-  serializeCastValue(value: T | null): unknown {
-    return value;
-  }
-
-  itselfIfSerializeCastValueCompatible(): this | null {
-    return (
-      this.constructor as unknown as { serializeCastValueCompatible(): boolean }
-    ).serializeCastValueCompatible()
-      ? this
-      : null;
-  }
-
-  static serializeCastValueCompatible(this: { _serializeCastValueCompatible?: boolean }): boolean {
-    if (Object.hasOwn(this, "_serializeCastValueCompatible")) {
-      return this._serializeCastValueCompatible as boolean;
-    }
-    let proto: object | null = (this as unknown as { prototype: object }).prototype;
-    let serializeDepth = -1;
-    let castDepth = -1;
-    let depth = 0;
-    while (proto && proto !== Object.prototype) {
-      if (serializeDepth < 0 && Object.prototype.hasOwnProperty.call(proto, "serialize")) {
-        serializeDepth = depth;
-      }
-      if (castDepth < 0 && Object.prototype.hasOwnProperty.call(proto, "serializeCastValue")) {
-        castDepth = depth;
-      }
-      proto = Object.getPrototypeOf(proto);
-      depth++;
-    }
-    const result = castDepth >= 0 && serializeDepth >= 0 && castDepth <= serializeDepth;
-    Object.defineProperty(this, "_serializeCastValueCompatible", {
-      value: result,
-      writable: true,
-      configurable: true,
-    });
-    return result;
-  }
 }
+
+include(ValueType, SerializeCastValue);
+
+rbDeclareIvar(ValueType, "@precision", "_precision");
+rbDeclareIvar(ValueType, "@scale", "_scale");
+rbDeclareIvar(ValueType, "@limit", "__limit");
+
+ValueType.prototype.eql = ValueType.prototype.equals;
 
 registerConstant("ActiveModel::Type::Value", ValueType);

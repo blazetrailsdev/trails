@@ -16,7 +16,7 @@ import { RouteSet } from "./route-set.js";
 import { urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
 
 class Post {
-  static readonly modelName = new ModelName("Post");
+  static readonly modelName = new ModelName(this);
   readonly modelName = Post.modelName;
   constructor(public id: number | null) {}
   toModel(): this {
@@ -28,7 +28,7 @@ class Post {
 }
 
 class Comment {
-  static readonly modelName = new ModelName("Comment");
+  static readonly modelName = new ModelName(this);
   readonly modelName = Comment.modelName;
   constructor(public id: number | null) {}
   toModel(): this {
@@ -169,8 +169,8 @@ describe("polymorphic dispatch against a drawn RouteSet", () => {
     }
   }
   const routes = new RouteSet();
-  routes.draw((r) => {
-    r.resources("articles");
+  routes.draw(function () {
+    this.resources("articles");
   });
   class Host {}
   include(Host, routes.urlHelpers());

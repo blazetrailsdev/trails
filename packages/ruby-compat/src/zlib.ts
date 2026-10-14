@@ -52,8 +52,18 @@ class GzipReader extends GzipFile<File> {
     return gzfileWrap(gz, block);
   }
 
+  /**
+   * `rb_gzreader_read` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4009`) with no
+   * length: the inflated bytes, one character per byte. `gzfile_newstr`
+   * (`zlib.c:2859`) tags them with the default external encoding without
+   * converting them, and a JS string carries no tag, so a text reader takes
+   * them through `forceEncoding`.
+   */
   async read(): Promise<string> {
-    return new TextDecoder().decode(await this.z.read());
+    const bytes = await this.z.read();
+    let str = "";
+    for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+    return str;
   }
 }
 
@@ -98,10 +108,15 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     return gzfileWrap(gz, block);
   }
 
-  write(string: string): number {
+  /**
+   * `rb_gzwriter_write` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3745`). A
+   * `Uint8Array` is an ASCII-8BIT String's bytes, as for `IO#write`.
+   */
+  write(string: string | Uint8Array): number {
+    const buffer = typeof string === "string" ? new TextEncoder().encode(string) : string;
     this.headerFinished = true;
-    this.z.write(new TextEncoder().encode(string));
-    return new TextEncoder().encode(string).length;
+    this.z.write(buffer);
+    return buffer.length;
   }
 
   /** `rb_gzwriter_flush` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3720`). */

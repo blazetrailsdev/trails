@@ -5,8 +5,10 @@ import {
   NotImplementedError,
   RuntimeError,
   TypeError,
+  eachPair,
+  isEmpty,
   rbFPublicSend,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "./errors.js";
@@ -14,10 +16,10 @@ import { UnknownAttributeError } from "./errors.js";
 export function assignAttributes(this: AttributeAssignment, newAttributes: unknown): void {
   if (!respondToEachPair(newAttributes)) {
     throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
+      `When assigning attributes, you must pass a hash as an argument, ${rbObjClassname(newAttributes)} passed.`,
     );
   }
-  if (isMassAssignmentEmpty(newAttributes)) return;
+  if (isEmpty(newAttributes)) return;
 
   assertAssignedSynchronously(
     this._assignAttributes(this.sanitizeForMassAssignment(newAttributes)),
@@ -28,11 +30,11 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
 /** @internal */
 export function _assignAttributes(
   this: AttributeAssignment,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): void {
-  for (const [k, v] of Object.entries(attributes)) {
+  eachPair(attributes, (k, v) => {
     void this._assignAttribute(k, v);
-  }
+  });
 }
 
 export function setAttributes(
@@ -41,10 +43,10 @@ export function setAttributes(
 ): Promise<void> | void {
   if (!respondToEachPair(newAttributes)) {
     throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
+      `When assigning attributes, you must pass a hash as an argument, ${rbObjClassname(newAttributes)} passed.`,
     );
   }
-  if (isMassAssignmentEmpty(newAttributes)) return;
+  if (isEmpty(newAttributes)) return;
 
   return this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
 }
@@ -58,15 +60,10 @@ export function attributeWriterMissing(
 }
 
 /** @internal */
-export function _assignAttribute(
-  this: AttributeAssignment,
-  k: string,
-  v: unknown,
-): Promise<void> | void {
+export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
-    const result = rbFPublicSend(this, setter, v);
-    return result instanceof Promise ? (result as Promise<void>) : undefined;
+    return rbFPublicSend(this, setter, v);
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;
     if (rbObjRespondTo(this, setter)) {
@@ -80,30 +77,23 @@ export function _assignAttribute(
 export interface AttributeAssignment {
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForMassAssignment(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
   /** @internal */
-  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  _assignAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Promise<void> | void;
   /** @internal */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void;
-  methodMissing?(method: string, ...args: unknown[]): unknown;
+  _assignAttribute(k: string, v: unknown): unknown;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-is-mass-assignment-empty-into-assign-attributes
- */
-export function isMassAssignmentEmpty(attrs: object): boolean {
-  if (isParamsLikeWrapper(attrs)) {
-    const empty = (attrs as { empty?: unknown }).empty;
-    if (typeof empty === "boolean") return empty;
-  }
-  return Object.keys(attrs).length === 0;
-}
-
-function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {
+function respondToEachPair(
+  attrs: unknown,
+): attrs is Record<string, unknown> | Map<string, unknown> {
   if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) return false;
   const proto = Object.getPrototypeOf(attrs);
-  if (proto === Object.prototype || proto === null) return true;
+  if (proto === Object.prototype || proto === null || attrs instanceof Map) return true;
   return isParamsLikeWrapper(attrs);
 }
 
@@ -111,21 +101,18 @@ function isParamsLikeWrapper(attrs: object): boolean {
   if (typeof attrs !== "object" || attrs === null) return false;
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return false;
-  const wrapper = attrs as { permitted?: unknown; toH?: unknown };
-  return "permitted" in wrapper || typeof wrapper.toH === "function";
+  const wrapper = attrs as { isPermitted?: unknown; toH?: unknown };
+  return "isPermitted" in wrapper || typeof wrapper.toH === "function";
 }
 
 export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE update-must-call-assign-attributes-carried-from-0087
  */
-export function assertAssignedSynchronously(
-  pending: Promise<void> | void,
-  methodName: string,
-): void {
-  if (!pending) return;
+export function assertAssignedSynchronously(pending: unknown, methodName: string): void {
+  if (!(pending instanceof Promise)) return;
   void pending.catch(() => {});
   throw new RuntimeError(
     `${methodName} cannot assign this attribute synchronously; use \`await record.setAttributes(...)\` instead.`,

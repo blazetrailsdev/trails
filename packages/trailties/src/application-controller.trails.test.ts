@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { Application } from "./application.js";
 import { InfoController } from "./info-controller.js";
 import { Trails } from "./rails.js";
@@ -15,9 +15,18 @@ describe("Rails::ApplicationController", () => {
     Trails.application = null;
   });
 
-  it("disables the nonce generator and allows inline script and style sources", async () => {
-    const tc = new ActionController.TestCase(InfoController);
-    await tc.get("properties", { env: { REMOTE_ADDR: "127.0.0.1" } });
+  it("disables the nonce generator and allows inline script and style sources", async ({
+    task,
+  }) => {
+    const tc = new ActionController.TestCase(task.name);
+    tc.controller = new InfoController();
+    await tc.beforeSetup();
+    tc.routes = new RouteSet();
+    tc.routes.draw(function () {
+      this.get("/rails/info/properties", { to: "rails/info#properties" });
+    });
+    tc.request.env["REMOTE_ADDR"] = "127.0.0.1";
+    await tc.get("properties");
 
     expect(tc.request.contentSecurityPolicyNonceGenerator).toBeNull();
     const policy = tc.request.contentSecurityPolicy!.build();

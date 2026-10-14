@@ -18,8 +18,46 @@ export interface SpawnSyncResult {
   error?: Error;
 }
 
+/**
+ * What `waitpid(2)` reports for a child (`rb_process_status_wait`,
+ * `vendor/ruby/v3.3.11/process.c:1198`): `pid` is `null` when the child was
+ * never spawned, `status` its exit status and `null` when it did not exit, and
+ * `error` what the spawn failed with.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface WaitStatus {
+  pid: number | null;
+  status: number | null;
+  signal: string | null;
+  error?: Error;
+}
+
 export interface ChildProcessAdapter {
   spawnSync(cmd: string, args: string[], options?: SpawnSyncOptions): SpawnSyncResult;
+  /**
+   * Runs the child with the parent's stdio and resolves once it is waited for.
+   * With no `args`, `command` is a command line for `/bin/sh -c` (`proc_exec_sh`,
+   * `vendor/ruby/v3.3.11/process.c:1788`); with `args` it is the program, exec'd
+   * with that argv and no shell (`proc_exec_cmd`, `process.c:1741`). `options.out`
+   * is `out: filename`: stdout opened on that file, truncated (`process.c:1985`).
+   */
+  system?(
+    command: string,
+    env: Record<string, string | undefined>,
+    args?: string[] | null,
+    options?: { out?: string },
+  ): Promise<WaitStatus>;
+  /**
+   * Runs `command` through `/bin/sh -c` with stdout and stderr on one pipe,
+   * as `Open3.popen2e` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:508-523`),
+   * and a stdin pipe closed at once (`open3.rb:928`), and resolves with what
+   * it wrote.
+   */
+  capture2e?(
+    command: string,
+    env: Record<string, string | undefined>,
+  ): Promise<[output: string, status: WaitStatus]>;
 }
 
 const registry = new Map<string, ChildProcessAdapter>();
@@ -66,9 +104,43 @@ type NodeSpawnSyncResult = {
   error?: Error;
 };
 
+type NodeReadable = {
+  setEncoding(encoding: string): void;
+  on(event: "data", listener: (chunk: string) => void): void;
+};
+
+type NodeChild = {
+  pid?: number;
+  stdin: { end(): void } | null;
+  stdout: NodeReadable | null;
+  on(event: "error", listener: (error: Error) => void): void;
+  on(event: "close", listener: (code: number | null, signal: string | null) => void): void;
+};
+
 type NodeChildProcess = {
   spawnSync: (cmd: string, args: string[], opts?: unknown) => NodeSpawnSyncResult;
+  spawn: (cmd: string, args: string[], opts?: unknown) => NodeChild;
 };
+
+function spawnChild(
+  cp: NodeChildProcess,
+  file: string,
+  args: string[],
+  env: Record<string, string | undefined>,
+  stdio: unknown,
+  read: (chunk: string) => void,
+): Promise<WaitStatus> {
+  return new Promise((resolve) => {
+    const child = cp.spawn(file, args, { env, stdio });
+    child.stdin?.end();
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", read);
+    child.on("error", (error) =>
+      resolve({ pid: child.pid ?? null, status: null, signal: null, error }),
+    );
+    child.on("close", (status, signal) => resolve({ pid: child.pid ?? null, status, signal }));
+  });
+}
 
 function wrap(cp: NodeChildProcess): ChildProcessAdapter {
   return {
@@ -97,6 +169,30 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         stderr: typeof result.stderr === "string" ? result.stderr : String(result.stderr ?? ""),
         error: result.error,
       };
+    },
+    system(command, env, args, options) {
+      const outFile = options?.out != null ? File.open(options.out, "w") : null;
+      const stdio = outFile === null ? "inherit" : ["inherit", outFile.fileno(), "inherit"];
+      const status =
+        args == null
+          ? spawnChild(cp, "/bin/sh", ["-c", command], env, stdio, () => {})
+          : spawnChild(cp, command, args, env, stdio, () => {});
+      return status.finally(() => outFile?.close());
+    },
+    async capture2e(command, env) {
+      let output = "";
+      const args = ["-c", 'exec 2>&1; eval "$1"', "sh", command];
+      const status = await spawnChild(
+        cp,
+        "/bin/sh",
+        args,
+        env,
+        ["pipe", "pipe", "ignore"],
+        (chunk) => {
+          output += chunk;
+        },
+      );
+      return [output, status];
     },
   };
 }

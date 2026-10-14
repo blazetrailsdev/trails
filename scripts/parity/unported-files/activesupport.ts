@@ -13,14 +13,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. " +
       "No JS equivalent — I18n is configured directly in user code.",
   },
-  {
-    pattern: "testing/error_reporter_assertions.rb",
-    package: "activesupport",
-    reason:
-      "Minitest assertion module (`assert_error_reported`) for Rails' own test suite; " +
-      "trails has no port, and its `subscribe`/`record`/`report` names otherwise cluster " +
-      "onto the unrelated `error-reporter.ts`.",
-  },
   // The activesupport `core_ext/*` tail with no trails counterpart (RFC 0072).
   {
     pattern: "core_ext/module/attribute_accessors_per_thread.rb",
@@ -281,7 +273,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     tests: [
       "is shared between fibers",
       "is not shared between fibers if isolation level is fiber",
-      "default value is accessible from other threads",
       "values should not bleed between threads",
     ],
     reason:
@@ -293,16 +284,15 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "core_ext/class/attribute_test.rb",
     tests: [
-      "works well with singleton classes",
       "when defined in a class's singleton",
       "works well with module singleton classes",
       "allow to prepend accessors",
     ],
     reason:
-      "The first three declare or read `class_attribute` through an object's singleton " +
-      "class (`object.singleton_class.setting=`, `class << self`), whose lookup chain is " +
-      "what core_ext/class/attribute.rb:86-120 walks; the fourth asserts `singleton_class.prepend` " +
-      "wraps the generated reader and writer. JS has no per-object singleton class and no " +
+      "The first two declare `class_attribute` inside a class's or module's own singleton " +
+      "class (`class << self`), whose lookup chain is what core_ext/class/attribute.rb:86-120 " +
+      "walks; the third asserts `singleton_class.prepend` wraps the generated reader and " +
+      "writer. A JS class has no metaclass apart from its own statics and no " +
       "`Module#prepend`, so there is no receiver for either shape.",
   },
   {
@@ -392,5 +382,33 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "Float and `1` an Integer; JS has one number type where `2.0 === 2`, so the literal " +
       "cannot carry the Float-ness the assertion is about. The file's other eleven " +
       "`to_xml` cases are portable and stay counted.",
+  },
+  {
+    testFile: "core_ext/module_test.rb",
+    className: "ModuleTest",
+    tests: [
+      "private delegate",
+      "private delegate prefixed",
+      "private delegate with private option",
+      "some public some private delegate with private option",
+      "private delegate prefixed with private option",
+    ],
+    reason:
+      "Each asserts `assert_not_respond_to place, :street` for a delegate made private by " +
+      "`private(*delegate(...))` or `delegate ..., private: true` " +
+      "(core_ext/module_test.rb:500-590). trails carries no method visibility at run time " +
+      "(see CLAUDE.md, 'Method visibility is compile-time only'), so a defined delegate " +
+      "answers `respond_to?` at both arities. The file's other delegate cases stay counted.",
+  },
+  {
+    testFile: "configurable_test.rb",
+    className: "ConfigurableActiveSupport",
+    tests: ["the config_accessor method should not be publicly callable"],
+    reason:
+      "Asserts `assert_raises NoMethodError` on calling the private class method " +
+      "`config_accessor` from outside the class body (configurable_test.rb:125-131, " +
+      "`private :config_accessor`, configurable.rb:129). trails carries no method " +
+      "visibility at run time (see CLAUDE.md, 'Method visibility is compile-time only'). " +
+      "The file's other nine cases stay counted.",
   },
 ];

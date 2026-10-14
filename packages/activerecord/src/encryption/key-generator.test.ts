@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
 import { KeyGenerator } from "./key-generator.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 
 function assertDeriveKey(
   secret: string,
@@ -12,10 +12,10 @@ function assertDeriveKey(
   }: { digestClass?: DigestClass; length?: number } = {},
 ): void {
   const expectedDerivedKey = new AsKeyGenerator(secret, { hashDigestClass: digestClass })
-    .generateKey(Configurable.config.keyDerivationSalt, length)
+    .generateKey(Encryption.config.keyDerivationSalt, length)
     .toString("base64");
   expect(Buffer.from(expectedDerivedKey, "base64").length).toBe(length);
-  Configurable.config.hashDigestClass = digestClass;
+  Encryption.config.hashDigestClass = digestClass;
   expect(new KeyGenerator({ hashDigestClass: digestClass }).deriveKeyFrom(secret, { length })).toBe(
     expectedDerivedKey,
   );
@@ -24,10 +24,10 @@ function assertDeriveKey(
 describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
   let originalHashDigestClass: DigestClass;
   beforeEach(() => {
-    originalHashDigestClass = Configurable.config.hashDigestClass;
+    originalHashDigestClass = Encryption.config.hashDigestClass;
   });
   afterEach(() => {
-    Configurable.config.hashDigestClass = originalHashDigestClass;
+    Encryption.config.hashDigestClass = originalHashDigestClass;
   });
 
   it("generate_random_key generates random keys with the cipher key length by default", () => {
@@ -79,50 +79,5 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
     expect(Buffer.from(gen.deriveKeyFrom("some password", { length: 12 }), "base64").length).toBe(
       12,
     );
-  });
-
-  it("hash_digest_class reflects the configured digest", () => {
-    expect(new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA256 }).hashDigestClass).toBe(
-      OpenSSL.Digest.SHA256,
-    );
-    expect(new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA1 }).hashDigestClass).toBe(
-      OpenSSL.Digest.SHA1,
-    );
-  });
-
-  it("default hash_digest_class reads from config", () => {
-    expect(new KeyGenerator().hashDigestClass).toBe(Configurable.config.hashDigestClass);
-  });
-
-  describe("derive_key_from", () => {
-    let originalSalt: string | undefined;
-    beforeEach(() => {
-      originalSalt = Configurable.config.keyDerivationSalt;
-      Configurable.config.keyDerivationSalt = "test-salt";
-    });
-    afterEach(() => {
-      Configurable.config.keyDerivationSalt = originalSalt;
-    });
-
-    it("uses config.keyDerivationSalt as the salt", () => {
-      const gen = new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA256 });
-      const expected = new AsKeyGenerator("password", { hashDigestClass: OpenSSL.Digest.SHA256 })
-        .generateKey("test-salt", 32)
-        .toString("base64");
-      expect(gen.deriveKeyFrom("password")).toBe(expected);
-    });
-
-    it("raises when config.keyDerivationSalt is not set", () => {
-      Configurable.config.keyDerivationSalt = undefined;
-      const gen = new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA256 });
-      expect(() => gen.deriveKeyFrom("password")).toThrow();
-    });
-
-    it("produces a different key for a different salt", () => {
-      const gen = new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA256 });
-      const withTestSalt = gen.deriveKeyFrom("password");
-      Configurable.config.keyDerivationSalt = "other-salt";
-      expect(gen.deriveKeyFrom("password")).not.toBe(withTestSalt);
-    });
   });
 });

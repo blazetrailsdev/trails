@@ -1,5 +1,10 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getChildProcessAsync, stdout, stderr } from "@blazetrails/ruby-compat";
+import {
+  type ChildProcessAdapter,
+  getChildProcessAsync,
+  stdout,
+  stderr,
+} from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import "../../tasks/mysql-database-tasks.js";
@@ -286,17 +291,15 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
     adapter: "mysql2",
     database: "test-db",
   });
-  let spawnSync: ReturnType<typeof vi.fn>;
+  let system: ReturnType<typeof vi.fn>;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
 
   beforeEach(async () => {
     previousFlags = DatabaseTasks.structureDumpFlags;
     const childProcess = await getChildProcessAsync();
-    spawnSync = vi
-      .spyOn(childProcess, "spawnSync")
-      .mockReturnValue({ status: 0, signal: null, stdout: "", stderr: "" }) as ReturnType<
-      typeof vi.fn
-    >;
+    system = vi
+      .spyOn(childProcess as Required<ChildProcessAdapter>, "system")
+      .mockResolvedValue({ pid: 1, status: 0, signal: null }) as ReturnType<typeof vi.fn>;
   });
 
   afterEach(() => {
@@ -307,10 +310,11 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
   it("structure dump", async () => {
     await DatabaseTasks.structureDump(configurationDb, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "mysqldump",
-      ["--result-file", filename, "--no-data", "--routines", "--skip-comments", "test-db"],
       expect.anything(),
+      ["--result-file", filename, "--no-data", "--routines", "--skip-comments", "test-db"],
+      {},
     );
   });
 
@@ -328,7 +332,7 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configurationDb, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith("mysqldump", expectedCommand, expect.anything());
+    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {});
   });
 
   it("structure dump with hash extra flags for a different driver", async () => {
@@ -344,7 +348,7 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configurationDb, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith("mysqldump", expectedCommand, expect.anything());
+    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {});
   });
 
   it("structure dump with hash extra flags for the correct driver", async () => {
@@ -361,7 +365,7 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configurationDb, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith("mysqldump", expectedCommand, expect.anything());
+    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {});
   });
 
   it("structure dump with ignore tables", async () => {
@@ -378,8 +382,9 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
       SchemaDumper.ignoreTables = previous;
     }
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "mysqldump",
+      expect.anything(),
       [
         "--result-file",
         filename,
@@ -390,12 +395,12 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
         "--ignore-table=test-db.ignored_foo",
         "test-db",
       ],
-      expect.anything(),
+      {},
     );
   });
 
   it("warn when external structure dump command execution fails", async () => {
-    spawnSync.mockReturnValue({ status: 1, signal: null, stdout: "", stderr: "" });
+    system.mockResolvedValue({ pid: 1, status: 1, signal: null });
 
     let message = "";
     await expect(
@@ -405,10 +410,11 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
       }),
     ).rejects.toThrow(Error);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "mysqldump",
-      ["--result-file", filename, "--no-data", "--routines", "--skip-comments", "test-db"],
       expect.anything(),
+      ["--result-file", filename, "--no-data", "--routines", "--skip-comments", "test-db"],
+      {},
     );
     expect(message).toMatch(/^failed to execute: `mysqldump`$/m);
   });
@@ -422,8 +428,9 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(config, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "mysqldump",
+      expect.anything(),
       [
         "--port=10000",
         "--result-file",
@@ -433,7 +440,7 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
         "--skip-comments",
         "test-db",
       ],
-      expect.anything(),
+      {},
     );
   });
 
@@ -446,8 +453,9 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(config, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "mysqldump",
+      expect.anything(),
       [
         "--ssl-ca=ca.crt",
         "--result-file",
@@ -457,7 +465,7 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
         "--skip-comments",
         "test-db",
       ],
-      expect.anything(),
+      {},
     );
   });
 });
@@ -469,17 +477,15 @@ describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
     database: "test-db",
   });
   const executeArg = `SET FOREIGN_KEY_CHECKS = 0; SOURCE ${filename}; SET FOREIGN_KEY_CHECKS = 1`;
-  let spawnSync: ReturnType<typeof vi.fn>;
+  let system: ReturnType<typeof vi.fn>;
   let previousFlags: typeof DatabaseTasks.structureLoadFlags;
 
   beforeEach(async () => {
     previousFlags = DatabaseTasks.structureLoadFlags;
     const childProcess = await getChildProcessAsync();
-    spawnSync = vi
-      .spyOn(childProcess, "spawnSync")
-      .mockReturnValue({ status: 0, signal: null, stdout: "", stderr: "" }) as ReturnType<
-      typeof vi.fn
-    >;
+    system = vi
+      .spyOn(childProcess as Required<ChildProcessAdapter>, "system")
+      .mockResolvedValue({ pid: 1, status: 0, signal: null }) as ReturnType<typeof vi.fn>;
   });
 
   afterEach(() => {
@@ -493,7 +499,7 @@ describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith("mysql", expectedCommand, expect.anything());
+    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {});
   });
 
   it("structure load with hash extra flags for a different driver", async () => {
@@ -502,7 +508,7 @@ describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith("mysql", expectedCommand, expect.anything());
+    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {});
   });
 
   it("structure load with hash extra flags for the correct driver", async () => {
@@ -511,6 +517,6 @@ describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration, filename);
 
-    expect(spawnSync).toHaveBeenCalledWith("mysql", expectedCommand, expect.anything());
+    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {});
   });
 });

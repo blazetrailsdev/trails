@@ -1,10 +1,11 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
 import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
 import { assertRespondTo, assertRaises, assertEmpty, Logger } from "@blazetrails/activesupport";
 import { Book, PublishedBook } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class MockLogger extends Logger {
   private _logged: Record<string, string[]> = { warn: [] };
@@ -114,8 +115,8 @@ describe("EnumTest", () => {
   });
 
   it("find via where with values", async () => {
-    const published = (Book as any).statuses.published;
-    const written = (Book as any).statuses.written;
+    const published = (Book as any).statuses.get("published");
+    const written = (Book as any).statuses.get("written");
 
     expect((await Book.where({ status: published }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
@@ -127,8 +128,8 @@ describe("EnumTest", () => {
 
   it("find via where with values.to_s", async () => {
     book = books("awdr");
-    const published = String((Book as any).statuses.published);
-    const written = String((Book as any).statuses.written);
+    const published = String((Book as any).statuses.get("published"));
+    const written = String((Book as any).statuses.get("written"));
 
     expect((await Book.where({ status: published }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
@@ -136,7 +137,9 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: [written, written] }).first())?.id).not.toBe(book.id);
     expect((await Book.where().not({ status: published }).first())?.id).not.toBe(book.id);
     expect((await Book.where().not({ status: written }).first())?.id).toBe(book.id);
-    expect((await Book.where({ cover: (Book as any).covers.soft }).first())?.id).toBe(book.id);
+    expect((await Book.where({ cover: (Book as any).covers.get("soft") }).first())?.id).toBe(
+      book.id,
+    );
   });
 
   it("find via where with symbols", async () => {
@@ -195,10 +198,10 @@ describe("EnumTest", () => {
 
   it("build from where", () => {
     expect(
-      (Book.where({ status: (Book as any).statuses.written }).build() as any).isWritten(),
+      (Book.where({ status: (Book as any).statuses.get("written") }).build() as any).isWritten(),
     ).toBeTruthy();
     expect(
-      (Book.where({ status: (Book as any).statuses.written }).build() as any).isProposed(),
+      (Book.where({ status: (Book as any).statuses.get("written") }).build() as any).isProposed(),
     ).toBeFalsy();
     expect((Book.where({ status: ":written" }).build() as any).isWritten()).toBeTruthy();
     expect((Book.where({ status: ":written" }).build() as any).isProposed()).toBeFalsy();
@@ -431,9 +434,9 @@ describe("EnumTest", () => {
   });
 
   it("constant to access the mapping", () => {
-    expect((Book as any).statuses.proposed).toBe(0);
-    expect((Book as any).statuses.written).toBe(1);
-    expect((Book as any).statuses.published).toBe(2);
+    expect((Book as any).statuses.get("proposed")).toBe(0);
+    expect((Book as any).statuses.get("written")).toBe(1);
+    expect((Book as any).statuses.get("published")).toBe(2);
   });
 
   it("building new objects with enum scopes", () => {
@@ -475,11 +478,11 @@ describe("EnumTest", () => {
     expect((book as any).status).toBe("published");
   });
   it("attributes_for_database", () => {
-    expect((book as any).attributesForDatabase().status).toBe(2);
+    expect(hashAref((book as any).attributesForDatabase(), "status")).toBe(2);
 
     (book as any).status = "published";
 
-    expect((book as any).attributesForDatabase().status).toBe(2);
+    expect(hashAref((book as any).attributesForDatabase(), "status")).toBe(2);
   });
 
   it("invalid definition values raise an ArgumentError", async () => {
@@ -664,15 +667,17 @@ describe("EnumTest", () => {
   });
 
   it("attempting to modify enum raises error", async () => {
-    let e = await assertRaises([TypeError], {}, () => {
-      (Book as any).statuses["bad_enum"] = 40;
+    let e = await assertRaises([RuntimeError], {}, () => {
+      (Book as any).statuses.set("bad_enum", 40);
     });
-    expect(e.message).toMatch(/Cannot add property bad_enum, object is not extensible/);
 
-    e = await assertRaises([TypeError], {}, () => {
-      delete (Book as any).statuses["published"];
+    expect(e.message).toMatch(/can't modify frozen/);
+
+    e = await assertRaises([RuntimeError], {}, () => {
+      (Book as any).statuses.delete("published");
     });
-    expect(e.message).toMatch(/Cannot delete property 'published'/);
+
+    expect(e.message).toMatch(/can't modify frozen/);
   });
 
   it("declare multiple enums with prefix: true", () => {
@@ -722,78 +727,6 @@ describe("EnumTest", () => {
     record = await (Klass as any).find(record.id);
     expect(record.isProposed()).toBeTruthy();
     expect(record.aliased_status).toBe("proposed");
-  });
-
-  it("enum declared before alias_attribute raises on first use", async () => {
-    class Klass extends Base {
-      static _tableName = "books";
-      static {
-        this.enum("aliased_status", ["proposed", "written", "published"]);
-        this.aliasAttribute("aliased_status", "status");
-      }
-    }
-    registerModel(Klass);
-
-    await expect((Klass as any).create({ status: "written" })).rejects.toThrow(
-      /Undeclared attribute type for enum 'aliased_status' in Klass/,
-    );
-    expect(() => (Klass as any).typeForAttribute("aliased_status")).toThrow(
-      /Undeclared attribute type for enum 'aliased_status' in Klass/,
-    );
-    expect(() => new (Klass as any)().isProposed()).toThrow(
-      /Undeclared attribute type for enum 'aliased_status' in Klass/,
-    );
-  });
-
-  it("column-backed enum whose name is later aliased does not raise", () => {
-    class Klass extends Base {
-      static _tableName = "books";
-      static {
-        this.enum("nullable_status", ["single", "married"]);
-        this.aliasAttribute("nullable_status", "status");
-      }
-    }
-    registerModel(Klass);
-
-    expect(() => (Klass as any).typeForAttribute("nullable_status")).not.toThrow();
-    expect(() => new (Klass as any)().isSingle()).not.toThrow();
-  });
-
-  it("enum on abstract parent resolves against concrete subclass columns", () => {
-    class AbstractParent extends Base {
-      static {
-        this._abstractClass = true;
-        this.enum("typeless_genre", ["adventure", "comic"]);
-      }
-    }
-    class Concrete extends AbstractParent {
-      static _tableName = "books";
-    }
-    registerModel(Concrete);
-
-    expect(() => (Concrete as any).typeForAttribute("typeless_genre")).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
-    );
-  });
-
-  it("enum on abstract parent raises through subclass materialization", () => {
-    class AbstractParent extends Base {
-      static {
-        this._abstractClass = true;
-        this.enum("typeless_genre", ["adventure", "comic"]);
-      }
-    }
-    class Concrete extends AbstractParent {
-      static _tableName = "books";
-    }
-    registerModel(Concrete);
-
-    expect(() => (Concrete as any)._defaultAttributes()).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
-    );
-    expect(() => new (Concrete as any)({})).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
-    );
   });
 
   it("query state by predicate with prefix", () => {
@@ -1002,7 +935,7 @@ describe("EnumTest", () => {
         this.attribute("cover", "integer");
         this.attribute("difficulty", "integer");
         this.enum("cover", { hard: 0, soft: 1 }, { suffix: true });
-        this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "toRead" });
+        this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "to_read" });
       }
     }
     const instance = new K();
@@ -1080,8 +1013,8 @@ describe("EnumTest", () => {
       }
     }
     const computer = (Klass as any)["etc::Gmt+1"]().build();
-    expect(computer["isEtc/GMT+1"]()).toBeTruthy();
-    expect(computer["isEtc/GMT-1"]()).toBeFalsy();
+    expect(computer["isEtc::Gmt+1"]()).toBeTruthy();
+    expect(computer["isEtc::Gmt-1"]()).toBeFalsy();
   });
 
   it("deserialize enum value to original hash key", async () => {

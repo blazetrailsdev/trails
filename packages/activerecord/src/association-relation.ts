@@ -3,13 +3,10 @@ import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { ActiveRecord } from "./namespaces.js";
-import { relationClassFor } from "./relation/delegation.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
+import { rbEqual, rbModConstSet } from "@blazetrails/ruby-compat";
 
-export class AssociationRelation<T extends Base> extends Relation<T> {
-  /** @internal */
-  static override _railsClassName = "ActiveRecord::AssociationRelation";
-
+export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
   _association: CollectionProxy<T> | Association;
 
@@ -25,30 +22,22 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     return association.proxyAssociation ?? (this._association as Association);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  override clone(): Relation<T> {
-    const Ctor = relationClassFor.call(AssociationRelation, this.model);
-    const rel = new Ctor(this.model, this._association) as Relation<T>;
-    rel.initializeCopy(this);
-    return rel;
-  }
-
-  protected override _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
+  protected override _new(
+    attributes: Record<string, unknown> | PermittedAttributes,
+    block?: (record: T) => void,
+  ): T {
     return (this._association as CollectionProxy<T>).build(attributes, block);
   }
 
   protected override _create(
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
     return (this._association as CollectionProxy<T>).create(attributes, block);
   }
 
   protected override _createBang(
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
     return (this._association as CollectionProxy<T>).createBang(attributes, block);
@@ -101,17 +90,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   override async equals(other: unknown): Promise<boolean | undefined> {
-    const records = await this.records();
-    if (Array.isArray(other)) {
-      return (
-        other.length === records.length && other.every((record: T, i) => record.equals(records[i]))
-      );
-    }
-    const otherEquals = (other as { equals?: (o: unknown) => unknown } | null)?.equals;
-    if (typeof otherEquals === "function") {
-      return (await otherEquals.call(other, records)) as boolean | undefined;
-    }
-    return false;
+    return rbEqual(other, await this.records());
   }
 
   protected override async execQueries(block?: (record: T) => void): Promise<T[]> {
@@ -126,4 +105,4 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 }
 
-ActiveRecord.AssociationRelation = AssociationRelation;
+rbModConstSet(ActiveRecord, "AssociationRelation", AssociationRelation);

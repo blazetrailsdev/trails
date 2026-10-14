@@ -1,3 +1,5 @@
+import { hashEntries } from "./rb-equal.js";
+
 /**
  * Ruby's `Object#hash` (`vendor/ruby/v3.3.11/object.c:4375`, `rb_define_method(rb_mKernel,
  * "hash", rb_obj_hash, 0)`), with the `Array#hash`
@@ -21,7 +23,7 @@ export function rbHash(value: unknown): number {
       return stringHash(value);
     case "number":
     case "bigint":
-      return stringHash(String(value));
+      return stringHash(`\0${String(value)}`);
     case "boolean":
       return value ? 0x5bf03635 : 0x27d4eb2f;
     case "symbol":
@@ -64,9 +66,8 @@ export function rbHash(value: unknown): number {
      Ruby's is. It has two JS seats — a plain object and a `Map` — and `rbEqual`
      answers true across them, so both must hash alike or the `hash`/`eql?`
      contract breaks. */
-  if ((value as object).constructor === Object || value instanceof Map) {
-    const pairs: [unknown, unknown][] =
-      value instanceof Map ? [...value.entries()] : Object.entries(value as object);
+  const pairs = hashEntries(value);
+  if (pairs !== null) {
     let h = 0x811c9dc5;
     for (const pair of pairs.map(([key, val]) => rbHash(key) ^ rbHash(val)).sort((l, r) => l - r)) {
       h ^= pair;

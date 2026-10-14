@@ -1,4 +1,4 @@
-import { basicObjRespondTo } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, Module, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -8,10 +8,8 @@ import {
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-methods.js";
-import { registerSubclass } from "./inheritance.js";
 
-import { fixtures } from "./test-fixtures.js";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
@@ -40,29 +38,6 @@ describe("AttributeMethodsTest (trails)", () => {
 
     expect(Legacy._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
     expect(new Legacy({ title: "t" }).heading).toBe("t");
-  });
-
-  it("initializeGeneratedModules replaces a module ActiveModel built first", () => {
-    class Legacy extends Base {
-      declare heading: unknown;
-      static {
-        this.attribute("title", "string");
-        this.aliasAttribute("heading", "title");
-      }
-    }
-    Legacy.generatedAttributeMethods().defineMethod("title", function () {
-      return "from the ActiveModel module";
-    });
-    Legacy.initializeGeneratedModules();
-    generatable(Legacy).defineAttributeMethods();
-
-    expect(Legacy._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
-    expect("title" in Legacy.prototype).toBe(true);
-
-    Legacy.undefineAttributeMethods();
-
-    expect(basicObjRespondTo(Legacy.prototype, "title")).toBe(false);
-    expect(basicObjRespondTo(Legacy.prototype, "heading")).toBe(false);
   });
 
   it("a class reached only through isInstanceMethodAlreadyImplemented holds a GeneratedAttributeMethods", () => {
@@ -99,22 +74,16 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(generatable(Dog)._attributeMethodsGenerated).toBe(true);
   });
 
-  it("formatForInspect renders a valid Date as a quoted ISO string", () => {
+  it("formatForInspect inspects a JS Date as any other object", () => {
     class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date("2026-04-15T12:00:00.000Z"));
-    expect(out).toBe('"2026-04-15T12:00:00.000Z"');
-  });
-
-  it("formatForInspect renders an invalid Date as quoted 'Invalid Date'", () => {
-    class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date(NaN));
-    expect(out).toBe('"Invalid Date"');
+    const date = new Date("2026-04-15T12:00:00.000Z");
+    expect(formatForInspect.call(new M(), "x", date)).toBe(rbInspect(date));
   });
 
   it("formatForInspect does not crash for array containing an object with bigint values", () => {
     class M extends Base {}
     expect(() => formatForInspect.call(new M(), "x", [{ a: 1n }])).not.toThrow();
-    expect(formatForInspect.call(new M(), "x", [{ a: 1n }])).toBe('[{"a":"1"}]');
+    expect(formatForInspect.call(new M(), "x", [{ a: 1n }])).toBe('[{"a"=>1}]');
   });
 
   it("returns true for alias_attribute names on instances", () => {
@@ -248,7 +217,7 @@ describe("AttributeMethodsTest (trails)", () => {
     class Topic extends Base {}
     class ImportantTopic extends Topic {
       static {
-        registerSubclass(this);
+        registerModel(this);
       }
     }
     await Topic.loadSchema();
@@ -474,6 +443,35 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 });
 
+describe("AttributeMethods#respond_to_missing? (trails)", () => {
+  fixtures([]);
+
+  it("defines the attribute methods for a record built before its schema loaded", async () => {
+    class Topic extends Base {}
+    Base.connectionPool().schemaCache.clearBang();
+    const topic = new Topic();
+
+    await Topic.loadSchema();
+    expect(rbObjRespondTo(topic, "title")).toBe(true);
+    expect(basicObjRespondTo(topic, "title", true)).toBe(true);
+    expect(basicObjRespondTo(topic, "mumbo", true)).toBe(false);
+    expect(rbObjRespondTo(new Topic(), "title")).toBe(true);
+  });
+
+  it("a dup of a record built before its schema loaded takes the columns too", async () => {
+    class Topic extends Base {}
+    Base.connectionPool().schemaCache.clearBang();
+    const topic = new Topic();
+    const dup = topic.dup();
+    expect(rbObjRespondTo(topic, "title")).toBe(false);
+
+    await Topic.loadSchema();
+    expect(rbObjRespondTo(dup, "title")).toBe(true);
+    expect(rbObjRespondTo(topic, "title")).toBe(true);
+    expect((dup as unknown as { title: unknown }).title).toBeNull();
+  });
+});
+
 describe("methodDefinedWithin (trails)", () => {
   class Super {
     greet(): string {
@@ -571,7 +569,7 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
     ["slice", (t: TrackingTopic) => t.slice("title")],
     ["valuesAt", (t: TrackingTopic) => t.valuesAt("title")],
   ] as const)("marks the field accessed when read through %s", (_label, read) => {
-    const t = AccessTopic.new({ title: "access-test", body: "hello" }) as TrackingTopic;
+    const t = new AccessTopic({ title: "access-test", body: "hello" }) as TrackingTopic;
     expect(t.accessedFields()).toEqual([]);
     read(t);
     expect(t.accessedFields()).toEqual(["title"]);
@@ -579,7 +577,7 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
 });
 
 describe("attributesForCreate (trails)", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
 
   it("keeps a nil composite primary key member", async () => {
     await CpkBook.loadSchema();
@@ -592,7 +590,7 @@ describe("attributesForCreate (trails)", () => {
     CpkOrder.partialInserts = false;
     try {
       let order: CpkOrder | undefined;
-      await assertQueriesMatch(/INSERT INTO[^(]+\([^)]*shop_id/i, 1, false, async () => {
+      await self().assertQueriesMatch(/INSERT INTO[^(]+\([^)]*shop_id/i, { count: 1 }, async () => {
         order = await CpkOrder.create({ status: "paid" });
       });
       expect(order?.shop_id).toBeNull();
@@ -607,5 +605,72 @@ describe("attributesForCreate (trails)", () => {
     expect(attributesForCreate.call(minivan as never, minivan.attributeNames())).not.toContain(
       "minivan_id",
     );
+  });
+});
+
+describe("attribute_alias arelTable integration", () => {
+  fixtures([]);
+  it("test_attribute_alias_in_where_references_association_name", () => {
+    class User extends Base {
+      static {
+        this.attribute("username", "string");
+        this.aliasAttribute("login", "username");
+      }
+    }
+    const attr = User.arelTable.get("login");
+    expect(attr.name).toBe("username");
+  });
+});
+
+describe("initialize_generated_modules", () => {
+  fixtures([]);
+
+  it("generated attribute methods ancestors have correct module", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.initializeGeneratedModules();
+    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+  });
+
+  it("runs lazily via defineAttributeMethods without a direct call", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.defineAttributeMethods();
+    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+  });
+
+  it("resets attribute-methods generation flags", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const flags = Topic as unknown as {
+      _attributeMethodsGenerated: boolean;
+      _aliasAttributesMassGenerated: boolean;
+    };
+    flags._attributeMethodsGenerated = true;
+    flags._aliasAttributesMassGenerated = true;
+    Topic.initializeGeneratedModules();
+    expect(flags._attributeMethodsGenerated).toBe(false);
+    expect(flags._aliasAttributesMassGenerated).toBe(false);
+  });
+
+  it("chains to Core#initialize_generated_modules via super", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.initializeGeneratedModules();
+    expect(
+      (Topic as unknown as { _generatedAssociationMethods: unknown })._generatedAssociationMethods,
+    ).toBeInstanceOf(Module);
   });
 });

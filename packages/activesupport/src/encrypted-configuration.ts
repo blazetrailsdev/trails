@@ -113,7 +113,7 @@ export class EncryptedConfiguration extends EncryptedFile {
 
   /** @internal */
   private async deserialize(content: string): Promise<Map<unknown, unknown>> {
-    const { parse } = await import("./yaml.js");
+    const { parse } = await import("@blazetrails/ruby-compat/psych-adapter");
     let config: unknown;
     try {
       config = parse(content, { mapAsMap: true, version: "1.1" });

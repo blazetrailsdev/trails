@@ -298,25 +298,28 @@ The eight artefacts were two named classes and nothing else:
   `ref:throw` onto. A `throw(:abort)` whose port `return false`s for its caller
   to convert (`associations/builder/association.ts:233`) emits no token at all,
   so there is nothing to fold it onto and it stays in the population.
-- **Ruby-only guards with no JS counterpart** — `require "bcrypt" rescue
-LoadError` (`secure_password.rb:120-124`), `constantize` / `NameError`
-  (`request.rb:98-103`), and the raise-to-build-a-backtrace trick
+- **Ruby-only guards with no JS counterpart** — `constantize` / `NameError`
+  (`request.rb:98-103`) and the raise-to-build-a-backtrace trick
   (`error_reporter.rb:258-263`) — and `singleton_class?`
-  (`attribute_accessors.rb:56`), which makes four, the dominant residual class
+  (`attribute_accessors.rb:56`), which makes three, the dominant residual class
   in this stratum. These are NOT folded. Each is a different Ruby construct with
-  no TS token at all — there is no `require` to fail, no `NameError` to rescue,
-  no singleton class, and no interpreter that fills a backtrace on raise — so
-  there is nothing on the port's side to fold the Ruby `throw` onto the way the
-  halt helper folds, and no single rule covers all four without dropping real
-  raises with them.
+  no TS token at all — there is no `NameError` to rescue, no singleton class,
+  and no interpreter that fills a backtrace on raise — so there is nothing on
+  the port's side to fold the Ruby `throw` onto the way the halt helper folds,
+  and no single rule covers all three without dropping real raises with them.
 
   The audit's own Gap 5 is the disposition, and it is stronger than "not yet
   suppressed": **no action proposed — these have no JS counterpart at all, so
   there is nothing to converge; they are a permanent floor, not debt.** (Gap 1's
   passing "both suppressible at the source" is loose phrasing, superseded by the
-  entry that examines the class.) So the four rows sit in the seeded marks
+  entry that examines the class.) So the three rows sit in the seeded marks
   permanently. A file whose mark is held up by one of them is not a burndown
   target — the mark for it cannot reach zero, and that is correct, not stale.
+
+  A fourth row, `require "bcrypt" rescue LoadError` (`secure_password.rb:120-124`),
+  was listed here until the gem moved into `packages/bcrypt`. Once activemodel
+  stopped importing it, `require "bcrypt"` became "is `TopLevel.BCrypt`
+  seated", and `has_secure_password` raises, warns and re-raises as Rails does.
 
 ### The seed run
 

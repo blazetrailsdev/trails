@@ -1,12 +1,20 @@
 /** @internal */
 
-import { isPlainObject, type SafeBuffer } from "@blazetrails/activesupport";
+import {
+  Concern,
+  extend,
+  isPlainObject,
+  type SafeBuffer,
+  dasherize,
+  underscore,
+} from "@blazetrails/activesupport";
 import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { include, Module } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
 import { Renderer } from "./renderer.js";
 import { Template } from "./template.js";
+import { ViewPaths } from "./view-paths.js";
 
 export interface RenderOptions {
   template?: string;
@@ -62,7 +70,6 @@ export function isInheritViewContextClass(this: ViewContextClassMethods): boolea
   );
 }
 
-/** @missingRailsArgs include — PERMANENT */
 export function buildViewContextClass(
   this: ViewContextClassMethods,
   klass: typeof Base,
@@ -112,13 +119,13 @@ export function viewContextClass(this: ViewContextClassMethods): typeof Base {
 
 /** @internal */
 export interface ViewContextHost {
-  constructor: ViewContextClassMethods;
+  viewContextClass(): typeof Base;
   lookupContext: LookupContext;
   viewAssigns(): Record<string, unknown>;
 }
 
 export function viewContext(this: ViewContextHost): Base {
-  return new (this.constructor.viewContextClass())(
+  return new (this.viewContextClass())(
     this.lookupContext,
     this.viewAssigns(),
     this as unknown as null,
@@ -130,6 +137,10 @@ export interface ViewRendererHost {
   lookupContext: LookupContext;
   /** @internal */
   _viewRenderer?: Renderer;
+}
+
+export function renderedFormat(this: { _renderedFormat?: unknown }): unknown {
+  return this._renderedFormat;
 }
 
 export function viewRenderer(this: ViewRendererHost): Renderer {
@@ -210,7 +221,10 @@ export function _normalizeArgs(
     const key = action.includes("/") ? "template" : "action";
     options[key] = action;
   } else {
-    if (rbObjRespondTo(action, "permitted") && (action as { permitted: boolean }).permitted) {
+    if (
+      rbObjRespondTo(action, "isPermitted") &&
+      (action as { isPermitted(): boolean }).isPermitted()
+    ) {
       options = action as Record<string, unknown>;
     } else if (rbObjRespondTo(action, "renderIn")) {
       options["renderable"] = action;
@@ -222,23 +236,40 @@ export function _normalizeArgs(
   return options;
 }
 
-/** @internal */
+/**
+ * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
+ * @internal
+ */
 export function _processRenderTemplateOptions(
   this: { actionName: string; _prefixes(): string[] },
   options: Record<string, unknown>,
 ): void {
   if (options["partial"] === true) {
-    options["partial"] = this.actionName;
+    options["partial"] = dasherize(underscore(this.actionName));
   }
 
   if (!["partial", "file", "template"].some((k) => k in options)) {
     options["prefixes"] ??= this._prefixes();
   }
 
-  options["template"] ??= String(options["action"] ?? this.actionName);
+  options["template"] ??= dasherize(underscore(String(options["action"] ?? this.actionName)));
 }
 
+export const ClassMethods = {
+  isInheritViewContextClass,
+  buildViewContextClass,
+  viewContextClass,
+};
+
 export const Rendering = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(ViewPaths);
+
+  mod.defineMethod("viewContextClass", function (this: { constructor: ViewContextClassMethods }) {
+    return this.constructor.viewContextClass();
+  });
+  mod.defineMethod("renderedFormat", renderedFormat);
   mod.defineMethod("viewContext", viewContext);
   mod.defineMethod("viewRenderer", viewRenderer);
   mod.defineMethod("renderToBody", renderToBody);
@@ -246,4 +277,5 @@ export const Rendering = new Module((mod) => {
   mod.defineMethod("_processFormat", _processFormat);
   mod.defineMethod("_normalizeArgs", _normalizeArgs);
   mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
-});
+}) as Module & { ClassMethods: typeof ClassMethods };
+Rendering.ClassMethods = ClassMethods;

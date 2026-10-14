@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Dir, createTmpname } from "./dir.js";
+import { File } from "./file.js";
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
@@ -64,6 +65,35 @@ describe("Dir", () => {
     ]);
   });
 
+  it("globAsync matches what glob does when no flag is given", async () => {
+    const root = fixture();
+
+    for (const pattern of [`${root}/**/*.rb`, `${root}/*`, `${root}/{a,b}/*.rb`, `${root}/nope/*`])
+      expect(await Dir.globAsync(pattern)).toEqual(Dir.glob(pattern));
+    expect(await Dir.globAsync(`${root}/a.rb`)).toEqual([`${root}/a.rb`]);
+    expect(await Dir.globAsync(`${root}/missing.rb`)).toEqual([]);
+  });
+
+  it("globAsync with FNM_DOTMATCH matches dotfiles and the first directory's own dot, never dot-dot", async () => {
+    const g = mkdtempSync(join(tmpdir(), "trails-dir-"));
+    for (const dir of ["a", "a/.h", ".d"]) mkdirSync(join(g, dir));
+    for (const file of ["B.rb", ".dot", "a/x.rb", "a/.y", "a/.h/z", ".d/w", "a.rb"])
+      writeFileSync(join(g, file), "");
+    symlinkSync(join(g, "a"), join(g, "lnk"));
+    const glob = async (pattern: string, flags = File.FNM_DOTMATCH): Promise<string> =>
+      (await Dir.globAsync(`${g}/${pattern}`, flags)).map((e) => e.slice(g.length + 1)).join(" ");
+
+    expect(await glob("*")).toBe(". .d .dot B.rb a a.rb lnk");
+    expect(await glob("a/?y")).toBe("a/.y");
+    expect(await glob("{.d,a}/*")).toBe(".d/. .d/w a/. a/.h a/.y a/x.rb");
+    expect(await glob("*/*")).toBe(
+      "./.d ./.dot ./B.rb ./a ./a.rb ./lnk .d/w a/.h a/.y a/x.rb lnk/.h lnk/.y lnk/x.rb",
+    );
+    expect(await glob("**/*")).toBe(". .d .d/w .dot B.rb a a/.h a/.h/z a/.y a/x.rb a.rb lnk");
+    expect(await glob("**/z")).toBe("a/.h/z");
+    expect(await glob("**/*.rb", 0)).toBe("B.rb a/x.rb a.rb");
+  });
+
   it("glob answers an empty array for a pattern that matches nothing", () => {
     expect(Dir.glob(`${fixture()}/nope/*`)).toEqual([]);
   });
@@ -97,6 +127,73 @@ describe("Dir", () => {
     expect(Dir.foreach(root, (filename) => yielded.push(filename))).toBe(null);
     expect(yielded.slice(0, 2)).toEqual([".", ".."]);
     expect(yielded.slice(2).sort()).toEqual(Dir.children(root).sort());
+  });
+});
+
+describe("Dir.chdir", () => {
+  it("raises for an async block that overlaps another from a sibling context", async () => {
+    const start = Dir.pwd();
+    const root = fixture();
+    let release!: () => void;
+    const first = Dir.chdir(join(root, "a"), async () => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return Dir.pwd();
+    });
+
+    expect(() => Dir.chdir(join(root, "b"), async () => Dir.pwd())).toThrow(
+      "conflicting chdir during another chdir block",
+    );
+    expect(() => Dir.chdir(join(root, "b"))).toThrow(
+      "conflicting chdir during another chdir block",
+    );
+
+    release();
+    expect(File.basename(await first)).toBe("a");
+    expect(Dir.pwd()).toBe(start);
+    expect(await Dir.chdir(join(root, "b"), async () => File.basename(Dir.pwd()))).toBe("b");
+  });
+
+  it("raises for a block opened from a finished block's context while another is open", async () => {
+    const root = fixture();
+    let resume!: () => void;
+    let release!: () => void;
+    const resumed = new Promise<void>((resolve) => (resume = resolve));
+    let open!: Promise<string>;
+    let conflict!: Promise<unknown>;
+    await Dir.chdir(join(root, "a"), async () => {
+      open = resumed.then(() =>
+        Dir.chdir(join(root, "b"), async () => {
+          await new Promise<void>((resolve) => (release = resolve));
+          return File.basename(Dir.pwd());
+        }),
+      );
+      conflict = resumed.then(() =>
+        Promise.resolve()
+          .then(() => Dir.chdir(join(root, "sub"), async () => Dir.pwd()))
+          .catch((error: unknown) => error),
+      );
+    });
+
+    resume();
+    expect(String(await conflict)).toContain("conflicting chdir during another chdir block");
+    release();
+    expect(await open).toBe("b");
+  });
+
+  it("restores nested async blocks in LIFO order", async () => {
+    const start = Dir.pwd();
+    const root = fixture();
+    const seen = await Dir.chdir(join(root, "a"), async () => {
+      await Promise.resolve();
+      const inner = await Dir.chdir(join(root, "b"), async () => {
+        await Promise.resolve();
+        return File.basename(Dir.pwd());
+      });
+      return [inner, File.basename(Dir.pwd())];
+    });
+
+    expect(seen).toEqual(["b", "a"]);
+    expect(Dir.pwd()).toBe(start);
   });
 });
 

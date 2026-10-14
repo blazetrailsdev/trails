@@ -3,21 +3,21 @@ import { describe, expect, it, vi } from "vitest";
 import {
   Buffer,
   ClientDisconnected,
+  Live,
   Response,
   SSE,
   cleanUpThreadLocals,
   liveThreadPoolExecutor,
   logError,
-  makeResponseBang,
   newControllerThread,
-  originalCleanUpThreadLocals,
-  originalNewControllerThread,
-  process,
   sendStream,
-  responseBody,
+  type LiveControllerHost,
 } from "./live.js";
-import { IOError, RuntimeError, SizedQueue, ThreadError } from "@blazetrails/ruby-compat";
+import { IOError, RuntimeError, SizedQueue, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../../action-dispatch/http/request.js";
+import { Base } from "../base.js";
 
 function makeResponse() {
   const response = new Response();
@@ -268,17 +268,17 @@ describe("ActionController::Live::Response", () => {
 
   it("stream writes flow through the live Buffer", async () => {
     const res = makeResponse();
-    res.stream.write("a");
-    res.stream.write("b");
-    res.stream.close();
-    expect(await drain(res.stream)).toEqual(["a", "b"]);
+    (res.stream as Buffer).write("a");
+    (res.stream as Buffer).write("b");
+    (res.stream as Buffer).close();
+    expect(await drain(res.stream as Buffer)).toEqual(["a", "b"]);
   });
 
   it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
     const res = new Response(201, { "x-test": "1" }, []);
     res.request = makeResponse().request;
-    res.stream.write("seed");
-    res.stream.close();
+    (res.stream as Buffer).write("seed");
+    (res.stream as Buffer).close();
     expect(res.status).toBe(201);
     expect(res.headers.get("x-test")).toBe("1");
     expect(res.body).toBe("seed");
@@ -288,10 +288,21 @@ describe("ActionController::Live::Response", () => {
   it("before_committed writes the request's cookie jar onto the response", () => {
     const res = makeResponse();
     res.request!.cookieJar().set("hello", "world");
-    res.stream.write("a");
-    res.stream.close();
+    (res.stream as Buffer).write("a");
+    (res.stream as Buffer).close();
     expect(res.committed).toBe(true);
     expect(res.cookies).toEqual({ hello: "world" });
+  });
+
+  it("await_sent waits on sent!'s broadcast", async () => {
+    const res = makeResponse();
+    let sent = false;
+    const waiting = res.awaitSent().then(() => (sent = true));
+    await Promise.resolve();
+    expect(sent).toBe(false);
+    res.sentBang();
+    await waiting;
+    expect(sent).toBe(true);
   });
 });
 
@@ -299,45 +310,104 @@ function makeHost() {
   return {
     request: { getHeader: () => undefined as string | undefined },
     response: makeResponse(),
-  };
+  } as unknown as LiveControllerHost;
 }
+
+class Host {
+  request = { getHeader: () => undefined as string | undefined };
+  response = makeResponse();
+  body: unknown = undefined;
+  action: (name: string) => void | Promise<void> = () => {};
+
+  process(name: string): void | Promise<void> {
+    return this.action(name);
+  }
+
+  get responseBody(): unknown {
+    return this.body;
+  }
+  set responseBody(body: unknown) {
+    this.body = body;
+  }
+}
+class LiveHost extends Host {}
+include(LiveHost, Live);
 
 describe("ActionController::Live#process", () => {
   it("awaits the action and commits the response", async () => {
-    const host = makeHost();
+    const host = new LiveHost();
     const seen: string[] = [];
-    await process.call(host, "show", async (n) => {
+    host.action = async (n) => {
       seen.push(n);
-      host.response.stream.write("hi");
-    });
+      (host.response.stream as Buffer).write("hi");
+    };
+    await host.process("show");
     expect(seen).toEqual(["show"]);
     expect(host.response.committed).toBe(true);
   });
 
   it("re-raises pre-commit errors; routes post-commit errors through onError", async () => {
-    await expect(
-      process.call(makeHost(), "show", () => {
-        throw new Error("boom");
-      }),
-    ).rejects.toThrow("boom");
+    const raising = new LiveHost();
+    raising.action = () => {
+      throw new Error("boom");
+    };
+    await expect(raising.process("show")).rejects.toThrow("boom");
 
-    const host = makeHost();
+    const host = new LiveHost();
     const fired = vi.fn();
-    host.response.stream.onError(fired);
-    await process.call(host, "show", async () => {
-      host.response.stream.write("partial");
+    (host.response.stream as Buffer).onError(fired);
+    host.action = async () => {
+      (host.response.stream as Buffer).write("partial");
       host.response.close();
       throw new Error("post");
-    });
+    };
+    await host.process("show");
     expect(fired).toHaveBeenCalledOnce();
+  });
+
+  it("copies the thread locals and execution state onto the controller thread, then clears them", async () => {
+    await new Thread(async () => {
+      const t1 = Thread.current();
+      t1.set("live_local", "copied");
+      IsolatedExecutionState.set("live_state", "shared");
+
+      const host = new LiveHost();
+      let t2!: Thread;
+      const seen: unknown[] = [];
+      host.action = () => {
+        t2 = Thread.current();
+        seen.push(t2.get("live_local"), IsolatedExecutionState.get("live_state"));
+        IsolatedExecutionState.set("live_state", "child");
+      };
+      await host.process("show");
+
+      expect(t2).not.toBe(t1);
+      expect(seen).toEqual(["copied", "shared"]);
+      expect(t2.keys()).toEqual([]);
+      expect(t2.activeSupportExecutionState()!.size).toBe(0);
+      expect(t1.get("live_local")).toBe("copied");
+      expect(IsolatedExecutionState.get("live_state")).toBe("shared");
+    }).join();
+  });
+
+  it("dispatches new_controller_thread on the receiver", async () => {
+    const host = new LiveHost() as LiveHost & LiveControllerHost;
+    const threads: string[] = [];
+    host.newControllerThread = async (block) => {
+      threads.push("own");
+      await block();
+    };
+    await host.process("show");
+    expect(threads).toEqual(["own"]);
   });
 });
 
 describe("ActionController::Live#response_body=", () => {
-  it("assigns the body and closes the response", () => {
-    const host = makeHost();
-    responseBody.call(host, "payload");
-    expect(host.response.body).toBe("payload");
+  it("assigns the body through super and closes the response", () => {
+    const host = new LiveHost();
+    host.responseBody = "payload";
+    expect(host.body).toBe("payload");
+    expect(host.responseBody).toBe("payload");
     expect(host.response.committed).toBe(true);
   });
 });
@@ -361,6 +431,23 @@ describe("ActionController::Live#send_stream", () => {
     expect(host.response.headers.get("content-type")).toBe("application/x-foo");
   });
 
+  it("instruments send_stream.action_controller with the payload", async () => {
+    const payloads: unknown[] = [];
+    const subscriber = Notifications.subscribe("send_stream.action_controller", (event) => {
+      payloads.push(event.payload);
+    });
+    try {
+      const host = makeHost();
+      await sendStream.call(host, { filename: "export.csv", type: ":csv" }, () => {});
+      expect(host.response.headers.get("content-type")).toBe("text/csv");
+      expect(payloads).toEqual([
+        { filename: "export.csv", disposition: "attachment", type: ":csv" },
+      ]);
+    } finally {
+      Notifications.unsubscribe(subscriber);
+    }
+  });
+
   it("closes the stream even when the block throws", async () => {
     const host = makeHost();
     await expect(
@@ -368,7 +455,7 @@ describe("ActionController::Live#send_stream", () => {
         throw new Error("write failed");
       }),
     ).rejects.toThrow("write failed");
-    expect(host.response.stream.isClosed).toBe(true);
+    expect((host.response.stream as Buffer).isClosed).toBe(true);
   });
 });
 
@@ -380,47 +467,103 @@ describe("ActionController::Live private helpers", () => {
       order.push("inside");
     });
     order.push("after-call");
+    expect(order).toEqual(["after-call"]);
     await p;
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(order).toEqual(["after-call", "inside"]);
   });
 
-  it("cleanUpThreadLocals is a no-op; originals are reference-equal; pool is a singleton", () => {
-    expect(() => cleanUpThreadLocals.call(makeHost(), [], null)).not.toThrow();
-    expect(originalNewControllerThread).toBe(newControllerThread);
-    expect(originalCleanUpThreadLocals).toBe(cleanUpThreadLocals);
+  it("newControllerThread runs the block on a thread of its own, aborting on exception", async () => {
+    let t2: Thread | undefined;
+    await newControllerThread.call(makeHost(), () => {
+      t2 = Thread.current();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(t2).not.toBe(Thread.current());
+    expect(t2!.abortOnException).toBe(true);
+  });
+
+  it("cleanUpThreadLocals clears the copied locals; pool is a singleton", () => {
+    const thread = new Thread(() => null);
+    thread.set("copied", 1);
+    thread.set("kept", 2);
+    cleanUpThreadLocals.call(makeHost(), [["copied", 1]], thread);
+    expect(thread.keys()).toEqual(["kept"]);
     expect(liveThreadPoolExecutor()).toBe(liveThreadPoolExecutor());
   });
 
-  it("logError writes via the controller logger at fatal", () => {
+  it("a body read before the stream closes keeps the chunks it popped", () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("a");
+    buf.write("b");
+    expect(() => buf.body).toThrow(ThreadError);
+    buf.close();
+    expect(buf.body).toBe("ab");
+  });
+
+  it("awaitBody waits for the stream to close", async () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("a");
+    const body = buf.awaitBody();
+    buf.write("b");
+    buf.close();
+    expect(await body).toBe("ab");
+    expect(buf.body).toBe("ab");
+  });
+
+  it("logError writes the class, the annotated source and the joined backtrace to Base.logger", () => {
     const fatal = vi.fn();
-    logError.call({ logger: { fatal } }, new Error("oops"));
+    const oldLogger = Base.logger;
+    Base.logger = { fatal } as unknown as typeof Base.logger;
+    try {
+      const exception = Object.assign(new ClientDisconnected("oops"), {
+        annotatedSourceCode: () => "source\n",
+      });
+      logError.call(makeHost(), exception);
+    } finally {
+      Base.logger = oldLogger;
+    }
     expect(fatal).toHaveBeenCalledOnce();
-    const arg = fatal.mock.calls[0][0];
-    const rendered = typeof arg === "function" ? (arg as () => string)() : arg;
-    expect(rendered).toContain("Error");
-    expect(rendered).toContain("oops");
+    const rendered = (fatal.mock.calls[0][0] as () => string)();
+    expect(rendered).toMatch(/^\nClientDisconnected \(oops\):\nsource\n {2}at .*\n {2}at /);
+    expect(rendered.endsWith("\n\n")).toBe(true);
   });
 
   it("logError silently no-ops when no logger is configured", () => {
-    expect(() => logError.call({}, new Error("oops"))).not.toThrow();
+    const oldLogger = Base.logger;
+    Base.logger = null;
+    try {
+      expect(() => logError.call(makeHost(), new Error("oops"))).not.toThrow();
+    } finally {
+      Base.logger = oldLogger;
+    }
   });
 });
 
 describe("ActionController::Live::ClassMethods#make_response!", () => {
-  type Req = Parameters<typeof makeResponseBang>[0];
-  function mkReq(protocol: string): Req {
-    return { getHeader: (n: string) => (n === "SERVER_PROTOCOL" ? protocol : undefined) } as Req;
+  const sentinel = new Response();
+  class Parent {
+    static makeResponseBang(_request: Request): unknown {
+      return sentinel;
+    }
+  }
+  class LiveController extends Parent {}
+  include(LiveController, Live);
+
+  function mkReq(protocol: string): Request {
+    return {
+      getHeader: (n: string) => (n === "SERVER_PROTOCOL" ? protocol : undefined),
+    } as unknown as Request;
   }
 
   it("returns a Live::Response for HTTP/1.1+ requests", () => {
-    const res = makeResponseBang(mkReq("HTTP/1.1"), () => new Response());
+    const res = LiveController.makeResponseBang(mkReq("HTTP/1.1"));
     expect(res).toBeInstanceOf(Response);
     expect((res as Response).stream).toBeInstanceOf(Buffer);
+    expect(res).not.toBe(sentinel);
   });
 
   it("defers to the parent factory for HTTP/1.0 requests", () => {
-    const sentinel = new Response();
-    const res = makeResponseBang(mkReq("HTTP/1.0"), () => sentinel);
-    expect(res).toBe(sentinel);
+    expect(LiveController.makeResponseBang(mkReq("HTTP/1.0"))).toBe(sentinel);
   });
 });

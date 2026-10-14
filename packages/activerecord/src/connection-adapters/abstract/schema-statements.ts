@@ -1,10 +1,32 @@
-import { block, fetch, KeyError, OpenSSL, slice, rbInspect } from "@blazetrails/ruby-compat";
+import { extractBang } from "@blazetrails/activesupport/core-ext/hash/slice";
+import {
+  block,
+  except,
+  fetch,
+  hashDelete,
+  isEmpty,
+  OpenSSL,
+  partition,
+  slice,
+  rbInspect,
+  rtest,
+  RuntimeError,
+  toI,
+  hasKey,
+  toS,
+  coreHashMergeKwd,
+} from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
 import type { MigrationCommand } from "../../migration/command-recorder.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { include, symbolizeKeys } from "@blazetrails/activesupport";
+import {
+  extractOptionsBang,
+  include,
+  isPlainObject,
+  symbolizeKeys,
+} from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Relation } from "../../relation.js";
 import type { Base } from "../../base.js";
@@ -33,7 +55,6 @@ import {
 import type { TableDefinitionOf, TableOf } from "./schema-definitions.js";
 import type { UniqueConstraintOptions } from "../postgresql/schema-definitions.js";
 import { SchemaCreation, type SchemaCreationConn } from "./schema-creation.js";
-import { maxIdentifierLength } from "./database-limits.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
@@ -44,23 +65,12 @@ import {
   presence,
   assertValidKeys,
   any,
-  truncateBytes,
+  first,
+  mbChars,
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
-
-/** @internal */
-export function canRemoveIndexByName(
-  columnName: string | string[] | undefined | null,
-  options: Record<string, unknown>,
-): boolean {
-  return (
-    columnName == null &&
-    "name" in options &&
-    Object.keys(options).filter((k) => k !== "name" && k !== "algorithm").length === 0
-  );
-}
 
 export type JoinTableOptions = {
   tableName?: string;
@@ -78,11 +88,11 @@ export interface ValidateConstraintStatements {
   validateConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string },
+    options?: { name?: string; expression?: string | null; validate?: boolean },
   ): Promise<void>;
   validateForeignKey(
     fromTable: string,
-    toTable?: string,
+    toTable?: string | null,
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void>;
 }
@@ -148,6 +158,7 @@ export interface SchemaStatements
       | "columnFor"
       | "execute"
       | "indexAlgorithms"
+      | "indexNameLength"
       | "internalExecQuery"
       | "lookupCastType"
       | "pool"
@@ -155,13 +166,16 @@ export interface SchemaStatements
       | "quote"
       | "schemaCache"
       | "selectRows"
+      | "supportsBulkAlter"
       | "supportsComments"
       | "supportsCommentsInCreate"
       | "supportsDatetimeWithPrecision"
       | "supportsForeignKeys"
+      | "supportsCheckConstraints"
       | "supportsIndexSortOrder"
       | "supportsIndexesInCreate"
       | "tableAliasLength"
+      | "tableNameLength"
       | "visitor"
     >,
     SchemaQuoter {
@@ -188,7 +202,7 @@ export class SchemaStatements {
     tableName: string,
     options?:
       | {
-          id?: boolean | ColumnType | IdHashOptions;
+          id?: false | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -205,33 +219,12 @@ export class SchemaStatements {
         }
       | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void> {
-    let kwargs: {
-      id?: boolean | ColumnType | IdHashOptions;
-      primaryKey?: string | string[] | false;
-      force?: boolean | "cascade";
-      ifNotExists?: boolean;
-      default?: unknown;
-      options?: string;
-      comment?: string;
-      charset?: string;
-      collation?: string;
-      temporary?: boolean;
-      as?: string | { toSql(): string };
-      autoIncrement?: boolean;
-      limit?: number;
-      precision?: number;
-    } = {};
-    let definer: ((t: TableDefinitionOf<this>) => void | Promise<void>) | undefined;
-
+  ): Promise<unknown> {
     if (typeof options === "function") {
-      definer = options;
-    } else {
-      kwargs = options ?? {};
-      definer = fn;
+      fn = options;
+      options = undefined;
     }
-
-    const { id, primaryKey, force, ...rest } = kwargs;
+    const { id, primaryKey, force, ...rest } = options ?? {};
     options = rest;
     this.validateCreateTableOptionsBang(options);
 
@@ -248,7 +241,7 @@ export class SchemaStatements {
     const td = await this.buildCreateTableDefinition(
       tableName,
       { id, primaryKey, force, ...options },
-      definer,
+      fn,
     );
 
     if (force) {
@@ -257,7 +250,7 @@ export class SchemaStatements {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
 
-    await this.execute(await this.schemaCreation.accept(td));
+    const result = await this.execute(await this.schemaCreation.accept(td));
 
     if (!this.supportsIndexesInCreate?.()) {
       for (const [columnName, indexOptions] of td.indexes) {
@@ -270,24 +263,18 @@ export class SchemaStatements {
 
     if (this.supportsComments?.() && !this.supportsCommentsInCreate?.()) {
       const tableComment = presence(td.comment);
-      if (tableComment != null && typeof this.changeTableComment === "function") {
+      if (tableComment != null) {
         await this.changeTableComment(tableName, tableComment);
       }
-      const commentAdapter = this as {
-        changeColumnComment?(t: string, c: string, comment: string | null): Promise<void>;
-      };
-      if (typeof commentAdapter.changeColumnComment === "function") {
-        for (const column of td.columns as Array<{
-          name: string;
-          options?: { comment?: string | null };
-        }>) {
-          const comment = presence(column.options?.comment);
-          if (comment != null) {
-            await commentAdapter.changeColumnComment(tableName, column.name, comment);
-          }
+
+      for (const column of td.columns) {
+        if (isPresent(column.options.comment)) {
+          await this.changeColumnComment(tableName, column.name, column.options.comment!);
         }
       }
     }
+
+    return result;
   }
 
   async dropTable(
@@ -300,24 +287,16 @@ export class SchemaStatements {
           { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
           ((t: TableDefinition) => void) | undefined,
         ]
-  ): Promise<void> {
-    const rest = [...args] as unknown[];
-    while (
-      rest.length > 0 &&
-      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
-    ) {
-      rest.pop();
-    }
-    args = rest as typeof args;
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
+  ): Promise<unknown> {
+    const tableNames = args.filter((arg) => typeof arg === "string") as string[];
+    const options = (args.find(isPlainObject) ?? {}) as { ifExists?: boolean };
     for (const tableName of tableNames) {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
-      await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(tableName)}`);
+      await this.execute(
+        `DROP TABLE${options.ifExists ? " IF EXISTS" : ""} ${this.quoteTableName(tableName)}`,
+      );
     }
+    return tableNames;
   }
 
   async addColumn(
@@ -325,10 +304,10 @@ export class SchemaStatements {
     columnName: string,
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
-    await this.execute(await this.schemaCreation.accept(addColumnDef));
+    return this.execute(await this.schemaCreation.accept(addColumnDef));
   }
 
   async removeColumn(
@@ -340,9 +319,7 @@ export class SchemaStatements {
     if (columnName === undefined) {
       throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
     }
-    if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
-      return;
-    }
+    if (options.ifExists === true && !(await this.columnExists(tableName, columnName))) return;
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} ${this.removeColumnForAlter(tableName, columnName, type, options)}`,
     );
@@ -361,13 +338,13 @@ export class SchemaStatements {
     tableName: string,
     columnName: string | string[],
     options: AddIndexOptions = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const createIndex = await this.buildCreateIndexDefinition(
       tableName,
       columnName,
       options as Record<string, unknown>,
     );
-    await this.execute(await this.schemaCreation.accept(createIndex));
+    return this.execute(await this.schemaCreation.accept(createIndex));
   }
 
   async removeIndex(
@@ -378,7 +355,7 @@ export class SchemaStatements {
       | { column?: string | string[]; name?: string; ifExists?: boolean }
       | null = null,
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
       columnName = null;
@@ -388,7 +365,7 @@ export class SchemaStatements {
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    await this.execute(
+    return this.execute(
       `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteTableName(tableName)}`,
     );
   }
@@ -438,17 +415,25 @@ export class SchemaStatements {
       comment?: unknown;
     } = {},
   ): Promise<boolean> {
-    const cols = await this.columns(tableName);
-    const optionKeys = this.columnOptionsKeys() as Array<keyof typeof options>;
-    return cols.some((c) => {
-      if (c.name !== columnName) return false;
-      if (type != null && (c as { type?: unknown }).type !== type) return false;
-      for (const key of optionKeys) {
-        if (key in options && (c as unknown as Record<string, unknown>)[key] !== options[key])
-          return false;
+    columnName = String(columnName);
+    const checks: Array<(c: Column) => unknown> = [];
+    checks.push((c) => c.name === columnName);
+    if (type != null) {
+      checks.push((c) => {
+        try {
+          return c.type === type;
+        } catch {
+          return null;
+        }
+      });
+    }
+    for (const attr of this.columnOptionsKeys() as Array<keyof typeof options>) {
+      if (attr in options) {
+        checks.push((c) => (c as unknown as Record<string, unknown>)[attr] === options[attr]);
       }
-      return true;
-    });
+    }
+
+    return (await this.columns(tableName)).some((c) => checks.every((check) => check(c)));
   }
 
   async changeColumnDefault(
@@ -489,26 +474,26 @@ export class SchemaStatements {
   async removeReference(
     tableName: string,
     refName: string,
-    options: RemoveReferenceOptions = {},
+    { foreignKey = false, polymorphic = false, ...options }: RemoveReferenceOptions = {},
   ): Promise<void> {
-    const conditionalOptions: { ifExists?: boolean; ifNotExists?: boolean } = {};
-    if (options.ifExists !== undefined) conditionalOptions.ifExists = options.ifExists;
-    if (options.ifNotExists !== undefined) conditionalOptions.ifNotExists = options.ifNotExists;
-    if (options.foreignKey) {
-      const fkOptions =
-        typeof options.foreignKey === "object"
-          ? { ...options.foreignKey, ...conditionalOptions }
-          : {
-              toTable: ActiveRecord.Base.pluralizeTableNames ? pluralize(refName) : refName,
-              ...conditionalOptions,
-            };
-      if ((fkOptions as { column?: string }).column == null) {
-        (fkOptions as { column?: string }).column = `${refName}_id`;
+    const conditionalOptions = slice(options, "ifExists", "ifNotExists");
+
+    if (foreignKey) {
+      const referenceName = ActiveRecord.Base.pluralizeTableNames
+        ? pluralize(String(refName))
+        : refName;
+      let foreignKeyOptions: RemoveForeignKeyOptions;
+      if (isPlainObject(foreignKey)) {
+        foreignKeyOptions = { ...foreignKey, ...conditionalOptions };
+      } else {
+        foreignKeyOptions = { toTable: referenceName, ...conditionalOptions };
       }
-      await this.removeForeignKey(tableName, fkOptions);
+      foreignKeyOptions.column ??= `${refName}_id`;
+      await this.removeForeignKey(tableName, undefined, foreignKeyOptions);
     }
+
     await this.removeColumn(tableName, `${refName}_id`, undefined, conditionalOptions);
-    if (options.polymorphic) {
+    if (polymorphic) {
       await this.removeColumn(tableName, `${refName}_type`, undefined, conditionalOptions);
     }
   }
@@ -549,24 +534,25 @@ export class SchemaStatements {
 
   async removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable: string | null = null,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     if (!this.useForeignKeys()) return;
-    if (typeof toTable === "object" && toTable !== null) {
-      options = { ...toTable };
-      toTable = options.toTable;
-    } else {
-      options = { ...options };
-    }
-    if (options.ifExists === true && !(await this.foreignKeyExists(fromTable, toTable))) {
+    options = { ...options };
+    if (
+      hashDelete<unknown>(options as Record<string, unknown>, "ifExists") === true &&
+      !(await this.foreignKeyExists(fromTable, toTable))
+    ) {
       return;
     }
-    const lookup: ForeignKeyLookupOptions = { ...options, toTable };
-    delete (lookup as RemoveForeignKeyOptions).ifExists;
-    const fk = await this.foreignKeyForBang(fromTable, lookup);
+
+    const fkNameToDelete = (
+      await this.foreignKeyForBang(fromTable, coreHashMergeKwd({ toTable }, options))
+    ).name;
+
     const at = this.createAlterTable(fromTable);
-    at.dropForeignKey(fk.name);
+    at.dropForeignKey(fkNameToDelete);
+
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -601,30 +587,23 @@ export class SchemaStatements {
 
   async removeCheckConstraint(
     tableName: string,
-    expression?:
-      | string
-      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-    options: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
+    expression: string | null = null,
+    {
+      ifExists = false,
+      ...options
+    }: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
   ): Promise<void> {
-    let expr: string | undefined;
-    let opts: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean };
-    if (typeof expression === "string") {
-      expr = expression;
-      opts = { ...options };
-    } else {
-      expr = undefined;
-      opts = { ...(expression ?? {}), ...options };
-    }
-    const { ifExists, ...lookupOptions } = opts;
+    if (!(await this.supportsCheckConstraints())) return;
 
-    if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
+    if (ifExists && !(await this.checkConstraintExists(tableName, options))) return;
 
-    const chk = await this.checkConstraintForBang(tableName, {
-      expression: expr,
-      ...lookupOptions,
-    });
+    const chkNameToDelete = (
+      await this.checkConstraintForBang(tableName, coreHashMergeKwd({ expression }, options))
+    ).name;
+
     const at = this.createAlterTable(tableName);
-    at.dropCheckConstraint(chk.name);
+    at.dropCheckConstraint(chkNameToDelete);
+
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -633,7 +612,7 @@ export class SchemaStatements {
     await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragments.join(", ")}`);
   }
 
-  async removeTimestamps(tableName: string): Promise<void> {
+  async removeTimestamps(tableName: string, _options: ColumnOptions = {}): Promise<void> {
     await this.removeColumns(tableName, "updated_at", "created_at");
   }
 
@@ -643,14 +622,11 @@ export class SchemaStatements {
     options?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
     fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void> {
-    let definer: ((t: TableDefinitionOf<this>) => void) | undefined;
     if (typeof options === "function") {
-      definer = options;
-      options = {};
-    } else {
-      options = { ...options };
-      definer = fn;
+      fn = options;
+      options = undefined;
     }
+    options = { ...options };
     let columnOptions = options.columnOptions ?? {};
     delete options.columnOptions;
     const joinTableName = this.findJoinTableName(table1, table2, options);
@@ -660,7 +636,7 @@ export class SchemaStatements {
     await this.createTable(joinTableName, { ...options, id: false }, (t) => {
       t.references(t1Ref, columnOptions);
       t.references(t2Ref, columnOptions);
-      if (definer) definer(t);
+      if (fn) fn(t);
     });
   }
 
@@ -681,25 +657,16 @@ export class SchemaStatements {
 
   async changeTable(
     tableName: string,
-    fnOrOptions?: ((t: TableOf<this>) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: TableOf<this>) => void | Promise<void>,
+    options: { bulk?: boolean } = {},
+    block: (t: TableOf<this>) => void | Promise<void>,
     base: unknown = this,
   ): Promise<void> {
-    const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
-    const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
-
-    const supportsBulk =
-      typeof (this as any).supportsBulkAlter === "function" &&
-      (this as any).supportsBulkAlter() === true;
-
-    if (options.bulk && supportsBulk) {
+    if (this.supportsBulkAlter() && options.bulk) {
       const recorder = new CommandRecorder(this);
-      const bulkTable = this.updateTableDefinition(tableName, recorder as unknown) as TableOf<this>;
-      if (callback) await callback(bulkTable);
+      await block(this.updateTableDefinition(tableName, recorder) as TableOf<this>);
       await this.bulkChangeTable(tableName, recorder.commands);
     } else {
-      const table = this.updateTableDefinition(tableName, base) as TableOf<this>;
-      if (callback) await callback(table);
+      await block(this.updateTableDefinition(tableName, base) as TableOf<this>);
     }
   }
 
@@ -742,21 +709,23 @@ export class SchemaStatements {
   async removeColumns(tableName: string, ...args: [...string[], ColumnOptions]): Promise<void>;
   async removeColumns(
     tableName: string,
-    ...columnsOrOptions: Array<string | ColumnOptions>
+    ...columnNames: Array<string | ColumnOptions>
   ): Promise<void> {
-    const last = columnsOrOptions[columnsOrOptions.length - 1];
-    const hasOpts = typeof last === "object" && last !== null;
-    const opts = (hasOpts ? columnsOrOptions.pop() : {}) as ColumnOptions;
-    const columns = columnsOrOptions as string[];
-    if (columns.length === 0) {
+    const { type = null, ...options } = extractOptionsBang(columnNames);
+    if (isEmpty(columnNames)) {
       throw new ArgumentError(
         "You must specify at least one column name. Example: remove_columns(:people, :first_name)",
       );
     }
-    const fragments = this.removeColumnsForAlter(tableName, ...columns, {
-      ...opts,
-    } as Record<string, unknown>);
-    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragments.join(", ")}`);
+
+    const removeColumnFragments = this.removeColumnsForAlter(
+      tableName,
+      ...(columnNames as string[]),
+      { type, ...options },
+    );
+    await this.execute(
+      `ALTER TABLE ${this.quoteTableName(tableName)} ${removeColumnFragments.join(", ")}`,
+    );
   }
 
   async addColumns(
@@ -765,16 +734,13 @@ export class SchemaStatements {
   ): Promise<void>;
   async addColumns(
     tableName: string,
-    ...columnsAndOptions: Array<string | ({ type: ColumnType } & ColumnOptions)>
+    ...columnNames: Array<string | ({ type: ColumnType } & ColumnOptions)>
   ): Promise<void> {
-    const last = columnsAndOptions[columnsAndOptions.length - 1];
-    if (typeof last !== "object" || last === null || !("type" in last)) {
-      throw new TypeError("addColumns requires a trailing options hash with a :type entry");
-    }
-    const { type, ...rest } = columnsAndOptions.pop() as { type: ColumnType } & ColumnOptions;
-    const columns = columnsAndOptions as string[];
-    for (const col of columns) {
-      await this.addColumn(tableName, col, type, rest);
+    const options = extractOptionsBang(columnNames);
+    if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+    const type = hashDelete(options, "type") as ColumnType;
+    for (const columnName of columnNames as string[]) {
+      await this.addColumn(tableName, columnName, type, options);
     }
   }
 
@@ -816,13 +782,15 @@ export class SchemaStatements {
   }
 
   async tables(): Promise<string[]> {
-    return (await this.queryValues(this.dataSourceSql({ type: "BASE TABLE" }), "SCHEMA")).map(
-      String,
-    );
+    return (
+      await this.queryValues(this.dataSourceSql(undefined, { type: "BASE TABLE" }), "SCHEMA")
+    ).map(String);
   }
 
   async views(): Promise<string[]> {
-    return (await this.queryValues(this.dataSourceSql({ type: "VIEW" }), "SCHEMA")).map(String);
+    return (await this.queryValues(this.dataSourceSql(undefined, { type: "VIEW" }), "SCHEMA")).map(
+      String,
+    );
   }
 
   async viewExists(viewName: string): Promise<boolean | null> {
@@ -855,14 +823,10 @@ export class SchemaStatements {
 
   async foreignKeyExists(
     fromTable: string,
-    toTable?: string | ForeignKeyLookupOptions,
-    options: Omit<ForeignKeyLookupOptions, "toTable"> = {},
+    toTable: string | null = null,
+    options: ForeignKeyLookupOptions = {},
   ): Promise<boolean> {
-    const lookup =
-      typeof toTable === "string" || toTable == null
-        ? { toTable: toTable ?? undefined, ...options }
-        : toTable;
-    return (await this.foreignKeyFor(fromTable, lookup)) !== undefined;
+    return isPresent(await this.foreignKeyFor(fromTable, coreHashMergeKwd({ toTable }, options)));
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
@@ -953,34 +917,24 @@ export class SchemaStatements {
   async buildCreateTableDefinition(
     tableName: string,
     kwargs: {
-      id?: boolean | ColumnType | IdHashOptions;
+      id?: false | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       [key: string]: unknown;
     } = {},
     fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<TableDefinitionOf<this>> {
-    const { id = true, primaryKey, force: _force, ...options } = kwargs;
-    const tdOptions: Record<string, unknown> = {};
-    for (const key of [...this.validTableDefinitionOptions(), "_skipValidateOptions"]) {
-      if (key in options) {
-        tdOptions[key] = options[key];
-        delete options[key];
-      }
-    }
-    const pkOptions: Record<string, unknown> = {};
-    for (const key of [...this.validPrimaryKeyOptions(), "_skipValidateOptions"]) {
-      if (key in options) {
-        pkOptions[key] = options[key];
-        delete options[key];
-      }
-    }
-
+    const { id = "primary_key", primaryKey, force: _force, ...options } = kwargs;
     const tableDefinition = this.createTableDefinition(
       tableName,
-      tdOptions,
+      extractBang(options, ...this.validTableDefinitionOptions(), "_skipValidateOptions"),
     ) as TableDefinitionOf<this>;
-    tableDefinition.setPrimaryKey(tableName, id, primaryKey, pkOptions);
+    tableDefinition.setPrimaryKey(
+      tableName,
+      id,
+      primaryKey,
+      extractBang(options, ...this.validPrimaryKeyOptions(), "_skipValidateOptions"),
+    );
 
     if (fn) await fn(tableDefinition);
 
@@ -1018,17 +972,17 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<AlterTable | null> {
-    if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
+    if (options.ifNotExists === true && (await this.columnExists(tableName, columnName))) {
       return null;
     }
     const { ifNotExists: _, ...colOpts } = options;
-    if (
-      this.supportsDatetimeWithPrecision?.() &&
-      type === "datetime" &&
-      !("precision" in colOpts)
-    ) {
-      colOpts.precision = 6;
+
+    if (this.supportsDatetimeWithPrecision?.()) {
+      if (type === "datetime" && !("precision" in colOpts)) {
+        colOpts.precision = 6;
+      }
     }
+
     const at = this.createAlterTable(tableName);
     at.addColumn(columnName, type, colOpts);
     return at;
@@ -1078,7 +1032,6 @@ export class SchemaStatements {
     return `${singularize(name)}_${columnName}`;
   }
 
-  /** @missingRailsCall size — PERMANENT */
   foreignKeyOptions(
     fromTable: string,
     toTable: string,
@@ -1087,20 +1040,16 @@ export class SchemaStatements {
     options = { ...options };
 
     if (Array.isArray(options.primaryKey)) {
-      if (!options.column) {
+      if (!rtest(options.column)) {
         options.column = (options.primaryKey as string[]).map((pkColumn) =>
           this.foreignKeyColumnFor(toTable, pkColumn),
         );
       }
     } else {
-      if (!options.column) {
-        options.column = this.foreignKeyColumnFor(toTable, "id");
-      }
+      if (!rtest(options.column)) options.column = this.foreignKeyColumnFor(toTable, "id");
     }
 
-    if (!options.name) {
-      options.name = this.foreignKeyName(fromTable, options);
-    }
+    if (!rtest(options.name)) options.name = this.foreignKeyName(fromTable, options);
 
     if (Array.isArray(options.column) || Array.isArray(options.primaryKey)) {
       if (wrap(options.primaryKey).length !== wrap(options.column).length) {
@@ -1136,7 +1085,7 @@ export class SchemaStatements {
     tableName: string,
     options: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<boolean> {
-    if (!("name" in options) && !("expression" in options)) {
+    if (!hasKey(options, "name") && !hasKey(options, "expression")) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
     }
     return (await this.checkConstraintFor(tableName, options)) !== undefined;
@@ -1154,30 +1103,29 @@ export class SchemaStatements {
     return this.insertVersionsSql(versions);
   }
 
-  internalStringOptionsForPrimaryKey(): Record<string, unknown> {
+  internalStringOptionsForPrimaryKey(): Record<string, unknown> | Promise<Record<string, unknown>> {
     return { primaryKey: true };
   }
 
   async assumeMigratedUptoVersion(version: number | string): Promise<void> {
-    const leading = /^\s*([+-]?\d+(?:_\d+)*)/.exec(String(version));
-    version = leading ? parseInt(leading[1].replace(/_/g, ""), 10) : 0;
+    version = Number(toI(version));
 
     const pool = this._pool;
     const smTable = this.quoteTableName(pool.schemaMigration.tableName);
 
     const migrationContext = pool.migrationContext;
     const migrated = await migrationContext.getAllVersions();
-    const allVersions = migrationContext.migrations.map((m) => m.version);
+    const versions = migrationContext.migrations.map((m) => m.version);
 
     if (!migrated.includes(version)) {
       await this.execute(`INSERT INTO ${smTable} (version) VALUES (${this.quote(version)})`);
     }
 
-    const inserting = allVersions.filter((v) => v < version && !migrated.includes(v));
+    const inserting = versions.filter((v) => !migrated.includes(v)).filter((v) => v < version);
     if (inserting.length > 0) {
       const duplicate = inserting.find((v) => inserting.filter((x) => x === v).length > 1);
       if (duplicate !== undefined) {
-        throw new Error(
+        throw new RuntimeError(
           `Duplicate migration ${duplicate}. Please renumber your migrations to resolve the conflict.`,
         );
       }
@@ -1185,7 +1133,7 @@ export class SchemaStatements {
     }
   }
 
-  columnsForDistinct(columns: string | string[], _orders?: string[]): string | string[] {
+  columnsForDistinct(columns: string | string[], _orders: string[]): string | string[] {
     return columns;
   }
 
@@ -1287,7 +1235,10 @@ export class SchemaStatements {
     columnNames: string[],
     options: Record<string, unknown> = {},
   ): Promise<string> {
-    const quotedColumns = new Map(columnNames.map((name) => [name, this.quoteColumnName(name)]));
+    const quotedColumns = new Map<string, string>();
+    for (const name of columnNames) {
+      quotedColumns.set(name, this.quoteColumnName(name));
+    }
     return Array.from(
       (
         await this.addOptionsForIndexColumns(
@@ -1340,16 +1291,12 @@ export class SchemaStatements {
       const method = `${command}ForAlter`;
 
       if (typeof (this as any)[method] === "function") {
-        const result = await (this as any)[method](table, ...arguments_);
-        const values = wrap(result);
-        const sqls: string[] = [];
-        const procs: Array<() => Promise<void>> = [];
-        for (const v of values) {
-          if (typeof v === "string") sqls.push(v);
-          else procs.push(v as () => Promise<void>);
-        }
-        sqlFragments = sqlFragments.concat(sqls);
-        nonCombinableOperations = nonCombinableOperations.concat(procs);
+        const [sqls, procs] = partition(
+          wrap(await (this as any)[method](table, ...arguments_)),
+          (v) => typeof v === "string",
+        ) as [string[], Array<() => Promise<void>>];
+        for (const sql of sqls) sqlFragments.push(sql);
+        for (const proc of procs) nonCombinableOperations.push(proc);
       } else {
         if (sqlFragments.length > 0) {
           await this.execute(
@@ -1387,21 +1334,18 @@ export class SchemaStatements {
     return 62;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   * @missingRailsCall limit — CONVERGEABLE port-multibyte-chars-and-string-mb-chars
-   */
+  /** @internal */
   generateIndexName(tableName: string, column: string | string[]): string {
-    const cols = wrap(column);
-    const name = `index_${tableName}_on_${cols.join("_and_")}`;
+    let name = `index_${tableName}_on_${wrap(column).join("_and_")}`;
     if (new TextEncoder().encode(name).length <= this.maxIndexNameSize()) return name;
 
-    const hashedIdentifier = "_" + OpenSSL.Digest.SHA256.hexdigest(name).slice(0, 10);
-    const shortName = `idx_on_${cols.join("_")}`;
+    const hashedIdentifier = "_" + first(OpenSSL.Digest.SHA256.hexdigest(name), 10);
+    name = `idx_on_${wrap(column).join("_")}`;
 
     const shortLimit = this.maxIndexNameSize() - new TextEncoder().encode(hashedIdentifier).length;
-    return `${truncateBytes(shortName, shortLimit, { omission: null })}${hashedIdentifier}`;
+    const shortName = mbChars(name).limit(shortLimit).toS();
+
+    return `${shortName}${hashedIdentifier}`;
   }
 
   /** @internal */
@@ -1460,35 +1404,25 @@ export class SchemaStatements {
   async indexNameForRemove(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options: { name?: string; column?: string | string[] },
+    options: { name?: string | null; column?: string | string[] },
   ): Promise<string> {
-    if (this.canRemoveIndexByName(columnName, options) && options.name) {
-      return options.name;
-    }
+    if (this.canRemoveIndexByName(columnName, options)) return options.name as string;
 
     const checks: Array<(idx: IndexDefinition) => boolean> = [];
     let columnNames: string[];
 
-    if (
-      !options.name &&
-      this.isExpressionColumnName(typeof columnName === "string" ? columnName : "")
-    ) {
+    if (!("name" in options) && this.isExpressionColumnName(columnName as string)) {
       options = { ...options, name: this.indexName(tableName, columnName as string) };
       columnNames = [];
     } else {
-      const rawColumn = columnName ?? options.column;
-      columnNames =
-        rawColumn !== undefined && rawColumn !== "" ? this.indexColumnNames(rawColumn) : [];
+      columnNames = this.indexColumnNames((columnName ?? options.column) as string | string[]);
     }
 
-    if (options.name) {
-      const n = options.name;
-      checks.push((i) => i.name === n);
-    }
+    if ("name" in options) checks.push((i) => i.name === toS(options.name));
 
     if (
       columnNames.length > 0 &&
-      !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
+      !("name" in options && this.isExpressionColumnName(columnNames as unknown as string))
     ) {
       checks.push(
         (i) => this.indexName(tableName, i.columns) === this.indexName(tableName, columnNames),
@@ -1624,22 +1558,21 @@ export class SchemaStatements {
     return m ? m[1] : str;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   */
+  /** @internal */
   foreignKeyName(
     tableName: string,
     options: { name?: string; column?: string | string[] },
   ): string | undefined {
-    if ("name" in options) return options.name;
-    if (!("column" in options)) {
-      throw new KeyError("key not found: :column");
-    }
-    const columns = wrap(options.column).map(String);
-    const identifier = `${tableName}_${columns.join("_and_")}_fk`;
-    const hashedIdentifier = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
-    return `fk_rails_${hashedIdentifier}`;
+    return fetch<string | undefined>(
+      options,
+      "name",
+      block(() => {
+        const columns = wrap(fetch<string[]>(symbolizeKeys(options), ":column")).map(String);
+        const identifier = `${tableName}_${columns.join("_and_")}_fk`;
+        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
+        return `fk_rails_${hashedIdentifier}`;
+      }),
+    );
   }
 
   /** @internal */
@@ -1658,9 +1591,9 @@ export class SchemaStatements {
     { toTable, ...options }: ForeignKeyLookupOptions,
   ): Promise<ForeignKeyDefinition> {
     const fk = await this.foreignKeyFor(fromTable, { toTable, ...options });
-    if (!fk) {
+    if (!rtest(fk)) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(symbolizeKeys(options))}`,
+        `Table '${fromTable}' has no foreign key for ${rtest(toTable) ? toTable : rbInspect(symbolizeKeys(options))}`,
       );
     }
     return fk;
@@ -1680,38 +1613,36 @@ export class SchemaStatements {
     }
   }
 
-  /** @internal */
   /**
    * @internal
-   * @missingRailsArgs fetch — PERMANENT
+   * @missingRailsName config — PERMANENT
    */
   isForeignKeysEnabled(): boolean {
     const foreignKeys = fetch<unknown>(this._config, "foreignKeys", true);
     return foreignKeys != null && foreignKeys !== false;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   */
+  /** @internal */
   checkConstraintName(
     tableName: string,
-    options: { name?: string; expression?: string } = {},
+    options: { name?: string; expression?: string | null } = {},
   ): string | undefined {
-    if ("name" in options) return options.name;
-    if (!("expression" in options)) {
-      throw new KeyError("key not found: :expression");
-    }
-    const expression = options.expression;
-    const identifier = `${tableName}_${expression ?? ""}_chk`;
-    const hex = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
-    return `chk_rails_${hex}`;
+    return fetch<string | undefined>(
+      options,
+      "name",
+      block(() => {
+        const expression = fetch<string | null>(symbolizeKeys(options), ":expression");
+        const identifier = `${tableName}_${expression ?? ""}_chk`;
+        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
+        return `chk_rails_${hashedIdentifier}`;
+      }),
+    );
   }
 
   /** @internal */
   async checkConstraintFor(
     tableName: string,
-    options: { name?: string; expression?: string; validate?: boolean } = {},
+    options: { name?: string; expression?: string | null; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition | undefined> {
     const adapter = this as any;
     if (
@@ -1722,18 +1653,23 @@ export class SchemaStatements {
     }
     const chkName = this.checkConstraintName(tableName, options);
     const constraints = await this.checkConstraints(tableName);
-    return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
+    return constraints.find((chk) =>
+      chk.isDefinedFor(coreHashMergeKwd({ name: chkName }, options)),
+    );
   }
 
   /** @internal */
   async checkConstraintForBang(
     tableName: string,
-    { expression, ...options }: { name?: string; expression?: string; validate?: boolean },
+    {
+      expression = null,
+      ...options
+    }: { name?: string; expression?: string | null; validate?: boolean },
   ): Promise<CheckConstraintDefinition> {
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
-    if (!chk) {
+    if (!rtest(chk)) {
       throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(symbolizeKeys(options))}`,
+        `Table '${tableName}' has no check constraint for ${rtest(expression) ? expression : rbInspect(symbolizeKeys(options))}`,
       );
     }
     return chk;
@@ -1741,22 +1677,18 @@ export class SchemaStatements {
 
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, _internal = false): void {
-    const adapter = this as unknown as { indexNameLength?(): number };
-    const limit = adapter.indexNameLength ? adapter.indexNameLength() : maxIdentifierLength();
-    if (newName.length > limit) {
+    if (newName.length > this.indexNameLength()) {
       throw new ArgumentError(
-        `Index name '${newName}' on table '${tableName}' is too long; the limit is ${limit} characters`,
+        `Index name '${newName}' on table '${tableName}' is too long; the limit is ${this.indexNameLength()} characters`,
       );
     }
   }
 
   /** @internal */
   validateTableLengthBang(tableName: string): void {
-    const adapter = this as unknown as { tableNameLength?(): number };
-    const limit = adapter.tableNameLength ? adapter.tableNameLength() : maxIdentifierLength();
-    if (tableName.length > limit) {
+    if (tableName.length > this.tableNameLength()) {
       throw new ArgumentError(
-        `Table name '${tableName}' is too long; the limit is ${limit} characters`,
+        `Table name '${tableName}' is too long; the limit is ${this.tableNameLength()} characters`,
       );
     }
   }
@@ -1779,15 +1711,12 @@ export class SchemaStatements {
     return this.extractNewDefaultValue(defaultOrChanges) as string | null;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall empty? — PERMANENT
-   */
+  /** @internal */
   canRemoveIndexByName(
     columnName: string | string[] | undefined | null,
     options: Record<string, unknown>,
   ): boolean {
-    return canRemoveIndexByName(columnName, options);
+    return columnName == null && "name" in options && isEmpty(except(options, "name", "algorithm"));
   }
 
   /** @internal */
@@ -1839,13 +1768,12 @@ export class SchemaStatements {
   /** @internal */
   removeColumnsForAlter(
     tableName: string,
-    ...args: Array<string | Record<string, unknown>>
+    ...columnNames: Array<string | Record<string, unknown>>
   ): string[] {
-    const last = args[args.length - 1];
-    const columnNames = (
-      typeof last === "object" && last !== null ? args.slice(0, -1) : args
-    ) as string[];
-    return columnNames.map((columnName) => this.removeColumnForAlter(tableName, columnName));
+    extractOptionsBang(columnNames);
+    return (columnNames as string[]).map((columnName) =>
+      this.removeColumnForAlter(tableName, columnName),
+    );
   }
 
   /** @internal */
@@ -1881,26 +1809,15 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    _nameOrOptions?: string | null | { type?: string },
-    _options?: { type?: string },
-  ): string {
+  dataSourceSql(_name: string | null = null, _options: { type?: string } = {}): string {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
-    throw new NotImplementedError(
-      "ActiveRecord::ConnectionAdapters::SchemaStatements#data_source_sql is not implemented",
-    );
+    throw new NotImplementedError();
   }
 
   /** @internal */
   quotedScope(_name?: string | null, _options?: { type?: string }): Record<string, string | null> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1894
-    throw new NotImplementedError(
-      "ActiveRecord::ConnectionAdapters::SchemaStatements#quoted_scope is not implemented",
-    );
+    throw new NotImplementedError();
   }
 }
 

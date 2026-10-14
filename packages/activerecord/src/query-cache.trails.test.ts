@@ -1,12 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Result } from "./result.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
-import { Attribute, Types } from "@blazetrails/activemodel";
-import { Store } from "./connection-adapters/abstract/query-cache.js";
+import * as Types from "@blazetrails/activemodel";
+import { Attribute } from "@blazetrails/activemodel";
+import {
+  QueryCache,
+  Store,
+  type QueryCacheHost,
+} from "./connection-adapters/abstract/query-cache.js";
+import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { FutureResult, type FutureResultPool } from "./future-result.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
 registerModel(Task as never);
@@ -29,6 +37,20 @@ async function capture(fn: () => Promise<void>): Promise<SqlPayload[]> {
     Notifications.unsubscribe(sub);
   }
   return payloads;
+}
+
+function overSuper(
+  props: object,
+  superSelectAll: (...args: never[]) => unknown,
+): { selectAll(...args: unknown[]): unknown } {
+  class Parent {
+    selectAll(...args: unknown[]): unknown {
+      return (superSelectAll as (...a: unknown[]) => unknown)(...args);
+    }
+  }
+  class Host extends Parent {}
+  QueryCache.appendFeatures(Host);
+  return Object.assign(new Host(), props);
 }
 
 describe("cacheNotificationInfo payload (trails)", () => {
@@ -203,5 +225,53 @@ describe("schema reflection does not dirty the query cache (trails)", () => {
       conn.execute = original;
     }
     expect(executeCalls).toBe(0);
+  });
+});
+
+describe("select_all async arm on a cache miss (trails)", () => {
+  it("returns the FutureResult super answers, not a promise of it", () => {
+    const future = new FutureResult({} as FutureResultPool, ["SELECT 1", null, []]);
+    const host = {
+      _queryCache: { enabled: true },
+      lookupSqlCache: () => undefined,
+    } as unknown as QueryCacheHost;
+
+    const result = overSuper(host, () => future).selectAll("SELECT 1", null, [], { async: true });
+
+    expect(result).toBe(future);
+  });
+});
+
+describe("QueryCache.included wires the including adapter class", () => {
+  it("wraps the dirtying methods on the class itself", () => {
+    const proto = AbstractAdapter.prototype as unknown as Record<string, unknown>;
+    const statements = DatabaseStatements as unknown as Record<string, unknown>;
+    for (const name of [
+      "execQuery",
+      "execute",
+      "create",
+      "insert",
+      "update",
+      "delete",
+      "truncate",
+      "truncateTables",
+      "rollbackToSavepoint",
+      "rollbackDbTransaction",
+      "restartDbTransaction",
+      "execInsertAll",
+    ]) {
+      expect(Object.hasOwn(proto, name), name).toBe(true);
+      expect(proto[name], name).toBeTypeOf("function");
+      expect(proto[name], name).not.toBe(statements[name]);
+    }
+  });
+
+  it("unsets the query cache after checkin", () => {
+    const callbacks = (
+      AbstractAdapter as unknown as {
+        _checkinCallbacks: { entries: { kind: string; filter: unknown }[] };
+      }
+    )._checkinCallbacks.entries;
+    expect(callbacks[0]).toMatchObject({ kind: "after", filter: ":unsetQueryCacheBang" });
   });
 });

@@ -1,5 +1,6 @@
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
 export interface Task {
@@ -15,3 +16,4 @@ export class Task extends Base {
     return this.readAttribute("ending");
   }
 }
+registerModel(Task);

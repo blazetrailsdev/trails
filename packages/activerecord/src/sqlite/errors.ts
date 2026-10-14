@@ -128,7 +128,7 @@ for (const [name, klass] of Object.entries({
 
 const { ErrorCode } = SQLite3Constants;
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 export function status2klass(status: number): typeof Exception | null {
   switch (status & 0xff) {
     case ErrorCode.OK:
@@ -190,37 +190,57 @@ export function status2klass(status: number): typeof Exception | null {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
+
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 function nativeStatus(error: unknown): number | null {
-  const { errcode, rawCode, code } = (error ?? {}) as Record<string, unknown>;
+  const { errcode, rawCode, code, message } = (error ?? {}) as Record<string, unknown>;
   if (typeof errcode === "number") return errcode & 0xff;
   if (typeof rawCode === "number") return rawCode & 0xff;
   if (typeof code === "string" && code.startsWith("SQLITE_")) {
     return ErrorCode[code.split("_")[1] as keyof typeof ErrorCode] ?? null;
   }
+  if (code === "ERR_INTERNAL_SQLITE_ERROR") {
+    const errorCode = /Error code (\d+|[^]): /.exec(String(message))?.[1];
+    if (errorCode == null) return null;
+    return (/^\d+$/.test(errorCode) ? Number(errorCode) : errorCode.charCodeAt(0)) & 0xff;
+  }
+  if (error instanceof TypeError && message === MISSING_DIRECTORY) return ErrorCode.CANTOPEN;
   return null;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+function sqlite3Errmsg(error: unknown): string {
+  const { code, message } = error as { code?: unknown; message: string };
+  if (code === "ERR_INTERNAL_SQLITE_ERROR") {
+    return message.replace(/^[^]*?Error code (?:\d+|[^]): /, "");
+  }
+  if (error instanceof TypeError && message === MISSING_DIRECTORY) {
+    return "unable to open database file";
+  }
+  return message;
+}
+
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 export function rbSqlite3Raise(error: unknown): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass((error as Error).message);
+  const exception = new klass(sqlite3Errmsg(error));
   exception.code = status;
   exception.cause = error;
 
   throw exception;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass((error as Error).message);
+  const exception = new klass(sqlite3Errmsg(error));
   exception.code = status;
   exception.cause = error;
   if (sql != null) {

@@ -3,6 +3,8 @@ import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 import { ArgumentError } from "./argument-error.js";
+import { Dir } from "./dir.js";
+import { TypeError } from "./type-error.js";
 import { FileUtils } from "./file-utils.js";
 import { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
 
@@ -434,5 +436,192 @@ describe("FileUtils", () => {
     FileUtils.rmRf(tree, { verbose: true });
 
     expect(lines).toEqual([`** rm -rf ${tree}`]);
+  });
+
+  it("cd without a block changes directory and answers 0", () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+    try {
+      expect(FileUtils.cd(dir)).toBe(0);
+      expect(Dir.pwd()).toBe(dir);
+    } finally {
+      Dir.chdir(start);
+    }
+  });
+
+  it("cd with a block restores the directory and answers the block's value", () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    expect(FileUtils.cd(dir, {}, (d) => [d, Dir.pwd()])).toEqual([dir, dir]);
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with an async block restores the directory only once the block settles", async () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    const result = FileUtils.cd(dir, {}, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return Dir.pwd();
+    });
+
+    expect(Dir.pwd()).toBe(dir);
+    await expect(result).resolves.toBe(dir);
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with an async block that rejects still restores the directory", async () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    const result = FileUtils.cd(dir, {}, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      throw new Error("boom");
+    });
+
+    await expect(result).rejects.toThrow("boom");
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with a block that raises restores the directory", () => {
+    const start = Dir.pwd();
+
+    expect(() =>
+      FileUtils.cd(root, {}, () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with verbose prints cd and, after an async block settles, cd -", async () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+
+    const result = FileUtils.cd(root, { verbose: true }, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      lines.push("block");
+    });
+    expect(lines).toEqual([`cd ${root}`]);
+    await result;
+
+    expect(lines).toEqual([`cd ${root}`, "block", "cd -"]);
+  });
+
+  it("cd takes a block with no options", () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    expect(FileUtils.cd(dir, () => Dir.pwd())).toBe(dir);
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("Dir.chdir raises TypeError for a given nil", () => {
+    expect(() => Dir.chdir(null as unknown as string)).toThrow(
+      new TypeError("no implicit conversion of nil into String"),
+    );
+  });
+
+  function useFs(name: string, overrides: object): void {
+    const fs = getFs();
+    registerFsAdapter(name, Object.assign(Object.create(fs) as typeof fs, overrides), getPath());
+    fsAdapterConfig.adapter = name;
+  }
+
+  function makeTree(): { tree: string; file: string } {
+    const tree = nodePath.join(root, "tree");
+    const file = nodePath.join(tree, "sub", "f");
+    nodeFs.mkdirSync(nodePath.join(tree, "sub"), { recursive: true });
+    nodeFs.writeFileSync(file, "x");
+    return { tree, file };
+  }
+
+  const modeOf = (path: string): number => nodeFs.statSync(path).mode & 0o777;
+  const failing = (code: string) => () => Promise.reject(Object.assign(new Error(code), { code }));
+
+  it("rm_r awaited removes a tree, raises ENOENT for a missing path unless forced, and prints rm -r", async () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+    const { tree } = makeTree();
+    const missing = nodePath.join(root, "missing");
+
+    await expect(FileUtils.rmRAsync(missing)).rejects.toThrow(/ENOENT/);
+    expect(await FileUtils.rmRAsync(tree, { noop: true, verbose: true })).toBeUndefined();
+    expect(nodeFs.existsSync(tree)).toBe(true);
+    expect(await FileUtils.rmRfAsync([tree, missing], { verbose: true })).toEqual([tree, missing]);
+    expect(nodeFs.existsSync(tree)).toBe(false);
+    expect(lines).toEqual([`rm -r ${tree}`, `rm -rf ${tree} ${missing}`]);
+  });
+
+  it("rm_rf awaited removes what it can beneath an entry it cannot", async () => {
+    const { tree, file } = makeTree();
+    nodeFs.writeFileSync(nodePath.join(tree, "gone"), "x");
+    const unlink = getFs().unlink!;
+    useFs("eperm", {
+      unlink: (path: string) => (path === file ? failing("EPERM")() : unlink(path)),
+    });
+
+    await expect(FileUtils.rmRAsync(tree)).rejects.toThrow("EPERM");
+    expect(await FileUtils.rmRfAsync(tree)).toEqual([tree]);
+    expect(nodeFs.readdirSync(tree)).toEqual(["sub"]);
+  });
+
+  it("chmod_R sets the mode on every entry beneath the root and leaves a symlink alone", async () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+    const { tree, file } = makeTree();
+    const outside = nodePath.join(root, "outside");
+    const missing = nodePath.join(root, "missing");
+    nodeFs.writeFileSync(outside, "x");
+    nodeFs.chmodSync(outside, 0o600);
+    nodeFs.symlinkSync(outside, nodePath.join(tree, "link"));
+
+    expect(await FileUtils.chmodRAsync(0o700, tree, { noop: true })).toBeUndefined();
+    expect(modeOf(file)).not.toBe(0o700);
+    expect(await FileUtils.chmodRAsync(0o755, tree, { verbose: true })).toEqual([tree]);
+    expect([tree, nodePath.join(tree, "sub"), file].map(modeOf)).toEqual([0o755, 0o755, 0o755]);
+    expect(modeOf(outside)).toBe(0o600);
+    expect(lines).toEqual([`chmod -R 755 ${tree}`]);
+    await expect(FileUtils.chmodRAsync(0o755, missing)).rejects.toThrow(/ENOENT/);
+    expect(await FileUtils.chmodRAsync(0o755, missing, { force: true })).toEqual([missing]);
+  });
+
+  it("chmod_R swallows EOPNOTSUPP without force, and any failure under it", async () => {
+    const { file } = makeTree();
+
+    useFs("eopnotsupp", { chmod: failing("EOPNOTSUPP") });
+    expect(await FileUtils.chmodRAsync(0o755, file)).toEqual([file]);
+
+    useFs("eperm", { chmod: failing("EPERM") });
+    await expect(FileUtils.chmodRAsync(0o755, file)).rejects.toThrow("EPERM");
+    expect(await FileUtils.chmodRAsync(0o755, file, { force: true })).toEqual([file]);
+  });
+
+  it("rm_rf and chmod_R awaited read a backend's sync verbs where it has no async ones", async () => {
+    const { tree, file } = makeTree();
+    const none = undefined;
+    useFs("sync-only", { lstat: none, readdir: none, chmod: none, unlink: none, rmdir: none });
+
+    expect(await FileUtils.chmodRAsync(0o700, tree)).toEqual([tree]);
+    expect(modeOf(file)).toBe(0o700);
+    expect(await Dir.globAsync(`${tree}/**/*`)).toEqual([`${tree}/sub`, file]);
+    expect(await FileUtils.rmRfAsync(tree)).toEqual([tree]);
+    expect(nodeFs.existsSync(tree)).toBe(false);
+  });
+
+  it("mkdir_p awaited creates every missing parent and accepts an existing directory", async () => {
+    const deep = nodePath.join(root, "x", "y", "z");
+    expect(await FileUtils.mkdirPAsync(deep)).toEqual([deep]);
+    expect(nodeFs.statSync(deep).isDirectory()).toBe(true);
+    expect(await FileUtils.mkdirPAsync(deep)).toEqual([deep]);
+    expect(await FileUtils.mkdirPAsync(nodePath.join(root, "n"), { noop: true })).toEqual([
+      nodePath.join(root, "n"),
+    ]);
+    expect(nodeFs.existsSync(nodePath.join(root, "n"))).toBe(false);
+  });
+
+  it("chdir is an alias for cd", () => {
+    expect(FileUtils.chdir).toBe(FileUtils.cd);
   });
 });

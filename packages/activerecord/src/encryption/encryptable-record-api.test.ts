@@ -18,8 +18,7 @@ import {
   Encryption,
 } from "./test-helpers.js";
 import { Scheme } from "./scheme.js";
-import { Configurable } from "./configurable.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
@@ -32,9 +31,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
-    Configurable.config.previousSchemes = [];
+    Encryption.config.previousSchemes = [];
     configureEncryption();
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
   });
 
   afterEach(() => {
@@ -203,7 +202,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt will honor forced encoding for deterministic attributes", async () => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = "UTF-8";
+    Encryption.config.forcedEncodingForDeterministicEncryption = "UTF-8";
     await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
@@ -213,7 +212,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt won't force encoding for deterministic attributes when option is nil", async () => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = "";
+    Encryption.config.forcedEncodingForDeterministicEncryption = "";
     await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
@@ -223,7 +222,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt will preserve case when :ignore_case option is used", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     await freshAdapter();
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
@@ -235,7 +234,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("re-encrypting will preserve case when :ignore_case option is used", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     await freshAdapter();
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();

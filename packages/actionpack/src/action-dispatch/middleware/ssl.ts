@@ -63,10 +63,7 @@ export class SSL {
     this.hsts = this.normalizeHstsOptions(options.hsts);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — PERMANENT
-   */
+  /** @internal */
   private normalizeHstsOptions(options: SSLOptions["hsts"]): Required<HSTSOptions> {
     if (options === false) {
       return merge<unknown>(SSL.defaultHstsOptions(), { expires: 0 }) as Required<HSTSOptions>;

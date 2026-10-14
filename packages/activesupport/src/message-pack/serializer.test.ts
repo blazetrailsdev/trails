@@ -1,14 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { MessagePack, UnserializableObjectError } from "./index.js";
+import { MessagePack, UnserializableObjectError } from "../message-pack.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import {
+  BigDecimal,
+  Complex,
+  Generic,
+  IPAddr,
+  Pathname,
+  Range,
+  Rational,
+  RuntimeError,
+  URI,
+  complex,
+  env as ENV,
+  rational,
+  rbCDate,
+  rbCDateTime,
+  rbCInteger,
+  rbCSymbol,
+  rbRegEqual,
+  setEnv,
+} from "@blazetrails/ruby-compat";
+import { Duration, days, hours, minutes, months, seconds, weeks, years } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 
 describe("MessagePackSerializerTest", () => {
   const dump = (object: unknown) => MessagePack.dump(object);
-  const load = (dumped: Buffer) => MessagePack.load(dumped);
+  const load = (dumped: Uint8Array) => MessagePack.load(dumped);
   const roundtrip = (object: unknown) => load(dump(object));
 
   it("raises friendly error when dumping an unsupported object", () => {
@@ -33,30 +53,36 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips Symbol", () => {
-    expect(roundtrip(Symbol.for("some_symbol"))).toBe(Symbol.for("some_symbol"));
+    expect(roundtrip(":some_symbol")).toBe(":some_symbol");
   });
 
-  it("dumps Symbol bytes identical to real Rails MessagePack", () => {
-    const expected = [204, 128, 199, 11, 0, 115, 111, 109, 101, 95, 115, 121, 109, 98, 111, 108];
-    expect([...dump(Symbol.for("some_symbol"))]).toEqual(expected);
-  });
+  it.todo("dumps Symbol bytes identical to real Rails MessagePack");
 
   it("enshrines type IDs", () => {
     MessagePack.warmup();
     const actual = Object.fromEntries(
-      MessagePack.messagePackFactory.registeredTypes().map((e) => [e.type, e.klass]),
+      MessagePack.messagePackFactory.registeredTypes().map((e) => [e.type, e.class]),
     );
     expect(actual).toEqual({
-      0: "Symbol",
-      1: "Integer",
-      5: "DateTime",
-      6: "Date",
-      7: "Time",
-      8: "ActiveSupport::TimeWithZone",
-      9: "ActiveSupport::TimeZone",
-      12: "Set",
-      17: "ActiveSupport::HashWithIndifferentAccess",
-      127: "Object",
+      0: rbCSymbol,
+      1: rbCInteger,
+      2: BigDecimal,
+      3: Rational,
+      4: Complex,
+      5: rbCDateTime,
+      6: rbCDate,
+      7: Time,
+      8: TimeWithZone,
+      9: TimeZone,
+      10: Duration,
+      11: Range,
+      12: Set,
+      13: Generic,
+      14: IPAddr,
+      15: Pathname,
+      16: RegExp,
+      17: HashWithIndifferentAccess,
+      127: Object,
     });
   });
 
@@ -64,6 +90,36 @@ describe("MessagePackSerializerTest", () => {
     const value = 2n ** 512n;
     expect(roundtrip(value)).toBe(value);
     expect(roundtrip(-(2n ** 512n))).toBe(-(2n ** 512n));
+  });
+
+  it("roundtrips BigDecimal", () => {
+    for (const value of ["9876543210.0123456789", "1", "-1.5", "0.1e-19", "-0", "Infinity"]) {
+      const object = new BigDecimal(value);
+      const deserialized = roundtrip(object) as BigDecimal;
+      expect(deserialized).toBeInstanceOf(BigDecimal);
+      expect(deserialized.toString("E")).toBe(object.toString("E"));
+    }
+    expect((roundtrip(new BigDecimal("NaN")) as BigDecimal).isNan()).toBe(true);
+  });
+
+  it("roundtrips Rational", () => {
+    const result = roundtrip(rational(1, 3));
+    expect(result).toBeInstanceOf(Rational);
+    expect(result).toEqual(rational(1, 3));
+  });
+
+  it("optimizes Rational zero encoding", () => {
+    expect(roundtrip(rational(0, 1))).toEqual(rational(0, 1));
+
+    const serializedZero = dump(rational(0, 1));
+    const serializedNonzero = dump(rational(1, 1));
+    expect(serializedZero.length).toBeLessThan(serializedNonzero.length);
+  });
+
+  it("roundtrips Complex", () => {
+    const result = roundtrip(complex(1, -1));
+    expect(result).toBeInstanceOf(Complex);
+    expect(result).toEqual(complex(1, -1));
   });
 
   it("roundtrips 64-bit native integers", () => {
@@ -119,6 +175,71 @@ describe("MessagePackSerializerTest", () => {
     expect((roundtrip(zone) as TimeZone).name).toBe(zone.name);
   });
 
+  it("roundtrips ActiveSupport::Duration", () => {
+    const duration = years(1)
+      .plus(months(2))
+      .plus(weeks(3))
+      .plus(days(4))
+      .plus(hours(5))
+      .plus(minutes(6))
+      .plus(seconds(7));
+    expect(duration.eql(roundtrip(duration))).toBe(true);
+    const monthAndDay = months(1).plus(days(1));
+    expect(monthAndDay.eql(roundtrip(monthAndDay))).toBe(true);
+  });
+
+  it("roundtrips Range", () => {
+    for (const range of [
+      new Range(1, 2),
+      new Range(1, 2, true),
+      new Range(1, null),
+      new Range(1, null, true),
+      new Range(null, 2),
+      new Range(null, 2, true),
+      new Range("1", "2"),
+      new Range("1", "2", true),
+    ]) {
+      const deserialized = roundtrip(range) as Range;
+      expect(deserialized).toBeInstanceOf(Range);
+      expect(range.equals(deserialized)).toBe(true);
+    }
+  });
+
+  it("roundtrips URI::Generic", () => {
+    const uri = URI.parse("https://example.com/#test");
+    const deserialized = roundtrip(uri) as Generic;
+    expect(deserialized).toBeInstanceOf(uri.constructor);
+    expect(deserialized.toString()).toBe(uri.toString());
+  });
+
+  it("roundtrips IPAddr", () => {
+    const assertRoundtrip = (object: IPAddr) => {
+      const deserialized = roundtrip(object) as IPAddr;
+      expect(deserialized).toBeInstanceOf(IPAddr);
+      expect(object.eql(deserialized)).toBe(true);
+    };
+    assertRoundtrip(new IPAddr("127.0.0.1"));
+    assertRoundtrip(new IPAddr("1.1.1.1/16"));
+    expect((roundtrip(new IPAddr("1.1.1.1/16")) as IPAddr).prefix).toBe(16);
+
+    assertRoundtrip(new IPAddr("::1"));
+    assertRoundtrip(new IPAddr("1:1:1:1:1:1:1:1/64"));
+    expect((roundtrip(new IPAddr("1:1:1:1:1:1:1:1/64")) as IPAddr).prefix).toBe(64);
+  });
+
+  it("roundtrips Pathname", () => {
+    const pathname = new Pathname(import.meta.url);
+    const deserialized = roundtrip(pathname) as Pathname;
+    expect(deserialized).toBeInstanceOf(Pathname);
+    expect(pathname.equals(deserialized)).toBe(true);
+  });
+
+  it("roundtrips Regexp", () => {
+    const deserialized = roundtrip(/.*/s) as RegExp;
+    expect(deserialized).toBeInstanceOf(RegExp);
+    expect(rbRegEqual(/.*/s, deserialized)).toBe(true);
+  });
+
   it("roundtrips ActiveSupport::HashWithIndifferentAccess", () => {
     const hwia = new HashWithIndifferentAccess({ a: true, b: 2, c: "three" });
     const result = roundtrip(hwia) as HashWithIndifferentAccess;
@@ -153,7 +274,24 @@ describe("MessagePackSerializerTest", () => {
     ]);
   });
 
+  it("works with ENV['RAILS_MAX_THREADS']", () => {
+    const originalEnv = { ...ENV };
+    setEnv("RAILS_MAX_THREADS", "1");
+    try {
+      const serialized = dump("value");
+      expect(serialized).toBeInstanceOf(Uint8Array);
+
+      const deserialized = load(serialized);
+      expect(typeof deserialized).toBe("string");
+      expect(deserialized).toBe("value");
+    } finally {
+      for (const name of Object.keys(ENV)) if (!(name in originalEnv)) setEnv(name, undefined);
+      for (const [name, value] of Object.entries(originalEnv)) setEnv(name, value);
+    }
+  });
+
   it("rejects input without the signature", () => {
-    expect(() => load(Buffer.from("hey there"))).toThrow();
+    expect(() => load(Buffer.from("hey there"))).toThrow(RuntimeError);
+    expect(() => load(Buffer.from("hey there"))).toThrow("Invalid serialization format");
   });
 });

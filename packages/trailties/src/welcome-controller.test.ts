@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { WelcomeController } from "./welcome-controller.js";
 
 describe("WelcomeController", () => {
@@ -11,10 +11,17 @@ describe("WelcomeController", () => {
     expect(WelcomeController._layout).toBe(false);
   });
 
-  it("index raises MissingExactTemplate when no template resolver is configured", async () => {
+  it("index raises MissingExactTemplate when no template resolver is configured", async ({
+    task,
+  }) => {
     class WelcomeControllerTest extends ActionController.TestCase {}
     WelcomeControllerTest.tests(WelcomeController);
-    const t = new WelcomeControllerTest(WelcomeController);
+    const t = new WelcomeControllerTest(task.name);
+    await t.beforeSetup();
+    t.routes = new RouteSet();
+    t.routes.draw(function () {
+      this.root({ to: "rails/welcome#index" });
+    });
     await expect(t.get("index")).rejects.toBeInstanceOf(ActionController.MissingExactTemplate);
   });
 });

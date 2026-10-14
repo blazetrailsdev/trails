@@ -22,10 +22,8 @@
     "byFile": {}
   },
   "activemodel": {
-    "total": 1,
-    "byFile": {
-      "secure-password.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activerecord": {
     "total": 0,
@@ -43,10 +41,12 @@
     }
   },
   "arel": {
-    "total": 1,
-    "byFile": {
-      "visitors/visitor.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
+  },
+  "bcrypt": {
+    "total": 0,
+    "byFile": {}
   },
   "did-you-mean": {
     "total": 0,
@@ -57,6 +57,14 @@
     "byFile": {}
   },
   "i18n": {
+    "total": 0,
+    "byFile": {}
+  },
+  "mysql2": {
+    "total": 0,
+    "byFile": {}
+  },
+  "pg": {
     "total": 0,
     "byFile": {}
   },
@@ -83,9 +91,7 @@
     "byFile": {}
   },
   "trailties": {
-    "total": 2,
-    "byFile": {
-      "generators/rails/model/model-generator.ts": 2
-    }
+    "total": 0,
+    "byFile": {}
   }
 }

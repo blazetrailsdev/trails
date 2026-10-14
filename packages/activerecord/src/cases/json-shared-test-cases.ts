@@ -1,9 +1,12 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
+import {
+  stringify as yamlStringify,
+  parse as yamlParse,
+} from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "../base.js";
 import { ColumnNotSerializableError } from "../attribute-methods/serialization.js";
-import { pp } from "../pretty-print.js";
+import { PP } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
@@ -47,7 +50,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_change_table_supports_json", async () => {
-    await connection.changeTable("json_data_type", async (t: Table) => {
+    await connection.changeTable("json_data_type", {}, async (t: Table) => {
       await (t as unknown as Record<string, (name: string) => Promise<void>>)[columnType]("users");
     });
     await klass().resetColumnInformation();
@@ -58,13 +61,13 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_schema_dumping", async () => {
-    const output = await dumpTableSchema(connection, "json_data_type");
+    const output = await dumpTableSchema("json_data_type");
     expect(output).toMatch(new RegExp(`t\\.${columnType}\\(\\s*"settings"`));
   });
 
   it("test_cast_value_on_write", async () => {
     const payload = { string: "foo", symbol: "bar" };
-    const x = klass().new({ payload }) as JsonRecord;
+    const x = new (klass())({ payload }) as JsonRecord;
     expect((x.attributeBeforeTypeCast as (attrName: string) => unknown)("payload")).toBe(payload);
     expect(x.payload).not.toBe(payload);
     expect(x.payload).toEqual({ string: "foo", symbol: "bar" });
@@ -143,7 +146,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_with_store_accessors", async () => {
-    let x = klass().new({ resolution: "320×480" }) as JsonRecord;
+    let x = new (klass())({ resolution: "320×480" }) as JsonRecord;
     expect(x.resolution).toBe("320×480");
 
     await x.saveBang();
@@ -158,7 +161,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_duplication_with_store_accessors", () => {
-    const x = klass().new({ resolution: "320×480" }) as JsonRecord;
+    const x = new (klass())({ resolution: "320×480" }) as JsonRecord;
     expect(x.resolution).toBe("320×480");
 
     const y = x.dup();
@@ -166,16 +169,16 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_yaml_round_trip_with_store_accessors", () => {
-    const x = klass().new({ resolution: "320×480" }) as JsonRecord;
+    const x = new (klass())({ resolution: "320×480" }) as JsonRecord;
     expect(x.resolution).toBe("320×480");
 
     const payload = yamlStringify(x.serializableHash());
-    const y = klass().new(yamlParse(payload) as Record<string, unknown>) as JsonRecord;
+    const y = new (klass())(yamlParse(payload) as Record<string, unknown>) as JsonRecord;
     expect(y.resolution).toBe("320×480");
   });
 
   it("test_changes_in_place", async () => {
-    const json = klass().new() as JsonRecord;
+    const json = new (klass())() as JsonRecord;
     expect(json.isChanged).toBe(false);
 
     json.payload = { one: "two" };
@@ -196,7 +199,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it.skip("test_changes_in_place_ignores_key_order", async () => {
-    const json = klass().new() as JsonRecord;
+    const json = new (klass())() as JsonRecord;
     expect(json.isChanged).toBe(false);
 
     json.payload = { three: "four", one: "two" };
@@ -302,7 +305,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     const x = (await JsonDataTypeWithFilter.createBang({ payload: {} })) as JsonRecord;
     (x.payload as Record<number, string>)[11] = "foo";
     let string = "";
-    await pp(x, { write: (s: string) => (string += s) });
+    await PP.pp(x, { write: (s: string) => (string += s) });
     expect(string).toBeTruthy();
   });
 
@@ -314,7 +317,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     host.insertStatementPerDatabase ??
     ((values: string) => `insert into json_data_type (payload) VALUES ('${values}')`);
 
-  async function assertTypeMatch(type: string, sqlType: string | undefined): Promise<void> {
+  async function assertTypeMatch(type: string, sqlType: string | null): Promise<void> {
     const nativeType = (
       (await Base.leaseConnection()).nativeDatabaseTypes()[type] as { name: string }
     ).name;

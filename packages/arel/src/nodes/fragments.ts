@@ -1,13 +1,14 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
-import { objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
+import type { ArelNode } from "../arel.js";
 
 export class Fragments extends Node {
-  values: Node[];
+  values: ArelNode[];
 
-  constructor(values: Node[] = []) {
+  constructor(values: ArelNode[] = []) {
     super();
     this.values = values;
   }
@@ -24,10 +25,8 @@ export class Fragments extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.values = [...this.values];
-    return copy;
+  initializeCopy(_other: Fragments): void {
+    this.values = rbObjClone(this.values);
   }
 
   plus(other: unknown): Fragments {
@@ -38,4 +37,4 @@ export class Fragments extends Node {
   }
 }
 
-Nodes.Fragments = Fragments;
+rbModConstSet(Nodes, "Fragments", Fragments);

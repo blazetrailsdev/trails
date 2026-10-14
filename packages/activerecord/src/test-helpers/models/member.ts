@@ -12,6 +12,7 @@ import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
 import type { TenantMembership } from "./membership.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Member extends Base {
@@ -126,6 +127,7 @@ export class Member extends Base {
     });
   }
 }
+registerModel(Member);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Member {
   get currentMembership(): CurrentMembership | null | Promise<CurrentMembership | null>;
@@ -183,3 +185,4 @@ export class SelfMember extends Base {
     });
   }
 }
+registerModel(SelfMember);

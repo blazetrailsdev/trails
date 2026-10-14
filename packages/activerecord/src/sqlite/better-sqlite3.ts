@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "better-sqlite3";
 import { File } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";
@@ -83,7 +83,15 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
   private boundParams: SqliteBinds | undefined;
 
   bindParams(binds: SqliteBinds): void {
-    this.boundParams = binds;
+    this.boundParams = Array.isArray(binds)
+      ? binds.map((value: unknown) =>
+          value instanceof Number
+            ? value.valueOf()
+            : typeof value === "number" && Number.isInteger(value)
+              ? BigInt(value)
+              : (value as SqliteBindValue),
+        )
+      : binds;
   }
 
   step(): null {
@@ -149,6 +157,11 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     return this.raw.open;
   }
 
+  filename(dbName = "main"): string | null {
+    const list = this.pragma("database_list") as { name: string; file: string }[];
+    return list.find(({ name }) => name === dbName)?.file ?? null;
+  }
+
   exec(sql: string): void {
     try {
       this.raw.exec(sql);
@@ -179,6 +192,11 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     } finally {
       stmt.close();
     }
+  }
+
+  rollback(): true {
+    this.execute("rollback transaction");
+    return true;
   }
 
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
@@ -246,7 +264,6 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,
   };
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   try {
     if (opts.readonly && config.database === ":memory:") {
       return new Database(new Database(":memory:").serialize(), opts);
@@ -272,10 +289,6 @@ export const betterSqlite3Driver: SqliteDriver = {
 
   open(config: SqliteOpenConfig): Promise<SqliteConnection> {
     return Promise.resolve(new BetterSqlite3Connection(openDatabase(config)));
-  },
-
-  openSync(config: SqliteOpenConfig): SyncSqliteConnection {
-    return new BetterSqlite3Connection(openDatabase(config));
   },
 
   databaseExists(config: SqliteOpenConfig): boolean {

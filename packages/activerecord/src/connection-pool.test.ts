@@ -1,12 +1,32 @@
-import { it, expect, vi } from "vitest";
-import { Process, RuntimeError, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import {
+  Concurrent,
+  Enumerator,
+  Mutex,
+  Process,
+  Timeout,
+  block,
+  rbObjSingletonClass,
+  rbFPublicSend,
+  rbFSend,
+  rbObjIvarSet,
+  RuntimeError,
+  Thread,
+  ThreadError,
+} from "@blazetrails/ruby-compat";
+import {
+  IsolatedExecutionState,
   Notifications,
+  NullLock,
   assertRaise,
   assertRaises,
   assertRespondTo,
 } from "@blazetrails/activesupport";
-import { ConnectionTimeoutError } from "./errors.js";
+import {
+  ConnectionNotEstablished,
+  ConnectionTimeoutError,
+  ExclusiveConnectionTimeoutError,
+} from "./errors.js";
 import {
   NullTransaction,
   RealTransaction,
@@ -20,12 +40,9 @@ import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { register, resolve } from "./connection-adapters.js";
-import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
 
 interface AmbientPoolOptions {
   role?: string;
@@ -70,72 +87,25 @@ function makePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ pool: size });
 }
 
-class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
-  constructor() {
-    super({});
-    this._connection = this;
-  }
-  activeFlag = true;
-  override async active(): Promise<boolean> {
-    return this.activeFlag;
-  }
-  isInTransaction(): boolean {
-    return false;
-  }
-
-  async execute(_sql: string, _name?: string | null): Promise<Record<string, unknown>[]> {
-    return [];
-  }
-  async commit(): Promise<void> {}
-  async rollback(): Promise<void> {}
-  async createSavepoint(_name: string): Promise<void> {}
-  async releaseSavepoint(_name: string): Promise<void> {}
-  async rollbackToSavepoint(_name: string): Promise<void> {}
-  async selectAll(sql: string, _n?: string | null, _b?: unknown[]) {
-    return resultFromRowHashes(await this.execute(sql));
-  }
-  async selectOne(sql: string, _n?: string | null, _b?: unknown[]) {
-    return (await this.execute(sql))[0];
-  }
-  async selectValue(_s: string) {
-    return undefined;
-  }
-  async selectValues(_s: string) {
-    return [];
-  }
-  async selectRows(_s: string) {
-    return [];
-  }
-  async execQuery(sql: string, _n?: string | null, _b?: unknown[]) {
-    return resultFromRowHashes(await this.execute(sql));
-  }
-  async execInsert(sql: string, _n?: string | null, _b?: unknown[]) {
-    return resultFromRowHashes(await this.execute(sql));
-  }
-  async execDelete(_sql: string, _n?: string | null, _b?: unknown[]) {
-    return 0;
-  }
-  async execUpdate(_sql: string, _n?: string | null, _b?: unknown[]) {
-    return 0;
-  }
-  isWriteQuery(_sql: string) {
-    return false;
-  }
-  emptyInsertStatementValue() {
-    return "DEFAULT VALUES";
-  }
+function newThread<R>(block: () => R): Thread<R> {
+  return new Thread(block);
 }
 
-register(
-  "transaction_aware_test",
-  "TrailsTestAdapter",
-  "./connection-adapters/transaction-aware-test-adapter.js",
-  async () => TransactionAwareTestAdapter,
-);
-await resolve("transaction_aware_test");
+function stopThread(): Promise<null> {
+  return Thread.stop();
+}
 
-function makeTransactionAwarePool(size: number = 5): ConnectionPool {
-  return makeAmbientPool({ adapter: "transaction_aware_test", pool: size });
+function passTo(_thread: Thread): Promise<null> {
+  return Thread.pass();
+}
+
+async function withSingleConnectionPool(block: (pool: ConnectionPool) => Promise<void>) {
+  const pool = makeAmbientPool({ pool: 1 });
+  try {
+    await block(pool);
+  } finally {
+    await pool.disconnectBang();
+  }
 }
 
 it("checkout after close", async () => {
@@ -147,6 +117,25 @@ it("checkout after close", async () => {
   expect(connection.isInUse()).toBeFalsy();
 
   expect((await pool.leaseConnection()).isInUse()).toBeTruthy();
+});
+
+it("released connection moves between threads", async () => {
+  const pool = makePool();
+  let threadConn: DatabaseAdapter | null = null;
+
+  await newThread(async () => {
+    await pool.withConnection((conn) => {
+      threadConn = conn;
+    });
+  }).join();
+
+  expect(threadConn).toBeTruthy();
+
+  await newThread(async () => {
+    await pool.withConnection((conn) => {
+      expect(conn).toBe(threadConn);
+    });
+  }).join();
 });
 
 it("with connection", async () => {
@@ -232,7 +221,7 @@ it("removing releases latch", async () => {
   while (pool.numWaitingInQueue() !== 1) await new Promise((resolve) => setTimeout(resolve, 1));
 
   const connection = cs[0];
-  pool.remove(connection);
+  await pool.remove(connection);
   assertRespondTo(await t.value(), "execute");
   await connection.close();
 });
@@ -250,19 +239,54 @@ it("reap and active", async () => {
 
 it("reap inactive", async () => {
   const pool = makePool();
-  const conn = await pool.checkout();
-  await new Thread(async () => {
+  try {
+    const ready = new Concurrent.CountDownLatch();
     await pool.checkout();
+    const child = newThread(async () => {
+      await pool.checkout();
+      await pool.checkout();
+      ready.countDown();
+      await stopThread();
+    });
+    while (!(await ready.wait(0))) await passTo(child);
+
+    expect(activeConnections(pool).length).toBe(3);
+
+    child.terminate();
+    await child.join();
+    await pool.reap();
+
+    expect(activeConnections(pool).length).toBe(1);
+  } finally {
+    for (const conn of pool.connections) if (conn.isInUse()) await conn.close();
+  }
+});
+
+it("inactive are returned from dead thread", async () => {
+  const pool = makePool();
+  try {
+    const ready = new Concurrent.CountDownLatch();
+    rbObjIvarSet(pool, "@size", 1);
+
+    const child = newThread(async () => {
+      await pool.checkout();
+      ready.countDown();
+      await stopThread();
+    });
+
+    while (!(await ready.wait(0))) await passTo(child);
+
+    expect(activeConnections(pool).length).toBe(1);
+
+    child.terminate();
+    await child.join();
+
     await pool.checkout();
-  }).value();
 
-  expect(activeConnections(pool).length).toBe(3);
-
-  await pool.reap();
-
-  expect(activeConnections(pool).length).toBe(1);
-  pool.checkin(conn);
-  await pool.disconnect();
+    expect(activeConnections(pool).length).toBe(1);
+  } finally {
+    for (const conn of pool.connections) if (conn.isInUse()) await conn.close();
+  }
 });
 
 it("idle timeout configuration", async () => {
@@ -338,11 +362,22 @@ it("remove connection", async () => {
     expect(conn.isInUse()).toBeTruthy();
 
     const length = pool.connections.length;
-    pool.remove(conn);
+    await pool.remove(conn);
     expect(conn.isInUse()).toBeTruthy();
     expect(pool.connections.length).toBe(length - 1);
   } finally {
     await conn.close();
+  }
+});
+
+it("remove connection for thread", async () => {
+  const pool = makePool();
+  const conn = await pool.leaseConnection();
+  try {
+    await pool.remove(conn);
+    expect(await pool.leaseConnection()).not.toBe(conn);
+  } finally {
+    if (conn) await conn.close();
   }
 });
 
@@ -388,6 +423,106 @@ it("checkout order is lifo", async () => {
   expect(c3).toBe(c2);
 });
 
+it("checkout fairness", async () => {
+  const pool = makePool();
+  rbObjIvarSet(pool, "@size", 10);
+  const expected = Array.from({ length: pool.size }, (_, i) => i + 1);
+  const conns = [];
+  for (const _ of expected) conns.push(await pool.checkout());
+  const mutex = new Mutex();
+  const order: number[] = [];
+  const errors: unknown[] = [];
+  const disposeHeldConnections = new Concurrent.Event();
+
+  const threads = [];
+  for (const i of expected) {
+    const t = newThread(async () => {
+      try {
+        await pool.checkout();
+        await mutex.synchronize(() => order.push(i));
+
+        await disposeHeldConnections.wait();
+      } catch (e) {
+        await mutex.synchronize(() => errors.push(e));
+      }
+    });
+    while (pool.numWaitingInQueue() !== i) await passTo(t);
+    threads.push(t);
+  }
+
+  for (const conn of conns) {
+    pool.checkin(conn);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  disposeHeldConnections.set();
+  for (const t of threads) await t.join();
+
+  // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `raise errors.first if errors.any?` (connection_pool_test.rb:462)
+  if (errors.length > 0) throw errors[0];
+
+  expect(order).toEqual(expected);
+});
+
+it("checkout fairness by group", async () => {
+  const pool = makePool();
+  rbObjIvarSet(pool, "@size", 10);
+  const conns: DatabaseAdapter[] = [];
+  for (let i = 1; i <= 10; i++) conns.push(await pool.checkout());
+  const mutex = new Mutex();
+  const successes: number[] = [];
+  const errors: unknown[] = [];
+  const disposeHeldConnections = new Concurrent.Event();
+
+  const makeThread = async (i: number) => {
+    const t = newThread(async () => {
+      try {
+        await pool.checkout();
+        await mutex.synchronize(() => successes.push(i));
+
+        await disposeHeldConnections.wait();
+      } catch (e) {
+        await mutex.synchronize(() => errors.push(e));
+      }
+    });
+    while (pool.numWaitingInQueue() !== i) await passTo(t);
+    return t;
+  };
+
+  const group1 = [];
+  for (let i = 1; i <= 5; i++) group1.push(await makeThread(i));
+  const group2 = [];
+  for (let i = 6; i <= 10; i++) group2.push(await makeThread(i));
+
+  const checkin = (n: number) => {
+    for (let k = 0; k < n; k++) {
+      const c = conns.pop()!;
+      pool.checkin(c);
+    }
+  };
+
+  checkin(group1.length);
+
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (await mutex.synchronize(() => successes.length + errors.length === group1.length)) break;
+  }
+
+  const winners = await mutex.synchronize(() => [...successes]);
+  checkin(group2.length);
+
+  disposeHeldConnections.set();
+  for (const t of group1) await t.join();
+  for (const t of group2) await t.join();
+
+  expect(winners.sort((a, b) => a - b)).toEqual(Array.from(group1, (_, i) => i + 1));
+
+  // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if errors.any?` (connection_pool_test.rb:528)
+  if (errors.length > 0) {
+    throw errors[0];
+  }
+});
+
 it("automatic reconnect restores after disconnect", async () => {
   const pool = makePool();
   expect(pool.automaticReconnect).toBeTruthy();
@@ -402,8 +537,8 @@ it("automatic reconnect can be disabled", async () => {
   await pool.disconnectBang();
   pool.automaticReconnect = false;
 
-  await expect(pool.leaseConnection()).rejects.toThrow(/automatic_reconnect is disabled/);
-  await expect(pool.withConnection(() => {})).rejects.toThrow(/automatic_reconnect is disabled/);
+  await expect(pool.leaseConnection()).rejects.toThrow(ConnectionNotEstablished);
+  await expect(pool.withConnection(() => {})).rejects.toThrow(ConnectionNotEstablished);
 });
 
 it("pool sets connection visitor", async () => {
@@ -494,6 +629,173 @@ it("pool sets connection schema cache", async () => {
   pool.checkin(connection);
 });
 
+it("concurrent connection establishment", async () => {
+  const pool = makePool();
+  expect(pool.connections.length).toBeLessThanOrEqual(1);
+
+  const allThreadsInNewConnection = new Concurrent.CountDownLatch(
+    pool.size - pool.connections.length,
+  );
+  const allGo = new Concurrent.CountDownLatch();
+
+  Object.assign(rbObjSingletonClass(pool).prototype, {
+    async newConnection(this: ConnectionPool) {
+      allThreadsInNewConnection.countDown();
+      await allGo.wait();
+      return ConnectionPool.prototype.newConnection.call(this);
+    },
+  });
+
+  const connectingThreads: Thread<unknown>[] = [];
+  for (let i = 0; i < pool.size; i++) {
+    connectingThreads.push(newThread(() => pool.checkout()));
+  }
+
+  try {
+    await Timeout.timeout(5, undefined, undefined, async () => {
+      await allThreadsInNewConnection.wait();
+    });
+  } catch (error) {
+    if (!(error instanceof Timeout.Error)) throw error;
+    expect.fail(
+      "pool unable to establish connections concurrently or implementation has " +
+        "changed, this test then needs to patch a different :new_connection method",
+    );
+  } finally {
+    allGo.countDown();
+    for (const thread of connectingThreads) await thread.join();
+  }
+});
+
+it("non bang disconnect and clear reloadable connections throw exception if threads dont return their conns", async () => {
+  const pool = makePool();
+  pool.checkoutTimeout = 0.001;
+  for (const groupActionMethod of ["disconnect", "clearReloadableConnections"]) {
+    await pool.withConnection(async () => {
+      const error = (await assertRaises([ExclusiveConnectionTimeoutError], {}, () =>
+        newThread(() => rbFPublicSend(pool, groupActionMethod)).join(),
+      )) as ExclusiveConnectionTimeoutError;
+      expect(error.connectionPool).toBe(pool);
+    });
+  }
+});
+
+it("disconnect and clear reloadable connections attempt to wait for threads to return their conns", async () => {
+  const pool = makePool();
+  for (const groupActionMethod of [
+    "disconnect",
+    "disconnectBang",
+    "clearReloadableConnections",
+    "clearReloadableConnectionsBang",
+  ]) {
+    let thread: Thread<unknown> | null = null;
+    let timedJoinResult: Thread<unknown> | null = null;
+    try {
+      await pool.withConnection(async () => {
+        thread = newThread(() => rbFSend(pool, groupActionMethod));
+
+        timedJoinResult = await thread.join(0.3);
+        expect(timedJoinResult).toBeNull();
+
+        expect(pool.isActiveConnection()).toBeTruthy();
+      });
+    } finally {
+      if (thread && !timedJoinResult) await (thread as Thread<unknown>).join();
+    }
+  }
+});
+
+it("bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway", async () => {
+  const pool = makePool();
+  pool.checkoutTimeout = 0.001;
+
+  await pool.withConnection(async () => {
+    await newThread(() => pool.disconnectBang()).join();
+    expect(pool.isActiveConnection()).toBeFalsy();
+
+    await pool.leaseConnection();
+  });
+  pool.releaseConnection();
+
+  await pool.withConnection(async () => {
+    await newThread(() => pool.clearReloadableConnectionsBang()).join();
+    expect(pool.isActiveConnection()).toBeFalsy();
+
+    await pool.leaseConnection();
+  });
+});
+
+it("disconnect and clear reloadable connections are able to preempt other waiting threads", async () => {
+  await withSingleConnectionPool(async (pool) => {
+    for (const groupActionMethod of [
+      "disconnect",
+      "disconnectBang",
+      "clearReloadableConnections",
+      "clearReloadableConnectionsBang",
+    ]) {
+      const conn = await pool.leaseConnection();
+      const secondThreadDone = new Concurrent.Event();
+      let firstThread: Thread<unknown> | undefined;
+      let secondThread: Thread<unknown> | undefined;
+
+      try {
+        firstThread = newThread(() => pool.withConnection(() => secondThreadDone.wait()));
+
+        while (pool.numWaitingInQueue() !== 1) await passTo(firstThread);
+
+        secondThread = newThread(async () => {
+          await rbFSend(pool, groupActionMethod);
+          secondThreadDone.set();
+        });
+
+        while (pool.numWaitingInQueue() !== 2) await passTo(secondThread);
+
+        pool.checkin(conn);
+
+        expect(
+          await secondThread.join(2),
+          `${groupActionMethod} is not able to preempt other waiting threads`,
+        ).toBeTruthy();
+      } finally {
+        const failed = !secondThreadDone.isSet();
+
+        if (failed) {
+          secondThreadDone.set();
+
+          await firstThread?.join(2);
+          await secondThread?.join(2);
+        }
+
+        // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` raises here (connection_pool_test.rb:772).
+        if (!(await firstThread!.join(10))) throw new RuntimeError("first_thread got stuck");
+        // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` raises here (connection_pool_test.rb:773).
+        if (!(await secondThread!.join(10))) throw new RuntimeError("second_thread got stuck");
+      }
+    }
+  });
+});
+
+it("clear reloadable connections creates new connections for waiting threads if necessary", async () => {
+  await withSingleConnectionPool(async (pool) => {
+    const conn = await pool.leaseConnection();
+    conn.requiresReloading = () => true;
+
+    const stuckThread = newThread(() => pool.withConnection(() => {}));
+
+    while (pool.numWaitingInQueue() !== 1) await passTo(stuckThread);
+
+    await pool.clearReloadableConnections();
+
+    if (!(await stuckThread.join(2))) {
+      expect.fail(
+        "clear_reloadable_connections must not let other connection waiting threads get stuck in queue",
+      );
+    }
+
+    expect(pool.numWaitingInQueue()).toBe(0);
+  });
+});
+
 it("connection pool stat", async () => {
   const pool = makeAmbientPool({ pool: 1 });
   try {
@@ -541,6 +843,24 @@ it("connection pool stat", async () => {
   } finally {
     await pool.disconnectBang();
   }
+});
+
+it("public connections access threadsafe", async () => {
+  const pool = makePool();
+  await pool.checkout();
+  const conn2 = await pool.checkout();
+
+  const connections = pool.connections;
+  let foundConn: DatabaseAdapter | null = null;
+
+  for (let idx = 0; idx < connections.length; idx++) {
+    if (connections[idx] === conn2) {
+      await newThread(() => pool.remove(conn2)).join();
+    }
+    foundConn = connections[idx];
+  }
+
+  expect(foundConn).not.toBeNull();
 });
 
 it("role and shard is returned", async () => {
@@ -607,15 +927,15 @@ it("pin connection connected?", async () => {
   expect(pool.isConnected()).toBeTruthy();
 });
 
-it("isConnected probes each pooled connection's connected state", async () => {
+it("pin connection synchronize the connection", async () => {
   const pool = makePool();
-  const conn = await pool.checkout();
-  await conn.verifyBang();
-  expect(pool.isConnected()).toBe(true);
-  pool.checkin(conn);
-  await conn.disconnectBang();
-  expect(pool.connections.length).toBe(1);
-  expect(pool.isConnected()).toBe(false);
+  await pool.pinConnectionBang(true);
+  expect((await pool.leaseConnection()).lock).not.toBe(NullLock);
+  await pool.unpinConnectionBang();
+  expect((await pool.leaseConnection()).lock).toBe(NullLock);
+
+  await pool.pinConnectionBang(false);
+  expect((await pool.leaseConnection()).lock).toBe(NullLock);
 });
 
 it("pin connection opens a transaction", async () => {
@@ -658,30 +978,35 @@ it("pin connection nesting", async () => {
   );
 });
 
-it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang();
+it("pin connection nesting lock", async () => {
+  const pool = makePool();
+  await pool.pinConnectionBang(true);
+  const actualLock = (await pool.leaseConnection()).lock;
+  expect(actualLock).not.toBe(NullLock);
 
-  const conn = (await pool.checkout()) as TransactionAwareTestAdapter;
-  const verify = vi.spyOn(conn, "verifyBang");
-  const reconnect = vi.spyOn(conn, "reconnectBang").mockImplementation(async () => {
-    conn.activeFlag = true;
-  });
+  await pool.pinConnectionBang(false);
+  expect((await pool.leaseConnection()).lock).toBe(actualLock);
 
-  expect(await pool.checkout()).toBe(conn);
-  expect(verify).toHaveBeenCalledTimes(1);
-  expect(reconnect).not.toHaveBeenCalled();
-
-  conn.activeFlag = false;
-  const again = (await pool.checkout()) as TransactionAwareTestAdapter;
-  expect(again).toBe(conn);
-  expect(verify).toHaveBeenCalledTimes(2);
-  expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
-  expect(await again.active()).toBe(true);
-
-  verify.mockRestore();
-  reconnect.mockRestore();
   await pool.unpinConnectionBang();
+  expect((await pool.leaseConnection()).lock).toBe(actualLock);
+
+  await pool.unpinConnectionBang();
+  expect((await pool.leaseConnection()).lock).toBe(NullLock);
+});
+
+it("pin connection nesting lock inverse", async () => {
+  const pool = makePool();
+  await pool.pinConnectionBang(false);
+
+  await pool.pinConnectionBang(true);
+  const actualLock = (await pool.leaseConnection()).lock;
+  expect(actualLock).not.toBe(NullLock);
+
+  await pool.unpinConnectionBang();
+  expect((await pool.leaseConnection()).lock).toBe(actualLock);
+
+  await pool.unpinConnectionBang();
+  expect((await pool.leaseConnection()).lock).toBe(NullLock);
 });
 
 it("inspect does not show secrets", async () => {
@@ -695,4 +1020,30 @@ it("inspect does not show secrets", async () => {
   expect(readingPool.inspect()).toMatch(
     /#<ActiveRecord::ConnectionAdapters::ConnectionPool env_name="\w+" role=:reading shard=:shard_one>/,
   );
+});
+
+describe("ConnectionPoolThreadTest", () => {
+  const previousIsolationLevel = IsolatedExecutionState.isolationLevel!;
+  beforeEach(() => {
+    IsolatedExecutionState.isolationLevel = "thread";
+  });
+  afterEach(() => {
+    IsolatedExecutionState.isolationLevel = previousIsolationLevel;
+  });
+
+  it("lock thread allow fiber reentrency", async () => {
+    const pool = makePool();
+    const connection = await pool.checkout();
+    connection.setLockThread(IsolatedExecutionState.context());
+    await connection.transaction(async () => {
+      const enumerator = new Enumerator(
+        block(async (yielder: { yield(value: number): unknown }) => {
+          await connection.transaction(async () => {
+            await yielder.yield(1);
+          });
+        }),
+      );
+      expect(await enumerator.next()).toEqual(1);
+    });
+  });
 });

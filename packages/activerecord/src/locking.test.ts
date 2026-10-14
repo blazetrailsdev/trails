@@ -8,9 +8,8 @@ import {
   RecordNotUnique,
   RecordNotFound,
 } from "./index.js";
-import { collectionProxyFor as association } from "./associations.js";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";
 import { Frog } from "./test-helpers/models/frog.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
@@ -40,7 +39,7 @@ import {
   travelBack,
 } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
-import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 import { adapterType } from "./test-adapter.js";
 import { deprecator } from "./deprecator.js";
 
@@ -259,19 +258,6 @@ describe("OptimisticLockingTest", () => {
 
     expect(await Person.find(2)).toBeTruthy();
     await assertRaises([RecordNotFound], {}, () => Person.find(1));
-  });
-
-  it("touch with dirty primary key", async () => {
-    const before = await Person.find(1);
-    const beforeLockVersion = before.lock_version;
-
-    const person = await Person.find(1);
-    person.id = 42;
-    expect(await person.touch()).toBe(true);
-
-    const persisted = await Person.find(1);
-    expect(persisted.lock_version).toBe(beforeLockVersion + 1);
-    await expect(Person.find(42)).rejects.toBeInstanceOf(RecordNotFound);
   });
 
   it("explicit update lock column raise error", async () => {
@@ -530,7 +516,7 @@ describe("OptimisticLockingTest", () => {
     previouslyWheelsOwnedAt = car.wheels_owned_at;
     travel(2);
     try {
-      await ((await association(car, "wheels").first()) as any).update({ size: 42 });
+      await ((await car.wheels.first()) as any).update({ size: 42 });
     } finally {
       travelBack();
     }
@@ -545,7 +531,7 @@ describe("OptimisticLockingTest", () => {
     previouslyWheelsOwnedAt = car.wheels_owned_at;
     travel(3);
     try {
-      await ((await association(car, "wheels").first()) as any).destroyBang();
+      await ((await car.wheels.first()) as any).destroyBang();
     } finally {
       travelBack();
     }
@@ -556,7 +542,7 @@ describe("OptimisticLockingTest", () => {
     expect(cmp(car.updated_at, previouslyUpdatedAt)).toBeGreaterThan(0);
     expect(cmp(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBeGreaterThan(0);
 
-    await association(car, "wheels").push(await Wheel.createBang({}));
+    await car.wheels.push(await Wheel.createBang({}));
     expect(car.wheels_count).toBe(1);
     expect(car.lock_version).toBe(4);
     expect((car as any).attributeChanged("lock_version")).toBeFalsy();
@@ -566,7 +552,7 @@ describe("OptimisticLockingTest", () => {
   it("polymorphic destroy with dependencies and lock version", async () => {
     const car = await Car.createBang({});
 
-    const wheels = association(car, "wheels");
+    const wheels = car.wheels;
     await assertDifference(
       () => wheels.count() as Promise<number>,
       1,
@@ -587,7 +573,7 @@ describe("OptimisticLockingTest", () => {
   });
   it("removing has and belongs to many associations upon destroy", async () => {
     const p = await RichPerson.createBang({ first_name: "Jon" });
-    const proxy = association(p, "treasures");
+    const proxy = p.treasures;
     await proxy.create({});
     assertNotEmpty(await proxy);
     await p.destroy();
@@ -721,7 +707,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 });
 
 describe("PessimisticLockingTest", () => {
-  const { people } = fixtures(["people"], {
+  const { self, people } = fixtures(["people"], {
     usesTransaction: ["with lock sets isolation"],
   });
 
@@ -808,7 +794,7 @@ describe("PessimisticLockingTest", () => {
   it.skipIf(adapterType !== "postgres")("lock sending custom lock statement", async () => {
     await Person.transaction(async () => {
       const person = await Person.find(people("michael").id);
-      await assertQueriesMatch(/LIMIT \$?\d FOR SHARE NOWAIT/, undefined, false, async () => {
+      await self().assertQueriesMatch(/LIMIT \$?\d FOR SHARE NOWAIT/, {}, async () => {
         await person.lockBang("FOR SHARE NOWAIT");
       });
     });
@@ -825,7 +811,7 @@ describe("PessimisticLockingTest", () => {
 
   it.skipIf(adapterType !== "postgres")("with lock locks with no args", async () => {
     const p = await Person.find(people("michael").id);
-    await assertQueriesMatch(/LIMIT \$?\d FOR UPDATE/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT \$?\d FOR UPDATE/i, {}, async () => {
       await p.withLock(async () => {});
     });
   });

@@ -44,6 +44,7 @@ import type {
   ParamInfo,
   LiteralValue,
   CallSite,
+  InlinedFrom,
 } from "@blazetrails/parity/types";
 import {
   ROOT_DIR,
@@ -54,6 +55,7 @@ import {
   overlappingSubDirs,
   apiComparePackageRoots,
 } from "./config.js";
+import { scopeOf } from "./scope.js";
 import {
   sharedCacheDir,
   contentFingerprint,
@@ -70,7 +72,12 @@ import {
 } from "@blazetrails/parity/shared-cache";
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
-import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
+import {
+  EVAL_CALLBACK_PREFIX,
+  FOREIGN_READ_PREFIX,
+  NATIVE_FORM_PREFIX,
+  NEGATED_CALL_PREFIX,
+} from "./enumerable-idioms.js";
 import {
   ANY_TAG_LINE,
   TAG as MISSING_RAILS_CALL_TAG,
@@ -83,6 +90,32 @@ import {
   suppressedArgReasonsIn,
 } from "./missing-rails-args-tags.js";
 import { TAG as MISSING_RAILS_NAME_TAG, suppressedNamesIn } from "./missing-rails-name-tags.js";
+import { TAG as INVENTED_ARM_TAG, inventedArmsIn } from "./invented-arm-tags.js";
+import { TAG as INLINED_FROM_TAG, inlinedFromIn } from "./inlined-from-tags.js";
+
+const OPTION_READER_FUNCTIONS = new Set([
+  "fetch",
+  "hasKey",
+  "hasOwn",
+  "hashDelete",
+  "deleteKey",
+  "deleteWithDefault",
+]);
+/**
+ * ruby-compat's `Kernel#send` / `Kernel#public_send` (`rb_f_send`,
+ * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, each
+ * is a call to that method; a computed name is Ruby's own `send(name)`. In
+ * ARGUMENT position the same literal names the descriptor (`call:usec` for
+ * `rbFSend(value, "usec")`), as `dispatchedCallName` does for `X.call`.
+ */
+const SEND_CALLEES = new Set(["rbFSend", "rbFPublicSend"]);
+/**
+ * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),
+ * which is a call to Ruby's `load`.
+ */
+const KERNEL_CALLEES = new Map([["rbFLoad", "load"]]);
+const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
+const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
 
 /** Memo for `internalJsDocTagApplies`'s file-level receipt lookup. */
 const fileLevelReceipts = new WeakMap<ts.SourceFile, boolean>();
@@ -120,12 +153,13 @@ let currentImportAliases: ReadonlyMap<string, string> | undefined;
 let currentChecker: ts.TypeChecker | undefined;
 
 /**
- * The local names a file binds `block` from `@blazetrails/ruby-compat` to —
- * the mark a value-or-block argument position carries (`rb_block_given_p`,
- * `vendor/ruby/v3.3.11/eval.c:866`). Read by `isMarkedBlockArg`, so a same-named local
- * parameter cannot pass for it.
+ * Per file, each local name bound from `@blazetrails/ruby-compat` → the export
+ * it binds. Read by `isMarkedBlockArg` for `block`, the mark a value-or-block
+ * argument position carries (`rb_block_given_p`, `vendor/ruby/v3.3.11/eval.c:866`),
+ * so a same-named local parameter cannot pass for it; and by `recordCallSite`
+ * for `CallSite.rubyCompat`.
  */
-const blockMarkNames = new WeakMap<ts.SourceFile, ReadonlySet<string>>();
+const rubyCompatBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
 
 interface CacheEntry {
   schemaVersion: string;
@@ -187,6 +221,8 @@ const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
 const fileHasMissingRailsArgsTag = new WeakMap<ts.SourceFile, boolean>();
 /** Same role for `@missingRailsName`. */
 const fileHasMissingRailsNameTag = new WeakMap<ts.SourceFile, boolean>();
+const fileHasInventedArmTag = new WeakMap<ts.SourceFile, boolean>();
+const fileHasInlinedFromTag = new WeakMap<ts.SourceFile, boolean>();
 
 /**
  * Tags a deliberate JSDoc block may legitimately carry *after*
@@ -364,7 +400,12 @@ async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], limit: number)
   return results;
 }
 
-export async function main() {
+/**
+ * `packages` narrows the walk to a per-package run (CI's thor-only comparison):
+ * each package is extracted from its own program, so a narrowed manifest holds
+ * the same entry for a package that the whole-surface one does.
+ */
+export async function main(packages: readonly string[] = TS_EXTRACT_PACKAGES) {
   const manifest: ApiManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),
@@ -416,7 +457,7 @@ export async function main() {
   }
   const pending: PendingExtract[] = [];
 
-  for (const pkg of TS_EXTRACT_PACKAGES) {
+  for (const pkg of packages) {
     const pkgDir = packageSrcDir(pkg);
     const files = walkTsFilesSync(pkgDir, COMPARED_TS_FILES, overlappingSubDirs(pkg));
     const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
@@ -539,7 +580,7 @@ export async function main() {
   }
 
   // Print summary in TS_EXTRACT_PACKAGES order (not extraction order).
-  for (const pkg of TS_EXTRACT_PACKAGES) {
+  for (const pkg of packages) {
     const data = manifest.packages[pkg];
     const classCount = Object.keys(data.classes).length;
     const moduleCount = Object.keys(data.modules).length;
@@ -556,7 +597,7 @@ export async function main() {
     const sharedNote =
       sharedHits.size > 0 ? ` (${sharedHits.size} from the shared cross-worktree cache)` : "";
     console.log(
-      `\n  ${cacheHits.size}/${TS_EXTRACT_PACKAGES.length} packages served from cache${sharedNote} (set API_COMPARE_FORCE=1 to rebuild).`,
+      `\n  ${cacheHits.size}/${packages.length} packages served from cache${sharedNote} (set API_COMPARE_FORCE=1 to rebuild).`,
     );
   }
 
@@ -674,8 +715,20 @@ export function extractFromProgram(
           info.classes[classKey] = classInfo;
           fileHasClassOrModule = true;
           for (const nested of staticClassExpressions(node, classInfo.name)) {
-            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir);
+            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir, nested.name);
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
+          }
+          for (const nested of staticModuleInstances(node, classInfo.name)) {
+            const instanceMethods = harvestModuleInstanceMethods(nested.init, checker, relPath);
+            if (instanceMethods.length === 0) continue;
+            info.modules[`${relPath}:${nested.seat}`] = {
+              name: nested.name,
+              file: relPath,
+              includes: [],
+              extends: [],
+              instanceMethods,
+              classMethods: [],
+            };
           }
         }
       } else if (ts.isExpressionStatement(node)) {
@@ -849,16 +902,19 @@ export function extractFromProgram(
       } else if (ts.isFunctionDeclaration(node) && node.name && isExported(node)) {
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
+        const fnOptionReads = extractOptionReads(node.parameters, node.body);
         const fnCalls = extractCalls(node.body);
         const fnCallSeq = extractCallSeq(node.body);
         const fnCallArgs = extractCallArgs(node.body);
         const fnSkeleton = extractSkeleton(node.body);
+        const fnShapeTokens = extractShapeTokens(node.body);
         const sectioned = sectionVisibility.get(node.name.text);
         const internal = internalJsDocTagApplies(node) || sectioned !== undefined;
         const noRailsEquivalent = noRailsEquivalentReason(node);
         const fnMissingRailsCalls = missingRailsCallTags(node);
         const fnMissingRailsArgs = missingRailsArgsTags(node);
         const fnMissingRailsNames = missingRailsNameTags(node);
+        const fnInventedArms = inventedArmTags(node);
         const fnMissingRailsCallReasons = missingRailsCallTagReasons(node);
         const fnMissingRailsArgsReasons = missingRailsArgsTagReasons(node);
         fileFunctions.push({
@@ -872,13 +928,18 @@ export function extractFromProgram(
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
           ...(signatureReturnsVoid(node, checker) ? { returnsVoid: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
+          ...(fnOptionKeys != null && fnOptionReads !== undefined
+            ? { optionReads: fnOptionReads }
+            : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
           ...(fnCallSeq !== undefined ? { callSeq: fnCallSeq } : {}),
           ...(fnCallArgs !== undefined ? { callArgs: fnCallArgs } : {}),
           ...(fnSkeleton !== undefined ? { skeleton: fnSkeleton } : {}),
+          ...(fnShapeTokens !== undefined ? { shapeTokens: fnShapeTokens } : {}),
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
           ...(fnMissingRailsArgs !== undefined ? { missingRailsArgs: fnMissingRailsArgs } : {}),
           ...(fnMissingRailsNames !== undefined ? { missingRailsNames: fnMissingRailsNames } : {}),
+          ...(fnInventedArms !== undefined ? { inventedArms: fnInventedArms } : {}),
           ...(fnMissingRailsCallReasons !== undefined
             ? { missingRailsCallReasons: fnMissingRailsCallReasons }
             : {}),
@@ -893,7 +954,7 @@ export function extractFromProgram(
           info.classes[`${relPath}:${seat}`] = classInfo;
           fileHasClassOrModule = true;
           for (const nested of staticClassExpressions(cls, seat)) {
-            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir);
+            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir, nested.name);
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
         }
@@ -904,8 +965,11 @@ export function extractFromProgram(
         for (const decl of node.declarationList.declarations) {
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
-          if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue;
-          const methods = harvestObjectLiteralMethods(decl.initializer, checker, relPath);
+          if (!decl.initializer) continue;
+          const objectLiteral = ts.isObjectLiteralExpression(decl.initializer);
+          const methods = ts.isObjectLiteralExpression(decl.initializer)
+            ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
+            : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
           if (methods.length === 0) continue;
           const modKey = `${relPath}:${decl.name.text}`;
           if (info.classes[modKey]) continue;
@@ -915,11 +979,12 @@ export function extractFromProgram(
           if (prior) {
             const bodied = new Set(methods.map((m) => m.name));
             prior.instanceMethods = [
-              ...methods,
+              ...(objectLiteral
+                ? methods.map((m) => ({ ...m, objectLiteralMember: true }))
+                : methods),
               ...prior.instanceMethods.filter((m) => !bodied.has(m.name)),
             ];
             prior.noRailsEquivalent ??= modReason;
-            prior.objectLiteral = true;
             continue;
           }
           info.modules[modKey] = {
@@ -929,7 +994,7 @@ export function extractFromProgram(
             extends: [],
             instanceMethods: methods,
             classMethods: [],
-            objectLiteral: true,
+            ...(objectLiteral ? { objectLiteral: true } : {}),
             ...(modReason !== undefined ? { noRailsEquivalent: modReason } : {}),
           };
           fileHasClassOrModule = true;
@@ -1071,6 +1136,24 @@ export function extractFromProgram(
       }
     });
 
+    const staticBlockStatements = sourceFile.statements
+      .filter(ts.isClassDeclaration)
+      .flatMap((klass) => klass.members.filter(ts.isClassStaticBlockDeclaration))
+      .flatMap((staticBlock) => [...staticBlock.body.statements]);
+    for (const statement of [...sourceFile.statements, ...staticBlockStatements]) {
+      const call = ts.isExpressionStatement(statement) ? statement.expression : undefined;
+      if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {
+        continue;
+      }
+      const [alias, original] = call.arguments;
+      if (call.expression.name.text !== "aliasMethod" || !alias || !original) continue;
+      if (!ts.isStringLiteralLike(alias) || !ts.isStringLiteralLike(original)) continue;
+      const mod = info.modules[`${relPath}:${call.expression.expression.getText(sourceFile)}`];
+      const aliased = mod?.instanceMethods.find((m) => m.name === original.text);
+      if (!mod || !aliased || mod.instanceMethods.some((m) => m.name === alias.text)) continue;
+      mod.instanceMethods.push({ ...aliased, name: alias.text, aliasOf: original.text });
+    }
+
     for (const generated of collectDefineColumnMethodsMembers(sourceFile)) {
       const entity = info.classes[`${relPath}:${generated.receiver}`];
       if (entity === undefined) continue;
@@ -1095,7 +1178,7 @@ export function extractFromProgram(
           .filter((n): n is string => n !== undefined)
           .map((n) => `${relPath}:${n}`)
           .find((key) => info.classes[key] || info.modules[key]) ??
-        (attr.enclosingObjectLiteral === true ? `${relPath}:${attr.enclosing}` : undefined);
+        (attr.enclosingSeatsModule === true ? `${relPath}:${attr.enclosing}` : undefined);
       if (target === undefined) continue;
       if (!info.classes[target] && !info.modules[target]) {
         info.modules[target] = {
@@ -1228,6 +1311,7 @@ export function extractFromProgram(
             const callSeq = extractCallSeq(body);
             const callArgs = extractCallArgs(body);
             const skeleton = extractSkeleton(body);
+            const shapeTokens = extractShapeTokens(body);
             const exportSectioned = sectionVisibility.get(sym.name);
             const internal = internalJsDocTagApplies(decl) || exportSectioned !== undefined;
             // A renamed export (`export { withRoutesHelpers as with }`) is its
@@ -1265,6 +1349,7 @@ export function extractFromProgram(
               ...(callSeq !== undefined ? { callSeq } : {}),
               ...(callArgs !== undefined ? { callArgs } : {}),
               ...(skeleton !== undefined ? { skeleton } : {}),
+              ...(shapeTokens !== undefined ? { shapeTokens } : {}),
               ...(exportedMissingRailsCalls !== undefined
                 ? { missingRailsCalls: exportedMissingRailsCalls }
                 : {}),
@@ -1418,7 +1503,7 @@ export function extractFromProgram(
 
     forEachCallNamed(sourceFile, "include", (call) => {
       if (call.arguments.length < 2) return;
-      const [hostArg, modArg] = call.arguments;
+      const [hostArg, modArg0] = call.arguments;
       if (!ts.isIdentifier(hostArg)) return;
 
       const hostSym0 = checker.getSymbolAtLocation(hostArg);
@@ -1451,72 +1536,76 @@ export function extractFromProgram(
 
       const pushMethods = (methods: MethodInfo[]): void => {
         for (const m of methods) {
+          if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
           hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });
         }
       };
 
-      // Inline object literal: `include(Host, { foo() {...}, bar: ... })`.
-      // No module name to reference — push methods straight onto the host.
-      if (ts.isObjectLiteralExpression(modArg)) {
-        pushMethods(harvestObjectLiteralMethods(modArg, checker, hostInfo.file ?? ""));
-        return;
-      }
-
-      // Property access: `include(Host, NS.InstanceMethods)`. The bare
-      // name "InstanceMethods" collides heavily across files (every
-      // concern declares one), so we can't push it onto host.extends
-      // and rely on path-proximity resolution. Resolve the property
-      // symbol back to its declaration and push its methods directly.
-      if (ts.isPropertyAccessExpression(modArg) && ts.isIdentifier(modArg.name)) {
-        const sym0 = checker.getSymbolAtLocation(modArg);
-        const resolved =
-          sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
-        const propDecl = resolved?.valueDeclaration ?? resolved?.declarations?.[0];
-        if (
-          propDecl &&
-          ts.isVariableDeclaration(propDecl) &&
-          propDecl.initializer &&
-          ts.isObjectLiteralExpression(propDecl.initializer)
-        ) {
-          pushMethods(
-            harvestObjectLiteralMethods(propDecl.initializer, checker, hostInfo.file ?? ""),
-          );
-        }
-        return;
-      }
-
-      // Bare identifier: `include(Host, Mod)`. Two sub-cases:
-      //
-      // (a) Mod is a class / interface — push its name onto host.extends so
-      //     compare.ts's getInherited() walker resolves it via tsByShort.
-      //     Imports may rebind (`import { Math as MathMixin }`), so follow
-      //     the alias to the original symbol's name.
-      //
-      // (b) Mod is a `const` object literal (e.g. `export const QueryMethods
-      //     = { foo, bar } as const`). The extractor never creates a class/module
-      //     entry for plain objects, so pushing the name to extends would leave
-      //     it unresolvable. Instead, harvest the object's method keys directly
-      //     onto the host — same treatment as the inline-object and
-      //     property-access branches above.
-      //     `defineModule(...)` (activesupport/include.ts) composes one such
-      //     module out of its sections, so its arguments are harvested instead.
-      if (ts.isIdentifier(modArg)) {
-        const sym0 = checker.getSymbolAtLocation(modArg);
-        const sym =
-          sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
-
-        // (b): const object literal → harvest directly, then fall through to
-        // also push the name onto extends for compare.ts resolution.
-        for (const literal of moduleObjectLiterals(sym, checker)) {
-          pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
+      const includeOne = (modArg: ts.Expression): void => {
+        // Inline object literal: `include(Host, { foo() {...}, bar: ... })`.
+        // No module name to reference — push methods straight onto the host.
+        if (ts.isObjectLiteralExpression(modArg)) {
+          pushMethods(harvestObjectLiteralMethods(modArg, checker, hostInfo.file ?? ""));
+          return;
         }
 
-        // (a): class / interface / module — push name for later resolution.
-        const modName = extendsModuleName(sym, modArg);
-        if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
-        recordExtendsFile(hostInfo, modName, sym, srcDir);
-      }
+        // Property access: `include(Host, NS.InstanceMethods)`. The bare
+        // name "InstanceMethods" collides heavily across files (every
+        // concern declares one), so we can't push it onto host.extends
+        // and rely on path-proximity resolution. Resolve the property
+        // symbol back to its declaration and push its methods directly.
+        if (ts.isPropertyAccessExpression(modArg) && ts.isIdentifier(modArg.name)) {
+          const sym0 = checker.getSymbolAtLocation(modArg);
+          const resolved =
+            sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+          const propDecl = resolved?.valueDeclaration ?? resolved?.declarations?.[0];
+          if (
+            propDecl &&
+            ts.isVariableDeclaration(propDecl) &&
+            propDecl.initializer &&
+            ts.isObjectLiteralExpression(propDecl.initializer)
+          ) {
+            pushMethods(
+              harvestObjectLiteralMethods(propDecl.initializer, checker, hostInfo.file ?? ""),
+            );
+          }
+          return;
+        }
+
+        // Bare identifier: `include(Host, Mod)`. Two sub-cases:
+        //
+        // (a) Mod is a class / interface — push its name onto host.extends so
+        //     compare.ts's getInherited() walker resolves it via tsByShort.
+        //     Imports may rebind (`import { Math as MathMixin }`), so follow
+        //     the alias to the original symbol's name.
+        //
+        // (b) Mod is a `const` object literal (e.g. `export const QueryMethods
+        //     = { foo, bar } as const`). The extractor never creates a class/module
+        //     entry for plain objects, so pushing the name to extends would leave
+        //     it unresolvable. Instead, harvest the object's method keys directly
+        //     onto the host — same treatment as the inline-object and
+        //     property-access branches above.
+        //     `defineModule(...)` (activesupport/include.ts) composes one such
+        //     module out of its sections, so its arguments are harvested instead.
+        if (ts.isIdentifier(modArg)) {
+          const sym0 = checker.getSymbolAtLocation(modArg);
+          const sym =
+            sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+
+          // (b): const object literal → harvest directly, then fall through to
+          // also push the name onto extends for compare.ts resolution.
+          for (const literal of moduleObjectLiterals(sym, checker)) {
+            pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
+          }
+
+          // (a): class / interface / module — push name for later resolution.
+          const modName = extendsModuleName(sym, modArg);
+          if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
+          recordExtendsFile(hostInfo, modName, sym, srcDir);
+        }
+      };
+      for (const modArg of loopedIncludeModules(modArg0, checker) ?? [modArg0]) includeOne(modArg);
     });
   }
 
@@ -1578,8 +1667,8 @@ export function extractFromProgram(
 
       const pushMethods = (methods: MethodInfo[]): void => {
         for (const m of methods) {
-          if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
-          hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });
+          if (hostInfo.classMethods.some((existing) => existing.name === m.name)) continue;
+          hostInfo.classMethods.push({ ...m, file: hostInfo.file, isStatic: true });
         }
       };
 
@@ -1640,7 +1729,7 @@ export function extractFromProgram(
   // above run, so it shares the `extends` array they push onto but not the
   // `extendsFiles` object they replace. Re-syncing the map keeps a re-exported
   // host's mixin edges resolvable: without it a cross-package edge
-  // (`include(Json, MutableModule)`, activemodel's module reached from
+  // (`include(Json, Mutable)`, activemodel's module reached from
   // activerecord) arrives at the clone as a bare short name and resolves to
   // nothing, dropping the whole inheritance edge.
   for (const entity of [...Object.values(info.classes), ...Object.values(info.modules)]) {
@@ -1694,6 +1783,31 @@ export function extractFromProgram(
   }
 
   return info;
+}
+
+/**
+ * The modules a looped `include` hands over: for
+ * `for (const mod of API.MODULES) include(API, mod)`, the elements of the array
+ * literal `MODULES` is initialized with. Rails writes the same loop
+ * (`MODULES.each do |mod| include mod end`, action_controller/api.rb:148-150),
+ * which `extract-ruby-api.rb` unrolls on its side. Undefined when `modArg` is
+ * not such a loop variable.
+ */
+export function loopedIncludeModules(
+  modArg: ts.Expression,
+  checker: ts.TypeChecker,
+): readonly ts.Expression[] | undefined {
+  if (!ts.isIdentifier(modArg)) return undefined;
+  const decl = checker.getSymbolAtLocation(modArg)?.valueDeclaration;
+  if (!decl || !ts.isVariableDeclaration(decl)) return undefined;
+  const loop = decl.parent.parent;
+  if (!ts.isForOfStatement(loop) || loop.initializer !== decl.parent) return undefined;
+  const list = checker.getSymbolAtLocation(loop.expression)?.valueDeclaration;
+  if (!list || !(ts.isPropertyDeclaration(list) || ts.isVariableDeclaration(list))) {
+    return undefined;
+  }
+  const init = list.initializer && unwrapAssertions(list.initializer);
+  return init && ts.isArrayLiteralExpression(init) ? init.elements : undefined;
 }
 
 /**
@@ -2225,30 +2339,50 @@ function findDefinePropertyAccessorCall(call: ts.CallExpression): {
 
 /** Push the reader — and, for a `get`/`set` pair, the writer — of a generated accessor. */
 function pushGeneratedAccessor(
-  classInfo: ClassInfo,
+  members: MethodInfo[],
+  file: string,
   name: string,
   line: number,
   writerParams: ParamInfo[] | null,
 ): void {
-  if (!classInfo.instanceMethods.some((m) => m.name === name && m.writer !== true)) {
-    classInfo.instanceMethods.push({
+  if (!members.some((m) => m.name === name && m.writer !== true)) {
+    members.push({
       name,
       visibility: "public",
       params: [],
       line,
-      file: classInfo.file,
+      file,
     });
   }
   if (writerParams === null) return;
-  if (classInfo.instanceMethods.some((m) => m.name === name && m.writer === true)) return;
-  classInfo.instanceMethods.push({
+  if (members.some((m) => m.name === name && m.writer === true)) return;
+  members.push({
     name,
     visibility: "public",
     params: writerParams,
     line,
-    file: classInfo.file,
+    file,
     writer: true,
   });
+}
+
+/**
+ * Where a generated accessor is credited: the host class when the generator
+ * sits in the host's own file, else the file the generator sits in. Ruby's
+ * `Relation::VALUE_METHODS.each` runs in `module QueryMethods`
+ * (`activerecord/lib/active_record/relation/query_methods.rb:162-183`), so the
+ * accessors are `QueryMethods` members that `Relation` reaches through
+ * `include`, and the trails loop in relation/query-methods.ts is their body.
+ */
+function generatedAccessorMembers(
+  node: ts.Node,
+  host: PrototypeHost,
+  info: PackageInfo,
+  srcDir: string,
+): { members: MethodInfo[]; file: string } {
+  const file = path.relative(srcDir, node.getSourceFile().fileName).replace(/\\/g, "/");
+  if (file === host.classInfo.file) return { members: host.classInfo.instanceMethods, file };
+  return { members: ((info.fileFunctions ??= {})[file] ??= []), file };
 }
 
 /**
@@ -2383,7 +2517,8 @@ function extractDefinePropertyAccessorForOf(
       names.push(name);
     }
     if (names.length !== values.length) continue;
-    for (const name of names) pushGeneratedAccessor(host.classInfo, name, line, writerParams);
+    const { members, file } = generatedAccessorMembers(node, host, info, srcDir);
+    for (const name of names) pushGeneratedAccessor(members, file, name, line, writerParams);
   }
 }
 
@@ -2406,7 +2541,8 @@ function extractDefinePropertyAccessorDirect(
   const writerParams = set === null ? null : setterParams(set);
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
   for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
-    pushGeneratedAccessor(host.classInfo, call.nameExpr.text, line, writerParams);
+    const { members, file } = generatedAccessorMembers(expr, host, info, srcDir);
+    pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams);
   }
 }
 
@@ -2519,6 +2655,26 @@ export function missingRailsArgsTags(node: ts.Node): string[] | undefined {
  */
 export function missingRailsNameTags(node: ts.Node): string[] | undefined {
   return taggedCallsOn(node, MISSING_RAILS_NAME_TAG, fileHasMissingRailsNameTag, suppressedNamesIn);
+}
+
+/**
+ * The skeleton tokens a declaration's JSDoc receipts as arms or calls its body
+ * adds to Rails' (`@inventedArm <token> — PERMANENT`), or undefined. compare.ts
+ * carries them onto the pair's skeleton row; report-arms.ts and
+ * lint-arm-throws.ts are what make them load-bearing.
+ */
+export function inventedArmTags(node: ts.Node): string[] | undefined {
+  return taggedCallsOn(node, INVENTED_ARM_TAG, fileHasInventedArmTag, inventedArmsIn);
+}
+
+/**
+ * The Ruby bodies a constructor's JSDoc names as inlined into it
+ * (`@inlinedFrom Module#initialize <citation>`, RFC 0188), in written order, or
+ * undefined. compare.ts joins them to the constructor's Rails call set.
+ */
+export function inlinedFromTags(node: ts.Node): InlinedFrom[] | undefined {
+  const tags = taggedCommentOf(node, INLINED_FROM_TAG, fileHasInlinedFromTag, inlinedFromIn);
+  return tags !== undefined && tags.length > 0 ? tags : undefined;
 }
 
 /**
@@ -3046,6 +3202,10 @@ export function isConstantCaseName(name: string): boolean {
  * with `aliasOf`, so the compare's alias arm pairs it.
  *
  * Only literal column types on an identifier receiver are credited.
+ *
+ * Inside a module's `X[included] = function (base) { … }` hook (Ruby's
+ * `included do`, `:323-329`) the same two statements on `base` are credited to
+ * every class the file hands to `include(Klass, X)`.
  */
 interface DefineColumnMethodsMember {
   receiver: string;
@@ -3054,7 +3214,10 @@ interface DefineColumnMethodsMember {
   line: number;
 }
 
-function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineColumnMethodsMember[] {
+function collectDefineColumnMethodsMembers(
+  sourceFile: ts.SourceFile,
+  statements: Iterable<ts.Statement> = sourceFile.statements,
+): DefineColumnMethodsMember[] {
   const out: DefineColumnMethodsMember[] = [];
   const lineOf = (node: ts.Node): number =>
     sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
@@ -3065,7 +3228,7 @@ function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineCol
     ts.isIdentifier(expr.expression.expression)
       ? { receiver: expr.expression.expression.text, name: expr.name.text }
       : null;
-  for (const statement of sourceFile.statements) {
+  for (const statement of statements) {
     if (!ts.isExpressionStatement(statement)) continue;
     const expr = statement.expression;
     if (
@@ -3097,6 +3260,33 @@ function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineCol
       });
     }
   }
+  if (statements !== sourceFile.statements) return out;
+
+  const hooks = new Map<string, DefineColumnMethodsMember[]>();
+  for (const statement of statements) {
+    if (!ts.isExpressionStatement(statement)) continue;
+    const expr = statement.expression;
+    const owner = includedHookOwner(expr);
+    if (owner === undefined || !ts.isBinaryExpression(expr)) continue;
+    const hook = expr.right;
+    const base = ts.isFunctionExpression(hook) ? hook.parameters[0]?.name : undefined;
+    if (!ts.isFunctionExpression(hook) || !base || !ts.isIdentifier(base)) continue;
+    hooks.set(
+      owner,
+      collectDefineColumnMethodsMembers(sourceFile, hook.body.statements).filter(
+        (member) => member.receiver === base.text,
+      ),
+    );
+  }
+  for (const statement of statements) {
+    if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression))
+      continue;
+    const { expression: callee, arguments: args } = statement.expression;
+    if (!ts.isIdentifier(callee) || callee.text !== "include") continue;
+    const [klass, mod] = args;
+    if (!klass || !mod || !ts.isIdentifier(klass) || !ts.isIdentifier(mod)) continue;
+    for (const member of hooks.get(mod.text) ?? []) out.push({ ...member, receiver: klass.text });
+  }
   return out;
 }
 
@@ -3126,7 +3316,7 @@ function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineCol
  */
 interface ClassAttributeCall {
   enclosing?: string;
-  enclosingObjectLiteral?: boolean;
+  enclosingSeatsModule?: boolean;
   receiver?: string;
   names: string[];
   reader: boolean;
@@ -3176,12 +3366,36 @@ function attributeMacro(
   }
 }
 
+function attrMacro(name: string): { reader: boolean; writer: boolean } | undefined {
+  switch (name) {
+    case "attrReader":
+      return { reader: true, writer: false };
+    case "attrWriter":
+      return { reader: false, writer: true };
+    default:
+      return undefined;
+  }
+}
+
+function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings === undefined || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if (element.name.text === id.text) return (element.propertyName ?? element.name).text;
+    }
+  }
+  return id.text;
+}
+
 function isClassAttributeCallee(expr: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expr) &&
-    expr.name.text === "call" &&
     ts.isIdentifier(expr.expression) &&
-    attributeMacro(expr.expression.text) !== undefined
+    (expr.name.text === "call"
+      ? attributeMacro(expr.expression.text) !== undefined
+      : attrMacro(expr.name.text) !== undefined)
   );
 }
 
@@ -3189,6 +3403,24 @@ function readClassAttributeCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
+  const callee = node.expression as ts.PropertyAccessExpression;
+  const attr = callee.name.text === "call" ? undefined : attrMacro(callee.name.text);
+  if (attr !== undefined) {
+    const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+    if (names.length === 0 || names.length !== node.arguments.length) return null;
+    const enclosing = enclosingEntity(node);
+    return {
+      ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+      receiver: importedName(callee.expression as ts.Identifier, sourceFile),
+      names,
+      reader: false,
+      writer: false,
+      instanceReader: attr.reader,
+      instanceWriter: attr.writer,
+      instancePredicate: false,
+      line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    };
+  }
   const [recv, ...rest] = node.arguments;
   if (recv === undefined) return null;
   const names: string[] = [];
@@ -3205,7 +3437,7 @@ function readClassAttributeCall(
   const enclosing = enclosingEntity(node);
   return {
     ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
-    ...(enclosing?.objectLiteral === true ? { enclosingObjectLiteral: true } : {}),
+    ...(enclosing?.seatsModule === true ? { enclosingSeatsModule: true } : {}),
     ...(ts.isIdentifier(recv) ? { receiver: recv.text } : {}),
     names,
     reader: macro.reader,
@@ -3230,12 +3462,11 @@ function optionBool(
   return undefined;
 }
 
-function enclosingEntity(node: ts.Node): { name: string; objectLiteral: boolean } | undefined {
+function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } | undefined {
   for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
-    if (ts.isClassDeclaration(cur) && cur.name)
-      return { name: cur.name.text, objectLiteral: false };
+    if (ts.isClassDeclaration(cur) && cur.name) return { name: cur.name.text, seatsModule: false };
     if (ts.isVariableDeclaration(cur) && ts.isIdentifier(cur.name)) {
-      const objectLiteral =
+      const seatsModule =
         cur.initializer !== undefined &&
         ts.isObjectLiteralExpression(cur.initializer) &&
         ts.isVariableStatement(cur.parent.parent) &&
@@ -3248,10 +3479,51 @@ function enclosingEntity(node: ts.Node): { name: string; objectLiteral: boolean 
             ts.isIdentifier(prop.name.expression) &&
             (prop.name.expression.text === "included" || prop.name.expression.text === "extended"),
         );
-      return { name: cur.name.text, objectLiteral };
+      return { name: cur.name.text, seatsModule };
+    }
+    if (ts.isExpressionStatement(cur) && ts.isSourceFile(cur.parent)) {
+      const name = includedHookOwner(cur.expression);
+      if (name !== undefined) return { name, seatsModule: isExportedModuleConst(cur.parent, name) };
     }
   }
   return undefined;
+}
+
+/**
+ * The module a top-level `included do ... end` port hangs its block on:
+ * `X.included(null, fn)` or `X[included] = fn`, where the block's `this` is the
+ * includer and so names no entity itself.
+ */
+function includedHookOwner(expr: ts.Expression): string | undefined {
+  const hook =
+    ts.isCallExpression(expr) && ts.isPropertyAccessExpression(expr.expression)
+      ? expr.expression
+      : ts.isBinaryExpression(expr) &&
+          expr.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          ts.isElementAccessExpression(expr.left)
+        ? expr.left
+        : undefined;
+  if (hook === undefined || !ts.isIdentifier(hook.expression)) return undefined;
+  const name = ts.isPropertyAccessExpression(hook) ? hook.name : hook.argumentExpression;
+  return ts.isIdentifier(name) && name.text === "included" ? hook.expression.text : undefined;
+}
+
+function isExportedModuleConst(sourceFile: ts.SourceFile, name: string): boolean {
+  return sourceFile.statements.some(
+    (stmt) =>
+      ts.isVariableStatement(stmt) &&
+      isExported(stmt) &&
+      stmt.declarationList.declarations.some((decl) => {
+        if (!ts.isIdentifier(decl.name) || decl.name.text !== name || !decl.initializer)
+          return false;
+        const init = unwrapAssertions(decl.initializer);
+        return (
+          ts.isNewExpression(init) &&
+          ts.isIdentifier(init.expression) &&
+          init.expression.text === "Module"
+        );
+      }),
+  );
 }
 
 /**
@@ -3300,6 +3572,149 @@ function unwrapAssertions(expr: ts.Expression): ts.Expression {
   return cur;
 }
 
+/**
+ * The methods an exported `Module` instance is built with — Ruby's
+ * `module X; def m; end; end` ported as a live module (ruby-compat/src/include.ts):
+ *
+ * - `new Module().include({ m() {} })` — every object literal an `.include(...)`
+ *   chained on the construction is handed.
+ * - `new Module((mod) => { mod.defineMethod("m", fn) })` — every `defineMethod`
+ *   the block calls on its own parameter with a literal name.
+ * - `new Module((mod) => { delegate.call(mod, "m", { to: "target" }) })` — every
+ *   literal name `delegate` is handed with the block's own parameter as `self`
+ *   (Ruby's `delegate :m, to: :target` in a module body).
+ * - `new Module((mod) => { mod[initialize] = function () {} })` — the module's
+ *   `def initialize` (`Thor::Shell#initialize`, thor/shell.rb:44-48), recorded
+ *   as `[initialize]`, the name a class's `static [initialize]` is recorded by.
+ */
+export function harvestModuleInstanceMethods(
+  init: ts.Expression,
+  checker: ts.TypeChecker,
+  file: string,
+): MethodInfo[] {
+  const literals: ts.ObjectLiteralExpression[] = [];
+  let cur = unwrapAssertions(init);
+  while (
+    ts.isCallExpression(cur) &&
+    ts.isPropertyAccessExpression(cur.expression) &&
+    cur.expression.name.text === "include"
+  ) {
+    const arg = cur.arguments[0] && unwrapAssertions(cur.arguments[0]);
+    if (arg && ts.isObjectLiteralExpression(arg)) literals.unshift(arg);
+    cur = unwrapAssertions(cur.expression.expression);
+  }
+  if (!ts.isNewExpression(cur) || !ts.isIdentifier(cur.expression)) return [];
+  if (cur.expression.text !== "Module") return [];
+  const out = literals.flatMap((literal) => harvestObjectLiteralMethods(literal, checker, file));
+
+  const block = cur.arguments?.[0];
+  if (!block || !(ts.isArrowFunction(block) || ts.isFunctionExpression(block))) return out;
+  const mod = block.parameters[0]?.name;
+  if (!mod || !ts.isIdentifier(mod)) return out;
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) && node !== block) return;
+    ts.forEachChild(node, visit);
+    const hook = moduleInitializeHook(node, mod.text);
+    if (hook !== undefined) {
+      const calls = extractCalls(hook.body);
+      const callSeq = extractCallSeq(hook.body);
+      const callArgs = extractCallArgs(hook.body);
+      const skeleton = extractSkeleton(hook.body);
+      out.push({
+        name: "[initialize]",
+        visibility: "public",
+        params: extractParameters(hook.parameters),
+        line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+        file,
+        ...(calls !== undefined ? { calls } : {}),
+        ...(callSeq !== undefined ? { callSeq } : {}),
+        ...(callArgs !== undefined ? { callArgs } : {}),
+        ...(skeleton !== undefined ? { skeleton } : {}),
+      });
+      return;
+    }
+    if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
+    const receiver = node.expression.expression;
+    if (
+      ts.isIdentifier(receiver) &&
+      receiver.text === "delegate" &&
+      node.expression.name.text === "call"
+    ) {
+      const [self, ...names] = node.arguments;
+      if (!self || !ts.isIdentifier(self) || self.text !== mod.text) return;
+      for (const delegated of names) {
+        if (!ts.isStringLiteralLike(delegated)) continue;
+        out.push({
+          name: delegated.text,
+          visibility: "public",
+          params: [{ name: "args", kind: "rest" }],
+          line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+          file,
+        });
+      }
+      return;
+    }
+    if (!ts.isIdentifier(receiver) || receiver.text !== mod.text) return;
+    if (node.expression.name.text !== "defineMethod") return;
+    const [name, body] = node.arguments;
+    if (!name || !ts.isStringLiteralLike(name) || !body) return;
+    const inline = ts.isFunctionExpression(body) || ts.isArrowFunction(body);
+    const params = inline ? extractParameters(body.parameters) : paramsOfCallableRef(body, checker);
+    if (!params) return;
+    const optionKeys = inline ? extractOptionKeys(body.parameters, checker) : undefined;
+    const calls = inline ? extractCalls(body.body) : undefined;
+    const callSeq = inline ? extractCallSeq(body.body) : undefined;
+    const callArgs = inline ? extractCallArgs(body.body) : undefined;
+    const noRailsEquivalent = ts.isExpressionStatement(node.parent)
+      ? noRailsEquivalentReason(node.parent)
+      : undefined;
+    out.push({
+      name: name.text,
+      visibility: "public",
+      params,
+      line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+      file,
+      ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      ...(optionKeys !== undefined ? { optionKeys } : {}),
+      ...(calls !== undefined ? { calls } : {}),
+      ...(callSeq !== undefined ? { callSeq } : {}),
+      ...(callArgs !== undefined ? { callArgs } : {}),
+      ...(inline ? {} : { bodyless: true }),
+    });
+  };
+  visit(block.body);
+  return out;
+}
+
+function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {
+  if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+    return undefined;
+  }
+  if (!ts.isElementAccessExpression(node.left) || !ts.isFunctionExpression(node.right)) {
+    return undefined;
+  }
+  let receiver: ts.Expression = node.left.expression;
+  while (ts.isParenthesizedExpression(receiver) || ts.isAsExpression(receiver)) {
+    receiver = receiver.expression;
+  }
+  if (!ts.isIdentifier(receiver) || receiver.text !== mod) return undefined;
+  const key = node.left.argumentExpression;
+  return ts.isIdentifier(key) && key.text === "initialize" ? node.right : undefined;
+}
+
+/**
+ * `{ [initialize]() {} }`: a plain-object module's `def initialize`
+ * (`DatabaseStatements#initialize`, abstract/database_statements.rb:6-9),
+ * recorded as `[initialize]` like a class's `static [initialize]`.
+ */
+function isInitializeHookName(name: ts.PropertyName): name is ts.ComputedPropertyName {
+  return (
+    ts.isComputedPropertyName(name) &&
+    ts.isIdentifier(name.expression) &&
+    name.expression.text === "initialize"
+  );
+}
+
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
@@ -3314,9 +3729,11 @@ export function harvestObjectLiteralMethods(
     // the real arity into the candidate pool.
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
+    let optionReads: string[] | undefined;
     let calls: string[] | undefined;
     let callSeq: string[] | undefined;
     let callArgs: CallSite[] | undefined;
+    let skeleton: string[] | undefined;
     let writer = false;
     // `{ qux }` / `{ foo: NS.bar }` — see MethodInfo.bodyless.
     let bodyless = false;
@@ -3331,15 +3748,24 @@ export function harvestObjectLiteralMethods(
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
     const propMissingRailsNames = missingRailsNameTags(prop);
+    const propInventedArms = inventedArmTags(prop);
     const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
     const propMissingRailsArgsReasons = missingRailsArgsTagReasons(prop);
-    if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
-      mname = prop.name.text;
+    if (
+      ts.isMethodDeclaration(prop) &&
+      prop.name &&
+      (ts.isIdentifier(prop.name) ||
+        ts.isStringLiteral(prop.name) ||
+        isInitializeHookName(prop.name))
+    ) {
+      mname = ts.isComputedPropertyName(prop.name) ? "[initialize]" : prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
+      optionReads = extractOptionReads(prop.parameters, prop.body);
       calls = extractCalls(prop.body);
       callSeq = extractCallSeq(prop.body);
       callArgs = extractCallArgs(prop.body);
+      skeleton = extractSkeleton(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
       bodyless = true;
@@ -3365,9 +3791,11 @@ export function harvestObjectLiteralMethods(
         mname = prop.name.text;
         params = extractParameters(init.parameters);
         optionKeys = extractOptionKeys(init.parameters, checker);
+        optionReads = extractOptionReads(init.parameters, init.body);
         calls = extractCalls(init.body);
         callSeq = extractCallSeq(init.body);
         callArgs = extractCallArgs(init.body);
+        skeleton = extractSkeleton(init.body);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -3409,12 +3837,15 @@ export function harvestObjectLiteralMethods(
         ? { noRailsEquivalentInherited: true }
         : {}),
       ...(optionKeys !== undefined ? { optionKeys } : {}),
+      ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
       ...(calls !== undefined ? { calls } : {}),
       ...(callSeq !== undefined ? { callSeq } : {}),
       ...(callArgs !== undefined ? { callArgs } : {}),
+      ...(skeleton !== undefined ? { skeleton } : {}),
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
       ...(propMissingRailsArgs !== undefined ? { missingRailsArgs: propMissingRailsArgs } : {}),
       ...(propMissingRailsNames !== undefined ? { missingRailsNames: propMissingRailsNames } : {}),
+      ...(propInventedArms !== undefined ? { inventedArms: propInventedArms } : {}),
       ...(propMissingRailsCallReasons !== undefined
         ? { missingRailsCallReasons: propMissingRailsCallReasons }
         : {}),
@@ -3541,12 +3972,14 @@ function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
   const calls = missingRailsCallTags(node);
   const args = missingRailsArgsTags(node);
   const names = missingRailsNameTags(node);
+  const arms = inventedArmTags(node);
   const callReasons = missingRailsCallTagReasons(node);
   const argReasons = missingRailsArgsTagReasons(node);
   return {
     ...(calls !== undefined ? { missingRailsCalls: calls } : {}),
     ...(args !== undefined ? { missingRailsArgs: args } : {}),
     ...(names !== undefined ? { missingRailsNames: names } : {}),
+    ...(arms !== undefined ? { inventedArms: arms } : {}),
     ...(callReasons !== undefined ? { missingRailsCallReasons: callReasons } : {}),
     ...(argReasons !== undefined ? { missingRailsArgsReasons: argReasons } : {}),
   };
@@ -3652,26 +4085,68 @@ export function seatedClassExpression(
 }
 
 /**
+ * A nested Ruby module ported as a live `Module` on a static property
+ * (`class V7_0 { static TableDefinition = new Module().include({ ... }) }`,
+ * `migration/compatibility.rb:70-96`). Keyed by the dotted seat, as a nested
+ * class expression is.
+ */
+export function staticModuleInstances(
+  node: ts.ClassDeclaration | ts.ClassExpression,
+  seat: string,
+): { seat: string; name: string; init: ts.Expression }[] {
+  const found: { seat: string; name: string; init: ts.Expression }[] = [];
+  for (const member of node.members) {
+    if (!ts.isPropertyDeclaration(member) || !ts.isIdentifier(member.name)) continue;
+    if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
+    if (!member.initializer) continue;
+    found.push({
+      seat: `${seat}.${member.name.text}`,
+      name: member.name.text,
+      init: member.initializer,
+    });
+  }
+  return found;
+}
+
+/**
  * A nested Ruby class ported as a named class expression on a static property
  * (`class Scanner { static Scanner = class Scanner { ... } }`, the only way TS
  * lets `Journey::Scanner::Scanner` share its outer class's name). Keyed by the
  * dotted seat so it never overwrites the outer class; recurses for deeper
- * nesting.
+ * nesting. A `static CONST = new (class { ... })()` member is hosted the same
+ * way, on a class named after the constant.
  */
 export function staticClassExpressions(
   node: ts.ClassDeclaration | ts.ClassExpression,
   seat: string,
-): { seat: string; cls: ts.ClassExpression }[] {
-  const found: { seat: string; cls: ts.ClassExpression }[] = [];
+): { seat: string; cls: ts.ClassExpression; name?: string }[] {
+  const found: { seat: string; cls: ts.ClassExpression; name?: string }[] = [];
   for (const member of node.members) {
     if (!ts.isPropertyDeclaration(member) || !ts.isIdentifier(member.name)) continue;
     if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
     const init = member.initializer;
-    if (!init || !ts.isClassExpression(init) || !init.name) continue;
     const nestedSeat = `${seat}.${member.name.text}`;
+    const instantiated = init && instantiatedClassExpression(init);
+    if (instantiated) {
+      found.push({ seat: nestedSeat, cls: instantiated, name: member.name.text });
+      continue;
+    }
+    if (!init || !ts.isClassExpression(init) || !init.name) continue;
     found.push({ seat: nestedSeat, cls: init }, ...staticClassExpressions(init, nestedSeat));
   }
   return found;
+}
+
+/**
+ * The class of a `new (class { ... })()` initializer: Ruby's
+ * `CONST = Class.new do ... end.new`, an instance of an anonymous class, which
+ * the Ruby extractor hosts on a class named after the constant.
+ */
+function instantiatedClassExpression(init: ts.Expression): ts.ClassExpression | undefined {
+  if (!ts.isNewExpression(init)) return undefined;
+  let cls: ts.Expression = init.expression;
+  while (ts.isParenthesizedExpression(cls)) cls = cls.expression;
+  return ts.isClassExpression(cls) ? cls : undefined;
 }
 
 /** The `export const Name = class Name { ... }` form of a class declaration. */
@@ -3691,8 +4166,8 @@ export function extractClass(
   checker: ts.TypeChecker,
   file: string,
   srcDir?: string,
+  name: string | undefined = node.name?.text,
 ): ClassInfo | null {
-  const name = node.name?.text;
   if (!name) return null;
 
   let superclass: string | undefined;
@@ -3700,7 +4175,7 @@ export function extractClass(
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-        const expr = clause.types[0]?.expression;
+        const expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
         if (!expr) continue;
         superclass = expr.getText();
         if (srcDir !== undefined) {
@@ -3742,6 +4217,7 @@ export function extractClass(
     const memberMissingRailsCalls = missingRailsCallTags(member);
     const memberMissingRailsArgs = missingRailsArgsTags(member);
     const memberMissingRailsNames = missingRailsNameTags(member);
+    const memberInventedArms = inventedArmTags(member);
     const memberMissingRailsCallReasons = missingRailsCallTagReasons(member);
     const memberMissingRailsArgsReasons = missingRailsArgsTagReasons(member);
     const tagged = {
@@ -3753,6 +4229,7 @@ export function extractClass(
       ...(memberMissingRailsNames !== undefined
         ? { missingRailsNames: memberMissingRailsNames }
         : {}),
+      ...(memberInventedArms !== undefined ? { inventedArms: memberInventedArms } : {}),
       ...(memberMissingRailsCallReasons !== undefined
         ? { missingRailsCallReasons: memberMissingRailsCallReasons }
         : {}),
@@ -3766,6 +4243,7 @@ export function extractClass(
     if (ts.isMethodDeclaration(member) && memberName) {
       const params = extractParameters(member.parameters);
       const optionKeys = extractOptionKeys(member.parameters, checker);
+      const optionReads = extractOptionReads(member.parameters, member.body);
       // A host-class method whose whole body is a trivial delegation to a
       // same-named module function pulled in via a namespace import — e.g.
       // `buildJoins(arel) { _qm.buildJoins.call(this, arel); }` in relation.ts,
@@ -3781,6 +4259,7 @@ export function extractClass(
       const callSeq = suppressed ? undefined : extractCallSeq(member.body);
       const callArgs = suppressed ? undefined : extractCallArgs(member.body);
       const skeleton = suppressed ? undefined : extractSkeleton(member.body);
+      const shapeTokens = suppressed ? undefined : extractShapeTokens(member.body);
       const delegatesTo = delegationTargetName(member.body, memberName, name, checker);
       if (delegatesTo) delegationTargets.add(delegatesTo);
       const method: MethodInfo = {
@@ -3794,10 +4273,12 @@ export function extractClass(
         ...tagged,
         ...(signatureReturnsVoid(member, checker) ? { returnsVoid: true } : {}),
         ...(optionKeys !== undefined ? { optionKeys } : {}),
+        ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
         ...(delegatesTo !== undefined ? { delegatesTo } : {}),
       };
       // Only instance methods are reachable via `this.helper(...)` and only
@@ -3820,6 +4301,8 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const shapeTokens = extractShapeTokens(member.body);
+      const inlinedFrom = inlinedFromTags(member);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -3828,10 +4311,12 @@ export function extractClass(
         file,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
       });
       for (const param of member.parameters) {
         if (!ts.isIdentifier(param.name)) continue;
@@ -3858,6 +4343,7 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const shapeTokens = extractShapeTokens(member.body);
       const valueAdmitsBoolean = memberAdmitsBoolean(member, checker);
       const method: MethodInfo = {
         name: memberName,
@@ -3873,6 +4359,7 @@ export function extractClass(
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -3885,6 +4372,7 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const shapeTokens = extractShapeTokens(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3899,6 +4387,7 @@ export function extractClass(
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -3911,8 +4400,11 @@ export function extractClass(
       const aliasRef =
         member.initializer ??
         (member.type && ts.isTypeQueryNode(member.type) ? member.type.exprName : undefined);
-      const aliasParams = aliasRef ? paramsOfCallableRef(aliasRef as ts.Expression, checker) : null;
-      const valueAdmitsBoolean = aliasParams ? undefined : memberAdmitsBoolean(member, checker);
+      const refParams = aliasRef ? paramsOfCallableRef(aliasRef as ts.Expression, checker) : null;
+      const valueAdmitsBoolean = refParams ? undefined : memberAdmitsBoolean(member, checker);
+      const declared = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword);
+      const declaredParams = declared && !refParams ? propertySignatureParams(member, checker) : [];
+      const aliasParams = refParams ?? (declaredParams.length > 0 ? declaredParams : null);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3967,7 +4459,7 @@ export function extractClass(
  * as the method spelling. Non-callable properties have no parameters.
  */
 function propertySignatureParams(
-  member: ts.PropertySignature,
+  member: ts.PropertySignature | ts.PropertyDeclaration,
   checker: ts.TypeChecker,
 ): ParamInfo[] {
   if (!member.type) return [];
@@ -4308,18 +4800,17 @@ export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[
   return out;
 }
 
-/** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
-function blockMarkNamesFor(sourceFile: ts.SourceFile): ReadonlySet<string> {
-  let names = blockMarkNames.get(sourceFile);
-  if (!names) {
-    names = collectBlockMarkNames(sourceFile);
-    blockMarkNames.set(sourceFile, names);
+function rubyCompatBindingsFor(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
+  let bindings = rubyCompatBindings.get(sourceFile);
+  if (!bindings) {
+    bindings = collectRubyCompatBindings(sourceFile);
+    rubyCompatBindings.set(sourceFile, bindings);
   }
-  return names;
+  return bindings;
 }
 
-function collectBlockMarkNames(sourceFile: ts.SourceFile): Set<string> {
-  const names = new Set<string>();
+function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, string> {
+  const bindings = new Map<string, string>();
   ts.forEachChild(sourceFile, (node) => {
     if (
       !ts.isImportDeclaration(node) ||
@@ -4331,14 +4822,23 @@ function collectBlockMarkNames(sourceFile: ts.SourceFile): Set<string> {
     }
     if (!node.moduleSpecifier.text.startsWith("@blazetrails/ruby-compat")) return;
     for (const el of node.importClause.namedBindings.elements) {
-      if ((el.propertyName ?? el.name).text === "block") names.add(el.name.text);
+      bindings.set(el.name.text, (el.propertyName ?? el.name).text);
     }
   });
-  return names;
+  return bindings;
 }
 
+/**
+ * Collect renamed-import aliases (`import { a as b }` → b→a): every rename from
+ * a relative module, and a `@blazetrails/ruby-compat` rename only when the
+ * module declares a top-level binding of the original name — the collision that
+ * forced it (`first as aryFirst` beside `FinderMethods#first`,
+ * relation/finder-methods.ts). Any other ruby-compat rename is TOWARD the Ruby
+ * name (`rbInspect as inspect`) and keeps its local name.
+ */
 function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
   const aliases = new Map<string, string>();
+  const topLevel = topLevelDeclaredNames(sourceFile);
   ts.forEachChild(sourceFile, (node) => {
     if (
       !ts.isImportDeclaration(node) ||
@@ -4349,14 +4849,36 @@ function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
       return;
     }
     const spec = node.moduleSpecifier.text;
-    if (!spec.startsWith("./") && !spec.startsWith("../")) return;
+    const relative = spec.startsWith("./") || spec.startsWith("../");
+    if (!relative && !spec.startsWith("@blazetrails/ruby-compat")) return;
     for (const el of node.importClause.namedBindings.elements) {
-      if (el.propertyName && el.propertyName.text !== el.name.text) {
-        aliases.set(el.name.text, el.propertyName.text);
-      }
+      if (!el.propertyName || el.propertyName.text === el.name.text) continue;
+      if (!relative && !topLevel.has(el.propertyName.text)) continue;
+      aliases.set(el.name.text, el.propertyName.text);
     }
   });
   return aliases;
+}
+
+function topLevelDeclaredNames(sourceFile: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of sourceFile.statements) {
+    if (
+      (ts.isFunctionDeclaration(stmt) ||
+        ts.isClassDeclaration(stmt) ||
+        ts.isEnumDeclaration(stmt) ||
+        ts.isModuleDeclaration(stmt)) &&
+      stmt.name !== undefined &&
+      ts.isIdentifier(stmt.name)
+    ) {
+      names.add(stmt.name.text);
+    } else if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) {
+        if (ts.isIdentifier(decl.name)) names.add(decl.name.text);
+      }
+    }
+  }
+  return names;
 }
 
 /**
@@ -4538,11 +5060,161 @@ function skeletonLogicalOpToken(kind: ts.SyntaxKind): string | undefined {
   }
 }
 
+/**
+ * An `instanceof` test, or an `||` of them — the lowering of a Ruby `rescue`
+ * naming a class LIST (`rescue TypeError, NoMethodError`,
+ * `activemodel/lib/active_model/attribute_mutation_tracker.rb:147`), which is
+ * one clause and so one arm.
+ */
 function isInstanceOfTest(expression: ts.Expression): boolean {
-  return (
-    ts.isBinaryExpression(expression) &&
-    expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword
-  );
+  if (!ts.isBinaryExpression(expression)) return false;
+  if (expression.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+    return isInstanceOfTest(expression.left) && isInstanceOfTest(expression.right);
+  }
+  return expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword;
+}
+
+function unparenthesized(expression: ts.Expression): ts.Expression {
+  while (ts.isParenthesizedExpression(expression)) expression = expression.expression;
+  return expression;
+}
+
+/**
+ * The operand and the class one type test names: `x instanceof K` names `K`
+ * (its last segment, as `new:K` is spelled), `typeof x === "string"` names
+ * `typeof:string`. Undefined for any other expression.
+ */
+function typeTest(expression: ts.Expression): { operand: string; klass: string } | undefined {
+  const test = unparenthesized(expression);
+  if (!ts.isBinaryExpression(test)) return undefined;
+  if (test.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword) {
+    const klass = ts.isIdentifier(test.right)
+      ? test.right.text
+      : ts.isPropertyAccessExpression(test.right)
+        ? test.right.name.text
+        : undefined;
+    return klass === undefined ? undefined : { operand: test.left.getText(), klass };
+  }
+  const typeofOperand = typeofStringOperand(test);
+  return typeofOperand === undefined
+    ? undefined
+    : { operand: typeofOperand, klass: "typeof:string" };
+}
+
+/** The `x` of `typeof x === "string"`, or undefined. */
+function typeofStringOperand(expression: ts.Expression): string | undefined {
+  const test = unparenthesized(expression);
+  if (!ts.isBinaryExpression(test)) return undefined;
+  const op = test.operatorToken.kind;
+  if (op !== ts.SyntaxKind.EqualsEqualsEqualsToken && op !== ts.SyntaxKind.EqualsEqualsToken) {
+    return undefined;
+  }
+  if (!ts.isTypeOfExpression(test.left) || !ts.isStringLiteral(test.right)) return undefined;
+  return test.right.text === "string" ? test.left.expression.getText() : undefined;
+}
+
+/**
+ * Whether `klass` is a Ruby `String` subclass, so Ruby's `String === x` admits
+ * it and a port's `typeof x === "string" || x instanceof SqlLiteral` is that
+ * ONE test spelled twice. These are every `class X < String` in the vendored
+ * Rails: `activerecord/lib/arel/nodes/sql_literal.rb:5`,
+ * `activesupport/lib/active_support/core_ext/string/output_safety.rb:19`,
+ * `activesupport/lib/active_support/string_inquirer.rb:21` and
+ * `actionview/lib/action_view/test_case.rb:301`. A hoisted function for the
+ * TDZ reason {@link skeletonLogicalOpToken} gives.
+ */
+export function isRubyStringSubclass(klass: string): boolean {
+  switch (klass) {
+    case "SqlLiteral":
+    case "SafeBuffer":
+    case "StringInquirer":
+    case "RenderedViewContent":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * The `||` chain of type tests on ONE operand that ports a Ruby `when` listing
+ * several classes — `case other when Arel::Nodes::Node, Arel::Table, …`
+ * (`activerecord/lib/arel/nodes/casted.rb:50`) — as `other instanceof Node ||
+ * other instanceof Table || …`. Ruby spells that as one test and emits no `or`;
+ * the chain emits one per `||`. Answered as the chain's leaves, its `arity`
+ * (the number of Ruby classes it tests) and the `absorbed` leaves that test a
+ * {@link isRubyStringSubclass} class beside a `typeof x === "string"` leaf,
+ * which Ruby's `String` arm already covers. Undefined unless every leaf is a
+ * type test on the same operand.
+ */
+function whenListChain(
+  chain: ts.BinaryExpression,
+): { leaves: ts.Expression[]; arity: number; absorbed: number } | undefined {
+  const leaves: ts.Expression[] = [];
+  const flatten = (e: ts.Expression): void => {
+    const inner = unparenthesized(e);
+    if (ts.isBinaryExpression(inner) && inner.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+      flatten(inner.left);
+      flatten(inner.right);
+    } else {
+      leaves.push(e);
+    }
+  };
+  flatten(chain);
+  const tests = leaves.map(typeTest);
+  const [first] = tests;
+  if (first === undefined || tests.some((t) => t === undefined || t.operand !== first.operand)) {
+    return undefined;
+  }
+  const hasString = tests.some((t) => t!.klass === "typeof:string");
+  const absorbed = hasString ? tests.filter((t) => isRubyStringSubclass(t!.klass)).length : 0;
+  return { leaves, arity: leaves.length - absorbed, absorbed };
+}
+
+/**
+ * The marked token an `&&` emits when it only narrows ONE Ruby test the port
+ * had to spell as two, or undefined for an ordinary `&&`:
+ *
+ * - `and:class-narrow` — `other instanceof Binary && this.constructor ===
+ *   other.constructor`, the port of `self.class == other.class`
+ *   (`activerecord/lib/arel/nodes/binary.rb:24-28`). The `instanceof` narrows
+ *   `other` so the later reads type-check; the class equality on the SAME
+ *   operand already implies it.
+ * - `and:string-not-symbol` — `typeof x === "string" && !isSymbol(x)`, the
+ *   port of `String === x` (`activerecord/lib/arel/select_manager.rb:74-83`): a
+ *   Ruby Symbol is a JS string, so the String arm has to exclude it.
+ *
+ * Resolved against the Ruby stream by compare.ts#foldSkeletonTokens.
+ */
+function narrowingAndToken(bin: ts.BinaryExpression): string | undefined {
+  const left = unparenthesized(bin.left);
+  const right = unparenthesized(bin.right);
+  if (ts.isBinaryExpression(left) && left.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword) {
+    if (!ts.isBinaryExpression(right)) return undefined;
+    const op = right.operatorToken.kind;
+    if (op !== ts.SyntaxKind.EqualsEqualsEqualsToken && op !== ts.SyntaxKind.EqualsEqualsToken) {
+      return undefined;
+    }
+    const constructorOf = (e: ts.Expression): string | undefined =>
+      ts.isPropertyAccessExpression(e) && e.name.text === "constructor"
+        ? e.expression.getText()
+        : undefined;
+    const sides = [constructorOf(right.left), constructorOf(right.right)];
+    if (sides.includes(undefined)) return undefined;
+    return sides.includes(left.left.getText()) ? "and:class-narrow" : undefined;
+  }
+  const operand = typeofStringOperand(left);
+  if (operand === undefined) return undefined;
+  if (!ts.isPrefixUnaryExpression(right) || right.operator !== ts.SyntaxKind.ExclamationToken) {
+    return undefined;
+  }
+  const call = unparenthesized(right.operand);
+  return ts.isCallExpression(call) &&
+    ts.isIdentifier(call.expression) &&
+    call.expression.text === "isSymbol" &&
+    call.arguments.length === 1 &&
+    call.arguments[0].getText() === operand
+    ? "and:string-not-symbol"
+    : undefined;
 }
 
 /**
@@ -4596,33 +5268,936 @@ function isFallenThroughInto(clause: ts.CaseClause): boolean {
   return previous !== undefined && ts.isCaseClause(previous) && previous.statements.length === 0;
 }
 
+function isNilLiteral(node: ts.Expression): boolean {
+  return (
+    node.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(node) && node.text === "undefined")
+  );
+}
+
+function isNilGuardConditional(node: ts.ConditionalExpression): boolean {
+  const test = node.condition;
+  if (!ts.isBinaryExpression(test) || !isNilLiteral(test.right)) return false;
+  switch (test.operatorToken.kind) {
+    case ts.SyntaxKind.EqualsEqualsToken:
+    case ts.SyntaxKind.EqualsEqualsEqualsToken:
+      return isNilLiteral(node.whenTrue);
+    case ts.SyntaxKind.ExclamationEqualsToken:
+    case ts.SyntaxKind.ExclamationEqualsEqualsToken:
+      return isNilLiteral(node.whenFalse);
+    default:
+      return false;
+  }
+}
+
+function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
+  const unconditional = ts.isForStatement(statement)
+    ? !statement.initializer && !statement.condition && !statement.incrementor
+    : statement.expression.kind === ts.SyntaxKind.TrueKeyword;
+  if (!unconditional || !ts.isBlock(statement.statement)) return false;
+  const body = statement.statement.statements.filter((s) => !ts.isVariableStatement(s));
+  return body.length === 1 && ts.isTryStatement(body[0]) && body[0].catchClause !== undefined;
+}
+
+/**
+ * The nodes a `for … of` body contributes when the loop is an awaiting
+ * `map`: `queries.map do |sql, binds| … end`
+ * (`activerecord/lib/active_record/explain.rb:21-29`) whose block awaits in
+ * the port, so `Array#map` cannot carry it without running the elements
+ * concurrently. The body ends by pushing the block's value onto a local, and
+ * nothing in it leaves an iteration early (a `continue` would make it a
+ * `filter_map`, a `break` a `take_while`). A one-statement body must push the
+ * awaited value itself, cast or not, and is the `map`. One that spreads the
+ * awaited value is `block` too: it is a `flat_map`
+ * (`activerecord/lib/active_record/associations/preloader/through_association.rb:8`)
+ * or an `each` that `concat`s. A longer one must await somewhere,
+ * and is `block`: Ruby spells the same loop `each` with a `<<`
+ * (`activerecord/lib/active_record/connection_handling.rb:98-104`), so it is
+ * marked `loop:collect` and compare.ts#foldSkeletonTokens reads it against the
+ * Ruby stream.
+ */
+function awaitedCollect(
+  statement: ts.ForOfStatement,
+): { nodes: ts.Node[]; block: boolean } | undefined {
+  const body = statement.statement;
+  const statements = ts.isBlock(body) ? [...body.statements] : [body];
+  const last = statements.pop();
+  if (!last || !ts.isExpressionStatement(last) || !ts.isCallExpression(last.expression)) {
+    return undefined;
+  }
+  const push = last.expression;
+  const [pushed] = push.arguments;
+  if (
+    !ts.isPropertyAccessExpression(push.expression) ||
+    !ts.isIdentifier(push.expression.expression) ||
+    push.expression.name.text !== "push" ||
+    push.arguments.length !== 1
+  ) {
+    return undefined;
+  }
+  if (statements.length === 0) {
+    const value = ts.isSpreadElement(pushed) ? pushed.expression : pushed;
+    const awaited = unwrapTsExpression(value);
+    if (!ts.isAwaitExpression(awaited)) return undefined;
+    return { nodes: [awaited.expression], block: ts.isSpreadElement(pushed) };
+  }
+  let awaits = false;
+  let exits = false;
+  const scan = (n: ts.Node): void => {
+    if (ts.isFunctionLike(n)) return;
+    if (ts.isAwaitExpression(n)) awaits = true;
+    if (ts.isContinueStatement(n) || ts.isBreakStatement(n) || ts.isReturnStatement(n)) {
+      exits = true;
+    }
+    ts.forEachChild(n, scan);
+  };
+  [...statements, pushed].forEach(scan);
+  return awaits && !exits ? { nodes: [...statements, pushed], block: true } : undefined;
+}
+
+/**
+ * The parts of a `for … of` that is an awaiting `any?` / `all?` / `none?`:
+ * `assoc.reader.any? { |source| … }`
+ * (`activerecord/lib/active_record/associations/collection_association.rb:508-516`)
+ * whose block awaits in the port, so `Array#some` cannot carry it: a
+ * callback's promise is always truthy. The body ends in an `if` with no
+ * `else` whose only statement returns a boolean literal, it awaits before or
+ * inside that test, and nothing else leaves an iteration early. What follows
+ * the loop is not constrained: that `any?` is the left operand of a `||`, so
+ * its port falls through to the right one. A `for await … of` walks an async
+ * iterable, not an Array, and is not one. The loop and
+ * that `if` are marked `loop:predicate` / `if:predicate`, and
+ * compare.ts#foldSkeletonTokens reads them against the Ruby stream.
+ */
+function awaitedPredicate(
+  statement: ts.ForOfStatement,
+): { statements: ts.Statement[]; test: ts.Expression } | undefined {
+  if (statement.awaitModifier !== undefined) return undefined;
+  const body = statement.statement;
+  const statements = ts.isBlock(body) ? [...body.statements] : [body];
+  const last = statements.pop();
+  if (!last || !ts.isIfStatement(last) || last.elseStatement !== undefined) return undefined;
+  const then = last.thenStatement;
+  const returned = ts.isBlock(then) && then.statements.length === 1 ? then.statements[0] : then;
+  if (!ts.isReturnStatement(returned) || returned.expression === undefined) return undefined;
+  const kind = returned.expression.kind;
+  if (kind !== ts.SyntaxKind.TrueKeyword && kind !== ts.SyntaxKind.FalseKeyword) return undefined;
+  let awaits = false;
+  let exits = false;
+  const scan = (n: ts.Node): void => {
+    if (ts.isFunctionLike(n)) return;
+    if (ts.isAwaitExpression(n)) awaits = true;
+    if (ts.isContinueStatement(n) || ts.isBreakStatement(n) || ts.isReturnStatement(n)) {
+      exits = true;
+    }
+    ts.forEachChild(n, scan);
+  };
+  [...statements, last.expression].forEach(scan);
+  return awaits && !exits ? { statements, test: last.expression } : undefined;
+}
+
+/**
+ * The test of a `for … of` that is an awaiting `select` / `reject`:
+ * `runnable.reject { |m| ran?(m) }`
+ * (`activerecord/lib/active_record/migration.rb:1460-1469`) whose block awaits
+ * in the port, so `Array#filter` cannot carry it: a callback's promise is
+ * always truthy. The body is one `if` with no `else`, whose test awaits and
+ * whose only statement pushes the loop's own element onto the filter's
+ * result: a local declared as an empty array in a block enclosing the loop,
+ * which reads it by name after the loop (`return kept`, or the `.any?` of
+ * `Array(value).reject { … }.any?`,
+ * `activerecord/lib/active_record/validations/associated.rb:9`). That is the
+ * block's predicate deciding membership, as a `filter` callback's value does,
+ * and neither a loop nor an arm. A push onto anything else (a field, a
+ * parameter, an array already holding elements, one declared in another scope,
+ * one the block never reads afterwards) is a side effect, and stays a loop
+ * with an arm.
+ */
+function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined {
+  const declared = statement.initializer;
+  if (!ts.isVariableDeclarationList(declared) || declared.declarations.length !== 1) {
+    return undefined;
+  }
+  const element = declared.declarations[0].name;
+  if (!ts.isIdentifier(element)) return undefined;
+  const single = (s: ts.Statement): ts.Statement | undefined =>
+    ts.isBlock(s) ? (s.statements.length === 1 ? s.statements[0] : undefined) : s;
+  const guard = single(statement.statement);
+  if (!guard || !ts.isIfStatement(guard) || guard.elseStatement !== undefined) return undefined;
+  const kept = single(guard.thenStatement);
+  if (!kept || !ts.isExpressionStatement(kept) || !ts.isCallExpression(kept.expression)) {
+    return undefined;
+  }
+  const push = kept.expression;
+  if (
+    !ts.isPropertyAccessExpression(push.expression) ||
+    !ts.isIdentifier(push.expression.expression) ||
+    push.expression.name.text !== "push" ||
+    push.arguments.length !== 1 ||
+    !ts.isIdentifier(push.arguments[0]) ||
+    push.arguments[0].text !== element.text
+  ) {
+    return undefined;
+  }
+  const result = push.expression.expression.text;
+  const owner = ts.findAncestor(statement, ts.isFunctionLike);
+  if (owner === undefined) return undefined;
+  const declaresResult = (block: ts.Node): block is ts.Block =>
+    ts.isBlock(block) &&
+    block.statements.some(
+      (s) =>
+        ts.isVariableStatement(s) &&
+        s.declarationList.declarations.some(
+          (d) =>
+            ts.isIdentifier(d.name) &&
+            d.name.text === result &&
+            d.initializer !== undefined &&
+            ts.isArrayLiteralExpression(d.initializer) &&
+            d.initializer.elements.length === 0,
+        ),
+    );
+  const scope = ts.findAncestor(statement.parent, (n) =>
+    n === owner ? "quit" : declaresResult(n),
+  );
+  if (scope === undefined || !ts.isBlock(scope)) return undefined;
+  const at = scope.statements.findIndex((s) => s.pos <= statement.pos && statement.end <= s.end);
+  const reads = (n: ts.Node): boolean =>
+    (ts.isIdentifier(n) && n.text === result) || ts.forEachChild(n, reads) === true;
+  if (!scope.statements.slice(at + 1).some(reads)) return undefined;
+  let awaits = false;
+  const scan = (n: ts.Node): void => {
+    if (ts.isFunctionLike(n)) return;
+    if (ts.isAwaitExpression(n)) awaits = true;
+    ts.forEachChild(n, scan);
+  };
+  scan(guard.expression);
+  return awaits ? guard.expression : undefined;
+}
+
+function isRescueClassGuard(statement: ts.Statement): boolean {
+  if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
+  const test = statement.expression;
+  if (!ts.isPrefixUnaryExpression(test) || test.operator !== ts.SyntaxKind.ExclamationToken) {
+    return false;
+  }
+  const operand = ts.isParenthesizedExpression(test.operand)
+    ? test.operand.expression
+    : test.operand;
+  if (!isInstanceOfTest(operand)) return false;
+  const then = ts.isBlock(statement.thenStatement)
+    ? statement.thenStatement.statements
+    : [statement.thenStatement];
+  return then.length === 1 && ts.isThrowStatement(then[0]) && ts.isIdentifier(then[0].expression);
+}
+
+/**
+ * The `y` of `rtest(x) ? x : y`, or undefined for any other conditional. That
+ * shape is Ruby's `x || y` (`options[:in] || options[:within]`,
+ * `activemodel/lib/active_model/validations/clusivity.rb:31`) spelled exactly:
+ * JS `||` also falls through on `0`, `""` and `NaN`, and `??` does not fall
+ * through on `false`, so neither operator is the port. It is a short-circuit,
+ * and tokens as the `or` Ruby's operator emits rather than as an arm.
+ */
+function rtestFallback(conditional: ts.ConditionalExpression): ts.Expression | undefined {
+  const test = conditional.condition;
+  if (!ts.isCallExpression(test) || !ts.isIdentifier(test.expression)) return undefined;
+  if (test.expression.text !== "rtest" || test.arguments.length !== 1) return undefined;
+  return test.arguments[0].getText() === conditional.whenTrue.getText()
+    ? conditional.whenFalse
+    : undefined;
+}
+
+/**
+ * The `y` of `rtest(x) ? y : x`, or undefined for any other conditional: Ruby's
+ * `x && y` (`peek && peek.to_s !~ /^-{1,2}\S+/`,
+ * `vendor/thor/v1.3.2/lib/thor/parser/arguments.rb:85`) spelled exactly, since
+ * JS `&&` also stops on `0`, `""` and `NaN`. The twin of {@link rtestFallback},
+ * and tokens as the `and` Ruby's operator emits.
+ */
+function rtestConjunct(conditional: ts.ConditionalExpression): ts.Expression | undefined {
+  const test = conditional.condition;
+  if (!ts.isCallExpression(test) || !ts.isIdentifier(test.expression)) return undefined;
+  if (test.expression.text !== "rtest" || test.arguments.length !== 1) return undefined;
+  return test.arguments[0].getText() === conditional.whenFalse.getText()
+    ? conditional.whenTrue
+    : undefined;
+}
+
+/**
+ * `throw e`, alone or as a block's only statement, where `e` is the catch
+ * binding: the exception leaving a typed `catch` it did not match. Ruby's
+ * `rescue TypeError, NoMethodError`
+ * (`activemodel/lib/active_model/attribute_mutation_tracker.rb:147`) lets every
+ * other class propagate with no statement at all, and JS's untyped `catch` has
+ * to spell that out, so the rethrow is the clause's type filter and not an arm.
+ * A rethrow INSIDE a matched arm is Ruby's bare `raise`
+ * (`activemodel/lib/active_model/attribute_assignment.rb:72`) and still tokens.
+ */
+function isRethrowOf(statement: ts.Statement, bound: string | undefined): boolean {
+  if (bound === undefined) return false;
+  if (ts.isBlock(statement)) {
+    return statement.statements.length === 1 && isRethrowOf(statement.statements[0], bound);
+  }
+  if (!ts.isThrowStatement(statement)) return false;
+  return ts.isIdentifier(statement.expression) && statement.expression.text === bound;
+}
+
+/**
+ * Whether every arm of an `instanceof` chain leaves the catch by itself. Only
+ * then is a `throw e` after the chain reached by the UNMATCHED exception alone:
+ * an arm that falls through into it is Ruby's `rescue X => e; warn …; raise e`
+ * (`activerecord/lib/active_record/connection_adapters/postgresql/referential_integrity.rb:28-33`),
+ * whose raise is an arm of its own.
+ */
+function everyCatchArmExits(arm: ts.IfStatement): boolean {
+  let last: ts.Statement = arm.thenStatement;
+  while (ts.isBlock(last) && last.statements.length > 0) {
+    last = last.statements[last.statements.length - 1];
+  }
+  const exits =
+    ts.isReturnStatement(last) ||
+    ts.isThrowStatement(last) ||
+    ts.isContinueStatement(last) ||
+    ts.isBreakStatement(last);
+  const alternate = arm.elseStatement;
+  if (!exits || alternate === undefined) return exits;
+  return ts.isIfStatement(alternate) && isInstanceOfTest(alternate.expression)
+    ? everyCatchArmExits(alternate)
+    : false;
+}
+
+function guardedWrite(statement: ts.IfStatement): ts.BinaryExpression | undefined {
+  if (statement.elseStatement !== undefined) return undefined;
+  let body = statement.thenStatement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return undefined;
+    body = body.statements[0];
+  }
+  if (!ts.isExpressionStatement(body) || !ts.isBinaryExpression(body.expression)) return undefined;
+  const write = body.expression;
+  if (write.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return undefined;
+  return isFalsinessOf(statement.expression, write.left.getText()) ? write : undefined;
+}
+
+function isFalsinessOf(test: ts.Expression, target: string): boolean {
+  while (ts.isParenthesizedExpression(test)) test = test.expression;
+  if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
+    const operand = test.operand;
+    return (
+      ts.isCallExpression(operand) &&
+      ts.isIdentifier(operand.expression) &&
+      operand.expression.text === "rtest" &&
+      operand.arguments.length === 1 &&
+      operand.arguments[0].getText() === target
+    );
+  }
+  if (!ts.isBinaryExpression(test) || test.operatorToken.kind !== ts.SyntaxKind.BarBarToken) {
+    return false;
+  }
+  const compares = (e: ts.Expression, op: ts.SyntaxKind, to: ts.SyntaxKind): boolean =>
+    ts.isBinaryExpression(e) &&
+    e.operatorToken.kind === op &&
+    e.left.getText() === target &&
+    e.right.kind === to;
+  return (
+    compares(test.left, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.NullKeyword) &&
+    compares(test.right, ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.FalseKeyword)
+  );
+}
+
+function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
+  if (statement.elseStatement !== undefined || !ts.isBlock(statement.parent)) return undefined;
+  let body = statement.thenStatement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return undefined;
+    body = body.statements[0];
+  }
+  if (!ts.isThrowStatement(body)) return undefined;
+  const siblings = statement.parent.statements;
+  const next = siblings[siblings.indexOf(statement) + 1];
+  if (next === undefined || !ts.isReturnStatement(next) || next.expression === undefined) {
+    return undefined;
+  }
+  const returned = ts.isNonNullExpression(next.expression)
+    ? next.expression.expression
+    : next.expression;
+  if (!ts.isIdentifier(returned)) return undefined;
+  return isFalsinessOf(statement.expression, returned.text) ? body : undefined;
+}
+
+function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
+  const parameters = body.parent.parameters.filter((p) => ts.isIdentifier(p.name));
+  const bound = parameters.map((p) => p.name.getText());
+  const splat = parameters.filter((p) => p.dotDotDotToken).map((p) => p.name.getText());
+  for (const earlier of body.statements) {
+    if (earlier === statement) break;
+    if (ts.isIfStatement(earlier) && isArgumentBindingGuard(earlier)) continue;
+    const declaration = ts.isVariableStatement(earlier)
+      ? earlier.declarationList.declarations[0]
+      : undefined;
+    let call = declaration?.initializer;
+    while (call && (ts.isAsExpression(call) || ts.isParenthesizedExpression(call))) {
+      call = call.expression;
+    }
+    if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration!.name)) return false;
+    if (splat.some((name) => call.expression.getText() === `${name}.pop`)) {
+      bound.push(declaration!.name.text);
+      continue;
+    }
+    const [rest] = call.arguments;
+    if (call.expression.getText() !== "extractOptionsBang" || !ts.isIdentifier(rest)) return false;
+    if (!splat.includes(rest.text)) return false;
+    bound.push(declaration!.name.text);
+  }
+  let test = statement.expression;
+  let message: RegExp;
+  if (ts.isBinaryExpression(test) && test.left.getText() === "arguments.length") {
+    let raise = statement.thenStatement;
+    if (ts.isBlock(raise) && raise.statements.length === 1) raise = raise.statements[0];
+    if (statement.elseStatement || !ts.isThrowStatement(raise)) return false;
+    const thrown = raise.expression;
+    if (!ts.isNewExpression(thrown) || thrown.expression.getText() !== "ArgumentError") {
+      return false;
+    }
+    const [text] = thrown.arguments ?? [];
+    return (
+      text !== undefined &&
+      /^[`"]wrong number of arguments \(given (\d+|\$\{arguments\.length\}), expected [\d.+]+\)[`"]$/.test(
+        text.getText(),
+      )
+    );
+  }
+  if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
+    test = test.operand;
+    while (ts.isParenthesizedExpression(test)) test = test.expression;
+    if (!ts.isBinaryExpression(test) || test.operatorToken.kind !== ts.SyntaxKind.InKeyword) {
+      return false;
+    }
+    test = test.right;
+    message = /^missing keyword: :\w+$/;
+  } else {
+    if (!ts.isBinaryExpression(test) || test.right.getText() !== "undefined") return false;
+    if (test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken) return false;
+    test = test.left;
+    message = /^wrong number of arguments \(given \d+, expected [\d.+]+\)$/;
+  }
+  if (!ts.isIdentifier(test) || !bound.includes(test.text)) return false;
+  let raise = statement.thenStatement;
+  if (ts.isBlock(raise) && raise.statements.length === 1) raise = raise.statements[0];
+  if (statement.elseStatement || !ts.isThrowStatement(raise)) return false;
+  const thrown = raise.expression;
+  if (!ts.isNewExpression(thrown) || thrown.expression.getText() !== "ArgumentError") return false;
+  const [text] = thrown.arguments ?? [];
+  return text !== undefined && ts.isStringLiteral(text) && message.test(text.text);
+}
+
+/**
+ * `if (isHash(scope)) { options = scope; scope = null; }`: the binding of Ruby's
+ * optional positional before keywords (`def has_many(name, scope = nil, **options)`,
+ * `activerecord/lib/active_record/associations.rb:1268`). A TS caller hands the
+ * options in the positional's slot, so the body moves them. The shape is exactly
+ * that: no `else`, ahead of anything but other binding guards, a test that reads
+ * no parameter but the positional and no `this`, and a body that assigns a LATER
+ * parameter from the positional and then, at most, clears the positional to
+ * `null` / `undefined` or back to its declared default: a block handed in the
+ * slot of a defaulted positional (`def sum(initial_value_or_column = 0, &block)`,
+ * `activerecord/lib/active_record/relation/calculations.rb:172`) leaves Ruby's
+ * positional at that default. That binds parameters, as
+ * {@link isArgumentBindingGuard}'s raise does, and is not an arm.
+ */
+function isParameterRebinding(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent) || statement.elseStatement) return false;
+  const bound = body.parent.parameters.map((p) => p.name.getText());
+  for (const earlier of body.statements) {
+    if (earlier === statement) break;
+    if (!ts.isIfStatement(earlier)) return false;
+    if (!isArgumentBindingGuard(earlier) && !isParameterRebinding(earlier)) return false;
+  }
+  const then = statement.thenStatement;
+  const moves = (ts.isBlock(then) ? [...then.statements] : [then]).map((move) =>
+    ts.isExpressionStatement(move) &&
+    ts.isBinaryExpression(move.expression) &&
+    move.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      ? move.expression
+      : undefined,
+  );
+  const [bind, clear] = moves;
+  if (moves.length > 2 || !bind || !ts.isIdentifier(bind.left) || !ts.isIdentifier(bind.right)) {
+    return false;
+  }
+  const positional = bind.right.text;
+  const at = bound.indexOf(positional);
+  if (at < 0 || bound.indexOf(bind.left.text) <= at) return false;
+  if (moves.length === 2) {
+    if (!clear || clear.left.getText() !== positional) return false;
+    const cleared = clear.right;
+    const declared = body.parent.parameters[at].initializer?.getText();
+    if (
+      cleared.kind !== ts.SyntaxKind.NullKeyword &&
+      cleared.getText() !== "undefined" &&
+      cleared.getText() !== declared
+    )
+      return false;
+  }
+  let onlyPositional = true;
+  const read = (n: ts.Node): void => {
+    if (n.kind === ts.SyntaxKind.ThisKeyword) onlyPositional = false;
+    if (ts.isIdentifier(n) && n.text !== positional && bound.includes(n.text))
+      onlyPositional = false;
+    ts.forEachChild(n, read);
+  };
+  read(statement.expression);
+  return onlyPositional && statement.expression.getText().includes(positional);
+}
+
+function parameterKindTest(
+  test: ts.Expression,
+  parameters: readonly string[],
+): string[] | undefined {
+  const tested: string[] = [];
+  const kind = (e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e)) e = e.expression;
+    if (ts.isPrefixUnaryExpression(e)) {
+      return e.operator === ts.SyntaxKind.ExclamationToken && kind(e.operand);
+    }
+    let asked: ts.Expression | undefined;
+    if (ts.isBinaryExpression(e)) {
+      const operator = e.operatorToken.kind;
+      if (
+        operator === ts.SyntaxKind.AmpersandAmpersandToken ||
+        operator === ts.SyntaxKind.BarBarToken
+      ) {
+        return kind(e.left) && kind(e.right);
+      }
+      const loose =
+        operator === ts.SyntaxKind.EqualsEqualsToken ||
+        operator === ts.SyntaxKind.ExclamationEqualsToken;
+      if (
+        operator !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
+        operator !== ts.SyntaxKind.ExclamationEqualsEqualsToken &&
+        !(loose && e.right.kind === ts.SyntaxKind.NullKeyword)
+      ) {
+        return false;
+      }
+      if (ts.isTypeOfExpression(e.left) && ts.isStringLiteral(e.right)) asked = e.left.expression;
+      else if (
+        e.right.kind === ts.SyntaxKind.NullKeyword ||
+        (ts.isIdentifier(e.right) && e.right.text === "undefined")
+      ) {
+        asked = e.left;
+      }
+    } else if (
+      ts.isCallExpression(e) &&
+      e.arguments.length === 1 &&
+      ts.isPropertyAccessExpression(e.expression) &&
+      ts.isIdentifier(e.expression.expression) &&
+      e.expression.expression.text === "Array" &&
+      e.expression.name.text === "isArray"
+    ) {
+      [asked] = e.arguments;
+    }
+    if (asked === undefined || !ts.isIdentifier(asked) || !parameters.includes(asked.text)) {
+      return false;
+    }
+    tested.push(asked.text);
+    return true;
+  };
+  return kind(test) ? tested : undefined;
+}
+
+function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
+  if (body.statements[0] !== statement) return false;
+  const final = body.parent.parameters[body.parent.parameters.length - 1];
+  if (final === undefined || !ts.isIdentifier(final.name) || final.dotDotDotToken) return false;
+  const declared = body.parent.parameters.filter((p) => ts.isIdentifier(p.name));
+  const parameters = declared.map((p) => p.name.getText());
+  const tested = parameterKindTest(statement.expression, parameters);
+  if (tested === undefined) return false;
+  const last = parameters[parameters.length - 1];
+  const clears = (name: string, e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+    if (e.kind === ts.SyntaxKind.NullKeyword) return true;
+    if (ts.isIdentifier(e) && e.text === "undefined") return true;
+    if (ts.isPropertyAccessExpression(e)) {
+      return ts.isIdentifier(e.expression) && e.expression.text === last && e.name.text === name;
+    }
+    const initializer = declared[parameters.indexOf(name)].initializer;
+    return (
+      initializer !== undefined &&
+      initializer.kind === e.kind &&
+      (ts.isLiteralExpression(e) || ts.isIdentifier(e)) &&
+      e.text === (initializer as ts.LiteralExpression | ts.Identifier).text
+    );
+  };
+  const isTested = (e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+    return ts.isIdentifier(e) && e.text !== last && tested.includes(e.text);
+  };
+  let moves = false;
+  const rebinds = (branch: ts.Statement | undefined): boolean => {
+    if (branch === undefined) return true;
+    const statements = ts.isBlock(branch) ? [...branch.statements] : [branch];
+    return statements.every((s) => {
+      if (!ts.isExpressionStatement(s) || !ts.isBinaryExpression(s.expression)) return false;
+      const { left, operatorToken, right } = s.expression;
+      if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+      if (!ts.isIdentifier(left) || !parameters.includes(left.text)) return false;
+      if (left.text === last) {
+        moves ||= ts.isObjectLiteralExpression(right)
+          ? right.properties.some((p) => ts.isSpreadAssignment(p) && isTested(p.expression))
+          : isTested(right);
+        return true;
+      }
+      return clears(left.text, right);
+    });
+  };
+  return rebinds(statement.thenStatement) && rebinds(statement.elseStatement) && moves;
+}
+
+/**
+ * `if (attributes === undefined) [id, attributes] = [":all", id];`: the binding
+ * of Ruby's optional positional AHEAD of a required one
+ * (`def update(id = :all, attributes)`,
+ * `activerecord/lib/active_record/persistence.rb:132`). Ruby fills the required
+ * parameter first, so a one-argument call binds `attributes`; a TS caller's one
+ * argument lands in the first slot, and the body moves it. The shape is exactly
+ * that: no `else`, ahead of anything but other binding guards, a test of the
+ * LATER parameter against `undefined`, and one destructuring write that moves
+ * the earlier parameter into it. That binds parameters, as
+ * {@link isParameterRebinding}'s move does, and is not an arm.
+ */
+function isLeadingOptionalBinding(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent) || statement.elseStatement) return false;
+  const bound = body.parent.parameters.map((p) => p.name.getText());
+  for (const earlier of body.statements) {
+    if (earlier === statement) break;
+    if (!ts.isIfStatement(earlier)) return false;
+    if (!isArgumentBindingGuard(earlier) && !isParameterRebinding(earlier)) return false;
+  }
+  const test = statement.expression;
+  if (
+    !ts.isBinaryExpression(test) ||
+    test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken ||
+    !ts.isIdentifier(test.left) ||
+    test.right.getText() !== "undefined"
+  ) {
+    return false;
+  }
+  let move: ts.Statement = statement.thenStatement;
+  if (ts.isBlock(move)) {
+    if (move.statements.length !== 1) return false;
+    move = move.statements[0];
+  }
+  if (!ts.isExpressionStatement(move) || !ts.isBinaryExpression(move.expression)) return false;
+  const { left, right, operatorToken } = move.expression;
+  if (
+    operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+    !ts.isArrayLiteralExpression(left) ||
+    !ts.isArrayLiteralExpression(right) ||
+    left.elements.length !== 2 ||
+    right.elements.length !== 2
+  ) {
+    return false;
+  }
+  const [optional, required] = left.elements.map((e) => e.getText());
+  let moved = right.elements[1];
+  while (ts.isAsExpression(moved) || ts.isParenthesizedExpression(moved)) moved = moved.expression;
+  const at = bound.indexOf(optional);
+  return (
+    at >= 0 &&
+    bound.indexOf(required) > at &&
+    test.left.text === required &&
+    moved.getText() === optional
+  );
+}
+
+/**
+ * `rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined`: the capture
+ * of Ruby's `&block` after a splat (`def validates_with(*args, &block)`,
+ * `activemodel/lib/active_model/validations/with.rb:88`). A TS rest parameter
+ * comes last, so the block rides in the splat and is popped off it. The test is
+ * `typeof args[args.length - 1] === "function"` where no positional can be
+ * callable (`def with_lock(*args)`,
+ * `activerecord/lib/active_record/locking/pessimistic.rb:92`). That binds
+ * a parameter, as {@link isArgumentBindingGuard}'s raise does, and is not an arm.
+ */
+function isBlockCapture(conditional: ts.ConditionalExpression): boolean {
+  const test = conditional.condition;
+  let last: ts.Expression | undefined;
+  if (ts.isCallExpression(test) && test.expression.getText() === "rbBlockGivenP") {
+    [last] = test.arguments;
+  } else if (
+    ts.isBinaryExpression(test) &&
+    test.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
+    ts.isTypeOfExpression(test.left) &&
+    ts.isStringLiteral(test.right) &&
+    test.right.text === "function"
+  ) {
+    last = test.left.expression;
+  }
+  if (!last || !ts.isElementAccessExpression(last) || !ts.isIdentifier(last.expression)) {
+    return false;
+  }
+  const args = last.expression.text;
+  if (last.argumentExpression.getText() !== `${args}.length - 1`) return false;
+  let popped = conditional.whenTrue;
+  while (ts.isAsExpression(popped) || ts.isParenthesizedExpression(popped)) {
+    popped = popped.expression;
+  }
+  return popped.getText() === `${args}.pop()` && conditional.whenFalse.getText() === "undefined";
+}
+
+/**
+ * `...(block !== undefined ? [block] : [])` (or `...(block ? [block] : [])`):
+ * the forward of a `&block` bound by {@link isBlockCapture} in the same body
+ * (`set_callback(:validate, *args, options, &block)`,
+ * `activemodel/lib/active_model/validations.rb:184`). Ruby passes an absent
+ * block as nothing at all; the port's block rides as the last argument, so
+ * forwarding it has to leave the slot out. That is the `&block` itself, which
+ * Ruby emits no token for.
+ */
+function isBlockForward(conditional: ts.ConditionalExpression): boolean {
+  let spread: ts.Node = conditional.parent;
+  while (ts.isParenthesizedExpression(spread)) spread = spread.parent;
+  if (!ts.isSpreadElement(spread)) return false;
+  const { whenTrue, whenFalse } = conditional;
+  if (!ts.isArrayLiteralExpression(whenFalse) || whenFalse.elements.length !== 0) return false;
+  if (!ts.isArrayLiteralExpression(whenTrue) || whenTrue.elements.length !== 1) return false;
+  let forwarded = whenTrue.elements[0];
+  while (ts.isAsExpression(forwarded) || ts.isParenthesizedExpression(forwarded)) {
+    forwarded = forwarded.expression;
+  }
+  if (!ts.isIdentifier(forwarded)) return false;
+  const block = forwarded.text;
+  const test = conditional.condition;
+  const given =
+    test.getText() === block ||
+    (ts.isBinaryExpression(test) &&
+      test.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken &&
+      test.left.getText() === block &&
+      test.right.getText() === "undefined");
+  if (!given) return false;
+  const fn = ts.findAncestor(conditional, ts.isFunctionLike) as
+    | ts.FunctionLikeDeclaration
+    | undefined;
+  const body = fn?.body;
+  if (!body || !ts.isBlock(body)) return false;
+  return body.statements.some(
+    (statement) =>
+      ts.isVariableStatement(statement) &&
+      statement.declarationList.declarations.some((declaration) => {
+        if (declaration.name.getText() !== block || !declaration.initializer) return false;
+        let init = declaration.initializer;
+        while (ts.isAsExpression(init) || ts.isParenthesizedExpression(init)) {
+          init = init.expression;
+        }
+        return ts.isConditionalExpression(init) && isBlockCapture(init);
+      }),
+  );
+}
+
+function isKwargsCapture(conditional: ts.ConditionalExpression): boolean {
+  let popped = conditional.whenTrue;
+  while (ts.isAsExpression(popped) || ts.isParenthesizedExpression(popped)) {
+    popped = popped.expression;
+  }
+  if (!ts.isCallExpression(popped) || !ts.isPropertyAccessExpression(popped.expression)) {
+    return false;
+  }
+  const splat = popped.expression.expression;
+  if (popped.expression.name.text !== "pop" || !ts.isIdentifier(splat)) return false;
+  const absent = conditional.whenFalse;
+  if (!ts.isObjectLiteralExpression(absent) || absent.properties.length > 0) return false;
+  let test = conditional.condition;
+  if (
+    ts.isBinaryExpression(test) &&
+    test.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+    ts.isBinaryExpression(test.left) &&
+    ts.isTypeOfExpression(test.left.left) &&
+    test.right.getText() === `${test.left.left.expression.getText()} !== null`
+  ) {
+    test = test.left;
+  }
+  if (
+    !ts.isBinaryExpression(test) ||
+    test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken ||
+    !ts.isTypeOfExpression(test.left) ||
+    !ts.isStringLiteral(test.right) ||
+    test.right.text !== "object"
+  ) {
+    return false;
+  }
+  let body: ts.Node = conditional;
+  while (!ts.isFunctionLike(body.parent)) {
+    if (ts.isSourceFile(body.parent)) return false;
+    body = body.parent;
+  }
+  const method = body.parent;
+  if (!method.parameters.some((p) => p.dotDotDotToken && p.name.getText() === splat.text)) {
+    return false;
+  }
+  let last: ts.Expression | undefined = test.left.expression;
+  if (ts.isIdentifier(last) && ts.isBlock(body)) {
+    const name = last.text;
+    last = body.statements
+      .flatMap((s) => (ts.isVariableStatement(s) ? [...s.declarationList.declarations] : []))
+      .find((d) => d.name.getText() === name && d.end <= conditional.pos)?.initializer;
+  }
+  return (
+    last !== undefined &&
+    ts.isElementAccessExpression(last) &&
+    last.expression.getText() === splat.text &&
+    last.argumentExpression.getText() === `${splat.text}.length - 1`
+  );
+}
+
+/**
+ * `Object.hasOwn(klass, "_x") ? klass._x : undefined` (or its
+ * `Object.prototype.hasOwnProperty.call` spelling): the read of a Ruby
+ * class-level ivar, `@x` in a `def self.` body
+ * (`activerecord/lib/active_record/core.rb:230` `@connection_class ||= false`).
+ * A Ruby ivar belongs to the object it is set on, so a subclass reads nil; a JS
+ * static is inherited through the constructor chain, so the port has to ask for
+ * the own property. That is the ivar read itself, which Ruby emits no token
+ * for, and is not an arm.
+ */
+function isOwnIvarRead(conditional: ts.ConditionalExpression): boolean {
+  const test = conditional.condition;
+  if (!ts.isCallExpression(test) || test.arguments.length !== 2) return false;
+  const callee = test.expression.getText();
+  if (callee !== "Object.hasOwn" && callee !== "Object.prototype.hasOwnProperty.call") return false;
+  const [owner, field] = test.arguments;
+  if (!ts.isStringLiteral(field)) return false;
+  const absent = conditional.whenFalse.getText();
+  if (absent !== "undefined" && absent !== "null") return false;
+  let read = conditional.whenTrue;
+  while (ts.isAsExpression(read) || ts.isParenthesizedExpression(read)) read = read.expression;
+  if (!ts.isPropertyAccessExpression(read) || read.name.text !== field.text) return false;
+  let receiver: ts.Expression = read.expression;
+  while (ts.isAsExpression(receiver) || ts.isParenthesizedExpression(receiver)) {
+    receiver = receiver.expression;
+  }
+  return receiver.getText() === owner.getText();
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
-      case ts.SyntaxKind.IfStatement:
-      case ts.SyntaxKind.ConditionalExpression:
+      case ts.SyntaxKind.ConditionalExpression: {
+        if (isBlockCapture(n as ts.ConditionalExpression)) return;
+        if (isBlockForward(n as ts.ConditionalExpression)) {
+          visit((n as ts.ConditionalExpression).whenTrue);
+          return;
+        }
+        if (isKwargsCapture(n as ts.ConditionalExpression)) return;
+        if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
+        const fallback = rtestFallback(n as ts.ConditionalExpression);
+        if (fallback !== undefined) {
+          visit((n as ts.ConditionalExpression).condition);
+          tokens.push("or");
+          visit(fallback);
+          return;
+        }
+        const conjunct = rtestConjunct(n as ts.ConditionalExpression);
+        if (conjunct !== undefined) {
+          visit((n as ts.ConditionalExpression).condition);
+          tokens.push("and");
+          visit(conjunct);
+          return;
+        }
+        tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
+        break;
+      }
+      case ts.SyntaxKind.IfStatement: {
+        const write = guardedWrite(n as ts.IfStatement);
+        if (write !== undefined) {
+          tokens.push("or");
+          visit(write);
+          return;
+        }
+        const raise = orRaise(n as ts.IfStatement);
+        if (raise !== undefined) {
+          tokens.push("or");
+          visit(raise);
+          return;
+        }
+        if (isArgumentBindingGuard(n as ts.IfStatement)) return;
+        if (isParameterRebinding(n as ts.IfStatement)) return;
+        if (isLeadingOptionalBinding(n as ts.IfStatement)) return;
+        if (isKwargsRebindingGuard(n as ts.IfStatement)) {
+          visit((n as ts.IfStatement).thenStatement);
+          const alternate = (n as ts.IfStatement).elseStatement;
+          if (alternate !== undefined) visit(alternate);
+          return;
+        }
         tokens.push("if");
         break;
+      }
       case ts.SyntaxKind.CaseClause:
         if (!isFallenThroughInto(n as ts.CaseClause)) tokens.push("if");
         break;
       case ts.SyntaxKind.BinaryExpression: {
         const bin = n as ts.BinaryExpression;
         const shortCircuit = skeletonLogicalOpToken(bin.operatorToken.kind);
+        const whenList =
+          bin.operatorToken.kind === ts.SyntaxKind.BarBarToken ? whenListChain(bin) : undefined;
+        if (whenList !== undefined) {
+          for (let i = 0; i < whenList.absorbed; i++) tokens.push("or:string-subclass");
+          if (whenList.arity > 1) tokens.push(`when:${whenList.arity}`);
+          whenList.leaves.forEach(visit);
+          return;
+        }
         if (shortCircuit !== undefined) {
           visit(bin.left);
-          tokens.push(shortCircuit);
+          tokens.push(
+            bin.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+              ? (narrowingAndToken(bin) ?? shortCircuit)
+              : shortCircuit,
+          );
           visit(bin.right);
           return;
         }
         break;
       }
       case ts.SyntaxKind.WhileStatement:
-      case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForStatement:
-      case ts.SyntaxKind.ForOfStatement:
+        tokens.push(isRetryLoop(n as ts.ForStatement | ts.WhileStatement) ? "loop:retry" : "loop");
+        break;
+      case ts.SyntaxKind.ForOfStatement: {
+        const collected = awaitedCollect(n as ts.ForOfStatement);
+        if (collected !== undefined) {
+          visit((n as ts.ForOfStatement).expression);
+          tokens.push(collected.block ? "loop:collect" : "ref:map");
+          collected.nodes.forEach(visit);
+          return;
+        }
+        const some = awaitedPredicate(n as ts.ForOfStatement);
+        if (some !== undefined) {
+          visit((n as ts.ForOfStatement).expression);
+          tokens.push("loop:predicate");
+          some.statements.forEach(visit);
+          tokens.push("if:predicate");
+          visit(some.test);
+          return;
+        }
+        const predicate = awaitedFilter(n as ts.ForOfStatement);
+        if (predicate !== undefined) {
+          visit((n as ts.ForOfStatement).expression);
+          tokens.push("ref:filter");
+          visit(predicate);
+          return;
+        }
+        tokens.push("loop");
+        break;
+      }
+      case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForInStatement:
         tokens.push("loop");
         break;
@@ -4672,7 +6247,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           tokens.push(`ref:${callee.text}`);
         } else if (ts.isPropertyAccessExpression(callee)) {
           visit(callee.expression);
-          tokens.push(`ref:${callee.name.text}`);
+          tokens.push(`ref:${memberNameText(callee.name)}`);
         } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
           tokens.push("ref:super");
         } else {
@@ -4701,30 +6276,71 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   };
   const visitCatchClause = (clause: ts.CatchClause): void => {
     const statements = clause.block.statements;
+    const binding = clause.variableDeclaration?.name;
+    const bound = binding !== undefined && ts.isIdentifier(binding) ? binding.text : undefined;
     const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));
     if (chain === undefined) {
       tokens.push("rescue");
-      statements.forEach(visit);
+      const guarded = statements.length > 0 && isRescueClassGuard(statements[0]);
+      statements.slice(guarded ? 1 : 0).forEach(visit);
       return;
     }
+    const filtered =
+      statements.length === 2 &&
+      isRethrowOf(statements[1], bound) &&
+      everyCatchArmExits(chain as ts.IfStatement);
     for (const statement of statements) {
-      if (statement === chain) visitCatchArms(statement as ts.IfStatement);
-      else visit(statement);
+      if (statement === chain) visitCatchArms(statement as ts.IfStatement, bound);
+      else if (!filtered) visit(statement);
     }
   };
-  const visitCatchArms = (arm: ts.IfStatement): void => {
+  const visitCatchArms = (arm: ts.IfStatement, bound: string | undefined): void => {
     tokens.push("rescue");
     visit(arm.thenStatement);
     const alternate = arm.elseStatement;
-    if (alternate === undefined) return;
+    if (alternate === undefined || isRethrowOf(alternate, bound)) return;
     if (ts.isIfStatement(alternate) && isInstanceOfTest(alternate.expression)) {
-      visitCatchArms(alternate);
+      visitCatchArms(alternate, bound);
       return;
     }
+    if (!ts.isIfStatement(alternate)) tokens.push("rescue");
     visit(alternate);
   };
   // The body ITSELF, not just its children: an expression-bodied arrow
   // (`= (x) => where(x)`) IS the call site, and Ruby's walk_for_skeleton covers it.
+  visit(node);
+  return tokens.length === 0 ? undefined : tokens;
+}
+
+function extractShapeTokens(node: ts.Node | undefined): string[] | undefined {
+  if (!node) return undefined;
+  const tokens: string[] = [];
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
+      const recv = n.expression.expression;
+      if (ts.isIdentifier(recv) && /^[A-Z]/.test(recv.text)) tokens.push(`recv:${recv.text}`);
+    } else if (ts.isNewExpression(n) && isThrownConstruction(n)) {
+      for (const arg of n.arguments ?? [])
+        if (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg))
+          tokens.push(`msg:${arg.text}`);
+    } else if (ts.isElementAccessExpression(n)) {
+      const index = n.argumentExpression;
+      if (ts.isNumericLiteral(index)) tokens.push(`[num:${index.text}]`);
+      else if (ts.isStringLiteral(index) || ts.isNoSubstitutionTemplateLiteral(index))
+        tokens.push(`[str:${index.text}]`);
+      else tokens.push("[]");
+    } else if (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n))
+      tokens.push(`op:${ts.tokenToString(n.operator) ?? "?"}`);
+    else if (ts.isTypeOfExpression(n)) tokens.push("op:typeof");
+    else if (ts.isSpreadElement(n)) tokens.push("...");
+    else if (ts.isConditionalExpression(n)) tokens.push("?:");
+    else if (ts.isClassExpression(n)) tokens.push("class");
+    else if (ts.isTemplateExpression(n))
+      tokens.push(
+        `tpl:${[n.head.text, ...n.templateSpans.map((span) => span.literal.text)].join("${}")}`,
+      );
+    ts.forEachChild(n, visit);
+  };
   visit(node);
   return tokens.length === 0 ? undefined : tokens;
 }
@@ -4759,6 +6375,16 @@ function extractCallArgs(node: ts.Node | undefined): CallSite[] | undefined {
 
 function walkForCallArgs(node: ts.Node, sites: CallSite[]): void {
   const visit = (n: ts.Node): void => {
+    for (const [form, receiver, key] of nativeHashForms(n)) {
+      const tail = receiver === undefined ? undefined : receiverTailName(receiver);
+      if (key === undefined || tail === undefined) continue;
+      sites.push({
+        name: `${NATIVE_FORM_PREFIX}${form}`,
+        args: [key],
+        flags: [],
+        recv: `id:${tail}`,
+      });
+    }
     if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
       recordCallSite(n, sites, visit);
       return;
@@ -4791,6 +6417,9 @@ function recordCallSite(
       ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
         ? describeArg(callee.expression, [])
         : undefined;
+    const rubyCompat = ts.isIdentifier(callee)
+      ? rubyCompatBindingsFor(call.getSourceFile()).get(callee.text)
+      : undefined;
     sites.push({
       name,
       args,
@@ -4798,6 +6427,7 @@ function recordCallSite(
       ...(recv !== undefined && recv !== "?" && recv !== "id:this" && !recv.startsWith("const:")
         ? { recv }
         : {}),
+      ...(rubyCompat !== undefined ? { rubyCompat } : {}),
     });
   }
 
@@ -4847,7 +6477,7 @@ function callSiteName(call: ts.CallExpression | ts.NewExpression): string | unde
   const name = ts.isIdentifier(callee)
     ? callee.text
     : ts.isPropertyAccessExpression(callee)
-      ? callee.name.text
+      ? memberNameText(callee.name)
       : undefined;
   if (name === undefined || name.startsWith("_") || !/^[a-z]/.test(name)) return undefined;
   return name;
@@ -4876,7 +6506,9 @@ function dispatchedCallName(call: ts.CallExpression): string | undefined {
 function isMarkedBlockArg(expr: ts.Expression): boolean {
   if (!ts.isCallExpression(expr)) return false;
   if (!ts.isIdentifier(expr.expression)) return false;
-  if (!blockMarkNamesFor(expr.getSourceFile()).has(expr.expression.text)) return false;
+  if (rubyCompatBindingsFor(expr.getSourceFile()).get(expr.expression.text) !== "block") {
+    return false;
+  }
   if (expr.arguments.length !== 1) return false;
   const inner = expr.arguments[0];
   return ts.isArrowFunction(inner) || ts.isFunctionExpression(inner);
@@ -4931,6 +6563,18 @@ function escapeDescriptorText(text: string): string {
   return text.replace(/[%,={}]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
+function productFactors(node: ts.Expression): string[] | undefined {
+  const expr = unwrapArg(node);
+  if (ts.isBinaryExpression(expr)) {
+    if (expr.operatorToken.kind !== ts.SyntaxKind.AsteriskToken) return undefined;
+    const left = productFactors(expr.left);
+    const right = productFactors(expr.right);
+    return left !== undefined && right !== undefined ? [...left, ...right] : undefined;
+  }
+  const factor = describeArg(expr, []);
+  return /^(num|id):/.test(factor) ? [factor] : undefined;
+}
+
 function describeArg(node: ts.Expression, flags: string[]): string {
   const expr = unwrapArg(node);
   if (ts.isIdentifier(expr)) {
@@ -4949,10 +6593,20 @@ function describeArg(node: ts.Expression, flags: string[]): string {
   if (ts.isCallExpression(expr)) {
     const dispatched = dispatchedCallName(expr);
     if (dispatched !== undefined) return `call:${dispatched}`;
+    const sent = expr.arguments[1];
+    if (
+      ts.isIdentifier(expr.expression) &&
+      SEND_CALLEES.has(currentImportAliases?.get(expr.expression.text) ?? expr.expression.text) &&
+      sent !== undefined &&
+      ts.isStringLiteralLike(sent)
+    ) {
+      return `call:${sent.text}`;
+    }
     const name = callSiteName(expr);
     return name === undefined ? "?" : `call:${name}`;
   }
   if (ts.isPropertyAccessExpression(expr)) {
+    if (expr.name.text === "prototype") return describeArg(expr.expression, flags);
     // A property READ is Ruby's reader send (`x.foo`) or its ivar (`@foo`) —
     // `const:` when the name is constant-shaped, matching `Foo::BAR`.
     const name = expr.name.text;
@@ -4962,6 +6616,8 @@ function describeArg(node: ts.Expression, flags: string[]): string {
   if (ts.isObjectLiteralExpression(expr)) return describeObjectLiteral(expr, flags);
   if (ts.isArrayLiteralExpression(expr)) return "array";
   if (ts.isBinaryExpression(expr)) {
+    const factors = productFactors(expr);
+    if (factors !== undefined) flags.push(`product=${factors.join("*")}`);
     return `binop:${ts.tokenToString(expr.operatorToken.kind) ?? "?"}`;
   }
   if (ts.isPrefixUnaryExpression(expr) || ts.isPostfixUnaryExpression(expr)) {
@@ -5019,6 +6675,42 @@ function isFunctionArgument(node: ts.Node): boolean {
   return ts.isExpression(node) && isMarkedBlockArg(node);
 }
 
+/**
+ * The settle parameter of `new Promise((resolve) => …)` — the name a
+ * suspension's timer callback must be, for {@link isSuspensionTimer}. A
+ * `Promise` constructed with anything but a single function argument, or whose
+ * executor takes no named first parameter, has no settler.
+ */
+function promiseSettlerName(n: ts.NewExpression): string | undefined {
+  if (!ts.isIdentifier(n.expression) || n.expression.text !== "Promise") return undefined;
+  const args = n.arguments ?? [];
+  if (args.length !== 1) return undefined;
+  const executor = args[0];
+  if (!ts.isArrowFunction(executor) && !ts.isFunctionExpression(executor)) return undefined;
+  const settle = executor.parameters[0]?.name;
+  return settle !== undefined && ts.isIdentifier(settle) ? settle.text : undefined;
+}
+
+/**
+ * Whether a call is the one-shot SUSPENSION that ports `Kernel#sleep` — a
+ * `setTimeout` whose callback is the settle parameter of an enclosing
+ * `new Promise`, the whole of `new Promise((resolve) => setTimeout(resolve, ms))`.
+ * A `setTimeout` that schedules work (a deadline, a retry, a callback) is not
+ * a suspension and credits nothing, which is what keeps the `sleep` row in
+ * {@link NATIVE_FORM_ANALOGUES} scoped to the form its rationale covers.
+ */
+function isSuspensionTimer(
+  callee: string,
+  n: ts.CallExpression,
+  promiseSettlers: readonly string[],
+): boolean {
+  if (callee !== "setTimeout") return false;
+  const callback = n.arguments[0];
+  return (
+    callback !== undefined && ts.isIdentifier(callback) && promiseSettlers.includes(callback.text)
+  );
+}
+
 function collectCalls(
   node: ts.Node | undefined,
   skipHoistedClosures = false,
@@ -5059,7 +6751,16 @@ function collectCalls(
   const tally = (map: Map<string, number>, name: string): void => {
     map.set(name, (map.get(name) ?? 0) + 1);
   };
+  const promiseSettlers: string[] = [];
+  const hashForms = new Set<string>();
+  const addHashForm = (form: string, receiver: ts.Expression | undefined): void => {
+    if (skipHoistedClosures || receiver === undefined) return;
+    hashForms.add(`${NATIVE_FORM_PREFIX}${form}`);
+    const tail = receiverTailName(receiver);
+    if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+  };
   const visit = (n: ts.Node): void => {
+    for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
     if (ts.isNewExpression(n)) {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
       // call as `new`, which conventions.ts maps to the TS `constructor`; record
@@ -5076,7 +6777,10 @@ function collectCalls(
         names.add("constructor");
         tally(occurrences, "constructor");
       }
+      const settler = promiseSettlerName(n);
+      if (settler !== undefined) promiseSettlers.push(settler);
       for (const block of blocks) visit(block);
+      if (settler !== undefined) promiseSettlers.pop();
       return;
     } else if (ts.isCallExpression(n)) {
       // Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION
@@ -5096,11 +6800,26 @@ function collectCalls(
         // original imported name so it matches the ported call set.
         called.push(resolve(callee.text));
         negated.push(callee.text, resolve(callee.text));
+        const sent = n.arguments[1];
+        if (SEND_CALLEES.has(resolve(callee.text)) && sent && ts.isStringLiteralLike(sent)) {
+          called.push(sent.text);
+        }
+        const kernel = KERNEL_CALLEES.get(resolve(callee.text));
+        if (kernel !== undefined) called.push(kernel);
+        if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
+          names.add(`${NATIVE_FORM_PREFIX}String`);
+        }
+        if (!skipHoistedClosures && isSuspensionTimer(callee.text, n, promiseSettlers)) {
+          names.add(`${NATIVE_FORM_PREFIX}timer`);
+        }
       } else if (ts.isPropertyAccessExpression(callee)) {
         visit(callee.expression);
-        const prop = callee.name.text;
+        const prop = memberNameText(callee.name);
         called.push(prop);
         negated.push(prop);
+        if (!skipHoistedClosures && prop === "unshift") {
+          names.add(`${NATIVE_FORM_PREFIX}unshift`);
+        }
         // An invocation off another object gets the same foreign tally as a read
         // off one (see FOREIGN_READ_PREFIX). The `X.call(...)` identifier
         // credited below is deliberately NOT tallied: that dispatch really does
@@ -5116,12 +6835,19 @@ function collectCalls(
           called.push(resolve(callee.expression.text));
         }
         if (prop === "new") called.push("constructor");
+      } else if (callee.kind === ts.SyntaxKind.ImportKeyword) {
+        const specifier = n.arguments[0];
+        if (!skipHoistedClosures && specifier && !ts.isStringLiteralLike(specifier)) {
+          names.add(`${NATIVE_FORM_PREFIX}import`);
+        }
       } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
         // Bare `super(...)` (constructor chain) — `super.foo()` is already
         // captured as `foo` by the property-access branch. Record as "super"
         // so calls-parity can flag a ported override that drops the super call.
         called.push("super");
       } else {
+        const tail = skipHoistedClosures ? undefined : receiverTailName(callee);
+        if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}invoked:${tail}`);
         visit(callee);
       }
       // A function-expression argument is the port's spelling of a Ruby BLOCK,
@@ -5134,8 +6860,20 @@ function collectCalls(
       for (const name of called) {
         names.add(name);
         tally(occurrences, name);
+        if (!skipHoistedClosures) names.add(`${NATIVE_FORM_PREFIX}invoked:${name}`);
       }
+      const evalCallback =
+        skipHoistedClosures &&
+        ts.isPropertyAccessExpression(callee) &&
+        (callee.name.text === "moduleEval" || callee.name.text === "classEval");
+      const before = evalCallback ? new Set(names) : undefined;
       for (const block of blocks) visit(block);
+      if (before !== undefined) {
+        for (const name of [...names].filter((c) => !before.has(c))) {
+          names.delete(name);
+          names.add(`${EVAL_CALLBACK_PREFIX}${name}`);
+        }
+      }
       addNegated(n, ...negated);
       addCallbackNegated(blocks, ...negated);
       return;
@@ -5174,6 +6912,11 @@ function collectCalls(
         tally(occurrences, n.name.text);
         if (isForeignReadReceiver(n.expression)) tally(foreignReadOccurrences, n.name.text);
         addNegated(n, n.name.text);
+        if (!skipHoistedClosures && n.name.text === "length") {
+          names.add(`${NATIVE_FORM_PREFIX}length`);
+          const tail = receiverTailName(n.expression);
+          if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}length:${tail}`);
+        }
       }
     }
     ts.forEachChild(n, visit);
@@ -5191,8 +6934,75 @@ function collectCalls(
       }
     }
   }
-  if (names.size === 0) return undefined;
-  return [...names];
+  if (names.size === 0 && hashForms.size === 0) return undefined;
+  return [...names, ...hashForms];
+}
+
+function nativeHashForms(
+  n: ts.Node,
+): [form: string, receiver: ts.Expression | undefined, key?: string][] {
+  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.InKeyword) {
+    let test: ts.Node = n;
+    while (ts.isParenthesizedExpression(test.parent) || ts.isPrefixUnaryExpression(test.parent)) {
+      test = test.parent;
+    }
+    const guard = test.parent;
+    if (ts.isIfStatement(guard) && guard.expression === test && isArgumentBindingGuard(guard)) {
+      return [];
+    }
+    return [["in", n.right, describeArg(n.left, [])]];
+  }
+  if (ts.isDeleteExpression(n)) {
+    const target = n.expression;
+    if (ts.isPropertyAccessExpression(target)) {
+      return [["delete", target.expression, `str:${escapeDescriptorText(target.name.text)}`]];
+    }
+    if (ts.isElementAccessExpression(target)) {
+      return [["delete", target.expression, describeArg(target.argumentExpression, [])]];
+    }
+    return [];
+  }
+  if (ts.isObjectLiteralExpression(n)) {
+    const first = n.properties[0];
+    if (n.properties.length < 2 || !ts.isSpreadAssignment(first)) return [];
+    return [["spread", first.expression]];
+  }
+  if (ts.isForOfStatement(n)) {
+    const iterated = n.expression;
+    if (ts.isCallExpression(iterated) && iterated.expression.getText() === "Object.entries") {
+      return [["entries", iterated.arguments[0]]];
+    }
+    return [];
+  }
+  if (!ts.isCallExpression(n)) return [];
+  const callee = n.expression.getText();
+  if (callee === "Object.hasOwn" || callee === "Object.prototype.hasOwnProperty.call") {
+    const key = n.arguments[1];
+    return [["in", n.arguments[0], key === undefined ? undefined : describeArg(key, [])]];
+  }
+  if (callee === "Object.assign") return [["assign", n.arguments[0]]];
+  return [];
+}
+
+/**
+ * The name a `.length` read's receiver ends in — `cursor`, `result.columns` →
+ * `columns`, `(await c.selectRows(…))` → `selectRows`, `wrap(ids)` → `wrap` —
+ * the TS half of extract-ruby-api.rb#receiver_tail_name.
+ */
+function receiverTailName(receiver: ts.Expression): string | undefined {
+  let e = receiver;
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAwaitExpression(e) ||
+    ts.isNonNullExpression(e) ||
+    ts.isAsExpression(e)
+  ) {
+    e = e.expression;
+  }
+  if (ts.isCallExpression(e)) e = e.expression;
+  if (ts.isIdentifier(e)) return e.text;
+  if (ts.isPropertyAccessExpression(e)) return e.name.text;
+  return undefined;
 }
 
 /**
@@ -5522,21 +7332,33 @@ function typeAdmitsBoolean(type: ts.Type): boolean {
   return type.isUnionOrIntersection() && type.types.some(typeAdmitsBoolean);
 }
 
+function optionsParam(
+  parameters: ts.NodeArray<ts.ParameterDeclaration>,
+): ts.ParameterDeclaration | undefined {
+  return (
+    parameters.find((p) => ts.isIdentifier(p.name) && /^(options|opts)$/.test(p.name.text)) ??
+    parameters[parameters.length - 1]
+  );
+}
+
 /**
- * Advisory option-key extraction (see options-keys.ts). Resolves the LAST
- * parameter's object type to its property names. Returns: undefined (no
- * options-shaped trailing param), null (uncheckable — `any`/`unknown` or a
+ * Advisory option-key extraction (see options-keys.ts). Resolves the options
+ * parameter's object type — one named `options` / `opts`, the names
+ * extract-ruby-api.rb `option_var_names` picks, else the trailing one — to its
+ * property names. Returns: undefined (no options-shaped param), null (uncheckable — `any`/`unknown` or a
  * string-index bag like `Record<string, unknown>`, distinct from `[]`), or the
  * sorted/deduped property names. Only interface/type-literal/intersection
- * trailing params are inspected.
+ * trailing params are inspected. A trailing kwargs bag that carries the options
+ * hash as its `options` / `opts` property (Ruby `def m(role, types:, options:)`,
+ * delegated_type.rb:237) is read through to that property, since those are the
+ * names extract-ruby-api.rb `option_var_names` reads keys off.
  */
 export function extractOptionKeys(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
   checker: ts.TypeChecker,
 ): string[] | null | undefined {
-  if (parameters.length === 0) return undefined;
-  const last = parameters[parameters.length - 1];
-  if (last.dotDotDotToken || !last.type) return undefined;
+  const last = optionsParam(parameters);
+  if (last === undefined || last.dotDotDotToken || !last.type) return undefined;
   const tn = last.type;
   if (!ts.isTypeLiteralNode(tn) && !ts.isIntersectionTypeNode(tn) && !ts.isTypeReferenceNode(tn)) {
     return undefined;
@@ -5545,12 +7367,19 @@ export function extractOptionKeys(
   // an enumerable contract — treat the param as uncheckable. Inline-literal index
   // signatures don't survive `getTypeFromTypeNode`, so check syntax too.
   if (hasSyntacticIndexSignature(tn)) return null;
-  const type = checker.getTypeFromTypeNode(tn);
+  let type = checker.getTypeFromTypeNode(tn);
   if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return null;
   const hasStringIndex = checker
     .getIndexInfosOfType(type)
     .some((i) => (i.keyType.flags & (ts.TypeFlags.String | ts.TypeFlags.Number)) !== 0);
   if (hasStringIndex) return null;
+  const nested = type.getProperty("options") ?? type.getProperty("opts");
+  if (nested) {
+    const nestedType = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(nested, last));
+    if (nestedType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return null;
+    if (checker.getIndexInfosOfType(nestedType).length > 0) return null;
+    type = nestedType;
+  }
   const names = checker
     .getPropertiesOfType(type)
     .map((s) => s.getName())
@@ -5562,6 +7391,202 @@ export function extractOptionKeys(
   // (that path returns `null` above).
   if (names.length === 0) return undefined;
   return [...new Set(names)].sort();
+}
+
+/**
+ * The option keys a body READS off its trailing options param — the TS half of
+ * extract-ruby-api.rb `collect_option_keys`, and like it an under-approximation
+ * read off the same shapes: `options.k` / `options["k"]` (Ruby `options[:k]`),
+ * a destructuring of the hash, `"k" in options`, and a reader call
+ * (`fetch(options, "k")`, Ruby `options.fetch(:k)`). A plain assignment target
+ * (`options.k = v`) is not a read; a compound one (`options.k ??= v`, Ruby
+ * `options[:k] ||= v`) is. An `Object.prototype` member (`options.toString()`)
+ * is not a key, as Ruby's bare `options.keys` is not.
+ *
+ * The declared options TYPE says what a caller may pass, which for a shared
+ * type (`ColumnOptions`) is every key any method on the surface accepts, so
+ * {@link extractOptionKeys} cannot say which keys this body branches on. A rest
+ * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`,
+ * or a `slice` / `except` / `merge` / `rbObjDup` / `rbObjClone` call, the TS
+ * spellings of extract-ruby-api.rb `OPTION_COPY_METHODS`), declared or assigned,
+ * carry the hash on under a new name, until it is reassigned from anything
+ * else. A multiple assignment (`a, b = options.dup, x`) is not followed, on
+ * either side. A kwargs bag carrying the hash as its
+ * `options` property is read through to it, as {@link extractOptionKeys} does.
+ * The reader calls are the TS spellings of extract-ruby-api.rb
+ * `OPTION_READER_METHODS`, plus `valuesAt`, which reads every key it names.
+ * `undefined` when there is no body or no options param.
+ */
+export function extractOptionReads(
+  parameters: ts.NodeArray<ts.ParameterDeclaration>,
+  body: ts.Node | undefined,
+): string[] | undefined {
+  const last = optionsParam(parameters);
+  if (last === undefined || body === undefined || last.dotDotDotToken) return undefined;
+  const vars = new Set<string>();
+  const bags = new Set<string>();
+  const keys = new Set<string>();
+
+  const unwrap = (e: ts.Expression): ts.Expression => {
+    while (
+      ts.isParenthesizedExpression(e) ||
+      ts.isAsExpression(e) ||
+      ts.isNonNullExpression(e) ||
+      ts.isSatisfiesExpression(e)
+    ) {
+      e = e.expression;
+    }
+    if (
+      ts.isBinaryExpression(e) &&
+      (e.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+        e.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+    ) {
+      return unwrap(e.left);
+    }
+    return e;
+  };
+  const isOptionsName = (name: string): boolean => name === "options" || name === "opts";
+  const isOptions = (expr: ts.Expression): boolean => {
+    const e = unwrap(expr);
+    if (ts.isIdentifier(e)) return vars.has(e.text);
+    return (
+      ts.isPropertyAccessExpression(e) &&
+      isOptionsName(e.name.text) &&
+      ts.isIdentifier(e.expression) &&
+      bags.has(e.expression.text)
+    );
+  };
+  const bind = (pattern: ts.ObjectBindingPattern, bag: boolean): void => {
+    for (const el of pattern.elements) {
+      const key = el.propertyName ?? el.name;
+      const local = ts.isIdentifier(el.name) ? el.name.text : undefined;
+      if (el.dotDotDotToken || (bag && ts.isIdentifier(key) && isOptionsName(key.text))) {
+        if (local !== undefined) vars.add(local);
+      } else if (!bag && (ts.isIdentifier(key) || ts.isStringLiteralLike(key))) {
+        keys.add(key.text);
+      }
+    }
+  };
+  const isBag = (pattern: ts.ObjectBindingPattern): boolean =>
+    pattern.elements.some((el) => {
+      const key = el.propertyName ?? el.name;
+      return !el.dotDotDotToken && ts.isIdentifier(key) && isOptionsName(key.text);
+    });
+
+  if (ts.isIdentifier(last.name)) {
+    vars.add(last.name.text);
+    bags.add(last.name.text);
+  } else if (ts.isObjectBindingPattern(last.name)) {
+    bind(last.name, isBag(last.name));
+  } else {
+    return undefined;
+  }
+
+  const isAssignmentTarget = (node: ts.Node): boolean => {
+    const parent = node.parent;
+    return (
+      ts.isBinaryExpression(parent) &&
+      parent.left === node &&
+      parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    );
+  };
+  const readerKeys = (call: ts.CallExpression): string[] => {
+    const callee = call.expression;
+    const name = ts.isIdentifier(callee)
+      ? callee.text
+      : ts.isPropertyAccessExpression(callee)
+        ? callee.name.text
+        : undefined;
+    if (name === undefined) return [];
+    const viaCall =
+      name === "call" &&
+      ts.isPropertyAccessExpression(callee) &&
+      ts.isPropertyAccessExpression(callee.expression) &&
+      callee.expression.name.text === "hasOwnProperty";
+    const at = call.arguments.findIndex((a) => isOptions(a));
+    if (at === -1) return [];
+    const after = call.arguments.slice(at + 1).filter(ts.isStringLiteralLike);
+    if (name === "valuesAt") return after.map((a) => a.text);
+    if (!viaCall && !OPTION_READER_FUNCTIONS.has(name)) return [];
+    const key = call.arguments[at + 1];
+    return key !== undefined && ts.isStringLiteralLike(key) ? [key.text] : [];
+  };
+
+  const isCopy = (expr: ts.Expression): boolean => {
+    const e = unwrap(expr);
+    if (isOptions(e)) return true;
+    if (ts.isObjectLiteralExpression(e)) {
+      return e.properties.some((p) => ts.isSpreadAssignment(p) && isCopy(p.expression));
+    }
+    if (!ts.isCallExpression(e) || !ts.isIdentifier(e.expression)) return false;
+    if (!OPTION_COPY_FUNCTIONS.has(e.expression.text)) return false;
+    const [receiver, ...rest] = e.arguments;
+    return (
+      (receiver !== undefined && isCopy(receiver)) ||
+      (e.expression.text === "merge" && rest.some(isCopy))
+    );
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      const init = unwrap(node.initializer);
+      if (ts.isObjectBindingPattern(node.name)) {
+        if (isOptions(init)) bind(node.name, false);
+        else if (ts.isIdentifier(init) && bags.has(init.text) && isBag(node.name)) {
+          bind(node.name, true);
+        }
+      } else if (ts.isIdentifier(node.name) && isCopy(init)) {
+        vars.add(node.name.text);
+      }
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left)
+    ) {
+      if (isCopy(node.right)) vars.add(node.left.text);
+      else vars.delete(node.left.text);
+    } else if (ts.isPropertyAccessExpression(node) && isOptions(node.expression)) {
+      const call = node.parent;
+      if (ts.isCallExpression(call) && call.expression === node) {
+        const key = call.arguments[0];
+        if (OPTION_READER_METHODS.has(node.name.text)) {
+          if (key !== undefined && ts.isStringLiteralLike(key)) keys.add(key.text);
+        } else if (!Object.hasOwn(Object.prototype, node.name.text)) {
+          keys.add(node.name.text);
+        }
+      } else if (!isAssignmentTarget(node) && !Object.hasOwn(Object.prototype, node.name.text)) {
+        keys.add(node.name.text);
+      }
+    } else if (ts.isElementAccessExpression(node) && isOptions(node.expression)) {
+      const key = node.argumentExpression;
+      if (ts.isStringLiteralLike(key) && !isAssignmentTarget(node)) keys.add(key.text);
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isObjectLiteralExpression(node.left) &&
+      isOptions(node.right)
+    ) {
+      for (const prop of node.left.properties) {
+        if (ts.isSpreadAssignment(prop)) {
+          if (ts.isIdentifier(prop.expression)) vars.add(prop.expression.text);
+        } else if (prop.name && (ts.isIdentifier(prop.name) || ts.isStringLiteralLike(prop.name))) {
+          keys.add(prop.name.text);
+        }
+      }
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.InKeyword &&
+      ts.isStringLiteralLike(node.left) &&
+      isOptions(node.right)
+    ) {
+      keys.add(node.left.text);
+    } else if (ts.isCallExpression(node)) {
+      for (const key of readerKeys(node)) keys.add(key);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(body);
+  return [...keys].sort();
 }
 
 /** Does a type node carry a string/number index signature in its syntax? Covers
@@ -5582,13 +7607,17 @@ function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
   return modifiers?.some((m) => m.kind === kind) ?? false;
 }
 
+function memberNameText(name: ts.MemberName): string {
+  return ts.isPrivateIdentifier(name) ? name.text.slice(1) : name.text;
+}
+
 function getMemberName(member: ts.ClassElement): string | undefined {
   if (member.name) {
     if (ts.isIdentifier(member.name)) {
       return member.name.text;
     }
     if (ts.isPrivateIdentifier(member.name)) {
-      return member.name.text;
+      return ts.isPropertyDeclaration(member) ? member.name.text : member.name.text.slice(1);
     }
     if (ts.isStringLiteral(member.name)) {
       return member.name.text;
@@ -5612,13 +7641,16 @@ function getMemberName(member: ts.ClassElement): string | undefined {
 function declarationArity(
   decl: ts.Declaration | undefined,
   checker: ts.TypeChecker,
-): { params: ParamInfo[]; optionKeys?: string[] | null } {
+): { params: ParamInfo[]; optionKeys?: string[] | null; optionReads?: string[] } {
   const parameters = decl !== undefined ? parameterListOf(decl) : undefined;
   if (parameters === undefined) return { params: [] };
   const optionKeys = extractOptionKeys(parameters, checker);
+  const body = ts.isMethodSignature(decl!) ? undefined : (decl as ts.FunctionLikeDeclaration).body;
+  const optionReads = extractOptionReads(parameters, body);
   return {
     params: extractParameters(parameters),
     ...(optionKeys !== undefined ? { optionKeys } : {}),
+    ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
   };
 }
 
@@ -5672,5 +7704,6 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  void main();
+  const scope = scopeOf(process.argv.slice(2));
+  void main(scope === null ? TS_EXTRACT_PACKAGES : [scope]);
 }

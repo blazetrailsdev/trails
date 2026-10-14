@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { FakeActiveRecordAdapter } from "./fake-adapter.js";
-import { resolve } from "../connection-adapters.js";
+import { load, resolve } from "../connection-adapters.js";
 
 describe("FakeActiveRecordAdapter", () => {
   it("is registered under the name fake", async () => {
-    await expect(resolve("fake")).resolves.toBe(
-      FakeActiveRecordAdapter as unknown as Awaited<ReturnType<typeof resolve>>,
-    );
+    await load("fake");
+    expect(resolve("fake")).toBe(FakeActiveRecordAdapter as unknown as ReturnType<typeof resolve>);
   });
 
   it("primary_key falls back to id", () => {
@@ -20,12 +19,12 @@ describe("FakeActiveRecordAdapter", () => {
   it("merge_column appends synthetic columns readable through columns", () => {
     const adapter = new FakeActiveRecordAdapter({});
     adapter.mergeColumn("fake_contacts", "name", "string");
-    adapter.mergeColumn("fake_contacts", "age", "integer", { null: false, default: 0 });
+    adapter.mergeColumn("fake_contacts", "age", "integer", { null: false, default: "0" });
 
     const columns = adapter.columns("fake_contacts");
     expect(columns.map((c) => c.name)).toEqual(["name", "age"]);
     expect(columns[1].null).toBe(false);
-    expect(columns[1].default).toBe(0);
+    expect(columns[1].default).toBe("0");
     expect(columns[0].sqlTypeMetadata?.sqlType).toBe("string");
     expect(columns[0].sqlTypeMetadata?.type).toBeUndefined();
     expect(columns[1].sqlTypeMetadata?.type).toBe("integer");

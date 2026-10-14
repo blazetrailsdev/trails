@@ -5,7 +5,8 @@ import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";
 import { Trails } from "../rails.js";
 
-type Counted = RouteSetLike & { calls: string[] };
+type Counted = RouteSetLike & { calls: string[]; draw(block: DrawCallback): void };
+const rails = new URL("../rails.js", import.meta.url).href;
 const makeRouteSet = (): Counted => {
   const r: Counted = {
     disableClearAndFinalize: false,
@@ -13,8 +14,12 @@ const makeRouteSet = (): Counted => {
     clearBang: () => void r.calls.push("clear"),
     finalizeBang: () => void r.calls.push("finalize"),
     eagerLoadBang: () => void r.calls.push("eagerLoad"),
-    draw: (block: DrawCallback) =>
-      block({ get: (path: string) => void r.calls.push(`get ${path}`) } as unknown as Mapper),
+    draw: (block: DrawCallback) => {
+      const mapper = {
+        get: (path: string) => void r.calls.push(`get ${path}`),
+      } as unknown as Mapper;
+      block.call(mapper);
+    },
   };
   return r;
 };
@@ -38,10 +43,12 @@ describe("RoutesReloader", () => {
     expect(r.loaded).toBe(false);
     const a = makeRouteSet();
     r.routeSets.push(a);
+    Trails.application = { routes: () => a } as never;
     for (const name of ["a", "b"]) {
       File.write(
         `${tmp}/routes-${name}.ts`,
-        `export function drawRoutes(mapper) { mapper.get("/${name}"); }\n`,
+        `import { Trails } from "${rails}";\n` +
+          `Trails.application.routes().draw(function () { this.get("/${name}"); });\n`,
       );
       r.paths.push(`${tmp}/routes-${name}.ts`);
     }

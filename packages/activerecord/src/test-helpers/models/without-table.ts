@@ -1,4 +1,5 @@
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class WithoutTable extends Base {
   static {
@@ -7,3 +8,4 @@ export class WithoutTable extends Base {
     });
   }
 }
+registerModel(WithoutTable);

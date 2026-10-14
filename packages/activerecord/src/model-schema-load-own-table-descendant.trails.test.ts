@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { registerSubclass } from "./inheritance.js";
+import { registerModel } from "./associations.js";
 import { loadSchema } from "./model-schema.js";
 import { defaultValue } from "./type.js";
 
@@ -13,7 +13,7 @@ function col(name: string): Cols[string] {
 
 function makeAdapter(tables: Record<string, Cols>, asked: string[]): unknown {
   return adapterDouble({
-    internalSchemaCache: {
+    schemaCache: {
       isCached: () => true,
       getCachedColumnsHash: (table: string) => {
         asked.push(table);
@@ -42,13 +42,13 @@ async function buildHierarchy(asked: string[]) {
     }
   }
   class Circle extends Shape {}
-  registerSubclass(Circle);
+  registerModel(Circle);
   class Ticket extends Circle {
     static override tableName = "tickets";
   }
-  registerSubclass(Ticket);
+  registerModel(Ticket);
   class VipTicket extends Ticket {}
-  registerSubclass(VipTicket);
+  registerModel(VipTicket);
 
   for (const klass of [Shape, Circle, Ticket, VipTicket]) {
     await establishConnectionTo(klass, makeAdapter(tables, asked) as never);

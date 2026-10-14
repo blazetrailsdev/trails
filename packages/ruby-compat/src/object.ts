@@ -1,34 +1,137 @@
+import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
+import { Enumerable } from "./enumerable.js";
+import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
-import { isSymbol } from "./symbol.js";
-import { rubyClass, type Comparable } from "./comparable.js";
+import { rbCheckStringType, stringValue } from "./string/support.js";
+import { rbPlus } from "./numeric.js";
+import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
+import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
+import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
+import { rbEql, rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
+import { temporalTag } from "./temporal-tag.js";
+import { rbRegToS } from "./regexp.js";
 import { NoMethodError } from "./no-method-error.js";
+import { Hash } from "./hash.js";
+import { registeredConstant } from "./variable.js";
+
+type Klass = abstract new (...args: never) => unknown;
 
 /**
- * `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`) over the values trails carries:
- * the immediates Ruby answers a class for without a heap object, the
- * {@link rubyClass} brand, and otherwise the constructor's own name.
+ * `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:265`), `Object#class`: the
+ * class object, read as `rb_class_of`
+ * (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`) reads it for the
+ * immediates Ruby answers a class for without a heap object, and otherwise
+ * the constructor, which a singleton class leaves naming the real class.
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
- *  which one it is is read off the value; a Temporal value carrying an instant
- *  is a Ruby `Time`, by the same reading `cmp` orders it with.
+ *  which one it is is read off the value; a `Uint8Array` is the binary
+ *  `String` seat, and an instance of a `Uint8Array` subclass is an instance of
+ *  that String subclass, whose ancestry `class_search_ancestor` continues
+ *  into `String`'s at `Uint8Array.prototype`; a Temporal value carrying an instant
+ *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
+ *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
+ *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
+ *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`, and a
+ *  record whose prototype chain holds no class is a `Hash`. `-0` is a whole
+ *  `number` and so an `Integer`, though Ruby has no negative Integer zero: JS
+ *  integer arithmetic answers `-0` (`Math.round(-0.4)`, `0 * -1`) where Ruby
+ *  answers `0`, so reading it as `-0.0` would turn those into Floats. The
+ *  Float `-0.0` is the boxed `new Number(-0)`.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`).
+ * @noRailsEquivalent PERMANENT
  */
-export function rbObjClass(x: unknown): string {
-  if (x === null || x === undefined) return "NilClass";
-  if (typeof x === "boolean") return x ? "TrueClass" : "FalseClass";
-  if (typeof x === "bigint") return "Integer";
-  if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
-  if (x instanceof Number) return "Float";
-  if (typeof x === "string") return "String";
-  const branded = (x as Comparable)[rubyClass];
+export function rbObjClass(obj: unknown): Klass {
+  if (obj === null || obj === undefined) return rbCNilClass;
+  if (typeof obj === "boolean") return obj ? rbCTrueClass : rbCFalseClass;
+  if (typeof obj === "bigint") return rbCInteger;
+  if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
+  if (obj instanceof Number) return rbCFloat;
+  if (typeof obj === "string") return rbCString;
+  if (obj instanceof Uint8Array) {
+    const klass = obj.constructor;
+    const nodeBuffer = (globalThis as { Buffer?: unknown }).Buffer;
+    return klass === Uint8Array || klass === nodeBuffer ? rbCString : (klass as Klass);
+  }
+  if (typeof obj === "function") {
+    return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
+      ? rbCClass
+      : rbCProc;
+  }
+  if (hasEpochNanoseconds(obj)) {
+    return reopened(
+      (obj as { [rubyClass]?: string })[rubyClass] === "DateTime" ? rbCDateTime : rbCTime,
+    ) as Klass;
+  }
+  const tag = temporalTag(obj);
+  if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;
+  if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime) as Klass;
+  if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
+  if (isPlainHash(obj)) return Hash;
+  const klass = (obj as object).constructor as Klass | undefined;
+  if (klass === Date) return reopened(rbCTime) as Klass;
+  return typeof klass === "function" ? klass : Object;
+}
+
+/**
+ * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
+ * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
+ * interpolates `obj.class`, or the {@link rubyClass} brand.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjClassname(x: unknown): string {
+  const branded = typeof x === "object" && x !== null ? (x as Comparable)[rubyClass] : null;
   if (branded != null) return branded;
-  if (hasEpochNanoseconds(x)) return "Time";
-  if (isPlainHash(x)) return "Hash";
-  return (x as object).constructor?.name ?? typeof x;
+  return rbModToS(rbObjClass(x));
+}
+
+/**
+ * `rb_obj_frozen_p` (`vendor/ruby/v3.3.11/object.c:1296`), `Object#frozen?`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjFrozenP(obj: unknown): boolean {
+  return Object.isFrozen(obj);
+}
+
+/**
+ * `rb_set_class_path_string` (`vendor/ruby/v3.3.11/variable.c:407`), by which
+ * `declare_under` (`vendor/ruby/v3.3.11/vm_insnhelper.c:5375`) paths a class
+ * after the cbase it is declared in: `under`'s path, `::`, and `name`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbSetClassPathString(
+  klass: abstract new (...args: never) => unknown,
+  under: { readonly name: string | null },
+  name: string,
+): void {
+  const permanent =
+    typeof under === "function"
+      ? (classpaths.get(under)?.permanent ?? Boolean(under.name))
+      : under.name != null;
+  const str =
+    typeof under === "function"
+      ? rbModToS(under as abstract new (...args: never) => unknown)
+      : (under.name ?? rbAnyToS(under));
+  classpaths.set(klass, { path: `${str}::${name}`, permanent });
+}
+
+/**
+ * The one class object a core class has once a gem reopens it
+ * (`class Date extends rbCDate`, seated by `registerConstant`): MRI has one
+ * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`), so the seat and
+ * the class reopening it are the same class. A class nothing reopens is
+ * answered as it is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function reopened(klass: object): object {
+  const path = classpaths.get(klass)?.path;
+  return path === undefined ? klass : (registeredConstant(path) ?? klass);
 }
 
 function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
@@ -39,7 +142,13 @@ function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigin
   );
 }
 
-const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
+/**
+ * `FL_SINGLETON` (`vendor/ruby/v3.3.11/include/ruby/internal/fl_type.h:58`), the
+ * flag marking a class as some object's singleton class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
 
 /**
  * `rb_obj_singleton_class` (`vendor/ruby/v3.3.11/object.c:288`), Ruby's
@@ -76,6 +185,180 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
 }
 
 /**
+ * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
+ * the singleton class when the object has one, where {@link rbObjClass}
+ * skips it, and the class {@link rbObjClass} answers otherwise.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassOf(obj: unknown): Klass {
+  if (typeof obj === "object" && obj !== null) {
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+      return proto[FL_SINGLETON] as Klass;
+    }
+  }
+  return rbObjClass(obj);
+}
+
+/**
+ * `T_ICLASS` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:140`), the
+ * type of the hidden class an `include` or `extend` splices into an ancestry. A link
+ * carries the module it stands for under this key.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const T_ICLASS = Symbol.for("@blazetrails/ruby-compat:T_ICLASS");
+
+/**
+ * `rb_class_superclass` (`vendor/ruby/v3.3.11/object.c:2191`), `Class#superclass`:
+ * the next `T_CLASS` in the ancestry, so the iclass an `extend` put above the
+ * class is skipped, where `Object.getPrototypeOf` answers it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassSuperclass<T extends object>(klass: T): T | null {
+  let superclass = Object.getPrototypeOf(klass) as object | null;
+  while (superclass && Object.prototype.hasOwnProperty.call(superclass, T_ICLASS)) {
+    superclass = Object.getPrototypeOf(superclass) as object | null;
+  }
+  return superclass === Function.prototype ? null : (superclass as T | null);
+}
+
+/**
+ * The `classpath` seat `RCLASS_SET_CLASSPATH`
+ * (`vendor/ruby/v3.3.11/internal/class.h:258`) writes: the path `const_set`
+ * gave a class or module, and whether it is permanent.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
+
+/** `rb_define_class` (`vendor/ruby/v3.3.11/class.c:972`) for a core class no JS constructor seats. */
+function rbDefineClass(name: string, superclass: Klass = Object): new () => object {
+  const klass = class extends (superclass as new () => object) {};
+  classpaths.set(klass, { path: name, permanent: true });
+  return klass;
+}
+
+/**
+ * `rb_cBasicObject` (`vendor/ruby/v3.3.11/object.c:4200`). `Object.prototype`
+ * is the seat of `Object`, so this prototype has no parent.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCBasicObject = rbDefineClass("BasicObject");
+Object.setPrototypeOf(rbCBasicObject.prototype, null);
+
+/**
+ * `rb_cClass` (`vendor/ruby/v3.3.11/object.c:4203`), a `Module` once include.ts loads.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCClass = rbDefineClass("Class");
+
+/**
+ * `rb_cNumeric` (`vendor/ruby/v3.3.11/numeric.c:6156`). `Rational`
+ * (`vendor/ruby/v3.3.11/rational.c:2759`), `Complex`
+ * (`vendor/ruby/v3.3.11/complex.c:2529`) and `BigDecimal`
+ * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4407`) are seated beneath
+ * it at the foot of include.ts, not by `extends`: this module reaches
+ * rational.ts through string/method-table.ts and kernel-format.ts, so an
+ * `extends rbCNumeric` reads the binding before this module body has run
+ * whenever this module is entered first.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCNumeric = rbDefineClass("Numeric");
+/** `Numeric#integer?` (`vendor/ruby/v3.3.11/numeric.rb:29`). */
+Object.defineProperty(rbCNumeric.prototype, "isInteger", {
+  value: function isInteger(): boolean {
+    return false;
+  },
+  writable: true,
+  configurable: true,
+});
+
+/**
+ * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12121`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCString = rbDefineClass("String");
+
+/**
+ * `rb_cSymbol` (`vendor/ruby/v3.3.11/string.c:12290`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCSymbol = rbDefineClass("Symbol");
+
+/**
+ * `rb_cTime` (`vendor/ruby/v3.3.11/time.c:5832`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCTime = rbDefineClass("Time");
+
+/**
+ * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCDate = rbDefineClass("Date");
+
+/**
+ * `cDateTime` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9984`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCDateTime = rbDefineClass("DateTime", rbCDate);
+
+/**
+ * `rb_cNilClass` (`vendor/ruby/v3.3.11/object.c:4412`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCNilClass = rbDefineClass("NilClass");
+
+/**
+ * `rb_cTrueClass` (`vendor/ruby/v3.3.11/object.c:4498`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCTrueClass = rbDefineClass("TrueClass");
+
+/**
+ * `rb_cFalseClass` (`vendor/ruby/v3.3.11/object.c:4510`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCFalseClass = rbDefineClass("FalseClass");
+
+/**
+ * `rb_cInteger` (`vendor/ruby/v3.3.11/numeric.c:6190`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
+/** `Integer#integer?` (`vendor/ruby/v3.3.11/numeric.rb:178`). */
+rbModDefineMethod(rbCInteger, "isInteger", () => true);
+
+/**
+ * `rb_cFloat` (`vendor/ruby/v3.3.11/numeric.c:6259`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCFloat = rbDefineClass("Float", rbCNumeric);
+const rbCProc = rbDefineClass("Proc");
+
+const SPECIAL_CONST_CLASSES: ReadonlySet<unknown> = new Set([
+  rbCNilClass,
+  rbCTrueClass,
+  rbCFalseClass,
+  rbCInteger,
+  rbCFloat,
+  rbCString,
+]);
+
+function classSeatMethodTable(recv: unknown): object | null {
+  if (typeof recv === "function") return null;
+  if (recv && typeof recv === "object" && !(recv instanceof Number || recv instanceof Uint8Array)) {
+    return null;
+  }
+  if (isSymbol(recv)) return rbCSymbol.prototype;
+  const klass = rbObjClass(recv);
+  return SPECIAL_CONST_CLASSES.has(klass) ? (klass.prototype as object) : null;
+}
+
+/**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
  * @noRailsEquivalent PERMANENT
@@ -88,7 +371,10 @@ export function rbModSingletonP(klass: unknown): boolean {
  * `rb_mod_to_s` (`vendor/ruby/v3.3.11/object.c:1710-1742`), `Module#to_s` /
  * `Module#inspect`: a singleton class renders `#<Class:` plus its attached
  * object — `rb_inspect` for a class or module, `rb_any_to_s` otherwise — and
- * `>`; any other class renders its name. Ruby's refinement arm has no JS seat.
+ * `>`; any other class renders `rb_class_name`: its name, or for an anonymous
+ * class the `#<Class:0x…>` path `make_temporary_path`
+ * (`vendor/ruby/v3.3.11/variable.c:320-336`) gives it. Ruby's refinement arm
+ * has no JS seat.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -106,7 +392,123 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
 
     return s;
   }
-  return klass.name;
+  return classpaths.get(klass)?.path ?? (klass.name || `#<Class:${objAddress(klass)}>`);
+}
+
+/**
+ * `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122-127`), `Module#name`: the
+ * classpath `const_set` gave the class, else the name its definition gave it,
+ * or `nil` while it is anonymous.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModName(klass: object): string | null {
+  return classpaths.get(klass)?.path ?? ((klass as { name?: string | null }).name || null);
+}
+
+/**
+ * The methods a package defines on `Object`, as `rb_define_method` on
+ * `rb_cObject` (`vendor/ruby/v3.3.11/class.c:2134`) does, keyed by the camelCased Ruby
+ * name, which {@link rbFSend} dispatches for a receiver whose own class
+ * defines none: ActiveSupport's `Object#in?`
+ * (`activesupport/lib/active_support/core_ext/object/inclusion.rb:15`) is
+ * reached by `value.public_send(:in?, range)` on an Integer.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const OBJECT_METHOD_TABLE: Record<string, (self: never, ...args: never[]) => unknown> =
+  Object.create(null);
+
+/**
+ * The methods a package defines on `Enumerable`, keyed by the camelCased Ruby
+ * name, which {@link rbFSend} dispatches and {@link basicObjRespondTo} answers
+ * for on the receivers `each` is bound for: a JS array, a `Set`, and a `Map`
+ * or plain hash, whose Ruby classes include `Enumerable`
+ * (`vendor/ruby/v3.3.11/array.c:8606`, `lib/set.rb:221`, `hash.c:7184`).
+ * ActiveSupport's `Enumerable#maximum`
+ * (`activesupport/lib/active_support/core_ext/enumerable.rb:40`) is reached by
+ * `object.try(:maximum, :updated_at)` on an Array of records.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ENUMERABLE_METHOD_TABLE: Record<string, (self: never, ...args: never[]) => unknown> =
+  Object.create(null);
+
+function enumerableMethod(
+  obj: unknown,
+  mid: string,
+): ((...args: unknown[]) => unknown) | undefined {
+  return Object.hasOwn(ENUMERABLE_METHOD_TABLE, mid) &&
+    (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
+    ? (ENUMERABLE_METHOD_TABLE[mid] as (...args: unknown[]) => unknown)
+    : undefined;
+}
+
+/**
+ * `rb_include_module(rb_cArray, rb_mEnumerable)` (`vendor/ruby/v3.3.11/array.c:8606`):
+ * the ported `Enumerable` module, which {@link rbFSend} dispatches and
+ * {@link basicObjRespondTo} answers for on an Array that has no member or
+ * `ARRAY_METHOD_TABLE` entry of that name.
+ */
+const enumerableModule = (): Record<string, AnyFunction> =>
+  Enumerable as unknown as Record<string, AnyFunction>;
+
+/**
+ * `rb_obj_is_proc` (`vendor/ruby/v3.3.11/proc.c:120`): a function that is not
+ * a class, which is what a block or a lambda is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjIsProc(proc: unknown): proc is AnyFunction {
+  return typeof proc === "function" && rbObjClass(proc) === rbCProc;
+}
+
+/**
+ * The methods a package defines on `Class`, as `rb_define_method` on
+ * `rb_cClass` (`vendor/ruby/v3.3.11/class.c:2134`) does, keyed by the camelCased Ruby
+ * name, which {@link basicObjRespondTo} answers for a class receiver:
+ * ActiveSupport's `Class#class_attribute`
+ * (`activesupport/lib/active_support/core_ext/class/attribute.rb:86`) is what
+ * `respond_to?(:class_attribute)` asks of a class and not of a module.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const CLASS_METHOD_TABLE: Record<string, (self: never, ...args: never[]) => unknown> =
+  Object.create(null);
+
+/**
+ * The methods bound on a Temporal seat, keyed by its `Symbol.toStringTag` and
+ * then by the camelCased Ruby name, which {@link rbFSend} dispatches and
+ * {@link basicObjRespondTo} answers for: a Temporal value's prototype carries
+ * none of them. `to_date` is Ruby's own, for Date and DateTime
+ * (`date_to_date` and `datetime_to_date`,
+ * `vendor/ruby/v3.3.11/ext/date/date_core.c:10054,10058`). A package that
+ * reopens one of those classes, as ActiveSupport's `core_ext/date_time` does,
+ * assigns an entry, as it does on `STRING_METHOD_TABLE`. A JS `Date`, which
+ * spells a Ruby Time at the boundary and has no such tag, is keyed `"Date"`:
+ * the date package seats `Time#utc?`, `#getutc` and `#getlocal`
+ * (`vendor/ruby/v3.3.11/time.c:4340,4425,4374`) there and on
+ * `Temporal.Instant`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const TEMPORAL_METHOD_TABLE: Record<
+  string,
+  Record<string, (self: never, ...args: never[]) => unknown>
+> = {
+  "Temporal.PlainDate": { toDate: (self: unknown) => self },
+  "Temporal.PlainDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+  "Temporal.ZonedDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+};
+
+function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unknown) | undefined {
+  const table =
+    obj == null
+      ? undefined
+      : TEMPORAL_METHOD_TABLE[temporalTag(obj) ?? (obj instanceof Date ? "Date" : "")];
+  return table !== undefined && Object.hasOwn(table, mid)
+    ? (table[mid] as (...args: unknown[]) => unknown)
+    : undefined;
 }
 
 /**
@@ -121,29 +523,71 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * never by a property read a `methodMissingProxy` `get` trap would answer.
  * `isEmpty` is bound for the core receivers `ruby-empty.ts`'s `isEmpty` answers
  * `empty?` for (`array.c:2686`, `hash.c:3023`, `string.c:2243`), whose JS
- * values carry no such member.
+ * values carry no such member. `isInclude` is bound for the same receivers and
+ * `Set`, which define `include?` (`array.c:8679`, `hash.c:7255`,
+ * `string.c:12215`, `lib/set.rb:393`), and `toSym` for every JS string
+ * (`string.c:12212`), which spells both a Ruby String and a Ruby Symbol
+ * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
+ * (`array.c:8619`), whose prototype carries no such member. `each` is bound
+ * for a JS array, a `Set`, and a `Map` or plain hash (`array.c:8642`,
+ * `lib/set.rb:499`, `hash.c:7219`), and `eachPair` for a `Map` or plain hash
+ * (`hash.c:7218`). `isInfinite` and
+ * `isFinite` are bound for a JS number and bigint, which spell Float
+ * (`numeric.c:6376-6377`) and Integer (`numeric.rb:39-48`). A Temporal seat answers for the methods
+ * {@link TEMPORAL_METHOD_TABLE} binds on it.
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
  * what Ruby keeps in class-level ivars, not methods, and the lookup stops
  * short of `Function.prototype`, whose `call` / `apply` / `bind` no Ruby
- * `Module` defines.
+ * `Module` defines. A plain function's own `length` and `name` are its JS
+ * arity and function name, which no Ruby `Proc` defines.
  *
- * A writer `name=` is answered by a JS accessor's setter, the entry
- * {@link rbFSend} dispatches it to.
+ * A writer `name=` is answered by a JS accessor's setter or by a `setName`
+ * method, the conventions table's two writer spellings and the entries
+ * {@link rbFSend} dispatches it to. An underscore-prefixed writer
+ * (`_reflections=`) is a `class_attribute` storage slot and has no `set*`
+ * spelling.
  *
- * A PRIVATE entry, and under `BOUND_RESPONDS` a PROTECTED one, answers `0`
- * when `pub` is set (`method_boundp`, `vm_method.c:1788-1818`), so the name
- * falls through to `respond_to_missing?`. JS carries no visibility of its own;
- * the entry's is what {@link rbModPrivate} / {@link rbModProtected} recorded.
+ * `method_boundp` (`vm_method.c:1788-1818`) answers `0` for a PRIVATE entry,
+ * and under `BOUND_RESPONDS` a PROTECTED one, when `pub` is set. A JS entry
+ * carries no visibility, so a defined name answers the same at both `pub`
+ * values and `pub` reaches only `respond_to_missing?` (see CLAUDE.md, "Method
+ * visibility is compile-time only").
  *
  * @noRailsEquivalent PERMANENT — Ruby core `basic_obj_respond_to`
  * (`vendor/ruby/v3.3.11/vm_method.c:2864`).
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
-  if (typeof obj === "string" && mid === "toStr") return true;
+  if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
+  if (Array.isArray(obj) && mid === "toAry") return true;
   if (
-    mid === "isEmpty" &&
+    (typeof obj === "number" || typeof obj === "bigint") &&
+    (mid === "isInfinite" || mid === "isFinite")
+  ) {
+    return true;
+  }
+  if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
+  if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
+  if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
+  if (temporalMethod(obj, mid) !== undefined) return true;
+  if (enumerableMethod(obj, mid) !== undefined) return true;
+  if (
+    mid === "each" &&
+    (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
+  ) {
+    return true;
+  }
+  if (mid === "eachPair" && (obj instanceof Map || isPlainHash(obj))) return true;
+  if (mid === "toHash" && (obj instanceof Map || isPlainHash(obj))) return true;
+  if (
+    mid === "get" &&
+    (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
+  ) {
+    return true;
+  }
+  if (
+    (mid === "isEmpty" || mid === "isInclude") &&
     (typeof obj === "string" ||
       Array.isArray(obj) ||
       obj instanceof Set ||
@@ -155,23 +599,34 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   const klass =
     typeof obj === "function" &&
     Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false;
+  if (typeof obj === "function" && !klass && (mid === "length" || mid === "name")) return false;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
   for (
     let o: object | null = Object(obj);
     o && !(klass && o === Function.prototype);
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    const visi = methodVisibilities.get(o)?.get(mid);
-    if (visi !== undefined) {
-      if (pub && visi !== "public") break;
-      return true;
-    }
     const entry = Object.getOwnPropertyDescriptor(o, mid);
     if (entry) {
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
     }
     if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
+    if (
+      writer !== undefined &&
+      typeof Object.getOwnPropertyDescriptor(o, writer)?.value === "function"
+    ) {
+      return true;
+    }
+  }
+  if (klass && Object.hasOwn(CLASS_METHOD_TABLE, mid)) return true;
+  for (
+    let o = classSeatMethodTable(obj);
+    o && o !== Object.prototype;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
   let cme: PropertyDescriptor | undefined;
   for (
@@ -186,158 +641,431 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   return ret != null && ret !== false;
 }
 
-type MethodVisibility = "public" | "protected" | "private";
-
-const methodVisibilities = new WeakMap<object, Map<string, MethodVisibility>>();
-
-function methodEntryVisi(obj: unknown, mid: string): MethodVisibility | undefined {
-  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
-    const visi = methodVisibilities.get(o)?.get(mid);
-    if (visi !== undefined) return visi;
-    if (Object.getOwnPropertyDescriptor(o, mid)) return "public";
-  }
-  return undefined;
-}
-
-function setMethodVisibility(
-  module: { prototype: object; name: string },
-  mids: string[],
-  visi: MethodVisibility,
-): void {
-  const owner = module.prototype;
-  for (const mid of mids) {
-    const defined =
-      mid in owner ||
-      (mid.endsWith("=") && typeof lookupSetter(owner, mid.slice(0, -1)) === "function");
-    if (!defined) {
-      throw new NameError(`undefined method '${mid}' for class '${module.name}'`, mid);
-    }
-    let table = methodVisibilities.get(owner);
-    if (!table) methodVisibilities.set(owner, (table = new Map()));
-    table.set(mid, visi);
-  }
-}
-
-function lookupSetter(obj: object, name: string): ((value: unknown) => unknown) | undefined {
-  for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
-    const desc = Object.getOwnPropertyDescriptor(o, name);
-    if (desc) return desc.set;
-  }
-  return undefined;
-}
-
 /**
- * `Module#private` with method names (`rb_mod_private`, `vendor/ruby/v3.3.11/vm_method.c:2516`,
- * through `set_method_visibility`, `:2388`): records each instance method of
- * `module` as PRIVATE, where {@link basicObjRespondTo} and {@link rbFPublicSend}
- * read it. A JS accessor's setter answers the Ruby writer `name=`.
+ * `Object#respond_to_missing?` (`obj_respond_to_missing`,
+ * `vendor/ruby/v3.3.11/vm_method.c:3009`), the default a class's own
+ * `respond_to_missing?` reaches through `super`: it answers false for every
+ * name.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Module#private` (`vendor/ruby/v3.3.11/vm_method.c:2516`).
+ * @noRailsEquivalent PERMANENT — Ruby core `obj_respond_to_missing`
+ * (`vendor/ruby/v3.3.11/vm_method.c:3009`).
  */
-export function rbModPrivate(module: { prototype: object; name: string }, ...mids: string[]): void {
-  setMethodVisibility(module, mids, "private");
+export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean): boolean {
+  return false;
 }
 
-/**
- * `Module#protected` with method names (`rb_mod_protected`,
- * `vendor/ruby/v3.3.11/vm_method.c:2482`); see {@link rbModPrivate}.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Module#protected` (`vendor/ruby/v3.3.11/vm_method.c:2482`).
- */
-export function rbModProtected(
-  module: { prototype: object; name: string },
-  ...mids: string[]
-): void {
-  setMethodVisibility(module, mids, "protected");
+function writerSpelling(attr: string | undefined): string | undefined {
+  if (attr === undefined || attr.startsWith("_")) return undefined;
+  return camelized(`set_${attr}`);
+}
+
+function camelized(name: string): string {
+  return name.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
 }
 
 function checkDefinitionVisibility(
   mod: { prototype: object },
   mid: string,
-): MethodVisibility | undefined {
+  inherit = true,
+): boolean {
+  const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
   for (
     let o: object | null = mod.prototype;
     o && o !== Object.prototype;
+    o = inherit ? (Object.getPrototypeOf(o) as object | null) : null
+  ) {
+    const me = Object.getOwnPropertyDescriptor(o, mid);
+    if (me) return typeof me.value === "function" || me.get !== undefined;
+    if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
+    if (
+      writer !== undefined &&
+      typeof Object.getOwnPropertyDescriptor(o, writer)?.value === "function"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * `Module#method_defined?` (`rb_mod_method_defined`,
+ * `vendor/ruby/v3.3.11/vm_method.c:2055`). A JS entry carries no visibility, so
+ * it answers as {@link rbModPublicMethodDefined} does. A writer `name=` is
+ * answered by a JS accessor's setter or a `setName` method, the entries
+ * {@link rbFSend} dispatches to. A false `inherit` answers for `mod`'s
+ * own method table only (`check_definition_visibility`, `vm_method.c:2000-2013`).
+ * A `Module` instance keeps its method table on a private carrier and answers
+ * through its own `isMethodDefined`, for that table only whatever `inherit` is:
+ * a ruby-compat `Module` copies an included module's methods into its includer
+ * and records no ancestor to walk.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModMethodDefined(
+  mod: { prototype: object } | { isMethodDefined(mid: string): boolean },
+  mid: string,
+  inherit = true,
+): boolean {
+  if (!("prototype" in mod)) return mod.isMethodDefined(mid);
+  return checkDefinitionVisibility(mod, mid, inherit);
+}
+
+/**
+ * `Module#define_method` on a class receiver (`rb_mod_define_method`,
+ * `vendor/ruby/v3.3.11/proc.c:2325`): binds `body` as `mod`'s instance method
+ * `mid`. `body` is the block, or the method `define_method(symbol, method)`
+ * takes, whose JS carrier is a property descriptor (see
+ * `Module#instanceMethod`), so a zero-argument reader can be defined as the
+ * accessor it ports to. A JS class has no metaclass apart from its own
+ * statics (CLAUDE.md, "`singleton_class` is a per-object subclass"), so a
+ * class's `singleton_class.define_method` passes `{ prototype: klass }`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModDefineMethod(
+  mod: { prototype: object },
+  mid: string,
+  body: ((...args: never[]) => unknown) | PropertyDescriptor,
+): string {
+  Object.defineProperty(
+    mod.prototype,
+    mid,
+    typeof body === "function"
+      ? { value: body, writable: true, configurable: true }
+      : { configurable: true, ...body },
+  );
+  return mid;
+}
+
+/**
+ * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`). A JS accessor is one
+ * descriptor, so the half not being defined keeps the nearest entry's; the
+ * ivar lives in the `_`-prefixed field ({@link rbDeclareIvar}).
+ */
+function rbAttr(klass: { prototype: object }, id: string, read: boolean, write: boolean): void {
+  const attriv = `_${id}`;
+  rbDeclareIvar(klass, `@${id.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`, attriv);
+  let me: PropertyDescriptor | undefined;
+  for (
+    let o: object | null = klass.prototype;
+    o && !me;
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    const visi = methodVisibilities.get(o)?.get(mid);
-    if (visi !== undefined) return visi;
-    const me = Object.getOwnPropertyDescriptor(o, mid);
-    if (me) return typeof me.value === "function" || me.get ? "public" : undefined;
+    me = Object.getOwnPropertyDescriptor(o, id);
   }
-  return undefined;
+  Object.defineProperty(klass.prototype, id, {
+    configurable: true,
+    get: read
+      ? function (this: Record<string, unknown>) {
+          return this[attriv] ?? null;
+        }
+      : me?.get,
+    set: write
+      ? function (this: Record<string, unknown>, val: unknown) {
+          this[attriv] = val;
+        }
+      : me?.set,
+  });
+}
+
+/**
+ * `Module#attr_reader` (`rb_mod_attr_reader`, `vendor/ruby/v3.3.11/object.c:2279`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModAttrReader(klass: { prototype: object }, ...argv: string[]): void {
+  for (const id of argv) {
+    rbAttr(klass, id, true, false);
+  }
+}
+
+/**
+ * `Module#attr_writer` (`rb_mod_attr_writer`, `vendor/ruby/v3.3.11/object.c:2335`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModAttrWriter(klass: { prototype: object }, ...argv: string[]): void {
+  for (const id of argv) {
+    rbAttr(klass, id, false, true);
+  }
 }
 
 /**
  * `Module#public_method_defined?` (`rb_mod_public_method_defined`,
  * `vendor/ruby/v3.3.11/vm_method.c:2098`, through `check_definition_visibility`,
- * `:1988`): whether `mod`'s instances have a PUBLIC method `mid`, reading the
- * visibility {@link rbModPrivate} / {@link rbModProtected} recorded. A JS method
- * or accessor is a method entry; a data property is not, and neither is an
- * `Object.prototype` member, which no Ruby class defines.
+ * `:1988`): whether `mod`'s instances have a method `mid`. A JS method entry
+ * carries no visibility, so every defined one is PUBLIC (see CLAUDE.md, "Method
+ * visibility is compile-time only"). A JS method or accessor is a method
+ * entry; a data property is not, and neither is an `Object.prototype` member,
+ * which no Ruby class defines.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Module#public_method_defined?`
  * (`vendor/ruby/v3.3.11/vm_method.c:2098`).
  */
 export function rbModPublicMethodDefined(mod: { prototype: object }, mid: string): boolean {
-  return checkDefinitionVisibility(mod, mid) === "public";
+  return checkDefinitionVisibility(mod, mid);
 }
 
 /**
  * `Kernel#public_send` (`rb_f_public_send`, `vendor/ruby/v3.3.11/vm_eval.c:1350`): `send`
- * restricted to public methods, so a PRIVATE or PROTECTED entry raises
- * `NoMethodError` instead of being called. The nearest entry answers: a writer
- * `name=` is either a `name=` method or a JS accessor's `name` setter. An
+ * restricted to public methods. A JS entry carries no visibility, so a defined
+ * name dispatches exactly as {@link rbFSend} does (see CLAUDE.md, "Method
+ * visibility is compile-time only"). The nearest entry answers: a writer
+ * `name=` is a `name=` method, a JS accessor's `name` setter, or a `setName`
+ * method. An
  * unbound name goes to the receiver's `method_missing`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/v3.3.11/vm_eval.c:1350`).
  */
-export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
-  return sendInternal(args.length, [mid, ...args], recv, "public");
+export function rbFPublicSend(recv: unknown, mid: unknown, ...args: unknown[]): unknown {
+  return sendInternal(args.length, [mid, ...args], recv);
+}
+
+/**
+ * Ruby's `obj.to_sym` send: `String#to_sym` (`rb_str_intern`,
+ * `vendor/ruby/v3.3.11/symbol.c:862`, bound at `vendor/ruby/v3.3.11/string.c:12212`)
+ * and `Symbol#to_sym` (`vendor/ruby/v3.3.11/symbol.rb:8`). A JS string spells
+ * both receivers and answers the Symbol's colon spelling (`":name"`); no other
+ * core receiver defines `to_sym`, so the send raises `NoMethodError`. It is
+ * the send, where {@link stringToSym} is `rb_str_intern` on a known String,
+ * as `toI` is to `rbStrToI`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toSym(obj: unknown): string {
+  if (typeof obj === "string") return stringToSym(obj);
+  if (obj == null) throw new NoMethodError("undefined method 'to_sym' for nil", "to_sym");
+  throw new NoMethodError(
+    `undefined method 'to_sym' for an instance of ${rbObjClassname(obj)}`,
+    "to_sym",
+    [],
+    false,
+    { receiver: obj },
+  );
+}
+
+/**
+ * Ruby's `obj.to_s` send for a receiver that may be a Symbol: `Symbol#to_s`
+ * (`rb_sym_to_s`, `vendor/ruby/v3.3.11/string.c:11734`) answers the name of a
+ * colon-spelled Symbol (`":name"`), and every other receiver answers as
+ * {@link rbObjAsString} does (`String#to_s` is `rb_str_to_s`,
+ * `vendor/ruby/v3.3.11/string.c:6648`). It is the send, where
+ * {@link symbolToS} is `rb_sym_to_s` on a known Symbol, as `toSym` is to
+ * `stringToSym`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toS(obj: string): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: Uint8Array): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: string | Uint8Array): string | Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: unknown): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: unknown): string | Uint8Array {
+  if (isSymbol(obj)) return symbolToS(obj);
+  return rbObjAsString(obj);
 }
 
 /**
  * `Kernel#send` (`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`): calls the nearest
  * entry for `mid` whatever its visibility. A zero-argument reader ported as a
  * JS accessor or a field answers through its getter or its value, as the Ruby
- * reader it ports would.
+ * reader it ports would. `infinite?` is dispatched for a JS number and bigint,
+ * whose prototypes carry no such member: `Float#infinite?`
+ * (`rb_flo_is_infinite_p`, `vendor/ruby/v3.3.11/numeric.c:1992`) answers `1` /
+ * `-1` for an infinity and `nil` otherwise, as `Integer#infinite?`
+ * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does. `odd?` and `even?` are
+ * dispatched for an Integer alone (`rb_int_odd_p` / `rb_int_even_p`,
+ * `vendor/ruby/v3.3.11/numeric.c:3564,3588`): a Float defines neither. A
+ * predicate sent by its Ruby name (`:odd?`, the value Rails' `NUMBER_CHECKS`
+ * holds) reaches those two arms and `OBJECT_METHOD_TABLE` by its `is`-prefixed
+ * TS spelling; every other lookup, `method_missing` included, sees the name as
+ * sent. An operator is sent by its
+ * Ruby name (`">"`), which has no TS method spelling. `==` is {@link rbEqual},
+ * which sends the receiver's own `==`, and `!=` its negation
+ * (`rb_obj_not_equal`, `vendor/ruby/v3.3.11/object.c:248`). The four ordering
+ * operators answer for the receivers that define them in Ruby: between two
+ * numbers they are `Integer`'s and `Float`'s own (`rb_int_gt`,
+ * `vendor/ruby/v3.3.11/numeric.c:4743`, and `rb_float_gt`, `:1753`), false for
+ * a NaN operand and never raising;
+ * a receiver defining the operator itself (`greaterThan` and its siblings, the
+ * spelling `Date` and `TimeWithZone` give them) answers it; a number against
+ * anything else, and any other `Comparable` receiver (a String, a Time or
+ * Date, or an object defining `<=>`), go through `cmpint`
+ * (`vendor/ruby/v3.3.11/compar.c:105-147`) and raise `ArgumentError` for a pair
+ * `<=>` cannot place. Any other receiver, `nil` included, has no such method
+ * and raises `NoMethodError`. `include?` is dispatched for the core receivers
+ * {@link basicObjRespondTo} binds it for, when no entry of their own answers
+ * (`vendor/ruby/v3.3.11/string.c:12215`, `array.c:8679`, `hash.c:7255`,
+ * `lib/set.rb:393`). A Set or Hash looks a member up by `eql?`, so an object a
+ * JS `has` misses by identity is compared with `rb_eql` against each key.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
-export function rbFSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
-  return sendInternal(args.length, [mid, ...args], recv, "fcall");
+export function rbFSend(recv: unknown, mid: unknown, ...args: unknown[]): unknown {
+  return sendInternal(args.length, [mid, ...args], recv);
 }
 
-function sendInternal(
-  argc: number,
-  argv: [string, ...unknown[]],
-  recv: unknown,
-  scope: "public" | "fcall",
-): unknown {
-  const [mid, ...args] = argv;
-  if (scope === "public") {
-    const visi = methodEntryVisi(recv, mid);
-    if (visi === "private" || visi === "protected") {
-      throw new NoMethodError(
-        `${visi} method '${mid}' called for an instance of ${rbObjClass(recv)}`,
-        mid,
-        { receiver: recv },
-      );
+/**
+ * `conversion_mismatch` (`vendor/ruby/v3.3.11/object.c:3132`): the `TypeError`
+ * a conversion method raises for answering the wrong type.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function conversionMismatch(
+  val: unknown,
+  tname: string,
+  method: string,
+  result: unknown,
+): never {
+  const cname = rbObjClassname(val);
+  throw new TypeError(
+    `can't convert ${cname} to ${tname} (${cname}#${method} gives ${rbObjClassname(result)})`,
+  );
+}
+
+const RELOPS = new Map<string, [string, (c: number) => boolean]>([
+  [">", ["greaterThan", (c) => c > 0]],
+  [">=", ["greaterThanOrEqual", (c) => c >= 0]],
+  ["<", ["lessThan", (c) => c < 0]],
+  ["<=", ["lessThanOrEqual", (c) => c <= 0]],
+]);
+
+function isNumeric(value: unknown): value is number | bigint {
+  return typeof value === "number" || typeof value === "bigint";
+}
+
+function isComparable(recv: unknown): boolean {
+  if (typeof recv === "string") return true;
+  if (typeof recv !== "object" || recv === null) return false;
+  if (recv instanceof Date || recv instanceof Number || temporalTag(recv) !== null) return true;
+  const { compareTo, cmp } = recv as { compareTo?: unknown; cmp?: unknown };
+  return typeof compareTo === "function" || typeof cmp === "function";
+}
+
+/**
+ * The method tables `Module#undef_method` writes its entries into: a data
+ * property holding `undefined` on one of them is `VM_METHOD_TYPE_UNDEF`
+ * (`vendor/ruby/v3.3.11/vm_method.c:1973` `rb_mod_undef_method`), where the
+ * lookup stops and `send` goes to `method_missing`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const UNDEF_METHOD_TABLES = new WeakSet<object>();
+
+function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown): unknown {
+  const [vid, ...args] = argv;
+  const name = rbCheckStringType(vid);
+  if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
+  const mid = isSymbol(name) ? symbolToS(name) : name;
+  const predicate = mid.endsWith("?") ? camelized(`is_${mid.slice(0, -1)}`) : mid;
+  if (argc === 1) {
+    const other = args[0];
+    if (mid === "==") return rbEqual(recv, other);
+    if (mid === "!=") return !rbEqual(recv, other);
+    if (mid === "+" && (isNumeric(recv) || typeof recv === "string" || Array.isArray(recv))) {
+      return rbPlus(recv, other);
     }
+    const [spelling, relop] = RELOPS.get(mid) ?? [];
+    if (relop !== undefined && isNumeric(recv) && isNumeric(other)) {
+      return relop(recv < other ? -1 : recv > other ? 1 : recv == other ? 0 : NaN);
+    }
+    if (spelling !== undefined && rbObjRespondTo(recv, spelling)) {
+      return sendInternal(argc, [spelling, other], recv);
+    }
+    if (relop !== undefined && (isNumeric(recv) || isComparable(recv))) {
+      return relop(rbCmpint(cmp(recv, other), recv, other));
+    }
+  }
+  if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
+    return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
+  }
+  if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isFinite") {
+    return typeof recv === "bigint" || Number.isFinite(recv);
+  }
+  if (
+    (typeof recv === "bigint" || Number.isInteger(recv)) &&
+    (predicate === "isOdd" || predicate === "isEven")
+  ) {
+    return (BigInt(recv as number | bigint) % 2n !== 0n) === (predicate === "isOdd");
+  }
+  const bound = temporalMethod(recv, mid);
+  if (bound !== undefined) return bound(recv, ...args);
+  if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
+    return rbStrSend(recv, mid, ...args)[0];
   }
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
+    if (UNDEF_METHOD_TABLES.has(o) && desc && "value" in desc && desc.value === undefined) break;
     if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);
+    const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
+    if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
+  }
+  for (
+    let o = classSeatMethodTable(recv);
+    o && o !== Object.prototype;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    const desc = Object.getOwnPropertyDescriptor(o, mid);
+    if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
+  }
+  if (mid === "isInclude") {
+    if (typeof recv === "string") return recv.includes(stringValue(args[0]));
+    if (Array.isArray(recv)) return aryIncludes(recv, args[0]);
+    if (recv instanceof Set || recv instanceof Map) {
+      if (recv.has(args[0]) || args[0] === null || typeof args[0] !== "object") {
+        return recv.has(args[0]);
+      }
+      return [...recv.keys()].some((key) => rbEql(key, args[0]));
+    }
+    if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
+    if (recv == null) throw new NoMethodError("undefined method 'include?' for nil", "include?");
+  }
+  if (mid === "each" && typeof args[0] === "function") {
+    const block = args[0] as AnyFunction;
+    if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map) {
+      for (const i of recv) block(i);
+      return recv;
+    }
+    if (isPlainHash(recv)) {
+      for (const key of Object.keys(recv)) block([key, recv[key]]);
+      return recv;
+    }
+  }
+  if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
+  if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
+    return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
+  }
+  if (Array.isArray(recv) && Object.hasOwn(enumerableModule(), mid)) {
+    const each = (block: (i: unknown) => void): void => recv.forEach((i) => block(i));
+    return enumerableModule()[mid].call({ each }, ...args);
+  }
+  const enumerable = enumerableMethod(recv, mid);
+  if (enumerable !== undefined) return enumerable(recv, ...args);
+  if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
+    return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);
   }
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
   }
-  throw new NoMethodError(`undefined method '${mid}' for an instance of ${rbObjClass(recv)}`, mid, {
+  const d =
+    recv == null
+      ? "nil"
+      : recv === true
+        ? "true"
+        : recv === false
+          ? "false"
+          : `an instance of ${rbObjClassname(recv)}`;
+  throw new NoMethodError(`undefined method '${mid}' for ${d}`, mid, args, false, {
     receiver: recv,
   });
 }
@@ -383,7 +1111,7 @@ export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false)
  * errors name their operand by: `builtin_class_name` (`error.c:1189`) answers
  * the LOWERCASE `"nil"` / `"true"` / `"false"` for those three immediates —
  * `Float(nil)` is `can't convert nil into Float`, not `NilClass` — and
- * everything else falls through to {@link rbObjClass}.
+ * everything else falls through to {@link rbObjClassname}.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_builtin_class_name` (`vendor/ruby/v3.3.11/error.c:1216`).
  */
@@ -391,7 +1119,7 @@ export function rbBuiltinClassName(x: unknown): string {
   if (x === null || x === undefined) return "nil";
   if (x === true) return "true";
   if (x === false) return "false";
-  return rbObjClass(x);
+  return rbObjClassname(x);
 }
 
 /**
@@ -408,6 +1136,25 @@ export function rbBuiltinClassName(x: unknown): string {
  */
 export function rbInspect(value: unknown): string {
   return inspectValue(value, new Set());
+}
+
+/**
+ * Node's `util.inspect` (`console.log`, an assertion diff, a spy matcher)
+ * renders an object by walking its fields, where Ruby's `p`
+ * (`rb_p`, `vendor/ruby/v3.3.11/io.c:9023`) prints `rb_inspect(obj)`. This
+ * defines the `nodejs.util.inspect.custom` hook on `klass` as its own
+ * `inspect`, so a class that ports `inspect` is printed by it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbDefineInspectCustom(klass: { prototype: { inspect(): unknown } }): void {
+  Object.defineProperty(klass.prototype, Symbol.for("nodejs.util.inspect.custom"), {
+    value(this: { inspect(): unknown }) {
+      return this.inspect();
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 /**
@@ -449,32 +1196,83 @@ export function rbObjInspect(obj: object): string {
  */
 export function rbAnyToS(obj: object): string {
   const cname = typeof obj === "function" ? "Proc" : obj.constructor.name;
+  return `#<${cname}:${objAddress(obj)}>`;
+}
+
+function objAddress(obj: object): string {
   let address = objAddresses.get(obj);
   if (address === undefined) {
     address = nextObjAddress += 8;
     objAddresses.set(obj, address);
   }
-  return `#<${cname}:0x${address.toString(16).padStart(16, "0")}>`;
+  return `0x${address.toString(16).padStart(16, "0")}`;
 }
 
 /**
- * `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`), `Kernel#object_id`: a stable integer
- * handed out on first use by `rb_find_object_id` (`gc.c:4883`), starting at
+ * `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`), `Kernel#object_id`. A heap
+ * object answers a stable integer handed out on first use, starting at
  * `OBJ_ID_INITIAL` and `OBJ_ID_INCREMENT` apart (`gc.c:3826-3827`, a 40-byte
- * `RVALUE` on 64-bit).
+ * `RVALUE` on 64-bit). A special constant answers its own `VALUE`
+ * (`rb_find_object_id`, `gc.c:4883-4898`): `nil` is 4, `true` 20, `false` 0
+ * (`vendor/ruby/v3.3.11/include/ruby/internal/special_consts.h:98-100`), a
+ * Fixnum `n` is `2n + 1`, and a flonum is the rotated bits
+ * `rb_float_new_inline` packs it into
+ * (`vendor/ruby/v3.3.11/internal/numeric.h:243-262`).
+ *
+ * @boundary: a JS `number` is the seat for both `Integer` and `Float`, read
+ *  off the value as {@link rbObjClassname} reads it, so `1.0`, `0.0` and `-0`
+ *  answer the Fixnum id where MRI answers a flonum's. A JS string has no
+ *  identity, so each send hands out a fresh id, as a fresh `String` would get;
+ *  a Symbol's static id is not modelled. A Bignum and a Float outside the
+ *  flonum range are heap objects in MRI and get a fresh id the same way. An id
+ *  past `Number.MAX_SAFE_INTEGER` is a bigint.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbObjId(obj: object): number {
-  let id = objIds.get(obj);
-  if (id === undefined) {
-    id = nextObjectId;
-    nextObjectId += OBJ_ID_INCREMENT;
-    objIds.set(obj, id);
+export function rbObjId(obj: object): number;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`). */
+export function rbObjId(obj: unknown): number | bigint;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`). */
+export function rbObjId(obj: unknown): number | bigint {
+  if (typeof obj === "number" && !Number.isInteger(obj)) {
+    flonumBits.setFloat64(0, obj);
+    const v = flonumBits.getBigUint64(0);
+    const bits = Number((v >> 60n) & 0x7n);
+    if (v !== 0x3000000000000000n && ((bits - 3) & ~0x01) === 0) {
+      const rotated = BigInt.asUintN(64, (v << 3n) | (v >> 61n));
+      return fixId(BigInt.asIntN(64, (rotated & ~0x01n) | 0x02n));
+    }
+  } else if (typeof obj === "number" || typeof obj === "bigint") {
+    const n = BigInt(obj);
+    if (n >= FIXNUM_MIN && n <= FIXNUM_MAX) return fixId(2n * n + 1n);
+  } else if (obj === null || obj === undefined) {
+    return 4;
+  } else if (obj === true) {
+    return 20;
+  } else if (obj === false) {
+    return 0;
+  } else if (typeof obj === "object" || typeof obj === "function") {
+    let id = objIds.get(obj);
+    if (id === undefined) {
+      id = nextObjectId;
+      nextObjectId += OBJ_ID_INCREMENT;
+      objIds.set(obj, id);
+    }
+    return id;
   }
+  const id = nextObjectId;
+  nextObjectId += OBJ_ID_INCREMENT;
   return id;
 }
 
+function fixId(id: bigint): number | bigint {
+  const n = Number(id);
+  return Number.isSafeInteger(n) ? n : id;
+}
+
+const FIXNUM_MAX = (1n << 62n) - 1n;
+const FIXNUM_MIN = -(1n << 62n);
+const flonumBits = new DataView(new ArrayBuffer(8));
 const OBJ_ID_INCREMENT = 20;
 const OBJ_ID_INITIAL = OBJ_ID_INCREMENT * 2;
 const objIds = new WeakMap<object, number>();
@@ -500,6 +1298,7 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (value instanceof RegExp) return regDesc(value);
   const own = (value as { inspect?: unknown }).inspect;
   if (typeof own === "function") return String((own as () => unknown).call(value));
+  if (value instanceof Error) return excInspect(value);
   if (
     typeof value === "function" &&
     Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
@@ -507,7 +1306,20 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "function") return rbAnyToS(value);
+  if (typeof value === "object" && !(value instanceof Uint8Array)) {
+    const str: unknown = rbObjAsString(value);
+    return typeof str === "string" ? str : rbObjInspect(value);
+  }
   return String(value);
+}
+
+/** `exc_inspect` (`vendor/ruby/v3.3.11/error.c:1677-1703`), `Exception#inspect`. */
+function excInspect(exc: Error): string {
+  const klass = rbObjClassname(exc);
+  const str = exc.message;
+  if (str.length === 0) return klass;
+  if (str.includes("\n")) return `#<${klass}:${stringInspect(str)}>`;
+  return `#<${klass}: ${str}>`;
 }
 
 function symInspect(sym: string): string {
@@ -585,10 +1397,25 @@ function inspectAry(ary: unknown[], recursing: Set<object>): string {
   }
 }
 
-function isPlainHash(value: unknown): value is Record<string, unknown> {
+/**
+ * `RB_TYPE_P(obj, T_HASH)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:122`)
+ * for the object-literal half of a trails Hash: an object whose prototype
+ * chain reaches `Object.prototype` through no class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isPlainHash(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
-  const proto: unknown = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+  for (
+    let proto: object | null = Object.getPrototypeOf(value);
+    proto !== null;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    if (proto === Object.prototype) return true;
+    const klass: unknown = Object.getOwnPropertyDescriptor(proto, "constructor")?.value;
+    if (typeof klass === "function" && klass.prototype === proto) return false;
+  }
+  return true;
 }
 
 /**
@@ -598,8 +1425,24 @@ function isPlainHash(value: unknown): value is Record<string, unknown> {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rtest(obj: unknown): boolean {
+export function rtest<T>(obj: T): obj is Exclude<T, null | undefined | false> {
   return obj !== null && obj !== undefined && obj !== false;
+}
+
+/**
+ * Ruby's `obj.nil?` send: `NilClass#nil?` is `rb_true`
+ * (`vendor/ruby/v3.3.11/object.c:4425`) and `Kernel#nil?` is `rb_false`
+ * (`object.c:4371`), which a class may override
+ * (`ActiveRecord::Relation::QueryAttribute#nil?`). JS has no method on `null`
+ * or `undefined`, the two spellings of Ruby's `nil`, so the send is a
+ * function; an override is spelled `isNil`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isNil(obj: unknown): boolean {
+  if (obj === null || obj === undefined) return true;
+  if (rbObjRespondTo(obj, "isNil")) return (obj as { isNil(): boolean }).isNil();
+  return false;
 }
 
 /**
@@ -607,18 +1450,53 @@ export function rtest(obj: unknown): boolean {
  * `Array#to_s` and `Hash#to_s` are aliases of `inspect`
  * (`vendor/ruby/v3.3.11/array.c:8616`, `vendor/ruby/v3.3.11/hash.c:7197`), so those two classes
  * render through {@link rbInspect}; every other value — a String above all,
- * which `rb_obj_as_string` returns unquoted — is its own `to_s`.
+ * which `rb_obj_as_string` returns unquoted — is its own `to_s`. A
+ * `Uint8Array` is the binary String seat (see {@link rbEqual}), so it is
+ * returned as it is (`string.c:1658`), and so is one a receiver's `to_s`
+ * answers (`rb_obj_as_string_result`, `string.c:1666`). Otherwise
+ * it is a send (`rb_funcall(obj, idTo_s, 0)`, `string.c:1661`): a ported class
+ * defining `toS` answers it, and an answer that is not a String falls back to
+ * {@link rbAnyToS}. A ported `String` subclass that is not a JS string
+ * (`ActiveSupport::SafeBuffer`) is an instance of {@link rbCString}, which is
+ * the `T_STRING` test on a `toS` answer, as it is for any class built on
+ * `rbCString`; `to_str` is never called. MRI returns that String itself, and
+ * the port returns its contents, since a Ruby String is a JS string primitive
+ * (CLAUDE.md, "Ruby Strings are JS string primitives").
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string`
  * (`vendor/ruby/v3.3.11/string.c:1653`); JS `String(x)` is not the same function, since
  * it gives the comma-joined form for a nested Array and `[object Object]` for a
  * Hash.
  */
-export function rbObjAsString(value: unknown): string {
+export function rbObjAsString(value: Uint8Array | { toString(): Uint8Array }): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
+export function rbObjAsString(value: unknown): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
+export function rbObjAsString(value: unknown): string | Uint8Array {
   if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (value instanceof RegExp) return rbRegToS(value);
+  if (rbObjRespondTo(value, "toS")) {
+    const str = (value as { toS(): unknown }).toS();
+    if (str instanceof Uint8Array) return str;
+    if (typeof str === "string") return str;
+    return str instanceof rbCString ? String(str) : rbAnyToS(value as object);
+  }
+  if (
+    typeof value === "function" &&
+    Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
+  ) {
+    return rbModToS(value as abstract new (...args: never) => unknown);
+  }
+  if (typeof value === "object") {
+    const str: unknown = value.toString();
+    if (typeof str === "string" || str instanceof Uint8Array) return str;
+    return rbAnyToS(value);
+  }
   return String(value);
 }
 
@@ -728,6 +1606,18 @@ export function rbObjIvarGet(obj: object, iv: string): unknown {
 }
 
 /**
+ * `Kernel#instance_variable_defined?` (`rb_obj_ivar_defined`, `vendor/ruby/v3.3.11/object.c:2942`):
+ * whether `obj` has an own field for ivar `iv`, a `nil`-valued one included.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variable_defined?`
+ * (`vendor/ruby/v3.3.11/object.c:2942`).
+ */
+export function rbObjIvarDefined(obj: object, iv: string): boolean {
+  const id = idForVar(obj, iv);
+  return Object.hasOwn(obj, ivarField(obj, id));
+}
+
+/**
  * `Kernel#instance_variable_set` (`rb_obj_ivar_set_m`, `vendor/ruby/v3.3.11/object.c:2914`):
  * sets ivar `iv` as an own field of `obj`, never through a setter, as
  * `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`) writes the ivar table
@@ -739,7 +1629,7 @@ export function rbObjIvarGet(obj: object, iv: string): unknown {
 export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
   const id = idForVar(obj, iv);
   if (Object.isFrozen(obj)) {
-    throw new FrozenError(`can't modify frozen ${rbObjClass(obj)}: ${rbInspect(obj)}`, {
+    throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {
       receiver: obj,
     });
   }

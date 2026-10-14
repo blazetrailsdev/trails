@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
-import { Types } from "../index.js";
+import * as Types from "../index.js";
 
 describe("BooleanTest", () => {
   it("type cast boolean", () => {

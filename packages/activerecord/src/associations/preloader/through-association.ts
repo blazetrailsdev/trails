@@ -1,43 +1,40 @@
-import type { Nodes } from "@blazetrails/arel";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
-import { WhereClause } from "../../relation/where-clause.js";
-import { pluralize, singularize } from "@blazetrails/activesupport";
+import { any } from "@blazetrails/activesupport";
+import {
+  Hash,
+  first,
+  isEmpty,
+  rbObjRespondTo,
+  reduce,
+  union,
+  uniq,
+} from "@blazetrails/ruby-compat";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
-
-function merge(acc: Map<Base, Base[]>, recordsByOwner: Map<Base, Base[]>): Map<Base, Base[]> {
-  return new Map([...acc, ...recordsByOwner]);
-}
 
 export class ThroughAssociation extends Association {
   private _sourcePreloaders: Association[] | undefined;
   private _throughPreloaders: Association[] | undefined;
-  private _sourceRecordsByOwner: Map<Base, Base[]> | undefined;
-  private _throughRecordsByOwner: Map<Base, Base[]> | undefined;
+  private _sourceRecordsByOwner: Map<Base, Base[]> | null | undefined;
+  private _throughRecordsByOwner: Map<Base, Base[]> | null | undefined;
   private _throughPreloadedRecords: Base[] | undefined;
   private _preloadIndex: Map<Base, number> | undefined;
 
   async preloadedRecords(): Promise<Base[]> {
-    if (this._throughPreloadedRecords !== undefined) return this._throughPreloadedRecords;
-    const records: Base[] = [];
-    for (const loader of await this.sourcePreloaders()) {
-      records.push(...(await loader.preloadedRecords()));
-    }
-    this._throughPreloadedRecords = records;
-    return this._throughPreloadedRecords;
+    return (this._throughPreloadedRecords ??= await (async () => {
+      const records: Base[] = [];
+      for (const l of await this.sourcePreloaders()) records.push(...(await l.preloadedRecords()));
+      return records;
+    })());
   }
 
-  /**
-   * @missingRailsCall any? — PERMANENT
-   * @missingRailsCall first — PERMANENT
-   */
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
-    const result = new Map<Base, Base[]>();
+    const result = new Hash<Base, Base[]>();
 
     for (const owner of this.owners) {
       if (this.isLoaded(owner)) {
@@ -45,9 +42,9 @@ export class ThroughAssociation extends Association {
         continue;
       }
 
-      let throughRecords = (await this.throughRecordsByOwner()).get(owner) ?? [];
+      let throughRecords = (await this.throughRecordsByOwner())!.get(owner) ?? [];
 
-      if (this.owners[0].association(this.throughReflection!.name).loaded) {
+      if (first(this.owners)!.association(this.throughReflection.name).loaded) {
         const sourceType = this.reflection.options.sourceType;
         if (sourceType) {
           throughRecords = throughRecords.filter(
@@ -56,22 +53,15 @@ export class ThroughAssociation extends Association {
         }
       }
 
-      const sourceRecordsByOwner = await this.sourceRecordsByOwner();
+      const sourceRecordsByOwner = (await this.sourceRecordsByOwner())!;
       let records = throughRecords.flatMap((record) => sourceRecordsByOwner.get(record) ?? []);
 
       records = records.filter((record) => record != null);
-      if (this.scope?.orderValues?.length > 0) {
+      if (any(this.scope.orderValues)) {
         const preloadIndex = await this.preloadIndex();
         records.sort((a, b) => (preloadIndex.get(a) ?? 0) - (preloadIndex.get(b) ?? 0));
       }
-      if (this.scope?.distinctValue) {
-        const seen = new Set<Base>();
-        records = records.filter((rhs) => {
-          if (seen.has(rhs)) return false;
-          seen.add(rhs);
-          return true;
-        });
-      }
+      if (this.scope.distinctValue) records = uniq(records);
       result.set(owner, records);
     }
 
@@ -82,66 +72,37 @@ export class ThroughAssociation extends Association {
   async runnableLoaders(): Promise<Association[]> {
     if (await this.dataAvailable()) {
       return [this];
-    }
-
-    const throughPreloaders = await this.throughPreloaders();
-    if (throughPreloaders.every((l) => l.isRun())) {
+    } else if ((await this.throughPreloaders()).every((l) => l.isRun())) {
       const runnable: Association[] = [];
-      for (const loader of await this.sourcePreloaders()) {
-        runnable.push(...(await loader.runnableLoaders()));
-      }
+      for (const l of await this.sourcePreloaders()) runnable.push(...(await l.runnableLoaders()));
+      return runnable;
+    } else {
+      const runnable: Association[] = [];
+      for (const l of await this.throughPreloaders()) runnable.push(...(await l.runnableLoaders()));
       return runnable;
     }
-
-    const runnable: Association[] = [];
-    for (const loader of throughPreloaders) {
-      runnable.push(...(await loader.runnableLoaders()));
-    }
-    return runnable;
   }
 
-  /** @missingRailsCall map — PERMANENT */
   async futureClasses(): Promise<(typeof Base)[]> {
-    if (this.isRun()) return [];
-
-    const throughPreloaders = await this.throughPreloaders();
-    if (throughPreloaders.every((l) => l.isRun())) {
+    if (this.isRun()) {
+      return [];
+    } else if ((await this.throughPreloaders()).every((l) => l.isRun())) {
       const sourceClasses: (typeof Base)[] = [];
-      for (const loader of await this.sourcePreloaders()) {
-        sourceClasses.push(...(await loader.futureClasses()));
-      }
-      const seen = new Set<typeof Base>();
-      return sourceClasses.filter((k) => {
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
+      for (const l of await this.sourcePreloaders())
+        sourceClasses.push(...(await l.futureClasses()));
+      return uniq(sourceClasses);
+    } else {
+      const throughClasses: (typeof Base)[] = [];
+      for (const l of await this.throughPreloaders())
+        throughClasses.push(...(await l.futureClasses()));
+      const sourceClasses = this.sourceReflection.chain
+        .filter(
+          (reflection) =>
+            !(rbObjRespondTo(reflection, "isPolymorphic") && reflection.isPolymorphic()),
+        )
+        .map((reflection) => reflection.klass);
+      return uniq([...throughClasses, ...sourceClasses]);
     }
-
-    const throughClasses: (typeof Base)[] = [];
-    for (const loader of throughPreloaders) {
-      throughClasses.push(...(await loader.futureClasses()));
-    }
-    const sourceRefl = this.sourceReflection;
-    const sourceClasses: (typeof Base)[] = [];
-    if (sourceRefl) {
-      try {
-        for (const chainRefl of sourceRefl.chain) {
-          if (!(chainRefl as any).isPolymorphic?.()) {
-            try {
-              sourceClasses.push(chainRefl.klass);
-            } catch {}
-          }
-        }
-      } catch {}
-    }
-
-    const seen = new Set<typeof Base>();
-    return [...throughClasses, ...sourceClasses].filter((k) => {
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
   }
 
   private async dataAvailable(): Promise<boolean> {
@@ -153,188 +114,109 @@ export class ThroughAssociation extends Association {
   }
 
   private async sourcePreloaders(): Promise<Association[]> {
-    if (this._sourcePreloaders !== undefined) return this._sourcePreloaders;
-
-    const middleRecords = await this.middleRecords();
-    const sourceRefl = this.sourceReflection;
-    if (!sourceRefl || middleRecords.length === 0) {
-      return [];
-    }
-
-    const preloader = Associations.Preloader.new({
-      records: middleRecords,
-      associations: [sourceRefl.name],
+    return (this._sourcePreloaders ??= await Associations.Preloader.new({
+      records: await this.middleRecords(),
+      associations: this.sourceReflection.name,
       scope: this.scope,
       associateByDefault: false,
-    });
-    this._sourcePreloaders = await preloader.loaders();
-    return this._sourcePreloaders;
+    }).loaders());
   }
 
   private async throughPreloaders(): Promise<Association[]> {
-    if (this._throughPreloaders !== undefined) return this._throughPreloaders;
-
-    const throughRefl = this.throughReflection;
-    if (!throughRefl) {
-      this._throughPreloaders = [];
-      return this._throughPreloaders;
-    }
-
-    const preloader = Associations.Preloader.new({
+    return (this._throughPreloaders ??= await Associations.Preloader.new({
       records: this.owners,
-      associations: [throughRefl.name],
+      associations: this.throughReflection.name,
       scope: this.throughScope(),
       associateByDefault: false,
-    });
-    this._throughPreloaders = await preloader.loaders();
-    return this._throughPreloaders;
+    }).loaders());
   }
 
   private async middleRecords(): Promise<Base[]> {
-    return [...(await this.throughRecordsByOwner()).values()].flat();
+    return [...(await this.throughRecordsByOwner())!.values()].flat();
   }
 
-  /** @missingRailsCall map — PERMANENT */
-  private async sourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    if (this._sourceRecordsByOwner === undefined) {
+  /** @missingRailsCall map — CONVERGEABLE preloader-through-records-by-owner-map-awaits-each-loader */
+  private async sourceRecordsByOwner(): Promise<Map<Base, Base[]> | null> {
+    return (this._sourceRecordsByOwner ??= await (async () => {
       const recordsByOwner: Map<Base, Base[]>[] = [];
       for (const l of await this.sourcePreloaders()) recordsByOwner.push(await l.recordsByOwner());
-      this._sourceRecordsByOwner = recordsByOwner.reduce(merge, new Map<Base, Base[]>());
-    }
-    return this._sourceRecordsByOwner;
+      return reduce(recordsByOwner, ":merge") as Map<Base, Base[]> | null;
+    })());
   }
 
-  /** @missingRailsCall map — PERMANENT */
-  private async throughRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    if (this._throughRecordsByOwner === undefined) {
+  /** @missingRailsCall map — CONVERGEABLE preloader-through-records-by-owner-map-awaits-each-loader */
+  private async throughRecordsByOwner(): Promise<Map<Base, Base[]> | null> {
+    return (this._throughRecordsByOwner ??= await (async () => {
       const recordsByOwner: Map<Base, Base[]>[] = [];
       for (const l of await this.throughPreloaders()) recordsByOwner.push(await l.recordsByOwner());
-      this._throughRecordsByOwner = recordsByOwner.reduce(merge, new Map<Base, Base[]>());
-    }
-    return this._throughRecordsByOwner;
+      return reduce(recordsByOwner, ":merge") as Map<Base, Base[]> | null;
+    })());
   }
 
   private async preloadIndex(): Promise<Map<Base, number>> {
-    if (this._preloadIndex !== undefined) return this._preloadIndex;
-    this._preloadIndex = new Map();
-    (await this.preloadedRecords()).forEach((record, index) => {
-      this._preloadIndex!.set(record, index);
-    });
-    return this._preloadIndex;
+    return (this._preloadIndex ??= await (async () => {
+      const result = new Map<Base, number>();
+      (await this.preloadedRecords()).forEach((record, index) => {
+        result.set(record, index);
+      });
+      return result;
+    })());
   }
 
   private throughScope(): any {
-    const throughRefl = this.throughReflection;
-    if (!throughRefl) return undefined;
-
-    let throughKlass: typeof Base;
-    try {
-      throughKlass = throughRefl.klass;
-    } catch {
-      return undefined;
-    }
-
-    let scope = (throughKlass as any).unscoped?.() ?? (throughKlass as any)._allForPreload();
-    const options = (this.reflection as any).options ?? {};
+    let scope: any = this.throughReflection.klass.unscoped();
+    const options = this.reflection.options;
 
     if (options.disableJoins) return scope;
 
-    const reflScope = this.reflectionScope;
-
-    const annotations: string[] = reflScope?.annotateValues ?? [];
-    if (annotations.length > 0) {
-      scope = scope.annotate(...annotations);
+    const values = this.reflectionScope.values();
+    const annotations = values.annotate;
+    if (annotations != null) {
+      scope.annotateBang(...annotations);
     }
 
-    const whereClause = reflScope?.whereClause;
-    if (options.sourceType) {
-      const foreignType = (this.reflection as any).foreignType;
-      if (foreignType) {
-        scope = scope.where({ [foreignType]: options.sourceType });
+    if (options.sourceType != null) {
+      scope.whereBang({ [this.reflection.foreignType!]: options.sourceType });
+    } else if (!this.reflectionScope.whereClause.isEmpty()) {
+      scope.whereClause = this.reflectionScope.whereClause;
+
+      const includes = values.includes;
+      if (includes != null) {
+        scope.includesBang({ [`:${this.sourceReflection.name}`]: includes });
+      } else {
+        scope.includesBang(`:${this.sourceReflection.name}`);
       }
-    } else if (reflScope != null && whereClause != null && !whereClause.isEmpty()) {
-      const sourceRefl = this.sourceReflection;
-      if (sourceRefl) {
-        scope.whereClause = new WhereClause([
-          ...scope.whereClause.predicates,
-          ...whereClause.predicates,
-        ]);
-        const sourceName = `:${sourceRefl.name}`;
-        const nestedIncludes: any[] = reflScope?.includesValues ?? [];
-        if (nestedIncludes.length > 0) {
-          scope = scope.includes({ [sourceName]: nestedIncludes });
-        } else {
-          scope = scope.includes(sourceName);
-        }
 
-        const refs: Array<string | Nodes.SqlLiteral> = reflScope?.referencesValues ?? [];
-        if (refs.length > 0) {
-          scope = scope.references(...refs);
-        } else {
-          scope = scope.references(sourceRefl.klass.tableName);
-        }
+      if (values.references != null && !isEmpty(values.references)) {
+        scope.referencesValues = union(scope.referencesValues, values.references);
+      } else {
+        scope.referencesBang(this.sourceReflection.tableName);
+      }
 
-        const nestedJoins: any[] = reflScope?.joinsValues ?? [];
-        if (nestedJoins.length > 0) {
-          scope = scope.joins({ [sourceName]: nestedJoins });
-        }
+      const joins = values.joins;
+      if (joins != null) {
+        scope.joinsBang({ [`:${this.sourceReflection.name}`]: joins });
+      }
 
-        const nestedLeftOuter: any[] = reflScope?.leftOuterJoinsValues ?? [];
-        if (nestedLeftOuter.length > 0) {
-          scope = scope.leftOuterJoins({ [sourceName]: nestedLeftOuter });
-        }
+      const leftOuterJoins = values.leftOuterJoins;
+      if (leftOuterJoins != null) {
+        scope.leftOuterJoinsBang({ [`:${this.sourceReflection.name}`]: leftOuterJoins });
+      }
 
-        const orderClauses: any[] = reflScope?.orderValues ?? [];
-        if (orderClauses.length > 0) {
-          scope.orderValues = [...scope.orderValues, ...orderClauses];
-        }
+      const orderValues = values.order;
+      if (scope.isEagerLoading && orderValues != null) {
+        scope = scope.order(orderValues);
       }
     }
 
     return this.cascadeStrictLoading(scope);
   }
 
-  private get throughReflection(): AssociationLikeReflection | null {
-    const refl = (this.reflection as any).throughReflection;
-    if (refl) return refl;
-
-    const model = (this.reflection as any).activeRecord;
-    const assocDef = model?._reflectOnAssociation?.(this.reflection.name);
-    if (assocDef?.options?.through) {
-      return model._reflectOnAssociation(
-        assocDef.options.through,
-      ) as AssociationLikeReflection | null;
-    }
-    return null;
+  private get throughReflection(): AssociationLikeReflection {
+    return this.reflection.throughReflection!;
   }
 
-  private get sourceReflection(): AssociationLikeReflection | null {
-    const refl = (this.reflection as any).sourceReflection;
-    if (refl && refl !== this.reflection) return refl;
-
-    const throughRefl = this.throughReflection;
-    if (!throughRefl) return null;
-    const model = (this.reflection as any).activeRecord;
-    const assocDef = model?._reflectOnAssociation?.(this.reflection.name);
-    const sourceNames: string[] = assocDef?.options?.source
-      ? [assocDef.options.source as string]
-      : ((this.reflection as any).sourceReflectionNames?.() ?? []);
-    if (sourceNames.length > 0) {
-      let throughKlass: typeof Base | null = null;
-      try {
-        throughKlass = throughRefl.klass;
-      } catch {}
-      if (throughKlass) {
-        for (const sourceName of sourceNames) {
-          if (!sourceName) continue;
-          const candidates = [sourceName, pluralize(sourceName), singularize(sourceName)];
-          for (const name of candidates) {
-            const r = throughKlass._reflectOnAssociation(name) as AssociationLikeReflection | null;
-            if (r) return r;
-          }
-        }
-      }
-    }
-    return null;
+  private get sourceReflection(): AssociationLikeReflection {
+    return this.reflection.sourceReflection!;
   }
 }

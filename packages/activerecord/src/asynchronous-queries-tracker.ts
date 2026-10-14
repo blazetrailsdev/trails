@@ -39,7 +39,6 @@ export class AsynchronousQueriesTracker {
     asynchronousQueriesTracker.finalizeSession();
   }
 
-  /** @missingRailsCall last — PERMANENT */
   get currentSession(): Session {
     const session = this.#stack[this.#stack.length - 1];
     if (!session)

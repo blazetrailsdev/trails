@@ -1,16 +1,40 @@
+import { LoadError, registerConstant, warn } from "@blazetrails/ruby-compat";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { CacheStore } from "./cache/index.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
+import type { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import type { Logger } from "./logger.js";
+import type { MessagePack } from "./message-pack.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
-const loadPath: Record<string, () => Promise<unknown>> = {};
+const loadPath: Record<string, () => Promise<unknown>> = {
+  "active_support/message_pack": async () => {
+    try {
+      return await import("./message-pack.js");
+    } catch (error) {
+      const { code, message } = error as { code?: unknown; message?: unknown };
+      if (
+        (code !== "ERR_MODULE_NOT_FOUND" && code !== "MODULE_NOT_FOUND") ||
+        !String(message).includes("@blazetrails/msgpack")
+      ) {
+        throw error;
+      }
+      warn(
+        "ActiveSupport::MessagePack requires the msgpack gem, version 1.7.0 or later. " +
+          'Please add it to your Gemfile: `gem "msgpack", ">= 1.7.0"`',
+      );
+      throw new LoadError("cannot load such file -- msgpack", { cause: error });
+    }
+  },
+};
 
 export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
   BroadcastLogger: typeof BroadcastLogger;
+  HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
+  MessagePack?: typeof MessagePack;
 };
 extend(ActiveSupport, Autoload);
 
@@ -38,16 +62,22 @@ export const TopLevel: {
       config: {
         considerAllRequestsLocal: boolean;
         root?: string | null;
-        paths(): { get(path: string): { toAry(): string[] } | undefined };
+        paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
       };
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
+      executor: { wrap<T>(block: () => T): T };
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;
+    Trailtie: abstract new (...args: never[]) => unknown;
     root(): string | null | undefined;
   };
   ActionDispatch?: {
-    Request: new (env: Record<string, unknown>) => unknown;
+    Request: new (env: Record<string, unknown>) => {
+      isGet(): boolean;
+      isHead(): boolean;
+      session: { get(key: string): unknown; set(key: string, value: unknown): unknown };
+    };
     Routing: {
       PolymorphicRoutes: {
         HelperMethodBuilder: { path(): PolymorphicBuilder; url(): PolymorphicBuilder };
@@ -56,7 +86,15 @@ export const TopLevel: {
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
   ActionCable?: { Engine?: unknown };
+  BCrypt?: {
+    Engine: { readonly MIN_COST: number; readonly cost: number };
+    Password: {
+      create(secret: unknown, options?: { cost?: number | false | null }): object;
+      new (rawHash: string): { readonly salt: string; isPassword(secret: unknown): boolean };
+    };
+  };
   AppBuilder?: new (generator: never) => object;
 } = {};
 
 TopLevel.ActiveSupport = ActiveSupport;
+registerConstant("ActiveSupport", ActiveSupport);

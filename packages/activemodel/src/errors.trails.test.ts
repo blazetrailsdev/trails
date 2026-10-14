@@ -13,7 +13,7 @@ import {
   BlockValidator,
 } from "./index.js";
 import { Error as ActiveModelError } from "./error.js";
-import { FrozenError, Hash } from "@blazetrails/ruby-compat";
+import { FrozenError, Hash, NoMethodError } from "@blazetrails/ruby-compat";
 import type { ValidatableRecord } from "./validator.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
@@ -25,6 +25,18 @@ class Person extends Model {
 }
 
 describe("Errors — trails-only coverage", () => {
+  it("a String and a Symbol attribute argument name the same attribute", () => {
+    const e = new Errors(new Person());
+    e.add(":name", ":blank");
+    expect(e.where("name").length).toBe(1);
+    expect(e.where(":name").length).toBe(1);
+    expect(e.added(":name", ":blank")).toBe(true);
+    expect(e.ofKind(":name", ":blank")).toBe(true);
+    expect(e.isInclude(":name")).toBe(true);
+    expect(e.delete(":name")).toEqual(["can't be blank"]);
+    expect(e.isInclude("name")).toBe(false);
+  });
+
   it("add creates an error object and returns it", () => {
     const e = new Errors(new Person());
     e.add("name", ":blank");
@@ -71,7 +83,7 @@ describe("Errors — trails-only coverage", () => {
     e.add("name", ":blank");
     e.add("name", ":too_short");
     e.add("age", ":blank");
-    expect(e.attributeNames).toEqual(["name", "age"]);
+    expect(e.attributeNames).toEqual([":name", ":age"]);
   });
 
   it("custom message overrides default", () => {
@@ -100,7 +112,7 @@ describe("Errors — trails-only coverage", () => {
   it("full_message uses default format", () => {
     const errors = new Errors(new Person());
     expect(errors.fullMessage("name", "is invalid")).toBe("Name is invalid");
-    expect(errors.fullMessage("base", "is invalid")).toBe("is invalid");
+    expect(errors.fullMessage(":base", "is invalid")).toBe("is invalid");
   });
 
   describe("i18nCustomizeFullMessage", () => {
@@ -137,7 +149,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("delete removes errors for attribute", () => {
-    const errors = new Errors({});
+    const errors = new Errors(new Person());
     errors.add("name", ":blank");
     errors.add("name", ":invalid");
     errors.add("age", ":invalid");
@@ -152,7 +164,7 @@ describe("Errors — trails-only coverage", () => {
     errors.add("age", ":invalid");
     const collected: string[] = [];
     errors.each((e) => collected.push(e.attribute));
-    expect(collected).toEqual(["name", "age"]);
+    expect(collected).toEqual([":name", ":age"]);
   });
 
   it("group_by_attribute groups errors", () => {
@@ -161,12 +173,12 @@ describe("Errors — trails-only coverage", () => {
     errors.add("name", ":invalid");
     errors.add("age", ":invalid");
     const grouped = errors.groupByAttribute();
-    expect(grouped["name"].length).toBe(2);
-    expect(grouped["age"].length).toBe(1);
+    expect(grouped.get(":name")!.length).toBe(2);
+    expect(grouped.get(":age")!.length).toBe(1);
   });
 
   it("messages_for returns messages for an attribute", () => {
-    const errors = new Errors({});
+    const errors = new Errors(new Person());
     errors.add("name", ":blank");
     errors.add("name", ":invalid");
     expect(errors.messagesFor("name")).toEqual(["can't be blank", "is invalid"]);
@@ -179,18 +191,18 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("import imports an error from another Errors instance", () => {
-    const errors1 = new Errors({});
+    const errors1 = new Errors(new Person());
     errors1.add("name", ":blank");
-    const errors2 = new Errors({});
+    const errors2 = new Errors(new Person());
     errors2.import(errors1.objects[0]);
     expect(errors2.count).toBe(1);
     expect(errors2.messagesFor("name")).toEqual(["can't be blank"]);
   });
 
   it("import with attribute override", () => {
-    const errors1 = new Errors({});
+    const errors1 = new Errors(new Person());
     errors1.add("name", ":blank");
-    const errors2 = new Errors({});
+    const errors2 = new Errors(new Person());
     errors2.import(errors1.objects[0], { attribute: "title" });
     expect(errors2.messagesFor("title")).toEqual(["can't be blank"]);
   });
@@ -202,7 +214,7 @@ describe("Errors — trails-only coverage", () => {
     e1.add("age", ":invalid");
     e2.copyBang(e1);
     expect(e2.count).toBe(1);
-    expect(e2.attributeNames).toEqual(["age"]);
+    expect(e2.attributeNames).toEqual([":age"]);
   });
 
   it("copy! deep-dups nested option values (matches Rails deep_dup)", () => {
@@ -235,7 +247,7 @@ describe("Errors — trails-only coverage", () => {
     });
 
     it("delete filters by options subset match", () => {
-      const errors = new Errors({});
+      const errors = new Errors(new Person());
       errors.add("age", ":too_short", { count: 3 });
       errors.add("age", ":too_short", { count: 5 });
       const removed = errors.delete("age", ":too_short", { count: 3 });
@@ -292,20 +304,41 @@ describe("Errors — trails-only coverage", () => {
       expect(target.added("name", ":too_short")).toBe(true);
     });
 
+    it("import keeps an :attribute override bare, as an attribute name's Symbol is spelled", () => {
+      const source = new Errors({});
+      source.add("name", ":invalid");
+      const target = new Errors({});
+      target.import(source.objects[0], { attribute: "title" });
+      expect(target.objects[0].attribute).toBe(":title");
+      expect(target.added("title", ":invalid")).toBe(true);
+    });
+
+    it("import raises for a nil :attribute or :type override, which has no to_sym", () => {
+      const source = new Errors({});
+      source.add("name", ":invalid");
+      const target = new Errors({});
+      expect(() => target.import(source.objects[0], { attribute: null as never })).toThrow(
+        NoMethodError,
+      );
+      expect(() => target.import(source.objects[0], { type: null as never })).toThrow(
+        NoMethodError,
+      );
+    });
+
     it("import accepts :attribute and :type override (rawType stays on inner)", () => {
       const source = new Errors({});
       source.add("name", ":invalid");
       const target = new Errors({});
       target.import(source.objects[0], { attribute: "title", type: "wrong" });
       const imported = target.objects[0];
-      expect(imported.attribute).toBe("title");
+      expect(imported.attribute).toBe(":title");
       expect(imported.type).toBe(":wrong");
       expect(imported.rawType).toBe(":invalid");
 
       const copy = new Errors({});
       copy.copyBang(target);
       const round = copy.objects[0];
-      expect(round.attribute).toBe("title");
+      expect(round.attribute).toBe(":title");
       expect(round.type).toBe(":wrong");
       expect(round.rawType).toBe(":invalid");
     });
@@ -346,7 +379,7 @@ describe("Errors — trails-only coverage", () => {
     e2.add("age", ":invalid");
     e2.mergeBang(e1);
     expect(e2.count).toBe(2);
-    const imported = e2.objects.find((e) => e.attribute === "name")!;
+    const imported = e2.objects.find((e) => e.attribute === ":name")!;
     expect(imported.constructor.name).toBe("NestedError");
   });
 
@@ -354,7 +387,7 @@ describe("Errors — trails-only coverage", () => {
     const errors = new Errors(null);
     errors.add("name", ":blank");
     expect(errors.objects).toHaveLength(1);
-    expect(errors.objects[0].attribute).toBe("name");
+    expect(errors.objects[0].attribute).toBe(":name");
   });
 
   it("uniq! removes duplicates with identical attribute/type/options", () => {
@@ -366,7 +399,7 @@ describe("Errors — trails-only coverage", () => {
     errors.add("age", ":too_short", { count: 3 });
     errors.uniqBang();
     expect(errors.count).toBe(3);
-    expect(errors.objects.filter((e) => e.attribute === "age")).toHaveLength(2);
+    expect(errors.objects.filter((e) => e.attribute === ":age")).toHaveLength(2);
   });
 
   describe("add strict + Enumerable (Rails fidelity)", () => {
@@ -374,7 +407,7 @@ describe("Errors — trails-only coverage", () => {
       const errors = new Errors({});
       const err = errors.add("name", ":blank");
       expect(err).toBeInstanceOf(ActiveModelError);
-      expect(err.attribute).toBe("name");
+      expect(err.attribute).toBe(":name");
       expect(err.type).toBe(":blank");
       expect(errors.objects[0]).toBe(err);
     });
@@ -400,7 +433,7 @@ describe("Errors — trails-only coverage", () => {
       for (const e of errors) {
         collected.push(e.attribute);
       }
-      expect(collected).toEqual(["name", "age"]);
+      expect(collected).toEqual([":name", ":age"]);
     });
 
     it("supports spread and Array.from", () => {
@@ -408,7 +441,7 @@ describe("Errors — trails-only coverage", () => {
       errors.add("name", ":blank");
       errors.add("age", ":invalid");
       expect([...errors]).toHaveLength(2);
-      expect(Array.from(errors, (e) => e.attribute)).toEqual(["name", "age"]);
+      expect(Array.from(errors, (e) => e.attribute)).toEqual([":name", ":age"]);
     });
   });
 
@@ -445,7 +478,7 @@ describe("Errors — trails-only coverage", () => {
   it("details shape strips reserved option keys", () => {
     const e = new Errors(null);
     e.add("name", ":blank", { custom: "x", message: "override" });
-    const detail = e.details.get("name")![0];
+    const detail = e.details.get(":name")![0];
     expect(detail.error).toBe(":blank");
     expect(detail.custom).toBe("x");
     expect(detail.message).toBeUndefined();
@@ -462,15 +495,15 @@ describe("Errors — trails-only coverage", () => {
     const e = new Errors(new Person());
     e.add("name", ":blank");
     const full = e.toHash(true);
-    expect(full.get("name")![0]).toContain("Name");
-    expect(full.get("name")![0]).toContain("can't be blank");
+    expect(full.get(":name")![0]).toContain("Name");
+    expect(full.get(":name")![0]).toContain("can't be blank");
   });
 
   it("toHash() with no arg returns short messages", () => {
     const e = new Errors(new Person());
     e.add("name", ":blank");
     const short = e.toHash();
-    expect(short.get("name")![0]).toBe("can't be blank");
+    expect(short.get(":name")![0]).toBe("can't be blank");
   });
 
   it("added returns true for exact type match", () => {
@@ -631,7 +664,7 @@ describe("ValidatableRecord<TBase> type tests", () => {
   });
 
   it("BlockValidator<User> callback receives ValidatableRecord<User>", () => {
-    type BlockFn = ConstructorParameters<typeof BlockValidator<User>>[1];
+    type BlockFn = NonNullable<ConstructorParameters<typeof BlockValidator<User>>[1]>;
     expectTypeOf<Parameters<BlockFn>[0]>().toEqualTypeOf<ValidatableRecord<User>>();
   });
 
@@ -663,5 +696,51 @@ describe("Errors#messages", () => {
     const details = errors.details as Hash<string, unknown>;
     expect(details.isFrozen()).toBe(true);
     expect(() => details.set("name", [])).toThrow(FrozenError);
+  });
+});
+
+describe("Errors frozen readers", () => {
+  it("attribute_names and full_messages_for return frozen arrays", () => {
+    const errors = new Errors(new Person());
+    errors.add("name", ":blank");
+
+    expect(Object.isFrozen(errors.attributeNames)).toBe(true);
+    expect(Object.isFrozen(errors.fullMessagesFor("name"))).toBe(true);
+    expect(errors.attributeNames).toEqual([":name"]);
+  });
+});
+
+describe("Errors holding a Symbol-attribute Error", () => {
+  it("reads an attribute by its String or its Symbol spelling", () => {
+    const errors = new Errors(new Person());
+    errors.add("name", ":blank");
+
+    expect(errors.get(":name")).toEqual(["can't be blank"]);
+    expect(errors.get("name")).toEqual(errors.get(":name"));
+    expect(errors.messagesFor("name")).toEqual(errors.messagesFor(":name"));
+    expect(errors.isInclude("name")).toBe(errors.isInclude(":name"));
+    expect(errors.added("name", ":blank")).toBe(errors.added(":name", ":blank"));
+  });
+
+  it("full_message returns the message alone for :base and not for the String", () => {
+    const errors = new Errors(new Person());
+
+    expect(errors.fullMessage(":base", "is invalid")).toBe("is invalid");
+    expect(errors.fullMessage("base", "is invalid")).toBe("Base is invalid");
+  });
+
+  it("an Error whose @attribute is a Symbol is the attribute Errors#add stores", () => {
+    const person = new Person();
+    const errors = new Errors(person);
+    errors.add("name", ":blank");
+    const loaded = new ActiveModelError(person, ":name", ":invalid");
+    errors.errors.push(loaded);
+
+    expect(loaded.attribute).toBe(":name");
+    expect(errors.attributeNames).toEqual([":name"]);
+    expect(errors.where("name")).toHaveLength(2);
+    expect(errors.messagesFor("name")).toEqual(["can't be blank", "is invalid"]);
+    expect([...errors.messages.keys()]).toEqual([":name"]);
+    expect([...errors.details.keys()]).toEqual([":name"]);
   });
 });

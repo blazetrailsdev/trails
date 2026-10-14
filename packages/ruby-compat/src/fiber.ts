@@ -58,9 +58,11 @@ export class Fiber<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber.yield` (`vendor/ruby/v3.3.11/cont.c:3263`).
    *
    * A JS body cannot be switched away from, so the fiber's body suspends by
-   * awaiting the returned promise, which the next `resume` settles.
+   * awaiting the returned promise, which the next `resume` settles. The
+   * argument is what the suspended `resume` answers (`rb_fiber_yield`,
+   * `cont.c:3193`).
    */
-  static yield(): Promise<void> {
+  static yield(value?: unknown): Promise<void> {
     const fiber = Fiber.current();
     const transfer = fiber.#transfer;
     if (transfer === null) {
@@ -70,7 +72,7 @@ export class Fiber<R = unknown> {
     fiber.#transfer = null;
     return new Promise<void>((resolve) => {
       fiber.#continue = resolve;
-      transfer.resolve(undefined);
+      transfer.resolve(value);
     });
   }
 

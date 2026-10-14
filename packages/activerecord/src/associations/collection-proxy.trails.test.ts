@@ -1,13 +1,11 @@
-import { Range, kernelThrow } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "./collection-proxy.js";
+import type { CollectionAssociation } from "./collection-association.js";
+import { Enumerable, Range, kernelThrow } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
-import {
-  Base,
-  collectionProxyFor as association,
-  registerModel,
-  RecordNotFound,
-} from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { Base, registerModel, RecordNotFound } from "../index.js";
+import { Relation } from "../relation.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -25,21 +23,21 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     for (const title of ["a", "b", "c"]) {
       await Post.create({ title, body: title, author_id: author.id as number });
     }
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     await proxy.loadTarget();
     return author;
   }
 
   it("exposes `length` against the loaded target", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(Array.from(proxy).length).toBe(3);
     expect(proxy.target.length).toBe(3);
   });
 
   it("shadows Relation#length() — use proxy.count() for async count", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     expect(typeof proxy.length).toBe("function");
     expect(await proxy.length()).toBe(3);
     expect(await proxy.count()).toBe(3);
@@ -47,7 +45,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("refuses to coerce `length` to a number", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     await proxy.loadTarget();
 
     expect(() => proxy.length > 0).toThrow(/`length` is a method on a collection/);
@@ -57,15 +55,57 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("is iterable via `for ... of`", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const titles: string[] = [];
     for (const p of proxy) titles.push(p.title);
     expect(titles.sort()).toEqual(["a", "b", "c"]);
   });
 
+  it("iterates the built records of a new owner, which has nothing to find", () => {
+    const author = new Author({ name: "Dev" });
+    const post = author.posts.build({ title: "a", body: "a" });
+    expect(author.posts.isLoaded).toBe(false);
+    expect(Array.from(author.posts)).toEqual([post]);
+    expect(author.posts.isLoaded).toBe(true);
+  });
+
+  it("is not iterable, and starts no load, before a persisted owner's records are loaded", async () => {
+    const author = await authorWithPosts();
+    author.posts.reset();
+    expect(Symbol.iterator in author.posts).toBe(false);
+    expect(author.posts).not.toBe(Post.where({ author_id: author.id }));
+    expect(author.posts.isLoaded).toBe(false);
+    expect(() => {
+      for (const post of author.posts) void post;
+    }).toThrow(TypeError);
+    await author.posts.loadTarget();
+    expect(Array.from(author.posts).length).toBe(3);
+  });
+
+  it("map and findAll are Enumerable's, over a loaded and an unloaded relation", async () => {
+    const author = await authorWithPosts();
+    const unloaded = Post.where({ author_id: author.id }).order("title");
+    expect(Relation.prototype.map).toBe(Enumerable.map);
+    expect(Relation.prototype.findAll).toBe(Enumerable.findAll);
+    for (const name of ["first", "select", "isAny", "isInclude", "sum"] as const) {
+      expect(Relation.prototype[name]).not.toBe(Enumerable[name]);
+    }
+    expect((unloaded as Partial<Iterable<Post>>)[Symbol.iterator]).toBeUndefined();
+    expect(unloaded.isLoaded).toBe(false);
+    expect(await unloaded.map((...args: unknown[]) => args.length)).toEqual([1, 1, 1]);
+    expect(await unloaded.map((p) => p.title)).toEqual(["a", "b", "c"]);
+    expect((await unloaded.findAll((p) => p.title !== "b")).length).toBe(2);
+    expect((await unloaded.drop(1)).length).toBe(2);
+
+    const loaded = await Post.where({ author_id: author.id }).order("title").load();
+    expect(loaded.map((p) => p.title)).toEqual(["a", "b", "c"]);
+    expect([...loaded].length).toBe(3);
+    expect((await loaded.first())?.title).toBe("a");
+  });
+
   it("supports numeric indexing (proxy[0]) — typed via the index signature", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(proxy[0]).toBe(proxy.target[0]);
     expect(proxy[2]).toBe(proxy.target[2]);
     expect(proxy[99]).toBeUndefined();
@@ -73,7 +113,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("at(index) returns the record or undefined", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(proxy.at(0)).toBe(proxy.target[0]);
     expect(proxy.at(-1)).toBe(proxy.target[2]);
     expect(proxy.at(99)).toBeNull();
@@ -81,8 +121,8 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("map / filter / forEach delegate to the target", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
-    expect(proxy.map((p: Post) => p.title).sort()).toEqual(["a", "b", "c"]);
+    const proxy = author.posts;
+    expect((await proxy.map((p: Post) => p.title)).sort()).toEqual(["a", "b", "c"]);
     expect(
       proxy
         .filter((p: Post) => p.title !== "b")
@@ -96,14 +136,14 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("some / every work", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(proxy.some((p: Post) => p.title === "b")).toBe(true);
     expect(proxy.every((p: Post) => p.title.length === 1)).toBe(true);
   });
 
   it("delegates arbitrary Array methods to the loaded target (method_missing)", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const loaded = proxy.target.map((p: Post) => p.title);
     expect(
       (proxy.sort((a: Post, b: Post) => b.title.localeCompare(a.title)) as Post[]).map(
@@ -117,7 +157,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("preserves Relation#includes (eager loading) — proxy.includes routes to Relation", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const first = proxy.at(0)!;
     const rel = proxy.includes(":comments");
     expect(typeof rel?.where).toBe("function");
@@ -127,7 +167,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("preserves Relation#values (query state) — proxy.values routes to Relation", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const v = proxy.values();
     expect(typeof v).toBe("object");
     expect(Array.isArray(v)).toBe(false);
@@ -136,7 +176,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("slice returns a plain array shallow copy", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const tail = proxy.slice(1, 2);
     expect(tail).toEqual(proxy.target.slice(1, 3));
     expect(Array.isArray(tail)).toBe(true);
@@ -147,14 +187,14 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("reduce composes over the target", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const concatenated = proxy.reduce((acc: string, p: Post) => acc + p.title, "");
     expect([...concatenated].sort().join("")).toBe("abc");
   });
 
   it("indexOf / flatMap work", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const second = proxy.at(1);
     expect(proxy.indexOf(second)).toBe(1);
     expect(proxy.flatMap((p: Post) => [p.title, p.title.toUpperCase()])).toEqual(
@@ -164,20 +204,20 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("array spread reads the loaded target", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const titles = [...(proxy as Iterable<Post>)].map((p) => p.title);
     expect(titles.sort()).toEqual(["a", "b", "c"]);
   });
 
   it("Array.from reads the loaded target", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(Array.from(proxy).length).toBe(3);
   });
 
   it("await still resolves to the loaded array (thenable preserved)", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const arr = await proxy;
     expect(arr.map((p) => p.title).sort()).toEqual(["a", "b", "c"]);
   });
@@ -187,7 +227,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     for (const title of ["x", "y"]) {
       await Post.create({ title, body: title, author_id: author.id as number });
     }
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     await proxy;
     expect(proxy.target.length).toBe(2);
     expect(proxy[0]).toBe(proxy.target[0]);
@@ -196,9 +236,9 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("array methods accept a thisArg (matches Array.prototype signatures)", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const ctx = { suffix: "!" };
-    const titles = proxy.map(function (this: { suffix: string }, p: Post) {
+    const titles = proxy.flatMap(function (this: { suffix: string }, p: Post) {
       return p.title + this.suffix;
     }, ctx);
     expect(titles.sort()).toEqual(["a!", "b!", "c!"]);
@@ -206,7 +246,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("reduce supports the no-initial overload (Array.prototype parity)", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const concat = proxy.reduce((acc: Post, p: Post) => {
       return { ...acc, title: acc.title + p.title } as Post;
     });
@@ -215,14 +255,14 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("Array.isArray returns false on the proxy (known limitation)", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(Array.isArray(proxy)).toBe(false);
     expect(Array.isArray(Array.from(proxy))).toBe(true);
   });
 
   it("preserves PK-lookup `find(id)` — Array-style find(predicate) intentionally not added", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const first = (author as any).posts[0];
     const found = await proxy.find(first?.id);
     expect(found?.title).toBe(first?.title);
@@ -233,7 +273,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     for (const title of ["a", "b"]) {
       await Post.create({ title, body: title, author_id: author.id as number });
     }
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const first = await proxy.toArray();
     expect(first.map((p: Post) => p.title).sort()).toEqual(["a", "b"]);
 
@@ -245,7 +285,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("bang builders delegate to scope, leaving load_target untouched", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const scope = proxy.scope();
     proxy.whereBang({ title: "b" });
     expect((await proxy.toArray()).map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
@@ -257,7 +297,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     for (const title of ["c", "a", "b"]) {
       await Post.create({ title, body: title, author_id: author.id as number });
     }
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const scope = proxy.scope();
     proxy.orderBang({ title: "asc" });
     expect((await scope.toArray()).map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
@@ -266,7 +306,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("author.posts is the AssociationProxy itself (Phase R.2 reader swap)", async () => {
     const author = await authorWithPosts();
     const direct = (author as any).posts;
-    const helper = association<Post>(author, "posts");
+    const helper = author.posts;
     expect(direct).toBe(helper);
   });
 
@@ -299,7 +339,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(() => {
       (author as any).posts = [replacement];
     }).toThrow(TypeError);
-    await association<Post>(author, "posts").replace([replacement]);
+    await author.posts.replace([replacement]);
     const reader = (author as any).posts;
     expect(reader.target.length).toBe(1);
     expect(reader[0]?.title).toBe("z");
@@ -307,7 +347,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("clear() invalidates the cached _associationIds (Batch 158 / B32)", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const instance = (author as unknown as { association(name: string): unknown }).association(
       "posts",
     ) as { _associationIds: unknown[] | null };
@@ -318,7 +358,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("destroyAll() invalidates the cached _associationIds (Batch 158 / B32)", async () => {
     const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     const instance = (author as unknown as { association(name: string): unknown }).association(
       "posts",
     ) as { _associationIds: unknown[] | null };
@@ -348,7 +388,8 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
   it("rolls back the nullify update_all when after_remove raises", async () => {
     const author = await AuthorWithRaisingAfterRemove.create({ name: "Owner" });
     const post = await Post.create({ title: "p", body: "p", author_id: author.id as number });
-    const proxy = association<Post>(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation)
+      .reader as unknown as AssociationProxy<Post>;
     await proxy.loadTarget();
 
     await expect(proxy.delete(post)).rejects.toThrow("after_remove boom");
@@ -359,7 +400,7 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
 
   it("does not open a transaction for new-record-only deletes", async () => {
     const author = await Author.create({ name: "Owner" });
-    const proxy = association<Post>(author, "posts") as any;
+    const proxy = author.posts as any;
     const built = proxy.build({ title: "p", body: "p" });
     expect(built.isNewRecord()).toBe(true);
 
@@ -398,19 +439,19 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
 
   it("returns nil when delete is called with no records", async () => {
     const author = await Author.create({ name: "Owner" });
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(await proxy.delete()).toBeUndefined();
   });
 
   it("returns nil when destroy is called with no records", async () => {
     const author = await Author.create({ name: "Owner" });
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(await proxy.destroy()).toBeUndefined();
   });
 
   it("returns [] (not nil) when delete is called with an explicit empty array", async () => {
     const author = await Author.create({ name: "Owner" });
-    const proxy = association<Post>(author, "posts");
+    const proxy = author.posts;
     expect(await (proxy.delete as (...r: unknown[]) => Promise<Base[] | undefined>)([])).toEqual(
       [],
     );
@@ -419,7 +460,8 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
   it("returns nil when a before_remove callback aborts delete", async () => {
     const author = await AuthorWithAbortingBeforeRemove.create({ name: "Owner" });
     const post = await Post.create({ title: "p", body: "p", author_id: author.id as number });
-    const proxy = association<Post>(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation)
+      .reader as unknown as AssociationProxy<Post>;
     await proxy.loadTarget();
 
     expect(await proxy.delete(post)).toBeUndefined();
@@ -442,13 +484,13 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
 
   it("returns nil when a through delete is called with no records", async () => {
     const post = await Post.create({ title: "p", body: "p" });
-    const proxy = association<Tag>(post, "tags");
+    const proxy = post.tags;
     expect(await proxy.delete()).toBeUndefined();
   });
 
   it("returns [] (not nil) when a through delete is called with an explicit empty array", async () => {
     const post = await Post.create({ title: "p", body: "p" });
-    const proxy = association<Tag>(post, "tags");
+    const proxy = post.tags;
     expect(await (proxy.delete as (...r: unknown[]) => Promise<Base[] | undefined>)([])).toEqual(
       [],
     );
@@ -462,7 +504,8 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
       taggable_type: "PostWithAbortingTagRemove",
       tag_id: tag.id as number,
     });
-    const proxy = association<Tag>(post, "tags");
+    const proxy = (post.association("tags") as CollectionAssociation)
+      .reader as unknown as AssociationProxy<Tag>;
     await proxy.loadTarget();
 
     const result = await proxy.delete(tag);
@@ -482,7 +525,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
       taggable_type: "Post",
       tag_id: tag.id as number,
     });
-    const proxy = association<Tag>(post, "tags");
+    const proxy = post.tags;
     await proxy.loadTarget();
 
     await expect((proxy.delete as (...r: unknown[]) => Promise<unknown>)([tag.id])).rejects.toThrow(
@@ -501,7 +544,7 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
 
   it("resolves the persisted FK on updateAll/updateCounters invoked on the proxy after save", async () => {
     const author = new Author({ name: "Proxy Mutation One" });
-    const posts = association<Post>(author, "posts") as any;
+    const posts = author.posts as any;
 
     await author.save();
     const authorId = author.id as number;
@@ -520,7 +563,7 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
 
   it("resolves the persisted FK on the diverged deleteAll branch invoked on the proxy after save", async () => {
     const author = new Author({ name: "Proxy Mutation Two" });
-    const posts = association<Post>(author, "posts") as any;
+    const posts = author.posts as any;
     posts.whereBang({ title: "drop" });
 
     await author.save();
@@ -539,7 +582,9 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
 
   it("resolves the persisted FK on updateAll read again after save", async () => {
     const author = new Author({ name: "Proxy Mutation Four" });
-    (association<Post>(author, "posts") as any).whereBang({ title: "mine" });
+    (author.posts as any).whereBang({
+      title: "mine",
+    });
 
     await author.save();
     const authorId = author.id as number;
@@ -555,7 +600,7 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
 
   it("counts against the persisted FK when read again after save", async () => {
     const author = new Author({ name: "Proxy Mutation Five" });
-    expect(await (association<Post>(author, "posts") as any).count()).toBe(0);
+    expect(await (author.posts as any).count()).toBe(0);
 
     await author.save();
     const authorId = author.id as number;
@@ -570,7 +615,7 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
 
   it("resolves the persisted FK on touchAll invoked on the proxy after save", async () => {
     const ship = new Ship({ name: "Proxy Mutation Three" });
-    const parts = association<ShipPart>(ship, "parts") as any;
+    const parts = ship.parts as any;
 
     await ship.save();
     const shipId = ship.id as number;
@@ -587,7 +632,7 @@ describe("CollectionProxy — a none-scoped association on a persisted owner", (
 
   it("still counts zero through the association scope", async () => {
     const tag = await Tag.find(tags("general").id);
-    const nullTaggings = association(tag as any, "nullTaggings") as any;
+    const nullTaggings = (tag as any).association("nullTaggings").reader;
     expect(tag.isNewRecord()).toBe(false);
     expect(await nullTaggings.count()).toBe(0);
     expect(await nullTaggings.size()).toBe(0);
@@ -599,7 +644,7 @@ describe("CollectionProxy#find — in-memory not-found message fidelity", () => 
 
   it("emits the pluralized aggregate message for a missing id in a loaded inverse_of collection", async () => {
     const firm = await Firm.find(companies("first_firm").id);
-    const proxy = association<Base>(firm, "clientsOfFirm");
+    const proxy = firm.clientsOfFirm as unknown as AssociationProxy<Base>;
     const clients = await proxy.loadTarget();
     expect(clients.length).toBeGreaterThan(0);
     const realId = clients[0].id as number;

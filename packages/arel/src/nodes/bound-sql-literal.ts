@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
-import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbEqual, rbHash, symbolizeKeys } from "@blazetrails/activesupport";
+import { rbInspect, rbModName, rbModConstSet, strCount } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -26,7 +26,7 @@ export class BoundSqlLiteral extends NodeExpression {
       if (hasNamed) {
         throw new BindError(`cannot mix positional and named binds`, sqlWithPlaceholders);
       }
-      const expected = (sqlWithPlaceholders.match(/\?/g) ?? []).length;
+      const expected = strCount(sqlWithPlaceholders, ["?"]);
       if (positionalBinds.length !== expected) {
         throw new BindError(
           `wrong number of bind variables (${positionalBinds.length} for ${expected})`,
@@ -86,10 +86,15 @@ export class BoundSqlLiteral extends NodeExpression {
     }
     return new Fragments([this, other as Node]);
   }
+
+  inspect(): string {
+    const namedBinds = this.namedBinds && symbolizeKeys(this.namedBinds);
+    return `#<${rbModName(this.constructor as typeof BoundSqlLiteral)} ${rbInspect(this.sqlWithPlaceholders)} ${rbInspect(namedBinds || this.positionalBinds)}>`;
+  }
 }
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface BoundSqlLiteral extends _AliasPredication {}
 
-Nodes.BoundSqlLiteral = BoundSqlLiteral;
+rbModConstSet(Nodes, "BoundSqlLiteral", BoundSqlLiteral);

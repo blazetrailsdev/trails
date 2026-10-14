@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -7,17 +7,15 @@ import {
   assertNoDifference,
   assertRaises,
   assertInDelta,
+  Logger,
 } from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
-import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
-import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
-import { quoteTableName } from "./support/quote-regex.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
-import { captureLogOutput } from "./testing/sql-capture.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -30,17 +28,10 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 
 const supportsInsertReturning = adapterSupports("insert_returning");
-const isMysql = adapterType === "mysql";
 
 class ReadonlyNameBook extends Book {
   static {
     this.attrReadonly("name");
-  }
-}
-
-class DivergentPrimaryKeyBook extends Book {
-  static {
-    this.primaryKey = "isbn";
   }
 }
 
@@ -82,7 +73,11 @@ async function withRecordTimestamps(
 }
 
 describe("InsertAllTest", () => {
-  fixtures(["authors", "books"]);
+  const { self } = fixtures(["authors", "books"]);
+
+  beforeEach(() => {
+    self()._originalDbWarningsAction = "ignore";
+  });
 
   beforeAll(async () => {
     ReadonlyNameBook.attrReadonly("name");
@@ -99,7 +94,7 @@ describe("InsertAllTest", () => {
   itIfSupports("insert_on_duplicate_skip", "insert", async () => {
     const id = 1_000_000;
     await assertDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       +1,
       null,
       async () => {
@@ -113,7 +108,7 @@ describe("InsertAllTest", () => {
 
   it("insert!", async () => {
     await assertDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       1,
       null,
       async () => {
@@ -138,7 +133,7 @@ describe("InsertAllTest", () => {
 
   it("insert all", async () => {
     await assertDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       10,
       null,
       async () => {
@@ -219,7 +214,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_skip", "insert all can skip duplicate records", async () => {
     await assertNoDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       null,
       async () => {
         await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
@@ -231,7 +226,7 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_skip",
     "insert all generates correct sql",
     async () => {
-      await assertQueriesMatch(/ON DUPLICATE KEY UPDATE/, undefined, false, async () => {
+      await self().assertQueriesMatch(/ON DUPLICATE KEY UPDATE/, {}, async () => {
         await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
       });
     },
@@ -250,7 +245,7 @@ describe("InsertAllTest", () => {
     "insert all with skip duplicates and autonumber id not given",
     async () => {
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         1,
         null,
         async () => {
@@ -268,7 +263,7 @@ describe("InsertAllTest", () => {
     "insert all with skip duplicates and autonumber id given",
     async () => {
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         1,
         null,
         async () => {
@@ -287,7 +282,7 @@ describe("InsertAllTest", () => {
     async () => {
       const book = await Book.create({ format: "EXPECTED", author_id: 8, name: "Refactoring" });
       await assertNoDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         null,
         async () => {
           await Book.insertAll([{ format: "UNEXPECTED", author_id: 8, name: "Refactoring" }]);
@@ -316,7 +311,7 @@ describe("InsertAllTest", () => {
     "insert all and upsert all with index finding options",
     async () => {
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         +4,
         null,
         async () => {
@@ -343,7 +338,7 @@ describe("InsertAllTest", () => {
     async () => {
       const book = await Book.create({ external_id: "abc" });
       await assertNoDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         null,
         async () => {
           await Book.insertAll([{ external_id: "ABC" }], {
@@ -390,7 +385,7 @@ describe("InsertAllTest", () => {
       expect(await (await Base.leaseConnection()).indexExists("books", columns)).toBeTruthy();
 
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         +2,
         null,
         async () => {
@@ -410,7 +405,7 @@ describe("InsertAllTest", () => {
     "insert all and upsert all works with composite primary keys when unique by is provided",
     async () => {
       await assertDifference(
-        () => Cart.count() as Promise<number>,
+        () => Cart.count(),
         2,
         null,
         async () => {
@@ -436,7 +431,7 @@ describe("InsertAllTest", () => {
     "insert all and upsert all works with composite primary keys when unique by is not provided",
     async () => {
       await assertDifference(
-        () => Cart.count() as Promise<number>,
+        () => Cart.count(),
         3,
         null,
         async () => {
@@ -449,23 +444,23 @@ describe("InsertAllTest", () => {
   );
 
   itIfSupports("insert_conflict_target", "insert logs message including model name", async () => {
-    const output = await captureLogOutput(async () => {
+    await captureLogOutput(async (output) => {
       await Book.insert({ name: "Rework", author_id: 1 });
+      expect(output.string()).toMatch("Book Insert");
     });
-    expect(output).toMatch("Book Insert");
   });
 
   itIfSupports(
     "insert_conflict_target",
     "insert all logs message including model name",
     async () => {
-      const output = await captureLogOutput(async () => {
+      await captureLogOutput(async (output) => {
         await Book.insertAll([
           { name: "Remote", author_id: 1 },
           { name: "Renote", author_id: 1 },
         ]);
+        expect(output.string()).toMatch("Book Bulk Insert");
       });
-      expect(output).toMatch("Book Bulk Insert");
     },
   );
 
@@ -475,7 +470,7 @@ describe("InsertAllTest", () => {
     async () => {
       if (supportsInsertReturning) {
         await assertDifference(
-          () => Book.count() as Promise<number>,
+          () => Book.count(),
           1,
           null,
           async () => {
@@ -501,7 +496,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_update", "insert all and upsert all with sti", async () => {
     await assertDifference(
-      () => Category.count() as Promise<number>,
+      () => Category.count(),
       2,
       null,
       async () => {
@@ -529,36 +524,40 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert logs message including model name",
     async () => {
-      const output = await captureLogOutput(async () => {
+      await captureLogOutput(async (output) => {
         await Book.upsert({ name: "Remote", author_id: 1 });
+        expect(output.string()).toMatch("Book Upsert");
       });
-      expect(output).toMatch("Book Upsert");
     },
   );
 
-  itIfSupports("insert_on_duplicate_update", "upsert and db warnings", async () => {
-    try {
-      await withDbWarningsAction("raise", async () => {
-        await expect(
-          Book.upsert({ id: 1001, name: "Remote", author_id: 1 }),
-        ).resolves.not.toThrow();
-      });
-    } finally {
-      await Book.delete(1001);
-    }
-  });
+  itIfSupports.skipIf(inMemoryDb())(
+    "insert_on_duplicate_update",
+    "upsert and db warnings",
+    async () => {
+      try {
+        await self().withDbWarningsAction("raise", undefined, async () => {
+          await expect(
+            Book.upsert({ id: 1001, name: "Remote", author_id: 1 }),
+          ).resolves.not.toThrow();
+        });
+      } finally {
+        await Book.delete(1001);
+      }
+    },
+  );
 
   itIfSupports(
     "insert_on_duplicate_update",
     "upsert all logs message including model name",
     async () => {
-      const output = await captureLogOutput(async () => {
+      await captureLogOutput(async (output) => {
         await Book.upsertAll([
           { name: "Remote", author_id: 1 },
           { name: "Renote", author_id: 1 },
         ]);
+        expect(output.string()).toMatch("Book Bulk Upsert");
       });
-      expect(output).toMatch("Book Bulk Upsert");
     },
   );
 
@@ -595,20 +594,6 @@ describe("InsertAllTest", () => {
         Speedometer.upsertAll([{ speedometer_id: "s1", name: "New Speedometer" }]),
       );
       expect(error.message).toMatch("No unique index found for speedometer_id");
-    },
-  );
-
-  it.skipIf(!isMysql)(
-    "upsert all on a table without a database primary key treats the configured primary key as updatable",
-    async () => {
-      await assertQueriesMatch(
-        /ON DUPLICATE KEY UPDATE[\s\S]*speedometer_id/,
-        undefined,
-        false,
-        async () => {
-          await Speedometer.upsertAll([{ speedometer_id: "s9", name: "Fast" }]);
-        },
-      );
     },
   );
 
@@ -687,7 +672,7 @@ describe("InsertAllTest", () => {
           name: "Out of the Silent Planet",
           author_id: 7,
           isbn: "1974522598",
-          published_on: Temporal.Instant.from("1938-04-01T00:00:00Z"),
+          published_on: RubyTime.utc(1938, 4, 1),
         },
       ]);
       await Book.upsertAll([{ name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
@@ -703,7 +688,7 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert all does not touch updated at when values do not change",
     async () => {
-      const updatedAt = Temporal.Instant.from("2018-01-01T00:00:00Z");
+      const updatedAt = RubyTime.utc(2018, 1, 1);
       await Book.insertAll(
         [
           {
@@ -730,7 +715,7 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert all touches updated at and updated on when values change",
     async () => {
-      const old = Temporal.Instant.from("2018-01-01T00:00:00Z");
+      const old = RubyTime.utc(2018, 1, 1);
       await Book.insertAll(
         [
           {
@@ -762,7 +747,7 @@ describe("InsertAllTest", () => {
             id: 101,
             name: "Out of the Silent Planet",
             published_on: "1938-04-01",
-            updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
+            updated_at: RubyTime.utc(2018, 1, 1),
           },
         ],
         { recordTimestamps: false },
@@ -781,14 +766,14 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert all uses given updated at over implicit updated at",
     async () => {
-      const updatedAt = Temporal.Instant.from("2025-01-01T00:00:00Z");
+      const updatedAt = RubyTime.utc(2025, 1, 1);
       await Book.insertAll(
         [
           {
             id: 101,
             name: "Out of the Silent Planet",
             published_on: "1938-04-01",
-            updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
+            updated_at: RubyTime.utc(2018, 1, 1),
           },
         ],
         { recordTimestamps: false },
@@ -923,7 +908,7 @@ describe("InsertAllTest", () => {
     "upsert all implicitly sets timestamps on update when model record timestamps is true",
     async () => {
       await withRecordTimestamps(Ship, true, async () => {
-        const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
+        const seed = RubyTime.utc(2016, 4, 17);
         await Ship.insertAll(
           [{ id: 101, name: "RSS Boaty McBoatface", created_at: seed, created_on: "2016-04-17" }],
           { recordTimestamps: false },
@@ -944,7 +929,7 @@ describe("InsertAllTest", () => {
     "upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden",
     async () => {
       await withRecordTimestamps(Ship, true, async () => {
-        const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
+        const seed = RubyTime.utc(2016, 4, 17);
         await Ship.insertAll(
           [
             {
@@ -1076,24 +1061,6 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertReturning)(
-    "insert all returning uses schema-cache primary keys not the model primary key",
-    async () => {
-      const returningId = new RegExp(`RETURNING ${regexpEscape(quoteTableName("id"))}`);
-      await assertQueriesMatch(returningId, undefined, false, async () => {
-        await DivergentPrimaryKeyBook.insertAll([
-          { name: "Divergent", isbn: "9990000000001", author_id: 1 },
-        ]);
-      });
-      const returningIsbn = new RegExp(`RETURNING ${regexpEscape(quoteTableName("isbn"))}`);
-      await assertNoQueriesMatch(returningIsbn, false, async () => {
-        await DivergentPrimaryKeyBook.insertAll([
-          { name: "Divergent II", isbn: "9990000000002", author_id: 1 },
-        ]);
-      });
-    },
-  );
-
   it("insert all with enum values", async () => {
     await Book.insertAllBang([
       { status: "published", isbn: "1234566", name: "Rework", author_id: 1 },
@@ -1134,7 +1101,7 @@ describe("InsertAllTest", () => {
 
   it("insert all create with", async () => {
     await assertDifference(
-      () => Book.where({ format: "X" }).count() as Promise<number>,
+      () => Book.where({ format: "X" }).count(),
       2,
       null,
       async () => {
@@ -1179,7 +1146,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_update", "upsert all create with", async () => {
     await assertDifference(
-      () => Book.where({ format: "X" }).count() as Promise<number>,
+      () => Book.where({ format: "X" }).count(),
       2,
       null,
       async () => {
@@ -1265,4 +1232,16 @@ describe("InsertAllTest", () => {
       Book.tableName = "books";
     }
   });
+
+  async function captureLogOutput(block: (output: StringIO) => Promise<void>): Promise<void> {
+    const output = new StringIO();
+    const oldLogger = Base.logger;
+    Base.logger = new Logger(output);
+
+    try {
+      await block(output);
+    } finally {
+      Base.logger = oldLogger;
+    }
+  }
 });

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet, UrlFor } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
-import { I18n, extend, isPresent, registerConstant } from "@blazetrails/activesupport";
-import { ArgumentError, include } from "@blazetrails/ruby-compat";
+import { I18n, extend, isPresent } from "@blazetrails/activesupport";
+import { ArgumentError, include, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 
 import { Base } from "../../base.js";
 import { LookupContext } from "../../lookup-context.js";
@@ -190,10 +190,12 @@ class Post {
   }
 }
 
+const Blog = { name: "Blog", isUseRelativeModelNaming: () => true };
+registerConstant("Blog", Blog);
+
 class BlogPost {
-  static moduleName = "Blog";
   static {
-    Object.defineProperty(this, "name", { value: "Post" });
+    rbModConstSet(Blog, "Post", this);
     extend(this, Naming);
     include(this, Conversion);
   }
@@ -208,14 +210,12 @@ class BlogPost {
   }
 }
 
-registerConstant("Blog", { name: "Blog", useRelativeModelNaming: () => true, Post: BlogPost });
-
 include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 
 const Routes = new RouteSet();
-Routes.draw((r) => {
-  r.resources("posts", (r) => {
-    r.resources("comments");
+Routes.draw(function () {
+  this.resources("posts", () => {
+    this.resources("comments");
   });
 });
 

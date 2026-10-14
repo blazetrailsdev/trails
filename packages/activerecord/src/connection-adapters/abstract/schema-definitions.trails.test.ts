@@ -50,6 +50,11 @@ describe("ForeignKeyDefinition#export_name_on_schema_dump?", () => {
     expect(definition.isExportNameOnSchemaDump).toBe(false);
     expect(definition.isExportNameOnSchemaDump).toBe(false);
   });
+
+  it("answers nil for a nameless definition", () => {
+    const definition = new ForeignKeyDefinition("astronauts", "rockets", { column: "rocket_id" });
+    expect(definition.isExportNameOnSchemaDump).toBeNull();
+  });
 });
 
 describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
@@ -104,7 +109,7 @@ describe("CheckConstraintDefinition#defined_for?", () => {
 describe("TableDefinition#remove_column", () => {
   const td = (): TableDefinition => {
     const t = new TableDefinition(conn, "astronauts");
-    t.setPrimaryKey("astronauts", true);
+    t.setPrimaryKey("astronauts", "primary_key");
     t.string("name");
     t.integer("rocket_id");
     return t;
@@ -655,7 +660,7 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
 
   it("raises with pk-specific message for primary key columns", () => {
     const td = new TableDefinition(conn, "t");
-    td.setPrimaryKey("t", true);
+    td.setPrimaryKey("t", "primary_key");
     expect(() => td.column("id", "integer", { primaryKey: true })).toThrow(
       "redefine the primary key",
     );
@@ -665,7 +670,7 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
 describe("TableDefinition#primary_key option", () => {
   it("treats primaryKey: 'uuid' as a custom PK column name", () => {
     const td = new TableDefinition(conn, "t");
-    td.setPrimaryKey("t", true, "uuid");
+    td.setPrimaryKey("t", "primary_key", "uuid");
     const pk = td.columns.find((c) => c.options.primaryKey);
     expect(pk?.name).toBe("uuid");
   });
@@ -815,12 +820,12 @@ describe("Table exists-predicate forwarders", () => {
     const t = new Table("users", recordingSchema as never);
     await t.foreignKeyExists("authors", { column: "author_id" });
     await t.foreignKeyExists("authors");
-    await t.foreignKeyExists({ column: "author_id" });
+    await t.foreignKeyExists(undefined, { column: "author_id" });
     await t.foreignKeyExists();
     expect(calls).toEqual([
       ["foreignKeyExists", "users", "authors", { column: "author_id" }],
       ["foreignKeyExists", "users", "authors"],
-      ["foreignKeyExists", "users", { column: "author_id" }],
+      ["foreignKeyExists", "users", undefined, { column: "author_id" }],
       ["foreignKeyExists", "users"],
     ]);
   });

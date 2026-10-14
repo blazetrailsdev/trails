@@ -1,12 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { Time as RubyTime } from "@blazetrails/date";
+import { describe, it, expect, beforeAll } from "vitest";
+import { regexpEscape } from "@blazetrails/ruby-compat";
+import { UnknownAttributeError } from "@blazetrails/activemodel";
 import { Builder } from "./insert-all.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { adapterType } from "./test-adapter.js";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
-import { itIfSupports } from "./support/supports.js";
+import { Speedometer } from "./test-helpers/models/speedometer.js";
+import { assertNoQueriesMatch } from "./testing/query-assertions.js";
+import { adapterSupports, itIfSupports } from "./support/supports.js";
 import type { Base } from "./base.js";
 
 async function withRecordTimestamps(
@@ -28,7 +32,7 @@ describe("InsertAll verify_attributes", () => {
 
   it("accepts rows that differ only in explicitly-given timestamp columns", async () => {
     await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
-      const now = new Date();
+      const now = RubyTime.now();
       await expect(
         Ship.insertAll([
           { name: "RSS Boaty McBoatface", created_at: now, updated_at: now },
@@ -51,7 +55,7 @@ describe("InsertAll verify_attributes", () => {
 });
 
 describe("InsertAll build_insert_sql raw alias syntax", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
 
   it.skipIf(adapterType !== "mysql")("selects the alias arm on MySQL >= 8.0.19", async () => {
     const connection = (await Ship.leaseConnection()) as unknown as {
@@ -63,7 +67,7 @@ describe("InsertAll build_insert_sql raw alias syntax", () => {
       : /ON DUPLICATE KEY UPDATE updated_at=\(CASE WHEN \(`name`<=>VALUES\(`name`\)\).*`name`=VALUES\(`name`\)/;
 
     await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
-      await assertQueriesMatch(expected, 1, false, async () => {
+      await self().assertQueriesMatch(expected, { count: 1 }, async () => {
         await Ship.upsertAll([{ id: 1, name: "RSS Boaty McBoatface" }]);
       });
     });
@@ -121,6 +125,16 @@ describe("InsertAll disallow_raw_sql!", () => {
     );
   });
 
+  itIfSupports(
+    "insert_conflict_target",
+    "names an Array unique_by as Ruby interpolates it when no unique index matches",
+    async () => {
+      await expect(
+        Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: ["isbn", "name"] }),
+      ).rejects.toThrow('No unique index found for ["isbn", "name"]');
+    },
+  );
+
   it("raises for a plain-string on_duplicate or returning, since only a Symbol is safe", async () => {
     await expect(
       Book.upsertAll([{ name: "Rework", author_id: 1 }], { onDuplicate: "skip" as ":skip" }),
@@ -136,4 +150,64 @@ describe("InsertAll disallow_raw_sql!", () => {
       Book.upsertAll([{ name: "Rework", author_id: 1 }], { onDuplicate: ":skip" }),
     ).resolves.toBeDefined();
   });
+});
+
+describe("InsertAll extract_types_from_columns_on", () => {
+  fixtures([]);
+
+  it("raises UnknownAttributeError carrying a new record of the model", async () => {
+    const error = await Book.insertAllBang([{ unknown_attribute: "Test" }]).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(UnknownAttributeError);
+    const { record, attribute } = error as UnknownAttributeError<Book>;
+    expect(record).toBeInstanceOf(Book);
+    expect(record.isNewRecord()).toBe(true);
+    expect(attribute).toBe("unknown_attribute");
+  });
+});
+
+class DivergentPrimaryKeyBook extends Book {
+  static {
+    this.primaryKey = "isbn";
+  }
+}
+
+describe("InsertAllTest (trails)", () => {
+  const { self } = fixtures(["authors", "books"]);
+
+  beforeAll(async () => {
+    await Speedometer.loadSchema();
+  });
+
+  it.skipIf(adapterType !== "mysql")(
+    "upsert all on a table without a database primary key treats the configured primary key as updatable",
+    async () => {
+      await self().assertQueriesMatch(
+        /ON DUPLICATE KEY UPDATE[\s\S]*speedometer_id/,
+        {},
+        async () => {
+          await Speedometer.upsertAll([{ speedometer_id: "s9", name: "Fast" }]);
+        },
+      );
+    },
+  );
+
+  it.skipIf(!adapterSupports("insert_returning"))(
+    "insert all returning uses schema-cache primary keys not the model primary key",
+    async () => {
+      const returningId = new RegExp(`RETURNING ${regexpEscape(self().quoteTableName("id"))}`);
+      await self().assertQueriesMatch(returningId, {}, async () => {
+        await DivergentPrimaryKeyBook.insertAll([
+          { name: "Divergent", isbn: "9990000000001", author_id: 1 },
+        ]);
+      });
+      const returningIsbn = new RegExp(`RETURNING ${regexpEscape(self().quoteTableName("isbn"))}`);
+      await assertNoQueriesMatch(returningIsbn, false, async () => {
+        await DivergentPrimaryKeyBook.insertAll([
+          { name: "Divergent II", isbn: "9990000000002", author_id: 1 },
+        ]);
+      });
+    },
+  );
 });

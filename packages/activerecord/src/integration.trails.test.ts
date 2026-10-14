@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TimeZone, toFs } from "@blazetrails/activesupport";
-import { cacheKey, cacheVersion } from "./integration.js";
+import { cacheKey, cacheVersion, canUseFastCacheVersion } from "./integration.js";
 
 describe("Integration with a TimeWithZone updated_at", () => {
   const twz = TimeZone.find("America/New_York")!.local(2026, 4, 28, 12, 30, 45);
@@ -14,6 +14,13 @@ describe("Integration with a TimeWithZone updated_at", () => {
     }
     return Object.assign(new Model(), {
       id: 1,
+      cacheVersioning,
+      cacheTimestampFormat: "usec",
+      modelName: Model.modelName,
+      cacheVersion,
+      canUseFastCacheVersion,
+      attributeCameFromUser: () => false,
+      maxUpdatedColumnTimestamp: () => twz,
       isNewRecord: () => false,
       hasAttribute: (name: string) => name === "updated_at",
       _readAttribute: () => twz,

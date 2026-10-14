@@ -1,4 +1,4 @@
-import { applyThenable } from "../thenable.js";
+import { AsyncEnumerable, type AsyncEnumerator, aryCount, include } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "../../timestamp.js";
 
 interface BatchRelation {
@@ -6,7 +6,7 @@ interface BatchRelation {
   deleteAll(): Promise<number>;
   updateAll(updates: Record<string, unknown>): Promise<number>;
   destroyAll(): Promise<any[]>;
-  touchAll?(...args: TouchAllArgs): Promise<number>;
+  touchAll(...args: TouchAllArgs): Promise<number>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -16,7 +16,7 @@ export class BatchEnumerator<T extends BatchRelation> {
   readonly finish: unknown;
   readonly relation: any;
   private _cursor: string[];
-  private _order: "asc" | "desc" | ("asc" | "desc")[];
+  private _order: ":asc" | ":desc" | (":asc" | ":desc")[];
   private _useRanges: boolean | null;
   /** @internal */
   _generator!: () => AsyncGenerator<T>;
@@ -27,7 +27,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     finish = null,
     relation,
     cursor,
-    order = "asc",
+    order = ":asc",
     useRanges = null,
   }: {
     of?: number;
@@ -35,7 +35,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     finish?: unknown;
     relation: any;
     cursor: string[];
-    order?: "asc" | "desc" | ("asc" | "desc")[];
+    order?: ":asc" | ":desc" | (":asc" | ":desc")[];
     useRanges?: boolean | null;
   }) {
     this._of = of;
@@ -49,11 +49,6 @@ export class BatchEnumerator<T extends BatchRelation> {
 
   get batchSize(): number {
     return this._of;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
-    yield* this.each();
   }
 
   eachRecord(): AsyncGenerator<any>;
@@ -81,46 +76,26 @@ export class BatchEnumerator<T extends BatchRelation> {
     })();
   }
 
-  /** @missingRailsCall sum — PERMANENT */
-  async deleteAll(): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      total += await batchRelation.deleteAll();
-    }
-    return total;
+  deleteAll(): Promise<number> {
+    return this.sum((relation) => relation.deleteAll());
   }
 
-  /** @missingRailsCall sum — PERMANENT */
-  async updateAll(updates: Record<string, unknown>): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      total += await batchRelation.updateAll(updates);
-    }
-    return total;
+  updateAll(updates: Record<string, unknown>): Promise<number> {
+    return this.sum((relation) => {
+      return relation.updateAll(updates);
+    });
   }
 
-  /** @missingRailsCall sum — PERMANENT */
-  async touchAll(...args: TouchAllArgs): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      if (typeof batchRelation.touchAll === "function") {
-        total += await batchRelation.touchAll(...args);
-      }
-    }
-    return total;
+  touchAll(...args: TouchAllArgs): Promise<number> {
+    return this.sum((relation) => {
+      return relation.touchAll(...args);
+    });
   }
 
-  /**
-   * @missingRailsCall count — PERMANENT
-   * @missingRailsCall sum — PERMANENT
-   */
-  async destroyAll(): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      const records = await batchRelation.destroyAll();
-      total += records.filter((r) => r.isDestroyed?.()).length;
-    }
-    return total;
+  destroyAll(): Promise<number> {
+    return this.sum(async (relation) => {
+      return aryCount(await relation.destroyAll(), (r) => r.isDestroyed());
+    });
   }
 
   each(): AsyncGenerator<T>;
@@ -142,28 +117,16 @@ export class BatchEnumerator<T extends BatchRelation> {
       }
     })();
   }
-
-  async toArray(): Promise<T[]> {
-    const batches: T[] = [];
-    for await (const batch of this) {
-      batches.push(batch);
-    }
-    return batches;
-  }
 }
 
 export interface BatchEnumerator<T extends BatchRelation> {
-  /** @noRailsEquivalent PERMANENT */
-  then<TResult1 = T[], TResult2 = never>(
-    onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
-  ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent PERMANENT */
-  catch<TResult = never>(
-    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
-  ): Promise<T[] | TResult>;
-  /** @noRailsEquivalent PERMANENT */
-  finally(onfinally?: (() => void) | null): Promise<T[]>;
+  sum(block: (relation: T) => number | Promise<number>): Promise<number>;
+  toA(): Promise<T[]>;
+  first(): Promise<T | null>;
+  first(n: number): Promise<T[]>;
+  reverseEach(): AsyncEnumerator<T>;
+  reverseEach(block: (relation: T) => unknown): Promise<this>;
+  [Symbol.asyncIterator](): AsyncIterator<T>;
 }
 
-applyThenable(BatchEnumerator.prototype);
+include(BatchEnumerator, AsyncEnumerable);

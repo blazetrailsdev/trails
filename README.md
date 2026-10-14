@@ -556,6 +556,9 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 | `@blazetrails/i18n`             | `i18n` gem                         | `I18n` config, simple and fallback backends, interpolation, pluralization and exceptions. The whole gem test suite is ported.                                                                                                                                                                                                                     |
 | `@blazetrails/date`             | `date` gem                         | Ruby's `Date` / `DateTime`, built on Temporal (`@js-temporal/polyfill`). Re-exports `Temporal`, which is how trails represents time values. The ported date gem tests all pass.                                                                                                                                                                   |
 | `@blazetrails/did-you-mean`     | `did_you_mean` gem                 | `SpellChecker` with Jaro-Winkler and Levenshtein distances, for "Did you mean?" error suggestions. The parts trails uses are complete.                                                                                                                                                                                                            |
+| `@blazetrails/bcrypt`           | `bcrypt` gem                       | `BCrypt::Password` and `BCrypt::Engine`, behind ActiveModel's `has_secure_password`.                                                                                                                                                                                                                                                              |
+| `@blazetrails/msgpack`          | `msgpack` gem                      | `MessagePack` packer, unpacker, factory and extension types, used by ActiveSupport's message serializers and ActiveRecord.                                                                                                                                                                                                                        |
+| `@blazetrails/activejob`        | `activejob`                        | A start: `ActiveJob::Base`, version and deprecator only. No queue adapters or job execution yet.                                                                                                                                                                                                                                                  |
 | `@blazetrails/ruby-compat`      | Ruby core / stdlib                 | Ruby primitives that Rails calls and does not define (`Range`, `Rational`, `Enumerator`, `String#succ`, `Hash#fetch` semantics, `Kernel#respond_to?`, monitors, `method_missing` proxies). A leaf package; see its [README](packages/ruby-compat/README.md).                                                                                      |
 | `@blazetrails/tse-compiler`     | `erubi` gem                        | The TSE (Trails Server Embedded) template compiler: lexer, parser and JS emitter with source maps. Used by actionview and the view build.                                                                                                                                                                                                         |
 | `@blazetrails/trails-tsc`       | none                               | A TypeScript 5.9 compiler wrapper with a plugin host. Today it builds and type-checks `.tse` views (`trails-tsc-views`) and provides the views language-service plugin. The model `trails-tsc` binary lives in `activerecord-cli`.                                                                                                                |
@@ -565,9 +568,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 
 ## Status and parity snapshot
 
-**As of 2026-09-27, `main` at `91245b796a`.** These numbers predate the
-quickstart run above (`53a6249ae6`) and were not regenerated for it. To
-regenerate from a checkout:
+**As of 2026-10-14, `main` at `bff6cb85f6`.** To regenerate from a checkout:
 
 ```sh
 pnpm parity:api --public-only   # "Public API" column: Rails public methods with a TS counterpart
@@ -583,27 +584,31 @@ matched test passes in CI or is counted as skipped.
 
 | Package (parity row)                               | Public API            | All methods           | Rails tests           |
 | -------------------------------------------------- | --------------------- | --------------------- | --------------------- |
-| activerecord                                       | 4748 / 4888 (97.1%)   | 6685 / 6721 (99.5%)   | 8501 / 8630 (98.5%)   |
-| activemodel                                        | 583 / 591 (98.6%)     | 778 / 784 (99.2%)     | 1007 / 1020 (98.7%)   |
-| arel                                               | 725 / 728 (99.6%)     | 993 / 996 (99.7%)     | 739 / 739 (100%)      |
-| activesupport                                      | 1553 / 1717 (90.4%)   | 1927 / 2097 (91.9%)   | 2975 / 3327 (89.4%)   |
-| actionpack: ActionDispatch                         | 1151 / 1357 (84.8%)   | 1651 / 1780 (92.8%)   | 1047 / 1689 (62.0%)   |
-| actionpack: ActionController                       | 402 / 563 (71.4%)     | 641 / 735 (87.2%)     | 714 / 1975 (36.2%)    |
-| actionpack: AbstractController                     | 64 / 114 (56.1%)      | 95 / 132 (72.0%)      | 52 / 52 (100%)        |
-| actionview                                         | 716 / 1040 (68.8%)    | 953 / 1346 (70.8%)    | 423 / 2497 (16.9%)    |
-| trailties (railties)                               | 520 / 1217 (42.7%)    | 656 / 1659 (39.5%)    | 173 / 2419 (7.2%)     |
-| rack                                               | 451 / 506 (89.1%)     | 536 / 581 (92.3%)     | 772 / 773 (99.9%)     |
+| activerecord                                       | 5010 / 5119 (97.9%)   | 6980 / 6980 (100%)    | 8883 / 8900 (99.8%)   |
+| activemodel                                        | 625 / 627 (99.7%)     | 821 / 821 (100%)      | 1037 / 1037 (100%)    |
+| arel                                               | 783 / 784 (99.9%)     | 1052 / 1052 (100%)    | 739 / 739 (100%)      |
+| activesupport                                      | 1659 / 1800 (92.2%)   | 2039 / 2187 (93.2%)   | 2995 / 3343 (89.6%)   |
+| actionpack: ActionDispatch                         | 1243 / 1376 (90.3%)   | 1740 / 1801 (96.6%)   | 1279 / 1724 (74.2%)   |
+| actionpack: ActionController                       | 545 / 604 (90.2%)     | 800 / 803 (99.6%)     | 1768 / 1949 (90.7%)   |
+| actionpack: AbstractController                     | 97 / 114 (85.1%)      | 132 / 132 (100%)      | 52 / 52 (100%)        |
+| actionview                                         | 904 / 1136 (79.6%)    | 1215 / 1482 (82.0%)   | 728 / 2579 (28.2%)    |
+| trailties (railties)                               | 601 / 1221 (49.2%)    | 789 / 1660 (47.5%)    | 223 / 2419 (9.2%)     |
+| rack                                               | 454 / 509 (89.2%)     | 539 / 584 (92.3%)     | 773 / 870 (88.9%)     |
 | rack-session                                       | 50 / 60 (83.3%)       | 69 / 98 (70.4%)       | 58 / 124 (46.8%)      |
-| rack-test                                          | 57 / 83 (68.7%)       | 101 / 104 (97.1%)     | 229 / 234 (97.9%)     |
-| globalid                                           | 58 / 60 (96.7%)       | 87 / 89 (97.8%)       | 131 / 138 (94.9%)     |
-| i18n                                               | 197 / 199 (99.0%)     | 287 / 288 (99.7%)     | 307 / 307 (100%)      |
-| did-you-mean                                       | 4 / 4 (100%)          | 6 / 6 (100%)          | 6 / 6 (100%)          |
+| rack-test                                          | 61 / 87 (70.1%)       | 105 / 108 (97.2%)     | 229 / 234 (97.9%)     |
+| globalid                                           | 60 / 62 (96.8%)       | 89 / 91 (97.8%)       | 131 / 138 (94.9%)     |
+| i18n                                               | 197 / 200 (98.5%)     | 287 / 289 (99.3%)     | 307 / 307 (100%)      |
+| did-you-mean                                       | 6 / 6 (100%)          | 8 / 8 (100%)          | 6 / 6 (100%)          |
 | date                                               | n/a (C extension)     | n/a                   | 137 / 137 (100%)      |
+| bcrypt                                             | 16 / 16 (100%)        | 18 / 18 (100%)        | 39 / 39 (100%)        |
+| msgpack                                            | 31 / 33 (93.9%)       | 34 / 34 (100%)        | 140 / 356 (39.3%)     |
+| activejob                                          | 5 / 269 (1.9%)        | 5 / 369 (1.4%)        | 0 / 396 (0%)          |
 | ruby-compat                                        | n/a (not a gem)       | n/a                   | 20 / 503 (4.0%)       |
-| **Data layer** (activerecord + activemodel + arel) | 6056 / 6207 (97.6%)   | 8456 / 8501 (99.5%)   |                       |
-| **Overall**                                        | 11550 / 13482 (85.7%) | 15738 / 17778 (88.5%) | 17291 / 24570 (70.4%) |
+| **Data layer** (activerecord + activemodel + arel) | 6418 / 6530 (98.3%)   | 8853 / 8853 (100%)    | 10659 / 10676 (99.8%) |
+| **Overall**                                        | 12940 / 14852 (87.1%) | 17482 / 19511 (89.6%) | 19923 / 26643 (74.8%) |
 
-The activerecord row also counts the ported `sqlite3` gem internals the SQLite
+The Overall row also counts the ported `thor`, `pg`, `mysql2` and `sqlite3`
+gem rows, which `parity:api` reports separately. The activerecord row also counts the ported `sqlite3` gem internals the SQLite
 adapter uses (229 / 298 public). Test support has its own row
 (`activerecord-test-support`, 41 / 56 public).
 
@@ -611,8 +616,8 @@ Read the columns this way. API coverage says a method with the Rails name
 exists. The fidelity gates in [CONTRIBUTING.md](CONTRIBUTING.md#measuring-progress)
 (call sets, call arguments, parameter names, arity) say how closely its body
 follows the Rails body. Test coverage is the better signal of what works. By
-that measure the data layer, Rack, i18n, globalid and date are close to done,
-and ActionController, ActionView and trailties are where most of the remaining
+that measure the data layer, ActionController, Rack, i18n, globalid and date
+are close to done, and ActionView and trailties are where most of the remaining
 work is.
 
 What the prose above means in practice:
@@ -644,13 +649,12 @@ What the prose above means in practice:
 
 | package                         | `typescript`                                    | why                                                                                                               |
 | ------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `@blazetrails/activerecord`     | optional peer, `7.1.0-dev.20260920.1`           | the `./type-virtualization/*` subpath parses and walks model source through the 7.1 API.                          |
 | `@blazetrails/trailties`        | optional peer, `7.1.0-dev.20260920.1`           | `./template-builder/testing`'s `parseTs()` uses `API#transpileModule`.                                            |
 | `@blazetrails/activerecord-cli` | dependency, `7.1.0-dev.20260920.1`              | the `trails-tsc` typecheck bin runs on the 7.1 API.                                                               |
 | `@blazetrails/trails-tsc`       | dependency, `typescript-5@npm:typescript@5.9.3` | it drives a programmatic `--build` and hosts a language-service plugin, neither of which TypeScript 7 offers yet. |
 
-For `activerecord` and `trailties` the peer is optional. Neither runtime needs
-the compiler, only the two subpaths named above do. `trails-tsc`'s 5.9.3 is an
+For `trailties` the peer is optional. Its runtime does not need the compiler,
+only the subpath named above does. `trails-tsc`'s 5.9.3 is an
 alias, so it never collides with a project's own `typescript`. Both retire when
 TypeScript 7 ships a programmatic build API (RFC `0125-typescript-7-ground-floor`
 in the tasks repo).

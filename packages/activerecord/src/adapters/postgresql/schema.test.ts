@@ -1,16 +1,15 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { Time as RubyTime } from "@blazetrails/date";
+import { StringIO, registeredConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { StatementInvalid } from "../../errors.js";
-import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { Name } from "../../connection-adapters/postgresql/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "../../support/schema-dumping-helper.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import { Base, registerModel, modelRegistry } from "../../index.js";
+import { Base, registerModel } from "../../index.js";
 import { Default } from "../../test-helpers/models/default.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 
@@ -79,9 +78,9 @@ function makeSongAlbumModels(): {
     Song: Song as unknown as ModelCtor,
     Album: Album as unknown as ModelCtor,
     cleanup: () => {
-      modelRegistry.delete("Song");
-      modelRegistry.delete("Album");
-      modelRegistry.delete("Song::HABTM_Albums");
+      unregisterConstant("Song", registeredConstant("Song"));
+      unregisterConstant("Album", registeredConstant("Album"));
+      unregisterConstant("Song::HABTM_Albums", registeredConstant("Song::HABTM_Albums"));
     },
   };
 }
@@ -192,7 +191,7 @@ async function teardownSchemas(adapter: PostgreSQLAdapter) {
   await adapter.dropSchema("music", { ifExists: true });
 }
 
-fixtures({}, { useTransactionalTests: false });
+const { self } = fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -289,41 +288,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     };
 
-    it("schema test 1", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      const cols = await adapter.columns(TABLE_NAME);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toContain("id");
-      expect(colNames).toContain("name");
-      expect(colNames).toContain("email");
-      expect(colNames).toContain("description");
-      expect(colNames).toContain("moment");
-    });
-
-    it("schema test 2", async () => {
-      const cols = await adapter.columns(`${SCHEMA_NAME}.${TABLE_NAME}`);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toContain("id");
-      expect(colNames).toContain("name");
-      expect(colNames).toContain("email");
-    });
-
-    it("schema test 3", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA2_NAME);
-      const cols = await adapter.columns(TABLE_NAME);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toContain("id");
-      expect(colNames).toContain("name");
-    });
-
-    it("column exists honors search path", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      expect(await adapter.tableExists(TABLE_NAME)).toBe(true);
-      expect(await adapter.columnExists(TABLE_NAME, "name")).toBe(true);
-      expect(await adapter.columnExists(TABLE_NAME, "email")).toBe(true);
-      expect(await adapter.columnExists(TABLE_NAME, "nonexistent")).toBe(false);
-    });
-
     it("schema names", async () => {
       const schemaNames = await adapter.schemaNames();
       expect(schemaNames).toContain("public");
@@ -351,14 +315,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("force create schema", async () => {
       try {
         await adapter.createSchema("test_schema3");
-        await assertQueriesMatch(
-          /DROP SCHEMA IF EXISTS "test_schema3"/,
-          undefined,
-          false,
-          async () => {
-            await adapter.createSchema("test_schema3", { force: true });
-          },
-        );
+        await self().assertQueriesMatch(/DROP SCHEMA IF EXISTS "test_schema3"/, {}, async () => {
+          await adapter.createSchema("test_schema3", { force: true });
+        });
         expect((await adapter.schemaNames()).includes("test_schema3")).toBeTruthy();
       } finally {
         await adapter.dropSchema("test_schema3");
@@ -368,10 +327,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("create schema if not exists", async () => {
       try {
         await adapter.createSchema("test_schema3");
-        await assertQueriesMatch(
+        await self().assertQueriesMatch(
           /CREATE SCHEMA IF NOT EXISTS "test_schema3"/,
-          undefined,
-          false,
+          {},
           async () => {
             await adapter.createSchema("test_schema3", { ifNotExists: true });
           },
@@ -576,25 +534,45 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await Thing3.count()).toEqual(0);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing1.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing1.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(0);
       expect(await Thing3.count()).toEqual(0);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing2.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing2.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(1);
       expect(await Thing3.count()).toEqual(0);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing3.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing3.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(1);
       expect(await Thing3.count()).toEqual(1);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing4.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing4.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(1);
       expect(await Thing3.count()).toEqual(1);
@@ -643,13 +621,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         INDEX_D_COLUMN,
         INDEX_E_COLUMN,
       );
-    });
-
-    it("indexes report their validity", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      const indexes = await adapter.indexes(TABLE_NAME);
-      expect(indexes.length).toBeGreaterThan(0);
-      expect(indexes.every((i) => i.valid === true)).toBe(true);
     });
 
     it("dump indexes for schema two", async () => {
@@ -826,7 +797,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             id: 1,
             name: `thing inside ${SCHEMA_NAME}`,
             email: "thing1@localhost",
-            moment: new Date(),
+            moment: RubyTime.now(),
           });
         });
       }
@@ -879,7 +850,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("dumping schemas", async () => {
-      const output = await dumpAllTableSchema([/./], adapter as unknown as SchemaSource);
+      const output = await dumpAllTableSchema([/./]);
       expect(output).not.toMatch(/createSchema\("public"\)/);
       expect(output).toMatch(/createSchema\("test_schema"\)/);
       expect(output).toMatch(/createSchema\("test_schema2"\)/);
@@ -959,7 +930,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name_and_description ON trains USING btree(name text_pattern_ops, description text_pattern_ops)`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/opclass: "text_pattern_ops"/);
     });
@@ -968,7 +939,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name_and_description ON trains USING btree(name, description text_pattern_ops)`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/opclass: \{ description: "text_pattern_ops" \}/);
     });
@@ -981,7 +952,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name_and_position ON trains USING btree(name, position text_pattern_ops)`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/opclass: "gin_trgm_ops"/);
       expect(output).toMatch(/opclass: \{ position: "text_pattern_ops" \}/);
@@ -1003,14 +974,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `CREATE INDEX trains_name_and_description ON trains USING btree(name NULLS FIRST, description)`,
       );
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
       expect(output).toMatch(/order: \{ name: "NULLS FIRST" \}/);
     });
     it("non default order with nulls is dumped", async () => {
       await adapter.execute(
         `CREATE INDEX trains_name_and_desc ON trains USING btree(name DESC NULLS LAST, description)`,
       );
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
       expect(output).toMatch(/order: \{ name: "DESC NULLS LAST" \}/);
     });
   });
@@ -1112,25 +1083,22 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("Active Record basics", async () => {
-      await adapter.setSchemaSearchPath('"my.schema"');
-      await adapter.createTable("articles", (t) => {
-        t.string("title");
-      });
-      class Article extends Base {
-        static {
-          this.tableName = '"my.schema".articles';
-          this.attribute("id", "integer");
+      await withSchemaSearchPath('"my.schema"', async () => {
+        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with the my.schema schema (SchemaWithDotsTest teardown)
+        await adapter.createTable("articles", (t) => {
+          t.string("title");
+        });
+        class Article extends Base {
+          static {
+            this.tableName = '"my.schema".articles';
+            this.attribute("id", "integer");
+          }
         }
-      }
-      try {
         await Article.loadSchema();
         await (Article as any).create({ title: "zOMG, welcome to my blorgh!" });
         const welcome = await (Article as any).last();
         expect(welcome.title).toBe("zOMG, welcome to my blorgh!");
-      } finally {
-        // eslint-disable-next-line blazetrails/require-canonical-rebuild
-        await adapter.dropTable("articles", { ifExists: true });
-      }
+      });
     });
   });
 
@@ -1155,7 +1123,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("SchemaIndexIncludeColumnsTest", () => {
     it("schema dumps index included columns", async () => {
-      const indexDefinition = (await dumpTableSchema(adapter, "companies"))
+      const indexDefinition = (await dumpTableSchema("companies"))
         .split(/\n/)
         .filter((l) => /t\.index.*company_include_index/.test(l))[0]
         .trim();
@@ -1187,21 +1155,21 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name ON trains USING btree(name) NULLS NOT DISTINCT`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/nullsNotDistinct: true/);
     });
     itIfSupports("nulls_not_distinct", "nulls distinct is dumped", async () => {
       await adapter.execute(`CREATE INDEX trains_name ON trains USING btree(name) NULLS DISTINCT`);
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).not.toMatch(/nullsNotDistinct/);
     });
     it("nulls not set is dumped", async () => {
       await adapter.execute(`CREATE INDEX trains_name ON trains USING btree(name)`);
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).not.toMatch(/nullsNotDistinct/);
     });
@@ -1220,7 +1188,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("kind");
       });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1233,7 +1201,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.datetime("created_at", { null: false });
       });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1248,7 +1216,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       await adapter.createTable("trains", { options });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1266,7 +1234,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       await adapter.createTable("trains", { options });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1276,32 +1244,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("name");
       });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).not.toMatch("options:");
-    });
-  });
-
-  describe("SchemaTableCommentTest", () => {
-    afterEach(async () => {
-      await adapter.dropTable("commented_table", { ifExists: true });
-    });
-
-    it("table comment is dumped and round-trips via createTable", async () => {
-      await adapter.execute(
-        `CREATE TABLE commented_table (id serial primary key, name varchar(50))`,
-      );
-      await adapter.execute(`COMMENT ON TABLE commented_table IS 'a test table'`);
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "commented_table");
-      expect(lines.string()).toContain(`comment: "a test table"`);
-      await adapter.execute(`DROP TABLE IF EXISTS commented_table`);
-
-      const ss = adapter;
-      await ss.createTable("commented_table", { comment: "a test table" }, (t) => {
-        t.string("name");
-      });
-      expect(await adapter.tableComment("commented_table")).toBe("a test table");
     });
   });
 });

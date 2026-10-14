@@ -1,8 +1,7 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { include, included, isModuleIncluded, Module } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
-import { inspectAccessor } from "./_accessor.js";
+import { include, included, kernelArray, Module } from "@blazetrails/activesupport";
+import { aryIncludes, except, includedModules } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 interface AttributeMethodQueryable {
@@ -15,25 +14,20 @@ export class AcceptanceValidator extends EachValidator {
   declare isAcceptableOption: typeof isAcceptableOption;
 
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
-    super(options);
+    super(Object.assign({ allowNil: true, accept: ["1", true] }, options));
     this.setupBang(options.class as AttributeMethodQueryable);
   }
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    const allowNil = this.options.allowNil ?? true;
-    if (allowNil && (value === null || value === undefined)) return;
     if (!this.isAcceptableOption(value)) {
       record.errors.add(attribute, ":accepted", except(this.options, "accept", "allowNil"));
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall include? — PERMANENT
-   */
+  /** @internal */
   setupBang(klass: AttributeMethodQueryable): void {
     const defineAttributes = new LazilyDefineAttributes(this.attributes);
-    if (!isModuleIncluded(klass, defineAttributes)) {
+    if (!aryIncludes(includedModules(klass), defineAttributes)) {
       include(klass as unknown as Parameters<typeof include>[0], defineAttributes);
     }
   }
@@ -60,33 +54,13 @@ export class LazilyDefineAttributes extends Module {
     const attrReaders = this.attributes.filter((name) => !klass.isAttributeMethod(name));
     const attrWriters = this.attributes.filter((name) => !klass.isAttributeMethod(`${name}=`));
 
-    this.moduleEval((mod) => {
-      for (const name of new Set([...attrReaders, ...attrWriters])) {
-        const inherited = inspectAccessor(klass.prototype, name);
-        const slot = `_${name}`;
-        Object.defineProperty(mod, name, {
-          configurable: true,
-          get: attrReaders.includes(name)
-            ? function (this: Record<string, unknown>) {
-                return this[slot];
-              }
-            : inherited.getter,
-          set: attrWriters.includes(name)
-            ? function (this: Record<string, unknown>, value: unknown) {
-                this[slot] = value;
-              }
-            : inherited.setter,
-        });
-      }
-    });
+    this.attrReader(...attrReaders);
+    this.attrWriter(...attrWriters);
 
     this.#lock = null;
   }
 
-  /**
-   * @missingRailsCall define_method — PERMANENT
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   [included](klass: AttributeMethodQueryable): void {
     this.#lock = {};
     this.defineOn(klass);
@@ -107,23 +81,7 @@ export function isAcceptableOption(
   this: { options: Record<string, unknown> },
   value: unknown,
 ): boolean {
-  const hasAccept = Object.hasOwn(this.options, "accept");
-  let accepted: unknown[];
-  if (!hasAccept) accepted = ["1", true];
-  else {
-    const rawAccept = this.options.accept;
-    if (rawAccept === null || rawAccept === undefined) accepted = [];
-    else if (Array.isArray(rawAccept)) accepted = rawAccept;
-    else if (isNonStringIterable(rawAccept)) accepted = Array.from(rawAccept);
-    else accepted = [rawAccept];
-  }
-  return accepted.includes(value);
-}
-
-function isNonStringIterable(value: unknown): value is Iterable<unknown> {
-  if (typeof value !== "object" || value === null) return false;
-  if (value instanceof String) return false;
-  return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
+  return aryIncludes(kernelArray(this.options.accept), value);
 }
 
 AcceptanceValidator.prototype.isAcceptableOption = isAcceptableOption;

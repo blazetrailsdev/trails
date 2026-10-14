@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Key } from "./key.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import type { KeyGenerator } from "./key-generator.js";
 
 describe("ActiveRecord::Encryption::KeyTest", () => {
@@ -12,7 +12,7 @@ describe("ActiveRecord::Encryption::KeyTest", () => {
   });
 
   it(".derive_from instantiates a key with its secret derived from the passed password", () => {
-    expect((Configurable.keyGenerator as KeyGenerator).deriveKeyFrom("some password")).toEqual(
+    expect((Encryption.keyGenerator as KeyGenerator).deriveKeyFrom("some password")).toEqual(
       Key.deriveFrom("some password").secret,
     );
   });

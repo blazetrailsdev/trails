@@ -151,6 +151,13 @@ export function stripThis(params: ParamInfo[]): ParamInfo[] {
   return params.length > 0 && params[0].name === "this" ? params.slice(1) : params;
 }
 
+/** Does this signature thread Ruby's `super` as a leading `super_` parameter —
+ *  the object-literal `prepend()` shape? Ruby's `super` is a keyword, so the
+ *  parameter is one Rails never declares and no candidate form may strip it. */
+export function threadsSuper(params: ParamInfo[]): boolean {
+  return stripThis(params)[0]?.name === "super_";
+}
+
 /** Is this leading param an explicit receiver — a known/`*Host` type, a `*Class`
  *  receiver, or a conventional receiver name? */
 export function isReceiverParam(first: ParamInfo): boolean {
@@ -305,6 +312,15 @@ export function isForwardingRubyEntry(ruby: Pick<MethodInfo, "notes" | "aliasRes
   return ruby.notes === "alias" && !ruby.aliasResolved;
 }
 
+/** The signature a TS member contributes to the arity pool. A class-level
+ *  `alias_method` is ported as `static declare x: typeof Klass.y`, a property
+ *  the extractor records with `params: []` and the target's signature under
+ *  `aliasParams`. Once the Ruby side resolves the alias, that placeholder `[]`
+ *  reads as a real zero-arg signature, so the target's is compared instead. */
+export function arityParams(ts: Pick<MethodInfo, "params" | "aliasParams">): ParamInfo[] {
+  return ts.params.length === 0 && ts.aliasParams ? ts.aliasParams : ts.params;
+}
+
 /** Nothing to compare: both sides take zero positional args (reader/predicate ↔ getter). */
 export function shouldSkipArity(ruby: ParamInfo[], ts: ParamInfo[]): boolean {
   const r = positionalArity(ruby, "ruby");
@@ -330,10 +346,12 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
     stripTrailingCallback(base),
     stripTrailingCallback(stripHostParam(base)),
   ];
-  const ok = forms.some((f) => {
-    const t = positionalArity(f, "ts");
-    return rubyForms.some((rf) => rangesOverlap(rf, t));
-  });
+  const ok =
+    !threadsSuper(ts) &&
+    forms.some((f) => {
+      const t = positionalArity(f, "ts");
+      return rubyForms.some((rf) => rangesOverlap(rf, t));
+    });
 
   return {
     ok,

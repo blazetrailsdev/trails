@@ -9,9 +9,10 @@ import { Errors } from "./errors.js";
 import { ModelName } from "./naming.js";
 import { humanAttributeName } from "./translation.js";
 import { Validations } from "./validations.js";
+import { BlockValidator } from "./validator.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, block } from "@blazetrails/ruby-compat";
 
 describe("ValidationsTest (trails)", () => {
   describe("presence", () => {
@@ -630,15 +631,15 @@ describe("ValidationsTest (trails)", () => {
 
       const a = new Scoped({});
       expect(await a.isValid("create")).toBe(false);
-      expect(a.errors.attributeNames).toEqual(["name"]);
+      expect(a.errors.attributeNames).toEqual([":name"]);
 
       const b = new Scoped({});
       expect(await b.isValid(["create", "publish"])).toBe(false);
-      expect(b.errors.attributeNames.sort()).toEqual(["name", "title"]);
+      expect([...b.errors.attributeNames].sort()).toEqual([":name", ":title"]);
 
       const c = new Scoped({});
       expect(await c.isValid(["publish"])).toBe(false);
-      expect(c.errors.attributeNames).toEqual(["title"]);
+      expect(c.errors.attributeNames).toEqual([":title"]);
     });
 
     it("on: [array] validator fires when current context is a single symbol in the set", async () => {
@@ -818,7 +819,7 @@ describe("ValidationsTest (trails)", () => {
       expect(Person.validatorsOn("name")[0]).toBe(Person.validatorsOn("email")[0]);
     });
 
-    it("inheritance is copy-on-first-write (subclass sees parent writes made before its own first write)", () => {
+    it("a subclass does not see parent validators added after its first _validators read", () => {
       class Base extends Model {
         declare static attribute: AttributesClassHalf["attribute"];
 
@@ -831,14 +832,33 @@ describe("ValidationsTest (trails)", () => {
       interface Base extends Attributes {}
 
       class Child extends Base {}
-      expect(Child.validatorsOn("name")).toHaveLength(1);
+      class Grandchild extends Child {}
+      expect(Grandchild.validatorsOn("name")).toHaveLength(1);
       Base.validates("name", { length: { minimum: 2 } });
-      expect(Child.validatorsOn("name")).toHaveLength(2);
       Child.validates("name", { length: { maximum: 10 } });
-      Base.validates("name", { format: { with: /x/ } });
-      expect(Child.validatorsOn("name")).toHaveLength(3);
-      expect(Base.validatorsOn("name")).toHaveLength(3);
-      expect(Child.validatorsOn("name")).not.toContain(Base.validatorsOn("name")[2]);
+      expect(Base.validatorsOn("name")).toHaveLength(2);
+      expect(Child.validatorsOn("name")).toHaveLength(2);
+      expect(Child.validatorsOn("name")).not.toContain(Base.validatorsOn("name")[1]);
+      expect(Grandchild.validatorsOn("name")).toHaveLength(1);
+    });
+
+    it("a subclass's first _validators read copies parent validators added since it was defined", () => {
+      class Base extends Model {}
+      class Child extends Base {}
+      Base.validates("name", { presence: true });
+      expect(Child.validatorsOn("name")).toHaveLength(1);
+      expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr__validators")).toBe(true);
+      const copy = Child._validators;
+      expect(Child._validators).toBe(copy);
+      expect(copy).not.toBe(Base._validators);
+    });
+
+    it("a validatorsOn miss on a subclass stores nothing in the parent's hash", () => {
+      class Base extends Model {}
+      class Child extends Base {}
+      expect(Child.validatorsOn("missing")).toEqual([]);
+      expect(Child._validators.has("missing")).toBe(true);
+      expect(Base._validators.has("missing")).toBe(false);
     });
 
     it("subclass inherits validators but its changes don't leak up", () => {
@@ -889,9 +909,6 @@ describe("ValidationsTest (trails)", () => {
         }
       }
       interface Person extends Attributes {}
-
-      Person.validatorsOn("never_registered");
-      expect(Array.from(Person._validators.keys())).not.toContain("never_registered");
 
       const a = Person.validatorsOn("name");
       a.length = 0;
@@ -1844,7 +1861,7 @@ describe("ValidationsTest (trails)", () => {
       u.errors.add("email", ":invalid");
       const collected: string[] = [];
       u.errors.each((e) => collected.push(`${e.attribute}:${e.type}`));
-      expect(collected).toEqual(["name::blank", "email::invalid"]);
+      expect(collected).toEqual([":name::blank", ":email::invalid"]);
     });
 
     it("merge errors", () => {
@@ -1883,8 +1900,8 @@ describe("ValidationsTest (trails)", () => {
       u.errors.add("name", ":too_short");
       u.errors.add("email", ":invalid");
       const hash = u.errors.toHash();
-      expect(hash.get("name")!.length).toBe(2);
-      expect(hash.get("email")!.length).toBe(1);
+      expect(hash.get(":name")!.length).toBe(2);
+      expect(hash.get(":email")!.length).toBe(1);
     });
 
     it("include?", () => {
@@ -1900,8 +1917,8 @@ describe("ValidationsTest (trails)", () => {
 
       const u = new User({});
       u.errors.add("name", ":blank");
-      expect(u.errors.include("name")).toBe(true);
-      expect(u.errors.include("email")).toBe(false);
+      expect(u.errors.isInclude("name")).toBe(true);
+      expect(u.errors.isInclude("email")).toBe(false);
     });
 
     it("messages returns grouped messages", () => {
@@ -1917,7 +1934,7 @@ describe("ValidationsTest (trails)", () => {
 
       const u = new User({});
       u.errors.add("name", ":blank");
-      expect(u.errors.messages.get("name")).toEqual(["can't be blank"]);
+      expect(u.errors.messages.get(":name")).toEqual(["can't be blank"]);
     });
 
     it("full_messages creates a list of error messages with the attribute name included", () => {
@@ -1933,7 +1950,7 @@ describe("ValidationsTest (trails)", () => {
 
       const u = new User({});
       expect(u.errors.fullMessage("name", "is required")).toBe("Name is required");
-      expect(u.errors.fullMessage("base", "Something went wrong")).toBe("Something went wrong");
+      expect(u.errors.fullMessage(":base", "Something went wrong")).toBe("Something went wrong");
     });
   });
 
@@ -2310,7 +2327,7 @@ describe("ValidationsTest (trails)", () => {
     it("gives the includer the class macros and the runner", async () => {
       const host = new Host();
       expect(await host.isValid()).toBe(false);
-      expect(host.errors.messages.get("title")).toEqual(["can't be blank"]);
+      expect(host.errors.messages.get(":title")).toEqual(["can't be blank"]);
 
       host.title = "hello";
       expect(await host.isValid()).toBe(true);
@@ -2361,5 +2378,76 @@ describe("validate with several filters", () => {
       }
       void Blocky;
     }).not.toThrow();
+  });
+
+  describe("validate with a block (validations.rb:160-185)", () => {
+    it("takes the block after the options and runs it under them", async () => {
+      class Blocky extends Model {
+        static {
+          this.validate(
+            { on: "create" },
+            block((record: Blocky) => {
+              record.errors.add("base", "from the block");
+            }),
+          );
+        }
+      }
+
+      expect(await new Blocky().isValid()).toBe(true);
+      const record = new Blocky();
+      expect(await record.isValid("create")).toBe(false);
+      expect(record.errors.fullMessages).toEqual(["from the block"]);
+    });
+
+    it("checks the option keys when the block is the only filter", () => {
+      class Blocky extends Model {}
+      expect(() =>
+        Blocky.validate(
+          { presence: true } as never,
+          block((_record: Blocky) => undefined),
+        ),
+      ).toThrow(/Unknown key: :presence/);
+    });
+  });
+
+  describe("validatesWith with a block (validations/with.rb:88-105)", () => {
+    it("passes the block to the validator's constructor", async () => {
+      const seen: unknown[] = [];
+      class Blocky extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          this.attribute("title", "string");
+          this.validatesWith(
+            BlockValidator,
+            { attributes: ["title"] },
+            block((_record: object, attribute: string, value: unknown) => {
+              seen.push([attribute, value]);
+            }),
+          );
+        }
+      }
+      interface Blocky extends Attributes {}
+
+      await new Blocky({ title: "hi" }).isValid();
+      expect(seen).toEqual([["title", "hi"]]);
+    });
+  });
+});
+
+describe("Validations#freeze (validations.rb:372-377)", () => {
+  class Person extends Model {}
+
+  it("builds errors and the validation context before freezing through super", () => {
+    const person = new Person();
+    expect(person._errors).toBeUndefined();
+
+    expect(person.freeze()).toBe(person);
+
+    expect(Object.isFrozen(person)).toBe(true);
+    expect(person._errors).toBeInstanceOf(Errors);
+    expect(person.errors).toBe(person._errors);
+    expect(person.validationContext).toBeNull();
   });
 });

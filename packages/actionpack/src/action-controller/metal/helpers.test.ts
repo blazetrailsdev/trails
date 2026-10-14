@@ -1,43 +1,68 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { File } from "@blazetrails/ruby-compat";
+import { describe, expect, it } from "vitest";
 
-import type { HelperMethodsModule } from "../../abstract-controller/helpers.js";
-import { modulesForHelpers, setApplicationHelpers, setHelpersPath } from "./helpers.js";
+import { FooHelper } from "../../test-helpers/fixtures/alternate-helpers/foo-helper.js";
+import { AbcHelper } from "../../test-helpers/fixtures/helpers/abc-helper.js";
+import { Base } from "../base.js";
 
-const AbcHelper: HelperMethodsModule = { bareA: () => "a" };
-const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
+const fixtures = File.expandPath(
+  "../../test-helpers/fixtures",
+  File.dirname(new URL(import.meta.url).pathname),
+);
 
-const constants = new Map<string, HelperMethodsModule>([
-  ["AbcHelper", AbcHelper],
-  ["FooHelper", FooHelper],
-]);
-
-afterEach(() => {
-  setHelpersPath([]);
-  setApplicationHelpers([], new Map());
-});
+class AlternateHelpersController extends Base {
+  static {
+    this.helpersPath = [File.expandPath("alternate-helpers", fixtures)];
+  }
+}
 
 describe("ActionController::Helpers.modulesForHelpers", () => {
-  it("expands :all to every application helper", () => {
-    setApplicationHelpers(["abc"], constants);
-
-    expect(modulesForHelpers(["all"])).toEqual([AbcHelper]);
+  it("expands :all to every helper under the class's helpersPath", () => {
+    expect(AlternateHelpersController.modulesForHelpers([":all"])).toEqual([FooHelper]);
+    expect(Base.modulesForHelpers([":all"])).toEqual([]);
   });
 
-  it("expands the Symbol spelling of :all too", () => {
-    setApplicationHelpers(["abc"], constants);
+  it("reaches the ActionController override through Base.helper", () => {
+    class AllHelpersController extends AlternateHelpersController {}
 
-    expect(modulesForHelpers([Symbol("all")])).toEqual([AbcHelper]);
+    AllHelpersController.helper(":all");
+
+    expect(AllHelpersController._helpers.isInclude(FooHelper)).toBe(true);
   });
 
   it("appends the application helpers after the arguments that stay", () => {
-    setApplicationHelpers(["abc"], constants);
-
-    expect(modulesForHelpers(["foo", "all"])).toEqual([FooHelper, AbcHelper]);
+    expect(AlternateHelpersController.modulesForHelpers(["abc", ":all"])).toEqual([
+      AbcHelper,
+      FooHelper,
+    ]);
   });
 
   it("resolves a helper by name when :all is absent", () => {
-    setApplicationHelpers(["abc"], constants);
+    expect(Base.modulesForHelpers(["foo"])).toEqual([FooHelper]);
+  });
+});
 
-    expect(modulesForHelpers(["foo"])).toEqual([FooHelper]);
+describe("ActionController::Helpers.helpers", () => {
+  it("memoizes the class-level proxy per class", () => {
+    class ParentController extends Base {}
+    class ChildController extends ParentController {}
+
+    const proxy = ParentController.helpers();
+    expect(ParentController.helpers()).toBe(proxy);
+    expect(ChildController.helpers()).not.toBe(proxy);
+    expect(ChildController.helpers()).toBe(ChildController.helpers());
+  });
+
+  it("memoizes the instance-level proxy per instance and dispatches through the prototype", () => {
+    class OverridingController extends Base {
+      override helpers(): ReturnType<Base["helpers"]> {
+        return super.helpers();
+      }
+    }
+    const controller = new OverridingController();
+
+    expect(Object.hasOwn(controller, "helpers")).toBe(false);
+    expect(controller.helpers()).toBe(controller.helpers());
+    expect(new OverridingController().helpers()).not.toBe(controller.helpers());
   });
 });

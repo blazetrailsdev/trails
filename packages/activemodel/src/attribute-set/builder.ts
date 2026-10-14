@@ -1,25 +1,33 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { Attribute, Uninitialized } from "../attribute.js";
-import type { Block } from "@blazetrails/ruby-compat";
+import { Attribute } from "../attribute.js";
+import type { Block, Hash } from "@blazetrails/ruby-compat";
 import {
+  hashAref,
+  hashAset,
+  block as rbBlock,
   dup,
+  each,
   eachKey,
   eachValue,
   except,
   fetch,
   hasKey,
+  keys as hashKeys,
   rbDeclareIvar,
   rbEqual,
+  rbObjDup,
   transformValues,
+  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 
-export class Builder {
-  readonly types: Record<string, ValueType>;
-  readonly defaultAttributes: Record<string, Attribute>;
+type RbHash<T> = Record<string, T> | Hash<string, T>;
 
-  constructor(types: Record<string, ValueType>, defaultAttributes: Record<string, Attribute> = {}) {
+export class Builder {
+  readonly types: RbHash<ValueType>;
+  readonly defaultAttributes: RbHash<Attribute>;
+
+  constructor(types: RbHash<ValueType>, defaultAttributes: RbHash<Attribute> = {}) {
     this.types = types;
     this.defaultAttributes = defaultAttributes;
   }
@@ -33,20 +41,20 @@ export class Builder {
 }
 
 export class LazyAttributeSet extends AttributeSet {
-  declare protected _attributes: Record<string, Attribute>;
-  private values: Record<string, unknown>;
-  private types: Record<string, ValueType>;
-  private additionalTypes: Record<string, ValueType>;
-  private defaultAttributes: Record<string, Attribute>;
-  private castedValues: Record<string, unknown>;
+  declare protected _attributes: RbHash<Attribute>;
+  private values: RbHash<unknown>;
+  private types: RbHash<ValueType>;
+  private additionalTypes: RbHash<ValueType>;
+  private defaultAttributes: RbHash<Attribute>;
+  private castedValues: RbHash<unknown>;
   private materialized: boolean;
 
   constructor(
-    values: Record<string, unknown>,
-    types: Record<string, ValueType>,
-    additionalTypes: Record<string, ValueType>,
-    defaultAttributes: Record<string, Attribute>,
-    attributes: Record<string, Attribute> = {},
+    values: RbHash<unknown>,
+    types: RbHash<ValueType>,
+    additionalTypes: RbHash<ValueType>,
+    defaultAttributes: RbHash<Attribute>,
+    attributes: RbHash<Attribute> = {},
   ) {
     super(attributes);
     this.values = values;
@@ -59,53 +67,63 @@ export class LazyAttributeSet extends AttributeSet {
 
   override isKey(name: string): boolean {
     return (
-      (Object.hasOwn(this.values, name) ||
-        hasKey(this.types, name) ||
-        hasKey(this._attributes, name)) &&
+      (hasKey(this.values, name) || hasKey(this.types, name) || hasKey(this._attributes, name)) &&
       this.getAttribute(name).isInitialized()
     );
   }
 
-  /** @missingRailsName attributes — PERMANENT */
   override keys(): string[] {
     const keys = new Set([
-      ...Object.keys(this.values),
-      ...Object.keys(this.types),
-      ...Object.keys(this._attributes),
+      ...hashKeys(this.values),
+      ...hashKeys(this.types),
+      ...hashKeys(this._attributes),
     ]);
     return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm hasKey — PERMANENT
+   */
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
-    const attr = this._attributes[name];
+    const attr = hashAref(this._attributes, name) as Attribute | null;
     if (attr) {
-      if (block !== undefined && attr instanceof Uninitialized) return block(name);
-      return attr.value;
+      return attr.value(block);
     }
 
-    if (hasKey(this.castedValues, name)) return this.castedValues[name];
-
-    let valuePresent = true;
-    let value: unknown;
-    if (Object.hasOwn(this.values, name)) {
-      value = this.values[name];
-    } else {
-      valuePresent = false;
+    if (hasKey(this.castedValues, name)) {
+      return hashAref(this.castedValues, name);
     }
 
-    if (valuePresent) {
-      const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
-      const casted = type.deserialize(value);
-      this.castedValues[name] = casted;
-      return casted;
-    } else {
-      const attr = this.defaultAttribute(name, valuePresent, value);
-      if (block !== undefined && attr instanceof Uninitialized) return block(name);
-      return attr.value;
-    }
+    return fetch<unknown>(
+      this.castedValues,
+      name,
+      rbBlock(() => {
+        let valuePresent: boolean = true;
+        const value = fetch<unknown>(
+          this.values,
+          name,
+          rbBlock(() => {
+            valuePresent = false;
+          }),
+        );
+
+        if (valuePresent) {
+          const type = fetch<ValueType>(
+            this.additionalTypes,
+            name,
+            hashAref(this.types, name) as ValueType,
+          );
+          return hashAset(this.castedValues, name, type.deserialize(value));
+        } else {
+          const attr = this.defaultAttribute(name, valuePresent, value);
+          return attr.value(block);
+        }
+      }),
+    );
   }
 
-  protected override attributes(): Record<string, Attribute> {
+  protected override attributes(): RbHash<Attribute> {
     if (!this.materialized) {
       eachKey(this.values, (key) => this.getAttribute(key));
       eachKey(this.types, (key) => this.getAttribute(key));
@@ -116,24 +134,29 @@ export class LazyAttributeSet extends AttributeSet {
 
   protected override defaultAttribute(
     name: string,
-    valuePresent?: boolean,
-    value?: unknown,
+    valuePresent: boolean = true,
+    value: unknown = fetch<unknown>(
+      this.values,
+      name,
+      rbBlock(() => {
+        valuePresent = false;
+      }),
+    ),
   ): Attribute {
-    if (valuePresent === undefined) {
-      valuePresent = Object.hasOwn(this.values, name);
-      value = valuePresent ? this.values[name] : undefined;
-    }
-
-    const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
+    const type = fetch<ValueType>(
+      this.additionalTypes,
+      name,
+      hashAref(this.types, name) as ValueType,
+    );
 
     if (valuePresent) {
-      const attr = Attribute.fromDatabase(name, value, type, this.castedValues[name]);
-      this._attributes[name] = attr;
+      const attr = Attribute.fromDatabase(name, value, type, hashAref(this.castedValues, name));
+      hashAset(this._attributes, name, attr);
       return attr;
     } else if (hasKey(this.types, name)) {
-      const attr = this.defaultAttributes[name];
+      const attr = hashAref(this.defaultAttributes, name) as Attribute | null;
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
-      this._attributes[name] = built;
+      hashAset(this._attributes, name, built);
       return built;
     } else {
       return Attribute.null(name);
@@ -142,14 +165,14 @@ export class LazyAttributeSet extends AttributeSet {
 }
 
 export class LazyAttributeHash {
-  private _delegateHash: Record<string, Attribute>;
-  private types: Record<string, ValueType>;
-  private values: Record<string, unknown>;
-  private additionalTypes: Record<string, ValueType>;
-  private defaultAttributes: Record<string, Attribute>;
-  private materialized: boolean;
+  declare private _delegateHash: RbHash<Attribute>;
+  declare private types: RbHash<ValueType>;
+  declare private values: RbHash<unknown>;
+  declare private additionalTypes: RbHash<ValueType>;
+  declare private defaultAttributes: RbHash<Attribute>;
+  declare private materialized: boolean;
 
-  transformValues<T>(fn: (attr: Attribute) => T): Record<string, T> {
+  transformValues<T>(fn: (attr: Attribute) => T): RbHash<T> {
     return transformValues(this.materialize(), fn);
   }
 
@@ -157,42 +180,34 @@ export class LazyAttributeHash {
     eachValue(this.materialize(), fn);
   }
 
-  fetch(name: string, ...rest: [] | [Attribute] | [Block<Attribute>]): Attribute {
-    const materialized = this.materialize();
-    return rest.length === 0
-      ? fetch<Attribute>(materialized, name)
-      : fetch<Attribute>(materialized, name, rest[0] as Attribute);
+  fetch(name: string, ...rest: [] | [Attribute | Block<Attribute>]): Attribute {
+    return fetch(this.materialize(), name, ...rest);
   }
 
-  except(...names: string[]): Record<string, Attribute> {
+  except(...names: string[]): RbHash<Attribute> {
     return except(this.materialize(), ...names);
   }
 
   constructor(
-    types: Record<string, ValueType>,
-    values: Record<string, unknown>,
-    additionalTypes: Record<string, ValueType> = {},
-    defaultAttributes: Record<string, Attribute> = {},
-    delegateHash: Record<string, Attribute> = {},
+    types: RbHash<ValueType>,
+    values: RbHash<unknown>,
+    additionalTypes: RbHash<ValueType> = {},
+    defaultAttributes: RbHash<Attribute> = {},
+    delegateHash: RbHash<Attribute> = {},
   ) {
-    this.types = types;
-    this.values = values;
-    this.additionalTypes = additionalTypes;
-    this.materialized = false;
-    this.defaultAttributes = defaultAttributes;
-    this._delegateHash = Object.setPrototypeOf(delegateHash, null) as Record<string, Attribute>;
+    this.initialize(types, values, additionalTypes, defaultAttributes, delegateHash);
   }
 
   isKey(key: string): boolean {
     return hasKey(this._delegateHash, key) || hasKey(this.values, key) || hasKey(this.types, key);
   }
 
-  getAttribute(key: string): Attribute {
-    return this._delegateHash[key] ?? this.assignDefaultValue(key);
+  get(key: string): Attribute | undefined {
+    return (hashAref(this.delegateHash(), key) as Attribute | null) ?? this.assignDefaultValue(key);
   }
 
   set(key: string, value: Attribute): void {
-    this._delegateHash[key] = value;
+    hashAset(this.delegateHash(), key, value);
   }
 
   deepDup(): LazyAttributeHash {
@@ -202,16 +217,18 @@ export class LazyAttributeHash {
   }
 
   private initializeDup(_: LazyAttributeHash): void {
-    this._delegateHash = dup(this._delegateHash);
+    this._delegateHash = dup(this.delegateHash());
   }
 
-  eachKey(fn: (key: string) => void): void {
-    const keys = new Set([
-      ...Object.keys(this.types),
-      ...Object.keys(this.values),
-      ...Object.keys(this.delegateHash()),
-    ]);
-    for (const key of keys) fn(key);
+  eachKey(block?: (key: string) => void): string[] {
+    const keys = [
+      ...new Set([
+        ...hashKeys(this.types),
+        ...hashKeys(this.values),
+        ...hashKeys(this.delegateHash()),
+      ]),
+    ];
+    return each(keys, block);
   }
 
   equals(other: unknown): boolean {
@@ -223,11 +240,11 @@ export class LazyAttributeHash {
   }
 
   marshalDump(): [
-    Record<string, ValueType>,
-    Record<string, unknown>,
-    Record<string, ValueType>,
-    Record<string, Attribute>,
-    Record<string, Attribute>,
+    RbHash<ValueType>,
+    RbHash<unknown>,
+    RbHash<ValueType>,
+    RbHash<Attribute>,
+    RbHash<Attribute>,
   ] {
     return [
       this.types,
@@ -238,23 +255,16 @@ export class LazyAttributeHash {
     ];
   }
 
-  static marshalLoad(
-    values: [
-      Record<string, ValueType>,
-      Record<string, unknown>,
-      (Record<string, ValueType> | undefined)?,
-      (Record<string, Attribute> | undefined)?,
-      (Record<string, Attribute> | undefined)?,
-    ],
-  ): LazyAttributeHash {
-    return new LazyAttributeHash(values[0], values[1], values[2], values[3], values[4]);
+  /** @missingRailsCall initialize — PERMANENT */
+  marshalLoad(values: unknown[]): void {
+    this.initialize(...(values as Parameters<LazyAttributeHash["initialize"]>));
   }
 
   /** @internal */
-  protected materialize(): Record<string, Attribute> {
+  protected materialize(): RbHash<Attribute> {
     if (!this.materialized) {
-      eachKey(this.values, (key) => this.getAttribute(key));
-      eachKey(this.types, (key) => this.getAttribute(key));
+      eachKey(this.values, (key) => this.get(key));
+      eachKey(this.types, (key) => this.get(key));
       if (!Object.isFrozen(this)) {
         this.materialized = true;
       }
@@ -263,38 +273,55 @@ export class LazyAttributeHash {
   }
 
   /** @internal */
-  delegateHash(): Record<string, Attribute> {
+  delegateHash(): RbHash<Attribute> {
     return this._delegateHash;
   }
 
   /** @internal */
-  assignDefaultValue(name: string): Attribute {
-    const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
-    let valuePresent = true;
-    let value: unknown;
-    if (Object.hasOwn(this.values, name)) {
-      value = this.values[name];
-    } else {
-      valuePresent = false;
-    }
+  assignDefaultValue(name: string): Attribute | undefined {
+    const type = fetch<ValueType>(
+      this.additionalTypes,
+      name,
+      hashAref(this.types, name) as ValueType,
+    );
+    let valuePresent: boolean = true;
+    const value = fetch(
+      this.values,
+      name,
+      rbBlock(() => {
+        valuePresent = false;
+      }),
+    );
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type);
-      this._delegateHash[name] = attr;
+      hashAset(this.delegateHash(), name, attr);
       return attr;
     } else if (hasKey(this.types, name)) {
-      const attr = this.defaultAttributes[name];
+      const attr = hashAref(this.defaultAttributes, name) as Attribute | null;
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
-      this._delegateHash[name] = built;
+      hashAset(this.delegateHash(), name, built);
       return built;
     }
-    return Attribute.null(name);
+  }
+
+  private initialize(
+    types: RbHash<ValueType>,
+    values: RbHash<unknown>,
+    additionalTypes: RbHash<ValueType> = {},
+    defaultAttributes: RbHash<Attribute> = {},
+    delegateHash: RbHash<Attribute> = {},
+  ): void {
+    this.types = types;
+    this.values = values;
+    this.additionalTypes = additionalTypes;
+    this.materialized = false;
+    this._delegateHash = delegateHash;
+    this.defaultAttributes = defaultAttributes;
   }
 
   dup(): LazyAttributeHash {
-    const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
-    dup.initializeDup(this);
-    return dup;
+    return rbObjDup(this);
   }
 }
 

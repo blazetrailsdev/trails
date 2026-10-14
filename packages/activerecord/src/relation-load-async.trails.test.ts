@@ -1,12 +1,12 @@
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { FutureResult } from "./future-result.js";
-import { globalThreadPoolAsyncQueryExecutor, setAsyncQueryExecutor } from "./active-record.js";
-import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
+import { setAsyncQueryExecutor } from "./active-record.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 
 fixtures({ topics: [Topic, {}] });
 
@@ -14,27 +14,8 @@ describe("Relation#load_async", () => {
   registerModel("Topic", Topic);
   registerModel("Reply", Reply);
 
-  let restoreExecutor: (() => void) | undefined;
-  let tracker: AsynchronousQueriesTracker | undefined;
-
-  beforeEach(async () => {
-    setAsyncQueryExecutor("global_thread_pool");
-    tracker = AsynchronousQueriesTracker.run();
-
-    const pool = (await Base.connectionPool()) as unknown as { asyncExecutor: unknown };
-    const previous = pool.asyncExecutor;
-    pool.asyncExecutor = globalThreadPoolAsyncQueryExecutor();
-    restoreExecutor = () => {
-      pool.asyncExecutor = previous;
-    };
-  });
-
   afterEach(() => {
-    if (tracker) AsynchronousQueriesTracker.complete(tracker);
-    tracker = undefined;
-    restoreExecutor?.();
-    restoreExecutor = undefined;
-    setAsyncQueryExecutor(null);
+    setAsyncQueryExecutor("global_thread_pool");
     vi.restoreAllMocks();
   });
 
@@ -174,7 +155,7 @@ describe("Relation#load_async", () => {
 
     const relation = Topic.where({ title: "sole async topic" }).loadAsync();
     expect(relation.isLoaded).toBe(true);
-    expect(relation.isScheduled).toBe(true);
+    expect(relation.isScheduled).toBe(!inMemoryDb());
 
     expect(await relation.size()).toBe(1);
     expect(await relation.isEmpty()).toBe(false);
@@ -202,6 +183,34 @@ describe("Relation#load_async", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
+  it("drains the pending query from the delegated record readers and inspect", async () => {
+    await Topic.create({ title: "delegated async topic", author_name: "David" });
+
+    const connection = (await Base.leaseConnection()) as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    const spy = vi.spyOn(connection, "selectAll");
+
+    const relation = Topic.where({ title: "delegated async topic" }).loadAsync() as unknown as {
+      length(): number | Promise<number>;
+      map(fn: (topic: { title: string }) => string): string[] | Promise<string[]>;
+      inspect(): string | Promise<string>;
+      0: unknown;
+    };
+
+    const [length, titles] = await Promise.all([
+      relation.length(),
+      relation.map((topic) => topic.title),
+    ]);
+    expect(length).toBe(1);
+    expect(titles).toEqual(["delegated async topic"]);
+    expect(((await relation[0]) as { title: string }).title).toBe("delegated async topic");
+    expect(await relation.length()).toBe(1);
+    expect(await relation.map((topic) => topic.title)).toEqual(["delegated async topic"]);
+    expect(await relation.inspect()).toContain("delegated async topic");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it("batches a scheduled relation in memory instead of re-querying", async () => {
     await Topic.create({ title: "batched async topic", author_name: "David" });
     await Topic.create({ title: "other batched async topic", author_name: "David" });
@@ -222,8 +231,6 @@ describe("Relation#load_async", () => {
   });
 
   it("runs the query in the foreground when no executor is configured", async () => {
-    restoreExecutor?.();
-    restoreExecutor = undefined;
     setAsyncQueryExecutor(null);
 
     const connection = (await Base.leaseConnection()) as unknown as {
@@ -234,6 +241,23 @@ describe("Relation#load_async", () => {
     await Topic.all().loadAsync();
 
     expect((spy.mock.calls[0][3] as { async?: boolean }).async).toBe(false);
+  });
+
+  it("re-runs the query for a later reader when the foreground load rejected", async () => {
+    setAsyncQueryExecutor(null);
+    await Topic.create({ title: "rejected async topic", author_name: "David" });
+
+    const connection = (await Base.leaseConnection()) as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    vi.spyOn(connection, "selectAll").mockRejectedValueOnce(new Error("boom"));
+
+    const relation = Topic.where({ title: "rejected async topic" }).loadAsync();
+
+    await expect(relation.records()).rejects.toThrow("boom");
+    expect((await relation.records()).map((topic) => topic.title)).toEqual([
+      "rejected async topic",
+    ]);
   });
   itIfSupports(
     "concurrent_connections",

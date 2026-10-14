@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
-import { assert, assertNotPredicate } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNotPredicate } from "@blazetrails/activesupport";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -61,7 +61,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("type cast binary value", () => {
       const data = new Uint8Array([0x1f, 0x8b]);
-      expect(type.deserialize(data)).toEqual(data);
+      expect(type.deserialize(data)).toEqual(Buffer.from(data));
     });
 
     it("type case nil", () => {
@@ -142,11 +142,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       obj.serialized = "hello world";
       await obj.saveBang();
       await obj.reload();
-      expect(obj.serialized).toBe("hello world");
+      assertEqual("hello world", obj.serialized);
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(connection, "bytea_data_type");
+      const output = await dumpTableSchema("bytea_data_type");
       expect(output).toMatch(/t\.binary\s*\("payload"\);$/m);
       expect(output).toMatch(/t\.binary\s*\("serialized"\);$/m);
     });

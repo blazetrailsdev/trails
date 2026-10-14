@@ -1,12 +1,11 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { rbModConstSet, registerConstant, rtest } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 
 export class UserProvidedDefault extends FromUser {
   /** @internal */
   readonly userProvidedValue: unknown;
-  private _memoizedVBTC: unknown;
-  private _hasMemoizedVBTC: boolean = false;
+  declare private memoizedValueBeforeTypeCast: unknown;
 
   constructor(
     name: string | null,
@@ -14,35 +13,48 @@ export class UserProvidedDefault extends FromUser {
     type: ValueType | null,
     databaseDefault: Attribute | null = null,
   ) {
-    super(name, undefined, type, databaseDefault);
+    super(name, value, type, databaseDefault);
     this.userProvidedValue = value;
   }
 
   override get valueBeforeTypeCast(): unknown {
     if (typeof this.userProvidedValue === "function") {
-      if (!this._hasMemoizedVBTC) {
-        this._memoizedVBTC = this.userProvidedValue();
-        this._hasMemoizedVBTC = true;
-      }
-      return this._memoizedVBTC;
+      return rtest(this.memoizedValueBeforeTypeCast)
+        ? this.memoizedValueBeforeTypeCast
+        : (this.memoizedValueBeforeTypeCast = this.userProvidedValue());
+    } else {
+      return this.userProvidedValue;
     }
-    return this.userProvidedValue;
   }
 
   override withType(type: ValueType | null): Attribute {
     return new UserProvidedDefault(this.name, this.userProvidedValue, type, this.originalAttribute);
   }
 
-  marshalDump(): [string | null, unknown, ValueType | null, Attribute | null] {
-    return [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
+  marshalDump(): unknown[] {
+    const result = [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
+    if (Object.hasOwn(this, "_value")) result.push(this.value());
+    return result;
   }
 
-  static marshalLoad(
-    values: [string | null, unknown, ValueType | null, Attribute | null],
-  ): UserProvidedDefault {
-    return new UserProvidedDefault(values[0], values[1], values[2], values[3]);
+  marshalLoad(values: unknown[]): unknown {
+    const [name, userProvidedValue, type, originalAttribute, value] = values;
+    const self = this as {
+      name: string | null;
+      userProvidedValue: unknown;
+      type: ValueType | null;
+    };
+    self.name = name as string | null;
+    self.userProvidedValue = userProvidedValue;
+    self.type = type as ValueType | null;
+    this.originalAttribute = originalAttribute as Attribute | null;
+    if (values.length === 5) {
+      this._value = value;
+      return value;
+    }
+    return null;
   }
 }
 
-Attribute.UserProvidedDefault = UserProvidedDefault;
+rbModConstSet(Attribute, "UserProvidedDefault", UserProvidedDefault);
 registerConstant("ActiveModel::Attribute::UserProvidedDefault", UserProvidedDefault);

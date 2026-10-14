@@ -11,7 +11,12 @@
  */
 
 import { include, isSymbol, KeyError, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
-import { extractOptionsBang, isPlainObject, isPresent } from "@blazetrails/activesupport";
+import {
+  extractOptionsBang,
+  isPlainObject,
+  isPresent,
+  mattrAccessor,
+} from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
@@ -202,9 +207,11 @@ export class CookieJar implements Iterable<[string, string]> {
     throw new KeyError(`key not found: "${name}"`, { receiver: this._cookies, key: name });
   }
 
-  has(key: string): boolean {
-    return this._cookies.has(key);
+  isKey(name: string): boolean {
+    return this._cookies.has(String(name));
   }
+
+  declare hasKey: CookieJar["isKey"];
 
   get keys(): string[] {
     return [...this._cookies.keys()];
@@ -269,10 +276,7 @@ export class CookieJar implements Iterable<[string, string]> {
     return value;
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT
-   * @missingRailsArgs split — PERMANENT
-   */
+  /** @missingRailsArgs split — PERMANENT */
   private handleOptions(options: Partial<SetCookieOptions>): void {
     if (isFromNow(options.expires)) {
       options.expires = options.expires.fromNow();
@@ -362,7 +366,12 @@ export class CookieJar implements Iterable<[string, string]> {
     }
   }
 
-  static alwaysWriteCookie = false;
+  declare static alwaysWriteCookie: boolean;
+  declare alwaysWriteCookie: boolean;
+
+  static {
+    mattrAccessor.call(this, "alwaysWriteCookie", { default: false });
+  }
 
   /** @internal */
   private escape(string: string): string {
@@ -375,7 +384,7 @@ export class CookieJar implements Iterable<[string, string]> {
     return (
       request.ssl === true ||
       !cookie.secure ||
-      CookieJar.alwaysWriteCookie ||
+      this.alwaysWriteCookie ||
       (request.host ?? "").endsWith(".onion")
     );
   }
@@ -457,6 +466,8 @@ export class AbstractCookieJar {
 
   protected commit(_name: string, _options: SerializedSetOptions): void {}
 }
+
+CookieJar.prototype.hasKey = CookieJar.prototype.isKey;
 
 include(CookieJar, ChainedCookieJars);
 include(AbstractCookieJar, ChainedCookieJars);
@@ -696,10 +707,7 @@ export const signedCookieDigest = requestEnvAccessor<string>(
 export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
 /** @internal */
 export const cookiesSerializer = requestEnvAccessor<unknown>("action_dispatch.cookies_serializer");
-/**
- * @internal
- * @missingRailsCall call — PERMANENT
- */
+/** @internal */
 export function cookiesSameSiteProtection(this: RequestCookieMethodsHost): unknown {
   return (
     this.getHeader(COOKIES_SAME_SITE_PROTECTION) as

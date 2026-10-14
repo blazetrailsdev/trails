@@ -1,9 +1,10 @@
 import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
-import { include } from "@blazetrails/ruby-compat/include";
+import { Concern, classAttribute, dasherize, extend, underscore } from "@blazetrails/activesupport";
+import { include, Module } from "@blazetrails/ruby-compat/include";
 import type { LookupContext } from "./lookup-context.js";
 import type { PathSet } from "./path-set.js";
 import type { RenderableTemplate } from "./renderer/abstract-renderer.js";
-import { _processRenderTemplateOptions as renderingProcessRenderTemplateOptions } from "./rendering.js";
+import { Rendering } from "./rendering.js";
 
 type LayoutValue = string | RenderableTemplate | false | null | undefined;
 type LayoutMethod = (
@@ -14,7 +15,7 @@ type LayoutMethod = (
 ) => LayoutValue;
 type LayoutOption = string | ((...args: never[]) => unknown) | boolean | null | undefined;
 
-type Layouts = {
+export type Layouts = {
   actionName: string;
   _actionHasLayout?: boolean;
   _layoutConditions: Record<string, string[]>;
@@ -38,24 +39,27 @@ type LayoutsClass = {
   _impliedLayoutName(): string;
 };
 
-export const LayoutConditions = {
-  /** @internal */
-  _isConditionalLayout(this: Layouts): boolean | undefined {
-    if (!_isConditionalLayout.call(this)) return undefined;
+export const LayoutConditions: Module = new Module((mod) => {
+  mod.defineMethod(
+    "_isConditionalLayout",
+    /** @internal */
+    function _isConditionalLayout(this: Layouts): boolean | undefined {
+      if (!LayoutConditions.superMethod(this, "_isConditionalLayout")!()) return undefined;
 
-    const conditions = this._layoutConditions;
+      const conditions = this._layoutConditions;
 
-    let only: string[] | undefined;
-    let except: string[] | undefined;
-    if ((only = conditions["only"])) {
-      return only.includes(this.actionName);
-    } else if ((except = conditions["except"])) {
-      return !except.includes(this.actionName);
-    } else {
-      return true;
-    }
-  },
-};
+      let only: string[] | undefined;
+      let except: string[] | undefined;
+      if ((only = conditions["only"])) {
+        return only.includes(this.actionName);
+      } else if ((except = conditions["except"])) {
+        return !except.includes(this.actionName);
+      } else {
+        return true;
+      }
+    },
+  );
+});
 
 export function layout(
   this: LayoutsClass,
@@ -81,7 +85,7 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
   };
 
   const impliedLayoutName = this._impliedLayoutName();
-  const prefixes = /\blayouts/.test(impliedLayoutName) ? [] : ["layouts"];
+  const prefixes = /\blayouts/.test(underscore(impliedLayoutName)) ? [] : ["layouts"];
   const defaultBehavior: LayoutMethod = function (lookupContext, formats, keys) {
     return (
       (lookupContext.findAll(impliedLayoutName, prefixes, false, keys, { formats })[0] as
@@ -137,7 +141,7 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
 
 /** @internal */
 export function _impliedLayoutName(this: LayoutsClass): string {
-  return this.controllerPath();
+  return dasherize(this.controllerPath());
 }
 
 /** @internal */
@@ -145,7 +149,7 @@ export function _processRenderTemplateOptions(
   this: Layouts,
   options: Record<string, unknown>,
 ): void {
-  renderingProcessRenderTemplateOptions.call(this, options);
+  Layouts.superMethod(this, "_processRenderTemplateOptions")!(options);
 
   if (_isIncludeLayout(options)) {
     const layout = "layout" in options ? options["layout"] : ":default";
@@ -227,3 +231,34 @@ export function _isIncludeLayout(options: Record<string, unknown>): boolean {
     !["body", "plain", "html", "inline", "partial"].some((k) => k in options) || "layout" in options
   );
 }
+
+export const ClassMethods = { layout, _writeLayoutMethod, _impliedLayoutName };
+
+export const Layouts = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(Rendering);
+
+  (mod as unknown as { included(base: null, block: (this: LayoutsClass) => void): void }).included(
+    null,
+    function () {
+      classAttribute.call(this, "_layout", { instanceAccessor: false });
+      classAttribute.call(this, "_layoutConditions", {
+        instanceAccessor: false,
+        instanceReader: true,
+        default: {},
+      });
+
+      this._writeLayoutMethod();
+    },
+  );
+
+  mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
+  mod.defineMethod("isActionHasLayout", isActionHasLayout);
+  mod.defineMethod("_isConditionalLayout", _isConditionalLayout);
+  mod.defineMethod("_layout", _layout);
+  mod.defineMethod("_layoutForOption", _layoutForOption);
+  mod.defineMethod("_normalizeLayout", _normalizeLayout);
+  mod.defineMethod("_defaultLayout", _defaultLayout);
+  mod.defineMethod("_isIncludeLayout", _isIncludeLayout);
+}) as Module & { ClassMethods: typeof ClassMethods };
+Layouts.ClassMethods = ClassMethods;

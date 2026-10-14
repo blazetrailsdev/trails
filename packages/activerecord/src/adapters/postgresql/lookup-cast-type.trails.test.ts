@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { IntegerType, StringType } from "@blazetrails/activemodel";
 import { Enum } from "../../connection-adapters/postgresql/oid/enum.js";
 import { describeIfPg, PG_TEST_URL, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 
 describeIfPg("PostgreSQLAdapter#lookupCastType", () => {
@@ -21,6 +21,10 @@ describeIfPg("PostgreSQLAdapter#lookupCastType", () => {
       expect(connection.lookupCastType("varchar")).toBeInstanceOf(StringType);
       expect(connection.lookupCastType("int4")).toBeInstanceOf(IntegerType);
       expect(connection.lookupCastType("integer")).toBeInstanceOf(IntegerType);
+      expect(connection.lookupCastType("decimal").constructor).toBe(
+        connection.lookupCastType("numeric").constructor,
+      );
+      expect(connection.lookupCastType("decimal")).not.toBeInstanceOf(StringType);
     });
 
     it("answers the real type for a schema-qualified name", () => {

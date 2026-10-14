@@ -1,16 +1,12 @@
 import { Nodes } from "../namespaces.js";
-import { Node } from "./node.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Table } from "../table.js";
 import { Binary } from "./binary.js";
+import type { ArelNode } from "../arel.js";
 
-export class JoinSource extends Binary {
-  declare left: Node | Table | null;
-  declare right: Node[];
-
-  constructor(singleSource: Node | Table | null, joinop: Node[] = []) {
+export class JoinSource extends Binary<ArelNode | Table | null, ArelNode[]> {
+  constructor(singleSource: ArelNode | Table | null, joinop: ArelNode[] = []) {
     super(singleSource, joinop);
-    this.left = singleSource;
-    this.right = joinop;
   }
 
   isEmpty(): boolean {
@@ -18,4 +14,4 @@ export class JoinSource extends Binary {
   }
 }
 
-Nodes.JoinSource = JoinSource;
+rbModConstSet(Nodes, "JoinSource", JoinSource);

@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { extractOptionsBang, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
@@ -8,64 +8,11 @@ import {
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
+import { ArgumentError, hashDelete, isEmpty, URI } from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
 
 export type RedirectBlock = (params: Record<string, string>, request: Request) => string;
-
-interface ParsedUri {
-  scheme: string | null;
-  host: string | null;
-  port: number | null;
-  path: string;
-  query: string | null;
-  fragment: string | null;
-}
-
-const URI_RE =
-  /^(?:([a-zA-Z][a-zA-Z0-9+.-]*):)?(?:\/\/([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?$/;
-
-function parseUri(raw: string): ParsedUri {
-  const m = URI_RE.exec(raw);
-  if (!m) {
-    return { scheme: null, host: null, port: null, path: raw, query: null, fragment: null };
-  }
-  const [, scheme, authority, path, query, fragment] = m;
-  let host: string | null = null;
-  let port: number | null = null;
-  if (authority !== undefined) {
-    const at = authority.lastIndexOf("@");
-    const hostport = at >= 0 ? authority.slice(at + 1) : authority;
-    const colon = hostport.lastIndexOf(":");
-    if (colon >= 0 && /^\d+$/.test(hostport.slice(colon + 1))) {
-      host = hostport.slice(0, colon) || null;
-      port = Number(hostport.slice(colon + 1));
-    } else {
-      host = hostport || null;
-    }
-  }
-  return {
-    scheme: scheme ?? null,
-    host,
-    port,
-    path: path ?? "",
-    query: query ?? null,
-    fragment: fragment ?? null,
-  };
-}
-
-function uriToString(uri: ParsedUri): string {
-  let out = "";
-  if (uri.scheme) out += `${uri.scheme}://`;
-  if (uri.host !== null) {
-    out += uri.host;
-    if (uri.port !== null) out += `:${uri.port}`;
-  }
-  out += uri.path;
-  if (uri.query !== null) out += `?${uri.query}`;
-  if (uri.fragment !== null) out += `#${uri.fragment}`;
-  return out;
-}
 
 function transformValues(
   params: Record<string, string>,
@@ -89,11 +36,11 @@ function scriptName(req: Request): string {
   return (req.env["SCRIPT_NAME"] as string) ?? "";
 }
 
-export class Redirect extends Endpoint {
+export class Redirect<B = RedirectBlock> extends Endpoint {
   readonly status: number;
-  readonly block: RedirectBlock;
+  readonly block: B;
 
-  constructor(status: number, block: RedirectBlock) {
+  constructor(status: number, block: B) {
     super();
     this.status = status;
     this.block = block;
@@ -104,8 +51,7 @@ export class Redirect extends Endpoint {
   }
 
   call(env: RackEnv): [number, Record<string, string>, unknown] {
-    const payload: { status?: number; location?: string; request?: Request } = {};
-    return Notifications.instrument("redirect.action_dispatch", payload, () => {
+    return Notifications.instrument("redirect.action_dispatch", undefined, (payload) => {
       const request = new Request(env);
       const response = this.buildResponse(request);
       payload.status = this.status;
@@ -116,25 +62,25 @@ export class Redirect extends Endpoint {
   }
 
   buildResponse(req: Request): Response {
-    const uri = parseUri(this.path(req.pathParameters as Record<string, string>, req));
+    const uri = URI.parse(this.path(req.pathParameters as Record<string, string>, req));
 
     if (!uri.host) {
       if (this.relativePath(uri.path)) {
         uri.path = `${scriptName(req)}/${uri.path}`;
-      } else if (uri.path === "") {
+      } else if (isEmpty(uri.path!)) {
         uri.path = scriptName(req) === "" ? "/" : scriptName(req);
       }
     }
 
     uri.scheme ??= req.scheme;
     uri.host ??= req.host;
-    if (uri.port === null && !req.isStandardPort) uri.port = req.port;
+    if (!req.isStandardPort) uri.port ??= req.port;
 
     req.commitFlash();
 
     const body = "";
     const headers = {
-      Location: uriToString(uri),
+      Location: uri.toString(),
       "Content-Type": `text/html; charset=${Response.defaultCharset}`,
       "Content-Length": String(body.length),
     };
@@ -142,7 +88,7 @@ export class Redirect extends Endpoint {
   }
 
   path(params: Record<string, string>, request: Request): string {
-    return this.block(params, request);
+    return (this.block as RedirectBlock)(params, request);
   }
 
   inspect(): string {
@@ -150,8 +96,8 @@ export class Redirect extends Endpoint {
   }
 
   /** @internal */
-  protected relativePath(path: string): boolean {
-    return !!path && path !== "" && !path.startsWith("/");
+  protected relativePath(path: string | null): boolean {
+    return path != null && !isEmpty(path) && !path.startsWith("/");
   }
 
   /** @internal */
@@ -172,17 +118,9 @@ export class Redirect extends Endpoint {
 
 const URL_PARTS = /^([^?]+)?(\?[^#]+)?(#.+)?$/;
 
-export class PathRedirect extends Redirect {
-  constructor(status: number, pathTemplate: string) {
-    super(status, () => pathTemplate);
-  }
-
-  get template(): string {
-    return (this.block as () => string)();
-  }
-
+export class PathRedirect extends Redirect<string> {
   override path(params: Record<string, string>, _request: Request): string {
-    const tpl = this.template;
+    const tpl = this.block;
     const m = URL_PARTS.exec(tpl);
     if (m) {
       const [, p, q, f] = m;
@@ -201,7 +139,7 @@ export class PathRedirect extends Redirect {
   }
 
   override inspect(): string {
-    return `redirect(${this.status}, ${this.template})`;
+    return `redirect(${this.status}, ${this.block})`;
   }
 
   /** @internal */
@@ -277,29 +215,28 @@ export function redirect(
   ...args: Array<
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
   >
-): Redirect {
-  let options: (OptionRedirectOptions & { status?: number }) | undefined;
-  const last = args[args.length - 1];
-  if (last && typeof last === "object" && !("call" in last) && typeof last !== "function") {
-    options = args.pop() as OptionRedirectOptions & { status?: number };
-  }
-  const status = options?.status ?? 301;
-  if (options) delete options.status;
+): Redirect<unknown> {
+  let block: RedirectBlock | undefined =
+    typeof args[args.length - 1] === "function" ? (args.pop() as RedirectBlock) : undefined;
+  const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
+  const deleted = hashDelete(options, "status") as number | false | null;
+  const status = deleted != null && deleted !== false ? deleted : 301;
   const path = args.shift();
 
-  if (options && Object.keys(options).length > 0) {
+  if (Object.keys(options).length > 0) {
     return new OptionRedirect(status, options);
   }
   if (typeof path === "string") {
     return new PathRedirect(status, path);
   }
-  let block: RedirectBlock | undefined;
   if (typeof path === "function") {
     block = path;
   } else if (path && typeof (path as RedirectCallable).call === "function") {
     const callable = path as RedirectCallable;
     block = (params, request) => callable.call(params, request);
   }
-  if (!block) throw new Error("redirection argument not supported");
+  if (!block) throw new ArgumentError("redirection argument not supported");
   return new Redirect(status, block);
 }
+
+export const Redirection = { redirect };

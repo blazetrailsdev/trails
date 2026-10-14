@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { File as FixtureFile } from "../../fixture-set/file.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
+import {
+  defaultInsertValue,
+  insertFixturesSet,
+} from "../../connection-adapters/abstract/database-statements.js";
+import { Visitors } from "@blazetrails/arel";
 import { FixtureSet } from "../../fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
 import { adminUsersFixtureData } from "./admin/users.js";
@@ -29,8 +34,14 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
     schemaCache: { columnsHash: async (table: string) => doubleColumnsHash(table) },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    supportsVirtualColumns: async () => false,
+    defaultInsertValue,
+    get visitor() {
+      return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+    },
     quoteString: (v: string) => v.replace(/'/g, "''"),
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
@@ -75,7 +86,10 @@ function makeModel(tableName: string, pk = "id") {
   const Model = {
     tableName,
     primaryKey: pk,
+    isCompositePrimaryKey: () => false,
     loadSchema: async () => {},
+    definedEnums: {},
+    _reflections: {},
     columns: () => Object.values(doubleColumnsHash(tableName)),
     typeForAttribute: () => ({ type: () => "integer" }),
     findBy: vi.fn(async (attrs: Record<string, unknown>) => {

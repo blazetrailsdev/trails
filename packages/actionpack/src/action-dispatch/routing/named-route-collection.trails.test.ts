@@ -8,9 +8,9 @@ import {
 
 function drawn(): RouteSet {
   const routeSet = new RouteSet();
-  routeSet.draw((r) => {
-    r.get("/posts", { to: "posts#index", as: "posts" });
-    r.get("/posts/:id", { to: "posts#show", as: "post" });
+  routeSet.draw(function () {
+    this.get("/posts", { to: "posts#index", as: "posts" });
+    this.get("/posts/:id", { to: "posts#show", as: "post" });
   });
   return routeSet;
 }
@@ -31,8 +31,8 @@ describe("NamedRouteCollection", () => {
 
   it("camelizes a multi-word route name into its helper names", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/admin", { to: "admin#index", as: "admin_root" });
+    routeSet.draw(function () {
+      this.get("/admin", { to: "admin#index", as: "admin_root" });
     });
     routeSet.namedRoutes.addUrlHelper("user_profile", {}, () => "/profile");
     const named = routeSet.namedRoutes;
@@ -90,8 +90,8 @@ describe("NamedRouteCollection", () => {
     const routeSet = new RouteSet();
     const helpers = routeSet.urlHelpers() as unknown as Record<string, () => string>;
 
-    routeSet.draw((r) => {
-      r.get("/posts", { to: "posts#index", as: "posts" });
+    routeSet.draw(function () {
+      this.get("/posts", { to: "posts#index", as: "posts" });
     });
 
     expect(routeSet.urlHelpers()).toBe(helpers);

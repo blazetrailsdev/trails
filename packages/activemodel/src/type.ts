@@ -1,4 +1,4 @@
-import { typeRegistry, TypeRegistry, type TypeClass, type TypeFactory } from "./type/registry.js";
+import { TypeRegistry, type TypeClass, type TypeFactory } from "./type/registry.js";
 import { ValueType } from "./type/value.js";
 import { BigIntegerType } from "./type/big-integer.js";
 import { BinaryType } from "./type/binary.js";
@@ -14,8 +14,14 @@ import { TimeType } from "./type/time.js";
 
 export { ValueType } from "./type/value.js";
 
+let _registry = new TypeRegistry();
+
 export function registry(): TypeRegistry {
-  return typeRegistry;
+  return _registry;
+}
+
+export function setRegistry(registry: TypeRegistry): void {
+  _registry = registry;
 }
 
 export function register(
@@ -23,11 +29,11 @@ export function register(
   klass: TypeClass | null = null,
   block?: TypeFactory,
 ): void {
-  typeRegistry.register(typeName, klass, block);
+  registry().register(typeName, klass, block);
 }
 
 export function lookup(name: string, ...args: unknown[]): ValueType {
-  return typeRegistry.lookup(name, ...args);
+  return registry().lookup(name, ...args);
 }
 
 let _defaultValue: ValueType | null = null;

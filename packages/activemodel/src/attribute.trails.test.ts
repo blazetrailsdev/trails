@@ -1,9 +1,14 @@
 import { describe, it, expect } from "vitest";
+import { deepDup } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
+import { Marshal, rbHash, rbObjDup, rbObjInstanceVariables } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
-import { typeRegistry } from "./type/registry.js";
+import { registry } from "./type.js";
 import { ValueType } from "./type/value.js";
-import "./attribute/user-provided-default.js";
+import { UserProvidedDefault } from "./attribute/user-provided-default.js";
+
+const typeRegistry = registry();
 
 describe("Attribute — trails-only coverage", () => {
   describe("equals compares the types by value (attribute.rb:119)", () => {
@@ -19,6 +24,31 @@ describe("Attribute — trails-only coverage", () => {
       const b = Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 20 }));
 
       expect(a.equals(b)).toBe(false);
+    });
+  });
+
+  describe("eql / hash (attribute.rb:115-125)", () => {
+    it("equal attributes are eql and hash alike under rbHash", () => {
+      const a = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+      const b = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+
+      expect(a.eql(b)).toBe(true);
+      expect(rbHash(a)).toBe(rbHash(b));
+      expect(a.hash()).toBe(rbHash([a.constructor, "name", "Alice", a.type]));
+    });
+
+    it("hashes each member of the tuple", () => {
+      const a = Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 10 }));
+
+      for (const other of [
+        Attribute.fromUser("name", "Alice", new ValueType({ limit: 10 })),
+        Attribute.fromDatabase("title", "Alice", new ValueType({ limit: 10 })),
+        Attribute.fromDatabase("name", "Bob", new ValueType({ limit: 10 })),
+        Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 20 })),
+      ]) {
+        expect(a.eql(other)).toBe(false);
+        expect(rbHash(a)).not.toBe(rbHash(other));
+      }
     });
   });
 
@@ -54,7 +84,7 @@ describe("Attribute — trails-only coverage", () => {
   it("#with_user_default creates a UserProvidedDefault attribute", () => {
     const attr = Attribute.fromDatabase("name", null, typeRegistry.lookup("string"));
     const withDefault = attr.withUserDefault("fallback");
-    expect(withDefault.value).toBe("fallback");
+    expect(withDefault.value()).toBe("fallback");
   });
 
   it("from_user came_from_user? checks value_constructed_by_mass_assignment", () => {
@@ -80,7 +110,7 @@ describe("Attribute — trails-only coverage", () => {
     const attr = Attribute.fromUser("age", "42", intType);
     attr.cameFromUser();
     expect(receivedValue).toBe("42");
-    expect(attr.value).toBe(42);
+    expect(attr.value()).toBe(42);
   });
 
   it("from_database came_from_user? returns false", () => {
@@ -179,7 +209,7 @@ describe("Attribute — trails-only coverage", () => {
     it("returns true when type.isChangedInPlace returns true (StringType: raw vs new value differ)", () => {
       const stringType = typeRegistry.lookup("string");
       const attr = Attribute.fromDatabase("name", "hello", stringType, "world");
-      void attr.value;
+      void attr.value();
       expect(attr.changedInPlace()).toBe(true);
     });
 
@@ -192,7 +222,7 @@ describe("Attribute — trails-only coverage", () => {
     it("returns false for immutable type even after value is read", () => {
       const intType = typeRegistry.lookup("integer");
       const attr = Attribute.fromDatabase("count", 5, intType);
-      void attr.value;
+      void attr.value();
       expect(attr.changedInPlace()).toBe(false);
     });
   });
@@ -224,7 +254,7 @@ describe("Attribute — trails-only coverage", () => {
 
       const attr = Attribute.fromDatabase("data", '{"x":1}', mutableType);
       void attr.valueForDatabase;
-      (attr.value as Record<string, number>).x = 99;
+      (attr.value() as Record<string, number>).x = 99;
       expect(attr.valueForDatabase).toBe('{"x":99}');
     });
   });
@@ -234,7 +264,7 @@ describe("Attribute — trails-only coverage", () => {
       const original = Attribute.fromDatabase("name", "Alice", type);
       const assigned = original.withValueFromUser("Bob");
 
-      const duped = assigned.deepDup();
+      const duped = deepDup(assigned);
 
       expect(duped).not.toBe(assigned);
       expect(duped.originalAttribute).toBe(assigned.originalAttribute);
@@ -249,12 +279,95 @@ describe("Attribute — trails-only coverage", () => {
       type.deserialize = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
 
       const attr = Attribute.fromDatabase("data", '["a"]', type as never);
-      void attr.value;
-      const duped = attr.deepDup();
-      (duped.value as string[]).push("b");
+      void attr.value();
+      const duped = deepDup(attr);
+      (duped.value() as string[]).push("b");
 
-      expect(attr.value).toEqual(["a"]);
-      expect(duped.value).toEqual(["a", "b"]);
+      expect(attr.value()).toEqual(["a"]);
+      expect(duped.value()).toEqual(["a", "b"]);
+    });
+    it("dups a Time, a JS Date, a class instance, a Map, a Set and a Hash cast value, as @value.dup does", () => {
+      class Point {
+        x = 1;
+      }
+      for (const cast of [
+        Time.now(),
+        new Date(),
+        new Point(),
+        new Map([["a", 1]]),
+        new Set([1]),
+        { a: 1 },
+      ]) {
+        const attr = Attribute.fromDatabase("v", cast, new ValueType());
+        void attr.value();
+        const duped = rbObjDup(attr);
+
+        expect(duped.value()).not.toBe(attr.value());
+        expect(duped.value()).toBeInstanceOf(cast.constructor);
+        expect(duped.value()).toEqual(attr.value());
+      }
+    });
+  });
+
+  describe("instance variables (attribute.rb:33-48)", () => {
+    const names = ["@name", "@value_before_type_cast", "@type", "@original_attribute"];
+
+    it("answers Rails' ivar names, and @value only once the value has been read", () => {
+      const attr = Attribute.fromUser("age", "42", typeRegistry.lookup("integer"));
+      expect(rbObjInstanceVariables(attr)).toEqual(names);
+      expect(attr.hasBeenRead()).toBe(false);
+
+      expect(attr.value()).toBe(42);
+      expect(rbObjInstanceVariables(attr)).toEqual([...names, "@value"]);
+      expect(attr.hasBeenRead()).toBe(true);
+    });
+
+    it("a value given to from_database is @value from the start, a nil one is not", () => {
+      const type = typeRegistry.lookup("integer");
+      expect(rbObjInstanceVariables(Attribute.fromDatabase("age", "42", type, 42))).toEqual([
+        ...names,
+        "@value",
+      ]);
+      expect(rbObjInstanceVariables(Attribute.fromDatabase("age", "42", type, null))).toEqual(
+        names,
+      );
+    });
+
+    it("dup of an unread attribute leaves @value undefined", () => {
+      const duped = rbObjDup(Attribute.fromUser("age", "42", typeRegistry.lookup("integer")));
+      expect(rbObjInstanceVariables(duped)).toEqual(names);
+      expect(duped.hasBeenRead()).toBe(false);
+    });
+
+    it("a marshal-loaded UserProvidedDefault holds the ivars a constructed one does", () => {
+      const type = typeRegistry.lookup("integer");
+      const attr = Attribute.fromUser("age", "1", type).withUserDefault(
+        "42",
+      ) as UserProvidedDefault;
+      const loaded = Object.create(Object.getPrototypeOf(attr)) as typeof attr;
+      loaded.marshalLoad(attr.marshalDump());
+      expect(rbObjInstanceVariables(loaded)).toEqual([
+        "@name",
+        "@user_provided_value",
+        "@type",
+        "@original_attribute",
+      ]);
+    });
+
+    it("Marshal.dump writes Rails' ivar names", () => {
+      const attr = Attribute.fromUser("age", "42", new ValueType());
+      const unread = Marshal.dump(attr);
+      expect(unread).toContain("@value_before_type_cast");
+      expect(unread).not.toMatch(/@_value|@_has_value|@value[^_]/);
+
+      attr.value();
+      const read = Marshal.dump(attr);
+      expect(read).toMatch(/@value[^_]/);
+      expect(read).not.toMatch(/@_value|@_has_value/);
+
+      const loaded = Marshal.load(Marshal.dump(attr)) as typeof attr;
+      expect(loaded.equals(attr)).toBe(true);
+      expect(loaded.value()).toBe("42");
     });
   });
 });

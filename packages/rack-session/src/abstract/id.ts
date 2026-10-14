@@ -7,7 +7,7 @@ import {
   SecureRandom,
   verbose,
   rbInspect as inspect,
-  rbObjClass,
+  rbObjClassname,
   KeyError,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
@@ -141,7 +141,7 @@ export class SessionHash implements PersistedSession {
     for (const k of keys) {
       if (value == null) return undefined;
       if (typeof value !== "object") {
-        throw new TypeError(`${rbObjClass(value)} does not have #dig method`);
+        throw new TypeError(`${rbObjClassname(value)} does not have #dig method`);
       }
       value = (value as Record<string, unknown>)[k as string];
     }
@@ -233,7 +233,7 @@ export class SessionHash implements PersistedSession {
     if (this.isLoaded()) {
       return inspect(this.data);
     } else {
-      return `#<${rbObjClass(this)}:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${rbObjClassname(this)}:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 

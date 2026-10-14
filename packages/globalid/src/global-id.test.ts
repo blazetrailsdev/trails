@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setApp, _resetApp } from "./config.js";
-import { registerConstant, _resetConstants, assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport";
+import { rbHash, registerConstant, resetConstants, uniq } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { GID } from "./uri/gid.js";
 import { type LocatorModel } from "./locator.js";
@@ -75,16 +76,6 @@ const FIXTURE_REGISTRY: Record<string, LocatorModel> = {
   CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
 };
 
-function uniq<T>(items: T[]): T[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const key = `${(item as object).constructor.name}:${String(item)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 describe("GlobalIDTest", () => {
   it("value equality", () => {
     expect(new GlobalID("gid://app/Person/5")).toEqual(new GlobalID("gid://app/Person/5"));
@@ -104,7 +95,7 @@ describe("GlobalIDParamEncodedTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("parsing", () => {
@@ -142,7 +133,7 @@ describe("GlobalIDCreationTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("find", async () => {
@@ -348,7 +339,7 @@ describe("GlobalIDCreationTest", () => {
     expect([gid1]).toEqual(uniq([gid1, gid2]));
     expect([gid1, gid3]).toEqual(uniq([gid1, gid2, gid3]));
 
-    expect(gid1).not.toEqual(gid1.uri);
+    expect(gid1.hash()).not.toEqual(rbHash(gid1.uri));
 
     expect([gid1, gid1.uri]).toEqual(uniq([gid1, gid1.uri]));
   });

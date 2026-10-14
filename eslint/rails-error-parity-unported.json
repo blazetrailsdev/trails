@@ -6,18 +6,6 @@
     "reason": "active_record/destroy_association_async_job.rb (dependent: :destroy_async job) is unported."
   },
   {
-    "package": "activerecord",
-    "name": "FixtureError",
-    "rubyFile": "active_record/fixtures.rb",
-    "reason": "active_record/fixtures.rb (fixtures subsystem) is unported."
-  },
-  {
-    "package": "activerecord",
-    "name": "FormatError",
-    "rubyFile": "active_record/fixtures.rb",
-    "reason": "active_record/fixtures.rb (fixtures subsystem) is unported."
-  },
-  {
     "package": "activesupport",
     "name": "DeprecationException",
     "rubyFile": "active_support/deprecation/behaviors.rb",

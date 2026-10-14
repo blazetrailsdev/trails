@@ -1,4 +1,5 @@
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Notification extends Base {
   declare message: string;
@@ -7,3 +8,4 @@ export class Notification extends Base {
     this.validates("message", { presence: true });
   }
 }
+registerModel(Notification);

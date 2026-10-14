@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";

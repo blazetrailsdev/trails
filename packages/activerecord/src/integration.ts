@@ -1,13 +1,12 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { type Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { rbFArray, rbFSend, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   included,
   isPresent,
   squish,
   parameterize,
-  toFs,
   truncate,
 } from "@blazetrails/activesupport";
 import { defaultTimezone } from "./active-record.js";
@@ -18,82 +17,53 @@ interface Identifiable {
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
   readAttributeBeforeTypeCast(name: string): unknown;
+  hasAttribute(name: string): boolean;
+  attributeCameFromUser(name: string): boolean;
+  cacheVersion(): string | null;
+  canUseFastCacheVersion(timestamp: unknown): boolean;
+  maxUpdatedColumnTimestamp(): RubyTime | null;
+  readonly modelName: { cacheKey: string };
+  readonly cacheTimestampFormat: "usec" | "number";
+  readonly cacheVersioning: boolean;
+  constructor: { name: string; paramDelimiter: string; hasAttribute(name: string): boolean };
 }
-
-type TemporalTimestamp = RubyTime;
 
 export function toParam(this: Identifiable): string | null {
-  const pk = this.id;
-  if (pk == null) return null;
-  const paramDelimiter: string = (this.constructor as any).paramDelimiter ?? "_";
-  return Array.isArray(pk) ? pk.join(paramDelimiter) : String(pk);
-}
-
-function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
-  const aliases: Record<string, string> = record.constructor?.attributeAliases ?? {};
-  const candidates: TemporalTimestamp[] = [];
-  for (const name of ["updated_at", "updated_on"] as const) {
-    const col = aliases[name] ?? name;
-    if (record.hasAttribute?.(col)) {
-      const val = record._readAttribute(col);
-      if (val instanceof RubyTime) {
-        candidates.push(val);
-      }
-    }
-  }
-  if (candidates.length === 0) return null;
-  return candidates.reduce((a, b) => (a.toR().cmp(b.toR()) >= 0 ? a : b));
+  if (this.id == null || this.id === false) return null;
+  return rbFArray(this.id).join(this.constructor.paramDelimiter);
 }
 
 export function cacheKey(this: Identifiable): string {
-  const klass = this.constructor as any;
-  const modelKey: string = klass.name ? klass.modelName.cacheKey : klass.tableName;
-  const pk = this.id;
-
   if (this.isNewRecord()) {
-    return `${modelKey}/new`;
+    return `${this.modelName.cacheKey}/new`;
+  } else {
+    if (this.cacheVersion() != null) {
+      return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}`;
+    } else {
+      const timestamp = this.maxUpdatedColumnTimestamp();
+
+      if (timestamp != null) {
+        return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}-${timestamp.utc().toFs(this.cacheTimestampFormat)}`;
+      } else {
+        return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}`;
+      }
+    }
   }
-
-  const delimiter: string = klass.paramDelimiter ?? "_";
-  const idStr = Array.isArray(pk) ? pk.join(delimiter) : String(pk);
-
-  if (klass.cacheVersioning) {
-    return `${modelKey}/${idStr}`;
-  }
-
-  const timestamp = maxUpdatedColumnTimestamp(this);
-  if (timestamp) {
-    const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
-    return `${modelKey}/${idStr}-${toFs(timestamp.utc(), cacheTimestampFormat)}`;
-  }
-
-  return `${modelKey}/${idStr}`;
 }
 
 export function cacheVersion(this: Identifiable): string | null {
-  const klass = this.constructor as any;
-  if (!klass.cacheVersioning) return null;
+  if (!this.cacheVersioning) return null;
 
-  if ((this as any).hasAttribute?.("updated_at")) {
+  if (this.hasAttribute("updated_at")) {
     let timestamp = this.readAttributeBeforeTypeCast("updated_at");
-    if (canUseFastCacheVersion(this, timestamp)) {
+    if (this.canUseFastCacheVersion(timestamp)) {
       return rawTimestampToCacheVersion(timestamp as string);
+    } else if ((timestamp = this.readAttribute("updated_at")) != null) {
+      return (timestamp as RubyTime).utc().toFs(this.cacheTimestampFormat);
     }
-    timestamp = this.readAttribute("updated_at");
-    if (timestamp instanceof RubyTime || timestamp instanceof Temporal.Instant) {
-      const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
-      return toFs(
-        timestamp instanceof RubyTime ? timestamp.utc() : timestamp,
-        cacheTimestampFormat,
-      );
-    }
-    return null;
+  } else if (this.constructor.hasAttribute("updated_at")) {
+    throw new MissingAttributeError(`missing attribute 'updated_at' for ${this.constructor.name}`);
   }
-
-  if (klass.hasAttribute?.("updated_at")) {
-    throw new MissingAttributeError(`missing attribute 'updated_at' for ${klass.name}`);
-  }
-
   return null;
 }
 
@@ -121,19 +91,18 @@ export const Integration = {
 };
 
 export const ClassMethods = {
-  /** @missingRailsCall define_method — PERMANENT */
   toParam(this: { name: string; prototype: any }, methodName?: string): string | undefined {
     if (methodName == null) {
       return this.name;
     }
     const klass = this;
-    klass.prototype.toParam = function (this: any): string | null {
+    rbModDefineMethod(klass, "toParam", function (this: any): string | null {
       let default_: string | null;
       let result: string;
       let param: string;
       if (
-        (default_ = Object.getPrototypeOf(klass.prototype).toParam?.call(this) ?? null) != null &&
-        isPresent((result = String(publicSend(this, methodName) ?? ""))) &&
+        (default_ = Object.getPrototypeOf(klass.prototype).toParam.call(this)) != null &&
+        isPresent((result = rbObjAsString(rbFSend(this, methodName)))) &&
         isPresent(
           (param = truncate(parameterize(squish(result)), 20, { separator: /-/, omission: "" })),
         )
@@ -142,20 +111,10 @@ export const ClassMethods = {
       } else {
         return default_;
       }
-    };
+    });
     return undefined;
   },
 };
-
-function publicSend(obj: object, method: string): unknown {
-  if (!(method in obj)) {
-    throw new NoMethodError(
-      `undefined method '${method}' for an instance of ${obj.constructor.name}`,
-    );
-  }
-  const value = (obj as Record<string, unknown>)[method];
-  return value instanceof Function ? (value as () => unknown).call(obj) : value;
-}
 
 export function collectionCacheKey(
   this: { all(): any },
@@ -166,19 +125,17 @@ export function collectionCacheKey(
   return Promise.resolve(rel.computeCacheKey(timestampColumn));
 }
 
-const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
-
 /**
  * @internal
  * @missingRailsCall with_connection — CONVERGEABLE cache-version-fast-path-reads-global-default-timezone
  */
-export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown): boolean {
-  if (typeof timestamp !== "string") return false;
-  const klass = record.constructor as any;
-  if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
-  if (defaultTimezone() !== "utc") return false;
-  if ((record as unknown as Record<string, boolean>)["updated_atCameFromUser"]) return false;
-  return TIMESTAMP_RE.test(timestamp);
+export function canUseFastCacheVersion(this: Identifiable, timestamp: unknown): boolean {
+  return (
+    typeof timestamp === "string" &&
+    this.cacheTimestampFormat === "usec" &&
+    defaultTimezone() === "utc" &&
+    !this.attributeCameFromUser("updated_at")
+  );
 }
 
 /** @internal */

@@ -1,13 +1,12 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Post } from "./test-helpers/models/post.js";
-import { collectionProxyFor as association } from "./associations.js";
 import { Rollback } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";
@@ -65,28 +64,15 @@ function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
   return (pool as unknown as { _queryCacheMaxSize: number | null })._queryCacheMaxSize;
 }
 
-function cleanUpConnectionHandler(): void {
-  const managers: Map<string, { roleNames: string[]; removeRole(role: string): unknown }> = (
-    Base.connectionHandler as unknown as {
-      _connectionNameToPoolManager: Map<string, never>;
-    }
-  )._connectionNameToPoolManager as never;
-  for (const [, poolManager] of managers) {
-    for (const role of [...poolManager.roleNames]) {
-      if (role !== Base.defaultRole) poolManager.removeRole(role);
-    }
-  }
-}
-
 describe("QueryCacheTest", () => {
-  fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
+  const { self } = fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
     useTransactionalTests: false,
   });
 
   afterEach(async () => {
     Task.connectionPool().clearQueryCache();
     Base.connectionPool().disableQueryCacheBang();
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
   });
 
   it("execute clear cache", async () => {
@@ -286,7 +272,7 @@ describe("QueryCacheTest", () => {
   it("cache passing a relation", async () => {
     const post = await Post.first();
     await Post.cache(async () => {
-      const query = association(post as never, "categories").select("post_id");
+      const query = post!.categories.select("post_id");
       assert((await (await Post.leaseConnection()).selectAll(query as never)) instanceof Result);
     });
   });
@@ -442,7 +428,7 @@ describe("QueryCacheTest", () => {
     class ShouldNotHaveExceptionsLogger extends LogSubscriber {
       events: NotificationEvent[] = [];
       exception = false;
-      override sql(event: NotificationEvent): void {
+      override sql(event: NotificationEvent): undefined {
         this.events.push(event);
         try {
           super.sql(event);
@@ -472,7 +458,7 @@ describe("QueryCacheTest", () => {
   });
 
   it.skip("query cache does not allow sql key mutation", () => {
-    // BLOCKED: relies on Ruby FrozenError when a subscriber mutates the frozen
+    // PERMANENT-SKIP: CLAUDE.md § "Ruby Strings are JS string primitives"
   });
 
   it("cache is flat", async () => {

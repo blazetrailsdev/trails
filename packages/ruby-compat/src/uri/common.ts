@@ -1,3 +1,7 @@
+import { Encoding } from "../encoding.js";
+import { bytes } from "../string/bytes.js";
+import { encode } from "../string/encode.js";
+import { forceEncoding, rbObjEncoding } from "../string/force-encoding.js";
 import { Generic } from "./generic.js";
 import { RFC2396Parser } from "./rfc2396-parser.js";
 import { RFC3986Parser } from "./rfc3986-parser.js";
@@ -151,16 +155,13 @@ export class URI {
 
   /**
    * `URI.encode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:337-339`).
-   * `enc` keeps its position and its `nil` default but has no effect: there is
-   * one string encoding here, so MRI's `encode!` pair (`common.rb:387-391`) has
-   * nothing to transcode between.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
    * `URI.encode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:337`).
    */
   static encodeWwwFormComponent(
     str: { toString(): string } | null | undefined,
-    enc: unknown = null,
+    enc: Encoding | null = null,
   ): string {
     return URI._encodeUriComponent(/[^*\-.0-9A-Z_a-z]/g, TBLENCWWWCOMP_, str, enc);
   }
@@ -168,27 +169,33 @@ export class URI {
   /**
    * `URI._encode_uri_component`
    * (`vendor/ruby/v3.3.11/lib/uri/common.rb:385-397`), private in MRI. `str.to_s` is
-   * `""` for `nil`, and the `force_encoding(ASCII_8BIT)` MRI does before the
-   * `gsub!` is the UTF-8 byte expansion here, so the table is indexed by byte
-   * exactly as MRI indexes it.
+   * `""` for `nil`. `force_encoding(ASCII_8BIT)` leaves a JS string as it is,
+   * so the `gsub!` runs over the String's bytes and the table is indexed by
+   * byte exactly as MRI indexes it.
    */
   private static _encodeUriComponent(
     regexp: RegExp,
     table: Record<string, string>,
     str: { toString(): string } | null | undefined,
-    enc: unknown,
+    enc: Encoding | null,
   ): string {
-    void enc;
-    const s = str == null ? "" : String(str);
-    let bytes = "";
-    for (const byte of new TextEncoder().encode(s)) {
-      bytes += String.fromCharCode(byte);
+    let s: string | Uint8Array = str == null ? "" : String(str);
+    if (rbObjEncoding(s) !== Encoding.ASCII_8BIT) {
+      if (enc != null && enc !== Encoding.ASCII_8BIT) {
+        s = encode(s, Encoding.UTF_8, { invalid: ":replace", undef: ":replace" });
+        s = encode(s, enc, { fallback: (x) => `&#${x.codePointAt(0)};` });
+      }
+      s = forceEncoding(s, Encoding.ASCII_8BIT);
     }
-    return bytes.replace(regexp, (c) => table[c]);
+    let b = "";
+    for (const byte of typeof s === "string" ? bytes(s) : s) {
+      b += String.fromCharCode(byte);
+    }
+    return b.replace(regexp, (c) => table[c]);
   }
 
   /** `URI.parse` (`vendor/ruby/v3.3.11/lib/uri/common.rb:186`). */
-  static parse(uri: string): Generic {
+  static parse(uri: string | Uint8Array): Generic {
     return RFC3986_PARSER.parse(uri);
   }
 }

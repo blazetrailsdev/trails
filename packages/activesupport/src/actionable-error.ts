@@ -54,10 +54,6 @@ export class ActionableError extends Error {
     return {};
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT
-   * @missingRailsArgs fetch — PERMANENT
-   */
   static dispatch(error: any, name: string): void {
     try {
       fetch<() => void>(this.actions(error), name)();

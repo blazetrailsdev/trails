@@ -32,7 +32,7 @@ function setupRoutes() {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 }
 
@@ -102,18 +102,18 @@ describe("ScaffoldGeneratorTest", () => {
     );
 
     for (const view of ["index", "show"]) {
-      expect(fs.existsSync(path.join(tmpDir, `app/views/product_lines/${view}.html.tse`))).toBe(
+      expect(fs.existsSync(path.join(tmpDir, `app/views/product-lines/${view}.html.tse`))).toBe(
         true,
       );
     }
 
     for (const view of ["edit", "new"]) {
-      expect(readFile(`app/views/product_lines/${view}.html.tse`)).toMatch(
+      expect(readFile(`app/views/product-lines/${view}.html.tse`)).toMatch(
         /render\("form", \{ product_line: this\.product_line \}\)/,
       );
     }
 
-    const form = readFile("app/views/product_lines/_form.html.tse");
+    const form = readFile("app/views/product-lines/_form.html.tse");
     expect(form).toContain("product_line");
     expect(form).not.toContain("this.product_line");
   });
@@ -157,13 +157,13 @@ describe("ScaffoldGeneratorTest", () => {
   it("scaffold generator on revoke does not mutilate routes", async () => {
     await runGenerator("product_line");
     expect(readFile("config/routes.ts")).toBe(
-      'export function drawRoutes(mapper: Mapper): void {\n  mapper.resources("product_lines");\n}\n',
+      'Trails.application!.routes().draw(function () {\n  this.resources("product_lines");\n});\n',
     );
 
     await runGenerator("product_line", [], { behavior: "revoke" });
 
     expect(readFile("config/routes.ts")).toBe(
-      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+      "Trails.application!.routes().draw(function () {\n});\n",
     );
   });
 
@@ -193,16 +193,16 @@ describe("ScaffoldGeneratorTest", () => {
     expect(migContent).toContain('t.belongsTo("product"');
     expect(migContent).toContain('t.references("cart"');
 
-    const form = readFile("app/views/line_items/_form.html.tse");
+    const form = readFile("app/views/line-items/_form.html.tse");
     expect(form).toMatch(/^\W{4}<%= form\.textField\("product_id"\) %>/m);
     expect(form).toMatch(/^\W{4}<%= form\.textField\("cart_id"\) %>/m);
 
-    const index = readFile("app/views/line_items/index.html.tse");
+    const index = readFile("app/views/line-items/index.html.tse");
     expect(index).toMatch(/^\W{2}<% for \(const line_item of this\.line_items\) \{ %>/m);
     expect(index).toMatch(/^\W{4}<%= render\(line_item\) %>/m);
     expect(index).toMatch(/<%= linkTo\("Show this line item", line_item\) %>/);
 
-    const show = readFile("app/views/line_items/show.html.tse");
+    const show = readFile("app/views/line-items/show.html.tse");
     expect(show).toMatch(/<%= render\(this\.line_item\) %>/);
     expect(show).toMatch(/linkTo\("Edit this line item"/);
     expect(show).toMatch(/buttonTo\("Destroy this line item"/);
@@ -265,7 +265,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
     fs.mkdirSync(path.join(jsTmpDir, "config"));
     fs.writeFileSync(
       path.join(jsTmpDir, "config/routes.ts"),
-      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+      "Trails.application!.routes().draw(function () {\n});\n",
     );
     jsLines = [];
   });

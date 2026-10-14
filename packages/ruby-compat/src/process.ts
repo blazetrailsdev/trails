@@ -1,8 +1,68 @@
 import { ArgumentError } from "./argument-error.js";
-import { getProcessAdapter } from "./process-adapter.js";
+import { isPlainHash, rbBuiltinClassName } from "./object.js";
+import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
+import type { WaitStatus } from "./child-process-adapter.js";
 
 interface SystemCallError extends Error {
   code?: string;
+}
+
+/**
+ * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
+ * (`process.c:2511-2538`) takes a trailing Hash as the options and a leading
+ * Hash as the env, laid over `ENV` with `nil` unsetting a name. One remaining
+ * String is a command line (`args` is `null`); more are a program and its argv.
+ *
+ * @inventedArm throw — CONVERGEABLE rb-exec-getargs-ports-rb-check-argv
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
+ * (`vendor/ruby/v3.3.11/process.c:2767`).
+ */
+export function rbExecargNew(
+  argv: readonly unknown[],
+): [
+  prog: string,
+  env: Record<string, string | undefined>,
+  args: string[] | null,
+  opthash: { out?: string },
+] {
+  const rest = [...argv];
+  let opthash: { out?: string } = {};
+  if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
+    opthash = rest.pop() as { out?: string };
+  }
+  const env: Record<string, string | undefined> = { ...processEnv };
+  if (rest.length > 0 && isPlainHash(rest[0])) {
+    for (const [name, value] of Object.entries(rest.shift() as Record<string, string | null>)) {
+      if (value == null) delete env[name];
+      else env[name] = value;
+    }
+  }
+  for (const arg of rest) {
+    if (typeof arg === "string") continue;
+    throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(arg)} into String`);
+  }
+  const [prog, ...args] = rest as string[];
+  return [prog, env, args.length === 0 ? null : args, opthash];
+}
+
+/**
+ * `Process::Status` (`vendor/ruby/v3.3.11/process.c:9169` `rb_cProcessStatus`),
+ * built from what the child was waited with (`rb_process_status_new`,
+ * `process.c:645`).
+ */
+class Status {
+  readonly pid: number | null;
+  readonly #status: number | null;
+
+  constructor(status: WaitStatus) {
+    this.pid = status.pid;
+    this.#status = status.error === undefined ? status.status : null;
+  }
+
+  isSuccess(): boolean | null {
+    if (this.#status === null) return null;
+    return this.#status === 0;
+  }
 }
 
 /**
@@ -23,6 +83,16 @@ interface SystemCallError extends Error {
  * Rails or gem file declares the module this file's export lives in.
  */
 export class Process {
+  /**
+   * `vendor/ruby/v3.3.11/process.c:9169` — what `Open3.capture2e` answers as
+   * its second value, which `Thor::Actions#run` asks `success?`
+   * (`vendor/thor/v1.3.2/lib/thor/actions.rb:265-266`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process::Status`
+   * (`vendor/ruby/v3.3.11/process.c:9169`).
+   */
+  static readonly Status = Status;
+
   /**
    * `vendor/ruby/v3.3.11/process.c:9404` — the clock that cannot go backwards, which is
    * every Rails elapsed-time measurement's clock id.

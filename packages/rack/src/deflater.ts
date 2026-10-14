@@ -1,4 +1,4 @@
-import { File, GzipWriter, hasKey } from "@blazetrails/ruby-compat";
+import { File, GzipWriter } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
@@ -92,7 +92,7 @@ export class Deflater {
     body: any,
   ): boolean {
     if (
-      hasKey(STATUS_WITH_NO_ENTITY_BODY, status) ||
+      Object.hasOwn(STATUS_WITH_NO_ENTITY_BODY, status) ||
       /\bno-transform\b/.test(String(headers[CACHE_CONTROL] ?? "")) ||
       (headers["content-encoding"] != null && !/\bidentity\b/.test(headers["content-encoding"]))
     ) {
@@ -102,7 +102,7 @@ export class Deflater {
     if (
       this.compressibleTypes &&
       !(
-        hasKey(headers, CONTENT_TYPE) &&
+        Object.hasOwn(headers, CONTENT_TYPE) &&
         this.compressibleTypes.includes(/[^;]*/.exec(headers[CONTENT_TYPE])![0])
       )
     ) {
@@ -141,9 +141,9 @@ export class GzipStream {
         }
       } else {
         let flushed: Promise<void> | undefined;
-        const block = (part: string): Promise<void> | undefined => {
+        const block = (part: string | Uint8Array): Promise<void> | undefined => {
           if (part.length === 0) return;
-          gzip.write(Buffer.from(String(part), "binary"));
+          gzip.write(typeof part === "string" ? new TextEncoder().encode(part) : part);
           if (this.sync) return (flushed = gzip.flush());
         };
         if (Symbol.asyncIterator in this.body || Symbol.iterator in this.body) {

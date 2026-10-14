@@ -5,7 +5,8 @@
 import { describe, it, expect } from "vitest";
 import { include, BigDecimal } from "@blazetrails/activesupport";
 import { Dirty } from "../dirty.js";
-import { Model, Types } from "../index.js";
+import * as Types from "../index.js";
+import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 const bd = (value: string) => new BigDecimal(value);
@@ -19,9 +20,20 @@ describe("DecimalTypeTrails", () => {
     expect(noPrec.cast(1.2346)).toEqual(bd("1.2346"));
   });
 
+  it("cast_value reads a boxed whole-valued number as the Float it seats", () => {
+    const type = new Types.DecimalType({ precision: 3 });
+    expect(type.cast(new Number(1234))).toEqual(bd("1230"));
+  });
+
+  it("apply_scale rounds a Float as Float#round does", () => {
+    const type = new Types.DecimalType({ precision: 10, scale: 2 });
+    expect(type.cast(1.005)).toEqual(bd("1.01"));
+    expect(type.cast(-2.675)).toEqual(bd("-2.68"));
+  });
+
   it("cast_value falls through to cast_value(value.to_s) for a value with no to_d", () => {
     const type = new Types.DecimalType();
-    expect(type.cast({})).toEqual(bd("0"));
+    expect(type.cast({ a: 1 })).toEqual(bd("0"));
     expect(type.cast(":sym")).toEqual(bd("0"));
   });
 

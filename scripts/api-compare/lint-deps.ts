@@ -16,7 +16,7 @@ import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
 import { fileURLToPath } from "url";
 import * as ts from "typescript-5";
 import type { ApiManifest, ClassInfo } from "@blazetrails/parity/types";
-import { OUTPUT_DIR, packageSrcDir } from "./config.js";
+import { OUTPUT_DIR, PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "@blazetrails/parity/conventions";
 import { isNotImplementedStub } from "./extract-ts-api.js";
 
@@ -32,7 +32,7 @@ interface DepRule {
   blocking: boolean;
 }
 
-const RULES: DepRule[] = [
+export const RULES: DepRule[] = [
   {
     package: "activerecord",
     dependency: "arel",
@@ -318,6 +318,7 @@ function analyzeTsDepUsage(
 
   const checker = program.getTypeChecker();
   const knownIds = new Set(tsIdentifiers);
+  const depRoot = path.join(ROOT_DIR, "packages", PACKAGE_DIR_OVERRIDES[dep] ?? dep) + path.sep;
   const { tainted: taintedSymbols, taintedRefs } = collectTaintedSymbols(
     program,
     pkgSrcDir,
@@ -347,7 +348,7 @@ function analyzeTsDepUsage(
         dep,
         sourceFile,
         anchor,
-        { checker, taintedSymbols, taintedRefs },
+        { checker, taintedSymbols, taintedRefs, depRoot },
         refs,
         aliasMap,
       );
@@ -365,7 +366,7 @@ function analyzeTsDepUsage(
   return result;
 }
 
-function visitMethodDeclarations(
+export function visitMethodDeclarations(
   sourceFile: ts.SourceFile,
   // anchor: the node whose leading trivia holds doc comments (e.g. VariableStatement, not its initializer)
   callback: (name: string, node: ts.Node, anchor: ts.Node) => void,
@@ -398,6 +399,20 @@ function visitMethodDeclarations(
             if (!isNotImplementedStub(decl.initializer.body)) {
               // anchor = VariableStatement so lint-deps-ignore above `const foo = ...` is found
               callback(decl.name.text, decl.initializer, node);
+            }
+          } else if (ts.isObjectLiteralExpression(decl.initializer)) {
+            for (const prop of decl.initializer.properties) {
+              if (
+                ts.isPropertyAssignment(prop) &&
+                ts.isIdentifier(prop.name) &&
+                (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
+              ) {
+                if (!isNotImplementedStub(prop.initializer.body)) {
+                  callback(prop.name.text, prop.initializer, prop);
+                }
+              } else if (!ts.isPropertyAssignment(prop)) {
+                visit(prop);
+              }
             }
           }
         }
@@ -454,6 +469,8 @@ export interface TransitiveContext {
   checker: ts.TypeChecker;
   taintedSymbols: Set<ts.Symbol>;
   taintedRefs?: Map<ts.Symbol, Set<string>>;
+  /** The dep package's directory; a module function declared outside it earns no module ref. */
+  depRoot?: string;
   // Suppresses lint-deps-ignore detection. Used during taint
   // computation so an opt-out helper doesn't spuriously taint callers.
   skipIgnoreAnnotation?: boolean;
@@ -484,11 +501,19 @@ export function methodUsesDepImport(
     if (found && !collectRefs) return;
 
     // Resolve namespace property accesses: Nodes.OuterJoin → "OuterJoin"
-    if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression)) {
-      if (importedNames.has(n.expression.text)) {
+    if (ts.isPropertyAccessExpression(n)) {
+      let root: ts.Expression = n.expression;
+      while (ts.isPropertyAccessExpression(root)) root = root.expression;
+      if (ts.isIdentifier(root) && importedNames.has(root.text)) {
         found = true;
         recordRef(n.name.text);
-        if (aliasMap?.has(n.expression.text)) recordRef(n.expression.text);
+        if (root === n.expression) {
+          if (aliasMap?.has(root.text)) recordRef(root.text);
+          if (collectRefs && transitive) {
+            const constant = declaredConstantName(root, transitive.checker);
+            if (constant) collectRefs.add(constant);
+          }
+        }
         if (!collectRefs) return;
       }
     }
@@ -497,31 +522,36 @@ export function methodUsesDepImport(
       if (!isDeclarationName(n)) {
         // Skip namespace identifiers that are the left side of a property
         // access — the property access handler above captures the leaf.
-        if (collectRefs && ts.isPropertyAccessExpression(n.parent) && n.parent.expression === n) {
-          // don't record the namespace import itself as a ref
-        } else {
-          const inType = isWithinTypeNode(n);
-          if (!inType || inSignatureType) {
-            if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
-              found = true;
-              recordRef(n.text);
-              if (!collectRefs) return;
+        const receiver =
+          collectRefs !== undefined &&
+          ts.isPropertyAccessExpression(n.parent) &&
+          n.parent.expression === n;
+        if (!isWithinTypeNode(n) || inSignatureType) {
+          if (!receiver && (importedNames.has(n.text) || knownIdentifiers.has(n.text))) {
+            found = true;
+            recordRef(n.text);
+            if (collectRefs && transitive && importedNames.has(n.text)) {
+              const owner = moduleFunctionOwner(n, transitive.checker, transitive.depRoot);
+              if (owner) collectRefs.add(owner);
+              const constant = declaredConstantName(n, transitive.checker);
+              if (constant) collectRefs.add(constant);
             }
-            if (transitive && transitive.taintedSymbols.size > 0) {
-              const sym = transitive.checker.getSymbolAtLocation(n);
-              if (sym) {
-                const resolved =
-                  sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
-                if (transitive.taintedSymbols.has(resolved)) {
-                  found = true;
-                  const wrapperRefs = transitive.taintedRefs?.get(resolved);
-                  if (collectRefs && wrapperRefs && wrapperRefs.size > 0) {
-                    for (const r of wrapperRefs) collectRefs.add(r);
-                  } else {
-                    recordRef(n.text);
-                  }
-                  if (!collectRefs) return;
+            if (!collectRefs) return;
+          }
+          if (transitive && transitive.taintedSymbols.size > 0) {
+            const sym = transitive.checker.getSymbolAtLocation(n);
+            if (sym) {
+              const resolved =
+                sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
+              if (transitive.taintedSymbols.has(resolved)) {
+                found = true;
+                const wrapperRefs = transitive.taintedRefs?.get(resolved);
+                if (collectRefs && wrapperRefs && wrapperRefs.size > 0) {
+                  for (const r of wrapperRefs) collectRefs.add(r);
+                } else {
+                  recordRef(n.text);
                 }
+                if (!collectRefs) return;
               }
             }
           }
@@ -538,6 +568,63 @@ export function methodUsesDepImport(
   };
   check(node, false);
   return found;
+}
+
+/**
+ * The module an imported top-level function belongs to, or null for any other
+ * identifier. Ruby names a module function through its module:
+ * `ActiveModel::Type.default_value`
+ * (activerecord/lib/arel/nodes/homogeneous_in.rb:51) extracts the dep ref
+ * `Type`. The port is a top-level function of the file mirroring that module
+ * (activemodel/src/type.ts's `defaultValue`), imported by its bare name, so
+ * its module is the declaring file's basename. With `depRoot`, a function
+ * declared outside that package directory has no module there and answers null.
+ */
+export function moduleFunctionOwner(
+  id: ts.Identifier,
+  checker: ts.TypeChecker,
+  depRoot?: string,
+): string | null {
+  const sym = checker.getSymbolAtLocation(id);
+  if (!sym) return null;
+  const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
+  const decl = resolved.declarations?.[0];
+  if (!decl) return null;
+  const isFunction = ts.isVariableDeclaration(decl)
+    ? decl.initializer !== undefined &&
+      (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) &&
+      ts.isSourceFile(decl.parent.parent.parent)
+    : ts.isFunctionDeclaration(decl) && ts.isSourceFile(decl.parent);
+  if (!isFunction) return null;
+  if (depRoot !== undefined && !decl.getSourceFile().fileName.startsWith(depRoot)) return null;
+  return path
+    .basename(decl.getSourceFile().fileName)
+    .replace(/(\.d)?\.ts$/, "")
+    .replace(/-/g, "");
+}
+
+/**
+ * The name an imported constant is declared under, or null for an identifier
+ * that is not one. Ruby names a constant where it is defined:
+ * `ActiveModel::Type::Binary::Data.new(value)`
+ * (activerecord/lib/active_record/encryption/encrypted_attribute_type.rb:168)
+ * extracts the dep ref `Data`, and
+ * `ActiveModel::Type::SerializeCastValue.serialize(...)`
+ * (activerecord/lib/active_record/insert_all.rb:243) extracts
+ * `SerializeCastValue`. The port reaches the first through a re-export alias
+ * (`Data as BinaryData`) and the second as the receiver of a module method, so
+ * neither spelling is the identifier or the member the walk records. A Ruby
+ * constant is capitalised, and so is the class, namespace or module object
+ * porting it. The walk also records every member of a chain rooted at an
+ * import, so `Duration.ISO8601Parser.ParsingError` answers
+ * `ActiveSupport::Duration::ISO8601Parser::ParsingError`
+ * (activerecord/lib/active_record/connection_adapters/postgresql/oid/interval.rb:21).
+ */
+export function declaredConstantName(id: ts.Identifier, checker: ts.TypeChecker): string | null {
+  const sym = checker.getSymbolAtLocation(id);
+  if (!sym) return null;
+  const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
+  return /^[A-Z]/.test(resolved.name) ? resolved.name : null;
 }
 
 function isDeclarationName(id: ts.Identifier): boolean {
@@ -616,6 +703,33 @@ const RUBY_METHOD_REFS = new Set([
 // the mixed-in methods but never references the module name itself.
 const RUBY_MIXIN_REFS = new Set(["Predications", "Expressions"]);
 
+const RUBY_UNPORTED_REFS = new Set(["Dependencies"]);
+
+/**
+ * Whether a Ruby dep ref names a constant with no trails counterpart.
+ * `ActiveSupport::Dependencies` is the Zeitwerk load interlock
+ * (`Dependencies.interlock.permit_concurrent_loads`,
+ * activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:117),
+ * which SKIP_GROUPS in scripts/parity/conventions.ts already leaves unmirrored
+ * for dependencies.rb and dependencies/interlock.rb.
+ */
+export function isUnportedRubyRef(ref: string): boolean {
+  return ref.split("::").some((part) => RUBY_UNPORTED_REFS.has(part));
+}
+
+/**
+ * The spellings a TS ref may answer a Ruby dep ref by: its leaf constant, or
+ * the whole path joined, which is how a constant whose leaf is a JS global is
+ * exported (`ActiveSupport::JSON` is `ActiveSupportJSON`,
+ * activesupport/src/json.ts).
+ */
+export function rubyRefSpellings(ref: string): string[] {
+  const leaf = normalizeRubyRef(ref);
+  if (leaf === null) return [];
+  const camel = snakeToCamel(leaf);
+  return [leaf, camel, "_" + camel, ref.split("::").join("")].map((r) => r.toLowerCase());
+}
+
 function normalizeRubyRef(ref: string): string | null {
   const parts = ref.split("::");
   const leaf = parts.pop() ?? ref;
@@ -639,6 +753,8 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
   for (const rm of rubyMethods) {
     const tsCandidates = rubyMethodToTs(rm.rubyName);
     if (!tsCandidates) continue;
+    const depRefs = rm.depRefs.filter((ref) => !isUnportedRubyRef(ref));
+    if (rm.depRefs.length > 0 && depRefs.length === 0) continue;
 
     const tsFile = rubyFileToTs(rm.rubyFile);
     // Key by Ruby method name — two Ruby methods can map to the same TS candidate
@@ -688,24 +804,23 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
     // that protocol (e.g., serializeCastValue → ActiveModel::Type::SerializeCastValue).
     const implementsProtocol =
       !info.uses &&
-      rm.depRefs.some((ref) => {
+      depRefs.some((ref) => {
         const simpleName = ref.split("::").pop() ?? "";
         return simpleName.toLowerCase() === matchedTsName.toLowerCase();
       });
     if (info.uses || implementsProtocol) {
       compliant.push(entry);
 
-      if (rm.depRefs.length > 0 && info.refs.size > 0) {
-        const rubyNormalized = rm.depRefs
-          .map(normalizeRubyRef)
-          .filter((r): r is string => r !== null);
+      if (depRefs.length > 0 && info.refs.size > 0) {
+        const rubyNormalized = depRefs.map(normalizeRubyRef).filter((r): r is string => r !== null);
         const tsRefNames = [...info.refs];
         const tsSet = new Set(tsRefNames.map((r) => r.toLowerCase()));
-        const missingInTs = rubyNormalized.filter((r) => {
-          const lower = r.toLowerCase();
-          const camel = snakeToCamel(r).toLowerCase();
-          return !tsSet.has(lower) && !tsSet.has(camel) && !tsSet.has("_" + camel);
-        });
+        const missingInTs = depRefs
+          .filter((ref) => {
+            const spellings = rubyRefSpellings(ref);
+            return spellings.length > 0 && !spellings.some((spelling) => tsSet.has(spelling));
+          })
+          .map((ref) => normalizeRubyRef(ref)!);
         if (missingInTs.length > 0) {
           refMismatches.push({
             ...entry,
@@ -716,7 +831,7 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
         }
       }
     } else {
-      violations.push({ ...entry, depRefs: rm.depRefs });
+      violations.push({ ...entry, depRefs });
     }
   }
 

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertNoChanges, assertRaises, registerConstant } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
+import { assertNoChanges, assertRaises } from "@blazetrails/activesupport";
+import { Module, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
 
@@ -30,6 +30,7 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line blazetrails/require-canonical-rebuild -- exclusion_constraint_test.rb:23-25 drops it; the fixtures() transaction rolls the DDL back
     await connection.dropTable("invoices", { ifExists: true });
   });
 
@@ -229,13 +230,15 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
       });
       expect((await connection.exclusionConstraints("invoices")).length).toBe(1);
 
-      await connection.removeExclusionConstraint("invoices", { name: "invoices_date_overlap" });
+      await connection.removeExclusionConstraint("invoices", undefined, {
+        name: "invoices_date_overlap",
+      });
       expect((await connection.exclusionConstraints("invoices")).length).toBe(0);
     });
 
     it("remove non existing exclusion constraint", async () => {
       await expect(
-        connection.removeExclusionConstraint("invoices", { name: "nonexistent" }),
+        connection.removeExclusionConstraint("invoices", undefined, { name: "nonexistent" }),
       ).rejects.toThrow(ArgumentError);
     });
   });

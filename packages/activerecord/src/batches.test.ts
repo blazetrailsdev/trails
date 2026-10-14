@@ -1,17 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { Relation, Base } from "./index.js";
-import { Batches } from "./relation/batches.js";
+import { ORDER_IGNORE_MESSAGE } from "./relation/batches.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
-import { fixtures } from "./test-fixtures.js";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
-import { quoteTableName } from "./support/quote-regex.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { currentAdapter } from "./support/adapter-helper.js";
-import { isPresent } from "@blazetrails/activesupport";
+import { assertEqual, isPresent } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import {
   Post,
@@ -30,15 +25,7 @@ import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./active-record.js"
 registerModel([Tagging, Tag]);
 
 describe("EachTest", () => {
-  const { posts } = fixtures([
-    "posts",
-    "taggings",
-    "developers",
-    "subscribers",
-    "cpkOrders",
-    "cpkBooks",
-    "cpkAuthors",
-  ] as const);
+  const { self, posts } = fixtures(["posts", "subscribers", "developers", "cpkOrders"]);
 
   it("each should execute one query per batch", async () => {
     const total = Number(await Post.count());
@@ -137,7 +124,7 @@ describe("EachTest", () => {
     try {
       for await (const _post of Post.order("title").findEach({})) {
       }
-      expect(logger.warn).toHaveBeenCalledWith(Batches.ORDER_IGNORE_MESSAGE);
+      expect(logger.warn).toHaveBeenCalledWith(ORDER_IGNORE_MESSAGE);
     } finally {
       Base.logger = previousLogger;
     }
@@ -203,10 +190,9 @@ describe("EachTest", () => {
   });
 
   it("find in batches should quote batch order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))}`, "i"),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))}`, "i"),
+      {},
       async () => {
         for await (const batch of Post.findInBatches({ batchSize: 1 })) {
           expect(batch).toBeInstanceOf(Array);
@@ -217,12 +203,11 @@ describe("EachTest", () => {
   });
 
   it("find in batches should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
-        for await (const batch of Post.findInBatches({ batchSize: 1, order: "desc" })) {
+        for await (const batch of Post.findInBatches({ batchSize: 1, order: ":desc" })) {
           expect(batch).toBeInstanceOf(Array);
           expect(batch[0]).toBeInstanceOf(Post);
         }
@@ -234,7 +219,7 @@ describe("EachTest", () => {
     await expect(async () => {
       for await (const _post of Post.select("title").findEach({
         batchSize: 1,
-        order: "invalid" as any,
+        order: ":invalid" as any,
       })) {
         throw new Error("should not call this block");
       }
@@ -243,7 +228,7 @@ describe("EachTest", () => {
 
   it("in batches without block should raise if order is invalid", async () => {
     await expect(async () => {
-      for await (const _rel of Post.select("title").inBatches({ order: "invalid" as any })) {
+      for await (const _rel of Post.select("title").inBatches({ order: ":invalid" as any })) {
       }
     }).rejects.toThrow();
   });
@@ -581,7 +566,7 @@ describe("EachTest", () => {
     let batchCount = 0;
     let lastId = Math.max(...(await allPosts).map((p: any) => p.id));
     await assertQueriesCount(0, false, async () => {
-      for await (const relation of allPosts.inBatches({ of: 1, order: "desc" })) {
+      for await (const relation of allPosts.inBatches({ of: 1, order: ":desc" })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
         const ids = (await relation.toArray()).map((p: any) => p.id);
@@ -622,7 +607,7 @@ describe("EachTest", () => {
         of: 1,
         start: startId,
         finish: finishId,
-        order: "desc",
+        order: ":desc",
       })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
@@ -658,7 +643,7 @@ describe("EachTest", () => {
         batchSize: 1,
         start: startId,
         finish: finishId,
-        order: ["desc", "asc"] as any,
+        order: [":desc", ":asc"] as any,
       })) {
         collected.push(order);
       }
@@ -680,7 +665,7 @@ describe("EachTest", () => {
       const collected: any[] = [];
       await assertNoQueries(false, async () => {
         for await (const post of orderedPosts
-          .inBatches({ of: 1, cursor: "id", order: "desc" })
+          .inBatches({ of: 1, cursor: "id", order: ":desc" })
           .eachRecord()) {
           collected.push(post);
         }
@@ -705,101 +690,75 @@ describe("EachTest", () => {
   it("in batches should start from the start option", async () => {
     const post = await Post.order("id ASC").where("id >= ?", 2).first();
     await assertQueriesCount(2, false, async () => {
-      let firstRelation: any = null;
-      for await (const rel of Post.inBatches({ of: 1, start: 2 })) {
-        firstRelation = rel;
-        break;
-      }
-      expect(await firstRelation.first()).toEqual(post);
+      const relation = (await Post.inBatches({ of: 1, start: 2 }).first())!;
+      assertEqual(post, await relation.first());
     });
   });
 
   it("in batches should end at the finish option", async () => {
     const post = await Post.order("id DESC").where("id <= ?", 5).first();
     await assertQueriesCount(7, false, async () => {
-      const batches: any[] = [];
-      for await (const rel of Post.inBatches({ of: 1, finish: 5, load: true })) {
-        batches.push(rel);
-      }
-      const lastBatch = batches[batches.length - 1];
-      const records = await lastBatch.toArray();
-      expect(records[records.length - 1].id).toBe((post as any).id);
+      const relation = (await Post.inBatches({ of: 1, finish: 5, load: true })
+        .reverseEach()
+        .first())!;
+      assertEqual(post, await relation.last());
     });
   });
 
   it("in batches executes range queries when unconstrained", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
-      new RegExp(`WHERE ${quoted} >=? .+ AND ${quoted} <= .+`, "i"),
-      undefined,
-      false,
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(
+      new RegExp(`WHERE ${quoted} > .+ AND ${quoted} <= .+`, "i"),
+      {},
       async () => {
         for await (const relation of Post.inBatches({ of: 2 })) {
           expect(await relation.first()).toBeInstanceOf(Post);
-          break;
         }
       },
     );
   });
 
   it("in batches executes in queries when unconstrained and opted out of ranges", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
-      new RegExp(`${quoted} IN \\(.+\\)`, "i"),
-      undefined,
-      false,
-      async () => {
-        for await (const relation of Post.inBatches({ of: 2, useRanges: false })) {
-          expect(await relation.first()).toBeInstanceOf(Post);
-          break;
-        }
-      },
-    );
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(new RegExp(`${quoted} IN \\(.+\\)`, "i"), {}, async () => {
+      for await (const relation of Post.inBatches({ of: 2, useRanges: false })) {
+        expect(await relation.first()).toBeInstanceOf(Post);
+        break;
+      }
+    });
   });
 
   it("in batches executes in queries when constrained", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
-      new RegExp(`${quoted} IN \\(.+\\)`, "i"),
-      undefined,
-      false,
-      async () => {
-        for await (const relation of Post.where("id < ?", 5).inBatches({ of: 2 })) {
-          expect(await relation.first()).toBeInstanceOf(Post);
-          break;
-        }
-      },
-    );
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(new RegExp(`${quoted} IN \\(.+\\)`, "i"), {}, async () => {
+      for await (const relation of Post.where("id < ?", 5).inBatches({ of: 2 })) {
+        expect(await relation.first()).toBeInstanceOf(Post);
+        break;
+      }
+    });
   });
 
   it("in batches executes range queries when constrained and opted in into ranges", async () => {
-    const quoted = regexpEscape(quoteTableName("posts.id"));
-    await assertQueriesMatch(
-      new RegExp(`${quoted} >=? .+ AND ${quoted} <= .+`, "i"),
-      undefined,
-      false,
+    const quoted = regexpEscape(self().quoteTableName("posts.id"));
+    await self().assertQueriesMatch(
+      new RegExp(`${quoted} > .+ AND ${quoted} <= .+`, "i"),
+      {},
       async () => {
         for await (const relation of Post.where("id < ?", 5).inBatches({
           of: 2,
           useRanges: true,
         })) {
           expect(await relation.first()).toBeInstanceOf(Post);
-          break;
         }
       },
     );
   });
 
   it("in batches no subqueries for whole tables batching", async () => {
-    const quotedPosts = regexpEscape(quoteTableName("posts"));
-    await assertQueriesMatch(
-      new RegExp(`DELETE FROM ${quotedPosts}`, "i"),
-      undefined,
-      false,
-      async () => {
-        await Post.inBatches({ of: 2 }).deleteAll();
-      },
-    );
+    const quotedPosts = regexpEscape(self().quoteTableName("posts"));
+    await self().assertQueriesMatch(new RegExp(`DELETE FROM ${quotedPosts}`, "i"), {}, async () => {
+      await Post.inBatches({ of: 2 }).deleteAll();
+    });
   });
 
   it("in batches shouldnt execute query unless needed", async () => {
@@ -818,10 +777,9 @@ describe("EachTest", () => {
   });
 
   it("in batches should quote batch order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))}`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))}`),
+      {},
       async () => {
         for await (const relation of Post.inBatches({ of: 1 })) {
           expect(relation).toBeInstanceOf(Relation);
@@ -833,12 +791,11 @@ describe("EachTest", () => {
   });
 
   it("in batches should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
-        for await (const relation of Post.inBatches({ of: 1, order: "desc" })) {
+        for await (const relation of Post.inBatches({ of: 1, order: ":desc" })) {
           expect(relation).toBeInstanceOf(Relation);
           expect(await relation.first()).toBeInstanceOf(Post);
           break;
@@ -848,29 +805,23 @@ describe("EachTest", () => {
   });
 
   it("in batches enumerator should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
-        let first: any = null;
-        for await (const rel of Post.inBatches({ of: 1, order: "desc" })) {
-          first = rel;
-          break;
-        }
-        expect(first).toBeInstanceOf(Relation);
-        expect(await first.first()).toBeInstanceOf(Post);
+        const relation = (await Post.inBatches({ of: 1, order: ":desc" }).first())!;
+        expect(relation).toBeInstanceOf(Relation);
+        expect(await relation.first()).toBeInstanceOf(Post);
       },
     );
   });
 
   it("in batches enumerator each record should quote batch order with desc order", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
-      undefined,
-      false,
+    await self().assertQueriesMatch(
+      new RegExp(`ORDER BY ${regexpEscape(self().quoteTableName("posts.id"))} DESC`),
+      {},
       async () => {
-        for await (const record of Post.inBatches({ of: 1, order: "desc" }).eachRecord()) {
+        for await (const record of Post.inBatches({ of: 1, order: ":desc" }).eachRecord()) {
           expect(record).toBeInstanceOf(Post);
         }
       },
@@ -1055,7 +1006,7 @@ describe("EachTest", () => {
       for await (const post of Post.inBatches({
         of: 1,
         cursor: "id",
-        order: "desc",
+        order: ":desc",
       }).eachRecord()) {
         collected.push(post);
       }
@@ -1137,7 +1088,7 @@ describe("EachTest", () => {
   it(".find_each respects table alias", async () => {
     await assertQueriesCount(1, false, async () => {
       const tableAlias = Post.arelTable.alias("omg_posts");
-      const postRel = new Relation(Post, tableAlias as any);
+      const postRel = new Relation(Post, { table: tableAlias as any });
       for await (const _post of postRel.findEach({})) {
       }
     });
@@ -1216,125 +1167,86 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should start from the start option when using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[1];
-    let firstRelation: any = null;
-    for await (const rel of CpkOrder.inBatches({ of: 1, start: (order as any).id })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(String(first.id)).toBe(String((order as any).id));
+    const order = (await CpkOrder.second())!;
+    const relation = (await CpkOrder.inBatches({ of: 1, start: order.id }).first())!;
+    assertEqual(order, await relation.first());
   });
 
   it(".in_batches should end at the finish option when using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[allOrders.length - 2];
-    const batches: any[] = [];
-    for await (const rel of CpkOrder.inBatches({ of: 1, finish: (order as any).id })) {
-      batches.push(rel);
-    }
-    const lastBatch = batches[batches.length - 1];
-    const records = await lastBatch.toArray();
-    const last = records[records.length - 1];
-    expect(String(last.id)).toBe(String((order as any).id));
+    const order = (await CpkOrder.secondToLast())!;
+    const relation = (await CpkOrder.inBatches({ of: 1, finish: order.id }).reverseEach().first())!;
+    assertEqual(order, await relation.last());
   });
 
   it(".in_batches with scope and using composite primary key", async () => {
-    await CpkOrder.deleteAll();
-    await CpkOrder.create({ id: [1, 1], status: "paid" });
-    await CpkOrder.create({ id: [1, 2], status: "paid" });
-    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const [order1, order2] = allOrders;
-    const [shopId, id] = (order1 as any).id as [number, number];
-    let firstRelation: any;
-    for await (const rel of CpkOrder.where(
+    const [order1, order2] = await CpkOrder.first(2);
+    const [shopId, id] = order1.id as [number, number];
+    const relation = (await CpkOrder.where(
       "shop_id > ? OR shop_id = ? AND id > ?",
       shopId,
       shopId,
       id,
-    ).inBatches({ of: 1 })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(String(first.id)).toBe(String((order2 as any).id));
+    )
+      .inBatches({ of: 1 })
+      .first())!;
+    assertEqual(order2, await relation.first());
   });
 
   it(".find_each with multiple column ordering and using composite primary key", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [2, 1] });
-    await CpkBook.create({ id: [2, 2] });
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 2, id: 1 },
+      { author_id: 2, id: 2 },
+    ]);
     const books = await CpkBook.order({ author_id: "asc", id: "desc" });
-    const bookIds = books.map((b: any) => JSON.stringify(b.id));
+
     let index = 0;
-    for await (const book of CpkBook.findEach({ batchSize: 1, order: ["asc", "desc"] as any })) {
-      expect(JSON.stringify((book as any).id)).toBe(bookIds[index]);
-      index++;
+    for await (const book of CpkBook.findEach({ batchSize: 1, order: [":asc", ":desc"] })) {
+      assertEqual(books[index], book);
+      index += 1;
     }
-    expect(index).toBe(books.length);
+    assertEqual(books.length, index);
   });
 
   it(".in_batches should start from the start option when using composite primary key with multiple column ordering", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [1, 2] });
-    await CpkBook.create({ id: [1, 3] });
-    const secondBook = await CpkBook.order({ author_id: "asc", id: "desc" }).offset(1).first();
-    let firstRelation: any = null;
-    for await (const rel of CpkBook.inBatches({
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 1, id: 2 },
+      { author_id: 1, id: 3 },
+    ]);
+    const secondBook = (await CpkBook.order({ author_id: "asc", id: "desc" }).second())!;
+    const relation = (await CpkBook.inBatches({
       of: 1,
-      start: (secondBook as any).id,
-      order: ["asc", "desc"] as any,
-    })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((secondBook as any).id));
+      start: secondBook.id,
+      order: [":asc", ":desc"],
+    }).first())!;
+    assertEqual(secondBook, await relation.first());
   });
 
   it(".in_batches should end at the finish option when using composite primary key with multiple column ordering", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [1, 2] });
-    await CpkBook.create({ id: [1, 3] });
-    const secondBook = await CpkBook.order({ author_id: "asc", id: "desc" }).offset(1).first();
-    const batches: any[] = [];
-    for await (const rel of CpkBook.inBatches({
-      of: 1,
-      finish: (secondBook as any).id,
-      order: ["asc", "desc"] as any,
-    })) {
-      batches.push(rel);
-    }
-    const lastBatch = batches[batches.length - 1];
-    const first = await lastBatch.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((secondBook as any).id));
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 1, id: 2 },
+      { author_id: 1, id: 3 },
+    ]);
+    const secondBook = (await CpkBook.order({ author_id: "asc", id: "desc" }).second())!;
+    const relation = (
+      await CpkBook.inBatches({ of: 1, finish: secondBook.id, order: [":asc", ":desc"] }).toA()
+    ).at(-1)!;
+    assertEqual(secondBook, await relation.first());
   });
 
   it(".in_batches with scope and multiple column ordering and using composite primary key", async () => {
-    await CpkBook.create({ id: [1, 1] });
-    await CpkBook.create({ id: [1, 2] });
-    await CpkBook.create({ id: [1, 3] });
-    const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).limit(2);
-    const [authorId, id] = (book1 as any).id as [number, number];
-    let firstRelation: any = null;
-    for await (const rel of CpkBook.where("author_id >= ? AND id < ?", authorId, id).inBatches({
-      of: 1,
-      order: ["asc", "desc"] as any,
-    })) {
-      firstRelation = rel;
-      break;
-    }
-    const first = await firstRelation.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((book2 as any).id));
+    await CpkBook.insertAllBang([
+      { author_id: 1, id: 1 },
+      { author_id: 1, id: 2 },
+      { author_id: 1, id: 3 },
+    ]);
+    const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).first(2);
+    const [authorId, id] = book1.id as [number, number];
+    const relation = (await CpkBook.where("author_id >= ? AND id < ?", authorId, id)
+      .inBatches({ of: 1, order: [":asc", ":desc"] })
+      .first())!;
+    assertEqual(book2, await relation.first());
   });
 });

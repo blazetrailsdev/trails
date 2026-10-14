@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { UnknownMigrationVersionError } from "../migration.js";
@@ -18,7 +18,7 @@ async function writeMigration(dir: string, version: number, name: string): Promi
   await writeFile(
     join(dir, `${version}_${fileName}.ts`),
     `import { Migration } from "${new URL("../migration.js", import.meta.url).pathname}";
-export class ${name} extends Migration {
+export class ${name} extends Migration.Current {
   async up() {}
   async down() {
     (globalThis.${REVERT_LOG} ??= []).push("${name}");
@@ -33,7 +33,7 @@ describe("DatabaseTasksRollbackTest", () => {
 
   afterEach(async () => {
     delete (globalThis as Record<string, unknown>)[REVERT_LOG];
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     try {
       await Base.removeConnection();
     } catch {
@@ -54,8 +54,8 @@ describe("DatabaseTasksRollbackTest", () => {
     const primaryPath = await migrationsPath([2, "PrimaryOnly"]);
     const animalsPath = await migrationsPath([3, "AnimalsOnly"]);
 
-    const env = DatabaseTasks.env;
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    const env = DEFAULT_ENV();
+    Base.configurations({
       [env]: {
         primary: {
           adapter: "sqlite3",
@@ -88,7 +88,7 @@ describe("DatabaseTasksRollbackTest", () => {
   it("rollback goes through move, not Migrator's applied-version walk", async () => {
     const path = await migrationsPath([1, "First"], [2, "Second"], [3, "Third"]);
 
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     await Base.establishConnection({
       adapter: "sqlite3",
       database: ":memory:",
@@ -109,7 +109,7 @@ describe("DatabaseTasksRollbackTest", () => {
   it("rollback raises UnknownMigrationVersionError for an unknown current version", async () => {
     const path = await migrationsPath([1, "Known"]);
 
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     await Base.establishConnection({
       adapter: "sqlite3",
       database: ":memory:",
@@ -128,7 +128,7 @@ describe("DatabaseTasksRollbackTest", () => {
   it("rolls back off the ambient pool when no configurations are loaded", async () => {
     const path = await migrationsPath([1, "Ambient"]);
 
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     await Base.establishConnection({
       adapter: "sqlite3",
       database: ":memory:",

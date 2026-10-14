@@ -1,12 +1,20 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { stringInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, Mutable, ValueType } from "@blazetrails/activemodel";
+import { include, isPlainObject } from "@blazetrails/activesupport";
+import {
+  eachPair,
+  rbEqual,
+  rbObjRespondTo,
+  registerConstant,
+  stringInspect,
+  StringScanner,
+} from "@blazetrails/ruby-compat";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
 
 const ERROR = "Invalid Hstore document: %s";
 
-export class Hstore extends ValueType<Record<string, string | null>> {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
+export class Hstore extends ValueType {
   override type(): string {
     return "hstore";
   }
@@ -14,74 +22,70 @@ export class Hstore extends ValueType<Record<string, string | null>> {
   override deserialize(value: unknown): Record<string, string | null> | null {
     if (typeof value !== "string") return value as Record<string, string | null> | null;
 
-    const string = value;
-    let pos = 0;
-    const scan = (pattern: RegExp): string | null => {
-      pattern.lastIndex = pos;
-      const match = pattern.exec(string);
-      if (match === null) return null;
-      pos = pattern.lastIndex;
-      return match[0];
-    };
+    const scanner = new StringScanner(value);
     const hash: Record<string, string | null> = {};
 
-    while (pos < string.length) {
-      if (scan(/"/y) === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+    while (!scanner.isEos()) {
+      if (scanner.skip(/"/) === null) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
 
-      let key = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
+      let key = scanner.scan(/^(\\[\\"]|[^\\"])*?(?=")/);
       if (key === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
 
-      if (scan(/"=>?/y) === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      if (scanner.skip(/"=>?/) === null) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
 
-      if (scan(/NULL/y) !== null) {
+      if (scanner.scan(/NULL/) !== null) {
         value = null;
       } else {
-        if (scan(/"/y) === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        if (scanner.skip(/"/) === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
 
-        value = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
+        value = scanner.scan(/^(\\[\\"]|[^\\"])*?(?=")/);
         if (value === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
 
-        if (scan(/"/y) === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        if (scanner.skip(/"/) === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
       }
 
-      key = key.replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+      key = key.replaceAll('\\"', '"');
+      key = key.replaceAll("\\\\", "\\");
 
       if (value !== null) {
-        value = (value as string).replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+        value = (value as string).replaceAll('\\"', '"');
+        value = (value as string).replaceAll("\\\\", "\\");
       }
 
       hash[key] = value as string | null;
 
-      if (scan(/, /y) === null && pos < string.length) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      if (!(scanner.skip(/, /) !== null || scanner.isEos())) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
     }
 
     return hash;
   }
 
-  override serialize(value: unknown): string | null {
-    if (value == null) return null;
-    if (isPlainObject(value)) {
-      const hash = value as Record<string, unknown>;
-      return Object.entries(hash)
-        .map(([k, v]) => `${escapeHstore(k)}=>${escapeHstore(v as string | null)}`)
-        .join(", ");
+  override serialize(value: unknown): unknown {
+    if (isPlainObject(value) || value instanceof Map) {
+      const pairs: string[] = [];
+      eachPair(value as Record<string, unknown>, (k, v) => {
+        pairs.push(`${escapeHstore(k)}=>${escapeHstore(v as string | null)}`);
+      });
+      return pairs.join(", ");
+    } else if (rbObjRespondTo(value, "toUnsafeH")) {
+      return this.serialize((value as { toUnsafeH(): unknown }).toUnsafeH());
+    } else {
+      return value;
     }
-    if (typeof value === "string") return value;
-    return null;
   }
 
   accessor(): typeof StringKeyedHashAccessor {
@@ -89,47 +93,26 @@ export class Hstore extends ValueType<Record<string, string | null>> {
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    const oldHash = this.deserialize(rawOldValue);
-    if (oldHash == null && newValue == null) return false;
-    if (oldHash == null || newValue == null) return true;
-    return !hashesEqual(oldHash, newValue as Record<string, unknown>);
-  }
-
-  override isMutable(): boolean {
-    return true;
-  }
-
-  cast(value: unknown): Record<string, string | null> | null {
-    if (value == null) return null;
-    const serialized = this.serialize(value);
-    if (typeof serialized !== "string") return null;
-    return this.deserialize(serialized);
+    return !rbEqual(this.deserialize(rawOldValue), newValue);
   }
 }
 
-function isPlainObject(value: unknown): boolean {
-  if (value == null || typeof value !== "object") return false;
-  if (Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge carries `include ActiveModel::Type::Helpers::Mutable`'s members onto the class; it declares none of its own.
+export interface Hstore extends Mutable {}
 
-function hashesEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
-  const ak = Object.keys(a);
-  const bk = Object.keys(b);
-  if (ak.length !== bk.length) return false;
-  for (const k of ak) {
-    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
-    if (a[k] !== b[k]) return false;
-  }
-  return true;
-}
+include(Hstore, Mutable);
 
 /** @internal */
 function escapeHstore(value: string | null | undefined): string {
-  if (value == null) return "NULL";
-  if (value === "") return '""';
-  return `"${String(value).replace(/(["\\])/g, "\\$1")}"`;
+  if (value == null) {
+    return "NULL";
+  } else {
+    if (value === "") {
+      return '""';
+    } else {
+      return `"${String(value).replace(/(["\\])/g, "\\$1")}"`;
+    }
+  }
 }
 
 registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Hstore", Hstore);

@@ -4,7 +4,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { Rational } from "@blazetrails/ruby-compat";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
@@ -40,8 +40,8 @@ describe("TimePrecisionTest", () => {
     await adapter.addColumn("foos", "finish", "time", { precision: 6 });
     const Foo = makeFoo();
     await Foo.loadSchema();
-    expect((Foo.columnsHash() as any)["start"].precision).toBe(3);
-    expect((Foo.columnsHash() as any)["finish"].precision).toBe(6);
+    expect(Foo.columnsHash()["start"].precision).toBe(3);
+    expect(Foo.columnsHash()["finish"].precision).toBe(6);
   });
 
   itIfSupports("datetime_with_precision", "time precision is truncated on assignment", async () => {
@@ -90,8 +90,8 @@ describe("TimePrecisionTest", () => {
       });
       const Foo = makeFoo();
       await Foo.loadSchema();
-      expect((Foo.columnsHash() as any)["start"].limit).toBeNull();
-      expect((Foo.columnsHash() as any)["finish"].limit).toBeNull();
+      expect(Foo.columnsHash()["start"].limit).toBeNull();
+      expect(Foo.columnsHash()["finish"].limit).toBeNull();
     },
   );
 
@@ -129,7 +129,7 @@ describe("TimePrecisionTest", () => {
       t.time("start", { precision: 4 });
       t.time("finish", { precision: 6 });
     });
-    const output = await dumpTableSchema(adapter, "foos");
+    const output = await dumpTableSchema("foos");
     expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*4/);
     expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*6/);
   });
@@ -142,7 +142,7 @@ describe("TimePrecisionTest", () => {
         t.time("start", { precision: 0 });
         t.time("finish", { precision: 0 });
       });
-      const output = await dumpTableSchema(adapter, "foos");
+      const output = await dumpTableSchema("foos");
       expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*0/);
       expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*0/);
     },

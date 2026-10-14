@@ -1,10 +1,11 @@
 import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { LocalJumpError, rbRegSUnion, rbRegToS, rtest } from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
+import type { SchemaDumper } from "./abstract/schema-dumper.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type * as Arel from "@blazetrails/arel";
-import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
+import { type Nodes, type ArelNode, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
   ActiveRecordError,
@@ -20,9 +21,12 @@ import {
 } from "../errors.js";
 import {
   IsolatedExecutionState,
+  kernelArray,
+  presence,
   LoadInterlockAwareMonitor,
   Notifications,
   NullLock,
+  ThreadLoadInterlockAwareMonitor,
 } from "@blazetrails/activesupport";
 import {
   Fiber,
@@ -30,7 +34,21 @@ import {
   Process,
   RbConfig,
   abort,
+  block,
+  cmp,
+  Concurrent,
   env,
+  excSetupMessage,
+  exec,
+  fetch,
+  isEmpty,
+  isNil,
+  last,
+  rbDefineInspectCustom,
+  rbEnsure,
+  rbFSend,
+  rbModConstSet,
+  toI,
   rbObjAsString as toS,
   Thread,
 } from "@blazetrails/ruby-compat";
@@ -45,33 +63,22 @@ type AdapterInstrumenter = {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T>;
 };
-import { ActiveRecord } from "../namespaces.js";
+import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
 import { Result, type ColumnTypes } from "../result.js";
-import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
+import { BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
-import {
-  TransactionManager,
-  type Transaction,
-  type NullTransaction,
-} from "./abstract/transaction.js";
+import { type Transaction, type NullTransaction } from "./abstract/transaction.js";
 import {
   Store,
-  queryCacheEnabled as queryCacheEnabledGet,
-  cache as cacheMixin,
-  enableQueryCacheBang as enableQueryCacheBangMixin,
-  uncached as uncachedMixin,
-  disableQueryCacheBang as disableQueryCacheBangMixin,
-  clearQueryCache as clearQueryCacheMixin,
   checkVersion as checkVersionMixin,
-  selectAll as querySelectAll,
-  dirtiesQueryCache,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
 import {
   DatabaseStatements,
+  type DatabaseStatementsHost,
   transaction as dbStatementsTransaction,
 } from "./abstract/database-statements.js";
 import {
@@ -79,6 +86,9 @@ import {
   typeCast as abstractTypeCast,
   typeCastedBinds as abstractTypeCastedBinds,
   quoteString as abstractQuoteString,
+  ClassMethods as QuotingClassMethods,
+  columnNameMatcher as abstractColumnNameMatcher,
+  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
@@ -95,7 +105,7 @@ import {
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
-import { include, prepend, type PrependMethod } from "@blazetrails/activesupport";
+import { Callbacks, include, type Extended, type Included } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
@@ -173,12 +183,10 @@ export class Version {
   }
 
   compare(versionString: string): number {
-    const other = versionString.split(".").map((part) => parseInt(part, 10) || 0);
-    for (let i = 0; i < Math.min(this._version.length, other.length); i++) {
-      if (this._version[i] > other[i]) return 1;
-      if (this._version[i] < other[i]) return -1;
-    }
-    return this._version.length === other.length ? 0 : this._version.length > other.length ? 1 : -1;
+    return cmp(
+      this._version,
+      versionString.split(".").map((part) => toI(part)),
+    ) as number;
   }
 
   toString(): string {
@@ -187,12 +195,26 @@ export class Version {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface AbstractAdapter {
+export interface AbstractAdapter
+  extends
+    Included<typeof Callbacks>,
+    Required<Pick<DatabaseStatementsHost, "_transactionManager" | "transactionManager">>,
+    Pick<QueryCacheHost, "_queryCache"> {
+  _runCheckoutCallbacks(block?: () => unknown): unknown;
+  _runCheckinCallbacks(block?: () => unknown): unknown;
+  queryCache: Store | null;
+  readonly queryCacheEnabled: boolean | undefined;
+  cache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  enableQueryCacheBang(): void;
+  uncached<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
+  disableQueryCacheBang(): void;
+  clearQueryCache(): void;
+  columnsForDistinct(columns: string | string[], orders: string[]): string | string[];
   createTable(
     tableName: string,
     options?:
       | {
-          id?: boolean | ColumnType | IdHashOptions;
+          id?: false | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -209,7 +231,7 @@ export interface AbstractAdapter {
         }
       | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void>;
+  ): Promise<unknown>;
   dropTable(
     ...args:
       | string[]
@@ -220,7 +242,7 @@ export interface AbstractAdapter {
           { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
           ((t: TableDefinition) => void) | undefined,
         ]
-  ): Promise<void>;
+  ): Promise<unknown>;
   renameTable(tableName: string, newName: string, options?: Record<string, unknown>): Promise<void>;
   /** @internal */
   fetchTypeMetadata(
@@ -232,7 +254,7 @@ export interface AbstractAdapter {
     columnName: string,
     type: ColumnType,
     options?: ColumnOptions & { ifNotExists?: boolean },
-  ): Promise<void>;
+  ): Promise<unknown>;
   renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void>;
   /** @internal */
   renameColumnSql(tableName: string, columnName: string, newColumnName: string): string;
@@ -268,7 +290,7 @@ export interface AbstractAdapter {
     tableName: string,
     columnName: string | string[],
     options?: AddIndexOptions,
-  ): Promise<void>;
+  ): Promise<unknown>;
   addIndexOptions(
     tableName: string,
     columnName: string | string[],
@@ -342,7 +364,7 @@ export interface AbstractAdapter {
       | { column?: string | string[]; name?: string; ifExists?: boolean }
       | null,
     options?: { column?: string | string[]; name?: string; ifExists?: boolean },
-  ): Promise<void>;
+  ): Promise<unknown>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   indexName(
     tableName: string,
@@ -382,13 +404,13 @@ export interface AbstractAdapter {
   indexNameForRemove(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options: { name?: string; column?: string | string[] },
+    options: { name?: string | null; column?: string | string[] },
   ): Promise<string>;
   /** @internal */
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
   tableExists(tableName: string): Promise<boolean | null>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
-  internalStringOptionsForPrimaryKey(): Record<string, unknown>;
+  internalStringOptionsForPrimaryKey(): Record<string, unknown> | Promise<Record<string, unknown>>;
   columnExists(
     tableName: string,
     columnName: string,
@@ -408,16 +430,18 @@ export interface AbstractAdapter {
   viewExists(viewName: string): Promise<boolean | null>;
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
+  tableOptions(tableName: string): Promise<Record<string, unknown> | null>;
+  tableComment(tableName: string): Promise<string | null>;
   indexes(tableName: string): Promise<IndexDefinition[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
+  foreignKeyColumnFor(tableName: string, columnName?: string): string;
+  createSchemaDumper(options: Record<string, unknown>): SchemaDumper;
   foreignKeyExists(
     fromTable: string,
-    toTable?: string | ForeignKeyLookupOptions,
-    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+    toTable?: string | null,
+    options?: ForeignKeyLookupOptions,
   ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
   /** @internal */
@@ -429,7 +453,7 @@ export interface AbstractAdapter {
   useForeignKeys(): boolean;
   removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable?: string | null,
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
@@ -437,7 +461,7 @@ export interface AbstractAdapter {
   removeReference(
     tableName: string,
     refName: string,
-    options?: RemoveReferenceOptions,
+    { foreignKey, polymorphic, ...options }?: RemoveReferenceOptions,
   ): Promise<void>;
   removeBelongsTo(
     tableName: string,
@@ -445,7 +469,7 @@ export interface AbstractAdapter {
     options?: RemoveReferenceOptions,
   ): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
-  removeTimestamps(tableName: string): Promise<void>;
+  removeTimestamps(tableName: string, _options?: ColumnOptions): Promise<void>;
   addCheckConstraint(
     tableName: string,
     expression: string,
@@ -465,14 +489,15 @@ export interface AbstractAdapter {
   /** @internal */
   checkConstraintForBang(
     tableName: string,
-    { expression, ...options }: { name?: string; expression?: string; validate?: boolean },
+    { expression, ...options }: { name?: string; expression?: string | null; validate?: boolean },
   ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
-    expression?:
-      | string
-      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-    options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    expression?: string | null,
+    {
+      ifExists,
+      ...options
+    }?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
   ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   /** @internal */
@@ -495,10 +520,14 @@ export interface AbstractAdapter {
       columnOptions?: Record<string, unknown>;
     },
   ): Promise<void>;
+  /**
+   * drift-ok: the mixin defaults `options`, and an interface cannot spell an
+   * optional parameter before the required block.
+   */
   changeTable(
     tableName: string,
-    fnOrOptions?: ((t: TableOf<this>) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: TableOf<this>) => void | Promise<void>,
+    options: { bulk?: boolean } | undefined,
+    block: (t: TableOf<this>) => void | Promise<void>,
     base?: unknown,
   ): Promise<void>;
   /** @internal */
@@ -529,7 +558,6 @@ export interface AbstractAdapter {
   dataSourceExists(name: string): Promise<boolean | null>;
   sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral;
   resetTransaction(): void;
-  resetTransaction(options: { restore: true }): Promise<void>;
   resetTransaction(
     options: { restore?: boolean },
     callback: () => Promise<unknown>,
@@ -604,7 +632,7 @@ export interface AbstractAdapter {
     tablesToDelete?: string[],
   ): Promise<void>;
   emptyInsertStatementValue(pk?: string | null): string;
-  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral | string;
+  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
   cacheableQuery(
     klass: {
       query(sql: string): unknown;
@@ -642,10 +670,10 @@ export interface AbstractAdapter {
   /** @internal */
   sqlForInsert(
     sql: string,
-    pk: string | false | null | undefined,
+    pk: string | string[] | false | null | undefined,
     binds: unknown[],
     returning: string[] | null | undefined,
-  ): Promise<[string, unknown[]]>;
+  ): [string, unknown[]];
   /** @internal */
   rawExecute(
     sql: string,
@@ -668,6 +696,7 @@ export interface AbstractAdapter {
       allowRetry?: boolean;
       materializeTransactions?: boolean;
     },
+    block?: (result: unknown) => unknown,
   ): Promise<unknown>;
   /** @internal */
   internalExecQuery(
@@ -732,25 +761,12 @@ export interface AbstractAdapter {
 
   readonly schemaCreation?: SchemaCreation;
 }
-/** @internal */
-export type ConnectionCallbackPhase = "checkout" | "checkin";
-/** @internal */
-export type ConnectionCallbackKind = "before" | "after";
-interface ConnectionCallback {
-  kind: ConnectionCallbackKind;
-  method: (this: AbstractAdapter) => void;
-}
 
 function isPlainConfigHash(value: unknown): value is Record<string, unknown> {
   if (value == null || typeof value !== "object") return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
-
-export const RAW_CONNECTION_DEPRECATION_MESSAGE =
-  "Initializing a connection adapter with a pre-opened raw connection is " +
-  "deprecated and will be removed. Pass a configuration hash (or connection " +
-  "string) and let the adapter open and manage the connection itself.";
 
 export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
   "bigint",
@@ -774,6 +790,15 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly ADAPTER_NAME: string = "Abstract";
+
+  declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
+
+  static {
+    include(this, Callbacks);
+    this.defineCallbacks("checkout", "checkin");
+  }
+
   static readonly Version = Version;
 
   static readonly COMMENT_REGEX = /(?:--.*\n)|\/\*(?:[^*]|\*[^/])*\*\//;
@@ -783,7 +808,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   protected _visitor!: Visitors.ToSql;
-  protected _connection: unknown = null;
+  /** @internal */
+  _rawConnection: unknown = null;
   private _owner: Thread | Fiber | null = null;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
@@ -797,13 +823,10 @@ export class AbstractAdapter implements Quoting {
   protected _config: Record<string, unknown> = {};
   protected _defaultTimezone?: string;
   protected _advisoryLocksEnabled: unknown = true;
-  _transactionManager!: TransactionManager;
-
-  _queryCache: Store | null = null;
-
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
-  lock: LoadInterlockAwareMonitor | NullLock = new LoadInterlockAwareMonitor();
+  lock: ThreadLoadInterlockAwareMonitor | LoadInterlockAwareMonitor | NullLock =
+    new LoadInterlockAwareMonitor();
 
   get owner(): Thread | Fiber | null {
     return this._owner;
@@ -843,30 +866,25 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /** @missingRailsCall union — PERMANENT */
   static buildReadQueryRegexp(...parts: string[]): RegExp {
     parts = parts.concat(AbstractAdapter.DEFAULT_READ_QUERY);
+    const res = parts.map((part) => new RegExp(part, "i"));
     return new RegExp(
-      `^(?:[(\\s]|${AbstractAdapter.COMMENT_REGEX.source})*(?:${parts.join("|")})`,
-      "i",
+      `^(?:[(\\s]|${rbRegToS(AbstractAdapter.COMMENT_REGEX)})*${rbRegToS(rbRegSUnion(...res))}`,
     );
   }
 
-  /**
-   * @missingRailsCall exec — PERMANENT
-   * @missingRailsCall empty? — PERMANENT
-   */
-  static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
-    let cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
+  static findCmdAndExec(commands: string | string[], ...args: string[]): never {
+    commands = kernelArray(commands);
 
     const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
     const ext = RbConfig.CONFIG["EXEEXT"];
-    if (ext !== "") {
-      cmds = cmds.map((cmd) => `${cmd}${ext}`);
+    if (!isEmpty(ext)) {
+      commands = commands.map((cmd) => `${cmd}${ext}`);
     }
 
     let fullPathCommand: string | null = null;
-    const found = cmds.find((cmd) =>
+    const found = commands.find((cmd) =>
       dirsOnPath.find((path) => {
         fullPathCommand = File.join(path, cmd);
         let stat;
@@ -880,18 +898,24 @@ export class AbstractAdapter implements Quoting {
     );
 
     if (found != null) {
-      return [fullPathCommand!, ...args];
+      exec(fullPathCommand!, ...args);
     } else {
-      abort(`Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`);
+      abort(
+        `Couldn't find database client: ${commands.join(", ")}. Check your $PATH and try again.`,
+      );
     }
   }
 
   static dbconsole(_config?: DatabaseConfig, _options?: Record<string, unknown>): unknown {
     // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:121
-    throw new NotImplementedError("dbconsole");
+    throw new NotImplementedError();
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
+  /**
+   * @missingRailsName config — PERMANENT
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::QueryCache#initialize rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/query_cache.rb:196-199
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::DatabaseStatements#initialize rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:6-9
+   */
   constructor(
     configOrDeprecatedConnection: unknown,
     deprecatedLogger: unknown = null,
@@ -899,12 +923,13 @@ export class AbstractAdapter implements Quoting {
     deprecatedConfig: unknown = null,
   ) {
     this.resetTransaction();
+    this._queryCache = null;
 
-    this._connection = null;
+    this._rawConnection = null;
     this._unconfiguredConnection = null;
 
     if (isPlainConfigHash(configOrDeprecatedConnection)) {
-      this._config = configOrDeprecatedConnection;
+      this._config = { ...configOrDeprecatedConnection };
       this.logger = ActiveRecord.Base?.logger ?? null;
 
       if (
@@ -922,10 +947,10 @@ export class AbstractAdapter implements Quoting {
         ? deprecatedLogger
         : (ActiveRecord.Base?.logger ?? null);
       if (rtest(deprecatedConfig)) {
-        this._config = (deprecatedConfig ?? {}) as Record<string, unknown>;
+        this._config = { ...((deprecatedConfig ?? {}) as Record<string, unknown>) };
         this._connectionParameters = deprecatedConnectionOptions;
       } else {
-        this._config = (deprecatedConnectionOptions ?? {}) as Record<string, unknown>;
+        this._config = { ...((deprecatedConnectionOptions ?? {}) as Record<string, unknown>) };
         this._connectionParameters = null;
       }
     }
@@ -937,14 +962,16 @@ export class AbstractAdapter implements Quoting {
     this.preparedStatements =
       !disablePreparedStatements() &&
       (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
-        "preparedStatements" in this._config
-          ? this._config.preparedStatements
-          : this.defaultPreparedStatements(),
+        fetch(
+          this._config,
+          "preparedStatements",
+          block(() => this.defaultPreparedStatements()),
+        ),
       );
 
     this._advisoryLocksEnabled = (
       this.constructor as typeof AbstractAdapter
-    ).typeCastConfigToBoolean("advisoryLocks" in this._config ? this._config.advisoryLocks : true);
+    ).typeCastConfigToBoolean(fetch(this._config, "advisoryLocks", true));
 
     this._defaultTimezone = (this.constructor as typeof AbstractAdapter).validateDefaultTimezone(
       this._config.defaultTimezone,
@@ -952,7 +979,12 @@ export class AbstractAdapter implements Quoting {
   }
 
   setLockThread(lockThread: unknown): void {
-    this.lock = lockThread != null ? new LoadInterlockAwareMonitor() : NullLock;
+    this.lock =
+      lockThread instanceof Thread
+        ? new ThreadLoadInterlockAwareMonitor()
+        : lockThread instanceof Fiber
+          ? new LoadInterlockAwareMonitor()
+          : NullLock;
   }
 
   checkIfWriteQuery(sql: string | null): void {
@@ -966,13 +998,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   get connectionRetries(): number {
-    const v = this._config.connectionRetries;
-    return typeof v === "number" ? v : 1;
+    return toI(this._config.connectionRetries ?? 1) as number;
   }
 
   get verifyTimeout(): number {
-    const v = this._config.verifyTimeout;
-    return typeof v === "number" ? v : 2;
+    return toI(this._config.verifyTimeout ?? 2) as number;
   }
 
   get retryDeadline(): number | null {
@@ -1016,8 +1046,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   isValidType(type: string | null | undefined): boolean {
-    if (type == null) return false;
-    return this.nativeDatabaseTypes()[type] != null;
+    return !isNil(this.nativeDatabaseTypes()[type as string]);
   }
 
   lease(): void {
@@ -1049,13 +1078,13 @@ export class AbstractAdapter implements Quoting {
   }
 
   get schemaCache(): BoundSchemaReflection {
-    const schemaCache = this.pool.schemaCache;
-    if (schemaCache instanceof BoundSchemaReflection) return schemaCache;
-    this._schemaCache ??= BoundSchemaReflection.forLoneConnection(
-      this._poolSchemaReflection(),
-      this,
+    return (
+      this.pool.schemaCache ||
+      (this._schemaCache ||= BoundSchemaReflection.forLoneConnection(
+        this.pool.schemaReflection,
+        this,
+      ))
     );
-    return this._schemaCache;
   }
 
   expire(): void {
@@ -1078,7 +1107,7 @@ export class AbstractAdapter implements Quoting {
   stealBang(): void {
     if (this.isInUse()) {
       if (this._owner !== IsolatedExecutionState.context()) {
-        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner!);
+        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner);
 
         this._owner = IsolatedExecutionState.context();
       }
@@ -1093,34 +1122,24 @@ export class AbstractAdapter implements Quoting {
   }
 
   get secondsSinceLastActivity(): number | null {
-    if (!this._connection || !this._lastActivity) return null;
+    if (!this._rawConnection || !this._lastActivity) return null;
     return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._lastActivity;
   }
 
   /** @missingRailsName objectId — PERMANENT */
   unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T {
     let cache: Set<unknown> | undefined;
-    if (
-      this._preparedStatements != null &&
-      this._preparedStatements !== false &&
-      !this.preparedStatementsDisabledCache.has(this)
-    ) {
-      cache = this.preparedStatementsDisabledCache.add(this);
-    }
-    let result: Promise<T> | T;
-    try {
-      result = fn();
-    } catch (error) {
-      cache?.delete(this);
-      throw error;
-    }
-    if (result instanceof Promise) {
-      return result.finally(() => {
+    return rbEnsure(
+      () => {
+        if (rtest(this._preparedStatements) && !this.preparedStatementsDisabledCache.has(this)) {
+          cache = this.preparedStatementsDisabledCache.add(this);
+        }
+        return fn();
+      },
+      () => {
         cache?.delete(this);
-      });
-    }
-    cache?.delete(this);
-    return result;
+      },
+    );
   }
 
   get adapterName(): string {
@@ -1145,11 +1164,6 @@ export class AbstractAdapter implements Quoting {
   supportsDdlTransactions(): boolean {
     return false;
   }
-
-  protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
-    checkout: [],
-    checkin: [],
-  };
 
   supportsBulkAlter(): boolean {
     return false;
@@ -1209,11 +1223,6 @@ export class AbstractAdapter implements Quoting {
 
   supportsIndexesInCreate(): boolean {
     return false;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return this.inspect();
   }
 
   supportsForeignKeys(): boolean {
@@ -1284,7 +1293,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  async supportsInsertReturning(): Promise<boolean> {
+  supportsInsertReturning(): boolean {
     return false;
   }
 
@@ -1317,10 +1326,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   isAsyncEnabled(): boolean {
-    return false;
-  }
-
-  asyncEnabled(): boolean {
     return (
       this.supportsConcurrentConnections() &&
       asyncQueryExecutor() != null &&
@@ -1377,11 +1382,11 @@ export class AbstractAdapter implements Quoting {
   async checkAllForeignKeysValidBang(): Promise<void> {}
 
   isConnected(): boolean {
-    return this._connection !== null;
+    return this._rawConnection !== null;
   }
 
   async active(): Promise<boolean> {
-    return this._connection !== null;
+    return this._rawConnection !== null;
   }
 
   async reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
@@ -1407,7 +1412,7 @@ export class AbstractAdapter implements Quoting {
           });
           return;
         } catch (originalException) {
-          const translatedException = this.translateExceptionClass(
+          const translatedException = await this.translateExceptionClass(
             originalException,
             undefined,
             undefined,
@@ -1425,7 +1430,7 @@ export class AbstractAdapter implements Quoting {
 
           this._lastActivity = 0;
           this._verified = false;
-          throw translatedException;
+          throw excSetupMessage(translatedException, originalException);
         }
       }
     });
@@ -1447,8 +1452,8 @@ export class AbstractAdapter implements Quoting {
     await this.attemptConfigureConnection();
   }
 
-  throwAwayBang(): void | Promise<void> {
-    this.pool.remove(this);
+  async throwAwayBang(): Promise<void> {
+    await this.pool.remove(this);
     return this.disconnectBang();
   }
 
@@ -1472,21 +1477,21 @@ export class AbstractAdapter implements Quoting {
 
   async verifyBang(): Promise<void> {
     if (!(await this.active())) {
-      const promoted = await this.lock.synchronize(async () => {
+      await this.lock.synchronize(async () => {
         if (this._unconfiguredConnection) {
-          this._connection = this._unconfiguredConnection;
+          this._rawConnection = this._unconfiguredConnection;
           this._unconfiguredConnection = null;
           await this.attemptConfigureConnection();
           this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
           this._verified = true;
-          return true;
+          return;
         }
+
         await this.reconnectBang({ restoreTransactions: true });
-        return false;
       });
-      if (promoted) return;
     }
-    this.verifiedBang();
+
+    this._verified = true;
   }
 
   async connectBang(): Promise<this> {
@@ -1571,7 +1576,6 @@ export class AbstractAdapter implements Quoting {
     return (this.pool as ConnectionPool).migrationContext.currentVersion();
   }
 
-  /** @missingRailsName last — PERMANENT */
   static registerClassWithPrecision(
     this: Pick<typeof AbstractAdapter, "extractPrecision">,
     mapping: TypeMap | HashLookupTypeMap,
@@ -1580,7 +1584,7 @@ export class AbstractAdapter implements Quoting {
     kwargs: Record<string, unknown> = {},
   ): void {
     (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
-      const precision = this.extractPrecision(args.at(-1)!);
+      const precision = this.extractPrecision(last(args)!);
       return new klass({ precision, ...kwargs }) as ReturnType<TypeMap["lookup"]>;
     });
   }
@@ -1626,10 +1630,7 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsName last — PERMANENT
-   */
+  /** @internal */
   static registerClassWithLimit(
     this: Pick<typeof AbstractAdapter, "extractLimit">,
     mapping: TypeMap | HashLookupTypeMap,
@@ -1637,7 +1638,7 @@ export class AbstractAdapter implements Quoting {
     klass: new (options?: { limit?: number }) => object,
   ): void {
     (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
-      const limit = this.extractLimit(args.at(-1)!);
+      const limit = this.extractLimit(last(args)!);
       return new klass({ limit }) as ReturnType<TypeMap["lookup"]>;
     });
   }
@@ -1658,9 +1659,7 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   static extractLimit(sqlType: string): number | undefined {
     const match = /\((.*)\)/.exec(sqlType);
-    if (!match) return undefined;
-    const n = Number.parseInt(match[1], 10);
-    return Number.isNaN(n) ? 0 : n;
+    return match ? (toI(match[1]) as number) : undefined;
   }
 
   /** @internal */
@@ -1677,31 +1676,42 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = options.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
-      if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
+      if (this._rawConnection === null && this.isReconnectCanRestoreState())
+        await this.connectBang();
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
       const deadline =
-        this.retryDeadline !== null
-          ? Process.clockGettime(Process.CLOCK_MONOTONIC) + this.retryDeadline
-          : null;
+        this.retryDeadline != null &&
+        Process.clockGettime(Process.CLOCK_MONOTONIC) + this.retryDeadline;
       let reconnectable = this.isReconnectCanRestoreState();
-      const last = this.secondsSinceLastActivity;
-      const recent = last !== null && last < this.verifyTimeout;
-      if (!this._verified && !recent && reconnectable && !allowRetry) await this.verifyBang();
+
+      let lastActivity: number | null;
+      if (this._verified) {
+      } else if (
+        (lastActivity = this.secondsSinceLastActivity) != null &&
+        lastActivity < this.verifyTimeout
+      ) {
+      } else if (reconnectable) {
+        if (allowRetry) {
+        } else {
+          await this.verifyBang();
+        }
+      } else {
+      }
 
       for (;;) {
         try {
           return await block(await this.rawConnectionForBlock());
         } catch (originalException) {
-          const translatedException = this.translateExceptionClass(
+          const translatedException = (await this.translateExceptionClass(
             originalException,
             null,
             null,
-          ) as Error;
+          )) as Error;
           this.invalidateTransaction(translatedException);
           const retryDeadlineExceeded =
-            deadline !== null && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
+            deadline !== false && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
           if (!retryDeadlineExceeded && retriesAvailable > 0) {
             retriesAvailable -= 1;
             if (this.isRetryableQueryError(translatedException)) {
@@ -1718,7 +1728,7 @@ export class AbstractAdapter implements Quoting {
             this._lastActivity = 0;
             this._verified = false;
           }
-          throw translatedException;
+          throw excSetupMessage(translatedException, originalException);
         } finally {
           if (materializeTransactions) this.dirtyCurrentTransaction();
         }
@@ -1760,12 +1770,9 @@ export class AbstractAdapter implements Quoting {
     return exception instanceof Deadlocked || exception instanceof LockWaitTimeout;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall sleep — PERMANENT
-   */
+  /** @internal */
   backoff(counter: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, 100 * counter));
+    return new Promise((resolve) => setTimeout(resolve, 0.1 * counter * 1000));
   }
 
   /** @internal */
@@ -1773,15 +1780,14 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   anyRawConnection(): unknown {
-    return this._connection ?? this.validRawConnection();
+    return this._rawConnection ?? this.validRawConnection();
   }
 
   /** @internal */
   validRawConnection(): unknown {
-    if (this._verified && this._connection) return this._connection;
-    return this.withRawConnection(
-      { allowRetry: false, materializeTransactions: false },
-      (conn) => conn,
+    return (
+      (this._verified && this._rawConnection) ||
+      this.withRawConnection({ allowRetry: false, materializeTransactions: false }, (conn) => conn)
     );
   }
 
@@ -1793,43 +1799,34 @@ export class AbstractAdapter implements Quoting {
     return null;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall compute_if_absent — PERMANENT
-   */
+  /** @internal */
   get typeMap(): unknown {
-    const ctor = this.constructor as typeof AbstractAdapter;
+    const klass = this.constructor as typeof AbstractAdapter;
     const key = this.extendedTypeMapKey();
-    if (!key) return ctor.TYPE_MAP;
-    const cacheKey = JSON.stringify(key);
-    let m = ctor.EXTENDED_TYPE_MAPS.get(cacheKey);
-    if (!m) ctor.EXTENDED_TYPE_MAPS.set(cacheKey, (m = ctor.extendedTypeMap(key)));
-    return m;
+    if (key != null) {
+      return klass.EXTENDED_TYPE_MAPS.computeIfAbsent(key, () => klass.extendedTypeMap(key));
+    } else {
+      return klass.TYPE_MAP;
+    }
   }
 
   /** @internal */
-  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown {
+  async translateExceptionClass(
+    nativeError: unknown,
+    sql: unknown,
+    binds: unknown,
+  ): Promise<unknown> {
     if (nativeError instanceof ActiveRecordError) return nativeError;
-    const name = (nativeError as any)?.constructor?.name ?? "Error";
-    const msg = (nativeError as any)?.message ?? "";
-    const message = `${name}: ${msg}`;
-    const arError = this.translateException(nativeError, {
+
+    const message = `${(nativeError as Error).constructor.name}: ${(nativeError as Error).message}`;
+
+    const activeRecordError = (await this.translateException(nativeError, {
       message,
       sql: sql as string,
       binds: binds as unknown[],
-    });
-    const setBacktrace = (translated: unknown) => {
-      if (
-        translated !== nativeError &&
-        translated instanceof Error &&
-        nativeError instanceof Error
-      ) {
-        translated.stack = nativeError.stack;
-        if (translated.cause === undefined) translated.cause = nativeError;
-      }
-      return translated;
-    };
-    return arError instanceof Promise ? arError.then(setBacktrace) : setBacktrace(arError);
+    })) as Error;
+    activeRecordError.stack = (nativeError as Error).stack;
+    return activeRecordError;
   }
 
   async log<T>(
@@ -1841,8 +1838,6 @@ export class AbstractAdapter implements Quoting {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
     try {
-      const userTx = this.currentTransaction().userTransaction;
-      const presentTx = userTx.isBlank() ? null : userTx;
       return (await this.instrumenter.instrument(
         "sql.active_record",
         {
@@ -1852,7 +1847,7 @@ export class AbstractAdapter implements Quoting {
           type_casted_binds: typeCastedBinds,
           async,
           connection: this,
-          transaction: presentTx,
+          transaction: presence(this.currentTransaction().userTransaction),
           row_count: 0,
         },
         block,
@@ -1888,16 +1883,16 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   async columnFor(tableName: string, columnName: string): Promise<import("./column.js").Column> {
-    const cols = await (this as any).columns(tableName);
-    const col = (cols as import("./column.js").Column[]).find((c) => c.name === columnName);
-    if (!col) throw new ActiveRecordError(`No such column: ${tableName}.${columnName}`);
-    return col;
+    columnName = toS(columnName);
+    const column = (await this.columns(tableName)).find((c) => c.name === columnName);
+    if (!column) throw new ActiveRecordError(`No such column: ${tableName}.${columnName}`);
+    return column;
   }
 
   /** @internal */
   async columnForAttribute(attribute: {
-    relation: { name: string | Nodes.Node };
-    name: string | Nodes.Node | null;
+    relation: { name: string | ArelNode };
+    name: string | ArelNode | null;
   }): Promise<import("./column.js").Column | undefined> {
     const tableName = String(attribute.relation.name);
     const hash = await this.schemaCache.columnsHash(tableName);
@@ -1957,11 +1952,11 @@ export class AbstractAdapter implements Quoting {
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
-    return dbWarningsIgnore().some((warningMatcher) => {
-      const matcher =
-        typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher;
-      return matcher.test(warning.message ?? "") || matcher.test(String(warning.code ?? ""));
-    });
+    return dbWarningsIgnore().some(
+      (warningMatcher) =>
+        rbFSend(warning.message, "isMatch", warningMatcher) ||
+        rbFSend(toS(warning.code), "isMatch", warningMatcher),
+    );
   }
 
   quote(value: unknown): string {
@@ -1981,8 +1976,16 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
+  static columnNameMatcher(): RegExp {
+    return abstractColumnNameMatcher();
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    return abstractColumnNameWithOrderMatcher();
+  }
+
   static quoteColumnName(columnName: unknown): string {
-    return abstractQuoteColumnName(columnName);
+    return QuotingClassMethods.quoteColumnName(columnName);
   }
 
   private static readonly DEFAULT_READ_QUERY = [
@@ -2005,14 +2008,12 @@ export class AbstractAdapter implements Quoting {
   }
 
   quoteColumnName(columnName: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteColumnName(columnName);
+    return abstractQuoteColumnName.call(this, columnName);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {
     return this.quoteTableName(`${table}.${attr}`);
   }
-
-  static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   quoteDefaultExpression(value: unknown, column: unknown): string {
     return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });
@@ -2035,7 +2036,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   quotedDate(value: Parameters<typeof abstractQuotedDate>[0]): string {
-    return abstractQuotedDate(value);
+    return abstractQuotedDate.call(this, value);
   }
 
   quotedTime(value: QuotedTimeValue): string {
@@ -2054,95 +2055,6 @@ export class AbstractAdapter implements Quoting {
     return abstractSanitizeAsSqlComment(value);
   }
 
-  private _ensureQueryCache(): Store {
-    if (!this._queryCache) {
-      this._queryCache = new Store();
-    }
-    return this._queryCache;
-  }
-
-  get queryCache(): Store | null {
-    return this._queryCache;
-  }
-
-  set queryCache(value: Store | null) {
-    this._queryCache = value;
-  }
-
-  get queryCacheEnabled(): boolean {
-    return queryCacheEnabledGet.call(this as unknown as QueryCacheHost);
-  }
-
-  cache<T>(fn: () => T | Promise<T>): T | Promise<T> {
-    this._ensureQueryCache();
-    return cacheMixin.call(this as unknown as QueryCacheHost, fn) as T | Promise<T>;
-  }
-
-  enableQueryCacheBang(): void {
-    this._ensureQueryCache();
-    enableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
-  }
-
-  async uncached<T>(fn: () => T | Promise<T>, options: { dirties?: boolean } = {}): Promise<T> {
-    this._ensureQueryCache();
-    return uncachedMixin.call(this as unknown as QueryCacheHost, fn, options) as Promise<T>;
-  }
-
-  disableQueryCacheBang(): void {
-    this._ensureQueryCache();
-    disableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
-  }
-
-  clearQueryCache(): void {
-    clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
-  }
-
-  static setCallback(
-    phase: ConnectionCallbackPhase,
-    kind: ConnectionCallbackKind,
-    method: (this: AbstractAdapter) => void,
-  ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_connectionCallbacks")) {
-      const inherited = this._connectionCallbacks;
-      this._connectionCallbacks = {
-        checkout: [...inherited.checkout],
-        checkin: [...inherited.checkin],
-      };
-    }
-    this._connectionCallbacks[phase].push({ kind, method });
-  }
-
-  private _runCallbacks(phase: ConnectionCallbackPhase, block: () => void): void {
-    const callbacks = (this.constructor as typeof AbstractAdapter)._connectionCallbacks[phase];
-    for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
-    block();
-    for (let i = callbacks.length - 1; i >= 0; i--) {
-      if (callbacks[i].kind === "after") callbacks[i].method.call(this);
-    }
-  }
-
-  /** @internal */
-  _runCheckoutCallbacks(block: () => void): void {
-    this._runCallbacks("checkout", block);
-  }
-
-  /** @internal */
-  _runCheckinCallbacks(block: () => void): void {
-    this._runCallbacks("checkin", block);
-  }
-
-  /** @internal */
-  protected static _isDeprecatedRawConnectionArg(arg: unknown): boolean {
-    if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
-    const proto = Object.getPrototypeOf(arg) as object | null;
-    return proto !== Object.prototype && proto !== null;
-  }
-
-  /** @internal */
-  protected _acceptDeprecatedRawConnection(rawConnection: unknown): void {
-    this._unconfiguredConnection = rawConnection;
-  }
-
   inspect(): string {
     const q = (v: string): string => JSON.stringify(String(v));
     const dbConfig = this.pool.dbConfig;
@@ -2158,25 +2070,6 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   _columnMethodNames(): string[] {
     return [...ABSTRACT_COLUMN_METHOD_NAMES];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  get internalSchemaCache(): SchemaCache {
-    const reflection = this._poolSchemaReflection();
-    if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
-    return reflection.loadedCache;
-  }
-
-  /** @internal */
-  private _poolSchemaReflection(): SchemaReflection {
-    return this.pool.schemaReflection;
-  }
-
-  get transactionManager(): TransactionManager {
-    return this._transactionManager;
   }
 
   async transaction<T>(
@@ -2197,7 +2090,7 @@ export class AbstractAdapter implements Quoting {
       block = fnOrOpts2 as (tx?: unknown) => Promise<T> | T;
     }
     if (typeof block !== "function") {
-      throw new TypeError("transaction requires a function block");
+      throw new LocalJumpError("no block given (yield)");
     }
     return dbStatementsTransaction.call(this as any, block, opts) as Promise<T | undefined>;
   }
@@ -2210,9 +2103,13 @@ export class AbstractAdapter implements Quoting {
     })());
   }
 
+  static readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
+
   /** @internal */
   protected async rawConnectionForBlock(): Promise<unknown> {
-    return this._connection;
+    return this._rawConnection;
   }
 
   /** @internal */
@@ -2231,16 +2128,12 @@ Object.defineProperty(AbstractAdapter, "name", {
 
 let abstractTypeMap: TypeMap | undefined;
 
+rbDefineInspectCustom(AbstractAdapter);
 include(AbstractAdapter, DatabaseStatements);
 include(AbstractAdapter, SchemaStatements);
 include(AbstractAdapter, QuotingMixin);
 include(AbstractAdapter, QueryCacheMixin);
-AbstractAdapter.setCallback("checkin", "after", function () {
-  (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
-});
-AbstractAdapter.setCallback("checkin", "after", function () {
-  this.enableLazyTransactionsBang();
-});
+AbstractAdapter.setCallback("checkin", "after", ":enableLazyTransactionsBang");
 include(AbstractAdapter, SavepointsMixin);
 include(AbstractAdapter, {
   maxIdentifierLength,
@@ -2250,20 +2143,4 @@ include(AbstractAdapter, {
   bindParamsLength,
 });
 
-prepend(AbstractAdapter.prototype, { selectAll: querySelectAll as PrependMethod });
-
-dirtiesQueryCache(
-  AbstractAdapter,
-  "execQuery",
-  "execute",
-  "create",
-  "insert",
-  "update",
-  "delete",
-  "truncate",
-  "truncateTables",
-  "rollbackToSavepoint",
-  "rollbackDbTransaction",
-  "restartDbTransaction",
-  "execInsertAll",
-);
+rbModConstSet(ConnectionAdapters, "AbstractAdapter", AbstractAdapter);

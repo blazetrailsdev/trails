@@ -65,10 +65,11 @@ export class Headers extends Hash<string, string> {
     return this.size === 0;
   }
 
-  each(fn: (key: string, value: string) => void): void {
+  each(fn: (key: string, value: string) => void): this {
     for (const [k, v] of this) {
       fn(k, v);
     }
+    return this;
   }
 
   eachKey(fn: (key: string) => void): void {
@@ -138,20 +139,6 @@ export class Headers extends Hash<string, string> {
     return undefined;
   }
 
-  key(value: string): string | undefined {
-    for (const [k, v] of this) {
-      if (v === value) return k;
-    }
-    return undefined;
-  }
-
-  hasValue(value: string): boolean {
-    for (const v of this.values()) {
-      if (v === value) return true;
-    }
-    return false;
-  }
-
   merge(
     hash: Record<string, string> | Headers,
     fn?: (key: string, oldVal: string, newVal: string) => string,
@@ -192,9 +179,9 @@ export class Headers extends Hash<string, string> {
     return this.mergeInPlace(hash, fn);
   }
 
-  replace(hash: Record<string, string> | Headers): Headers {
+  override replace(hash: Record<string, string> | Headers): this {
     this.clear();
-    return this.update(hash);
+    return this.update(hash) as this;
   }
 
   select(fn: (key: string, value: string) => boolean): Headers {
@@ -343,13 +330,6 @@ export class Headers extends Hash<string, string> {
     return fn ? arr.sort(fn) : arr.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
-  shift(): [string, string] | undefined {
-    const first = this.entries().next();
-    if (first.done) return undefined;
-    this.delete(first.value[0]);
-    return first.value;
-  }
-
   dup(): Headers {
     const h = new Headers();
     if (this.defaultProc()) h.setDefaultProc(this.defaultProc());
@@ -386,12 +366,8 @@ export class Headers extends Hash<string, string> {
     return (key: string) => this.get(key);
   }
 
-  compareByIdentity(): never {
-    throw new TypeError("Headers cannot compare by identity");
-  }
-
-  get isCompareByIdentity(): boolean {
-    return false;
+  override compareByIdentity(): never {
+    throw new TypeError("Rack::Headers cannot compare by identity, use regular Hash");
   }
 
   deconstructKeys(): Headers {

@@ -4,11 +4,12 @@ import { Base } from "../base.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { Column } from "./mysql/column.js";
 import { TypeMetadata } from "./mysql/type-metadata.js";
+import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
 } from "./abstract/schema-definitions.js";
-import { AbstractMysqlAdapter, parseTableOptions } from "./abstract-mysql-adapter.js";
+import { AbstractMysqlAdapter } from "./abstract-mysql-adapter.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
@@ -18,9 +19,11 @@ function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | 
   return new Column(
     "id",
     null,
-    new TypeMetadata({ sqlType: "bigint" }, { extra: opts.autoIncrement ? "auto_increment" : "" }),
+    new TypeMetadata(new SqlTypeMetadata({ sqlType: "bigint" }), {
+      extra: opts.autoIncrement ? "auto_increment" : "",
+    }),
     false,
-    { defaultFunction: opts.defaultFunction ?? null },
+    opts.defaultFunction ?? null,
   );
 }
 
@@ -29,6 +32,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
@@ -38,6 +42,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
@@ -47,6 +52,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(
@@ -58,9 +64,41 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn())).toBe(false);
+  });
+});
+
+describe("AbstractMysqlAdapter#supportsInsertReturning", () => {
+  async function makeAdapter(fullVersionString: string) {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const { Version } = await import("./abstract-adapter.js");
+    const { sqlForInsert } = await import("./abstract/database-statements.js");
+    const databaseVersion = new Version(fullVersionString.split("-")[0], fullVersionString);
+    return Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      pool: { serverVersion: () => databaseVersion },
+      quoteColumnName: (c: string) => `\`${c}\``,
+      sqlForInsert,
+    });
+  }
+
+  it("answers false on MySQL 8, which emits no RETURNING", async () => {
+    const adapter = await makeAdapter("8.0.36");
+    expect(adapter.supportsInsertReturning()).toBe(false);
+    expect(await adapter.sqlForInsert("INSERT INTO t (x) VALUES (1)", "id", [], null)).toEqual([
+      "INSERT INTO t (x) VALUES (1)",
+      [],
+    ]);
+  });
+
+  it("answers true on MariaDB 10.5, which emits RETURNING", async () => {
+    const adapter = await makeAdapter("10.5.0-MariaDB");
+    expect(adapter.supportsInsertReturning()).toBe(true);
+    expect((await adapter.sqlForInsert("INSERT INTO t (x) VALUES (1)", "id", [], null))[0]).toBe(
+      "INSERT INTO t (x) VALUES (1) RETURNING `id`",
+    );
   });
 });
 
@@ -204,11 +242,11 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
     return new Column(
       "body",
       "hello",
-      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
       true,
+      opts.defaultFunction ?? null,
       {
         collation: opts.collation ?? "utf8mb4_unicode_ci",
-        defaultFunction: opts.defaultFunction ?? null,
       },
     );
   }
@@ -347,70 +385,78 @@ function showCreate(tableName: string, options: string): string {
   return `CREATE TABLE \`${tableName}\` (\n  \`id\` bigint NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (\`id\`)\n) ${options}`;
 }
 
+function tableOptions(createTableInfo: string, tableComment: string | null) {
+  const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+    createTableInfo: async () => createTableInfo,
+    tableComment: async () => tableComment,
+  });
+  return adapter.tableOptions("t");
+}
+
 describe("parseTableOptions", () => {
-  it("returns empty object for ENGINE=InnoDB only (default — not emitted)", () => {
-    expect(parseTableOptions(showCreate("t", "ENGINE=InnoDB"), null)).toEqual({});
+  it("returns empty object for ENGINE=InnoDB only (default — not emitted)", async () => {
+    expect(await tableOptions(showCreate("t", "ENGINE=InnoDB"), null)).toEqual({});
   });
 
-  it("extracts charset without collation", () => {
-    const opts = parseTableOptions(showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=latin1"), null);
+  it("extracts charset without collation", async () => {
+    const opts = await tableOptions(showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=latin1"), null);
     expect(opts).toEqual({ charset: "latin1" });
   });
 
-  it("extracts charset and collation together", () => {
-    const opts = parseTableOptions(
+  it("extracts charset and collation together", async () => {
+    const opts = await tableOptions(
       showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"),
       null,
     );
     expect(opts).toEqual({ charset: "utf8mb4", collation: "utf8mb4_bin" });
   });
 
-  it("strips AUTO_INCREMENT from ENGINE clause", () => {
-    const opts = parseTableOptions(
+  it("strips AUTO_INCREMENT from ENGINE clause", async () => {
+    const opts = await tableOptions(
       showCreate("t", "ENGINE=MyISAM AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4"),
       null,
     );
     expect(opts).toEqual({ charset: "utf8mb4", options: "ENGINE=MyISAM" });
   });
 
-  it("includes non-InnoDB engine in options", () => {
-    const opts = parseTableOptions(showCreate("t", "ENGINE=MyISAM DEFAULT CHARSET=utf8mb4"), null);
+  it("includes non-InnoDB engine in options", async () => {
+    const opts = await tableOptions(showCreate("t", "ENGINE=MyISAM DEFAULT CHARSET=utf8mb4"), null);
     expect(opts).toEqual({ charset: "utf8mb4", options: "ENGINE=MyISAM" });
   });
 
-  it("includes row format in options", () => {
-    const opts = parseTableOptions(
+  it("includes row format in options", async () => {
+    const opts = await tableOptions(
       showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=REDUNDANT"),
       null,
     );
     expect(opts).toEqual({ charset: "utf8mb4", options: "ENGINE=InnoDB ROW_FORMAT=REDUNDANT" });
   });
 
-  it("extracts comment via pre-fetched value", () => {
-    const opts = parseTableOptions(
+  it("extracts comment via pre-fetched value", async () => {
+    const opts = await tableOptions(
       showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='hello world'"),
       "hello world",
     );
     expect(opts).toEqual({ charset: "utf8mb4", comment: "hello world" });
   });
 
-  it("returns empty object when createInfo has no options (NO_TABLE_OPTIONS mode)", () => {
-    expect(parseTableOptions(showCreate("t", ""), null)).toEqual({});
+  it("returns empty object when createInfo has no options (NO_TABLE_OPTIONS mode)", async () => {
+    expect(await tableOptions(showCreate("t", ""), null)).toBeNull();
   });
 
-  it("strips partition hint from options", () => {
+  it("strips partition hint from options", async () => {
     const createInfo =
       "CREATE TABLE `t` (\n  `id` bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n/*!50100 PARTITION BY HASH (`id`)\nPARTITIONS 4 */\n";
-    const opts = parseTableOptions(createInfo, null);
+    const opts = await tableOptions(createInfo, null);
     expect(opts).toEqual({ charset: "utf8mb4" });
   });
 });
 
-function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown } = {}) {
+function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: string | null } = {}) {
   return new Column(
     "body",
     opts.default_ === undefined ? "hello" : opts.default_,
-    new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+    new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
     opts.null_ ?? true,
   );
 }

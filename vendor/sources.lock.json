@@ -1,5 +1,9 @@
 {
   "sources": {
+    "bcrypt-ruby": {
+      "ref": "v3.1.20",
+      "sha": "58f8afd33d8813e84706b938815bb1aa08d0b470"
+    },
     "date": {
       "ref": "v3.4.1",
       "sha": "a3295ad262773a80ad61526beb500b29e770b817"
@@ -19,6 +23,18 @@
     "minitest": {
       "ref": "v5.27.0",
       "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"
+    },
+    "msgpack": {
+      "ref": "v1.8.0",
+      "sha": "e4305b4b8a2506422bc78b6fab624907eb7e74a5"
+    },
+    "mysql2": {
+      "ref": "0.5.6",
+      "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
+    },
+    "pg": {
+      "ref": "v1.5.9",
+      "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
     },
     "rack": {
       "ref": "v3.1.14",

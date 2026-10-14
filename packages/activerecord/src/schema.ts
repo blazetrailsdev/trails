@@ -60,15 +60,18 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
 
   declare private static _classForVersion: Map<string | number, typeof Migration> | undefined;
 
-  /** @missingRailsArgs include — PERMANENT */
-  static get(version: string | number): typeof Migration {
-    if (!Object.hasOwn(this, "_classForVersion")) this._classForVersion = new Map();
-    if (!this._classForVersion!.has(version)) {
-      const klass = class extends (Migration.Compatibility.find(version) as new () => object) {};
-      include(klass, Definition);
-      this._classForVersion!.set(version, klass as unknown as typeof Migration);
-    }
-    return this._classForVersion!.get(version)!;
+  static get(version: string | number): typeof Migration & { define: DefineClassMethod } {
+    this._classForVersion =
+      (Object.hasOwn(this, "_classForVersion") ? this._classForVersion : undefined) ?? new Map();
+    return (
+      (this._classForVersion.get(version) as typeof Migration & { define: DefineClassMethod }) ??
+      (() => {
+        const klass = class extends (Migration.Compatibility.find(version) as new () => object) {};
+        include(klass, Definition);
+        this._classForVersion.set(version, klass as unknown as typeof Migration);
+        return klass as unknown as typeof Migration & { define: DefineClassMethod };
+      })()
+    );
   }
 }
 

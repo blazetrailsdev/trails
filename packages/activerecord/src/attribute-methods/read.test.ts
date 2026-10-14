@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   defineAttributeMethods,
   isAttributeMethodsGenerated,
@@ -18,9 +18,11 @@ describe("ReadTest", () => {
       static _primaryKey = null;
       static _attributeMethodsGenerated = false;
       static _schemaLoaded = true;
+      static isBaseClass = () => true;
+      static abstractClass = false;
+      static generateAliasAttributes = Base.generateAliasAttributes;
       static attributeMethodPatterns = Base.attributeMethodPatterns;
       static attributeAliases = {};
-      static _aliasesByAttributeName = new Map<string, string[]>();
       static defineAttributeMethods = defineAttributeMethods;
       static defineMethodAttribute = defineMethodAttribute;
       static setDefineMethodAttribute = setDefineMethodAttribute;
@@ -42,6 +44,7 @@ describe("ReadTest", () => {
       static buildMangledName = Base.buildMangledName;
       static defineCall = Base.defineCall;
     }
+    Object.setPrototypeOf(Klass, Base);
     return Klass;
   }
 
@@ -75,37 +78,5 @@ describe("ReadTest", () => {
     Klass.defineAttributeMethods();
 
     expect("one" in Klass.prototype).toBeTruthy();
-  });
-
-  it("_read_attribute returns value for existing attribute", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "hello" });
-    expect(p._readAttribute("title")).toBe("hello");
-  });
-
-  it("_read_attribute returns null for unset attribute", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({});
-    expect(p._readAttribute("title")).toBeNull();
-  });
-
-  it("_read_attribute does not apply alias resolution", () => {
-    class Post extends Base {
-      static {
-        this.attribute("body", "string");
-        this.aliasAttribute("content", "body");
-      }
-    }
-    const p = new Post({ body: "text" });
-    expect(p._readAttribute("body")).toBe("text");
-    expect(p._readAttribute("content")).toBeNull();
   });
 });

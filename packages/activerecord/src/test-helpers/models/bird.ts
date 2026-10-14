@@ -33,7 +33,7 @@ export class Bird extends Base {
     this.afterInitialize(function (this: Bird) {
       if (this.enableCount) {
         void Bird.count().then((c) => {
-          this.totalCount = c as number;
+          this.totalCount = c;
         });
       }
     });

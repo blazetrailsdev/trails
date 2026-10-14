@@ -1,4 +1,4 @@
-import { classAttribute, included, rbHash } from "@blazetrails/activesupport";
+import { classAttribute, include, included, rbHash } from "@blazetrails/activesupport";
 import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
 import { DelegateClass, rbObjInspect } from "@blazetrails/ruby-compat";
 
@@ -64,8 +64,7 @@ export function normalizeChangedInPlaceAttributes(
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
+export const Normalization = {
   normalizeAttribute,
   normalizeChangedInPlaceAttributes,
 
@@ -78,10 +77,13 @@ export const InstanceMethods = {
 };
 
 export class NormalizedValueType extends DelegateClass(ValueType) {
+  declare static serializeCastValueCompatible: () => boolean;
+
   readonly castType: ValueType;
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
 
+  /** @inlinedFrom ActiveModel::Type::SerializeCastValue#initialize rails/v8.0.2/activemodel/lib/active_model/type/serialize_cast_value.rb:41-44 */
   constructor({
     castType,
     normalizer,
@@ -92,6 +94,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     normalizeNil: boolean;
   }) {
     super(castType);
+    (this.constructor as typeof NormalizedValueType).serializeCastValueCompatible();
     this.castType = castType;
     this.normalizer = normalizer;
     this.normalizeNil = normalizeNil;
@@ -112,14 +115,6 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     );
   }
 
-  override itselfIfSerializeCastValueCompatible(): this | null {
-    return (
-      this.constructor as unknown as { serializeCastValueCompatible(): boolean }
-    ).serializeCastValueCompatible()
-      ? this
-      : null;
-  }
-
   equals(other: ValueType): boolean {
     return (
       this.constructor === (other as object)?.constructor &&
@@ -129,9 +124,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     );
   }
 
-  eql(other: ValueType): boolean {
-    return this.equals(other);
-  }
+  declare eql: NormalizedValueType["equals"];
 
   hash(): number {
     return rbHash([this.constructor, this.castType, this.normalizer, this.normalizeNil]);
@@ -146,6 +139,10 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     return this.normalizer(value);
   }
 }
+
+NormalizedValueType.prototype.eql = NormalizedValueType.prototype.equals;
+
+include(NormalizedValueType, SerializeCastValue);
 
 function castTypesEqual(a: ValueType, b: ValueType): boolean {
   const equals = (a as { equals?(other: ValueType): boolean }).equals;

@@ -1,15 +1,31 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
+import { NamespacedCompany } from "./test-helpers/models/company.js";
+import { Post } from "./test-helpers/models/post.js";
+import { ActiveRecord } from "./namespaces.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { rbHash, uniq } from "@blazetrails/ruby-compat";
-import { equals as coreEquals, hash as coreHash } from "./core.js";
+import { compactBlank, isBlank } from "@blazetrails/activesupport";
+import { rbCheckArrayType, rbHash, rbModToS, rbObjRespondTo, uniq } from "@blazetrails/ruby-compat";
+import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
+import { hasQueryConstraints, queryConstraints } from "./persistence.js";
+
+describe("present? / blank?", () => {
+  fixtures(["topics"]);
+
+  it("a new record is present, and compactBlank keeps it", () => {
+    const topic = new Topic();
+    expect(isBlank(topic)).toBe(false);
+    expect(topic.isPresent()).toBe(true);
+    expect(compactBlank([topic])).toEqual([topic]);
+  });
+});
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -21,6 +37,12 @@ describe("frozen / isFrozen", () => {
     expect(topic.isFrozen()).toBe(true);
   });
 
+  it("a record does not respond to to_ary and is not converted to an Array", () => {
+    const topic = new Topic({ title: "Alice" });
+    expect(rbObjRespondTo(topic, "toAry")).toBe(false);
+    expect(rbCheckArrayType(topic)).toBeNull();
+  });
+
   it("freeze clones the attribute set so prior references stay mutable", async () => {
     const topic = await Topic.create({ title: "Alice" });
     const attrsOf = (record: Topic) => (record as unknown as { _attributes: object })._attributes;
@@ -30,6 +52,228 @@ describe("frozen / isFrozen", () => {
     expect(attrsOf(topic)).not.toBe(preFreezeAttrs);
     expect(Object.isFrozen(preFreezeAttrs)).toBe(false);
     expect(Object.isFrozen(attrsOf(topic))).toBe(true);
+  });
+});
+
+function ownState(klass: object): Array<[PropertyKey, unknown]> {
+  return Reflect.ownKeys(klass).map((key) => [
+    key,
+    Object.getOwnPropertyDescriptor(klass, key)?.value,
+  ]);
+}
+
+describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
+  fixtures(["topics"]);
+
+  it("loads records without copying the default attribute set", async () => {
+    await Topic.create({ title: "Alice" });
+    const defaults = (
+      Topic as unknown as { _defaultAttributes(): { deepDup(): unknown } }
+    )._defaultAttributes();
+    const proto = Object.getPrototypeOf(defaults) as { deepDup(): unknown };
+    const deepDup = proto.deepDup;
+    let copies = 0;
+    proto.deepDup = function (this: unknown) {
+      if (this === defaults) copies++;
+      return deepDup.call(this);
+    };
+    try {
+      const loaded = await Topic.all();
+      expect(loaded.length).toBeGreaterThan(0);
+      expect(loaded[0].isNewRecord()).toBe(false);
+      expect(copies).toBe(0);
+
+      const fresh = new Topic({ title: "Bob" });
+      expect(fresh.isNewRecord()).toBe(true);
+      expect(copies).toBeGreaterThan(0);
+    } finally {
+      proto.deepDup = deepDup;
+    }
+  });
+
+  it("memoizes columnDefaults as one frozen hash until the schema is reloaded", async () => {
+    const columnDefaults = Topic.columnDefaults;
+    expect(Object.isFrozen(columnDefaults)).toBe(true);
+    expect(Topic.columnDefaults).toBe(columnDefaults);
+
+    await Topic.resetColumnInformation();
+    await Topic.loadSchema();
+
+    expect(Topic.columnDefaults).not.toBe(columnDefaults);
+    expect(Topic.columnDefaults).toEqual(columnDefaults);
+  });
+
+  it("copies an STI base class's defaults once per new", () => {
+    void Topic.columnDefaults;
+    const defaults = (
+      Topic as unknown as { _defaultAttributes(): { deepDup(): unknown } }
+    )._defaultAttributes();
+    const proto = Object.getPrototypeOf(defaults) as { deepDup(): unknown };
+    const deepDup = proto.deepDup;
+    let copies = 0;
+    proto.deepDup = function (this: unknown) {
+      if (this === defaults) copies++;
+      return deepDup.call(this);
+    };
+    try {
+      new Topic({ title: "Bob" });
+      expect(copies).toBe(1);
+    } finally {
+      proto.deepDup = deepDup;
+    }
+  });
+
+  it("loads STI subclass rows through the base class without building either default set", async () => {
+    type DefaultsHost = { _defaultAttributes(): { deepDup(): unknown } };
+    const topicDefaults = (Topic as unknown as DefaultsHost)._defaultAttributes();
+    const replyDefaults = (Reply as unknown as DefaultsHost)._defaultAttributes();
+    const proto = Object.getPrototypeOf(topicDefaults) as { deepDup(): unknown };
+    const deepDup = proto.deepDup;
+    const copies = { topic: 0, reply: 0 };
+    proto.deepDup = function (this: unknown) {
+      if (this === topicDefaults) copies.topic++;
+      if (this === replyDefaults) copies.reply++;
+      return deepDup.call(this);
+    };
+    const columnDefaults = Object.getOwnPropertyDescriptor(Base, "columnDefaults")!;
+    let columnDefaultsReads = 0;
+    Object.defineProperty(Base, "columnDefaults", {
+      ...columnDefaults,
+      get(this: typeof Base) {
+        columnDefaultsReads++;
+        return columnDefaults.get!.call(this);
+      },
+    });
+    try {
+      const loaded = await Topic.all();
+      expect(loaded.some((record) => record instanceof Reply)).toBe(true);
+      expect(copies).toEqual({ topic: 0, reply: 0 });
+      expect(columnDefaultsReads).toBe(0);
+    } finally {
+      proto.deepDup = deepDup;
+      Object.defineProperty(Base, "columnDefaults", columnDefaults);
+    }
+  });
+
+  it("initWithAttributes keeps the attributes and new_record it is handed", async () => {
+    const source = await Topic.create({ title: "Carol" });
+    const record = Topic.allocate() as Topic & {
+      initWithAttributes(attributes: unknown, newRecord?: boolean): Topic;
+      _attributes: unknown;
+    };
+    const handed = (
+      source as unknown as { _attributes: { deepDup(): unknown } }
+    )._attributes.deepDup();
+    record.initWithAttributes(handed, true);
+    expect(record._attributes).toBe(handed);
+    expect(record.title).toBe("Carol");
+    expect(record.isNewRecord()).toBe(true);
+
+    const loaded = Topic.allocate() as typeof record;
+    loaded.initWithAttributes(handed);
+    expect(loaded.title).toBe("Carol");
+    expect(loaded.isNewRecord()).toBe(false);
+  });
+
+  it("init_internals is rooted at Core, beneath ActiveModel::Dirty's", () => {
+    const record = new Topic() as unknown as Record<string, unknown>;
+    expect(record._readonly).toBe(false);
+    expect(record._mutationsBeforeLastSave).toBeNull();
+  });
+
+  it("a new record holds the state Validations#init_internals leaves", () => {
+    const record = new Topic() as unknown as {
+      _errors?: unknown;
+      _contextForValidation?: unknown;
+      validationContext: unknown;
+      errors: { isEmpty(): boolean };
+    };
+    expect(record._errors ?? null).toBeNull();
+    expect(record._contextForValidation ?? null).toBeNull();
+    expect(record.validationContext).toBeNull();
+    expect(record.errors.isEmpty()).toBe(true);
+  });
+
+  it("allocate leaves the class untouched when the constructor returns", () => {
+    Reply.allocate();
+    const before = [ownState(Reply), ownState(Topic)];
+    Reply.allocate();
+    expect([ownState(Reply), ownState(Topic)]).toEqual(before);
+    expect(_allocation.klass).toBeNull();
+  });
+
+  it("allocate adds no class state of its own while it constructs", () => {
+    Reply.allocate();
+    const before = new Map(ownState(Reply));
+    const changed: PropertyKey[][] = [];
+    const original = (Reply.prototype as unknown as { initInternals(): void }).initInternals;
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(function (this: unknown) {
+        const during = new Map(ownState(Reply));
+        changed.push(
+          [...new Set([...before.keys(), ...during.keys()])].filter(
+            (key) =>
+              !before.has(key) || !during.has(key) || !Object.is(before.get(key), during.get(key)),
+          ),
+        );
+        original.call(this);
+      });
+    try {
+      Reply.allocate();
+    } finally {
+      initInternals.mockRestore();
+    }
+    expect(changed).toEqual([[]]);
+  });
+
+  it("a nested new of the class being allocated is an ordinary new", () => {
+    let nested: Reply | undefined;
+    let nesting = false;
+    const original = (Reply.prototype as unknown as { initInternals(): void }).initInternals;
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(function (this: unknown) {
+        original.call(this);
+        if (nesting) return;
+        nesting = true;
+        nested = new Reply({ title: "Nested" });
+      });
+    try {
+      Reply.allocate();
+    } finally {
+      initInternals.mockRestore();
+    }
+    expect(nested!.isNewRecord()).toBe(true);
+    expect(nested!.title).toBe("Nested");
+    expect(_allocation.klass).toBeNull();
+  });
+
+  it("allocate leaves the class untouched when the constructor throws", () => {
+    Reply.allocate();
+    const before = [ownState(Reply), ownState(Topic)];
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(() => {
+        throw new Error("constructor failed");
+      });
+    try {
+      expect(() => Reply.allocate()).toThrow("constructor failed");
+    } finally {
+      initInternals.mockRestore();
+    }
+    expect([ownState(Reply), ownState(Topic)]).toEqual(before);
+    expect(_allocation.klass).toBeNull();
+  });
+});
+
+describe("DatabaseConfigurations.new given a DatabaseConfigurations", () => {
+  it("takes the other instance's configurations (database_configurations.rb:201)", () => {
+    const configs = new DatabaseConfigurations({
+      test: { adapter: "sqlite3", database: ":memory:" },
+    });
+
+    expect(new DatabaseConfigurations(configs).configurations).toEqual(configs.configurations);
   });
 });
 
@@ -89,11 +333,11 @@ describe("connection checkout for directly-assigned adapters", () => {
   beforeEach(async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.execute(
-      "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+      "CREATE TABLE direct_topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
     );
     const adp = adapter;
     class TopicWithDirectAdapter extends Base {
-      static tableName = "topics";
+      static tableName = "direct_topics";
       static {
         this.connectionSpecificationName = "TopicWithDirectAdapter";
         this.attribute("id", new IntegerType());
@@ -106,12 +350,12 @@ describe("connection checkout for directly-assigned adapters", () => {
   });
 
   afterEach(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS topics");
+    await adapter.execute("DROP TABLE IF EXISTS direct_topics");
     await adapter.disconnectBang();
   });
 
   it("find resolves through the assigned adapter without a pool", async () => {
-    await adapter.execute("INSERT INTO topics (id, title) VALUES (42, 'Alice')");
+    await adapter.execute("INSERT INTO direct_topics (id, title) VALUES (42, 'Alice')");
     expect((await DirectTopic.find(42)).readAttribute("title")).toBe("Alice");
     expect((await DirectTopic.findBy({ title: "Alice" }))!.id).toBe(42);
   });
@@ -166,12 +410,31 @@ describe("configurations is a single process-global registry", () => {
       OverridingModel as unknown as typeof Base,
       ":global_registry_env",
     );
-    expect(resolved.database).toBe("db/global.sqlite3");
+    expect(resolved!.database).toBe("db/global.sqlite3");
+  });
+});
+
+describe("inspection_filter", () => {
+  it("a subclass assigning filter_attributes gets its own filter, reset on reassignment", () => {
+    class FilteredTopic extends Topic {}
+    expect(FilteredTopic.inspectionFilter()).toBe(Topic.inspectionFilter());
+
+    FilteredTopic.filterAttributes = ["title"];
+    const filter = FilteredTopic.inspectionFilter();
+    expect(filter).not.toBe(Topic.inspectionFilter());
+    expect(FilteredTopic.inspectionFilter()).toBe(filter);
+
+    FilteredTopic.filterAttributes = ["content"];
+    expect(FilteredTopic.inspectionFilter()).not.toBe(filter);
   });
 });
 
 describe("compare", () => {
   fixtures(["topics"]);
+
+  it("find_by with an empty hash takes the cached path", async () => {
+    expect(await Topic.findBy({})).toBeInstanceOf(Topic);
+  });
 
   it("orders same-class records by primary key and reports nil as undefined", async () => {
     const first = await Topic.find(1);
@@ -182,12 +445,12 @@ describe("compare", () => {
     expect(first.compare(first)).toBe(0);
 
     expect(new Topic({ title: "a" }).compare(new Topic({ title: "b" }))).toBe(0);
-    expect(first.compare(new Topic({ title: "a" }))).toBeUndefined();
-    expect(first.compare("not a topic")).toBeUndefined();
+    expect(first.compare(new Topic({ title: "a" }))).toBeNull();
+    expect(first.compare("not a topic")).toBeNull();
 
     const reply = await Reply.find(2);
     expect(first.compare(reply)).toBe(-1);
-    expect(reply.compare(first)).toBeUndefined();
+    expect(reply.compare(first)).toBeNull();
   });
 });
 
@@ -237,6 +500,64 @@ describe("init_internals / initialize_dup super chain", () => {
   });
 });
 
+describe("initialize_internals_callback runs before assign_attributes (core.rb:475-477)", () => {
+  fixtures(["topics"]);
+
+  it("the chain reaches Scoping's and Inheritance's bodies before the attributes are assigned", async () => {
+    type Callback = { initializeInternalsCallback(): void };
+    const seen: unknown[] = [];
+    const original = (Reply.prototype as unknown as Callback).initializeInternalsCallback;
+    const callback = vi
+      .spyOn(Reply.prototype as unknown as Callback, "initializeInternalsCallback")
+      .mockImplementation(function (this: Reply) {
+        seen.push(this.title);
+        original.call(this);
+        seen.push(this.title, this.readAttribute("type"));
+      });
+    try {
+      await Reply.where({ title: "scoped" }).scoping(async () => {
+        const reply = new Reply({ content: "assigned" });
+        expect(reply.title).toBe("scoped");
+        expect(reply.content).toBe("assigned");
+        expect(new Reply({ title: "assigned" }).title).toBe("assigned");
+      });
+    } finally {
+      callback.mockRestore();
+    }
+    expect(seen).toEqual([null, "scoped", "Reply", null, "scoped", "Reply"]);
+  });
+});
+
+describe("populate_with_current_scope_attributes (scoping.rb:44-52)", () => {
+  const { authors } = fixtures(["authors", "posts"]);
+
+  it("ActiveRecord::Scoping keeps its name as a Module", () => {
+    expect(rbModToS(ActiveRecord.Scoping as never)).toBe("ActiveRecord::Scoping");
+  });
+
+  it("an association named by create_with is assigned to a new record", async () => {
+    const david = await authors("david");
+    const relation = Post.createWith({ author: david } as never);
+    expect(relation.new().author_id).toBe(david.id);
+    await relation.scoping(async () => {
+      expect(new Post({}).author_id).toBe(david.id);
+    });
+  });
+});
+
+describe("inspect interpolates Module#to_s (core.rb:881)", () => {
+  fixtures(["topics"]);
+
+  it("an anonymous model class inspects as #<Class:0x...>", () => {
+    const klass = (() => class extends Topic {})();
+    expect(new klass({}).inspect()).toMatch(/^#<#<Class:0x[0-9a-f]+> id: nil, /);
+  });
+
+  it("a class seated under a namespace inspects with its path", () => {
+    expect(new NamespacedCompany({}).inspect()).toMatch(/^#<Namespaced::Company id: nil, /);
+  });
+});
+
 describe("hash agrees with ==", () => {
   class Keyed {}
   const record = (id: unknown) =>
@@ -261,5 +582,199 @@ describe("hash agrees with ==", () => {
     expect(() => rbHash([new Topic()])).not.toThrow();
     expect(rbHash([new Topic({ id: 1 })])).toEqual(rbHash([new Topic({ id: 1 })]));
     expect(rbHash([new Topic({ id: 1 })])).not.toEqual(rbHash([new Topic({ id: 2 })]));
+  });
+});
+
+describe("underscore class_attribute slots", () => {
+  it("_destroy_association_async_job defaults to Rails' job name and is written per class", () => {
+    class Job {}
+    class Parent extends Topic {}
+    class Child extends Parent {}
+
+    expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Base.is_destroyAssociationAsyncJob).toBe(true);
+    expect(() => Parent.destroyAssociationAsyncJob).toThrow(
+      /Unable to load destroy_association_async_job: /,
+    );
+
+    Parent.destroyAssociationAsyncJob = Job;
+    expect(Child.destroyAssociationAsyncJob).toBe(Job);
+    expect(new Child().destroyAssociationAsyncJob).toBe(Job);
+    expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Topic._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect("_destroyAssociationAsyncJob" in Parent.prototype).toBe(false);
+  });
+
+  it("destroy_association_async_job= is the slot's own writer, local to the class assigned", () => {
+    class Job {}
+    class Sub extends Topic {}
+    class Sibling extends Topic {}
+
+    Sub.destroyAssociationAsyncJob = Job;
+
+    expect(Object.getOwnPropertyDescriptor(Base, "destroyAssociationAsyncJob")?.set).toBe(
+      Object.getOwnPropertyDescriptor(Base, "_destroyAssociationAsyncJob")?.set,
+    );
+    expect(Sub._destroyAssociationAsyncJob).toBe(Job);
+    expect(Sibling._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Topic._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+  });
+
+  it("_attr_readonly and _counter_cache_columns stay local to the subclass that writes them", () => {
+    class Parent extends Topic {}
+    class Child extends Parent {}
+
+    Child.attrReadonly("title");
+    Child._counterCacheColumns = [...Child._counterCacheColumns, "written_on_count"];
+
+    expect(Child.readonlyAttributes).toContain("title");
+    expect(Parent._attrReadonly).not.toContain("title");
+    expect(Parent._counterCacheColumns).toEqual(Topic._counterCacheColumns);
+    expect(Child.isCounterCacheColumn("written_on_count")).toBe(true);
+    expect(Parent.isCounterCacheColumn("written_on_count")).toBe(false);
+    expect(Child.is_attrReadonly).toBe(true);
+    expect(Child.is_counterCacheColumns).toBe(true);
+    expect("_attrReadonly" in Child.prototype).toBe(false);
+    expect("_counterCacheColumns" in Child.prototype).toBe(false);
+  });
+
+  it("_reflections keeps its instance reader and predicate, and no instance writer", () => {
+    expect(Reply.is_reflections).toBe(true);
+    const reply = new Reply() as unknown as { _reflections: object; is_reflections: boolean };
+    expect(reply._reflections).toBe(Reply._reflections);
+    expect(reply.is_reflections).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(Base.prototype, "_reflections")?.set).toBeUndefined();
+  });
+});
+
+describe("Core's included class attributes", () => {
+  it("leaves belongs_to_required_by_default unset, as core.rb:89 declares no default", () => {
+    class Unconfigured extends Base {}
+    expect(Unconfigured.belongsToRequiredByDefault ?? null).toBeNull();
+  });
+
+  it("keeps a subclass write local to that subclass", () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    Child.strictLoadingByDefault = true;
+    Child.hasManyInversing = true;
+    expect(Child.strictLoadingByDefault).toBe(true);
+    expect(Parent.strictLoadingByDefault).toBe(false);
+    expect(Base.strictLoadingByDefault).toBe(false);
+    expect(Parent.hasManyInversing).toBe(false);
+  });
+
+  it("answers connection_class from the class's own ivar", () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    Parent.connectionClass = true;
+    expect(Parent.isConnectionClass()).toBe(true);
+    expect(Child.connectionClass).toBe(false);
+  });
+
+  it("reads filter_attributes from the superclass until the class sets its own", () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    Parent.filterAttributes = ["secret"];
+    expect(Child.filterAttributes).toEqual(["secret"]);
+    Child.filterAttributes = ["token"];
+    expect(Parent.filterAttributes).toEqual(["secret"]);
+    expect(Base.filterAttributes).toEqual([]);
+  });
+});
+
+describe("arelTable memo", () => {
+  it("answers one table until the table name or the schema cache changes", () => {
+    class Memoized extends Base {
+      static {
+        this.tableName = "topics";
+      }
+    }
+    const table = Memoized.arelTable;
+    expect(Memoized.arelTable).toBe(table);
+    expect(Memoized.predicateBuilder.table.arelTable).toBe(table);
+
+    Memoized.tableName = "posts";
+    const renamed = Memoized.arelTable;
+    expect(renamed).not.toBe(table);
+    expect(renamed.name).toBe("posts");
+
+    (Memoized as unknown as { reloadSchemaFromCache(): void }).reloadSchemaFromCache();
+    expect(Memoized.arelTable).not.toBe(renamed);
+  });
+
+  it("does not hand a subclass its parent's table", () => {
+    expect(Reply.arelTable).toBe(Reply.arelTable);
+    expect(Reply.arelTable).not.toBe(Topic.arelTable);
+  });
+});
+
+describe("Base's inherited chain is deferred to own-property memo guards", () => {
+  fixtures(["topics"]);
+
+  const memos = [
+    "_generatedAttributeMethods",
+    "_generatedAssociationMethods",
+    "_arelTable",
+    "_predicateBuilder",
+    "_findByStatementCache",
+  ];
+  const ownMemos = (klass: object) => memos.filter((memo) => Object.hasOwn(klass, memo));
+  const read = async (klass: typeof Topic) => {
+    await klass.findBy({ id: 1 });
+    const associationMethods = klass.generatedAssociationMethods();
+    return {
+      associationMethods,
+      attributeMethods: (klass as unknown as { _generatedAttributeMethods: object })
+        ._generatedAttributeMethods,
+      arelTable: klass.arelTable,
+      predicateBuilder: klass.predicateBuilder,
+      findByCache: (klass as unknown as { _findByStatementCache: object })._findByStatementCache,
+    };
+  };
+
+  it("seeds each class of a three-level hierarchy on its own first read, leaf before parent", async () => {
+    class Middle extends Topic {}
+    class Leaf extends Middle {}
+
+    const leaf = await read(Leaf);
+    expect(ownMemos(Leaf)).toEqual(memos);
+    expect(ownMemos(Middle)).toEqual([]);
+
+    const middle = await read(Middle);
+    const root = await read(Topic);
+    expect(ownMemos(Middle)).toEqual(memos);
+    for (const memo of Object.keys(leaf) as (keyof typeof leaf)[]) {
+      expect(middle[memo]).not.toBe(leaf[memo]);
+      expect(middle[memo]).not.toBe(root[memo]);
+    }
+    expect(await read(Leaf)).toEqual(leaf);
+  });
+
+  it("resets locking_column and has_query_constraints? for a subclass", () => {
+    class Middle extends Topic {}
+    Middle.lockingColumn = "custom_lock_version";
+    queryConstraints.call(Middle as never, "author_name", "id");
+    class Leaf extends Middle {}
+
+    expect(Middle.lockingColumn).toBe("custom_lock_version");
+    expect(Leaf.lockingColumn).toBe("lock_version");
+    expect(hasQueryConstraints.call(Middle as never)).toEqual(["author_name", "id"]);
+    expect(hasQueryConstraints.call(Leaf as never)).toBe(false);
+  });
+
+  it("answers an unset filter_attributes from the superclass after the leaf was read", () => {
+    class Middle extends Topic {}
+    class Leaf extends Middle {}
+
+    const inherited = Leaf.filterAttributes;
+    const filter = Leaf.inspectionFilter();
+    Middle.filterAttributes = ["title"];
+
+    expect(Topic.filterAttributes).toBe(inherited);
+    expect(Leaf.filterAttributes).toEqual(["title"]);
+    expect(Leaf.inspectionFilter()).not.toBe(filter);
+    expect(Leaf.inspectionFilter()).toBe(Middle.inspectionFilter());
   });
 });

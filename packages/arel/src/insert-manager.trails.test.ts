@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, InsertManager, Nodes } from "./index.js";
+import { Table, InsertManager, Nodes, type ArelNode } from "./index.js";
 
 describe("InsertManagerTest (trails)", () => {
   const users = new Table("users");
@@ -23,7 +23,7 @@ describe("InsertManagerTest (trails)", () => {
       const mgr = new InsertManager(users);
       mgr.insert("foo");
       expect(mgr.ast.values).toBeInstanceOf(Nodes.SqlLiteral);
-      expect((mgr.ast.values as Nodes.SqlLiteral).value).toBe("foo");
+      expect((mgr.ast.values as Nodes.SqlLiteral).toString()).toBe("foo");
     });
 
     it("infers ast.relation from the first column when not yet set", () => {
@@ -48,5 +48,17 @@ describe("InsertManagerTest (trails)", () => {
       expect(mgr.ast.select).toBe(selectMgr);
       expect(mgr.toSql()).toContain("SELECT");
     });
+  });
+  it("takes the Hash ActiveRecord passes and reads its first key's relation", () => {
+    const mgr = new InsertManager();
+    mgr.insert(
+      new Map<ArelNode, unknown>([
+        [users.get("id"), 1],
+        [users.get("name"), "aaron"],
+      ]),
+    );
+    expect(mgr.ast.relation).toBe(users);
+    expect(mgr.toSql()).toBe(`INSERT INTO "users" ("id", "name") VALUES (1, 'aaron')`);
+    expect(new InsertManager().insert(new Map())).toBeUndefined();
   });
 });

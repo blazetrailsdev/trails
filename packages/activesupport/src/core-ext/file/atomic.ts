@@ -1,21 +1,25 @@
 import { File, FileUtils, type FsStatResult } from "@blazetrails/ruby-compat";
 import { Tempfile } from "../../tempfile.js";
 
+type AtomicWriteBlock<T> = (tempFile: Tempfile) => T;
+
+export function atomicWrite<T>(fileName: string, block: AtomicWriteBlock<Promise<T>>): Promise<T>;
+export function atomicWrite<T>(fileName: string, block: AtomicWriteBlock<T>): T;
 export function atomicWrite<T>(
   fileName: string,
-  tempDir: string | undefined,
-  block: (tempFile: Tempfile) => Promise<T>,
+  tempDir: string,
+  block: AtomicWriteBlock<Promise<T>>,
 ): Promise<T>;
+export function atomicWrite<T>(fileName: string, tempDir: string, block: AtomicWriteBlock<T>): T;
 export function atomicWrite<T>(
   fileName: string,
-  tempDir: string | undefined,
-  block: (tempFile: Tempfile) => T,
-): T;
-export function atomicWrite<T>(
-  fileName: string,
-  tempDir: string | undefined,
-  block: (tempFile: Tempfile) => T,
+  tempDir: string | undefined | AtomicWriteBlock<T>,
+  block?: AtomicWriteBlock<T>,
 ): T {
+  if (typeof tempDir === "function") {
+    block = tempDir;
+    tempDir = undefined;
+  }
   tempDir ??= File.dirname(fileName);
 
   return Tempfile.open(`.${File.basename(fileName)}`, tempDir, (tempFile) => {
@@ -41,7 +45,7 @@ export function atomicWrite<T>(
       return returnVal;
     };
 
-    const returnVal = block(tempFile);
+    const returnVal = block!(tempFile);
     if (returnVal instanceof Promise) return returnVal.then(overwrite) as T;
     return overwrite(returnVal);
   });

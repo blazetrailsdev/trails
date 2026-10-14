@@ -20,7 +20,7 @@ describe("DispatcherTest", () => {
   beforeEach(() => {
     counts.a = 0;
     counts.b = 0;
-    Callbacks.resetCallbacks("call");
+    (Callbacks as typeof Callbacks & { resetCallbacks(name: string): void }).resetCallbacks("call");
   });
 
   it("before and after callbacks", async () => {

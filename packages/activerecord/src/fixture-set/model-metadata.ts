@@ -41,7 +41,7 @@ export class ModelMetadata {
       : new Set());
   }
 
-  get timestampColumnNames(): string[] {
+  get timestampColumnNames(): readonly string[] {
     return this._modelClass!.allTimestampAttributesInModel();
   }
 

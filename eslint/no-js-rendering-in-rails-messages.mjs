@@ -21,7 +21,7 @@
  * Scoped to Rails-matched source: test files are not enrolled, and a file
  * carrying a file-level `@noRailsEquivalent` receipt has no Rails rendering to
  * mirror. Not autofixable: the remedy is ruby-compat's `rbInspect` /
- * `rbObjClass` / `rbBuiltinClassName`, or the value's own ported `inspect`,
+ * `rbObjClassname` / `rbBuiltinClassName`, or the value's own ported `inspect`,
  * and which one is a per-site reading of the Rails line.
  *
  * ENROLLMENT is per package, in the `files` list of the rule's block in
@@ -118,7 +118,7 @@ const rule = {
       jsRendering:
         "`{{what}}` inside {{where}} renders the JS way, not Ruby's. Port the Rails " +
         "line: `x.inspect` is ruby-compat's `rbInspect(x)` (or the value's own ported " +
-        "`inspect`), `x.class` / `x.class.name` is ruby-compat's `rbObjClass(x)` / " +
+        "`inspect`), `x.class` / `x.class.name` is ruby-compat's `rbObjClassname(x)` / " +
         "`rbBuiltinClassName(x)`, and `x.to_s` on an Array is `inspect`.",
     },
   },

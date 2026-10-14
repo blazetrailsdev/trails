@@ -25,13 +25,20 @@ describe("applySecondsPrecision", () => {
     expect(applySecondsPrecision.call({ precision: 9 }, dt)).toBe(dt);
   });
 
-  it("rejects non-integer precision", () => {
-    expect(applySecondsPrecision.call({ precision: 3.5 }, dt)).toBe(dt);
+  it("returns value unchanged for a precision past the nanosecond", () => {
+    expect(applySecondsPrecision.call({ precision: 10 }, dt)).toBe(dt);
   });
 
-  it("rejects out-of-range precision", () => {
-    expect(applySecondsPrecision.call({ precision: -1 }, dt)).toBe(dt);
-    expect(applySecondsPrecision.call({ precision: 10 }, dt)).toBe(dt);
+  it("a negative precision rounds every sub-second digit off", () => {
+    const r = applySecondsPrecision.call({ precision: -1 }, dt) as Temporal.PlainDateTime;
+    expect(r.toString()).toBe("2024-01-02T03:04:05");
+  });
+
+  it("a non-Integer precision does Float arithmetic", () => {
+    const time = RubyTime.utc(2024, 1, 2, 3, 4, 5, new Rational(123456789, 1000));
+    expect((applySecondsPrecision.call({ precision: 3.5 }, time) as RubyTime).nsec).toBe(123328828);
+    const r = applySecondsPrecision.call({ precision: 3.5 }, dt) as Temporal.PlainDateTime;
+    expect(r.toString()).toBe("2024-01-02T03:04:05.123328828");
   });
 
   it("precision 0 truncates to whole seconds", () => {
@@ -65,15 +72,6 @@ describe("applySecondsPrecision", () => {
   it("truncates rather than rounds (789 → 780 at precision 8, not 790)", () => {
     const r = applySecondsPrecision.call({ precision: 8 }, dt) as Temporal.PlainDateTime;
     expect(r.nanosecond).toBe(780);
-  });
-
-  it("works on Temporal.Instant via .round()", () => {
-    const inst = Temporal.Instant.from("2024-01-02T03:04:05.123456789Z");
-    const r = applySecondsPrecision.call({ precision: 3 }, inst) as Temporal.Instant;
-    const zdt = r.toZonedDateTimeISO("UTC");
-    expect(zdt.millisecond).toBe(123);
-    expect(zdt.microsecond).toBe(0);
-    expect(zdt.nanosecond).toBe(0);
   });
 
   it("passes PlainDate (no .round) through unchanged", () => {

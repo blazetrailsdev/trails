@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "../index.js";
+import * as Types from "../index.js";
 import { assertNil } from "@blazetrails/activesupport";
 
 describe("BinaryTest", () => {
@@ -18,7 +18,7 @@ describe("BinaryTest", () => {
 
   it("serialize binary strings", () => {
     const type = new Types.BinaryType();
-    expect(type.serialize("ƒée")!.bytes).toEqual(new TextEncoder().encode("ƒée"));
+    expect(type.serialize("ƒée")!.toString()).toEqual(new TextEncoder().encode("ƒée"));
     expect(type.serialize("ƒée")).not.toEqual("ƒée");
   });
 });

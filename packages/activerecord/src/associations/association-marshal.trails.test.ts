@@ -1,0 +1,36 @@
+import { describe, expect, it } from "vitest";
+import { Marshal, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { fixtures } from "../test-helpers/use-fixtures.js";
+import { Firm } from "../test-helpers/models/company.js";
+import { Association } from "./association.js";
+
+describe("Association#marshal_dump / #marshal_load", () => {
+  const { companies } = fixtures(["companies", "accounts"]);
+
+  it("round-trips every instance variable but the reflection, which is re-resolved from the owner", async () => {
+    const firm = companies("first_firm") as Firm;
+    const association = firm.association("account");
+    await association.loadTarget();
+
+    const [reflectionName, ivars] = association.marshalDump();
+    expect(reflectionName).toBe("account");
+    const names = ivars.map(([name]) => name);
+    expect(names).toContain("@owner");
+    expect(names).not.toContain("@reflection");
+
+    const loaded = Object.create(Object.getPrototypeOf(association)) as Association;
+    loaded.marshalLoad([reflectionName, ivars]);
+
+    expect(loaded.owner).toBe(firm);
+    expect(loaded.isLoaded()).toBe(true);
+    expect(loaded.target).toBe(association.target);
+    expect(loaded.reflection).toBe(Firm._reflectOnAssociation("account"));
+  });
+
+  it("dumps a collection association's @replaced_or_added_targets as Ruby's compare_by_identity Set", () => {
+    const firm = companies("first_firm") as Firm;
+    const targets = rbObjIvarGet(firm.association("clients"), "@replaced_or_added_targets");
+
+    expect(Marshal.dump(targets)).toBe("\x04\bo:\bSet\x06:\n@hashC:\tHash}\x00F");
+  });
+});

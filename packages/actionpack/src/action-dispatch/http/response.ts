@@ -1,8 +1,10 @@
-import { include, presence } from "@blazetrails/activesupport";
-import { File, IO, IOError } from "@blazetrails/ruby-compat";
+import type { Time } from "@blazetrails/date";
+import { cattrAccessor, include, presence } from "@blazetrails/activesupport";
+import { File, IO, IOError, stringSplit } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
+  HTTP_STATUS_CODES,
   ResponseHelpers as RackResponseHelpers,
   setCookieHeader,
   statusCode,
@@ -10,9 +12,9 @@ import {
 } from "@blazetrails/rack";
 import type { CookieExpires, SetCookieOptions } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
+import type { MimeType } from "./mime-type.js";
 import {
   type CacheControlHash,
-  cacheControl as _cacheControl,
   cacheControlHeaders as _cacheControlHeaders,
   cacheControlSegments as _cacheControlSegments,
   generateStrongEtag as _generateStrongEtag,
@@ -51,7 +53,7 @@ const BODY_METHODS = ["toAry", "call", "toPath"] as const;
 
 export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>> {
   /** @internal */
-  protected _response: Response;
+  protected _response: Response | null;
   /** @internal */
   protected _buf: Buf;
   /** @internal */
@@ -59,7 +61,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
   /** @internal */
   protected _strBody: string | null = null;
 
-  constructor(response: Response, buf: Buf) {
+  constructor(response: Response | null, buf: Buf) {
     this._response = response;
     this._buf = buf;
   }
@@ -72,11 +74,20 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
     return this._strBody;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  async awaitBody(): Promise<string> {
+    if (this._strBody !== null) return this._strBody;
+    let buf = "";
+    for await (const chunk of this) buf += String(chunk);
+    this._strBody = buf;
+    return this._strBody;
+  }
+
   write(string: string): void {
     if (this.isClosed) throw new IOError("closed stream");
 
     this._strBody = null;
-    this._response.commitBang();
+    this._response!.commitBang();
     this._buf.push(string);
   }
 
@@ -127,7 +138,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
   abort(): void {}
 
   close(): void {
-    this._response.commitBang();
+    this._response!.commitBang();
     this._closed = true;
   }
 
@@ -204,16 +215,24 @@ export class FileBody {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
-  static defaultCharset = "utf-8";
+  declare static defaultCharset: string | null;
+  declare defaultCharset: string | null;
+  declare static defaultHeaders: Record<string, string> | undefined;
+  declare defaultHeaders: Record<string, string> | undefined;
+
+  static {
+    cattrAccessor.call(this, "defaultCharset", { default: "utf-8" });
+    cattrAccessor.call(this, "defaultHeaders");
+  }
 
   private _status: number;
   private _headers: Headers;
   private _committed = false;
+  private cv: Array<() => void> = [];
   private _sending = false;
   private _sent = false;
-  stream: unknown = null;
+  stream: ResponseBuffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
   request: Request | null = null;
-  static defaultHeaders: Record<string, string> | undefined;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     this._status = status;
@@ -222,6 +241,7 @@ export class Response {
       this._headers.set(key, value);
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject([...body]));
+    this.prepareCacheControlBang();
   }
 
   get status(): number {
@@ -231,21 +251,21 @@ export class Response {
     this._status = statusCode(status);
   }
 
-  get code(): number {
-    return this._status;
+  get code(): string {
+    return String(this._status);
   }
   get statusCode(): number {
     return this._status;
   }
 
   get message(): string {
-    return STATUS_MESSAGES[this._status] || "";
+    return HTTP_STATUS_CODES[this._status];
   }
 
   get successful(): boolean {
     return this._status >= 200 && this._status < 300;
   }
-  get redirection(): boolean {
+  get isRedirection(): boolean {
     return this._status >= 300 && this._status < 400;
   }
   get clientError(): boolean {
@@ -274,27 +294,27 @@ export class Response {
     this._headers.delete(key);
   }
 
-  get contentType(): string | undefined {
+  get contentType(): string | null | undefined {
     return presence(this.getHeader(CONTENT_TYPE));
   }
 
-  set contentType(value: string | undefined) {
+  set contentType(value: string | MimeType | undefined) {
     if (value == null) return;
     const newHeaderInfo = this.parseContentType(String(value));
     const prevHeaderInfo = this.parsedContentTypeHeader();
-    let charset = newHeaderInfo.charset || prevHeaderInfo.charset;
+    let charset: string | null | undefined = newHeaderInfo.charset || prevHeaderInfo.charset;
     if (!charset && !prevHeaderInfo.mimeType) {
       charset = (this.constructor as typeof Response).defaultCharset;
     }
     this.setContentType(newHeaderInfo.mimeType, charset);
   }
 
-  get charset(): string | undefined {
+  get charset(): string | null | undefined {
     const headerInfo = this.parsedContentTypeHeader();
     return headerInfo.charset || (this.constructor as typeof Response).defaultCharset;
   }
 
-  set charset(charset: string | false | undefined) {
+  set charset(charset: string | false | null | undefined) {
     const contentType = this.parsedContentTypeHeader().mimeType;
     if (charset === false) {
       this.setContentType(contentType, undefined);
@@ -312,13 +332,13 @@ export class Response {
     return (this.stream as { body: string }).body;
   }
 
-  set body(value: string | { toPath(): string }) {
+  set body(value: string | Buffer | { toPath(): string }) {
     if (typeof (value as { toPath?: unknown }).toPath === "function") {
-      this.stream = value;
+      this.stream = value as { toPath(): string };
       return;
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
-    this.setHeader("content-length", String(Buffer.byteLength(value as string, "utf-8")));
+    this.setHeader("content-length", String(Buffer.byteLength(value as string | Buffer, "utf-8")));
   }
 
   get contentLength(): number | undefined {
@@ -372,11 +392,11 @@ export class Response {
     const cookies: Record<string, string | undefined> = {};
     let header: string | string[] | undefined = this.getHeader(SET_COOKIE);
     if (header != null) {
-      if (typeof header === "string") header = header.split("\n");
+      if (typeof header === "string") header = stringSplit(header, "\n");
       for (const cookie of header) {
-        const pair = cookie.split(";")[0];
-        if (pair) {
-          const [key, value] = pair.split("=").map((v) => unescape(v));
+        const pair = stringSplit(cookie, ";")[0];
+        if (pair != null) {
+          const [key, value] = stringSplit(pair, "=").map((v) => unescape(v));
           cookies[key] = value;
         }
       }
@@ -397,8 +417,6 @@ export class Response {
     }
   }
 
-  declare lastModified: Date | undefined;
-  declare date: Date | undefined;
   declare etag: string | undefined;
   declare readonly isLastModified: boolean;
   declare readonly isDate: boolean;
@@ -411,6 +429,8 @@ export class Response {
   declare handleConditionalGetBang: () => void;
   /** @internal */
   declare mergeAndNormalizeCacheControlBang: (cacheControl: CacheControlHash) => void;
+  /** @internal */
+  declare _cacheControlHash: CacheControlHash;
   declare readonly cacheControl: CacheControlHash;
   /** @internal */
   declare cacheControlSegments: () => string[] | undefined;
@@ -478,16 +498,19 @@ export class Response {
     if (this._committed) return;
     this.beforeCommitted();
     this._committed = true;
+    for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   sendingBang(): void {
     if (this._sending) return;
     this.beforeSending();
     this._sending = true;
+    for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   sentBang(): void {
     this._sent = true;
+    for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   get isSending(): boolean {
@@ -498,8 +521,13 @@ export class Response {
     return this._sent;
   }
 
-  async awaitCommit(): Promise<void> {}
-  async awaitSent(): Promise<void> {}
+  async awaitCommit(): Promise<void> {
+    while (!this._committed) await new Promise<void>((broadcast) => this.cv.push(broadcast));
+  }
+
+  async awaitSent(): Promise<void> {
+    while (!this._sent) await new Promise<void>((broadcast) => this.cv.push(broadcast));
+  }
 
   get header(): Headers {
     return this._headers;
@@ -537,7 +565,7 @@ export class Response {
   }
 
   /** @internal */
-  setContentType(contentType: string | undefined, charset: string | undefined): void {
+  setContentType(contentType: string | undefined, charset: string | null | undefined): void {
     const type = contentType ?? "";
     const value = charset ? `${type}; charset=${String(charset).toLowerCase()}` : type;
     this.setHeader(CONTENT_TYPE, value);
@@ -560,7 +588,7 @@ export class Response {
   }
 
   /** @internal */
-  buildBuffer(response: unknown, body: unknown[]): unknown {
+  buildBuffer(response: unknown, body: unknown[]): ResponseBuffer<{ push(obj: unknown): unknown }> {
     return new ResponseBuffer(response as Response, body);
   }
 
@@ -570,7 +598,8 @@ export class Response {
     if (
       body != null &&
       typeof (body as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function" &&
-      typeof body !== "string"
+      typeof body !== "string" &&
+      !(body instanceof Uint8Array)
     ) {
       return Array.from(body as Iterable<unknown>);
     }
@@ -666,12 +695,6 @@ Object.defineProperty(Response.prototype, "isEtag", {
   },
   configurable: true,
 });
-Object.defineProperty(Response.prototype, "cacheControl", {
-  get(this: Response) {
-    return _cacheControl.call(this);
-  },
-  configurable: true,
-});
 Response.prototype.weakEtag = function (this: Response, v: unknown) {
   _weakEtag.call(this, v);
 };
@@ -710,11 +733,21 @@ Response.prototype.parameterFilteredLocation = function (this: Response) {
 };
 
 include(Response, RackResponseHelpers);
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
+Object.defineProperty(Response.prototype, "cacheControl", {
+  ...Object.getOwnPropertyDescriptor(RackResponseHelpers.prototype, "cacheControl"),
+  get: Object.getOwnPropertyDescriptor(CacheResponse.prototype, "cacheControl")!.get,
+  configurable: true,
+});
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Response extends Omit<
   RackResponseHelpers,
-  "status" | "headers" | "mediaType" | "contentLength" | "cacheControl"
-> {}
+  "status" | "headers" | "mediaType" | "contentLength" | "cacheControl" | "contentType"
+> {
+  get lastModified(): Date | undefined;
+  set lastModified(t: Date | Time | { epochMilliseconds: number });
+  get date(): Date | undefined;
+  set date(t: Date | Time);
+}
 export interface CookieOptions {
   value: string;
   path?: string;
@@ -741,32 +774,3 @@ function rackCookieValue(value: string | Partial<CookieOptions>): Record<string,
     sameSite: opts.sameSite,
   };
 }
-
-const STATUS_MESSAGES: Record<number, string> = {
-  100: "Continue",
-  101: "Switching Protocols",
-  200: "OK",
-  201: "Created",
-  202: "Accepted",
-  204: "No Content",
-  301: "Moved Permanently",
-  302: "Found",
-  303: "See Other",
-  304: "Not Modified",
-  307: "Temporary Redirect",
-  308: "Permanent Redirect",
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  405: "Method Not Allowed",
-  406: "Not Acceptable",
-  409: "Conflict",
-  410: "Gone",
-  415: "Unsupported Media Type",
-  422: "Unprocessable Entity",
-  429: "Too Many Requests",
-  500: "Internal Server Error",
-  502: "Bad Gateway",
-  503: "Service Unavailable",
-};

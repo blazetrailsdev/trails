@@ -676,11 +676,11 @@ function categorize(relPath: string, describeName: string, testName: string): An
     };
   }
 
-  // --- Marshal serialization / message pack ---
-  if (p === "marshal-serialization.test.ts" || p === "message-pack.test.ts") {
+  // --- Marshal serialization ---
+  if (p === "marshal-serialization.test.ts") {
     return {
-      blocked: "serialization — Ruby Marshal / MessagePack round-trip, no Node.js equivalent",
-      rootCause: "Node.js has no Marshal.dump/load or msgpack Ruby object round-trip",
+      blocked: "serialization — Ruby Marshal round-trip, no Node.js equivalent",
+      rootCause: "Node.js has no Marshal.dump/load",
       scope: "~0 LOC fix; permanent skip-list.ts candidate",
     };
   }

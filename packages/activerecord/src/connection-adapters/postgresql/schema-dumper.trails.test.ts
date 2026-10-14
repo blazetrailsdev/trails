@@ -3,10 +3,12 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
+import { AbstractAdapter } from "../abstract-adapter.js";
 import { TypeMetadata } from "./type-metadata.js";
-import type { SchemaSource } from "../../schema-dumper.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
-const emptySource: SchemaSource = {
+const emptySource: any = {
+  supportsVirtualColumns: async () => false,
   tables: async () => [],
   columns: async () => [],
   indexes: async () => [],
@@ -27,11 +29,14 @@ function makeColumn(
   return new Column(
     options.name ?? "id",
     null,
-    new TypeMetadata({
-      sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
-      type: options.type ?? "integer",
-    }),
+    new TypeMetadata(
+      new SqlTypeMetadata({
+        sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
+        type: options.type ?? "integer",
+      }),
+    ),
     true,
+    null,
     { serial: options.serial, generated: options.generated },
   );
 }
@@ -133,14 +138,13 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "computed",
         null,
-        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
         true,
+        "(a + b)",
         {
-          defaultFunction: "(a + b)",
           generated: "s",
         },
       );
@@ -158,20 +162,34 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "status",
         null,
-        new TypeMetadata({ sqlType: "mood", type: "enum" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "mood", type: "enum" })),
         true,
+        "('happy'::mood)",
         {
-          defaultFunction: "('happy'::mood)",
           generated: "s",
         },
       );
       const spec = await dumper.prepareColumnOptions(col);
       expect(spec["stored"]).toBe(true);
       expect(spec["enumType"]).toBe(JSON.stringify("mood"));
+    });
+
+    it("keeps the bit_varying type key for a virtual column's type option", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
+      const col = new Column(
+        "flags",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "bit varying", type: "bit_varying" })),
+        true,
+        "(a)",
+        { generated: "s" },
+      );
+      expect(dumper.schemaType(col)).toBe(":bit_varying");
+      expect((await dumper.prepareColumnOptions(col))["type"]).toBe('"bit_varying"');
     });
 
     it("skips virtual options when adapter does not support virtual columns", async () => {
@@ -182,14 +200,13 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => false,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "computed",
         null,
-        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
         true,
+        "(a + b)",
         {
-          defaultFunction: "(a + b)",
           generated: "s",
         },
       );
@@ -202,9 +219,9 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "status",
         null,
-        new TypeMetadata({ sqlType: "mood", type: "enum" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "mood", type: "enum" })),
         true,
-        {},
+        null,
       );
       const spec = await dumper.prepareColumnOptions(col);
       expect(spec["enumType"]).toBe(JSON.stringify("mood"));
@@ -212,25 +229,26 @@ describe("PostgreSQL::SchemaDumper", () => {
   });
 
   describe("schemaTypeWithVirtual", () => {
-    it("returns virtual for generated (stored) PG columns", () => {
+    it("returns virtual for generated (stored) PG columns", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      dumper.supportsVirtualColumns = true;
+      dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
       const col = new Column(
         "computed",
         null,
-        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
         true,
+        null,
         {
           generated: "s",
         },
       );
-      expect(dumper.schemaTypeWithVirtual(col)).toBe(":virtual");
+      expect(await dumper.schemaTypeWithVirtual(col)).toBe(":virtual");
     });
 
-    it("returns schemaType for non-virtual columns", () => {
+    it("returns schemaType for non-virtual columns", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
-      expect(dumper.schemaTypeWithVirtual(col)).toBe(":serial");
+      expect(await dumper.schemaTypeWithVirtual(col)).toBe(":serial");
     });
   });
 
@@ -240,16 +258,41 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "full_name",
         null,
-        new TypeMetadata({ sqlType: "text", type: "string" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "text", type: "string" })),
         true,
+        "concat(first_name, ' ', last_name)",
         {
-          defaultFunction: "concat(first_name, ' ', last_name)",
           generated: "s",
         },
       );
       expect(dumper.extractExpressionForVirtualColumn(col)).toBe(
         JSON.stringify("concat(first_name, ' ', last_name)"),
       );
+    });
+  });
+
+  describe("table", () => {
+    it("emits the camelCase column method for a bit_varying column", async () => {
+      const source = {
+        ...emptySource,
+        columns: async () => [
+          new Column(
+            "flags",
+            null,
+            new TypeMetadata(new SqlTypeMetadata({ sqlType: "bit varying", type: "bit_varying" })),
+            true,
+          ),
+        ],
+        primaryKey: async () => null,
+        nativeDatabaseTypes: () => ({ bit_varying: { name: "bit varying" } }),
+        tableOptions: async () => ({}),
+      };
+      const dumper = new (SchemaDumper as any)(
+        Object.assign(Object.create(AbstractAdapter.prototype), source),
+      );
+      const io = new StringIO();
+      await dumper.table("widgets", io);
+      expect(io.string()).toContain('t.bitVarying("flags")');
     });
   });
 

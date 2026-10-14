@@ -8,7 +8,7 @@ import {
   _resetSignedGlobalIDClassConfig,
 } from "./signed-global-id.js";
 import { setApp, _resetApp } from "./config.js";
-import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
+import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 
 function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
@@ -32,7 +32,7 @@ describe("SignedGlobalIDTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("as string", () => {

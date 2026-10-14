@@ -39,12 +39,14 @@ export interface SqliteConnection {
     bindVars: SqliteBinds | undefined,
     block: ((row: unknown) => void) | undefined,
   ): readonly unknown[] | null | Promise<readonly unknown[] | null>;
+  rollback(): true | Promise<true>;
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown | Promise<unknown>;
   pragma(source: string, opts?: { simple?: boolean }): unknown | Promise<unknown>;
   changes(): number | Promise<number>;
   lastInsertRowId(): number | bigint | Promise<number | bigint>;
   close(): void | Promise<void>;
   isOpen(): boolean;
+  filename(dbName?: string): string | null | Promise<string | null>;
   readonly raw: unknown;
 }
 
@@ -72,12 +74,14 @@ export interface SyncSqliteConnection {
     bindVars: SqliteBinds | undefined,
     block: ((row: unknown) => void) | undefined,
   ): readonly unknown[] | null;
+  rollback(): true;
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown;
   pragma(source: string, opts?: { simple?: boolean }): unknown;
   changes(): number;
   lastInsertRowId(): number | bigint;
   close(): void;
   isOpen(): boolean;
+  filename(dbName?: string): string | null;
   readonly raw: unknown;
 }
 
@@ -136,11 +140,9 @@ export interface SqliteOpenConfig {
   flags?: number;
   readOnly?: boolean;
   noMutex?: boolean;
-  timeout?: number;
   strict?: boolean;
   authToken?: string;
   syncUrl?: string;
-  remoteUrl?: string;
   driverOptions?: Record<string, unknown>;
 }
 
@@ -157,8 +159,6 @@ export interface SqliteDriver {
   readonly name: string;
   readonly capabilities: SqliteDriverCapabilities;
   open(config: SqliteOpenConfig): Promise<SqliteConnection>;
-  /** @internal */
-  openSync?(config: SqliteOpenConfig): SyncSqliteConnection;
   databaseExists?(config: SqliteOpenConfig): boolean | Promise<boolean>;
   restoreFromPath?(sourcePath: string, destination: string): Promise<void>;
 }

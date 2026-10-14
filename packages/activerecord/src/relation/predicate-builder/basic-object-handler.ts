@@ -15,7 +15,7 @@ export class BasicObjectHandler {
 
   /** @missingRailsName name — PERMANENT */
   call(attribute: Arel.Attribute, value: unknown): Nodes.Node {
-    const bind = this._predicateBuilder.buildBindAttribute(toS(attribute.name), value);
+    const bind = this.predicateBuilder.buildBindAttribute(toS(attribute.name), value);
     return attribute.eq(bind);
   }
 

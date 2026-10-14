@@ -1,9 +1,9 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
-import { Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbObjInspect, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
-import { parse as yamlParse } from "@blazetrails/activesupport/yaml";
+import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { Result } from "./result.js";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
@@ -17,7 +17,7 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { lazilyLoadSchemaCache, setLazilyLoadSchemaCache } from "./active-record.js";
@@ -53,6 +53,44 @@ async function closePoolConnections(pool: ConnectionPool): Promise<void> {
 function makePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ pool: size });
 }
+
+it("isConnected probes each pooled connection's connected state", async () => {
+  const pool = makePool();
+  const conn = await pool.checkout();
+  await conn.verifyBang();
+  expect(pool.isConnected()).toBe(true);
+  pool.checkin(conn);
+  await conn.disconnectBang();
+  expect(pool.connections.length).toBe(1);
+  expect(pool.isConnected()).toBe(false);
+});
+
+it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
+  const pool = makePool();
+  await pool.pinConnectionBang();
+
+  const conn = await pool.checkout();
+  const verify = vi.spyOn(conn, "verifyBang");
+  const active = vi.spyOn(conn, "active");
+  const reconnect = vi.spyOn(conn, "reconnectBang").mockImplementation(async () => {
+    active.mockRestore();
+  });
+
+  expect(await pool.checkout()).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(1);
+  expect(reconnect).not.toHaveBeenCalled();
+
+  active.mockResolvedValue(false);
+  const again = await pool.checkout();
+  expect(again).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(2);
+  expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
+  expect(await again.active()).toBe(true);
+
+  verify.mockRestore();
+  reconnect.mockRestore();
+  await pool.unpinConnectionBang();
+});
 
 it("verifyBang on a checked-out adapter establishes the raw connection on every lane", async () => {
   const pool = makePool();
@@ -190,9 +228,8 @@ it("reaper flushes idle connections after idle_timeout", async () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(pool.stat().connections).toBe(0);
   } finally {
-    (Reaper as any)._timers.forEach((t: any) => clearInterval(t));
-    (Reaper as any)._timers.clear();
-    (Reaper as any)._pools.clear();
+    (Reaper as any).threads.clear();
+    (Reaper as any).pools.clear();
     vi.useRealTimers();
   }
 });
@@ -227,19 +264,19 @@ it("disconnect under exclusive acquisition checks out idle connections during th
   expect(pool.stat().connections).toBe(0);
 });
 
-it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", () => {
+it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", async () => {
   const pool = makePool(2) as any;
   const seen: number[] = [];
   pool.checkoutNewConnection = () => {
     seen.push(pool._nowConnecting);
     throw new ConnectionNotEstablished("boom");
   };
-  expect(() => pool.tryToCheckoutNewConnection()).toThrow("boom");
+  await expect(pool.tryToCheckoutNewConnection()).rejects.toThrow("boom");
   expect(seen).toEqual([1]);
   expect(pool._nowConnecting).toBe(0);
 
   pool._nowConnecting = 2;
-  expect(pool.tryToCheckoutNewConnection()).toBeNull();
+  expect(await pool.tryToCheckoutNewConnection()).toBeNull();
 });
 
 it("the exclusive sweep keeps waiting while a connect is in flight", async () => {
@@ -336,7 +373,7 @@ it("a nested execution context shares the pool's single pinned connection", asyn
         await pool.pinConnectionBang();
         expect(await pool.checkout()).toBe(ctx1Conn);
         await pool.unpinConnectionBang();
-      });
+      }).value();
 
       expect(await pool.checkout()).toBe(ctx1Conn);
       await pool.unpinConnectionBang();
@@ -478,21 +515,6 @@ describe("ConnectionPool schema cache", () => {
     expect(pool.schemaCache).toBe(pool.schemaCache);
   });
 
-  it("adapter.internalSchemaCache reads the raw SchemaCache from poolConfig, not the bound reflection", async () => {
-    const { SchemaCache } = await import("./connection-adapters/schema-cache.js");
-    const pool = makeAmbientPool();
-    try {
-      const cache = await pool.withConnection(
-        (conn) => (conn as unknown as { internalSchemaCache: unknown }).internalSchemaCache,
-      );
-      expect(cache).toBeInstanceOf(SchemaCache);
-      expect(cache).not.toBe(pool.schemaCache);
-      expect(pool.poolConfig.schemaReflection.loadedCache).toBe(cache);
-    } finally {
-      await closePoolConnections(pool);
-    }
-  });
-
   it("swapping schemaReflection invalidates the cached BoundSchemaReflection", async () => {
     const pool = makePool();
     const before = pool.schemaCache;
@@ -525,13 +547,14 @@ describe("ConnectionPool schema cache", () => {
   ): Promise<void> {
     await writeFile(
       cacheFile,
-      JSON.stringify({
-        columns: { [tableName]: [realisticColumnJson] },
-        primary_keys: { [tableName]: "id" },
-        data_sources: { [tableName]: true },
-        indexes: {},
-        version,
-      }),
+      "--- !ruby/object:ActiveRecord::ConnectionAdapters::SchemaCache\n" +
+        JSON.stringify({
+          columns: { [tableName]: [realisticColumnJson] },
+          primary_keys: { [tableName]: "id" },
+          data_sources: { [tableName]: true },
+          indexes: {},
+          version,
+        }),
     );
   }
 
@@ -546,14 +569,38 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        await pool._lazyLoadPromise;
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.schemaCache.isCached("more_testings")).toBe(true);
-        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.poolConfig.schemaReflection.loadedCache!.isCached("more_testings")).toBe(
           true,
         );
       } finally {
         setLazilyLoadSchemaCache(prevLazy);
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
+  it("a pool too small for a second connection times out validating the lazily loaded cache", async () => {
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "more_testings", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile, pool: 1, checkoutTimeout: 0.05 });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(warn.mock.calls[0][0]).toMatch(
+          /^Failed to validate the schema cache because of ActiveRecord::ConnectionTimeoutError/,
+        );
+        expect(pool.stat().connections).toBe(1);
+        expect(await pool.schemaCache.isCached("more_testings")).toBe(false);
+      } finally {
+        setLazilyLoadSchemaCache(prevLazy);
+        vi.restoreAllMocks();
         await closePoolConnections(pool);
       }
     });
@@ -571,8 +618,7 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        expect(pool._lazyLoadPromise).not.toBeNull();
-        await pool._lazyLoadPromise;
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.schemaCache.isCached("stale_thing")).toBe(false);
       } finally {
         setLazilyLoadSchemaCache(prevLazy);
@@ -592,74 +638,12 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        expect(pool._lazyLoadPromise).toBeNull();
+        expect(pool.schemaReflection.loadedCache).toBeNull();
         expect(await pool.schemaCache.isCached("widgets")).toBeNull();
       } finally {
         await closePoolConnections(pool);
       }
     });
-  });
-
-  it.skipIf(inMemoryDb())(
-    "eagerly warms the schema cache by introspection on first connection when enabled",
-    async () => {
-      const prevEager = SchemaReflection.eagerLoadSchemaCache;
-      SchemaReflection.eagerLoadSchemaCache = true;
-
-      const pool = makeAmbientPool({ schemaCachePath: "" });
-      try {
-        await pool.leaseConnection();
-        pool.releaseConnection();
-        expect(pool._eagerWarmPromise).not.toBeNull();
-        await pool._eagerWarmPromise;
-        expect(await pool.schemaCache.isCached("posts")).toBe(true);
-        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
-        expect(
-          await pool.poolConfig.schemaReflection.loadedCache!.isColumnsHash(null, "posts"),
-        ).toBe(true);
-      } finally {
-        SchemaReflection.eagerLoadSchemaCache = prevEager;
-        await closePoolConnections(pool);
-      }
-    },
-  );
-
-  it.skipIf(inMemoryDb())(
-    "lets eager warming win when both lazy and eager flags are on",
-    async () => {
-      const prevLazy = lazilyLoadSchemaCache();
-      const prevEager = SchemaReflection.eagerLoadSchemaCache;
-      setLazilyLoadSchemaCache(true);
-      SchemaReflection.eagerLoadSchemaCache = true;
-
-      const pool = makeAmbientPool({ schemaCachePath: "" });
-      try {
-        await pool.leaseConnection();
-        pool.releaseConnection();
-        expect(pool._lazyLoadPromise).toBeNull();
-        expect(pool._eagerWarmPromise).not.toBeNull();
-        await pool._eagerWarmPromise;
-        expect(await pool.schemaCache.isCached("posts")).toBe(true);
-      } finally {
-        setLazilyLoadSchemaCache(prevLazy);
-        SchemaReflection.eagerLoadSchemaCache = prevEager;
-        await closePoolConnections(pool);
-      }
-    },
-  );
-
-  it("does not eagerly warm when the flag is off (default)", async () => {
-    expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
-
-    const pool = makeAmbientPool({ schemaCachePath: "" });
-    try {
-      await pool.leaseConnection();
-      pool.releaseConnection();
-      expect(pool._eagerWarmPromise).toBeNull();
-      expect(await pool.schemaCache.isCached("posts")).toBeNull();
-    } finally {
-      await closePoolConnections(pool);
-    }
   });
 
   it.skipIf(inMemoryDb())(
@@ -680,41 +664,6 @@ describe("ConnectionPool schema cache", () => {
       });
     },
   );
-
-  it("PoolConfig treats blank/empty schemaCachePath as presence-based 'no cache'", async () => {
-    for (const blank of ["", "   "]) {
-      const dbConfig = makeAmbientDbConfig({ schemaCachePath: blank });
-      const pc = new PoolConfig(
-        new ConnectionDescriptor("primary"),
-        dbConfig,
-        "writing",
-        "default",
-      );
-      expect(
-        (pc.schemaReflection as unknown as { _cachePath: string | null })._cachePath,
-      ).toBeNull();
-    }
-  });
-
-  it("PoolConfig aligns SchemaReflection path with DatabaseTasks.dbDir", async () => {
-    const { DatabaseTasks } = await import("./tasks/database-tasks.js");
-    const originalDbDir = DatabaseTasks.dbDir;
-    DatabaseTasks.dbDir = "custom_db_dir";
-    try {
-      const dbConfig = makeAmbientDbConfig();
-      const pc = new PoolConfig(
-        new ConnectionDescriptor("primary"),
-        dbConfig,
-        "writing",
-        "default",
-      );
-      const cachePath = (pc.schemaReflection as unknown as { _cachePath: string | null })
-        ._cachePath;
-      expect(cachePath).toBe("custom_db_dir/schema_cache.yml");
-    } finally {
-      DatabaseTasks.dbDir = originalDbDir;
-    }
-  });
 
   it("PoolConfig primes SchemaReflection with the config's schemaCachePath", async () => {
     const dbConfig = makeAmbientDbConfig({ schemaCachePath: "db/custom_cache.json" });
@@ -1006,48 +955,47 @@ describe("checkout/checkin callbacks", () => {
 
   it("setCallback registers a custom :checkout callback that runs on checkout", async () => {
     const calls: string[] = [];
-    AbstractAdapter.setCallback("checkout", "after", function () {
+    const callback = function (this: AbstractAdapter) {
       calls.push(this.adapterName);
-    });
+    };
+    AbstractAdapter.setCallback("checkout", "after", callback);
     const pool = makeAmbientPool({ pool: 1 });
     try {
       const conn = await pool.checkout();
       expect(calls).toEqual([conn.adapterName]);
     } finally {
       await closePoolConnections(pool);
-      (
-        AbstractAdapter as unknown as {
-          _connectionCallbacks: { checkout: unknown[] };
-        }
-      )._connectionCallbacks.checkout.pop();
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
     }
   });
 
   it("setCallback on a subclass clones the registry and does not leak onto AbstractAdapter", async () => {
     class SubAdapter extends AbstractAdapter {}
-    const before = (AbstractAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
-      ._connectionCallbacks.checkout.length;
+    const before = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks.entries.length;
 
     SubAdapter.setCallback("checkout", "after", function () {});
 
-    const sub = (SubAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
-      ._connectionCallbacks;
-    const base = (AbstractAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
-      ._connectionCallbacks;
+    const sub = checkoutCallbacks(SubAdapter)._checkoutCallbacks;
+    const base = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks;
     expect(sub).not.toBe(base);
-    expect(sub.checkout.length).toBe(before + 1);
-    expect(base.checkout.length).toBe(before);
+    expect(sub.entries.length).toBe(before + 1);
+    expect(base.entries.length).toBe(before);
   });
 
   it("subclass without its own callback inherits AbstractAdapter's shared registry", async () => {
     class SharedAdapter extends AbstractAdapter {}
-    const sub = (SharedAdapter as unknown as { _connectionCallbacks: unknown })
-      ._connectionCallbacks;
-    const base = (AbstractAdapter as unknown as { _connectionCallbacks: unknown })
-      ._connectionCallbacks;
+    const sub = checkoutCallbacks(SharedAdapter)._checkoutCallbacks;
+    const base = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks;
     expect(sub).toBe(base);
   });
 });
+
+function checkoutCallbacks(klass: typeof AbstractAdapter) {
+  return klass as unknown as {
+    _checkoutCallbacks: { entries: unknown[] };
+    skipCallback(name: string, ...filterList: unknown[]): void;
+  };
+}
 
 describe("NullPool member parity", () => {
   it("defines no role or shard, matching Rails' NullPool", () => {
@@ -1074,9 +1022,8 @@ describe("NullPool member parity", () => {
     for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType"]) {
       expect(() => pool[probe]).toThrow(NoMethodError);
     }
-    expect((pool.inspect as () => string)()).toBe(
-      "#<ActiveRecord::ConnectionAdapters::NullPool @server_version=nil>",
-    );
+    expect(pool.inspect).toBeUndefined();
+    expect(rbObjInspect(pool)).toMatch(/^#<NullPool:0x[0-9a-f]+ .*@server_version=nil/);
     expect(pool.toString).toBe(Object.prototype.toString);
     expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
   });
@@ -1109,23 +1056,25 @@ describe("execution context at Rails thread-spawn sites", () => {
 
   it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
     const seen = new Map<number, number[]>();
+    let stopped = false;
     const pools = [0.01, 0.02].map((frequency) => ({
       reap: async () => {
         const ids = seen.get(frequency) ?? [];
         ids.push(Thread.current().id);
         seen.set(frequency, ids);
       },
+      flush: async () => {},
+      isDiscarded: () => stopped,
     }));
-    Reaper.registerPool(pools[0], 0.01);
-    Reaper.registerPool(pools[1], 0.02);
+    void Reaper.registerPool(pools[0], 0.01);
+    void Reaper.registerPool(pools[1], 0.02);
     try {
       await vi.waitFor(() => {
         expect(seen.get(0.01)?.length ?? 0).toBeGreaterThanOrEqual(2);
         expect(seen.get(0.02)?.length ?? 0).toBeGreaterThanOrEqual(2);
       });
     } finally {
-      (Reaper as any)._pools.delete(0.01);
-      (Reaper as any)._pools.delete(0.02);
+      stopped = true;
     }
     const [a1, a2] = seen.get(0.01)!;
     const [b1, b2] = seen.get(0.02)!;

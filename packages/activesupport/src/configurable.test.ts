@@ -162,5 +162,6 @@ describe("ConfigurableActiveSupport", () => {
     }).toThrow(NameError);
   });
 
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("the config_accessor method should not be publicly callable");
 });

@@ -27,13 +27,6 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return [...this.entries()];
   }
 
-  hasValue(value: V): boolean {
-    for (const v of this.values()) {
-      if (v === value) return true;
-    }
-    return false;
-  }
-
   select(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
     const block = args[args.length - 1];
     const result = new OrderedHash<K, V>();
@@ -95,7 +88,7 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return this.mergeInPlace(other);
   }
 
-  replace(other: OrderedHash<K, V>): this {
+  override replace(other: OrderedHash<K, V>): this {
     this.clear();
     for (const [k, v] of other) {
       this.set(k, v);

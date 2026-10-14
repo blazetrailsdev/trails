@@ -1,3 +1,5 @@
+import { Gem } from "@blazetrails/ruby-compat";
+
 export const VERSION = {
   MAJOR: 8,
   MINOR: 0,
@@ -10,7 +12,6 @@ export const VERSION = {
   },
 };
 
-/** @missingRailsCall new — PERMANENT */
-export function gemVersion(): string {
-  return VERSION.STRING;
+export function gemVersion(): InstanceType<typeof Gem.Version> {
+  return new Gem.Version(VERSION.STRING);
 }

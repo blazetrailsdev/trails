@@ -1,21 +1,22 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 export class UpdateStatement extends Node {
-  relation: Node | Table | null;
-  values: Node[];
-  wheres: Node[];
-  orders: Node[];
-  groups: Node[];
-  havings: Node[];
+  relation: ArelNode | Table | null;
+  values: (ArelNode | string)[];
+  wheres: ArelNode[];
+  orders: ArelNode[];
+  groups: ArelNode[];
+  havings: (ArelNode | string)[];
   limit: Node | null;
   offset: Node | null;
-  key: Node | Node[] | null;
+  key: ArelNode | ArelNode[] | null;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.relation = relation;
     this.values = [];
@@ -56,12 +57,10 @@ export class UpdateStatement extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.wheres = [...this.wheres];
-    copy.values = [...this.values];
-    return copy;
+  initializeCopy(_other: UpdateStatement): void {
+    this.wheres = rbObjClone(this.wheres);
+    this.values = rbObjClone(this.values);
   }
 }
 
-Nodes.UpdateStatement = UpdateStatement;
+rbModConstSet(Nodes, "UpdateStatement", UpdateStatement);

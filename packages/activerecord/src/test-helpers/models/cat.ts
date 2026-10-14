@@ -1,5 +1,6 @@
 import type { Relation } from "../../relation.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Cat extends Base {
   declare isFemale: () => boolean;
@@ -12,15 +13,17 @@ export class Cat extends Base {
   declare static notMale: () => Relation<Cat>;
 
   static {
-    this._abstractClass = true;
+    this.abstractClass = true;
     this.enum("gender", ["female", "male"]);
     this.defaultScope(function (this: any) {
       return this.where({ is_vegetarian: false });
     });
   }
 }
+registerModel(Cat);
 
 export class Lion extends Cat {
   declare gender: "female" | "male" | null;
   declare is_vegetarian: boolean | null;
 }
+registerModel(Lion);

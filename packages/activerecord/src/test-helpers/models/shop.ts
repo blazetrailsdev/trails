@@ -15,6 +15,7 @@ export class ShopCollection extends Base {
     });
   }
 }
+registerModel(ShopCollection);
 
 export class ShopProductType extends Base {
   declare products: AssociationProxy<ShopProduct>;
@@ -25,6 +26,7 @@ export class ShopProductType extends Base {
     this.hasMany("products", { className: "ShopProduct", foreignKey: "type_id" });
   }
 }
+registerModel(ShopProductType);
 
 export class ShopProduct extends Base {
   declare variants: AssociationProxy<ShopVariant>;
@@ -36,16 +38,16 @@ export class ShopProduct extends Base {
     this.hasMany("variants", {
       className: "ShopVariant",
       foreignKey: "product_id",
-      dependent: "delete",
+      dependent: "deleteAll",
     });
     this.belongsTo("type", { className: "ShopProductType" });
   }
 }
+registerModel(ShopProduct);
 
 export class ShopVariant extends Base {
   static {
     this.tableName = "variants";
   }
 }
-
-registerModel([ShopCollection, ShopProductType, ShopProduct, ShopVariant]);
+registerModel(ShopVariant);

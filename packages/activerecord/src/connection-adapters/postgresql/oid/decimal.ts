@@ -1,5 +1,6 @@
 import { DecimalType } from "@blazetrails/activemodel";
-import { BigDecimal, registerConstant } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
 export class Decimal extends DecimalType {
   infinity(options: { negative?: boolean } = {}): BigDecimal {

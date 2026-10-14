@@ -5,10 +5,9 @@ import {
   assertRespondTo,
 } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { registerModel } from "../index.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Table } from "@blazetrails/arel";
-import { captureSql } from "../testing/sql-capture.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import {
@@ -27,7 +26,7 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 
 describe("LeftOuterJoinAssociationTest", () => {
-  const { authors, posts } = fixtures([
+  const { self, authors, posts } = fixtures([
     "authors",
     "authorAddresses",
     "essays",
@@ -44,9 +43,6 @@ describe("LeftOuterJoinAssociationTest", () => {
   registerModel(SpecialComment);
   registerModel(SubSpecialComment);
   registerModel(VerySpecialComment);
-  registerSubclass(SpecialComment);
-  registerSubclass(SubSpecialComment);
-  registerSubclass(VerySpecialComment);
   registerModel(Rating);
   registerModel(Essay);
   registerModel(Categorization);
@@ -76,7 +72,7 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("construct finder sql does not table name collide on duplicate associations", async () => {
     await assertNothingRaised(async () => {
-      const queries = await captureSql(async () => {
+      const queries = await self().captureSql({}, async () => {
         await Person.leftOuterJoins({ ":agents": { ":agents": ":agents" } }).leftOuterJoins({
           ":agents": { ":agents": { ":primaryContact": ":agents" } },
         });
@@ -110,14 +106,14 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("left outer joins actually does a left outer join", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Author.leftOuterJoins(":posts");
     });
     expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
   });
 
   it("left outer joins is deduped when same association is joined", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Author.joins(":posts").leftOuterJoins(":posts");
     });
     expect(queries.some((sql) => /INNER JOIN/i.test(sql))).toBeTruthy();
@@ -125,14 +121,14 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("construct finder sql ignores empty left outer joins hash", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Author.leftOuterJoins({});
     });
     expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
   });
 
   it("construct finder sql ignores empty left outer joins array", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Author.leftOuterJoins([]);
     });
     expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
@@ -164,7 +160,7 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("join conditions added to join clause", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Author.leftOuterJoins(":essays");
     });
     expect(queries.some((sql) => /writer_type.*?=.*?(Author|\?|\$1|:a1)/i.test(sql))).toBeTruthy();
@@ -200,7 +196,7 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("left outer joins includes all nested associations", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Friendship.leftOuterJoins([
         ":friendFavoriteReferenceJob",
         ":followerFavoriteReferenceJob",

@@ -5,18 +5,17 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { NotImplementedError } from "../../errors.js";
 
 import { DeferredIdsIn } from "./deferred-distinct-pk-in.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
 
 export class RelationHandler {
-  /** @missingRailsCall empty? — PERMANENT */
   call(attribute: Arel.Attribute, value: any): Nodes.Node {
     const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;
     value = this.applyJoinDependency(value);
 
-    if (value.selectValues.length === 0) {
+    if (isEmpty(value.selectValues)) {
       const model = value.model;
-      if (model.compositePrimaryKey) {
+      if (model.isCompositePrimaryKey()) {
         throw new ArgumentError(
           `Cannot map composite primary key ${rbInspect(model.primaryKey)} to ${attribute.name}`,
         );
@@ -32,7 +31,7 @@ export class RelationHandler {
     if (typeof value?._isDeferredDistinctPkSubquery !== "function") return null;
     if (!value._isDeferredDistinctPkSubquery()) return null;
     const inlineSubquery = value._buildDeferredDistinctPkInlineSubquery();
-    return new DeferredIdsIn(attribute, inlineSubquery, [
+    return new DeferredIdsIn(attribute, inlineSubquery.ast, [
       { ids: () => value._materializeDistinctPkIds() },
     ]);
   }

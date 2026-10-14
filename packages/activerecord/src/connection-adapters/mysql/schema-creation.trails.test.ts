@@ -1,6 +1,7 @@
 import { it, expect, beforeAll } from "vitest";
 import { SchemaCreation, type VisitorHostAdapter } from "./schema-creation.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import {
   AddColumnDefinition,
   ChangeColumnDefinition,
@@ -66,7 +67,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
     const col = new Column(
       "status",
       null,
-      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
     );
     const def = new ChangeColumnDefaultDefinition(col, "active");
     expect(await (sc as any).visitChangeColumnDefaultDefinition(def)).toMatch(
@@ -78,7 +79,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
     const col = new Column(
       "status",
       null,
-      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
       false,
     );
     const def = new ChangeColumnDefaultDefinition(col, null);
@@ -213,7 +214,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
 
   it("emits bigint AUTO_INCREMENT PRIMARY KEY for default id column", async () => {
     const td = new MyTd(mysqlConn(), "users");
-    td.setPrimaryKey("users", true);
+    td.setPrimaryKey("users", "primary_key");
     td.string("name");
     expect(await toSql(td)).toBe(
       "CREATE TABLE `users` (`id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, `name` varchar(255))",
@@ -256,7 +257,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
 
   it("emits composite PRIMARY KEY clause", async () => {
     const td = new MyTd(mysqlConn(), "memberships");
-    td.setPrimaryKey("memberships", true, ["user_id", "group_id"]);
+    td.setPrimaryKey("memberships", "primary_key", ["user_id", "group_id"]);
     td.bigint("user_id", { null: false });
     td.bigint("group_id", { null: false });
     const sql = await toSql(td);

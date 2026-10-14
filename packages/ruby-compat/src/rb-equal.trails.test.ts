@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 import { Range } from "./range.js";
+import { stringSuperclass } from "./string/method-table.js";
 
 describe("rbEqual over the values a Ruby binary String stands in for", () => {
   it("compares Uint8Array byte strings by value", () => {
@@ -9,6 +10,31 @@ describe("rbEqual over the values a Ruby binary String stands in for", () => {
     expect(rbEqual(new Uint8Array([0x80]), new Uint8Array([0x80, 0xde]))).toBe(false);
     expect(rbEqual(new Uint8Array([]), new Uint8Array([]))).toBe(true);
     expect(rbEqual(new Uint8Array([0x80]), "")).toBe(false);
+  });
+
+  it("answers false for a byte string against a non-String, and asks a to_str responder", () => {
+    class Bytes extends Uint8Array {
+      equals(): boolean {
+        throw new Error("not a byte string");
+      }
+    }
+    const bytes = Bytes.from([0x62, 0x6f]);
+    expect(rbEqual(bytes, { other: true })).toBe(false);
+    expect(rbEqual(bytes, 5)).toBe(false);
+    expect(rbEqual(bytes, new Uint8Array([0x62, 0x6f]))).toBe(true);
+    const data = { toStr: () => bytes, equals: (other: unknown) => other === bytes };
+    expect(rbEqual(bytes, data)).toBe(true);
+    expect(rbEql(bytes, data)).toBe(false);
+  });
+
+  it("compares a String with a binary String only where both are 7-bit", () => {
+    expect(rbEqual("1", new Uint8Array([0x31]))).toBe(true);
+    expect(rbEqual(new Uint8Array([0x31]), "1")).toBe(true);
+    expect(rbEqual("", new Uint8Array([]))).toBe(true);
+    expect(rbEqual("12", new Uint8Array([0x31]))).toBe(false);
+    expect(rbEqual("ƒée", new TextEncoder().encode("ƒée"))).toBe(false);
+    expect(rbEqual("\u00c6", new Uint8Array([0xc6]))).toBe(false);
+    expect(rbEql(new Uint8Array([0x31]), "1")).toBe(true);
   });
 
   it("compares two Temporal values by class and instant, never by their own equals", () => {
@@ -79,6 +105,46 @@ describe("rbEql is rb_equal without the `==` arm", () => {
   });
 });
 
+describe("rbEqual between a String and a String subclass", () => {
+  class Literal extends stringSuperclass("eql", "hash") {}
+
+  it("compares contents in either order, as rb_str_equal does for two T_STRINGs", () => {
+    expect(rbEqual("a", new Literal("a"))).toBe(true);
+    expect(rbEqual(new Literal("a"), "a")).toBe(true);
+    expect(rbEql("a", new Literal("a"))).toBe(true);
+    expect(rbEqual("a", new Literal("b"))).toBe(false);
+    expect(rbEqual(["a"], [new Literal("a")])).toBe(true);
+    expect(rbEqual("a", { toString: () => "a" })).toBe(false);
+  });
+});
+
+describe("rbEqual over a String subclass instance", () => {
+  it("compares a String object with a primitive by content", () => {
+    class Inquirer extends String {
+      constructor(value: string) {
+        super(value);
+        return new Proxy(this, {
+          get(target, prop, receiver) {
+            if (Reflect.has(target, prop)) {
+              const value = Reflect.get(target, prop, receiver);
+              return typeof value === "function" ? value.bind(target) : value;
+            }
+            return () => {
+              throw new Error(`undefined method '${String(prop)}'`);
+            };
+          },
+        });
+      }
+    }
+    expect(rbEqual("test", new Inquirer("test"))).toBe(true);
+    expect(rbEqual(new Inquirer("test"), "test")).toBe(true);
+    expect(rbEqual(new Inquirer("test"), new Inquirer("test"))).toBe(true);
+    expect(rbEql("test", new Inquirer("test"))).toBe(true);
+    expect(rbEqual(new Inquirer("test"), "development")).toBe(false);
+    expect(rbEqual(new Inquirer("1"), 1)).toBe(false);
+  });
+});
+
 describe("rbEqq, the === send", () => {
   it("dispatches to Range, Regexp, Set, Module, Proc and Kernel#===", () => {
     expect(rbEqq(new Range(1, 5), 3)).toBe(true);
@@ -99,5 +165,16 @@ describe("rbEqq, the === send", () => {
     ).toBe(true);
     class Point {}
     expect(rbEqq(Point, new Point())).toBe(true);
+  });
+});
+
+describe("rbEqual of a Hash and a non-Hash", () => {
+  it("answers false without reading the Hash's entries", () => {
+    const hash = {
+      get value(): never {
+        throw new Error("read");
+      },
+    };
+    expect(rbEqual(hash, new (class Other {})())).toBe(false);
   });
 });

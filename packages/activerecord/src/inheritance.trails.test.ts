@@ -1,16 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "./test-fixtures.js";
-import { Client } from "./test-helpers/models/company.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { Client, Company } from "./test-helpers/models/company.js";
+import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
+import { rbClassSuperclass, rbObjClone } from "@blazetrails/ruby-compat";
 import { Author } from "./test-helpers/models/author.js";
 
 describe("_instantiate STI dispatch", () => {
   fixtures([]);
 
   it("keeps a row without the inheritance column on the receiver subclass", () => {
-    const record = Client._instantiate({ id: "7", name: "Acme" });
+    const record = Client.instantiate({ id: "7", name: "Acme" });
 
     expect(record).toBeInstanceOf(Client);
+  });
+});
+
+describe("compute_type candidates cache", () => {
+  fixtures(["authors"]);
+
+  it("remembers the candidate that resolved, per class", () => {
+    expect(Client.computeType("Author")).toBe(Author);
+
+    const cache = (Client as unknown as { _typeCandidatesCache: Map<string, string> })
+      ._typeCandidatesCache;
+    expect(Object.prototype.hasOwnProperty.call(Client, "_typeCandidatesCache")).toBe(true);
+    expect(cache.get("Author")).toBe("Author");
+    expect(Client.computeType("Author")).toBe(Author);
   });
 });
 
@@ -85,5 +101,60 @@ describe("becomes! inheritance column writer", () => {
 
     expect(written).toEqual(["WriterClient"]);
     expect(became.type).toBe("WriterClient");
+  });
+});
+
+describe("Inheritance::ClassMethods#initialize_clone", () => {
+  fixtures([]);
+
+  it("recomputes the base class on a cloned model class", () => {
+    expect(Company.baseClass).toBe(Company);
+    const copy = rbObjClone(Company);
+
+    expect(copy).not.toBe(Company);
+    expect(Object.prototype.hasOwnProperty.call(copy, "_computedBaseClass")).toBe(true);
+    expect(copy.baseClass).toBe(copy);
+    expect(rbObjClone(Client).baseClass).toBe(Company);
+  });
+
+  it("returns a constructible class carrying the original's statics and methods", () => {
+    const copy = rbObjClone(Client);
+    const record = new copy({ name: "Acme" });
+
+    expect(record).toBeInstanceOf(copy);
+    expect(record).toBeInstanceOf(Company);
+    expect(record).not.toBeInstanceOf(Client);
+    expect(record.name).toBe("Acme");
+    expect(copy.tableName).toBe(Client.tableName);
+    expect(rbClassSuperclass(copy)).toBe(rbClassSuperclass(Client));
+    expect(Object.getOwnPropertyNames(copy.prototype)).toEqual(
+      Object.getOwnPropertyNames(Client.prototype),
+    );
+  });
+});
+
+describe("Inheritance::ClassMethods#dup", () => {
+  fixtures([]);
+
+  it("recomputes the base class on a duped model class", () => {
+    const other = (Company as typeof Company & { dup(): typeof Company }).dup();
+
+    expect(other).not.toBe(Company);
+    expect(other.baseClass).toBe(other);
+    expect(new other({ name: "Acme" })).toBeInstanceOf(other);
+  });
+});
+
+describe("subclass_from_attributes with permitted parameters", () => {
+  fixtures([]);
+
+  it("converts parameters with to_h before reading the inheritance column", () => {
+    const params = new ProtectedParams({ type: "Client" }).permitBang();
+
+    expect(Company.subclassFromAttributes(params as never)).toBe(Client);
+  });
+
+  it("reads the inheritance column from a Map", () => {
+    expect(Company.subclassFromAttributes(new Map([["type", "Client"]]) as never)).toBe(Client);
   });
 });

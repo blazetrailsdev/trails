@@ -31,7 +31,7 @@ describeIfPg("PostgresqlDbConsoleTest", () => {
     new HashConfig("test", "primary", config as DatabaseConfigOptions);
 
   const assertFindCmdAndExecCalledWith = (args: unknown[], block: () => unknown): void => {
-    const spy = vi.spyOn(PostgreSQLAdapter, "findCmdAndExec").mockImplementation(() => []);
+    const spy = vi.spyOn(PostgreSQLAdapter, "findCmdAndExec").mockReturnValue(undefined as never);
     try {
       block();
       expect(spy).toHaveBeenCalledWith(...args);

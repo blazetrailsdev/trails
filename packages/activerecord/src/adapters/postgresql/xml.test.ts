@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class XmlDataType extends Base {
   static {
     this.tableName = "xml_data_type";
-    this.attribute("id", "integer");
   }
 }
 
@@ -18,19 +17,20 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeEach(async () => {
     connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
-    await connection.execute("DROP TABLE IF EXISTS xml_data_type");
-    await connection.execute(`CREATE TABLE xml_data_type (id SERIAL PRIMARY KEY, payload xml)`);
+    await connection.createTable("xml_data_type", {}, (t) => {
+      t.xml("payload");
+    });
     void XmlDataType.resetColumnInformation();
     await XmlDataType.loadSchema();
   });
 
   afterEach(async () => {
-    await connection.execute("DROP TABLE IF EXISTS xml_data_type");
+    await connection.dropTable("xml_data_type", { ifExists: true });
     void XmlDataType.resetColumnInformation();
   });
 
   describe("PostgreSQLXMLTest", () => {
-    it("xml column", async () => {
+    it("column", async () => {
       const column = XmlDataType.columnsHash()["payload"];
       expect(column.type).toBe("xml");
     });
@@ -42,7 +42,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("round trip", async () => {
-      const data = XmlDataType.new({ payload: "<foo>bar</foo>" }) as any;
+      const data = new XmlDataType({ payload: "<foo>bar</foo>" }) as any;
       expect(data.payload).toBe("<foo>bar</foo>");
       await data.saveBang();
       await data.reload();
@@ -56,8 +56,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(data.payload).toBe("<bar>baz</bar>");
     });
 
-    it("xml schema dump", async () => {
-      const output = await dumpTableSchema(connection, "xml_data_type");
+    it("schema dump with shorthand", async () => {
+      const output = await dumpTableSchema("xml_data_type");
       expect(output).toMatch(/t\.xml\("payload"\)/);
     });
   });

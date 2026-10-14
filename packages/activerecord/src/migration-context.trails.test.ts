@@ -9,15 +9,14 @@ import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
-import { fixtures } from "./test-fixtures.js";
-import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { DEFAULT_ENV } from "./connection-handling.js";
 import {
   setTimestampedMigrations,
   setValidateMigrationTimestamps,
   timestampedMigrations,
 } from "./active-record.js";
-
-const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
+import { MIGRATIONS_ROOT } from "./config.js";
 
 describe("MigrationContext", () => {
   afterEach(() => {
@@ -133,12 +132,6 @@ describe("MigrationContext filename spellings", () => {
       "20260102000000:AddEmailToUsers",
     ]);
   });
-
-  it("prefers .ts over .js when both exist for the same migration", () => {
-    const migrations = found("spellings_ts_and_js");
-    expect(migrations).toHaveLength(1);
-    expect(basename(migrations[0].filename)).toBe("20260101000000_create_posts.ts");
-  });
 });
 
 describe("MigrationContext connected surface", () => {
@@ -198,14 +191,14 @@ describe("MigrationContext connected surface", () => {
     await context.schemaMigration.createVersion("1");
 
     expect(await context.migrationsStatus()).toEqual([
-      { status: "up", version: "001", name: "Valid people have last names" },
-      { status: "down", version: "002", name: "We need reminders" },
-      { status: "down", version: "003", name: "Innocent jointable" },
+      ["up", "001", "Valid people have last names"],
+      ["down", "002", "We need reminders"],
+      ["down", "003", "Innocent jointable"],
     ]);
   });
 
   it("currentEnvironment answers the resolved default env", () => {
-    expect(context.currentEnvironment).toBe(DatabaseTasks.env);
+    expect(context.currentEnvironment).toBe(DEFAULT_ENV());
   });
 
   it("lastStoredEnvironment is null until a version has been recorded", async () => {

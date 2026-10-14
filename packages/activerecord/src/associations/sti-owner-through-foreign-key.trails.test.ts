@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Reader } from "../test-helpers/models/reader.js";

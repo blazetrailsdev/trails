@@ -1,4 +1,5 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { hashDelete, isEmpty, kernelThrow } from "@blazetrails/ruby-compat";
+import { isPresent } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -11,6 +12,7 @@ import type { PriceEstimate } from "./price-estimate.js";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
@@ -121,11 +123,11 @@ export class Pirate extends Base {
     this.hasOne("attackerMatey", { foreignKey: "target_id", className: "Matey" });
     this.acceptsNestedAttributesFor("parrots", "birds", {
       allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+      rejectIf: isEmpty,
     });
     this.acceptsNestedAttributesFor("ship", {
       allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+      rejectIf: isEmpty,
     });
     this.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true });
     this.acceptsNestedAttributesFor(
@@ -153,6 +155,10 @@ export class Pirate extends Base {
   }
   private _shipLog?: string[];
 
+  rejectEmptyShipsOnCreate(attributes: Record<string, unknown>): boolean {
+    return isPresent(hashDelete(attributes, "_reject_me_if_new")) && !this.isPersisted();
+  }
+
   cancelSaveCallbackMethod() {
     kernelThrow(":abort");
   }
@@ -176,6 +182,7 @@ export class Pirate extends Base {
     this.log(record, "after_removing_method");
   }
 }
+registerModel(Pirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;
@@ -204,6 +211,7 @@ export class DestructivePirate extends Pirate {
     });
   }
 }
+registerModel(DestructivePirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestructivePirate {
   get dependentShip(): Ship | null | Promise<Ship | null>;
@@ -219,6 +227,7 @@ export class FamousPirate extends Base {
     this.validates("catchphrase", { presence: true, on: "conference" });
   }
 }
+registerModel(FamousPirate);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpacePirate extends Base {
@@ -288,6 +297,7 @@ export class SpacePirate extends Base {
     );
   }
 }
+registerModel(SpacePirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpacePirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Nodes } from "../index.js";
+import { Nodes, arelNode } from "../index.js";
 
 describe("SqlLiteralTest (trails)", () => {
   it("to_s returns the sql text", () => {
@@ -15,5 +15,13 @@ describe("SqlLiteralTest (trails)", () => {
     expect(node.eql("id * 3")).toBe(false);
     expect(node.eql(new Nodes.SqlLiteral("id * 2", { retryable: true }))).toBe(true);
     expect(node.eql(new Nodes.SqlLiteral("id * 3"))).toBe(false);
+  });
+
+  it("is a String, not a Node, and an arel_node?", () => {
+    const node = new Nodes.SqlLiteral("id * 2");
+    expect(node).not.toBeInstanceOf(Nodes.Node);
+    expect("not" in node).toBe(false);
+    expect(arelNode(node)).toBe(true);
+    expect(Nodes.buildQuoted(node)).toBe(node);
   });
 });

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import "../message-pack.js";
 
 import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";

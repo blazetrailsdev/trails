@@ -2,12 +2,13 @@ import { describe, it, expect } from "vitest";
 import { SingularAssociation } from "../associations/singular-association.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Interest } from "../test-helpers/models/interest.js";
 import { Face } from "../test-helpers/models/face.js";
 
 registerModel(Interest);
+registerModel(Human);
 fixtures({});
 
 describe("AbsenceValidationTest", () => {

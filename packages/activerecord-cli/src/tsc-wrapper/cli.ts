@@ -9,17 +9,20 @@ import {
 } from "typescript/unstable/sync";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
-import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
+import { tsApi } from "../type-virtualization/ts-api.js";
+import { virtualize } from "../type-virtualization/virtualize.js";
 import {
   createArTrailsProgram,
   createArSolutionBuilder,
   getPreEmitDiagnostics,
   remapDiagnostics,
+  type ArTrailsProgram,
   sortAndDeduplicateDiagnostics,
 } from "./ar-program.js";
-import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
+import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
+import { buildViews, decodeLineMappings } from "@blazetrails/trails-tsc";
+import type { TseSourceMap } from "./ar-program.js";
 
 type RichColumnValue = Extract<SchemaColumnValue, object>;
 
@@ -252,7 +255,7 @@ function flattenDiagnosticMessageText(d: Diagnostic, newLine: string, indent = 0
   return result;
 }
 
-function handleBuildMode(args: string[]): void {
+async function handleBuildMode(args: string[]): Promise<void> {
   const buildIdx = args.findIndex((a) => a === "--build" || a === "-b");
   if (buildIdx === -1) return;
 
@@ -280,6 +283,10 @@ function handleBuildMode(args: string[]): void {
   const fh = formatHost();
   const pretty = parsePretty(args, {});
   const schemaColumnsByTable = loadSchemaColumns(args);
+  for (const root of rootConfigs) {
+    const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
+    await buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
+  }
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
@@ -299,12 +306,58 @@ function handleBuildMode(args: string[]): void {
   process.exit(status);
 }
 
-export function main(): void {
+async function buildConfiguredViews(configPath: string): Promise<void> {
+  const { config } = tsApi().readConfigFile(configPath) as {
+    config?: { compilerOptions?: { plugins?: { name?: string; viewsDir?: string }[] } };
+  };
+  const plugins = config?.compilerOptions?.plugins ?? [];
+  const plugin = plugins.find((p) => p.name === "@blazetrails/trails-tsc/ts-plugin");
+  if (plugin?.viewsDir === undefined) return;
+  await buildViews({ cwd: path.dirname(configPath), viewsDir: plugin.viewsDir });
+}
+
+async function loadTseSourceMaps(
+  program: ArTrailsProgram["program"],
+): Promise<Map<string, TseSourceMap>> {
+  const maps = new Map<string, TseSourceMap>();
+  const shims = program.getSourceFileNames().filter((f) => f.endsWith(".tse.ts"));
+  await Promise.all(
+    shims.map(async (fileName) => {
+      const text = program.getSourceFile(fileName)?.text ?? "";
+      const url = /\/\/# sourceMappingURL=(\S+)\s*$/u.exec(text)?.[1];
+      if (url === undefined) return;
+      const mapPath = path.resolve(path.dirname(fileName), url);
+      let raw: { sources: string[]; sourcesContent: (string | null)[]; mappings: string };
+      try {
+        raw = JSON.parse(await fs.promises.readFile(mapPath, "utf8"));
+      } catch {
+        return;
+      }
+      const sourceContent = raw.sourcesContent[0];
+      if (sourceContent == null) return;
+      const lines = new Map<number, { line: number; genCol: number; srcCol: number }[]>();
+      for (const m of decodeLineMappings(raw.mappings)) {
+        if (!lines.has(m.genLine)) lines.set(m.genLine, []);
+        lines
+          .get(m.genLine)!
+          .push({ line: m.srcLine, genCol: m.genCol ?? 0, srcCol: m.srcCol ?? 0 });
+      }
+      maps.set(fileName, {
+        source: path.resolve(path.dirname(mapPath), raw.sources[0]),
+        sourceContent,
+        lines,
+      });
+    }),
+  );
+  return maps;
+}
+
+export async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   handleHelp(args);
   handlePrintVirtualized(args);
-  handleBuildMode(args);
+  await handleBuildMode(args);
 
   let configPath: string | undefined;
   for (let i = 0; i < args.length; i++) {
@@ -326,6 +379,7 @@ export function main(): void {
   }
 
   const schemaColumnsByTable = loadSchemaColumns(args);
+  await buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
   });
@@ -346,7 +400,11 @@ export function main(): void {
     diagnostics.push(...emitResult.diagnostics);
   }
 
-  const remapped = remapDiagnostics(diagnostics, host);
+  const tseSourceMaps = await loadTseSourceMaps(program);
+  const remapped = remapDiagnostics(diagnostics, {
+    ...host,
+    getTseSourceMap: (fileName) => tseSourceMaps.get(fileName),
+  });
   const sorted = sortAndDeduplicateDiagnostics(remapped);
 
   if (sorted.length > 0) {

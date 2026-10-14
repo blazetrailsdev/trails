@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport";
-import { stdout } from "@blazetrails/ruby-compat";
+import { puts, stdout } from "@blazetrails/ruby-compat";
 import {
   Migration,
   Migrator,
@@ -11,14 +11,14 @@ import {
 } from "./migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
-import { fixtures } from "./test-fixtures.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import type { SchemaMigration } from "./schema-migration.js";
+import type { InternalMetadata } from "./internal-metadata.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
-
-const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
+import "./test-helpers/migration-helper.js";
+import { MIGRATIONS_ROOT } from "./config.js";
 
 function migration(name: string, version?: number): MigrationProxy {
   return migrationProxy({
@@ -57,7 +57,7 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
 describe("MigratorTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
-  let adapter: DatabaseAdapter;
+  let pool: ConnectionPool;
   let schemaMigration: SchemaMigration;
   let internalMetadata: InternalMetadata;
 
@@ -79,19 +79,28 @@ describe("MigratorTest", () => {
     return schemaMigration;
   }
 
-  let verboseWas: boolean;
+  let verboseWas: boolean | undefined;
 
   beforeEach(async () => {
-    adapter = await Base.leaseConnection();
-    schemaMigration = new SchemaMigration(adapter.pool);
+    pool = Base.connectionPool();
+    schemaMigration = pool.schemaMigration;
     await schemaMigration.createTable();
-    await schemaMigration.deleteAllVersions();
-    internalMetadata = new InternalMetadata(adapter.pool);
+    await schemaMigration.deleteAllVersions().catch(() => null);
+    internalMetadata = pool.internalMetadata;
     verboseWas = Migration.verbose;
+    Migration.messageCount = 0;
+    Migration.prototype["puts"] = function () {
+      Migration.messageCount += 1;
+      return null;
+    };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await schemaMigration.deleteAllVersions().catch(() => null);
     Migration.verbose = verboseWas;
+    Migration.prototype["puts"] = function (...args: unknown[]) {
+      return puts.call(stdout, ...args);
+    };
   });
 
   it("migrator with duplicate names", async () => {
@@ -233,10 +242,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "down", version: "001", name: "Valid people have last names" },
-      { status: "up", version: "002", name: "We need reminders" },
-      { status: "down", version: "003", name: "Innocent jointable" },
-      { status: "up", version: "010", name: "********** NO FILE **********" },
+      ["down", "001", "Valid people have last names"],
+      ["up", "002", "We need reminders"],
+      ["down", "003", "Innocent jointable"],
+      ["up", "010", "********** NO FILE **********"],
     ]);
   });
 
@@ -250,10 +259,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "up", version: "230", name: "Add people hobby" },
-      { status: "up", version: "231", name: "Add people last name" },
-      { status: "up", version: "20210716122844", name: "Add people description" },
-      { status: "up", version: "20210716123013", name: "Add people number of legs" },
+      ["up", "230", "Add people hobby"],
+      ["up", "231", "Add people last name"],
+      ["up", "20210716122844", "Add people description"],
+      ["up", "20210716123013", "Add people number of legs"],
     ]);
   });
 
@@ -267,10 +276,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "up", version: "230", name: "Add people hobby" },
-      { status: "up", version: "231", name: "Add people last name" },
-      { status: "down", version: "20210716122844", name: "Add people description" },
-      { status: "up", version: "20210716123013", name: "Add people number of legs" },
+      ["up", "230", "Add people hobby"],
+      ["up", "231", "Add people last name"],
+      ["down", "20210716122844", "Add people description"],
+      ["up", "20210716123013", "Add people number of legs"],
     ]);
   });
 
@@ -284,10 +293,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "down", version: "001", name: "Valid people have last names" },
-      { status: "up", version: "002", name: "We need reminders" },
-      { status: "down", version: "003", name: "Innocent jointable" },
-      { status: "up", version: "010", name: "********** NO FILE **********" },
+      ["down", "001", "Valid people have last names"],
+      ["up", "002", "We need reminders"],
+      ["down", "003", "Innocent jointable"],
+      ["up", "010", "********** NO FILE **********"],
     ]);
   });
 
@@ -301,9 +310,9 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "up", version: "001", name: "Valid people have last names" },
-      { status: "up", version: "002", name: "We need reminders" },
-      { status: "up", version: "003", name: "Innocent jointable" },
+      ["up", "001", "Valid people have last names"],
+      ["up", "002", "We need reminders"],
+      ["up", "003", "Innocent jointable"],
     ]);
   });
 
@@ -320,24 +329,12 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "down", version: "20090101010101", name: "People have hobbies" },
-      { status: "down", version: "20090101010202", name: "People have descriptions" },
-      {
-        status: "up",
-        version: "20100101010101",
-        name: "Valid with timestamps people have last names",
-      },
-      {
-        status: "down",
-        version: "20100201010101",
-        name: "Valid with timestamps we need reminders",
-      },
-      {
-        status: "down",
-        version: "20100301010101",
-        name: "Valid with timestamps innocent jointable",
-      },
-      { status: "up", version: "20160528010101", name: "********** NO FILE **********" },
+      ["down", "20090101010101", "People have hobbies"],
+      ["down", "20090101010202", "People have descriptions"],
+      ["up", "20100101010101", "Valid with timestamps people have last names"],
+      ["down", "20100201010101", "Valid with timestamps we need reminders"],
+      ["down", "20100301010101", "Valid with timestamps innocent jointable"],
+      ["up", "20160528010101", "********** NO FILE **********"],
     ]);
   });
 
@@ -500,49 +497,26 @@ describe("MigratorTest", () => {
   });
 
   it("migrator verbosity", async () => {
-    const lines: string[] = [];
-    const spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
-      lines.push(chunk);
-      return true;
-    });
-    try {
-      const { migrations } = sensors(3);
+    const { migrations } = sensors(3);
 
-      Migration.verbose = true;
-      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
-      await upMigrator.migrate();
-      expect(lines.length).not.toBe(0);
+    Migration.verbose = true;
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
+    expect(Migration.messageCount).not.toEqual(0);
 
-      lines.length = 0;
+    Migration.messageCount = 0;
 
-      const downMigrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
-      await downMigrator.migrate();
-      expect(lines.length).not.toBe(0);
-    } finally {
-      spy.mockRestore();
-    }
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
+    expect(Migration.messageCount).not.toEqual(0);
   });
 
   it("migrator verbosity off", async () => {
-    const lines: string[] = [];
-    const spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
-      lines.push(chunk);
-      return true;
-    });
-    try {
-      const { migrations } = sensors(3);
+    const { migrations } = sensors(3);
 
-      Migration.verbose = false;
-      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
-      await upMigrator.migrate();
-      expect(lines.length).toBe(0);
-
-      const downMigrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
-      await downMigrator.migrate();
-      expect(lines.length).toBe(0);
-    } finally {
-      spy.mockRestore();
-    }
+    Migration.verbose = false;
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
+    expect(Migration.messageCount).toEqual(0);
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
+    expect(Migration.messageCount).toEqual(0);
   });
 
   it("target version zero should run only once", async () => {

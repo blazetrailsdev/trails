@@ -1,4 +1,5 @@
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
+import { max, rbObjDup, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export class TypeConflictError extends Error {
   constructor(message?: string) {
@@ -71,7 +72,7 @@ export class Registration {
     return result;
   }
 
-  compare(other: Registration): number {
+  compareTo(other: Registration): number {
     if (this.isConflictsWith(other)) {
       throw new TypeConflictError(
         `Type ${this.name} was registered for all adapters, but shadows a native type with the same name for ${this.adapter ?? other.adapter}`,
@@ -163,6 +164,10 @@ export class DecorationRegistration extends Registration {
 export class AdapterSpecificRegistry {
   private _registrations: Registration[] = [];
 
+  initializeCopy(other: AdapterSpecificRegistry): void {
+    this._registrations = rbObjDup(this._registrations);
+  }
+
   /** @internal */
   private get registrations(): Registration[] {
     return this._registrations;
@@ -182,8 +187,13 @@ export class AdapterSpecificRegistry {
     options?: { adapter?: string; override?: boolean },
     block?: (...args: unknown[]) => ValueType,
   ): void {
-    const factory = block ?? ((_symbol: unknown, ...args: unknown[]) => new klass!(...args));
-    this.registrations.push(new Registration(typeName, factory, options));
+    if (block == null) {
+      block = (_: unknown, ...args: unknown[]) => new klass!(...args);
+      if (rbObjRespondTo(block, "ruby2Keywords")) {
+        (block as unknown as { ruby2Keywords(): void }).ruby2Keywords();
+      }
+    }
+    this.registrations.push(new Registration(typeName, block, options));
   }
 
   lookup(symbol: string, ...args: unknown[]): ValueType {
@@ -195,12 +205,7 @@ export class AdapterSpecificRegistry {
   }
 
   /** @internal */
-  private findRegistration(symbol: string, ...args: unknown[]): Registration | undefined {
-    const matching = this.registrations.filter((r) => r.matches(symbol, ...args));
-    if (matching.length === 0) return undefined;
-    return matching.reduce((best, current) => {
-      const cmp = best.compare(current);
-      return cmp < 0 ? current : best;
-    });
+  private findRegistration(symbol: string, ...args: unknown[]): Registration | null {
+    return max(this.registrations.filter((registration) => registration.matches(symbol, ...args)));
   }
 }

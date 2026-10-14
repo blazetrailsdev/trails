@@ -1,18 +1,37 @@
 import {
   ActiveSupportJSON,
-  Assertion,
   camelize,
   classAttribute,
+  Concern,
+  constantize,
+  ConstantLookup,
+  extend,
   include,
+  isAnonymous,
   isBlank,
+  isModuleIncluded,
   isPlainObject,
   runLoadHooks,
-  SetupAndTeardown,
+  TopLevel,
+  toQuery,
   toXml,
-  type FilterListEntry,
+  fromXml,
   type Included,
 } from "@blazetrails/activesupport";
-import { b, KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
+import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
+import {
+  ArgumentError,
+  b,
+  KeyError,
+  merge,
+  Module,
+  rbModConstSet,
+  RuntimeError,
+  SecureRandom,
+  StringIO,
+  verbose,
+  warn,
+} from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
   Persisted,
@@ -20,525 +39,523 @@ import {
   SessionId,
   type PersistedRequest,
 } from "@blazetrails/rack-session";
-import { buildNestedQuery, statusCode } from "@blazetrails/rack";
 import {
   MULTIPART_BOUNDARY,
   UploadedFile as RackTestUploadedFile,
   Utils as RackTestUtils,
 } from "@blazetrails/rack-test";
 import { Mime } from "../action-dispatch/http/mime-type.js";
-import { Response } from "../action-dispatch/http/response.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
+import { Assertions } from "../action-dispatch/testing/assertions.js";
+import type { XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
-import { FlashHash } from "../action-dispatch/middleware/flash.js";
-import { CookieJar, type CookieResponse } from "../action-dispatch/middleware/cookies.js";
-import { cookies, type TestProcessHost } from "../action-dispatch/testing/test-process.js";
+import type { CookieJar, CookieResponse } from "../action-dispatch/middleware/cookies.js";
+import { TestProcess } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
-import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
+import type { DispatchableControllerClass } from "../action-dispatch/routing/dispatcher.js";
+import type { ClassMethods as RoutingAssertionsClassMethods } from "../action-dispatch/testing/assertions/routing.js";
+import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
-import { Functional } from "./metal/testing.js";
-import { _computeRedirectToLocation } from "./metal/redirecting.js";
+import { TemplateAssertions } from "./template-assertions.js";
+import { Testing } from "./metal/testing.js";
+import {
+  Buffer as LiveBuffer,
+  Live,
+  type LiveControllerHost,
+  Response as LiveResponse,
+} from "./metal/live.js";
 
-include(Metal, Functional);
+include(Metal, Testing.Functional);
 
 declare module "./metal.js" {
   /* eslint-disable-next-line @typescript-eslint/no-empty-object-type -- Ruby `class Metal; include Testing::Functional; end` (`actionpack/lib/action_controller/test_case.rb:16-18`). */
-  interface Metal extends Included<typeof Functional> {}
+  interface Metal extends Included<(typeof Testing)["Functional"]> {}
 }
+
+Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+
+export async function newControllerThread(
+  this: LiveControllerHost,
+  block: () => void | Promise<void>,
+): Promise<void> {
+  await block();
+}
+
+Live.aliasMethod("originalCleanUpThreadLocals", "cleanUpThreadLocals");
+
+export function cleanUpThreadLocals(this: LiveControllerHost, ..._args: unknown[]): void {}
+
+Live.defineMethod("newControllerThread", newControllerThread);
+Live.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
+
+LiveBuffer.queueSize = null;
 
 type ControllerClass = new () => Metal;
 
 export interface RequestOptions {
-  params?: Record<string, unknown>;
-  headers?: Record<string, string>;
+  params?: Record<string, unknown> | null;
   session?: Record<string, unknown>;
   flash?: Record<string, string>;
-  body?: string;
+  body?: string | Record<string, unknown>;
   format?: string;
   xhr?: boolean;
   as?: string;
-  env?: Record<string, unknown>;
   method?: string;
 }
 
-const STATUS_RANGES: Record<string, [number, number]> = {
-  success: [200, 299],
-  redirect: [300, 399],
-  missing: [400, 499],
-  error: [500, 599],
-};
-
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`actionpack/lib/action_controller/test_case.rb:152`); the class/interface merge is how a mixin surfaces on the type side. */
-interface Encoder extends Included<typeof RackTestUtils> {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
-class Encoder {
-  shouldMultipart(params: Record<string, unknown>): boolean {
-    let multipart = false;
-    const query = (value: unknown): void => {
-      if (Array.isArray(value)) {
-        value.forEach(query);
-      } else if (isPlainObject(value)) {
-        Object.values(value).forEach(query);
-      } else if (value instanceof RackTestUploadedFile) {
-        multipart = true;
-      }
-    };
-    Object.values(params).forEach(query);
-    return multipart;
-  }
-
-  get contentType(): string {
-    return `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
-  }
+interface BehaviorClassMethods {
+  tests(controllerClass: ControllerClass | string): void;
+  controllerClass: ControllerClass | null;
+  determineDefaultControllerClass(name: string): ControllerClass | null;
 }
 
-include(Encoder, RackTestUtils);
+interface BehaviorClass extends BehaviorClassMethods {
+  name: string;
+  determineConstantFromTestName(testName: string, block: (constant: unknown) => unknown): unknown;
+  _controllerClass: ControllerClass | null | undefined;
+}
 
-export class TestCase {
-  /** @internal */
-  declare static _controllerClass: ControllerClass | null | undefined;
-  declare static is_controllerClass: boolean;
-
-  static {
-    classAttribute.call(this, "_controllerClass");
-  }
-
-  static executorAroundEachRequest = false;
-
-  static tests(controllerClass: ControllerClass | string): void {
+export const ClassMethods: BehaviorClassMethods & ThisType<BehaviorClass> = {
+  tests(controllerClass: ControllerClass | string): void {
     if (typeof controllerClass === "string") {
-      const constantName = `${camelize(controllerClass)}Controller`;
-      const klass = (globalThis as Record<string, unknown>)[constantName];
-      if (typeof klass !== "function") {
-        throw new Error(`uninitialized constant ${constantName}`);
-      }
-      this._controllerClass = klass as ControllerClass;
-      return;
+      this.controllerClass = constantize(
+        `${camelize(controllerClass)}Controller`,
+      ) as ControllerClass;
+    } else if (typeof controllerClass === "function") {
+      this.controllerClass = controllerClass;
+    } else {
+      throw new ArgumentError("controller class must be a String, Symbol, or Class");
     }
-    if (typeof controllerClass !== "function") {
-      throw new Error("controller class must be a String or Class");
-    }
-    this._controllerClass = controllerClass;
-  }
+  },
 
-  static get controllerClass(): ControllerClass | null {
+  set controllerClass(newClass: ControllerClass | null) {
+    this._controllerClass = newClass;
+  },
+
+  get controllerClass(): ControllerClass | null {
     const currentControllerClass = this._controllerClass;
     if (currentControllerClass) {
       return currentControllerClass;
     } else {
       return (this.controllerClass = this.determineDefaultControllerClass(this.name));
     }
-  }
-  static set controllerClass(v: ControllerClass | null) {
-    this._controllerClass = v;
-  }
+  },
 
-  static determineDefaultControllerClass(name: string): ControllerClass | null {
-    if (!name) return null;
-    const stripped = name.replace(/Test$/, "");
-    const candidate = (globalThis as Record<string, unknown>)[stripped];
-    return typeof candidate === "function" ? (candidate as ControllerClass) : null;
-  }
+  determineDefaultControllerClass(name: string): ControllerClass | null {
+    return this.determineConstantFromTestName(
+      name,
+      (constant) => typeof constant === "function" && constant.prototype instanceof Metal,
+    ) as ControllerClass | null;
+  },
+};
 
-  static setup(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.setup.call(this.prototype, ...args);
-  }
-
-  static teardown(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.teardown.call(this.prototype, ...args);
-  }
-
-  static withRouting(
-    this: ThisParameterType<typeof routingAssertions.ClassMethods.withRouting>,
-    block: (routes: RouteSet) => unknown,
-  ): void {
-    routingAssertions.ClassMethods.withRouting.call(this, block);
-  }
-
-  /** @internal */
-  beforeSetup(): void {
-    SetupAndTeardown.beforeSetup.call(this);
-  }
-
-  /** @internal */
-  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): void {
-    SetupAndTeardown.afterTeardown.call(this, test);
-  }
-
-  setup(): void {
-    routingAssertions.setup.call(this);
-  }
-
+export interface Behavior extends Included<typeof TestProcess> {
   routes?: RouteSet;
-
-  declare assertRecognizes: typeof routingAssertions.assertRecognizes;
-  declare assertGenerates: typeof routingAssertions.assertGenerates;
-  declare assertRouting: typeof routingAssertions.assertRouting;
-  declare withRouting: typeof routingAssertions.withRouting;
-  /** @internal */
-  declare createRoutes: typeof routingAssertions.createRoutes;
-  /** @internal */
-  declare resetRoutes: typeof routingAssertions.resetRoutes;
-  /** @internal */
-  declare recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
-  /** @internal */
-  declare failOn: typeof routingAssertions.failOn;
-
-  controllerClassName(): string {
-    return (this.constructor as typeof TestCase).controllerClass?.name ?? "";
-  }
-
-  private _controllerClass: ControllerClass;
-
-  controller!: Metal;
-
-  request!: TestRequest;
-
-  response!: Response;
-
-  get session(): TestSession {
-    return this.request.session as unknown as TestSession;
-  }
-
-  get flash(): FlashHash {
-    return (this.controller as any).flash ?? new FlashHash();
-  }
-
-  get cookies(): CookieJar {
-    return cookies.call(this as unknown as TestProcessHost);
-  }
-
+  controller: Metal;
+  request: TestRequest;
+  response: TestResponse | LiveTestResponse;
   /** @internal */
   _cookieJar?: CookieJar;
-
   /** @internal */
-  _responseKlass!: typeof Response;
+  _responseKlass: typeof TestResponse | typeof LiveTestResponse;
+  /** @internal */
+  _htmlDocument?: XmlDocument;
+  readonly htmlDocument: XmlDocument;
+  get: OmitThisParameter<typeof get>;
+  post: OmitThisParameter<typeof post>;
+  patch: OmitThisParameter<typeof patch>;
+  put: OmitThisParameter<typeof put>;
+  delete: OmitThisParameter<typeof deleteRequest>;
+  head: OmitThisParameter<typeof head>;
+  process: OmitThisParameter<typeof process>;
+  controllerClassName: OmitThisParameter<typeof controllerClassName>;
+  /** @internal */
+  generatedPath: OmitThisParameter<typeof generatedPath>;
+  /** @internal */
+  queryParameterNames: OmitThisParameter<typeof queryParameterNames>;
+  setupControllerRequestAndResponse: OmitThisParameter<typeof setupControllerRequestAndResponse>;
+  /** @internal */
+  buildResponse: OmitThisParameter<typeof buildResponse>;
+  /** @internal */
+  setupRequest: OmitThisParameter<typeof setupRequest>;
+  /** @internal */
+  wrapExecution<T>(block: () => T): T;
+  /** @internal */
+  processControllerResponse: OmitThisParameter<typeof processControllerResponse>;
+  /** @internal */
+  scrubEnvBang: OmitThisParameter<typeof scrubEnvBang>;
+  /** @internal */
+  readonly documentRootElement: ReturnType<typeof documentRootElement>;
+  /** @internal */
+  checkRequiredIvars: OmitThisParameter<typeof checkRequiredIvars>;
+}
 
-  get responseBody(): string {
-    return this.response?.body ?? this.controller?.responseBody ?? "";
+async function get(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "GET", ...options });
+}
+
+async function post(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "POST", ...options });
+}
+
+async function patch(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "PATCH", ...options });
+}
+
+async function put(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "PUT", ...options });
+}
+
+async function deleteRequest(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "DELETE", ...options });
+}
+
+export { deleteRequest as delete };
+
+async function head(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "HEAD", ...options });
+}
+
+async function process(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  const { method = "GET", params, session, body, flash = {}, xhr = false, as } = options;
+  let { format } = options;
+
+  this.checkRequiredIvars();
+  this.controller.clearInstanceVariablesBetweenRequests();
+
+  const httpMethod = String(method).toUpperCase();
+
+  this._htmlDocument = undefined;
+
+  this.cookies().update(this.request.cookies);
+  this.cookies().updateCookiesFromJar();
+  this.request.setHeader("HTTP_COOKIE", this.cookies().toHeader());
+  this.request.deleteHeader("action_dispatch.cookies");
+
+  this.request = new TestRequest(
+    this.scrubEnvBang(this.request.env),
+    this.request.session as unknown as TestSession,
+    this.controller.constructor as typeof Metal,
+  );
+  this.response = this.buildResponse(this._responseKlass);
+  this.response.request = this.request;
+  this.controller.recycleBang();
+
+  if (body) {
+    this.request.setHeader("RAW_POST_DATA", body);
   }
 
-  get parsedBody(): unknown {
-    return JSON.parse(this.responseBody);
+  this.request.setHeader("REQUEST_METHOD", httpMethod);
+
+  if (as) {
+    this.request.contentType = Mime.get(as)!.toString();
+    format ??= as;
   }
 
-  constructor(controllerClass: ControllerClass) {
-    this._controllerClass = controllerClass;
-    this.setupControllerRequestAndResponse();
+  const parameters: Record<string, unknown> = { ...(params ?? {}) };
+
+  if (format) {
+    parameters["format"] = format;
   }
 
-  setupControllerRequestAndResponse(): void {
-    this._responseKlass = TestResponse;
+  this.setupRequest(this.controllerClassName(), action, parameters, session, flash, xhr);
+  return this.processControllerResponse(action, this.cookies(), xhr);
+}
 
-    const klass = this._controllerClass;
-    if (klass) {
-      if (!this.controller) {
-        try {
-          this.controller = new klass();
-        } catch {
-          this.controller = undefined!;
+function controllerClassName(this: Behavior): string {
+  const klass = this.controller.constructor as typeof Metal;
+  return isAnonymous(klass) ? "anonymous" : klass.controllerPath();
+}
+
+/** @internal */
+function generatedPath(this: Behavior, generatedExtras: [string, string[]]): string {
+  return generatedExtras[0];
+}
+
+/** @internal */
+function queryParameterNames(this: Behavior, generatedExtras: [string, string[]]): string[] {
+  return [...generatedExtras[1], "controller", "action"];
+}
+
+function setupControllerRequestAndResponse(this: Behavior): void {
+  if (this.controller === undefined) this.controller = null!;
+
+  this._responseKlass = TestResponse;
+
+  const klass = (this.constructor as typeof TestCase).controllerClass;
+  if (klass) {
+    if (isModuleIncluded(klass, Live)) this._responseKlass = LiveTestResponse;
+    if (!this.controller) {
+      try {
+        this.controller = new klass();
+      } catch {
+        const verboseGlobal = verbose();
+        if (verboseGlobal != null && verboseGlobal !== false) {
+          warn(`could not construct controller ${klass.name}`);
         }
       }
     }
-
-    this.request = TestRequest.create(this.controller?.constructor ?? klass);
-    this.response = this.buildResponse(this._responseKlass);
-    this.response.request = this.request;
-
-    if (this.controller) {
-      this.controller.request = this.request;
-      this.controller.params = {};
-    }
   }
 
-  async get(action: string, options: RequestOptions = {}): Promise<void> {
-    await this.process(action, { method: "GET", ...options });
-  }
+  this.request = TestRequest.create(this.controller == null ? null : this.controller.constructor);
+  this.response = this.buildResponse(this._responseKlass);
+  this.response.request = this.request;
 
-  async post(action: string, options: RequestOptions = {}): Promise<void> {
-    await this.process(action, { method: "POST", ...options });
-  }
-
-  async put(action: string, options: RequestOptions = {}): Promise<void> {
-    await this.process(action, { method: "PUT", ...options });
-  }
-
-  async patch(action: string, options: RequestOptions = {}): Promise<void> {
-    await this.process(action, { method: "PATCH", ...options });
-  }
-
-  async delete(action: string, options: RequestOptions = {}): Promise<void> {
-    await this.process(action, { method: "DELETE", ...options });
-  }
-
-  async head(action: string, options: RequestOptions = {}): Promise<void> {
-    await this.process(action, { method: "HEAD", ...options });
-  }
-
-  assertResponse(expected: number | string): void {
-    const actual = this.response?.statusCode ?? this.controller?.status;
-    if (typeof expected === "number") {
-      if (actual !== expected) {
-        throw new Error(`Expected response status ${expected}, got ${actual}`);
-      }
-      return;
-    }
-
-    const range = STATUS_RANGES[expected];
-    if (range) {
-      if (actual < range[0] || actual > range[1]) {
-        throw new Error(
-          `Expected response to be "${expected}" (${range[0]}-${range[1]}), got ${actual}`,
-        );
-      }
-      return;
-    }
-
-    const code = statusCode(expected);
-    if (actual !== code) {
-      throw new Error(`Expected response status :${expected} (${code}), got ${actual}`);
-    }
-  }
-
-  assertRedirectedTo(expected: string | RegExp): void {
-    const location =
-      this.response?.getHeader("location") ?? this.controller?.headers.get("location");
-    if (!location) {
-      throw new Assertion("Expected a redirect but no Location header was set");
-    }
-    if (typeof expected === "string") {
-      const redirectIs = _computeRedirectToLocation(this.request, location);
-      const redirectExpected = _computeRedirectToLocation(this.request, expected);
-      if (redirectIs !== redirectExpected) {
-        throw new Assertion(`Expected redirect to "${expected}", got "${location}"`);
-      }
-    } else {
-      if (!expected.test(location)) {
-        throw new Assertion(`Expected redirect matching ${expected}, got "${location}"`);
-      }
-    }
-  }
-
-  /** @internal */
-  assertTemplate(_options: unknown = {}, _message?: string): never {
-    throw new Error(
-      "assert_template has been extracted to a gem. To continue using it, " +
-        'add `gem "rails-controller-testing"` to your Gemfile.',
-    );
-  }
-
-  reset(): void {
-    this.controller = undefined!;
-    this._cookieJar = undefined;
-    this.setupControllerRequestAndResponse();
-  }
-
-  async process(action: string, options: RequestOptions = {}): Promise<void> {
-    const {
-      method = "GET",
-      params,
-      session,
-      body,
-      flash,
-      xhr = false,
-      as,
-      env: extraEnv = {},
-      headers,
-    } = options;
-    let { format } = options;
-
-    const httpMethod = String(method).toUpperCase();
-
-    this.controller.clearInstanceVariablesBetweenRequests();
-
-    this.cookies.update(this.request.cookies);
-    this.cookies.updateCookiesFromJar();
-    this.request.setHeader("HTTP_COOKIE", this.cookies.toHeader());
-    this.request.deleteHeader("action_dispatch.cookies");
-
-    this.request = new TestRequest(
-      this.scrubEnvBang(this.request.env),
-      this.request.session as unknown as TestSession,
-      this.controller.constructor,
-    );
-    this.response = this.buildResponse(this._responseKlass);
-    this.response.request = this.request;
-    this.controller.recycleBang();
-
-    if (body) {
-      this.request.setHeader("RAW_POST_DATA", body);
-    }
-
-    this.request.setHeader("REQUEST_METHOD", httpMethod);
-
-    if (as) {
-      this.request.contentType = formatToMime(as);
-      format ??= as;
-    }
-
-    const parameters: Record<string, unknown> = { ...(params ?? {}) };
-
-    if (format) {
-      parameters["format"] = format;
-    }
-
-    for (const [key, value] of Object.entries(extraEnv)) this.request.setHeader(key, value);
-    if (headers) {
-      for (const [name, value] of Object.entries(headers)) {
-        const envKey = name.startsWith("HTTP_")
-          ? name
-          : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
-        this.request.setHeader(envKey, value);
-      }
-    }
-
-    this.setupRequest(
-      (this._controllerClass as unknown as typeof import("./metal.js").Metal).controllerPath(),
-      action,
-      parameters,
-      session,
-      flash,
-      xhr,
-    );
-    await this.processControllerResponse(action, this.cookies, xhr);
-  }
-
-  /** @internal */
-  generatedPath(generatedExtras: [string, string[]]): string {
-    return generatedExtras[0];
-  }
-
-  /** @internal */
-  queryParameterNames(generatedExtras: [string, string[]]): string[] {
-    return [...generatedExtras[1], "controller", "action"];
-  }
-
-  /** @internal */
-  buildResponse(klass: typeof Response): Response {
-    return klass.create();
-  }
-
-  /** @internal */
-  wrapExecution(fn: () => Promise<void>): Promise<void> {
-    return fn();
-  }
-  /** @internal */
-  private setupRequest(
-    controllerClassName: string,
-    action: string,
-    parameters: Record<string, unknown>,
-    session: Record<string, unknown> | undefined,
-    flash: Record<string, string> | undefined,
-    xhr: boolean,
-  ): void {
-    this.request.setHeader("PATH_INFO", parameters["path"] ?? `/${action}`);
-    if (Object.keys(parameters).length > 0) (this.request as any).parameters = parameters;
-    this.request.setHeader("action_dispatch.request.path_parameters", {
-      controller: controllerClassName,
-      action,
-    });
-
-    if (session) this.request.session.update(session);
-    this.request.flash!.update(flash ?? {});
-
-    if (xhr) {
-      this.request.setHeader("HTTP_X_REQUESTED_WITH", "XMLHttpRequest");
-      this.request.fetchHeader("HTTP_ACCEPT", (k) => {
-        this.request.setHeader(
-          k,
-          [Mime.get("js"), Mime.get("html"), Mime.get("xml"), "text/xml", "*/*"].join(", "),
-        );
-      });
-    }
-
-    this.request.fetchHeader("SCRIPT_NAME", (k) => {
-      this.request.setHeader(
-        k,
-        (this.controller as unknown as { config(): { relativeUrlRoot?: string } }).config()
-          .relativeUrlRoot,
-      );
-    });
-  }
-
-  /** @internal */
-  private async processControllerResponse(
-    action: string,
-    cookies: CookieJar,
-    xhr: boolean,
-  ): Promise<void> {
-    try {
-      this.controller.recycleBang();
-
-      await this.wrapExecution(() =>
-        this.controller.dispatch(action, this.request, this.response).then(() => {}),
-      );
-    } finally {
-      this.request = this.controller.request as TestRequest;
-      this.response = this.controller.response;
-
-      if (this.request.isHaveCookieJar()) {
-        if (!this.request.cookieJar().isCommitted()) {
-          this.request.cookieJar().write(this.response as unknown as CookieResponse);
-          cookies.update(this.request.cookieJar().toHash());
-          cookies.update(this.response.cookies as Record<string, string>);
-        }
-      }
-      this.response.toRack();
-
-      const flashValue = this.request.flash!.toSessionValue();
-      if (flashValue) {
-        this.request.session.set("flash", flashValue);
-      } else {
-        this.request.session.delete("flash");
-      }
-
-      if (xhr) {
-        this.request.deleteHeader("HTTP_X_REQUESTED_WITH");
-        this.request.deleteHeader("HTTP_ACCEPT");
-      }
-      this.request.queryString = "";
-
-      this.response.sentBang();
-    }
-  }
-
-  /** @internal */
-  private scrubEnvBang(env: Record<string, unknown>): Record<string, unknown> {
-    for (const key of Object.keys(env)) {
-      if (
-        key.startsWith("rack.request") ||
-        key.startsWith("action_dispatch.request") ||
-        key.startsWith("action_dispatch.rescue")
-      )
-        delete env[key];
-    }
-    delete env["CONTENT_LENGTH"];
-    delete env["RAW_POST_DATA"];
-    env["rack.input"] = new StringIO();
-    return env;
+  if (this.controller) {
+    this.controller.request = this.request;
+    this.controller.params = {};
   }
 }
 
-const proto = TestCase.prototype as unknown as Record<string, unknown>;
-proto.assertRecognizes = routingAssertions.assertRecognizes;
-proto.assertGenerates = routingAssertions.assertGenerates;
-proto.assertRouting = routingAssertions.assertRouting;
-proto.withRouting = routingAssertions.withRouting;
-proto.createRoutes = routingAssertions.createRoutes;
-proto.resetRoutes = routingAssertions.resetRoutes;
-proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
-proto.failOn = routingAssertions.failOn;
+/** @internal */
+function buildResponse(this: Behavior, klass: Behavior["_responseKlass"]): Behavior["response"] {
+  return klass.create();
+}
 
-SetupAndTeardown.prepended(TestCase.prototype);
+/** @internal */
+function setupRequest(
+  this: Behavior,
+  controllerClassName: string,
+  action: string,
+  parameters: Record<string, unknown>,
+  session: Record<string, unknown> | undefined,
+  flash: Record<string, string> | undefined,
+  xhr: boolean,
+): void {
+  const generatedExtras = this.routes!.generateExtras(
+    merge(parameters, { controller: controllerClassName, action }),
+  );
+  const generatedPath = this.generatedPath(generatedExtras);
+  const queryStringKeys = this.queryParameterNames(generatedExtras);
 
-runLoadHooks("action_controller_test_case", TestCase);
+  this.request.assignParameters(
+    this.routes,
+    controllerClassName,
+    action,
+    parameters,
+    generatedPath,
+    queryStringKeys,
+  );
+
+  if (session) this.request.session.update(session);
+  this.request.flash!.update(flash ?? {});
+
+  if (xhr) {
+    this.request.setHeader("HTTP_X_REQUESTED_WITH", "XMLHttpRequest");
+    this.request.fetchHeader("HTTP_ACCEPT", (k) => {
+      this.request.setHeader(
+        k,
+        [Mime.get("js"), Mime.get("html"), Mime.get("xml"), "text/xml", "*/*"].join(", "),
+      );
+    });
+  }
+
+  this.request.fetchHeader("SCRIPT_NAME", (k) => {
+    this.request.setHeader(
+      k,
+      (this.controller as unknown as { config(): { relativeUrlRoot?: string } }).config()
+        .relativeUrlRoot,
+    );
+  });
+}
+
+/** @internal */
+function wrapExecution<T>(this: Behavior, block: () => T): T {
+  if (
+    TestCase.executorAroundEachRequest &&
+    TopLevel.Trails !== undefined &&
+    TopLevel.Trails.application
+  ) {
+    return TopLevel.Trails.application.executor.wrap(block);
+  } else {
+    return block();
+  }
+}
+
+/** @internal */
+async function processControllerResponse(
+  this: Behavior,
+  action: string,
+  cookies: CookieJar,
+  xhr: boolean,
+): Promise<Behavior["response"]> {
+  try {
+    this.controller.recycleBang();
+
+    await this.wrapExecution(() => this.controller.dispatch(action, this.request, this.response));
+  } finally {
+    this.request = this.controller.request as TestRequest;
+    this.response = this.controller.response as Behavior["response"];
+
+    if (this.request.isHaveCookieJar()) {
+      if (!this.request.cookieJar().isCommitted()) {
+        this.request.cookieJar().write(this.response as unknown as CookieResponse);
+        cookies.update(this.request.cookieJar().toHash());
+        cookies.update(this.response.cookies as Record<string, string>);
+      }
+    }
+    this.response.toRack();
+
+    const flashValue = this.request.flash!.toSessionValue();
+    if (flashValue) {
+      this.request.session.set("flash", flashValue);
+    } else {
+      this.request.session.delete("flash");
+    }
+
+    if (xhr) {
+      this.request.deleteHeader("HTTP_X_REQUESTED_WITH");
+      this.request.deleteHeader("HTTP_ACCEPT");
+    }
+    this.request.queryString = "";
+
+    this.response.sentBang();
+  }
+
+  return this.response;
+}
+
+/** @internal */
+function scrubEnvBang(this: Behavior, env: Record<string, unknown>): Record<string, unknown> {
+  for (const key of Object.keys(env)) {
+    if (
+      key.startsWith("rack.request") ||
+      key.startsWith("action_dispatch.request") ||
+      key.startsWith("action_dispatch.rescue")
+    )
+      delete env[key];
+  }
+  env["rack.input"] = new StringIO();
+  delete env["CONTENT_LENGTH"];
+  delete env["RAW_POST_DATA"];
+  return env;
+}
+
+/** @internal */
+function documentRootElement(this: Behavior) {
+  return this.htmlDocument.root;
+}
+
+/** @internal */
+function checkRequiredIvars(this: Behavior): void {
+  for (const ivName of ["routes", "controller", "request", "response"] as const) {
+    if (this[ivName] == null) {
+      throw new RuntimeError(
+        `@${ivName} is nil: make sure you set it in your test's setup method.`,
+      );
+    }
+  }
+}
+
+export const Behavior = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(TestProcess);
+  mod.include(ConstantLookup);
+
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      get,
+      post,
+      patch,
+      put,
+      delete: deleteRequest,
+      head,
+      process,
+      controllerClassName,
+      generatedPath,
+      queryParameterNames,
+      setupControllerRequestAndResponse,
+      buildResponse,
+    });
+  });
+
+  (
+    mod as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
+  ).included(null, function (this: typeof TestCase) {
+    include(this, TemplateAssertions);
+    include(this, Assertions);
+    classAttribute.call(this, "_controllerClass");
+    this.setup(":setupControllerRequestAndResponse");
+    runLoadHooks("action_controller_test_case", this);
+  });
+
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      setupRequest,
+      wrapExecution,
+      processControllerResponse,
+      scrubEnvBang,
+      checkRequiredIvars,
+    });
+    Object.defineProperty(m, "documentRootElement", {
+      get: documentRootElement,
+      configurable: true,
+    });
+  });
+});
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Behavior` (`actionpack/lib/action_controller/test_case.rb:696`) and the two `include`s of its `included do` block (`:597-598`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface TestCase extends Behavior, TemplateAssertions, Assertions {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class TestCase extends ActiveSupportTestCase {
+  static executorAroundEachRequest: boolean | null | undefined = null;
+
+  declare response: TestResponse | LiveTestResponse;
+  declare request: TestRequest;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace -- `Behavior::ClassMethods`, `class_attribute :_controller_class` and `RoutingAssertions::ClassMethods` reach `TestCase` through `include Behavior` (`actionpack/lib/action_controller/test_case.rb:379-414,599,696`); a namespace merged onto the class is how the added statics surface on the type side.
+export declare namespace TestCase {
+  /** @internal */
+  let _controllerClass: ControllerClass | null | undefined;
+  let is_controllerClass: boolean;
+  const tests: BehaviorClassMethods["tests"];
+  let controllerClass: ControllerClass | null;
+  const determineDefaultControllerClass: BehaviorClassMethods["determineDefaultControllerClass"];
+  const determineConstantFromTestName: BehaviorClass["determineConstantFromTestName"];
+  let withRouting: typeof RoutingAssertionsClassMethods.withRouting;
+}
+
+rbModConstSet(ActionController, "TestCase", TestCase);
+
+include(TestCase, Behavior);
 
 export class TestRequest extends AbstractTestRequest {
   /** @internal */
   private _customParamParsers: Record<string, (raw: string) => unknown> = {
-    xml: (_raw) => ({}),
+    ":xml": (rawPost) => (fromXml(rawPost) as Record<string, unknown>)["hash"],
   };
 
   /** @internal */
@@ -546,16 +563,19 @@ export class TestRequest extends AbstractTestRequest {
     return new TestSession();
   }
 
-  /** @internal */
-  private _testControllerClass: unknown;
+  private _controllerClass: DispatchableControllerClass | null;
 
-  static create(controllerClass?: unknown): TestRequest {
+  override controllerClass(): DispatchableControllerClass | null {
+    return this._controllerClass;
+  }
+
+  static create(controllerClass: unknown): TestRequest {
     const env: Record<string, unknown> = {};
     env["rack.request.cookie_hash"] = {};
     return new TestRequest(
       merge(TestRequest.defaultEnv(), env),
       TestRequest.newSession(),
-      controllerClass ?? null,
+      controllerClass as DispatchableControllerClass | null,
     );
   }
 
@@ -567,12 +587,16 @@ export class TestRequest extends AbstractTestRequest {
     return env;
   }
 
-  constructor(env: Record<string, unknown>, session: TestSession, controllerClass: unknown) {
+  constructor(
+    env: Record<string, unknown>,
+    session: TestSession,
+    controllerClass: DispatchableControllerClass | null,
+  ) {
     super(env);
 
     this.session = session as never;
     this.sessionOptions = { ...TestSession.DEFAULT_OPTIONS };
-    this._testControllerClass = controllerClass;
+    this._controllerClass = controllerClass;
   }
 
   get queryString(): string {
@@ -616,7 +640,7 @@ export class TestRequest extends AbstractTestRequest {
 
     if (this.isGet()) {
       if (isBlank(this.queryString)) {
-        this.queryString = buildNestedQuery(nonPathParameters);
+        this.queryString = toQuery(nonPathParameters);
       }
     } else {
       let data: string;
@@ -639,11 +663,11 @@ export class TestRequest extends AbstractTestRequest {
             data = toXml(nonPathParameters);
             break;
           case ":url_encoded_form":
-            data = buildNestedQuery(nonPathParameters);
+            data = toQuery(nonPathParameters);
             break;
           default:
             this._customParamParsers[contentMimeType!.symbol!] = () => nonPathParameters;
-            data = buildNestedQuery(nonPathParameters);
+            data = toQuery(nonPathParameters);
         }
         data = b(data);
       }
@@ -665,19 +689,43 @@ export class TestRequest extends AbstractTestRequest {
     this.pathParameters = pathParameters;
   }
 
-  static readonly ENCODER = new Encoder();
+  static readonly ENCODER = new (class {
+    static {
+      include(this, RackTestUtils);
+    }
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — PERMANENT
-   */
+    shouldMultipart(params: Record<string, unknown>): boolean {
+      let multipart = false;
+      const query = (value: unknown): void => {
+        if (Array.isArray(value)) {
+          value.forEach(query);
+        } else if (isPlainObject(value)) {
+          Object.values(value).forEach(query);
+        } else if (value instanceof RackTestUploadedFile) {
+          multipart = true;
+        }
+      };
+      Object.values(params).forEach(query);
+      return multipart;
+    }
+
+    declare buildMultipart: Included<typeof RackTestUtils>["buildMultipart"];
+
+    get contentType(): string {
+      return `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
+    }
+  })();
+
+  /** @internal */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
   }
 }
 
-export class LiveTestResponse extends Response {
+rbModConstSet(ActionController, "TestRequest", TestRequest);
+
+export class LiveTestResponse extends LiveResponse {
   get isSuccess(): boolean {
     return this.successful;
   }
@@ -761,17 +809,3 @@ export class TestSession extends SecureSessionHash {
 }
 
 Object.defineProperty(TestSession, "name", { value: "ActionController::TestSession" });
-
-function formatToMime(format: string): string {
-  const MIMES: Record<string, string> = {
-    json: "application/json",
-    xml: "application/xml",
-    html: "text/html",
-    text: "text/plain",
-    js: "text/javascript",
-    css: "text/css",
-    csv: "text/csv",
-    any: "*/*",
-  };
-  return MIMES[format] ?? format;
-}

@@ -1,11 +1,7 @@
 import { Logger } from "@blazetrails/activesupport";
-import { stderr } from "@blazetrails/ruby-compat";
-import {
-  ParameterTypeError as RackParameterTypeError,
-  InvalidParameterError as RackInvalidParameterError,
-  ParamsTooDeepError as RackParamsTooDeepError,
-} from "@blazetrails/rack";
-import { merge, mergeBang } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
+
+import { merge } from "@blazetrails/ruby-compat";
 import { MimeType } from "./mime-type.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
@@ -37,7 +33,7 @@ export interface ParametersHost {
   deleteHeader(key: string): void;
   queryParameters: Record<string, unknown>;
   requestParameters: Record<string, unknown>;
-  contentLength: number | undefined;
+  contentLength: number;
   contentMimeType: MimeType | null;
   rawPost: string;
   logger?: { debug(message: string): void } | null;
@@ -87,7 +83,7 @@ export function parameters(this: ParametersHost): Record<string, unknown> {
   if (cached) return cached as Record<string, unknown>;
 
   const params: Record<string, unknown> = merge(this.requestParameters, this.queryParameters);
-  mergeBang(params, pathParameters.call(this));
+  Object.assign(params, pathParameters.call(this));
   this.setHeader("action_dispatch.request.parameters", params);
   return params;
 }
@@ -115,14 +111,7 @@ export function parseFormattedParameters(
   try {
     return strategy(this.rawPost);
   } catch (e) {
-    if (e instanceof ParseError) throw e;
-    if (
-      e instanceof RackParameterTypeError ||
-      e instanceof RackInvalidParameterError ||
-      e instanceof RackParamsTooDeepError
-    ) {
-      throw e;
-    }
+    if (e instanceof Exception && !(e instanceof StandardError)) throw e;
     logParseErrorOnce.call(this);
     throw new ParseError("Error occurred while parsing request parameters");
   }

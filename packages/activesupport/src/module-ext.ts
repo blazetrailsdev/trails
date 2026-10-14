@@ -1,16 +1,27 @@
-import { NameError } from "@blazetrails/ruby-compat";
+import { classpaths, NameError, rbModName } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
+import { callerLocations } from "./deprecation.js";
 import { extractOptionsBang } from "./hash-utils.js";
 
-/** @missingRailsArgs generate — PERMANENT */
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
   const options = extractOptionsBang(methods);
   const names = methods;
-  const { to, prefix, allowNil } = options as unknown as DelegateOptions;
+  const {
+    to = null,
+    prefix = null,
+    allowNil = null,
+    private: priv = null,
+  } = options as unknown as DelegateOptions;
 
-  return Delegation.generate(this, names as string[], { to, prefix, allowNil });
+  return Delegation.generate(this, names as string[], {
+    location: callerLocations(1, 1)[0],
+    to,
+    prefix,
+    allowNil,
+    private: priv,
+  });
 }
 
 export function delegateMissingTo<T extends object>(
@@ -205,22 +216,41 @@ export function attrInternalAccessor(this: object, ...attrs: string[]): void {
 
 export const attrInternal = attrInternalAccessor;
 
+/**
+ * `name.nil?` (`core_ext/module/anonymous.rb:27-29`). A class is named by the
+ * constant seat that paths it (`vendor/ruby/v3.3.11/variable.c:122-127`), or
+ * by its own `class Foo` definition. A definition with no identifier is
+ * Ruby's `Class.new`, which JS names after the binding it is assigned to:
+ * like Ruby, that names the class only when the binding is a constant name
+ * (`Foo = Class.new`), and not when it is a local (`klass = Class.new`).
+ *
+ * A minifier that mangles class names is out of scope, as it is for every
+ * reader of `name`: `controller_name` would read the mangled name either way.
+ * A bundle keeps its classes named by preserving names (esbuild `keepNames`
+ * writes the original constant name back onto the class) or by seating them.
+ */
 export function isAnonymous(klass: { name: string }): boolean {
-  return !klass.name || klass.name === "";
+  if (classpaths.has(klass)) return false;
+  if (!klass.name) return true;
+  if (typeof klass !== "function") return false;
+  const source = Function.prototype.toString.call(klass);
+  if (!/^class(?:\s|\/\*[\s\S]*?\*\/|\/\/.*)*(?:extends\b|\{)/.test(source)) return false;
+  return !/^[\p{Lu}\p{Lt}]/u.test(klass.name);
 }
 
-export function moduleParentName(klass: { name: string }): string | null {
-  const name = klass.name ?? "";
+export function moduleParentName(klass: object): string | null {
+  const name = rbModName(klass);
+  if (name == null) return null;
   const parts = name.split("::");
   if (parts.length <= 1) return null;
   return parts.slice(0, -1).join("::");
 }
 
-export function moduleParent(klass: { name: string }): unknown {
+export function moduleParent(klass: object): unknown {
   return moduleParentName(klass) != null ? constantize(moduleParentName(klass)!) : Object;
 }
 
-export function moduleParents(klass: { name: string }): unknown[] {
+export function moduleParents(klass: object): unknown[] {
   const parents: unknown[] = [];
   const parentName = moduleParentName(klass);
   if (parentName != null) {

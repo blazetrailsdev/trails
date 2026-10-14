@@ -143,6 +143,12 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "actionview/test",
       },
       {
+        name: "activejob",
+        libPath: "activejob/lib/active_job",
+        libEntryFile: "activejob/lib/active_job.rb",
+        testPath: "activejob/test",
+      },
+      {
         name: "trailties",
         libPath: "railties/lib/rails",
         testPath: "railties/test",
@@ -249,6 +255,72 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "bcrypt-ruby",
+    origin: {
+      type: "git",
+      url: "https://github.com/bcrypt-ruby/bcrypt-ruby.git",
+      // vendor/rails/v8.0.2/Gemfile:34 declares `gem "bcrypt", "~> 3.1.11"`,
+      // resolved to 3.1.20 by vendor/rails/v8.0.2/Gemfile.lock:145.
+      ref: "v3.1.20",
+    },
+    packages: [
+      {
+        name: "bcrypt",
+        libPath: "lib/bcrypt",
+        testPath: "spec/bcrypt",
+      },
+    ],
+  },
+  {
+    name: "msgpack",
+    origin: {
+      type: "git",
+      url: "https://github.com/msgpack/msgpack-ruby.git",
+      ref: "v1.8.0",
+    },
+    packages: [
+      {
+        name: "msgpack",
+        libPath: "lib/msgpack",
+        libEntryFile: "lib/msgpack.rb",
+        testPath: "spec",
+      },
+    ],
+  },
+  {
+    name: "mysql2",
+    origin: {
+      type: "git",
+      url: "https://github.com/brianmario/mysql2.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:380 resolves mysql2 (0.5.6).
+      ref: "0.5.6",
+    },
+    packages: [
+      {
+        // The driver gem `Mysql2Adapter` calls into; its ports live in
+        // `packages/activerecord/src/mysql2/`.
+        name: "mysql2",
+        libPath: "lib/mysql2",
+        libEntryFile: "lib/mysql2.rb",
+      },
+    ],
+  },
+  {
+    name: "pg",
+    origin: {
+      type: "git",
+      url: "https://github.com/ged/ruby-pg.git",
+      ref: "v1.5.9",
+    },
+    packages: [
+      {
+        name: "pg",
+        libPath: "lib/pg",
+        libEntryFile: "lib/pg.rb",
+      },
+    ],
+  },
+  {
     name: "sqlite3",
     origin: {
       type: "git",
@@ -277,6 +349,8 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "thor",
         libPath: "lib/thor",
+        libEntryFile: "lib/thor.rb",
+        testPath: "spec",
       },
     ],
   },

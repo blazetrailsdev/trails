@@ -7,12 +7,9 @@ function configFile(name: string): string {
   return join(__dirname, "builder", name);
 }
 
-it("can provide options", async () => {
-  const builder = new Builder();
-  builder.run(async () => [200, { "content-type": "text/plain" }, ["options"]]);
-  const app = builder.toApp();
-  const res = await new MockRequest(app).get("/");
-  expect(res.body).toBe("options");
+it("can provide options", () => {
+  const builder = new Builder(null, { foo: ":bar" });
+  expect(builder.options.foo).toEqual(":bar");
 });
 
 it("supports run with block", async () => {

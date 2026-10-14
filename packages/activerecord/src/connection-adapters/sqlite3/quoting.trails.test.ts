@@ -1,10 +1,10 @@
 import { quotingHost } from "../../support/quoting-host.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, TypeError } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { DateTime as ARDateTimeType } from "../../type/date-time.js";
@@ -247,7 +247,6 @@ describe("SQLite3::Quoting", () => {
     });
 
     it("quotes a binary default through SQLite's quotedBinary", () => {
-      expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]), {})).toBe("x'dead'");
       expect(
         quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])), {}),
       ).toBe("x'dead'");
@@ -259,8 +258,8 @@ describe("SQLite3::Quoting", () => {
 
   describe("typeCast", () => {
     it("converts booleans to 1/0", () => {
-      expect(typeCast(true)).toBe(1n);
-      expect(typeCast(false)).toBe(0n);
+      expect(typeCast(true)).toBe(1);
+      expect(typeCast(false)).toBe(0);
     });
 
     it("passes through strings and floats", () => {
@@ -269,29 +268,18 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(Infinity)).toBe(Infinity);
     });
 
-    it("converts integer-valued numbers to BigInt so they bind as SQLITE_INTEGER", () => {
-      expect(typeCast(42)).toBe(42n);
-      expect(typeCast(0)).toBe(0n);
-      expect(typeCast(-7)).toBe(-7n);
-    });
-
-    it("casts a symbol through the inherited abstract arm", () => {
-      expect(typeCast(Symbol("foo"))).toBe("foo");
-      expect(typeCast(Symbol())).toBe("Symbol()");
-    });
-
     it("throws on unsupported types", () => {
       expect(() => typeCast({})).toThrow(TypeError);
     });
 
-    it("throws on Date — Date is no longer accepted", () => {
-      expect(() => typeCast(new Date())).toThrow(TypeError);
+    it("casts a Date as a Time", () => {
+      expect(typeCast(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("2020-01-02 03:04:05");
     });
   });
 
   describe("quote(Date)", () => {
-    it("throws — Date is no longer accepted", () => {
-      expect(() => quote(new Date())).toThrow(TypeError);
+    it("quotes it as a Time", () => {
+      expect(quote(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("'2020-01-02 03:04:05'");
     });
   });
 

@@ -1,13 +1,12 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 async function clearSchemaCache(table: string): Promise<void> {
-  const conn = await Base.leaseConnection();
-  await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, table);
+  await Base.schemaCache().clearDataSourceCacheBang(table);
 }
 
 describe("association create on a target whose schema is not reflected yet", () => {
@@ -27,6 +26,7 @@ describe("association create on a target whose schema is not reflected yet", () 
 
       static {
         this.tableName = "posts";
+        this.inheritanceColumn = "not_there";
         this.hasMany("cold_comments", { className: "ColdComment", foreignKey: "post_id" });
       }
     }
@@ -38,6 +38,7 @@ describe("association create on a target whose schema is not reflected yet", () 
     class ColdAuthoredPost extends Base {
       static {
         this.tableName = "posts";
+        this.inheritanceColumn = "not_there";
         this.belongsTo("author", { className: "ColdAuthor" });
       }
     }

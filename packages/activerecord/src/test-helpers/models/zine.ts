@@ -2,6 +2,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Human } from "./human.js";
 import type { Interest } from "./interest.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Zine extends Base {
   declare interests: AssociationProxy<Interest>;
@@ -13,3 +14,4 @@ export class Zine extends Base {
     this.hasMany("polymorphicHumans", { through: "interests", sourceType: "Human" });
   }
 }
+registerModel(Zine);

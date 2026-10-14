@@ -1,5 +1,5 @@
 import { DelegationError } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface ControllerHelperHost {
   _controller: ControllerLike | null;
@@ -66,13 +66,24 @@ export function logger(this: ControllerHelperHost): unknown {
   return controller && rbObjRespondTo(controller, "logger") ? controller.logger : undefined;
 }
 
+export function isRespondTo(
+  this: ControllerHelperHost,
+  methodName: string,
+  includePrivate: boolean = false,
+): boolean {
+  if ((CONTROLLER_DELEGATES as readonly string[]).includes(methodName))
+    return rbObjRespondTo(this._controller, methodName);
+  return basicObjRespondTo(this, methodName, !includePrivate);
+}
+
 export function installControllerDelegates(prototype: object): void {
   for (const name of CONTROLLER_DELEGATES) {
     Object.defineProperty(prototype, name, {
       get(this: ControllerHelperHost): unknown {
         const controller = this._controller;
         if (controller == null) throw DelegationError.nilTarget(name, "controller");
-        return controller[name];
+        const value = controller[name];
+        return typeof value === "function" ? value.bind(controller) : value;
       },
       configurable: true,
     });

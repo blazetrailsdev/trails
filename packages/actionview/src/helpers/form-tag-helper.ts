@@ -14,12 +14,13 @@ import { Hash, Module, fetch, hashDelete, rbObjRespondTo, update } from "@blazet
 
 import { ActionView } from "../namespaces.js";
 import type { capture } from "./capture-helper.js";
-import * as ContentExfiltrationPreventionHelper from "./content-exfiltration-prevention-helper.js";
-import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
+import {
+  ContentExfiltrationPreventionHelper,
+  preventContentExfiltration,
+} from "./content-exfiltration-prevention-helper.js";
 import { contentTag, tag, type TagHelperHost } from "./tag-helper.js";
-import * as TextHelper from "./text-helper.js";
-import * as UrlHelper from "./url-helper.js";
-import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
+import { TextHelper } from "./text-helper.js";
+import { UrlHelper, methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
 
 export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   urlFor(options: unknown): string;
@@ -40,6 +41,20 @@ export function setEmbedAuthenticityTokenInRemoteForms(value: boolean | null): v
 
 export function setDefaultEnforceUtf8(value: boolean): void {
   defaultEnforceUtf8 = value;
+}
+
+export function formTag(
+  this: FormTagHelperHost,
+  urlForOptions: unknown = {},
+  options: Record<string, unknown> = {},
+  block?: ((...args: unknown[]) => unknown) | null,
+): SafeBuffer {
+  const htmlOptions = htmlOptionsForForm.call(this, urlForOptions, options);
+  if (block != null) {
+    return formTagWithBody.call(this, htmlOptions, this.capture(block));
+  } else {
+    return formTagHtml.call(this, htmlOptions);
+  }
 }
 
 export function fieldId(
@@ -140,7 +155,7 @@ export function htmlOptionsForForm(
   const multipart = hashDelete(htmlOptions, "multipart");
   if (multipart != null && multipart !== false) htmlOptions["enctype"] = "multipart/form-data";
   if (urlForOptions === false || htmlOptions["action"] === false) {
-    hashDelete(htmlOptions, "action");
+    delete htmlOptions["action"];
   } else {
     htmlOptions["action"] = this.urlFor(urlForOptions);
   }
@@ -239,7 +254,7 @@ export function setDefaultDisableWith(value: unknown, tagOptions: Record<string,
     (data instanceof Hash ? data.get("disable_with") : data["disable_with"]) === false
   ) {
     if (data instanceof Hash) data.delete("disable_with");
-    else hashDelete(data, "disable_with");
+    else delete data["disable_with"];
   } else if (ActionView.Base.automaticallyDisableSubmitTag) {
     let disableWithText = tagOptions["data-disable-with"];
     if (disableWithText == null || disableWithText === false)
@@ -250,7 +265,7 @@ export function setDefaultDisableWith(value: unknown, tagOptions: Record<string,
     deepMergeBang(tagOptions, { data: { disable_with: disableWithText } });
   }
 
-  hashDelete(tagOptions, "data-disable-with");
+  delete tagOptions["data-disable-with"];
 }
 
 export const FormTagHelper = new Module((mod) => {
@@ -259,7 +274,7 @@ export const FormTagHelper = new Module((mod) => {
   mod.include(ContentExfiltrationPreventionHelper);
 
   mod.moduleEval((m) => {
-    Object.assign(m, { fieldId, fieldName, labelTag, submitTag, utf8EnforcerTag });
+    Object.assign(m, { formTag, fieldId, fieldName, labelTag, submitTag, utf8EnforcerTag });
     Object.assign(m, { htmlOptionsForForm, extraTagsForForm, formTagHtml, formTagWithBody });
     Object.assign(m, { sanitizeToId, setDefaultDisableWith });
   });

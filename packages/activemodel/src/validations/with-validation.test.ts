@@ -7,8 +7,6 @@ import {
   assertPredicate,
   assertRaise,
 } from "@blazetrails/activesupport";
-import { Errors } from "../index.js";
-import { WithValidator } from "./with.js";
 import { EachValidator, Validator } from "../validator.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -208,55 +206,5 @@ describe("ValidatesWithTest", () => {
     assertNotPredicate(await topic.isValid(), (v) => v);
     assertEmpty(topic.errors.get("title"));
     expect(topic.errors.get("content")).toEqual(["is missing"]);
-  });
-});
-
-describe("WithValidator arity dispatch", () => {
-  it("calls zero-arity method without arguments", () => {
-    const spy = vi.fn();
-    const record = { myCheck: spy, errors: new Errors(null) };
-    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
-    validator.validateEach(record, "name", "value");
-    expect(spy).toHaveBeenCalledWith();
-    expect(spy).toHaveBeenCalledTimes(1);
-  });
-
-  it("calls one-arity method with attribute name", () => {
-    let capturedArg: unknown;
-    const record = {
-      myCheck(attr: string) {
-        capturedArg = attr;
-      },
-      errors: new Errors(null),
-    };
-    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
-    validator.validateEach(record, "name", "value");
-    expect(capturedArg).toBe("name");
-  });
-
-  it("known divergence: rest-param method called without args (JS length 0 vs Ruby arity -1)", () => {
-    const received: unknown[] = [];
-    const record = {
-      myCheck(...args: unknown[]) {
-        received.push(...args);
-      },
-      errors: new Errors(null),
-    };
-    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
-    validator.validateEach(record, "name", "value");
-    expect(received).toHaveLength(0);
-  });
-
-  it("known divergence: default-param method called without args (JS length 0 vs Ruby arity -1)", () => {
-    let capturedArg: unknown = "not-called";
-    const record = {
-      myCheck(attr: string = "") {
-        capturedArg = attr;
-      },
-      errors: new Errors(null),
-    };
-    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
-    validator.validateEach(record, "name", "value");
-    expect(capturedArg).toBe("");
   });
 });

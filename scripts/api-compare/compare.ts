@@ -86,6 +86,7 @@ import type {
   ApiManifest,
   CallSite,
   ClassInfo,
+  InlinedFrom,
   MethodInfo,
   PackageInfo,
   ParamInfo,
@@ -116,13 +117,17 @@ import {
   rubyFileToTs,
   rubyCallToTs,
   rubyMethodToTs,
+  snakeToCamel,
+  OWN_NEW_TS_CANDIDATES,
 } from "@blazetrails/parity/conventions";
 import {
+  arityParams,
   isForwardingRubyEntry,
   matchArityAgainst,
   renderSig,
   shouldSkipArity,
   stripThis,
+  threadsSuper,
   type ArityRange,
 } from "./arity.js";
 import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
@@ -148,11 +153,12 @@ import {
   compareCallArgs,
   comparableRubySites,
   pairCallSites,
+  resolveCalleeSigs,
   type CallArgClass,
   type CallArgSkipReason,
 } from "./call-args.js";
 import { callOf } from "./call-mismatch-baseline.js";
-import { refName } from "./naming-taxonomy.js";
+import { differingRefPairs } from "./naming-taxonomy.js";
 import {
   compareDefaults,
   compareLiteral,
@@ -170,6 +176,9 @@ import {
 import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
+  EVAL_CALLBACK_PREFIX,
+  LENGTH_READ_UNCREDITED_RECEIVER_KINDS,
+  NATIVE_FORM_ANALOGUES,
   NEGATED_ALIASES,
   partitionNegatedCalls,
   requiresNegatedAlias,
@@ -177,6 +186,20 @@ import {
   skeletonIdiomLowering,
 } from "./enumerable-idioms.js";
 import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
+import {
+  blockRidesZsuper,
+  inlinedHookCreditedBy,
+  inlinedHookTags,
+  inlinedRubyBody,
+  inlinedRubyCallArgs,
+  inlinedRubySkeleton,
+  inlinedSegments,
+  isInitializeLessTaggedClass,
+  moduleAncestors,
+  sameFileInitializeModules,
+  taggedBodies,
+  uncomparedInlinedTags,
+} from "./inlined-bodies.js";
 import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 
 // `super` is captured by both extractors (extract-ruby-api.rb records
@@ -200,13 +223,65 @@ import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
  * an Enumerator and iterates nothing itself; the chained iterator carries the loop.
  */
 function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
-  const isPlainLoop = (n: string) =>
-    SKELETON_IDIOM_LOWERINGS.get(n)
-      ?.map((l) => l.join(" "))
-      .join() === "loop";
   if (!isPlainLoop(name) || next?.startsWith("ref:") !== true) return false;
   const chained = next.slice("ref:".length);
+  if (name === "each_with_index" && INDEXED_ENUMERATOR_CONSUMERS.has(chained)) return true;
+  if (name === "reverse_each" && REVERSED_ENUMERATOR_CONSUMERS.has(chained)) return true;
   return SKELETON_IDIOM_LOWERINGS.has(chained) && !isPlainLoop(chained);
+}
+
+function isPlainLoop(name: string): boolean {
+  return (
+    SKELETON_IDIOM_LOWERINGS.get(name)
+      ?.map((l) => l.join(" "))
+      .join() === "loop"
+  );
+}
+
+/**
+ * The call-keeping iterators a blockless `each_with_index` is chained into:
+ * `join_root.each_with_index.map { |join_part, i| … }`
+ * (activerecord/lib/active_record/associations/join_dependency.rb:169) is
+ * `[...joinRoot].map((joinPart, i) => …)`, whose callback already receives the
+ * index, so the Enumerator stands for no loop of its own.
+ */
+const INDEXED_ENUMERATOR_CONSUMERS = new Set(["map", "flat_map", "select", "reject", "to_a"]);
+
+/**
+ * The call-keeping iterators a blockless `reverse_each` is chained into:
+ * `@mapping.reverse_each.detect { |key, _| key === lookup_key }`
+ * (activerecord/lib/active_record/type/type_map.rb:44-46) is
+ * `[...this._mapping].reverse().find(([key]) => …)`, whose `find` carries the
+ * iteration, so the Enumerator stands for no loop of its own.
+ */
+const REVERSED_ENUMERATOR_CONSUMERS = new Set(["detect", "find", "map", "select", "reject"]);
+
+/**
+ * The control tokens `counterpart` shows BEYOND the ones the Ruby stream
+ * already accounts for by itself: its literal arms and the reaches with a
+ * single lowering. Only this surplus can be the port's spelling of an idiom
+ * with alternative lowerings, so `ids.compact.uniq` beside two Ruby `if`s
+ * (activerecord/lib/active_record/associations/collection_association.rb:521-531)
+ * is credited nothing against a port showing exactly those two `if`s.
+ */
+function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[]): string[] {
+  const surplus = [...counterpart];
+  const spend = (token: string) => {
+    const at = surplus.indexOf(token);
+    if (at !== -1) surplus.splice(at, 1);
+  };
+  for (const [index, token] of skeleton.entries()) {
+    if (!token.startsWith("ref:")) {
+      spend(token);
+      continue;
+    }
+    const name = token.slice("ref:".length);
+    if (isEnumeratorReceiver(name, skeleton[index + 1])) continue;
+    if (name === JS_ITERATION_CALLEE) spend("loop");
+    const alternatives = SKELETON_IDIOM_LOWERINGS.get(name);
+    if (alternatives?.length === 1) alternatives[0].forEach(spend);
+  }
+  return surplus;
 }
 
 // The significant set (RFC 0047): admits EVERY ported Ruby call name as
@@ -232,12 +307,14 @@ function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
 // justified by the non-call construct it becomes.
 //
 // A name qualifies ONLY because no JS call form exists at all. There is no
-// second group any more: `key?` / `has_key?` sat here because the only JS call
-// form was `Map#has` and a ported options hash is an object literal, whose
-// membership test was the `in` operator or `x.k !== undefined` — a shape the
-// gate cannot tell from a dropped guard. `@blazetrails/ruby-compat`'s `hasKey`
-// (the port of `rb_hash_has_key`, `vendor/ruby/v3.3.11/hash.c:3671`) is that missing
-// call form, so RFC 0129 discharged both entries and the ports call it.
+// second group any more: `key?` / `has_key?` sat here until RFC 0129 discharged
+// them, and they stay in the comparison. Two things satisfy one now: a call of
+// `@blazetrails/ruby-compat`'s `hasKey` (the port of `rb_hash_has_key`,
+// `vendor/ruby/v3.3.11/hash.c:3671`), or the `in` operator / `Object.hasOwn` on
+// the receiver the Ruby site names, which the extractor marks and
+// `NATIVE_FORM_ANALOGUES` (enumerable-idioms.ts) credits for that one body
+// (RFC 0190). A membership test on any other receiver, or none at all, is the
+// dropped guard and still flags.
 //
 // `catch` left the same way: `kernelCatch` (`ruby-compat/src/kernel-catch.ts`)
 // is the call form Ruby's `Kernel#catch` ports onto.
@@ -260,8 +337,11 @@ function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
 // distinction, so suppressing them would make a TS port that rewrites a relation
 // `.first`/`.size` into indexing a preloaded array (dropping the query trigger)
 // permanently invisible to the gate — exactly the fidelity gap it exists to
-// catch. Same reason `delete` (Map#delete), `merge`, `fetch` — all real JS call
-// forms — stay in.
+// catch. `delete`, `merge`, `merge!` and `fetch` stay in the comparison too.
+// `fetch` is satisfied by a call only. The other three are also satisfied by a
+// marked native form on the receiver the Ruby site names (`delete h[k]`,
+// `{ ...h, ...other }`, `Object.assign(h, other)`; RFC 0190): unlike `.length`
+// and `[0]`, none of those forms is a spelling anyone gives a Relation call.
 //
 // MEASURED, 2026-08-08 (RFC 0092 `positional-idiom-analogues`): the question
 // "can the comparator tell an Array/Hash receiver from a Relation/association
@@ -314,12 +394,14 @@ function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
 // `activesupport/cache/file-store.ts#filePathKey` — hand-verified against
 // Rails source as split/scan chains, none a Relation receiver), each
 // previously carrying its own now-stale `@missingRailsCall` receipt.
-// (2) NOT BUILT — per-class ivar typing off a constructor-parameter default:
-// `actionview/digestor.rb:112`'s `children.any?`. `@children` comes from a
-// constructor PARAMETER (`children = []`), not a literal, so it needs (1)'s
-// mechanism chained one hop further, onto machinery (`hash_typed_ivars`,
-// Hash-only, blocked on `prove-hash-literal-ivars-in-ruby-compat-receiver-kinds`
-// for an unrelated reason) this story leaves alone rather than widen mid-flight.
+// (2) BUILT for a literal, NOT for a parameter — per-class ivar typing.
+// `typed_ivars` (extract-ruby-api.rb) proves an ivar `array` when every
+// assignment to it in its class is an Array literal or a `Kernel#Array` call —
+// `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
+// (`connection_pool/queue.rb:17`) — and `Array(x)` is itself a proven receiver
+// (`schema_statements.rb:1260`). Still unbuilt: `actionview/digestor.rb:112`'s
+// `children.any?`, whose `@children` comes from a constructor PARAMETER
+// (`children = []`), not a literal, so it needs the proof chained one hop further.
 // (3) NOT BUILT, nothing to build against — bare self-calls typed via
 // enclosing-class ancestry, the shape the original audit counted 23 rows
 // under. None survive: `sharded?`'s `shard_keys.any?`
@@ -335,7 +417,7 @@ function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
  * `send` / `public_send` / `__send__` stay OUT of this set and of the call-name
  * comparison: they map to no TS candidate, so significantMissingCalls drops
  * them. The two differ only in visibility, which a JS member access cannot see
- * (CLAUDE.md § "Method visibility is a side table"), and both port
+ * (CLAUDE.md § "Method visibility is compile-time only"), and both port
  * to a computed member access — `public_send("#{name}=", value)`
  * (`persistence.rb:533`) is `this[name] = value`, with no callee. A call-name
  * check would flag that correct port too; setter-dispatch.ts reads the
@@ -344,12 +426,14 @@ function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
+  "reverse_each", // a descending index loop, or a loop over a reversed copy
   "present?", // truthiness (`x != null && x !== ""`)
   "blank?", // truthiness (`!x`)
   "to_str", // implicit String coercion — same family as `to_s`
   "synchronize", // the block runs bare — JS has no mutex to acquire
   "symbolize_keys", // a bare-keyed JS object is already normalized (RFC 0149)
   "symbolize_keys!", // same, in place
+  "nil?",
 ]);
 
 // `synchronize` is the strongest member of that set rather than a marginal one.
@@ -391,6 +475,20 @@ export const NO_JS_CALL_FORM = new Set([
 const JS_ITERATION_CALLEE = "forEach";
 
 /**
+ * The camelCased spelling of every Ruby block iterator whose lowering is a
+ * plain `loop` (`each_key` is `eachKey`). A port that keeps the call form —
+ * ruby-compat's `eachKey` / `eachValue` / `eachPair` (hash.ts), or a ported
+ * method of that name (`LazyAttributeHash#eachKey`) — iterates exactly as the
+ * Ruby reach does, so the TS side folds it onto the same `loop` the Ruby side
+ * gets, whatever its receiver.
+ */
+const TS_ITERATION_CALLEES = new Set(
+  [...SKELETON_IDIOM_LOWERINGS]
+    .filter(([, alternatives]) => alternatives.map((l) => l.join(" ")).join() === "loop")
+    .map(([name]) => name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())),
+);
+
+/**
  * Fold a skeleton stream's Ruby stdlib reaches onto the control constructs their
  * faithful port is forced to spell, so Ruby's `xs.each { |x| save(x) }`
  * (`ref:each ref:save`) and its `for (const x of xs) this.save(x)` port
@@ -420,10 +518,15 @@ export type SkeletonSide = "ruby" | "ts";
  * `try` / `throw`. Folding the pair onto the construct the port is forced to
  * use is what lets a line-for-line body read as one — the residual `if` the TS
  * tag test contributes is a real extra arm and is left flagged (RFC 0113).
+ *
+ * `Kernel#loop` is the same kind of call: `loop do … end`
+ * (`activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:116`)
+ * emits `ref:loop`, and its port is a `for (;;)`, which emits `loop`.
  */
 const CONSTRUCT_SKELETON_NAMES = new Map([
   ["catch", "try"],
   ["throw", "throw"],
+  ["loop", "loop"],
 ]);
 
 /**
@@ -432,11 +535,106 @@ const CONSTRUCT_SKELETON_NAMES = new Map([
  * folds `ref:throw` / `ref:catch` onto the constructs
  * ({@link CONSTRUCT_SKELETON_NAMES}); without this mirror the call reads as an
  * ordinary `ref:` reach and a faithful port scores a missing `throw`.
+ *
+ * `rbEnsure` (`ruby-compat/src/ensure.ts`) is the port of `begin … ensure`,
+ * whose `:bodystmt` the Ruby side emits as `try`: a hand-written `try` cannot
+ * defer the ensure clause to an async block's settlement.
  */
 const TS_CONSTRUCT_SKELETON_NAMES = new Map([
   ["kernelThrow", "throw"],
   ["kernelCatch", "try"],
+  ["rbEnsure", "try"],
 ]);
+
+const NIL_GUARD_TOKEN = "if:nil-guard";
+const RETRY_LOOP_TOKEN = "loop:retry";
+
+/**
+ * A `for … of` whose multi-statement body awaits and ends by pushing onto a
+ * local (extract-ts-api.ts#awaitedCollect). It is the port of an awaiting
+ * `map` block (`activerecord/lib/active_record/explain.rb:21-29`) and equally
+ * of an `each` that `<<`s
+ * (`activerecord/lib/active_record/connection_handling.rb:98-104`), so it reads
+ * as `loop` while the Ruby stream still shows an unclaimed iteration, and as
+ * `ref:map` otherwise. With no counterpart it reads as `loop`.
+ */
+const COLLECT_LOOP_TOKEN = "loop:collect";
+
+/**
+ * A `for … of` whose body awaits and ends in an `if` returning a boolean
+ * literal, and that `if` (extract-ts-api.ts#awaitedPredicate). The pair is the
+ * port of an awaiting `any?` / `all?` / `none?` block
+ * (`activerecord/lib/active_record/associations/collection_association.rb:508-516`),
+ * so it reads as `ref:some` while the Ruby stream still shows an unclaimed one
+ * of {@link AWAITED_PREDICATE_REFS}, and as `loop` / `if` otherwise: a Ruby
+ * `each` that returns early is the same TS shape. A TS `.some` / `.every` call
+ * claims a Ruby predicate first, once the Ruby stream's `include?`-family
+ * reaches, which a port also spells `.some`, are accounted for. With no
+ * counterpart it reads as `loop` / `if`.
+ */
+const PREDICATE_LOOP_TOKEN = "loop:predicate";
+const PREDICATE_IF_TOKEN = "if:predicate";
+const AWAITED_PREDICATE_REFS = new Set(["ref:any?", "ref:all?", "ref:none?"]);
+const SYNC_PREDICATE_REFS = new Set(["ref:some", "ref:every"]);
+const CONTAINMENT_REFS = new Set(["ref:include?", "ref:member?", "ref:exclude?"]);
+
+function isPlainIteration(token: string, side: SkeletonSide): boolean {
+  if (token === "loop") return true;
+  if (!token.startsWith("ref:")) return false;
+  const name = token.slice("ref:".length);
+  if (side === "ts") return name === JS_ITERATION_CALLEE || TS_ITERATION_CALLEES.has(name);
+  return (
+    SKELETON_IDIOM_LOWERINGS.get(name)
+      ?.map((l) => l.join(" "))
+      .join() === "loop"
+  );
+}
+
+/**
+ * The short-circuit MARKS: each is a `||` / `&&` one side spells where the
+ * other spells one test, so each reads as its plain operator only while the
+ * counterpart still shows an unclaimed one, and as nothing otherwise — the rule
+ * `if:nil-guard` already takes for `if`. With no counterpart (a same-file
+ * helper's skeleton), each reads as its operator, as before it was marked.
+ *
+ * - `and:class-narrow` / `and:string-not-symbol` (TS): an `instanceof` narrowing
+ *   a class-equality test on the same operand, and the `!isSymbol(x)` a String
+ *   test has to add (extract-ts-api.ts#narrowingAndToken).
+ * - `or:string-subclass` (TS): a `x instanceof SqlLiteral` beside
+ *   `typeof x === "string"` in a type-test chain, which Ruby's `String ===`
+ *   covers (`class SqlLiteral < String`, `activerecord/lib/arel/nodes/sql_literal.rb:5`).
+ * - `or:string-symbol` (Ruby): `String === x || Symbol === x`
+ *   (`activerecord/lib/arel/nodes/window.rb:14-28`), one `typeof x === "string"`.
+ */
+const SHORT_CIRCUIT_MARKS = new Map([
+  ["and:class-narrow", "and"],
+  ["and:string-not-symbol", "and"],
+  ["or:string-subclass", "or"],
+  ["or:string-symbol", "or"],
+]);
+
+/**
+ * `when:N` marks a Ruby `when` listing N values and a TS `||` chain of N type
+ * tests on one operand (extract-ts-api.ts#whenListChain). The chain is that
+ * clause's faithful port when the arities agree, so a TS `when:N` claiming an
+ * unclaimed Ruby `when:N` emits nothing; an unclaimed one reads as the N - 1
+ * `or`s it spells. The Ruby mark always folds away: the list emits no `or`, and
+ * the clause's other lowerings (fall-through `case`s, `includes`) carry no mark.
+ */
+const WHEN_LIST_PREFIX = "when:";
+
+/**
+ * Ruby's `value || raise(Klass, …)` is one expression: `columns(table_name)
+ * .detect { … } || raise(ActiveRecordError, "No such column: …")`
+ * (activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:1165-1169)
+ * emits `or throw:ActiveRecordError`. JS has no throw expression, so its
+ * faithful port is `if (!value) throw …`, which emits `if throw:…`. An `or`
+ * directly before a `throw` reads as that `if` while the TS counterpart still
+ * shows an unclaimed one, and as the plain `or` otherwise.
+ */
+function isRaiseOperand(token: string | undefined): boolean {
+  return token === "throw" || token?.startsWith("throw:") === true;
+}
 
 export function foldSkeletonTokens(
   skeleton: readonly string[],
@@ -444,20 +642,109 @@ export function foldSkeletonTokens(
   counterpart?: readonly string[],
 ): string[] {
   const folded: string[] = [];
+  const surplus =
+    side === "ruby" && counterpart !== undefined ? idiomSurplus(skeleton, counterpart) : undefined;
+  const unclaimed = (arm: string) => {
+    if (side !== "ts" || counterpart === undefined) return Infinity;
+    const count = (tokens: readonly string[]) => tokens.filter((t) => t === arm).length;
+    return count(counterpart) - count(skeleton);
+  };
+  let unclaimedIfs = unclaimed("if");
+  let unclaimedLoops = unclaimed("loop");
+  let unclaimedIterations =
+    side !== "ts" || counterpart === undefined
+      ? Infinity
+      : counterpart.filter((t) => isPlainIteration(t, "ruby")).length -
+        skeleton.filter((t) => isPlainIteration(t, "ts")).length;
+  const countOf = (tokens: readonly string[], token: string) =>
+    tokens.filter((t) => t === token).length;
+  const unclaimedShortCircuits = new Map(
+    ["and", "or"].map((op) => [
+      op,
+      counterpart === undefined ? Infinity : countOf(counterpart, op) - countOf(skeleton, op),
+    ]),
+  );
+  const rubyWhenLists = side === "ts" ? [...(counterpart ?? [])] : [];
+  const reaches = (tokens: readonly string[], refs: ReadonlySet<string>) =>
+    tokens.filter((t) => refs.has(t)).length;
+  let unclaimedPredicates =
+    side !== "ts" || counterpart === undefined
+      ? 0
+      : reaches(counterpart, AWAITED_PREDICATE_REFS) -
+        Math.max(
+          0,
+          reaches(skeleton, SYNC_PREDICATE_REFS) - reaches(counterpart, CONTAINMENT_REFS),
+        );
+  let predicateIfs = 0;
   for (const [index, token] of skeleton.entries()) {
+    const marked = SHORT_CIRCUIT_MARKS.get(token);
+    if (marked !== undefined) {
+      const unclaimedOps = unclaimedShortCircuits.get(marked)!;
+      unclaimedShortCircuits.set(marked, unclaimedOps - 1);
+      if (unclaimedOps > 0) folded.push(marked);
+      continue;
+    }
+    if (token.startsWith(WHEN_LIST_PREFIX)) {
+      if (side === "ruby") continue;
+      const claimed = rubyWhenLists.indexOf(token);
+      if (claimed !== -1) {
+        rubyWhenLists.splice(claimed, 1);
+        continue;
+      }
+      const arity = Number(token.slice(WHEN_LIST_PREFIX.length));
+      for (let i = 1; i < arity; i++) folded.push("or");
+      continue;
+    }
+    if (token === NIL_GUARD_TOKEN) {
+      folded.push(unclaimedIfs-- > 0 ? "if" : "and");
+      continue;
+    }
+    if (token === COLLECT_LOOP_TOKEN) {
+      folded.push(unclaimedIterations-- > 0 ? "loop" : "ref:map");
+      continue;
+    }
+    if (token === PREDICATE_LOOP_TOKEN) {
+      if (unclaimedPredicates-- > 0) {
+        predicateIfs++;
+        folded.push("ref:some");
+      } else folded.push("loop");
+      continue;
+    }
+    if (token === PREDICATE_IF_TOKEN) {
+      if (predicateIfs > 0) predicateIfs--;
+      else folded.push("if");
+      continue;
+    }
+    if (token === RETRY_LOOP_TOKEN) {
+      if (unclaimedLoops-- > 0) folded.push("loop");
+      continue;
+    }
+    if (side === "ruby" && token === "or" && isRaiseOperand(skeleton[index + 1])) {
+      const at = surplus?.indexOf("if") ?? -1;
+      if (at !== -1) {
+        surplus!.splice(at, 1);
+        folded.push("if");
+        continue;
+      }
+    }
     if (!token.startsWith("ref:")) {
       folded.push(token);
       continue;
     }
     const name = token.slice("ref:".length);
     if (side === "ruby" && isEnumeratorReceiver(name, skeleton[index + 1])) continue;
-    if (name === JS_ITERATION_CALLEE) {
+    if (name === JS_ITERATION_CALLEE || (side === "ts" && TS_ITERATION_CALLEES.has(name))) {
       folded.push("loop");
       continue;
     }
-    const lowering = side === "ruby" ? skeletonIdiomLowering(name, counterpart) : undefined;
+    const lowering = side === "ruby" ? skeletonIdiomLowering(name, surplus) : undefined;
     if (lowering !== undefined) {
       folded.push(...lowering);
+      const alternatives = SKELETON_IDIOM_LOWERINGS.get(name)!.length;
+      for (const spent of alternatives > 1 ? lowering : []) {
+        const at = surplus?.indexOf(spent) ?? -1;
+        if (at !== -1) surplus!.splice(at, 1);
+      }
       continue;
     }
     const tsConstruct = side === "ts" ? TS_CONSTRUCT_SKELETON_NAMES.get(name) : undefined;
@@ -504,15 +791,103 @@ const POSITIONAL_ARRAY_ANALOGUES = new Set(["first", "last", "any?", "size", "em
 export function significantCallsForReceivers(
   receivers: Record<string, readonly string[]> | undefined,
   base: { has(value: string): boolean } = SIGNIFICANT_CALLS,
+  tsNativeForms: ReadonlySet<string> = new Set(),
+  receiverNames?: Record<string, readonly string[]>,
 ): { has(value: string): boolean } {
   return {
     has: (value) => {
       if (!base.has(value)) return false;
+      if (hasNativeFormAnalogue(value, receivers, tsNativeForms, receiverNames)) return false;
+      if (value === "new" && isCoreNewWithNoNewExpression(receivers?.new, tsNativeForms)) {
+        return false;
+      }
       if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
       return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
     },
   };
+}
+
+/**
+ * The callee names a TS body invoked, from the `invoked:<name>` native forms
+ * the extractor marks at each call expression. A property read records no such
+ * mark, so `options.namespace` alone never answers `options[:namespace].call`.
+ */
+export function invokedNames(nativeForms: Iterable<string>): string[] {
+  const names: string[] = [];
+  for (const form of nativeForms) {
+    if (form.startsWith("invoked:")) names.push(form.slice("invoked:".length));
+  }
+  return names;
+}
+
+/**
+ * The `invoke` native forms (see NATIVE_FORM_ANALOGUES' `call`) for the callee
+ * names a TS body invoked ({@link invokedNames}): `this.tableNameResolver()`
+ * yields `invoke:tableNameResolver`, keyed also with a leading `_` dropped so
+ * `this._block()` answers Ruby's `@block.call`.
+ */
+export function invokeForms(calls: Iterable<string>): string[] {
+  const forms = ["invoke"];
+  for (const c of calls) {
+    if (!/^[_a-zA-Z]/.test(c)) continue;
+    forms.push(`invoke:${c}`, `invoke:${c.replace(/^_+/, "")}`);
+  }
+  return forms;
+}
+
+/**
+ * A Ruby body whose EVERY `new` site is one whose faithful port is not a `new`
+ * expression (extract-ruby-api.rb#core_new_kind):
+ *
+ * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new` /
+ *   `Concurrent::Array.new`, the literal `{}` / `[]`
+ *   (`associations/foreign_association.rb:14`, `core.rb:220`).
+ * - `string-new`: `String.new(x)`, credited only against a TS body that makes
+ *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
+ *
+ * One `Foo.new` in the body leaves `new` significant, the all-sites discipline
+ * {@link POSITIONAL_ARRAY_ANALOGUES} has.
+ */
+function isCoreNewWithNoNewExpression(
+  kinds: readonly string[] | undefined,
+  tsNativeForms: ReadonlySet<string>,
+): boolean {
+  if (kinds === undefined || kinds.length === 0) return false;
+  return kinds.every(
+    (k) => k === "literal-new" || (k === "string-new" && tsNativeForms.has("String")),
+  );
+}
+
+function hasNativeFormAnalogue(
+  value: string,
+  receivers: Record<string, readonly string[]> | undefined,
+  tsNativeForms: ReadonlySet<string>,
+  receiverNames: Record<string, readonly string[]> | undefined,
+): boolean {
+  const analogue = NATIVE_FORM_ANALOGUES.get(value);
+  if (analogue === undefined || !tsNativeForms.has(analogue.form)) return false;
+  const kinds = receivers?.[value];
+  if (analogue.receivers === "implicit-self") return kinds === undefined;
+  const uncredited = analogue.uncreditedKinds ?? LENGTH_READ_UNCREDITED_RECEIVER_KINDS;
+  if (kinds === undefined || kinds.some((k) => uncredited.has(k))) return false;
+  const credited = analogue.creditedKinds;
+  if (credited !== undefined && !kinds.every((k) => credited.has(k))) return false;
+  const names = receiverNames?.[value] ?? [];
+  if (analogue.named === true && names.length === 0) return false;
+  return names.every((name) =>
+    name.split("|").some((operand) => {
+      const bare = operand.replace(/^@+/, "");
+      return (
+        tsNativeForms.has(`${analogue.form}:${snakeToCamel(bare)}`) ||
+        (bare !== operand && tsNativeForms.has(`${analogue.form}:_${snakeToCamel(bare)}`)) ||
+        (analogue.key === true &&
+          /^[A-Z][A-Z0-9_]*$/.test(bare) &&
+          tsNativeForms.has(`${analogue.form}:${bare}`)) ||
+        (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`))
+      );
+    }),
+  );
 }
 
 /**
@@ -631,10 +1006,11 @@ export function suppressedCallClaims(
     const mapped = mapCall(rc);
     if (!mapped || mapped.length === 0) continue;
     if (mapped.some(isPortedWithArgs)) continue;
+    const spelledByName = mapped.some((c) => tsCalls.has(c));
     for (const c of [
       ...mapped,
-      ...aliasCall(rc),
-      ...(SUPPRESSED_CALL_TS_SPELLINGS.get(rc) ?? []),
+      ...(spelledByName ? [] : aliasCall(rc)),
+      ...(spelledByName ? [] : (SUPPRESSED_CALL_TS_SPELLINGS.get(rc) ?? [])),
     ]) {
       if (tsCalls.has(c)) claimed.add(c);
     }
@@ -821,6 +1197,11 @@ export const ORDER_PREFIX = "order:";
  * disambiguation above is about what the Ruby body NAMES, and a call the weak
  * filter drops (an inert receiver, `reflection.validate?`) still names a TS
  * spelling that another call would otherwise be credited with.
+ *
+ * `rubyStringEval` says the Ruby body hands `module_eval` / `class_eval` a
+ * String: the TS calls the extractor marked with {@link EVAL_CALLBACK_PREFIX}
+ * then have no Ruby position and are dropped; otherwise they are positioned
+ * where they were made, as the block form is.
  */
 export function reorderedCalls(
   rubyName: string,
@@ -831,7 +1212,9 @@ export function reorderedCalls(
   significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
   bodyRubyCalls: readonly string[] = rubyCalls,
   aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
+  rubyStringEval = false,
 ): string[] {
+  tsCalls = resolveEvalCallbackCalls(tsCalls, rubyStringEval);
   const unpositioned = new Set([
     ...ambiguousTsNames(bodyRubyCalls, mapCall),
     ...suppressedCallClaims(
@@ -866,6 +1249,15 @@ export function reorderedCalls(
     }
   }
   return [];
+}
+
+function resolveEvalCallbackCalls(tsCalls: readonly string[], drop: boolean): string[] {
+  const resolved = new Set<string>();
+  for (const c of tsCalls) {
+    if (!c.startsWith(EVAL_CALLBACK_PREFIX)) resolved.add(c);
+    else if (!drop) resolved.add(c.slice(EVAL_CALLBACK_PREFIX.length));
+  }
+  return [...resolved];
 }
 
 /**
@@ -916,6 +1308,15 @@ export interface TsPortedWithArgsMaps {
    * against the file the method actually MATCHED in.
    */
   optionKeysByFileName: Map<string, Map<string, (string[] | null)[]>>;
+  optionReadsByFileName: Map<string, Map<string, string[][]>>;
+  /**
+   * The same two keyed by DECLARING CLASS too (`<owner>#<name>`), so a pair is
+   * compared against its own class's member: unioned per file, `A#foo`'s
+   * missing key is masked by a sibling `B#foo` declaring it
+   * (schema_definitions.rb's three `defined_for?`). See {@link optionKeyPair}.
+   */
+  optionKeysByFileOwnerName: Map<string, Map<string, (string[] | null)[]>>;
+  optionReadsByFileOwnerName: Map<string, Map<string, string[][]>>;
 }
 
 export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
@@ -925,6 +1326,9 @@ export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
     paramsByFileOwnerNameInPkg: new Map(),
     writerSigs: new Set(),
     optionKeysByFileName: new Map(),
+    optionReadsByFileName: new Map(),
+    optionKeysByFileOwnerName: new Map(),
+    optionReadsByFileOwnerName: new Map(),
   };
 }
 
@@ -959,10 +1363,80 @@ export function recordTsPortedWithArgs(
   maps.paramsByFileOwnerNameInPkg.set(file, pkgByOwnerName);
   if (m.writer) maps.writerSigs.add(m.params);
   if (m.optionKeys !== undefined) {
-    const byName = maps.optionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
-    byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
-    maps.optionKeysByFileName.set(file, byName);
+    const optionKeys = m.optionKeys;
+    for (const [byFile, key] of [
+      [maps.optionKeysByFileName, m.name],
+      [maps.optionKeysByFileOwnerName, ownerKey],
+    ] as const) {
+      const byName = byFile.get(file) ?? new Map<string, (string[] | null)[]>();
+      byName.set(key, [...(byName.get(key) ?? []), optionKeys]);
+      byFile.set(file, byName);
+    }
   }
+  if (m.optionReads !== undefined) {
+    const optionReads = m.optionReads;
+    for (const [byFile, key] of [
+      [maps.optionReadsByFileName, m.name],
+      [maps.optionReadsByFileOwnerName, ownerKey],
+    ] as const) {
+      const byName = byFile.get(file) ?? new Map<string, string[][]>();
+      byName.set(key, [...(byName.get(key) ?? []), optionReads]);
+      byFile.set(file, byName);
+    }
+  }
+}
+
+/** One Ruby body's option keys and the params that filter them. */
+export interface RubyOptionKeys {
+  keys: string[];
+  params: ParamInfo[];
+}
+
+/**
+ * The two sides the option-key check compares for one matched pair.
+ *
+ * Paired by (owner, name) wherever the TS file carries a checkable options type
+ * on the member of the Ruby owner's class: both sides then come from that one
+ * class, since a union on EITHER side masks a finding — a sibling's TS type
+ * hides a `missingInTs`, a sibling's Ruby body an `extraInTs`. Where it does
+ * not (a mixin's `static x = x` re-export holds no options type), both sides
+ * fall back to the per-name union, together, as keying one side alone would
+ * manufacture rows. The Ruby owner is keyed by seat too ({@link rubyBodyKey}),
+ * so `GlobalID::Locator.locate` and `#locate` stay apart, and a reopened class's
+ * bodies merge. `owned` says which arm was taken. `undefined` when the chosen
+ * Ruby side read no keys.
+ */
+export function optionKeyPair(
+  rubyName: string,
+  tsName: string,
+  tsFile: string,
+  rubyModule: string,
+  level: OwnerSeat,
+  ruby: { byName: Map<string, RubyOptionKeys>; byOwnerName: Map<string, RubyOptionKeys> },
+  maps: TsPortedWithArgsMaps,
+):
+  | { ruby: RubyOptionKeys; candidates: (string[] | null)[]; reads: string[][]; owned: boolean }
+  | undefined {
+  const tsOwnerKey = `${rubyModule.split("::").at(-1) ?? rubyModule}#${tsName}`;
+  const ownerCandidates = maps.optionKeysByFileOwnerName.get(tsFile)?.get(tsOwnerKey);
+  if (ownerCandidates?.some((c) => c !== null)) {
+    const rubyOwned = ruby.byOwnerName.get(rubyBodyKey(rubyModule, level, rubyName));
+    if (rubyOwned === undefined) return undefined;
+    return {
+      owned: true,
+      ruby: rubyOwned,
+      candidates: ownerCandidates,
+      reads: maps.optionReadsByFileOwnerName.get(tsFile)?.get(tsOwnerKey) ?? [],
+    };
+  }
+  const rubyUnion = ruby.byName.get(rubyName);
+  if (rubyUnion === undefined) return undefined;
+  return {
+    owned: false,
+    ruby: rubyUnion,
+    candidates: maps.optionKeysByFileName.get(tsFile)?.get(tsName) ?? [],
+    reads: maps.optionReadsByFileName.get(tsFile)?.get(tsName) ?? [],
+  };
 }
 
 /**
@@ -1260,6 +1734,7 @@ interface MoveResult {
   rubyModule: string;
   expectedFile: string;
   actualFile: string;
+  inDefiningFile?: true;
 }
 
 interface FileResult {
@@ -1333,6 +1808,8 @@ interface CallResult {
   uncomparedTags: StaleCallTag[];
   suppressed: SuppressedCall[];
   skeletons: CallSkeleton[];
+  /** `@inventedArm` tags on a declaration no skeleton row was written for. */
+  uncomparedArmTags: StaleCallTag[];
 }
 
 /**
@@ -1369,6 +1846,8 @@ export interface CallSkeleton {
    *  terms and no wider. Absent when nothing resolves. */
   rubyHelpers?: Record<string, string[]>;
   tsHelpers?: Record<string, string[]>;
+  /** The TS declaration's `@inventedArm` receipts, sorted. */
+  inventedArms?: string[];
 }
 
 /**
@@ -1591,6 +2070,11 @@ export function rubyOwnerSeat(rubyModule: string, klass: boolean): OwnerSeat {
  * are prototype members of the grouping either way, so `isStatic` would read
  * every one of them as the instance seat.
  *
+ * A const named after the Rails module its file mirrors (`export const
+ * Timestamp = {...}` in timestamp.ts) is the settled spelling of that module's
+ * instance half, and reaches here through `instanceOwners`: see
+ * `tsMemberStatesSeat`.
+ *
  * `undefined` for a top-level function (`""`), which is neither — the port
  * spells both a `ClassMethods` body and an instance mixin body that way.
  */
@@ -1605,6 +2089,90 @@ export function tsOwnerSeat(
   const isInstance = instanceOwners?.has(tsOwner) ?? false;
   if (isStatic === isInstance) return undefined;
   return isStatic ? "class" : "instance";
+}
+
+/**
+ * Whether a TS member states the seat it is declared on. A class member does,
+ * by its staticness, and so does an `interface` signature, which types the
+ * instance. A non-static member of an object literal does not: the literal may
+ * be either half of a module (`ClassInfo.objectLiteral`), and where it merges
+ * with an `interface` only the members harvested from the literal are seatless
+ * (`MethodInfo.objectLiteralMember`): `interface Optimistic { lockOptimistically }`
+ * beside `const Optimistic = { lockingEnabled }` still types the instance. A `namespace`
+ * function is the same shape, bodied where the interface it may merge with is
+ * not: `interface Naming { modelName }` is `Naming#model_name` and
+ * `namespace Naming { function plural }` is `def self.plural`
+ * (active_model/naming.rb:283), as `CallTemplate.build` is
+ * (active_support/callbacks.rb:494). The exception is an owner named after a
+ * Rails module its file mirrors, for a name that module declares as an
+ * instance method: `include(Base, Timestamp.Timestamp)` is `include Timestamp`,
+ * so the member is `Timestamp#name` exactly as an `InstanceMethods` literal's
+ * would be. A name the module declares only on its singleton (`Mime.symbols`,
+ * action_dispatch/http/mime_type.rb:50-67) still states none.
+ */
+export function tsMemberStatesSeat(
+  owner: { name: string; objectLiteral?: boolean; declaredAsNamespace?: boolean },
+  member: { name: string; isStatic?: boolean; bodyless?: boolean; objectLiteralMember?: boolean },
+  rubyInstanceNames: ReadonlyMap<string, ReadonlySet<string>> | undefined,
+): boolean {
+  const namespaceFunction = owner.declaredAsNamespace === true && member.bodyless !== true;
+  const literalMember = owner.objectLiteral === true || member.objectLiteralMember === true;
+  if ((!literalMember && !namespaceFunction) || member.isStatic === true) return true;
+  return rubyInstanceNames?.get(owner.name)?.has(member.name) ?? false;
+}
+
+/**
+ * Records the seat each TS owner declares each name on (file → name → owners),
+ * split by staticness: `tsOwnerSeat`'s population.
+ */
+export function recordTsSeatOwners(
+  staticOwnersByFileName: Map<string, Map<string, Set<string>>>,
+  instanceOwnersByFileName: Map<string, Map<string, Set<string>>>,
+  entities: readonly ClassInfo[],
+  shouldInclude: (m: MethodInfo) => boolean,
+  rubyInstanceNames: ReadonlyMap<string, ReadonlyMap<string, ReadonlySet<string>>>,
+): void {
+  for (const cls of entities) {
+    const file = cls.file || "";
+    for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
+      if (!shouldInclude(m) || !tsMemberStatesSeat(cls, m, rubyInstanceNames.get(file))) continue;
+      const bySeat = m.isStatic === true ? staticOwnersByFileName : instanceOwnersByFileName;
+      const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
+      seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(cls.name));
+      bySeat.set(file, seatOwners);
+    }
+  }
+}
+
+/**
+ * The TS spellings of the instance methods each Ruby module declares, keyed by
+ * the TS file mirroring the module and then by the module's short name:
+ * `tsMemberStatesSeat`'s population. `ClassMethods` is the singleton half of
+ * its enclosing module, never a module a const is named after. A TS owner
+ * carries only its short name, so modules sharing one within a file are
+ * unioned: `Compatibility::V7_0::TableDefinition` … `V4_2::TableDefinition`
+ * (migration/compatibility.rb) and `HttpAuthentication::Basic` / `Digest` /
+ * `Token::ControllerMethods` (metal/http_authentication.rb) are the two such
+ * sets, and neither declares a name on a singleton as well.
+ */
+export function rubyModuleInstanceNamesByTsFile(
+  rubyModules: Record<string, { file?: string; instanceMethods: { name: string }[] }>,
+  pkg: string,
+): Map<string, Map<string, Set<string>>> {
+  const byFile = new Map<string, Map<string, Set<string>>>();
+  for (const [fqn, mod] of Object.entries(rubyModules)) {
+    const short = fqn.split("::").at(-1) ?? fqn;
+    if (!mod.file || short === "ClassMethods") continue;
+    const tsFile = rubyFileToTs(mod.file, pkg);
+    const byModule = byFile.get(tsFile) ?? new Map<string, Set<string>>();
+    const names = byModule.get(short) ?? new Set<string>();
+    for (const m of mod.instanceMethods) {
+      for (const c of rubyMethodToTsForFqn(fqn, m.name, undefined, pkg) ?? []) names.add(c);
+    }
+    byModule.set(short, names);
+    byFile.set(tsFile, byModule);
+  }
+  return byFile;
 }
 
 /**
@@ -1658,6 +2226,88 @@ export function ownerRecordsNothing(
   const byOwner = byFileNameOwner.get(tsFile)?.get(tsName);
   if (byOwner?.get(tsClass) !== undefined) return false;
   return !(bodylessOwners?.has(tsClass) === true && byOwner?.size === 1 && byOwner.has(""));
+}
+
+/**
+ * Whether the skeleton recorded for (file, name) is some OTHER owner's body.
+ *
+ * Where {@link skeletonsOfOwner} falls back to the (file, name) list, its one
+ * skeleton may belong to a different owner than the resolved one. A resolved
+ * owner with a body of its own compares only against a skeleton that owner
+ * recorded.
+ */
+export function skeletonIsAnotherOwners(
+  ownerHasBody: boolean,
+  tsClass: string | undefined,
+  skeletonOwners: ReadonlySet<string> | undefined,
+): boolean {
+  return tsClass !== undefined && ownerHasBody && skeletonOwners?.has(tsClass) !== true;
+}
+
+/** One name's bodies in one file, keyed by declaration site (`file:line`). */
+export type SkeletonBodies = Map<string, { owner: string; skeleton: string[] }>;
+
+/**
+ * Records a body under the owner that declares it.
+ *
+ * A namespace entity re-lists the file's top-level functions, so one
+ * declaration arrives under two owners. It is the top-level function's
+ * (owner `""`) whichever arrives first; otherwise the first owner keeps it.
+ */
+export function recordSkeletonBody(
+  bodies: SkeletonBodies,
+  site: string,
+  owner: string,
+  skeleton: string[],
+): void {
+  if (!bodies.has(site) || owner === "") bodies.set(site, { owner, skeleton });
+}
+
+/** {@link SkeletonBodies} grouped by owner, each body once. */
+export function skeletonsByOwner(
+  bodies: SkeletonBodies | undefined,
+): Map<string, string[][]> | undefined {
+  if (bodies === undefined) return undefined;
+  const byOwner = new Map<string, string[][]>();
+  for (const { owner, skeleton } of bodies.values())
+    byOwner.set(owner, [...(byOwner.get(owner) ?? []), skeleton]);
+  return byOwner;
+}
+
+/**
+ * The skeletons a matched pair compares against: the resolved owner's own where
+ * the file holds the name as SEVERAL module or top-level bodies, else every one
+ * the file records under the name.
+ *
+ * `validations/with.ts` holds `validatesWith` twice, on the `ClassMethods`
+ * object literal and as the top-level instance function, and each carries a
+ * skeleton. Read by name that is two bodies for one pair, which compares
+ * neither; read by owner each Rails `validates_with`
+ * (`activemodel/lib/active_model/validations/with.rb:88`, `:144`) meets its own
+ * port.
+ *
+ * `byOwner` is {@link skeletonsByOwner}'s, which holds each body once. Where
+ * that is ONE body it answers whatever the by-name list holds: the extractor's
+ * synthesized file module re-lists every top-level function, so the by-name
+ * list carries a lone `export function` twice. Otherwise a class owner still
+ * reads by name, and so does a name whose owners share one body.
+ *
+ * The caller reads these maps for the file the `.rb` path mirrors where that
+ * file holds the name's one body, past a `RUBY_FILE_TS_OVERRIDES` entry:
+ * `String#camelize` (`core_ext/string/inflections.rb:101`) is
+ * `core-ext/string/inflections.ts`'s, not `Inflector.camelize`'s.
+ */
+export function skeletonsOfOwner(
+  byName: string[][] | undefined,
+  byOwner: ReadonlyMap<string, string[][]> | undefined,
+  tsClass: string | undefined,
+  classOwners: ReadonlySet<string> | undefined,
+): string[][] | undefined {
+  const declared = [...(byOwner?.values() ?? [])].flat();
+  if (declared.length === 1) return declared;
+  const bodies = [...(byOwner?.keys() ?? [])].filter((o) => classOwners?.has(o) !== true);
+  if (tsClass === undefined || bodies.length < 2 || !bodies.includes(tsClass)) return byName;
+  return byOwner?.get(tsClass);
 }
 
 /**
@@ -2320,6 +2970,7 @@ interface ArityResult {
 interface OptionKeyMismatch {
   rubyFile: string;
   tsFile: string;
+  rubyModule: string;
   rubyName: string;
   tsName: string;
   missingInTs: string[];
@@ -2482,6 +3133,8 @@ function shortName(fqn: string | undefined | null): string | null {
   // Ruby uses `::` as the namespace separator; TS extractor stores the
   // raw superclass expression, so `extends globalThis.Error` ends up as
   // `globalThis.Error` — strip either separator to reach the leaf name.
+  const delegated = /^DelegateClass\((.+)\)$/s.exec(fqn.trim());
+  if (delegated) return shortName(delegated[1]);
   const parts = fqn.split(/::|\./);
   return parts[parts.length - 1] || null;
 }
@@ -2535,15 +3188,9 @@ export function nameMatches(rubyName: string, tsName: string): boolean {
 // Keyed by ts class name → ts superclass name that should be accepted.
 // - Arel Table/Attribute: Rails has no super (plain object or
 //   `Struct.new(...)`), TS roots them at `Node` for uniform AST walking.
-// - AR LockingType / Serialized: Rails uses `DelegateClass(Type::Value)`
-//   — a dynamic parent our extractor can't resolve (comes through as
-//   null). TS extends `ValueType` directly, which matches the intent.
 const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   ["Table", "Node"],
   ["Attribute", "Node"],
-  ["LockingType", "ValueType"],
-  ["Serialized", "ValueType"],
-  ["TimeZoneConverter", "ValueType"],
   // `ActiveRecord::Base` has no Ruby super; TS `Base` extends `Model`
   // so the ActiveModel mixin surface is type-visible on subclasses.
   ["Base", "Model"],
@@ -2797,7 +3444,11 @@ export function buildModuleIncluderFqns(
 ): Map<string, Set<string>> {
   const moduleIncluderFqns = new Map<string, Set<string>>();
   for (const { fqn, info } of entities) {
-    for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
+    for (const inc of [
+      ...(info.includes || []),
+      ...(info.extends || []),
+      ...(info.prepends || []),
+    ]) {
       const modFqn = resolveModuleName(inc, fqn, moduleFqnByShort);
       const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
       includers.add(fqn);
@@ -2907,8 +3558,44 @@ export function mixinMethodCreditedToOwnFile(
   const tsFile = rubyFileToTs(mixinFile, pkg);
   const mixinTsMethods = tsMethodsByFile.get(tsFile);
   if (mixinTsMethods === undefined) return null;
-  const tsName = candidates.find((c) => mixinTsMethods.has(c));
+  const tsName =
+    rm.rubyName === "initialize" && mixinTsMethods.has(MODULE_INITIALIZE_HOOK)
+      ? MODULE_INITIALIZE_HOOK
+      : candidates.find((c) => mixinTsMethods.has(c));
   return tsName === undefined ? null : { tsName, tsFile };
+}
+
+/**
+ * Is an includer's `constructor` only the chain seat for an included module's
+ * `initialize`?
+ *
+ * `Thor::Group` defines no `initialize`; it inherits `Thor::Base#initialize`
+ * (`thor/base.rb:53`) through `include Thor::Base` (`thor/group.rb:270`). A JS
+ * class still needs a constructor to run the module's `[initialize]` hook, and
+ * that constructor is `initializeIncludedModules(this, ...args)`: Ruby's
+ * implicit `super` into the module. It makes none of the module body's calls,
+ * so it is an `include` seam exactly as a one-line forwarder is, and the
+ * module's own bucket is where the body is compared.
+ *
+ * Narrow by construction: the method must arrive from a mixin defined in
+ * another Ruby file, and every constructor of that name in the TS file must
+ * call `initializeIncludedModules` and nothing else. A constructor that makes
+ * any other call is still held to the module body's call set.
+ */
+export function includerConstructorIsInitializeSeat(
+  rm: { rubyName: string; mixinFile?: string },
+  hostRubyFile: string,
+  tsName: string,
+  tsCallSets: readonly (readonly string[])[] | undefined,
+): boolean {
+  if (rm.rubyName !== "initialize" || tsName !== "constructor") return false;
+  if (rm.mixinFile === undefined || rm.mixinFile === hostRubyFile) return false;
+  if (tsCallSets === undefined || tsCallSets.length === 0) return false;
+  return tsCallSets.every(
+    (calls) =>
+      calls.length > 0 &&
+      calls.every((call) => call.replace(/^@invoked:/, "") === "initializeIncludedModules"),
+  );
 }
 
 /**
@@ -2947,6 +3634,169 @@ export function reopeningMethodCreditedToOwnFile(
   if (reopeningTsMethods === undefined) return null;
   const tsName = candidates.find((c) => reopeningTsMethods.has(c));
   return tsName === undefined ? null : { tsName, tsFile };
+}
+
+/**
+ * The file mirroring the `.rb` that defines this method, when a BODY for it
+ * sits there.
+ *
+ * The include-chain arm credits a flattened expectation through whichever
+ * includer names it first, and an includer names every mixin member it types:
+ * `declare static modelName` on `Model`, a `validatesAbsenceOf` signature on
+ * `interface API`. That declaration is the type-level cost of `include`, not
+ * the port. `model_name` is defined by `naming.rb:270` and ported in naming.ts;
+ * `validates_acceptance_of` by `validations/acceptance.rb:108`, a reopening of
+ * `HelperMethods`, and ported in validations/acceptance.ts. Naming the
+ * includer's file as where the member lives tells the reader to move a method
+ * out of its Rails file.
+ *
+ * A bodyless-only presence in the defining file is not a port
+ * ({@link declarationOnlyInFile}), so it earns nothing here and the includer's
+ * file is still reported.
+ */
+export function bodyInDefiningFile(
+  rm: {
+    rubyName: string;
+    rubyModule: string;
+    mixinFile?: string;
+    definedInFile?: string;
+    notes?: string;
+  },
+  hostRubyFile: string,
+  pkg: string,
+  rubyFileHasBucket: (rubyFile: string) => boolean,
+  tsMethodsByFile: ReadonlyMap<string, Set<string>>,
+  bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  aliasNamesByFile?: ReadonlyMap<string, ReadonlySet<string>>,
+): { tsName: string; tsFile: string } | null {
+  const credited =
+    mixinMethodCreditedToOwnFile(rm, hostRubyFile, pkg, rubyFileHasBucket, tsMethodsByFile) ??
+    reopeningMethodCreditedToOwnFile(rm, hostRubyFile, pkg, tsMethodsByFile);
+  if (credited === null) return null;
+  const declarationOnly = declarationOnlyInFile(
+    credited.tsFile,
+    credited.tsName,
+    bodylessOwnersByFile,
+    bodiedOwnersByFile,
+    rm.notes,
+    aliasNamesByFile,
+  );
+  return declarationOnly ? null : credited;
+}
+
+/**
+ * Which cross-file arm credits a method the expected file does not port: the
+ * member the move row names (`move`) and the member the pair is compared
+ * against (`compared`).
+ *
+ * - `"include"`: an includer names it. `compared` is the includer's member,
+ *   the pair this arm has always measured. `move` is the includer's member
+ *   too when no body sits in the defining file: that is drift (the four
+ *   `crud.rb` bodies in select-manager.ts) and a relocation. When
+ *   {@link bodyInDefiningFile} finds the body, `move` names that member and
+ *   file instead and is flagged `inDefiningFile`.
+ * - `"mixin"`: ported in the file mirroring the mixin's own `.rb`. `compared`
+ *   is null: the same pair is compared in the mixin's own bucket, so a second
+ *   run per host double-counts every mismatch.
+ * - `"reopening"`: ported in the file mirroring the reopening that defines it,
+ *   and compared against that member.
+ *
+ * `moves.ts` leaves an `inDefiningFile` move out of the relocation plan.
+ */
+export function crossFileCredit(
+  rm: {
+    rubyName: string;
+    rubyModule: string;
+    mixinFile?: string;
+    definedInFile?: string;
+    notes?: string;
+  },
+  hostRubyFile: string,
+  pkg: string,
+  rubyFileHasBucket: (rubyFile: string) => boolean,
+  tsMethodsByFile: ReadonlyMap<string, Set<string>>,
+  bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  aliasNamesByFile: ReadonlyMap<string, ReadonlySet<string>> | undefined,
+  viaInclude: { tsName: string; tsFile: string } | null,
+): {
+  arm: "include" | "mixin" | "reopening";
+  move: { tsName: string; tsFile: string; inDefiningFile: boolean };
+  compared: { tsName: string; tsFile: string } | null;
+} | null {
+  if (viaInclude !== null) {
+    const definedIn = bodyInDefiningFile(
+      rm,
+      hostRubyFile,
+      pkg,
+      rubyFileHasBucket,
+      tsMethodsByFile,
+      bodylessOwnersByFile,
+      bodiedOwnersByFile,
+      aliasNamesByFile,
+    );
+    return {
+      arm: "include",
+      move:
+        definedIn === null
+          ? { ...viaInclude, inDefiningFile: false }
+          : { ...definedIn, inDefiningFile: true },
+      compared: viaInclude,
+    };
+  }
+  const mixin = mixinMethodCreditedToOwnFile(
+    rm,
+    hostRubyFile,
+    pkg,
+    rubyFileHasBucket,
+    tsMethodsByFile,
+  );
+  if (mixin !== null) {
+    return { arm: "mixin", move: { ...mixin, inDefiningFile: true }, compared: null };
+  }
+  const reopening = reopeningMethodCreditedToOwnFile(rm, hostRubyFile, pkg, tsMethodsByFile);
+  if (reopening === null) return null;
+  return { arm: "reopening", move: { ...reopening, inDefiningFile: true }, compared: reopening };
+}
+
+/**
+ * The extractor's name for `static [initialize]`: a computed member is recorded
+ * by its source text. `CONCERN_HOOK_MEMBERS.initialize` in extra-surface.ts is
+ * the same spelling.
+ */
+export const MODULE_INITIALIZE_HOOK = "[initialize]";
+
+/**
+ * The TS candidates for a Ruby method, with a MODULE's `def initialize` offered
+ * its hook first.
+ *
+ * A module has no constructor to be. `SerializeCastValue#initialize`
+ * (`type/serialize_cast_value.rb:41`) is ported as the symbol-keyed
+ * `static [initialize]` that `initializeIncludedModules` runs where the
+ * includer's `initialize` calls `super`. Offered only `constructor`, the
+ * expectation is answered by the includer's own constructor
+ * (`ValueType`, type/value.ts) and reported as a method to relocate.
+ *
+ * The hook is offered only when the expected file declares one, so a module
+ * whose `initialize` is unported still falls through to the arms that report
+ * it.
+ *
+ * A module's `new` is the same: `Deduplicable::ClassMethods#new`
+ * (`connection_adapters/deduplicable.rb:13-15`) wraps the includer's
+ * constructor through `super` and is ported as a `new` member, so it is
+ * offered `new` ahead of the includer's `constructor` (`Column`, column.ts).
+ */
+export function moduleInitializeCandidates(
+  rubyName: string,
+  ownerIsModule: boolean,
+  tsMethods: ReadonlySet<string>,
+  candidates: string[],
+): string[] {
+  if (rubyName === "new" && ownerIsModule && tsMethods.has("new")) return ["new", ...candidates];
+  if (rubyName !== "initialize" || !ownerIsModule) return candidates;
+  if (!tsMethods.has(MODULE_INITIALIZE_HOOK)) return candidates;
+  return [MODULE_INITIALIZE_HOOK, ...candidates];
 }
 
 /** A Ruby class or module, paired with the fully-qualified name it was found under. */
@@ -3121,9 +3971,11 @@ export function dedupeRubyMethodInto(
   klass = false,
   pkg?: string,
 ): void {
-  if (rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) return;
-  if (isRubyOnlyClass(itemFqn)) return;
   const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
+  if (tsMirrorNames === null && rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) {
+    return;
+  }
+  if (isRubyOnlyClass(itemFqn)) return;
   if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
   const level = rubyOwnerSeat(itemFqn, klass);
   const key = rubyLevelKey(level, rm.name);
@@ -3224,11 +4076,12 @@ function rubyDefinitionBucket(
   seen: Set<string>,
   pkg: string,
 ): DenominatorBucket {
-  if (rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
+  const tsMirrorNames = scopedSkipMirrorName(name, file);
+  if (tsMirrorNames === null && rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
     return OPERATORS.has(name) ? "operator" : "globalSkip";
   }
   if (isRubyOnlyClass(fqn)) return "rowlessFile";
-  if (scopedSkipMirrorName(name, file) === null && isScopedSkip(name, file)) return "scopedSkip";
+  if (tsMirrorNames === null && isScopedSkip(name, file)) return "scopedSkip";
   const key = rubyLevelKey(rubyOwnerSeat(fqn, klass), name);
   if (seen.has(key)) return "sameNameCollapse";
   seen.add(key);
@@ -3731,6 +4584,7 @@ export function main() {
   const appliedInheritanceExcludes = new Set<string>();
 
   const results: PackageResult[] = [];
+  const tsInlinedHookTags = inlinedHookTags(ts, ruby);
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
@@ -3756,17 +4610,20 @@ export function main() {
     // The package-only signature populations the calls-parity ported-with-args
     // gate reads — see TsPortedWithArgsMaps for what each one is scoped to.
     const portedWithArgsMaps = newTsPortedWithArgsMaps();
+    const tsParamsByNameInDeps = new Map<string, ParamInfo[][]>();
     const {
       paramsByNameInPkg: tsParamsByNameInPkg,
       paramsByFileNameInPkg: tsParamsByFileNameInPkg,
       paramsByFileOwnerNameInPkg: tsParamsByFileOwnerNameInPkg,
       writerSigs: tsWriterSigs,
-      optionKeysByFileName: tsOptionKeysByFileName,
     } = portedWithArgsMaps;
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
+    const tsSkeletonOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    const tsSkeletonBodiesByFileName = new Map<string, Map<string, SkeletonBodies>>();
+    const tsClassOwnersByFile = new Map<string, Set<string>>();
     const tsLocalSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
     // The same two populations narrowed by declaring class (file → name → owner
@@ -3794,6 +4651,12 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
+    const tsInventedArmTagsByFileName = new Map<
+      string,
+      Map<string, Map<string, Map<string, string>>>
+    >();
+    const tsInlinedFromByFileOwner = new Map<string, Map<string, InlinedFrom[]>>();
+    const inlinedTagsCompared = new Set<string>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // (file → name → owner → the file the member is DECLARED in), recorded only
@@ -3878,7 +4741,6 @@ export function main() {
       file = m.file ?? "",
       scope: "package" | "dep" = "package",
       owner = "",
-      statesSeat = owner !== "",
     ) => {
       if (scope === "package") {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
@@ -3910,21 +4772,14 @@ export function main() {
           writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
           tsWriterOwnersByFileName.set(file, writerOwners);
         }
-        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat —
-        // and neither does a non-static member of an object literal
-        // (`ClassInfo.objectLiteral`).
-        if (statesSeat) {
-          const bySeat =
-            m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
-          const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
-          seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(owner));
-          bySeat.set(file, seatOwners);
-        }
       }
       const sigs = tsParamsByName.get(m.name) ?? [];
-      sigs.push(m.params);
+      sigs.push(arityParams(m));
       tsParamsByName.set(m.name, sigs);
       if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
+      if (scope === "dep" && !isTestHelperFile(file)) {
+        tsParamsByNameInDeps.set(m.name, [...(tsParamsByNameInDeps.get(m.name) ?? []), m.params]);
+      }
       if (scope === "package") {
         const byName = tsBlockSigsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
         const blockSigs = byName.get(m.name) ?? [];
@@ -3974,6 +4829,28 @@ export function main() {
           scope,
         );
       }
+      if (m.inventedArms !== undefined) {
+        recordTaggedCalls(
+          tsInventedArmTagsByFileName,
+          file,
+          m.name,
+          owner,
+          m.inventedArms,
+          undefined,
+          scope,
+        );
+      }
+      const declaredHere = m.file === undefined || m.file === file;
+      if (
+        m.inlinedFrom !== undefined &&
+        m.name === "constructor" &&
+        scope === "package" &&
+        declaredHere
+      ) {
+        const byOwner = tsInlinedFromByFileOwner.get(file) ?? new Map<string, InlinedFrom[]>();
+        byOwner.set(owner, m.inlinedFrom);
+        tsInlinedFromByFileOwner.set(file, byOwner);
+      }
       // A relative path is not unique across packages — activemodel and
       // activerecord both port attribute_methods.rb to attribute-methods.ts —
       // so the file-keyed BODY maps below take this package's members only, or
@@ -3999,6 +4876,15 @@ export function main() {
         const byName = tsSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.skeleton]);
         tsSkeletonByFileName.set(file, byName);
+        const owners = tsSkeletonOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
+        owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
+        tsSkeletonOwnersByFileName.set(file, owners);
+        const bodiesByName =
+          tsSkeletonBodiesByFileName.get(file) ?? new Map<string, SkeletonBodies>();
+        const bodies = bodiesByName.get(m.name) ?? new Map();
+        recordSkeletonBody(bodies, `${m.file ?? file}:${m.line}`, owner, m.skeleton);
+        bodiesByName.set(m.name, bodies);
+        tsSkeletonBodiesByFileName.set(file, bodiesByName);
       }
       if (m.localSkeleton !== undefined && scope === "package") {
         const byName = tsLocalSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
@@ -4034,20 +4920,25 @@ export function main() {
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
           if (tsShouldInclude(m)) {
             methods.add(m.name);
-            recordTsParams(
-              m,
-              file,
-              "package",
-              cls.name,
-              cls.objectLiteral !== true || m.isStatic === true,
-            );
+            recordTsParams(m, file, "package", cls.name);
           }
         }
         tsMethodsByFile.set(file, methods);
       };
 
-      for (const cls of Object.values(tsPkg.classes)) addMethods(cls);
+      for (const cls of Object.values(tsPkg.classes)) {
+        addMethods(cls);
+        const file = cls.file || "";
+        tsClassOwnersByFile.set(file, (tsClassOwnersByFile.get(file) ?? new Set()).add(cls.name));
+      }
       for (const mod of Object.values(tsPkg.modules)) addMethods(mod);
+      recordTsSeatOwners(
+        tsStaticOwnersByFileName,
+        tsInstanceOwnersByFileName,
+        [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)],
+        tsShouldInclude,
+        rubyModuleInstanceNamesByTsFile(rubyPkg.modules, pkg),
+      );
 
       // Include file-level functions (top-level exports not in any class/interface)
       if (tsPkg.fileFunctions) {
@@ -4198,6 +5089,17 @@ export function main() {
     }
     const moduleIncluderFqns = buildModuleIncluderFqns(allClassesAndModules, moduleFqnByShort);
 
+    const rubyNamesByMirrorTs = new Map<string, Set<string>>();
+    for (const { info } of allClassesAndModules) {
+      if (!info.file) continue;
+      const mirror = rubyFileToTs(info.file, pkg);
+      const names = rubyNamesByMirrorTs.get(mirror) ?? new Set<string>();
+      for (const m of [...(info.instanceMethods ?? []), ...(info.classMethods ?? [])]) {
+        names.add(m.name);
+      }
+      rubyNamesByMirrorTs.set(mirror, names);
+    }
+
     // Step 2: transitively resolve includer files (DFS with memoization)
     const moduleIncluderFiles = new Map<string, Set<string>>();
     const resolveIncluderFiles = (modFqn: string, visited: Set<string>): Set<string> => {
@@ -4291,6 +5193,7 @@ export function main() {
     // mismatch is STALE, the only-shrink half `@missingRailsCall` already has.
     const argTagsUsed = new Map<string, Set<string>>();
     const nameTagsUsed = new Map<string, Set<string>>();
+    const armTagsUsed = new Map<string, Set<string>>();
     const suppressedCalls: SuppressedCall[] = [];
     // The call-ARGUMENT twin, reported in that artifact for the same reason:
     // its receipts carry a permanence claim and are a population of their own.
@@ -4369,8 +5272,10 @@ export function main() {
       // always describes the very params the arity check would compare.
       const rubyForwardingNames = new Set<string>();
       const rubyBlockOwners = new Map<string, string[]>();
-      // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
-      const rubyOptionKeysByName = new Map<string, string[]>();
+      const rubyOptionKeys = {
+        byName: new Map<string, RubyOptionKeys>(),
+        byOwnerName: new Map<string, RubyOptionKeys>(),
+      };
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();
       // Same first-sighting keying: the inert-receiver subset of that call-set
@@ -4380,6 +5285,8 @@ export function main() {
       // had (RFC 0129), which the ruby-compat half of `jsEnumerableAliases`
       // needs to tell `options.fetch` from `cache.fetch`.
       const rubyCallReceiversByName = new Map<string, Record<string, string[]>>();
+      const rubyCallReceiverNamesByName = new Map<string, Record<string, string[]>>();
+      const rubyStringEvalCallsByName = new Map<string, string[]>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
@@ -4391,12 +5298,19 @@ export function main() {
       const rubyOwnersByName = new Map<string, Set<string>>();
       const rubyCallsByOwnerName = new Map<
         string,
-        { calls: string[]; weak: string[]; receivers: Record<string, string[]> }
+        {
+          calls: string[];
+          weak: string[];
+          receivers: Record<string, string[]>;
+          receiverNames: Record<string, string[]>;
+          stringEvals: string[];
+        }
       >();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
       const rubyReaderNames = new Set<string>();
       const rubyOwnerShortNames = new Set<string>();
       const rubyOwnersDefiningInitialize = new Set<string>();
+      const rubyFqnsDefiningInitialize = new Set<string>();
       // See rubyCallToTsForReceivers.
       let rubyFileDefinesInstanceNew = false;
       // (owner, name) pairs the extractor bucketed as CLASS methods — the
@@ -4417,6 +5331,9 @@ export function main() {
         if (rubyMethods.some((rm) => rm.name === "initialize")) {
           rubyOwnersDefiningInitialize.add(itemShort);
         }
+        if (item.info.instanceMethods.some((rm) => rm.name === "initialize")) {
+          rubyFqnsDefiningInitialize.add(item.fqn);
+        }
         if (f.instance.some((rm) => rm.name === "new")) rubyFileDefinesInstanceNew = true;
         for (const rm of rubyMethods) {
           // Collected ahead of the mode filter: a Rails `attr_reader` is
@@ -4434,12 +5351,25 @@ export function main() {
             ...(rubyParamListsByName.get(rm.name) ?? []),
             rm.params,
           ]);
-          if (rm.takesBlock) {
+          if (
+            rm.takesBlock &&
+            !(rm.name === "new" && klassMethods.has(rm) && blockRidesZsuper(rm))
+          ) {
             const blockKey = `${rmLevel}|${rm.name}`;
             rubyBlockOwners.set(blockKey, [...(rubyBlockOwners.get(blockKey) ?? []), item.fqn]);
           }
-          if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
-            rubyOptionKeysByName.set(rm.name, rm.option_keys);
+          if (rm.option_keys) {
+            const union = rubyOptionKeys.byName.get(rm.name);
+            rubyOptionKeys.byName.set(rm.name, {
+              keys: [...(union?.keys ?? []), ...rm.option_keys],
+              params: union?.params ?? rubyParamsByName.get(rm.name)!,
+            });
+            const ownedKey = rubyBodyKey(item.fqn, rmLevel, rm.name);
+            const owned = rubyOptionKeys.byOwnerName.get(ownedKey);
+            rubyOptionKeys.byOwnerName.set(ownedKey, {
+              keys: [...(owned?.keys ?? []), ...rm.option_keys],
+              params: [...(owned?.params ?? []), ...rm.params],
+            });
           }
           rubyOwnersByName.set(
             rm.name,
@@ -4450,12 +5380,16 @@ export function main() {
             rubyCallsByName.set(rm.name, rm.calls);
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
             rubyCallReceiversByName.set(rm.name, rm.callReceivers ?? {});
+            rubyCallReceiverNamesByName.set(rm.name, rm.callReceiverNames ?? {});
+            rubyStringEvalCallsByName.set(rm.name, rm.stringEvalCalls ?? []);
           }
           if (rm.calls && !rubyCallsByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))) {
             rubyCallsByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), {
               calls: rm.calls,
               weak: rm.weakCalls ?? [],
               receivers: rm.callReceivers ?? {},
+              receiverNames: rm.callReceiverNames ?? {},
+              stringEvals: rm.stringEvalCalls ?? [],
             });
           }
           if (
@@ -4484,21 +5418,45 @@ export function main() {
 
       // Advisory option-key check: diff the Ruby method's consumed option
       // symbols against the TS options-object keys (see options-keys.ts).
-      const checkOptionKeys = (rubyName: string, tsName: string, tsFile: string) => {
-        const rubyKeys = rubyOptionKeysByName.get(rubyName);
-        if (!rubyKeys) return;
-        const candidates = tsOptionKeysByFileName.get(tsFile)?.get(tsName);
-        if (!candidates || candidates.length === 0) return;
-        const positionalParams = (rubyParamsByName.get(rubyName) ?? [])
+      const checkOptionKeys = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+        level: OwnerSeat,
+      ) => {
+        const pair = optionKeyPair(
+          rubyName,
+          tsName,
+          tsFile,
+          rubyModule,
+          level,
+          rubyOptionKeys,
+          portedWithArgsMaps,
+        );
+        if (!pair || pair.candidates.length === 0) return;
+        const positionalParams = pair.ruby.params
           .filter((p) => p.kind === "required" || p.kind === "optional")
           .map((p) => p.name);
-        const verdict = matchOptionKeysAgainst(rubyKeys, candidates, positionalParams);
+        const keywordParams = (
+          pair.owned ? pair.ruby.params : (rubyParamListsByName.get(rubyName) ?? []).flat()
+        )
+          .filter((p) => p.kind === "keyword")
+          .map((p) => p.name);
+        const verdict = matchOptionKeysAgainst(
+          pair.ruby.keys,
+          pair.candidates,
+          positionalParams,
+          pair.reads,
+          keywordParams,
+        );
         if (!verdict.comparable) return;
         optionKeysCompared++;
         if (verdict.missingInTs.length === 0 && verdict.extraInTs.length === 0) return;
         optionKeyMismatches.push({
           rubyFile,
           tsFile,
+          rubyModule,
           rubyName,
           tsName,
           missingInTs: verdict.missingInTs,
@@ -4608,6 +5566,50 @@ export function main() {
         return { tsClass, ambiguous };
       };
 
+      const inlinedSegmentsFor = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+        level: OwnerSeat,
+      ): MethodInfo[] => {
+        if (rubyName !== "initialize" || tsName !== "constructor") return [];
+        const klass = rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined;
+        if (!klass) return [];
+        const initializeOf = (fqn: string) =>
+          (rubyPkg.modules[fqn] as unknown as ClassInfo | undefined)?.instanceMethods.find(
+            (m) => m.name === "initialize",
+          );
+        const ancestors = moduleAncestors(
+          klass,
+          rubyModule,
+          rubyPkg.modules,
+          (incName, contextFqn) => resolveModuleName(incName, contextFqn, moduleFqnByShort),
+        );
+        const sameFile = sameFileInitializeModules(klass, ancestors, rubyPkg.modules);
+        const byOwner = tsInlinedFromByFileOwner.get(tsFile);
+        const tsClass =
+          byOwner === undefined
+            ? undefined
+            : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
+        if (byOwner?.has(tsClass ?? "")) inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
+        return inlinedSegments(
+          klass.instanceMethods.find((m) => m.name === "initialize"),
+          ancestors,
+          sameFile.flatMap((module) => {
+            const body = initializeOf(module);
+            return body === undefined ? [] : [{ module, body }];
+          }),
+          taggedBodies(
+            ruby,
+            byOwner?.get(tsClass ?? "") ?? [],
+            sameFile,
+            `${pkg}/${tsFile} ${tsClass}#constructor`,
+          ),
+          klass.classMethods.find((m) => m.name === "new"),
+        );
+      };
+
       // Advisory calls-parity check: for a name-matched pair, flag Ruby body
       // calls that (a) map by naming convention to a method we ported and
       // (b) are absent from the TS body's call-set. A coarse body-fidelity
@@ -4629,13 +5631,19 @@ export function main() {
         // The call set is computed only under `--calls`, the mode that
         // writes and gates the artifact (see the artifact write below).
         if (!callsGate) return;
-        const rubyOwned = ownsBody(rubyName)
-          ? rubyCallsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
-          : {
-              calls: rubyCallsByName.get(rubyName) ?? [],
-              weak: rubyWeakCallsByName.get(rubyName) ?? [],
-              receivers: rubyCallReceiversByName.get(rubyName) ?? {},
-            };
+        const segments = inlinedSegmentsFor(rubyName, tsName, tsFile, rubyModule, level);
+        const rubyOwned =
+          segments.length > 0
+            ? inlinedRubyBody(segments)
+            : ownsBody(rubyName)
+              ? rubyCallsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+              : {
+                  calls: rubyCallsByName.get(rubyName) ?? [],
+                  weak: rubyWeakCallsByName.get(rubyName) ?? [],
+                  receivers: rubyCallReceiversByName.get(rubyName) ?? {},
+                  receiverNames: rubyCallReceiverNamesByName.get(rubyName) ?? {},
+                  stringEvals: rubyStringEvalCallsByName.get(rubyName) ?? [],
+                };
         // A body whose every Ruby call is weak still gets compared:
         // significantMissingCalls returns empty for an empty `rubyCalls`, so the
         // pair is counted and found clean rather than leaving the population.
@@ -4649,7 +5657,7 @@ export function main() {
           rubyModule,
           level,
         );
-        if (ambiguous) return;
+        if (ambiguous && segments.length < 2) return;
         if (
           ownerRecordsNothing(
             tsCallsByFileNameOwner,
@@ -4691,13 +5699,17 @@ export function main() {
         // too, or the helper's `!xs.includes(y)` would not count — same for a
         // wrapper and its delegate.
         const negatedTsCalls = new Set(own.negated);
+        const tsNativeForms = new Set(own.nativeForms);
         for (const n of reached) {
           for (const c of sameFile.get(n)?.negated ?? []) negatedTsCalls.add(c);
+          for (const c of sameFile.get(n)?.nativeForms ?? []) tsNativeForms.add(c);
         }
         if (isDelegatingWrapper(tsName, own.calls)) {
           for (const c of tsNegatedCallsByName.get(tsName) ?? []) negatedTsCalls.add(c);
         }
         for (const c of graphCalls.negated) negatedTsCalls.add(c);
+        for (const c of graphCalls.nativeForms) tsNativeForms.add(c);
+        for (const c of invokeForms(invokedNames(own.nativeForms))) tsNativeForms.add(c);
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,
@@ -4708,29 +5720,74 @@ export function main() {
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
-          significantCallsForReceivers(rubyOwned?.receivers, callsSignificant),
+          significantCallsForReceivers(
+            rubyOwned?.receivers,
+            callsSignificant,
+            tsNativeForms,
+            rubyOwned?.receiverNames,
+          ),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
         );
-        const rubySkeleton = ownsBody(rubyName)
-          ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
-          : rubySkeletonByName.get(rubyName);
-        const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
-        if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
+        const rubySkeleton =
+          segments.length > 0
+            ? inlinedRubySkeleton(segments)
+            : ownsBody(rubyName)
+              ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+              : rubySkeletonByName.get(rubyName);
+        const mirrorFile = rubyFileToTs(rubyFile, pkg, false);
+        const mirrored =
+          mirrorFile === tsFile
+            ? []
+            : [
+                ...(skeletonsByOwner(
+                  tsSkeletonBodiesByFileName.get(mirrorFile)?.get(tsName),
+                )?.values() ?? []),
+              ].flat();
+        const skeletonFile = mirrored.length === 1 ? mirrorFile : tsFile;
+        const tsSkeletonsByOwner = skeletonsByOwner(
+          tsSkeletonBodiesByFileName.get(skeletonFile)?.get(tsName),
+        );
+        const tsSkeletons = skeletonsOfOwner(
+          tsSkeletonByFileName.get(skeletonFile)?.get(tsName),
+          tsSkeletonsByOwner,
+          tsClass,
+          tsClassOwnersByFile.get(skeletonFile),
+        );
+        if (
+          rubySkeleton !== undefined &&
+          tsSkeletons?.length === 1 &&
+          !skeletonIsAnotherOwners(
+            tsClass !== undefined &&
+              tsCallsByFileNameOwner.get(skeletonFile)?.get(tsName)?.get(tsClass) !== undefined,
+            tsClass,
+            tsSkeletonOwnersByFileName.get(skeletonFile)?.get(tsName),
+          )
+        ) {
           const tsSkeletonOf = (name: string) => {
-            const sets = tsSkeletonByFileName.get(tsFile)?.get(name);
+            const sets = tsSkeletonByFileName.get(skeletonFile)?.get(name);
             if (sets?.length === 1) return sets[0];
-            const local = tsLocalSkeletonByFileName.get(tsFile)?.get(name);
+            const local = tsLocalSkeletonByFileName.get(skeletonFile)?.get(name);
             return local?.length === 1 ? local[0] : undefined;
           };
-          const localSets = tsLocalSkeletonByFileName.get(tsFile)?.get(tsName);
+          const localSets = tsLocalSkeletonByFileName.get(skeletonFile)?.get(tsName);
           const tsOwnNameDelegate = localSets?.length === 1 ? localSets[0] : undefined;
-          const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts");
+          const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts", rubySkeleton);
+          const armTags = tagsForOwner(
+            tsInventedArmTagsByFileName.get(skeletonFile)?.get(tsName),
+            tsClass,
+            tsBodylessOwnersByFileName.get(skeletonFile)?.get(tsName),
+          );
+          seedComparedTagKey(
+            armTagsUsed,
+            armTags,
+            callTagKey(skeletonFile, tsClass ?? "*", tsName),
+          );
           callSkeletons.push({
             rubyFile,
             rubyName,
-            tsFile,
+            tsFile: skeletonFile,
             tsName,
             ruby: foldSkeletonTokens(rubySkeleton, "ruby", tsFolded),
             ts: tsFolded,
@@ -4747,6 +5804,7 @@ export function main() {
               "ts",
               tsOwnNameDelegate,
             ),
+            ...(armTags ? { inventedArms: [...armTags.keys()].sort() } : {}),
           });
         }
         const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);
@@ -4761,6 +5819,8 @@ export function main() {
               (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
               callsSignificant,
               rubyOwned?.calls ?? rubyCalls,
+              undefined,
+              (rubyOwned?.stringEvals.length ?? 0) > 0,
             ),
           );
         }
@@ -4817,9 +5877,13 @@ export function main() {
         // only drop whole NAMES, but here a name that is weak at one site and a
         // genuine call at another would lose both sites to a name filter. See
         // {@link comparableRubySites} below for when a weak site is kept.
-        const rubyOwnSites = ownsBody(rubyName)
-          ? rubyCallArgsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
-          : rubyCallArgsByName.get(rubyName);
+        const segments = inlinedSegmentsFor(rubyName, tsName, tsFile, rubyModule, level);
+        const rubyOwnSites =
+          segments.length > 0
+            ? inlinedRubyCallArgs(segments)
+            : ownsBody(rubyName)
+              ? rubyCallArgsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+              : rubyCallArgsByName.get(rubyName);
         // Also dropped: a receiver-less zero-arg read of an `attr_reader` name.
         // Ruby spells such a read exactly like a call, so `if foreign_key`
         // (schema_definitions.rb:241) arrives as a second, zero-arg
@@ -4846,7 +5910,7 @@ export function main() {
           rubyModule,
           level,
         );
-        if (ambiguous) return;
+        if (ambiguous && segments.length < 2) return;
         if (
           ownerRecordsNothing(
             tsCallArgsByFileNameOwner,
@@ -4890,7 +5954,10 @@ export function main() {
             ruby,
             ts,
             rubyName,
-            portedWithArgsSigs(tsFile, ts.name),
+            resolveCalleeSigs(
+              portedWithArgsSigs(tsFile, ts.name),
+              tsParamsByNameInDeps.get(ts.name),
+            ),
             rubyParamsByName.get(ruby.name),
           );
           if (result.verdict === "skip") {
@@ -4919,13 +5986,9 @@ export function main() {
           }
           const receipts =
             result.class === "naming" && nameTags
-              ? result.rubyArgs.flatMap((arg, i) => {
-                  const r = refName(arg);
-                  const t = refName(result.tsArgs[i] ?? "");
-                  return r !== undefined && t !== undefined && r !== t && nameTags.has(r)
-                    ? [r]
-                    : [];
-                })
+              ? differingRefPairs(result.rubyArgs, result.tsArgs).flatMap(([r]) =>
+                  nameTags.has(r) ? [r] : [],
+                )
               : [];
           for (const r of receipts) nameTagsUsed.get(tagKey)!.add(r);
           callArgMismatches.push({
@@ -4974,7 +6037,7 @@ export function main() {
         guessedFile = false,
         level: OwnerSeat = rubyOwnerSeat(rubyModule, false),
       ) => {
-        checkOptionKeys(rubyName, tsName, tsFile);
+        checkOptionKeys(rubyName, tsName, tsFile, rubyModule, level);
         checkLiterals(rubyName, tsName, tsFile);
         if (!skipCalls) {
           checkCalls(rubyName, tsName, tsFile, rubyModule, level);
@@ -4989,13 +6052,24 @@ export function main() {
         if (!rubyParams) return;
         // Every signature recorded for this TS name; a pair matches when it
         // overlaps ANY (see tsParamsByName above for why this is global).
-        const candidates = tsParamsByName.get(tsName) ?? [];
+        const threaded = (tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? []).filter(
+          threadsSuper,
+        );
+        const candidates = threaded.length > 0 ? threaded : (tsParamsByName.get(tsName) ?? []);
         if (candidates.length === 0) return;
         if (!rubyForwardingNames.has(rubyName) && !guessedFile) {
           for (const blockOwner of rubyBlockOwners.get(`${level}|${rubyName}`) ?? []) {
             blockParamsCompared++;
             const short = blockOwner.split("::").at(-1) ?? blockOwner;
-            const ownerSigs = tsBlockSigsByFileOwnerName.get(tsFile)?.get(`${short}#${tsName}`);
+            const seat = tsOwnerSeat(
+              short,
+              tsStaticOwnersByFileName.get(tsFile)?.get(tsName),
+              tsInstanceOwnersByFileName.get(tsFile)?.get(tsName),
+            );
+            const ownerSigs =
+              seat !== undefined && seat !== level
+                ? undefined
+                : tsBlockSigsByFileOwnerName.get(tsFile)?.get(`${short}#${tsName}`);
             const sigs = ownerSigs ?? tsBlockSigsByFileName.get(tsFile)?.get(tsName) ?? [];
             if (dropsBlock(true, sigs)) {
               blockParamMismatches.push({
@@ -5164,11 +6238,47 @@ export function main() {
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
-        const tsCandidates =
-          tsMirrorNames === undefined
-            ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg)
-            : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
-        if (tsCandidates === null) continue;
+        const ownerIsModule = Object.hasOwn(rubyPkg.modules, rubyModule);
+        const classMethodsNew =
+          rubyName === "new" &&
+          level === "class" &&
+          (
+            rubyPkg.modules[`${rubyModule}::ClassMethods`] as unknown as ClassInfo | undefined
+          )?.instanceMethods.some((m) => m.name === "new") === true;
+        const extendedInFile =
+          classMethodsNew &&
+          items.some(
+            (item) =>
+              Object.hasOwn(rubyPkg.classes, item.fqn) &&
+              [rubyModule, `${rubyModule}::ClassMethods`].some((fqn) =>
+                moduleIncluderFqns.get(fqn)?.has(item.fqn),
+              ),
+          );
+        const ownNew =
+          rubyName === "new" && level === "class" && (!ownerIsModule || extendedInFile);
+        const mirrorCandidates =
+          tsMirrorNames !== undefined
+            ? scopedSkipMirrorCandidates(tsMirrorNames, tsMethods)
+            : ownNew
+              ? [...(tsMethods.has("new") ? ["new"] : []), ...OWN_NEW_TS_CANDIDATES]
+              : rubyMethodToTsForFqn(
+                  rubyModule,
+                  rubyName,
+                  classMethodsNew ? undefined : siblingRubyNames,
+                  pkg,
+                );
+        if (mirrorCandidates === null) continue;
+        const besideInitialize =
+          ownNew &&
+          (rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined)?.instanceMethods.some(
+            (m) => m.name === "initialize",
+          ) === true;
+        const tsCandidates = moduleInitializeCandidates(
+          rubyName,
+          ownerIsModule,
+          tsMethods,
+          mirrorCandidates,
+        );
         const notePredicateKind = (tsFile: string, tsName: string) => {
           const admits = tsAdmitsBooleanByFileName.get(tsFile)?.get(tsName);
           if (predicateKindMismatch(rubyName, tsName, admits)) {
@@ -5224,6 +6334,7 @@ export function main() {
         if (directMatch !== undefined && COPY_HOOKS.has(rubyName)) copyHookClaims.add(directMatch);
         if (directMatch && !declOnly) {
           fileMatched++;
+          if (besideInitialize && directMatch === "constructor") continue;
           notePredicateKind(expectedTs, directMatch);
           const claimKey = `${expectedTs}#${directMatch}#${rubyName.endsWith("=") ? "w" : "r"}`;
           const self = `${rubyFile}#${rubyName}`;
@@ -5243,7 +6354,13 @@ export function main() {
               pkg,
               (f) => byFile.has(f),
               tsMethodsByFile,
-            ) !== null;
+            ) !== null ||
+            includerConstructorIsInitializeSeat(
+              { rubyName, mixinFile },
+              rubyFile,
+              directMatch,
+              tsCallsByFileName.get(expectedTs)?.get(directMatch),
+            );
           checkArity(
             rubyName,
             directMatch,
@@ -5270,8 +6387,25 @@ export function main() {
               if (otherLevel !== level) continue;
               if (!tsOwners?.has(other.split("::").at(-1) ?? other)) continue;
               checkCalls(rubyName, directMatch, expectedTs, other, otherLevel);
+              checkOptionKeys(rubyName, directMatch, expectedTs, other, otherLevel);
             }
           }
+          continue;
+        }
+
+        const creditedBy =
+          ownerIsModule && mixinFile === undefined && (rubyName === "initialize" || classMethodsNew)
+            ? inlinedHookCreditedBy(
+                classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
+                classMethodsNew ? "new" : "initialize",
+                pkg,
+                moduleIncluderFiles.get(rubyModule) ?? new Set(),
+                tsInlinedHookTags,
+              )
+            : undefined;
+        if (creditedBy !== undefined) {
+          checkBody(rubyName, "constructor", creditedBy.tsFile);
+          fileMatched++;
           continue;
         }
 
@@ -5324,76 +6458,44 @@ export function main() {
           if (foundViaInclude) break;
         }
 
-        if (foundViaInclude && !declOnly) {
-          fileMatched++;
-          notePredicateKind(foundViaInclude, matchedCandidate!);
-          checkArity(
-            rubyName,
-            matchedCandidate!,
-            foundViaInclude,
-            rubyModule,
-            writerPairedWithReader(rubyName, matchedCandidate!, siblingRubyNames),
-            false,
-            level,
-          );
-          moves.push({
-            tsName: matchedCandidate!,
-            rubyName,
-            rubyModule,
-            expectedFile: expectedTs,
-            actualFile: foundViaInclude,
-          });
-          continue;
-        }
-
-        // Mixed in from another Ruby file and ported there, once, exactly as
-        // Rails writes it — see `mixinMethodCreditedToOwnFile`.
-        const creditedToMixin = mixinMethodCreditedToOwnFile(
-          { rubyName, rubyModule, mixinFile },
+        const credit = crossFileCredit(
+          { rubyName, rubyModule, mixinFile, definedInFile, notes },
           rubyFile,
           pkg,
           (f) => byFile.has(f),
           tsMethodsByFile,
+          tsBodylessOwnersByFileName,
+          tsBodiedOwnersByFileName,
+          tsAliasNamesByFileName,
+          foundViaInclude && !declOnly
+            ? { tsName: matchedCandidate!, tsFile: foundViaInclude }
+            : null,
         );
-        if (creditedToMixin) {
-          fileMatched++;
-          // No `checkArity`: the same pair is already compared in the mixin's
-          // own bucket, so re-running it per host double-counts every mismatch.
-          moves.push({
-            tsName: creditedToMixin.tsName,
-            rubyName,
-            rubyModule,
-            expectedFile: expectedTs,
-            actualFile: creditedToMixin.tsFile,
-          });
-          continue;
-        }
 
-        // Defined by a reopening of this class in another Ruby file, and ported
-        // there — see `reopeningMethodCreditedToOwnFile`.
-        const creditedToReopening = reopeningMethodCreditedToOwnFile(
-          { rubyName, rubyModule, definedInFile },
-          rubyFile,
-          pkg,
-          tsMethodsByFile,
-        );
-        if (creditedToReopening) {
+        if (credit !== null) {
           fileMatched++;
-          checkArity(
-            rubyName,
-            creditedToReopening.tsName,
-            creditedToReopening.tsFile,
-            rubyModule,
-            false,
-            false,
-            level,
-          );
+          if (credit.arm === "include") {
+            notePredicateKind(credit.compared!.tsFile, credit.compared!.tsName);
+          }
+          if (credit.compared !== null) {
+            checkArity(
+              rubyName,
+              credit.compared.tsName,
+              credit.compared.tsFile,
+              rubyModule,
+              credit.arm === "include" &&
+                writerPairedWithReader(rubyName, credit.compared.tsName, siblingRubyNames),
+              false,
+              level,
+            );
+          }
           moves.push({
-            tsName: creditedToReopening.tsName,
+            tsName: credit.move.tsName,
             rubyName,
             rubyModule,
             expectedFile: expectedTs,
-            actualFile: creditedToReopening.tsFile,
+            actualFile: credit.move.tsFile,
+            ...(credit.move.inDefiningFile ? { inDefiningFile: true as const } : {}),
           });
           continue;
         }
@@ -5420,7 +6522,7 @@ export function main() {
               misplacedMatch,
               misplacedActualFile!,
               rubyModule,
-              false,
+              rubyNamesByMirrorTs.get(misplacedActualFile!)?.has(rubyName) === true,
               true,
               level,
             );
@@ -5469,6 +6571,25 @@ export function main() {
         };
         missingMethods.push(missed);
         if (declOnly) declarationOnly.push(missed);
+      }
+
+      for (const { fqn } of items) {
+        if (
+          !isInitializeLessTaggedClass(
+            fqn,
+            rubyPkg.classes,
+            rubyFqnsDefiningInitialize,
+            tsInlinedFromByFileOwner.get(expectedTs),
+            inlinedTagsCompared,
+            expectedTs,
+            (rubyModule) =>
+              resolveOwner("initialize", "constructor", expectedTs, rubyModule, "instance").tsClass,
+          )
+        ) {
+          continue;
+        }
+        checkCalls("initialize", "constructor", expectedTs, fqn, "instance");
+        checkCallArgs("initialize", "constructor", expectedTs, fqn, "instance");
       }
 
       const total = fileMatched + fileMissing;
@@ -5641,6 +6762,11 @@ export function main() {
       }
     }
 
+    const uncomparedInlined = uncomparedInlinedTags(tsInlinedFromByFileOwner, inlinedTagsCompared);
+    if (callsGate && uncomparedInlined.length > 0) {
+      const where = uncomparedInlined.map((key) => `${pkg}/${key}#constructor`).join(", ");
+      throw new Error(`@inlinedFrom was never compared, no Rails \`initialize\` paired: ${where}`);
+    }
     results.push({
       package: pkg,
       totalMethods,
@@ -5697,6 +6823,11 @@ export function main() {
         ),
         suppressed: suppressedCalls,
         skeletons: callSkeletons,
+        uncomparedArmTags: uncomparedCallTags(
+          tsInventedArmTagsByFileName,
+          armTagsUsed,
+          tsDeclFileByFileNameOwner,
+        ),
       },
       callArgs: {
         compared: callArgsCompared,
@@ -5971,6 +7102,9 @@ export function main() {
           note: "Advisory, ungated. Ordered control + call skeleton per name-matched pair, both sides uncollapsed: if/loop/try/rescue/throw, new:Ctor, ref:<name>, in source order with duplicates. Ruby block iteration folds onto loop. rubyHelpers/tsHelpers carry the same-file skeletons the report splices at each reach.",
           packages: [...new Set(results.map((r) => r.package))].sort(),
           skeletons: skeletonsFlat,
+          uncomparedArmTags: results.flatMap((r) =>
+            r.calls.uncomparedArmTags.map((t) => ({ package: r.package, ...t })),
+          ),
         },
         null,
         2,

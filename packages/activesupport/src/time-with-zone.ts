@@ -10,7 +10,7 @@ import {
   lessThanOrEqual,
   NoMethodError,
   PROTOCOL_PROBES,
-  rbObjClass,
+  rbObjClassname,
   rubyClass,
 } from "@blazetrails/ruby-compat";
 import { actsLike } from "./core-ext/object/acts-like.js";
@@ -20,10 +20,17 @@ import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js"
 import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational, rational, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  rational,
+  rbDefineAllocFunc,
+  rbEqual,
+  rbHash,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
-import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
+import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 import {
   change as timeChange,
   type ChangeOptions as TimeChangeOptions,
@@ -175,7 +182,7 @@ export class TimeWithZone {
     try {
       if (typeof time[method] !== "function") {
         throw new NoMethodError(
-          `undefined method '${method}' for an instance of ${rbObjClass(time)}`,
+          `undefined method '${method}' for an instance of ${rbObjClassname(time)}`,
         );
       }
       return this._wrapWithTimeZone(
@@ -522,7 +529,7 @@ export class TimeWithZone {
 
   toFs(format: string = "default"): string {
     if (format === "db") {
-      return toFs(this.utc(), format);
+      return this.utc().toFs(format);
     } else {
       const formatter = DATE_FORMATS[format];
       if (formatter != null) {
@@ -715,6 +722,10 @@ export class TimeWithZone {
       return this._zoned.epochNanoseconds === other.toZonedDateTime().epochNanoseconds;
     }
     return false;
+  }
+
+  hash(): number {
+    return rbHash(this.utc());
   }
 
   isBetween = isBetween;
@@ -910,3 +921,8 @@ export class TimeWithZone {
     return this._epochMs;
   }
 }
+
+rbDefineAllocFunc(
+  TimeWithZone,
+  (klass) => new Proxy(Object.create(klass.prototype) as TimeWithZone, METHOD_MISSING_HANDLER),
+);

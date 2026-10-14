@@ -1,29 +1,52 @@
 import {
   classAttribute,
-  defineCallbacks,
   extend,
   extractOptionsBang,
   include,
   included,
   kernelArray,
-  runCallbacks,
 } from "@blazetrails/activesupport";
 
+import {
+  block as rbBlock,
+  dup as hashDup,
+  flatten,
+  Hash,
+  Module,
+  rbBlockGivenP,
+  rbFPublicSend,
+  rbFSend,
+  rbModConstSet,
+  rbModMethodDefined,
+  rbModSingletonP,
+  uniq,
+} from "@blazetrails/ruby-compat";
+
 import { Errors } from "./errors.js";
-import { inspectAccessor } from "./validations/_accessor.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
 
 import { Naming } from "./naming.js";
-import { Translation, raiseOnMissingTranslations as translationRaise } from "./translation.js";
+import { Translation } from "./translation.js";
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
   ClassMethods as WithClassMethods,
   validatesWith as withValidatesWith,
 } from "./validations/with.js";
 import * as Validates from "./validations/validates.js";
-import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
+import { AbsenceValidator } from "./validations/absence.js";
+import { AcceptanceValidator } from "./validations/acceptance.js";
+import { ComparisonValidator } from "./validations/comparison.js";
+import { ConfirmationValidator } from "./validations/confirmation.js";
+import { ExclusionValidator } from "./validations/exclusion.js";
+import { FormatValidator } from "./validations/format.js";
+import { InclusionValidator } from "./validations/inclusion.js";
+import { LengthValidator } from "./validations/length.js";
+import { NumericalityValidator } from "./validations/numericality.js";
+import { PresenceValidator } from "./validations/presence.js";
+import { WithValidator } from "./validations/with.js";
+import { ArgumentError } from "./attribute-assignment.js";
 import type { CallbackConditions } from "./callbacks.js";
 import {
   Callbacks,
@@ -55,8 +78,7 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
 export class Validations {
   static [included](base: IncludingClass): void {
-    include(base, InstanceMethods);
-
+    include(base, SuperMethods);
     include(base, { validatesWith: withValidatesWith });
 
     extend(base, ClassMethods);
@@ -73,27 +95,45 @@ export class Validations {
     extend(base, Translation);
     extend(base, HelperMethods);
     include(base, HelperMethods);
-    defineCallbacks(base.prototype, "validate", { scope: ["name"] });
-    classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
+    (base as IncludingClass & ValidationsClassHost).defineCallbacks("validate", {
+      scope: ["name"],
+    });
+    classAttribute.call(base, "_validators", {
+      instanceWriter: false,
+      default: new Hash<string | null, ValidatorLike[]>((h, k) => {
+        const v: ValidatorLike[] = [];
+        h.set(k, v);
+        return v;
+      }),
+    });
+    const reader = Object.getOwnPropertyDescriptor(base, "_validators")!;
+    Object.defineProperty(base, "_validators", {
+      ...reader,
+      get(this: ValidationsClassHost) {
+        if (
+          !Object.prototype.hasOwnProperty.call(this, "__class_attr__validators") &&
+          !rbModSingletonP(this)
+        ) {
+          inherited.call(Object.getPrototypeOf(this), this);
+        }
+        return reader.get!.call(this);
+      },
+    });
   }
 
   /** @internal */
   declare _errors?: Errors<this>;
 
+  /** @internal */
+  declare _contextForValidation?: ValidationContext;
+
   get errors(): Errors<this> {
     return (this._errors ??= new Errors(this));
   }
 
-  /** @internal */
-  declare contextForValidation: () => ValidationContext;
-  /** @internal */
-  declare runValidationsBang: () => Promise<boolean>;
-  declare raiseValidationError: () => never;
-
-  async isValid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
+  async isValid(context: string | string[] | null = null): Promise<boolean> {
     const currentContext = this.validationContext;
-    const inner = context instanceof ValidationContext ? context.context : (context ?? null);
-    this.contextForValidation().context = Array.isArray(inner) ? [...inner] : inner;
+    this.contextForValidation().context = context;
     this.errors.clear();
 
     try {
@@ -103,17 +143,20 @@ export class Validations {
     }
   }
 
-  declare validate: (context?: string | string[] | ValidationContext | null) => Promise<boolean>;
+  declare validate: (context?: string | string[] | null) => Promise<boolean>;
 
-  async isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
+  declare freeze: () => this;
+
+  async isInvalid(context: string | string[] | null = null): Promise<boolean> {
     return !(await this.isValid(context));
   }
 
-  async validateBang(context?: string | string[] | ValidationContext | null): Promise<true> {
-    if (!(await this.isValid(context))) {
-      this.raiseValidationError();
-    }
-    return true;
+  async validateBang(context: string | string[] | null = null): Promise<true> {
+    return (await this.isValid(context)) || this.raiseValidationError();
+  }
+
+  readAttributeForValidation(this: ReadAttributeForValidationHost, attribute: string): unknown {
+    return rbFSend(this, attribute);
   }
 
   get validationContext(): string | string[] | null {
@@ -131,8 +174,21 @@ export class Validations {
   }
 
   /** @internal */
-  async _runValidateCallbacks(): Promise<void> {
-    await runCallbacks(this, "validate");
+  declare _runValidateCallbacks: (block?: () => unknown) => unknown;
+
+  /** @internal */
+  contextForValidation(): ValidationContext {
+    return (this._contextForValidation ??= new ValidationContext());
+  }
+
+  /** @internal */
+  async runValidationsBang(): Promise<boolean> {
+    await this._runValidateCallbacks();
+    return this.errors.isEmpty();
+  }
+
+  raiseValidationError(): never {
+    throw new ValidationError(this);
   }
 }
 
@@ -146,11 +202,16 @@ type ValidateFilter<T extends ValidatableRecord> =
   | ValidatorLike;
 
 export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
+  | [
+      ...filters: Array<ValidateFilter<T>>,
+      options: ConditionalOptions,
+      block: (record: T) => unknown,
+    ]
   | [...filters: Array<ValidateFilter<T>>, options: ConditionalOptions]
   | Array<ValidateFilter<T>>;
 
 export interface ValidationsClassHost {
-  _validators: Map<string | null, ValidatorLike[]>;
+  _validators: Hash<string | null, ValidatorLike[]>;
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
   validatesWith(...args: unknown[]): void;
   validate(...args: ValidateArgs<ValidatableRecord>): void;
@@ -159,6 +220,7 @@ export interface ValidationsClassHost {
     ...filterList: Array<string | ((record: object) => unknown) | CallbackConditions>
   ): void;
   resetCallbacks(name: string): void;
+  defineCallbacks(name: string, options?: { scope?: string[] }): void;
   /** @internal */
   predicateForValidationContext(
     context: string | string[],
@@ -172,15 +234,20 @@ export const ClassMethods = {
     block: (record: T, attribute: string, value: unknown) => void,
     options: ConditionalOptions = {},
   ): void {
-    this.validatesWith(BlockValidator, this._mergeAttributes([...attrNames, options]), block);
+    this.validatesWith(
+      BlockValidator,
+      this._mergeAttributes([...attrNames, options]),
+      rbBlock(block),
+    );
   },
 
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
     ...args: ValidateArgs<T>
   ): void {
-    const extracted = extractOptionsBang(args as unknown[]);
     const filters = args as unknown[];
+    const block = rbBlockGivenP(filters[filters.length - 1]) ? filters.pop() : undefined;
+    const extracted = extractOptionsBang(filters);
     let options = extracted as ConditionalOptions;
 
     if (filters.every((arg) => typeof arg === "string" && arg.startsWith(":"))) {
@@ -225,54 +292,41 @@ export const ClassMethods = {
       "validate",
       ...(filters as Array<string | ((record: object) => unknown)>),
       options as CallbackConditions,
+      ...(block !== undefined ? [block as (record: object) => unknown] : []),
     );
   },
 
   validators(this: ValidationsClassHost): ValidatorLike[] {
-    const seen = new Set<ValidatorLike>();
-    const out: ValidatorLike[] = [];
-    for (const bucket of this._validators.values()) {
-      for (const v of bucket) {
-        if (seen.has(v)) continue;
-        seen.add(v);
-        out.push(v);
-      }
-    }
-    return out;
+    return uniq(flatten([...this._validators.values()]) as ValidatorLike[]);
   },
 
   clearValidatorsBang(this: ValidationsClassHost): void {
     this.resetCallbacks("validate");
-    this._validators = new Map();
+    this._validators.clear();
   },
 
   validatorsOn(this: ValidationsClassHost, ...attributes: string[]): ValidatorLike[] {
-    return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
+    return attributes.flatMap((attribute) => this._validators.get(attribute)!);
   },
 
   /** @internal */
   predicateForValidationContext(
     context: string | string[],
   ): (model: ValidationsContextHost) => boolean {
-    const arr = Array.isArray(context) ? [...context].sort() : [context];
-    const key = JSON.stringify(arr);
-    let cached = _predicatesForValidationContexts.get(key);
-    if (!cached) {
-      cached = (model: ValidationsContextHost): boolean => {
-        const mc = model.validationContext;
-        if (Array.isArray(mc)) {
-          return mc.some((c) => arr.includes(c));
-        }
-        return mc !== null && mc !== undefined && arr.includes(mc);
-      };
-      _predicatesForValidationContexts.set(key, cached);
-    }
-    return cached;
+    context = Array.isArray(context) ? [...context].sort() : kernelArray(context);
+
+    return (_predicatesForValidationContexts[JSON.stringify(context)] ||= (
+      model: ValidationsContextHost,
+    ): boolean => {
+      if (Array.isArray(model.validationContext)) {
+        return model.validationContext.some((modelContext) => context.includes(modelContext));
+      } else {
+        return context.includes(model.validationContext as string);
+      }
+    });
   },
   isAttributeMethod(this: { prototype: object }, attribute: string): boolean {
-    const isWriter = attribute.endsWith("=");
-    const accessor = inspectAccessor(this.prototype, isWriter ? attribute.slice(0, -1) : attribute);
-    return isWriter ? accessor.hasSetter : accessor.hasGetter;
+    return rbModMethodDefined(this, attribute);
   },
 };
 
@@ -287,12 +341,13 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
 
   constructor(model: TModel) {
     const errors = model.errors.fullMessages.join(", ");
-    const rawScope = (model as { constructor?: { i18nScope?: unknown } }).constructor?.i18nScope;
-    const scope = typeof rawScope === "string" ? rawScope : "activemodel";
-    const message = I18n.t(`${scope}.errors.messages.model_invalid`, {
-      errors,
-      default: ":errors.messages.model_invalid",
-    }) as string;
+    const message = I18n.t(
+      `${rbFPublicSend(model.constructor, "i18nScope")}.errors.messages.model_invalid`,
+      {
+        errors,
+        default: ":errors.messages.model_invalid",
+      },
+    ) as string;
     super(message);
     this.name = "ValidationError";
     this.model = model;
@@ -300,49 +355,26 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
 }
 
 export class ValidationContext {
-  private _context: string | string[] | null;
-
-  constructor(context: string | string[] | null = null) {
-    this._context = context;
-  }
-
-  get context(): string | string[] | null {
-    return this._context;
-  }
-
-  set context(value: string | string[] | null) {
-    this._context = value;
-  }
-
-  get name(): string {
-    const c = this._context;
-    return Array.isArray(c) ? (c[0] ?? "") : (c ?? "");
-  }
-
-  toString(): string {
-    return this.name;
-  }
+  context: string | string[] | null = null;
 }
 
 /** @internal */
-const _predicatesForValidationContexts = new Map<
-  string,
-  (model: ValidationsContextHost) => boolean
->();
+const _predicatesForValidationContexts: Record<string, (model: ValidationsContextHost) => boolean> =
+  {};
 
 export function initializeDup<TBase extends object>(
   this: ValidationsInternalsHost<TBase>,
-  super_: (other: unknown) => void,
   other: unknown,
 ): void {
   this._errors = undefined;
-  super_(other);
+  SuperMethods.superMethod(this, "initializeDup")!(other);
 }
 
-interface ValidationsFreezeHost {
-  readonly errors: unknown;
-  /** @internal */
-  contextForValidation(): unknown;
+export function freeze<T extends Validations>(this: T): T {
+  void this.errors;
+  void this.contextForValidation();
+
+  return SuperMethods.superMethod(this, "freeze")!() as T;
 }
 
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
@@ -351,72 +383,31 @@ export interface ValidationsContextHost {
   readonly validationContext: string | string[] | null;
 }
 
-export const InstanceMethods = {
-  freeze<T extends ValidationsFreezeHost>(this: T): T {
-    void this.errors;
-    void this.contextForValidation();
-    Object.freeze(this);
-    return this;
-  },
-
-  readAttributeForValidation(this: ReadAttributeForValidationHost, attribute: string): unknown {
-    if (!(attribute in this)) {
-      const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
-      throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
-    }
-    const reader = this[attribute];
-    return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
-  },
-
-  /** @internal */
-  contextForValidation(this: ContextForValidationHost): ValidationContext {
-    if (this._contextForValidation) return this._contextForValidation;
-    const vc = new ValidationContext();
-    this._contextForValidation = vc;
-    return vc;
-  },
-
-  /** @internal */
-  async runValidationsBang(this: RunValidationsHost): Promise<boolean> {
-    await this._runValidateCallbacks();
-    return this.errors.isEmpty();
-  },
-
-  raiseValidationError<TBase extends object = object>(this: { errors: Errors<TBase> }): never {
-    throw new ValidationError(this);
-  },
-};
-
-export interface ContextForValidationHost {
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
-}
-
-export interface RunValidationsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _runValidateCallbacks(): void | Promise<void>;
-}
-
 export interface ReadAttributeForValidationHost {
   [key: string]: unknown;
 }
 
 /** @internal */
-export function initInternals<TBase extends object>(
-  this: ValidationsInternalsHost<TBase>,
-  super_: () => void,
-): void {
-  super_();
+export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+  SuperMethods.superMethod(this, "initInternals")!();
+  this._errors = undefined;
   this._contextForValidation = undefined;
 }
 
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  return translationRaise(value);
+function inherited(this: ValidationsClassHost, base: ValidationsClassHost): void {
+  const dup = hashDup(this._validators);
+  dup.forEach((v, k) => dup.set(k, [...v]));
+  base._validators = dup;
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("freeze", freeze);
+  mod.defineMethod("initializeDup", initializeDup);
+  mod.defineMethod("initInternals", initInternals);
+});
 
 export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
 
-/** @noRailsEquivalent PERMANENT */
 export interface ConditionalOptions {
   if?: ConditionFn | ConditionFn[];
   unless?: ConditionFn | ConditionFn[];
@@ -426,3 +417,16 @@ export interface ConditionalOptions {
 }
 
 ActiveModel.ValidationError = ValidationError;
+rbModConstSet(ActiveModel, "Validations", Validations);
+rbModConstSet(ActiveModel, "ValidationContext", ValidationContext);
+rbModConstSet(Validations, "AbsenceValidator", AbsenceValidator);
+rbModConstSet(Validations, "AcceptanceValidator", AcceptanceValidator);
+rbModConstSet(Validations, "ComparisonValidator", ComparisonValidator);
+rbModConstSet(Validations, "ConfirmationValidator", ConfirmationValidator);
+rbModConstSet(Validations, "ExclusionValidator", ExclusionValidator);
+rbModConstSet(Validations, "FormatValidator", FormatValidator);
+rbModConstSet(Validations, "InclusionValidator", InclusionValidator);
+rbModConstSet(Validations, "LengthValidator", LengthValidator);
+rbModConstSet(Validations, "NumericalityValidator", NumericalityValidator);
+rbModConstSet(Validations, "PresenceValidator", PresenceValidator);
+rbModConstSet(Validations, "WithValidator", WithValidator);

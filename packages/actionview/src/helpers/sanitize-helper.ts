@@ -1,5 +1,6 @@
-import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
+import { SafeBuffer, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
 import { HTML4 } from "@blazetrails/html-sanitizer";
+import { Module } from "@blazetrails/ruby-compat";
 
 export interface Sanitizer {
   sanitize(
@@ -22,14 +23,20 @@ export interface SanitizerVendor {
   };
 }
 
-let _sanitizerVendor: SanitizerVendor = HTML4.Sanitizer;
+export const SanitizeHelper = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { sanitize, sanitizeCss, stripTags, stripLinks });
+  });
+}) as Module & { sanitizerVendor: SanitizerVendor };
+mattrAccessor.call(SanitizeHelper, "sanitizerVendor", { default: HTML4.Sanitizer });
 
+/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
 export function getSanitizerVendor(): SanitizerVendor {
-  return _sanitizerVendor;
+  return SanitizeHelper.sanitizerVendor;
 }
 
 export function setSanitizerVendor(vendor: SanitizerVendor): void {
-  _sanitizerVendor = vendor;
+  SanitizeHelper.sanitizerVendor = vendor;
   _fullSanitizer = null;
   _linkSanitizer = null;
   _safeListSanitizer = null;
@@ -39,9 +46,10 @@ let _fullSanitizer: Sanitizer | null = null;
 let _linkSanitizer: Sanitizer | null = null;
 let _safeListSanitizer: Sanitizer | null = null;
 
+/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
 export function getFullSanitizer(): Sanitizer {
   if (!_fullSanitizer) {
-    _fullSanitizer = new _sanitizerVendor.fullSanitizer();
+    _fullSanitizer = new SanitizeHelper.sanitizerVendor.fullSanitizer();
   }
   return _fullSanitizer;
 }
@@ -50,9 +58,10 @@ export function setFullSanitizer(sanitizer: Sanitizer): void {
   _fullSanitizer = sanitizer;
 }
 
+/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
 export function getLinkSanitizer(): Sanitizer {
   if (!_linkSanitizer) {
-    _linkSanitizer = new _sanitizerVendor.linkSanitizer();
+    _linkSanitizer = new SanitizeHelper.sanitizerVendor.linkSanitizer();
   }
   return _linkSanitizer;
 }
@@ -61,9 +70,10 @@ export function setLinkSanitizer(sanitizer: Sanitizer): void {
   _linkSanitizer = sanitizer;
 }
 
+/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
 export function getSafeListSanitizer(): Sanitizer {
   if (!_safeListSanitizer) {
-    _safeListSanitizer = new _sanitizerVendor.safeListSanitizer();
+    _safeListSanitizer = new SanitizeHelper.sanitizerVendor.safeListSanitizer();
   }
   return _safeListSanitizer;
 }
@@ -73,11 +83,11 @@ export function setSafeListSanitizer(sanitizer: Sanitizer): void {
 }
 
 export function sanitizedAllowedTags(): Iterable<string> {
-  return _sanitizerVendor.safeListSanitizer.allowedTags;
+  return SanitizeHelper.sanitizerVendor.safeListSanitizer.allowedTags;
 }
 
 export function sanitizedAllowedAttributes(): Iterable<string> {
-  return _sanitizerVendor.safeListSanitizer.allowedAttributes;
+  return SanitizeHelper.sanitizerVendor.safeListSanitizer.allowedAttributes;
 }
 
 export function sanitize(
@@ -105,7 +115,7 @@ export function stripLinks(html: string | null | undefined): string | null | und
   return getLinkSanitizer().sanitize(html);
 }
 
-export class SanitizeHelper {
+export class ClassMethods {
   static get fullSanitizer(): Sanitizer {
     return getFullSanitizer();
   }

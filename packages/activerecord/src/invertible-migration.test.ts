@@ -1,3 +1,4 @@
+import { block as rbBlock } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
@@ -7,6 +8,7 @@ import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class Horse extends Base {
   static {
@@ -15,7 +17,7 @@ class Horse extends Base {
   }
 }
 
-class SilentMigration extends Migration {
+class SilentMigration extends Migration.Current {
   write(): void {}
 }
 
@@ -32,7 +34,7 @@ class InvertibleMigration extends SilentMigration {
 
 class InvertibleChangeTableMigration extends SilentMigration {
   async change(): Promise<void> {
-    await this.changeTable("horses", async (t) => {
+    await this.changeTable("horses", {}, async (t) => {
       await t.column("name", "string");
       await t.remove("remind_at", { type: "datetime" });
     });
@@ -49,12 +51,14 @@ class InvertibleTransactionMigration extends InvertibleMigration {
 
 class InvertibleRevertMigration extends SilentMigration {
   async change(): Promise<void> {
-    await this.revert(async () => {
-      await this.createTable("horses", (t) => {
-        t.column("content", "text");
-        t.column("remind_at", "datetime");
-      });
-    });
+    await this.revert(
+      rbBlock(async () => {
+        await this.createTable("horses", (t) => {
+          t.column("content", "text");
+          t.column("remind_at", "datetime");
+        });
+      }),
+    );
   }
 }
 
@@ -66,15 +70,17 @@ class InvertibleByPartsMigration extends SilentMigration {
     });
     await this.reversible(async (dir) => {
       await this.test?.(Symbol.for("both"));
-      dir.up(async () => this.test?.(Symbol.for("up")));
-      dir.down(async () => this.test?.(Symbol.for("down")));
+      await dir.up(async () => this.test?.(Symbol.for("up")));
+      await dir.down(async () => this.test?.(Symbol.for("down")));
     });
-    await this.revert(async () => {
-      await this.createTable("horses", (t) => {
-        t.column("content", "text");
-        t.column("remind_at", "datetime");
-      });
-    });
+    await this.revert(
+      rbBlock(async () => {
+        await this.createTable("horses", (t) => {
+          t.column("content", "text");
+          t.column("remind_at", "datetime");
+        });
+      }),
+    );
   }
 }
 
@@ -101,7 +107,7 @@ class RemoveIndexMigration1 extends SilentMigration {
 
 class RemoveIndexMigration2 extends SilentMigration {
   async change(): Promise<void> {
-    await this.changeTable("horses", async (t) => {
+    await this.changeTable("horses", {}, async (t) => {
       await t.removeIndex(["name", "color"]);
       if (await (t as any).indexExists?.(["color"])) {
         await t.removeIndex(["color"]);
@@ -173,7 +179,7 @@ class DropTableMigration extends SilentMigration {
   }
 }
 
-class LegacyMigration extends Migration {
+class LegacyMigration extends Migration.Current {
   static async up(): Promise<void> {
     const m = Migration.delegate ?? new LegacyMigration();
     await m.createTable("horses", (t) => {
@@ -200,9 +206,11 @@ class RevertWholeMigration extends SilentMigration {
 
 class NestedRevertWholeMigration extends RevertWholeMigration {
   async change(): Promise<void> {
-    await this.revert(async () => {
-      await super.change();
-    });
+    await this.revert(
+      rbBlock(async () => {
+        await super.change();
+      }),
+    );
   }
 }
 
@@ -230,7 +238,7 @@ class RevertNonNamedExpressionIndexMigration extends SilentMigration {
 
 class RevertCustomForeignKeyTable extends SilentMigration {
   async change(): Promise<void> {
-    await this.changeTable("horses", async (t) => {
+    await this.changeTable("horses", {}, async (t) => {
       await t.references("owner", { foreignKey: { toTable: "developers" } } as any);
     });
   }
@@ -269,6 +277,8 @@ async function resetHorse(): Promise<void> {
 }
 
 describe("InvertibleMigrationTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   afterEach(async () => {
     const connection = await Base.leaseConnection();
     for (const table of ["horses", "new_horses"]) {

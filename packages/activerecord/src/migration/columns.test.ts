@@ -16,6 +16,7 @@ import { assertDifference, assertRaises } from "@blazetrails/activesupport";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { adapterSupports } from "../support/supports.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 const mariaDbRejectsUniqueColumnDrop =
   adapterType === "mysql" && isMariaDb && (serverVersion?.compare("10.2.8") ?? -1) >= 0;
@@ -33,6 +34,8 @@ include(ColumnsTest, TestHelper);
 
 describe("Migration", () => {
   const self = new ColumnsTest();
+
+  fixtures({}, { useTransactionalTests: false });
 
   beforeEach(() => self.setup());
   afterEach(() => self.teardown());
@@ -286,13 +289,13 @@ describe("Migration", () => {
     it("change column with nil default", async () => {
       await self.addColumn("test_models", "contributor", "boolean", { default: true });
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBeTruthy();
+      expect(new TestModel().queryAttribute("contributor")).toBeTruthy();
 
       await self.changeColumn("test_models", "contributor", "boolean", { default: null });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBeFalsy();
-      expect(TestModel.new().contributor).toBeNull();
+      expect(new TestModel().queryAttribute("contributor")).toBeFalsy();
+      expect(new TestModel().contributor).toBeNull();
     });
 
     it("change column to drop default with null false", async () => {
@@ -301,7 +304,7 @@ describe("Migration", () => {
         null: false,
       });
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBeTruthy();
+      expect(new TestModel().queryAttribute("contributor")).toBeTruthy();
 
       await self.changeColumn("test_models", "contributor", "boolean", {
         default: null,
@@ -309,19 +312,19 @@ describe("Migration", () => {
       });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBeFalsy();
-      expect(TestModel.new().contributor).toBeNull();
+      expect(new TestModel().queryAttribute("contributor")).toBeFalsy();
+      expect(new TestModel().contributor).toBeNull();
     });
 
     it("change column with new default", async () => {
       await self.addColumn("test_models", "administrator", "boolean", { default: true });
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("administrator")).toBeTruthy();
+      expect(new TestModel().queryAttribute("administrator")).toBeTruthy();
 
       await self.changeColumn("test_models", "administrator", "boolean", { default: false });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("administrator")).toBeFalsy();
+      expect(new TestModel().queryAttribute("administrator")).toBeFalsy();
     });
 
     it("change column with custom index name", async () => {
@@ -362,7 +365,7 @@ describe("Migration", () => {
 
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().first_name).toBe("Tester");
+      expect(new TestModel().first_name).toBe("Tester");
     });
 
     it("change column default to null", async () => {
@@ -371,7 +374,7 @@ describe("Migration", () => {
 
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().first_name).toBeNull();
+      expect(new TestModel().first_name).toBeNull();
     });
 
     it("change column default to null with not null", async () => {
@@ -382,13 +385,13 @@ describe("Migration", () => {
 
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().first_name).toBeNull();
+      expect(new TestModel().first_name).toBeNull();
 
       await self.connection.changeColumnDefault("test_models", "age", null);
 
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().age).toBeNull();
+      expect(new TestModel().age).toBeNull();
     });
 
     it("change column default with from and to", async () => {
@@ -400,7 +403,7 @@ describe("Migration", () => {
 
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().first_name).toBe("Tester");
+      expect(new TestModel().first_name).toBe("Tester");
     });
 
     it.skipIf(adapterType !== "mysql")("mysql rename column preserves auto increment", async () => {
@@ -490,7 +493,7 @@ describe("Migration", () => {
       void TestModel.resetColumnInformation();
 
       await assertDifference(
-        new Map([[async () => (await TestModel.count()) as number, 1]]),
+        new Map([[async () => await TestModel.count(), 1]]),
         null,
         async () => {
           await TestModel.create({ first_name: null });

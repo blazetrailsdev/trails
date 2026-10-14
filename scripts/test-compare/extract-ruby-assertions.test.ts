@@ -687,4 +687,85 @@ describe("Ruby extractor mocha expectation collection", () => {
     expect(k["never"]).toEqual(["expects_never", "assert_raises"]);
     expect(k["stubs are not expectations"]).toEqual([]);
   });
+
+  it("names an RSpec expectation chain by its matcher, in place of the bare expect", () => {
+    const k = rubyAssertionKinds({
+      "actions_spec.rb": `
+        describe Thor::Actions do
+          it "matchers" do
+            expect(runner.find("doc")).to eq(File.expand_path("doc", root))
+            expect(paths).not_to include("fixtures")
+            expect(paths).to_not match(/doc/)
+            expect(File.exist?(file)).to be true
+            expect(paths).to be_empty
+            expect(runner.shell.base).to be nil
+            expect(command.options[:foo]).to be
+            expect(defined?(Blat)).not_to be
+            expect(task).to be(other)
+            expect(invoke!("doc/README")).to(
+              eq("   unchanged  doc/README\\n")
+            )
+          end
+
+          it "blocks" do
+            expect do
+              A.new.find_in_source_paths("foo")
+            end.to raise_error(Thor::Error, /Currently you have no source paths/)
+            expect { runner.find("README") }.not_to raise_error
+          end
+
+          specify "operators" do
+            expect(count).to be > 3
+            expect(described_class).to be < BCrypt::Error
+          end
+
+          it "chains" do
+            expect(shell).to receive(:say).and_return(nil)
+            expect(shell).to receive(:say)
+            expect(editor).to receive(:readline).with("> ", anything).and_return("yes")
+            expect(shell).not_to receive :exit
+            expect { wrap_text }.to output(expected).to_stdout
+            expect do
+              script.start
+            end.not_to output.to_stderr
+            expect(paths).to include("doc").and include("lib")
+          end
+
+          it "predicates" do
+            expect(option).to be_required
+            expect(file).not_to be_identical
+          end
+
+          it "stays a bare expect" do
+            mock.expect(:call, nil)
+          end
+        end
+      `,
+    });
+    expect(k["matchers"]).toEqual([
+      "expect_to_eq",
+      "expect_not_to_include",
+      "expect_not_to_match",
+      "expect_to_be",
+      "expect_to_be_empty",
+      "expect_to_be_nil",
+      "expect_to_be_truthy",
+      "expect_not_to_be_truthy",
+      "expect_to_be",
+      "expect_to_eq",
+    ]);
+    expect(k["blocks"]).toEqual(["expect_to_raise_error", "expect_not_to_raise_error"]);
+    expect(k["operators"]).toEqual(["expect_to_be_>", "expect_to_be_kind_of"]);
+    expect(k["chains"]).toEqual([
+      "expect_to_receive",
+      "expect_to_receive",
+      "expect_to_receive",
+      "expect_not_to_receive",
+      "expect_to_output",
+      "expect_not_to_output",
+      "expect_to_include",
+    ]);
+    expect(k["predicates"]).toEqual(["expect_to_be_required", "expect_not_to_be_identical"]);
+    expect(k["stays a bare expect"]).toEqual(["expect"]);
+  });
 });

@@ -2,7 +2,7 @@ import type { Base } from "../../base.js";
 import type { Preloader } from "../preloader.js";
 import type { Association } from "./association.js";
 import type { Branch } from "./branch.js";
-import { groupBy } from "@blazetrails/activesupport";
+import { groupBy, isEmpty, partition, uniq } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 
 export class Batch {
@@ -18,77 +18,42 @@ export class Batch {
   }
 
   async call(): Promise<void> {
-    const active: Preloader[] = [];
-    for (const preloader of this._preloaders) {
-      if (!(await preloader.isEmpty())) active.push(preloader);
-    }
-    this._preloaders = active;
+    const empty: boolean[] = [];
+    for (const preloader of this._preloaders) empty.push(await preloader.isEmpty());
+    this._preloaders = this._preloaders.filter((_, i) => !empty[i]);
 
     let branches: Branch[] = this._preloaders.flatMap((p) => p.branches);
-
-    while (branches.length > 0) {
-      const loaders: Association[] = [];
-      for (const branch of branches) {
-        loaders.push(...(await branch.runnableLoaders()));
-      }
+    while (!isEmpty(branches)) {
+      const runnableLoaders: Association[][] = [];
+      for (const branch of branches) runnableLoaders.push(await branch.runnableLoaders());
+      const loaders = runnableLoaders.flat();
 
       for (const loader of loaders) {
-        const available = this._availableRecords.get(loader.klass.baseClass);
-        loader.associateRecordsFromUnscoped(available);
+        loader.associateRecordsFromUnscoped(this._availableRecords.get(loader.klass.baseClass));
       }
 
       if (loaders.length > 0) {
-        const futureTables = new Set<string | null>();
+        const futureClasses: (typeof Base)[][] = [];
         for (const branch of branches) {
-          const futureClasses = await branch.futureClasses();
-          const runnableClasses = (await branch.runnableLoaders()).map((l) => l.klass);
-          for (const k of futureClasses) {
-            if (!runnableClasses.includes(k)) futureTables.add(k.tableName);
-          }
+          futureClasses.push(
+            await (async () => {
+              const klasses = (await branch.runnableLoaders()).map((l) => l.klass);
+              return (await branch.futureClasses()).filter((k) => !klasses.includes(k));
+            })(),
+          );
         }
+        const futureTables = uniq(futureClasses.flat().map((k) => k.tableName));
 
-        let targetLoaders = loaders.filter((l) => !futureTables.has(l.tableName));
-        if (targetLoaders.length === 0) targetLoaders = loaders;
+        let targetLoaders = loaders.filter((l) => !futureTables.includes(l.tableName));
+        if (isEmpty(targetLoaders)) targetLoaders = loaders;
 
         await this.groupAndLoadSimilar(targetLoaders);
-        for (const loader of targetLoaders) {
-          await loader.run();
-        }
+        for (const loader of targetLoaders) await loader.run();
       }
 
-      const finished: Branch[] = [];
-      const inProgress: Branch[] = [];
-      for (const branch of branches) {
-        if (branch.isDone()) {
-          await this._setDefaultsForUncoveredRecords(branch);
-          finished.push(branch);
-        } else {
-          inProgress.push(branch);
-        }
-      }
+      const [finished, inProgress] = partition(branches, (branch) => branch.isDone());
 
-      branches = [...inProgress, ...finished.flatMap((b) => b.children)];
-    }
-  }
-
-  private async _setDefaultsForUncoveredRecords(branch: Branch): Promise<void> {
-    if (branch.isRoot() || !branch.association) return;
-
-    const coveredRecords = new Set<Base>();
-    for (const loader of await branch.loaders()) {
-      for (const owner of loader.owners) {
-        coveredRecords.add(owner);
-      }
-    }
-
-    for (const record of await branch.sourceRecords()) {
-      if (coveredRecords.has(record)) continue;
-      try {
-        const association = (record as any).association(branch.association);
-        if (!association.isLoaded()) {
-          association.target = null;
-        }
-      } catch {}
+      branches = inProgress.concat(finished.flatMap((branch) => branch.children));
     }
   }
 
@@ -100,10 +65,10 @@ export class Batch {
   private _loaders: Association[] | undefined;
 
   private async groupAndLoadSimilar(loaders: Association[]): Promise<void> {
-    const nonThroughLoaders = loaders.filter((l) => !(l instanceof ThroughAssociation));
-    const groups = groupBy(nonThroughLoaders, (loader) => loader.loaderQuery().hash());
-    for (const similarLoaders of groups.values()) {
-      const query = similarLoaders[0].loaderQuery();
+    for (const [query, similarLoaders] of groupBy(
+      loaders.filter((l) => !(l instanceof ThroughAssociation)),
+      (loader) => loader.loaderQuery(),
+    )) {
       await query.loadRecordsInBatch(similarLoaders);
     }
   }

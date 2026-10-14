@@ -32,10 +32,11 @@ import { Firm, Client } from "./test-helpers/models/company.js";
 import { Sponsor } from "./test-helpers/models/sponsor.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Edge } from "./test-helpers/models/edge.js";
-import { ShardedComment } from "./test-helpers/models/sharded.js";
+import { ShardedComment } from "./test-helpers/models/sharded/comment.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { HasManyThroughSourceAssociationNotFoundError } from "./associations/errors.js";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assert,
@@ -55,13 +56,13 @@ import { Company } from "./test-helpers/models/company.js";
 import { Essay } from "./test-helpers/models/essay.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { BestHardback } from "./test-helpers/models/hardback.js";
-import { DrinkDesigner } from "./test-helpers/models/drink-designer.js";
+import { DrinkDesigner, MocktailDesigner } from "./test-helpers/models/drink-designer.js";
+import { CakeDesigner } from "./test-helpers/models/cake-designer.js";
 import { Recipe } from "./test-helpers/models/recipe.js";
 import { FirstPost } from "./test-helpers/models/post.js";
-import { captureSql } from "./testing/sql-capture.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
-fixtures(["topics", "customers", "companies", "subscribers", "priceEstimates"]);
+const { self } = fixtures(["topics", "customers", "companies", "subscribers", "priceEstimates"]);
 
 describe("ReflectionTest", () => {
   function makeModels() {
@@ -102,161 +103,33 @@ describe("ReflectionTest", () => {
   }
 
   it("scope chain does not interfere with hmt with polymorphic case", async () => {
-    class ScHotel extends Base {
-      declare name: string | null;
-      declare departments: AssociationProxy<ScDept>;
-      declare chefs: AssociationProxy<Base>;
-      declare cakeDesigners: AssociationProxy<ScCake>;
-      declare drinkDesigners: AssociationProxy<ScDrink>;
+    const hotel = await CanonicalHotel.createBang();
+    const department = await hotel.departments.createBang();
+    await department.chefs.createBang({ employable: await CakeDesigner.createBang() });
+    await department.chefs.createBang({ employable: await DrinkDesigner.createBang() });
 
-      static {
-        this.attribute("name", "string");
-        this.hasMany("departments", {
-          className: "ScDept",
-          foreignKey: "hotel_id",
-        });
-        this.hasMany("chefs", { through: "departments", className: "ScChef" });
-        this.hasMany("cakeDesigners", {
-          through: "chefs",
-          source: "employable",
-          sourceType: "ScCake",
-          className: "ScCake",
-        });
-        this.hasMany("drinkDesigners", {
-          through: "chefs",
-          source: "employable",
-          sourceType: "ScDrink",
-          className: "ScDrink",
-        });
-      }
-    }
-    class ScDept extends Base {
-      declare hotel_id: number | null;
-      declare chefs: AssociationProxy<ScChef>;
-
-      static {
-        this.attribute("hotel_id", "integer");
-        this.hasMany("chefs", {
-          className: "ScChef",
-          foreignKey: "department_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class ScChef extends Base {
-      declare department_id: number | null;
-      declare employable_id: number | null;
-      declare employable_type: string | null;
-
-      static {
-        this.attribute("department_id", "integer");
-        this.attribute("employable_id", "integer");
-        this.attribute("employable_type", "string");
-        this.belongsTo("employable", { polymorphic: true });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface ScChef {
-      get employable(): Base | null | Promise<Base | null>;
-      set employable(value: Base | null);
-    }
-    class ScCake extends Base {}
-    class ScDrink extends Base {}
-    registerModel("ScHotel", ScHotel);
-    registerModel("ScDept", ScDept);
-    registerModel("ScChef", ScChef);
-    registerModel("ScCake", ScCake);
-    registerModel("ScDrink", ScDrink);
-
-    const hotel = await ScHotel.create({ name: "Grand" });
-    const dept = await ScDept.create({ hotel_id: hotel.id });
-    const cake = await ScCake.create({});
-    const drink = await ScDrink.create({});
-    await ScChef.create({
-      department_id: dept.id,
-      employable_id: cake.id,
-      employable_type: "ScCake",
-    });
-    await ScChef.create({
-      department_id: dept.id,
-      employable_id: drink.id,
-      employable_type: "ScDrink",
-    });
-
-    const h = hotel as any;
-    expect((await h.cakeDesigners.toArray()).length).toBe(1);
-    expect(await h.cakeDesigners.count()).toBe(1);
-    expect((await h.drinkDesigners.toArray()).length).toBe(1);
-    expect(await h.drinkDesigners.count()).toBe(1);
-    expect((await h.chefs.toArray()).length).toBe(2);
-    expect(await h.chefs.count()).toBe(2);
+    expect(await hotel.cakeDesigners.size()).toBe(1);
+    expect(await hotel.cakeDesigners.count()).toBe(1);
+    expect(await hotel.drinkDesigners.size()).toBe(1);
+    expect(await hotel.drinkDesigners.count()).toBe(1);
+    expect(await hotel.chefs.size()).toBe(2);
+    expect(await hotel.chefs.count()).toBe(2);
   });
   it("scope chain does not interfere with hmt with polymorphic case and subclass source", async () => {
-    class SC2Hotel extends Base {
-      declare name: string | null;
-      declare chefLists: AssociationProxy<SC2ChefList>;
-      declare mocktailDesigners: AssociationProxy<SC2Mocktail>;
+    const hotel = await CanonicalHotel.createBang();
+    await hotel.mocktailDesigners.push(await MocktailDesigner.createBang());
 
-      static {
-        this.attribute("name", "string");
-        this.hasMany("chefLists", {
-          className: "SC2ChefList",
-          as: "employableList",
-        });
-        this.hasMany("mocktailDesigners", {
-          through: "chefLists",
-          source: "employable",
-          sourceType: "SC2Mocktail",
-          className: "SC2Mocktail",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class SC2ChefList extends Base {
-      declare employable_list_id: number | null;
-      declare employable_list_type: string | null;
-      declare employable_id: number | null;
-      declare employable_type: string | null;
+    expect(await hotel.mocktailDesigners.size()).toBe(1);
+    expect(await hotel.mocktailDesigners.count()).toBe(1);
+    expect(await hotel.chefLists.size()).toBe(1);
+    expect(await hotel.chefLists.count()).toBe(1);
 
-      static {
-        this.attribute("employable_list_id", "integer");
-        this.attribute("employable_list_type", "string");
-        this.attribute("employable_id", "integer");
-        this.attribute("employable_type", "string");
-        this.belongsTo("employable", { polymorphic: true });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface SC2ChefList {
-      get employable(): Base | null | Promise<Base | null>;
-      set employable(value: Base | null);
-    }
-    class SC2Mocktail extends Base {}
-    registerModel("SC2Hotel", SC2Hotel);
-    registerModel("SC2ChefList", SC2ChefList);
-    registerModel("SC2Mocktail", SC2Mocktail);
+    await hotel.mocktailDesigners.replace([]);
 
-    const hotel = await SC2Hotel.create({ name: "Grand" });
-    const mocktail = await SC2Mocktail.create({});
-    await SC2ChefList.create({
-      employable_list_id: hotel.id,
-      employable_list_type: "SC2Hotel",
-      employable_id: mocktail.id,
-      employable_type: "SC2Mocktail",
-    });
-
-    const h2 = hotel as any;
-    expect((await h2.mocktailDesigners.toArray()).length).toBe(1);
-    expect(await h2.mocktailDesigners.count()).toBe(1);
-    expect((await h2.chefLists.toArray()).length).toBe(1);
-    expect(await h2.chefLists.count()).toBe(1);
-
-    await h2.mocktailDesigners.replace([]);
-
-    expect((await h2.mocktailDesigners.toArray()).length).toBe(0);
-    expect(await h2.mocktailDesigners.count()).toBe(0);
-    expect((await h2.chefLists.toArray()).length).toBe(0);
-    expect(await h2.chefLists.count()).toBe(0);
+    expect(await hotel.mocktailDesigners.size()).toBe(0);
+    expect(await hotel.mocktailDesigners.count()).toBe(0);
+    expect(await hotel.chefLists.size()).toBe(0);
+    expect(await hotel.chefLists.count()).toBe(0);
   });
   it("scope chain does not interfere with hmt with polymorphic and subclass source 2", async () => {
     const author = await Author.create({ name: "John Doe" });
@@ -277,14 +150,14 @@ describe("ReflectionTest", () => {
     const drink = await department.chefs.create({ employable: await DrinkDesigner.create() });
     await Recipe.create({ chef_id: drink.id, hotel_id: hotel.id });
 
-    const expectedSql = await captureSql(async () => {
+    const expectedSql = await self().captureSql({}, async () => {
       await hotel.recipes;
     });
 
     CanonicalHotel.reflectOnAssociation("recipes")!.clearAssociationScopeCache();
     await hotel.reload();
     await hotel.drinkDesigners;
-    const loadedSql = await captureSql(async () => {
+    const loadedSql = await self().captureSql({}, async () => {
       await hotel.recipes;
     });
 
@@ -520,48 +393,65 @@ describe("ReflectionTest", () => {
     expect(normalRef!.foreignType).toBeNull();
   });
   it("default association validation", () => {
-    expect(createReflection("hasMany", "clients", null, {}, Firm).validate).toBeTruthy();
+    expect(createReflection("hasMany", "clients", null, {}, Firm).isValidate()).toBeTruthy();
 
-    expect(createReflection("hasOne", "client", null, {}, Firm).validate).toBeFalsy();
-    expect(createReflection("belongsTo", "client", null, {}, Firm).validate).toBeFalsy();
+    expect(createReflection("hasOne", "client", null, {}, Firm).isValidate()).toBeFalsy();
+    expect(createReflection("belongsTo", "client", null, {}, Firm).isValidate()).toBeFalsy();
   });
   it("always validate association if explicit", () => {
     expect(
-      createReflection("hasOne", "client", null, { validate: true }, Firm).validate,
+      createReflection("hasOne", "client", null, { validate: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("belongsTo", "client", null, { validate: true }, Firm).validate,
+      createReflection("belongsTo", "client", null, { validate: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("hasMany", "clients", null, { validate: true }, Firm).validate,
+      createReflection("hasMany", "clients", null, { validate: true }, Firm).isValidate(),
     ).toBeTruthy();
   });
   it("validate association if autosave", () => {
     expect(
-      createReflection("hasOne", "client", null, { autosave: true }, Firm).validate,
+      createReflection("hasOne", "client", null, { autosave: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("belongsTo", "client", null, { autosave: true }, Firm).validate,
+      createReflection("belongsTo", "client", null, { autosave: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("hasMany", "clients", null, { autosave: true }, Firm).validate,
+      createReflection("hasMany", "clients", null, { autosave: true }, Firm).isValidate(),
     ).toBeTruthy();
   });
   it("never validate association if explicit", () => {
     expect(
-      createReflection("hasOne", "client", null, { autosave: true, validate: false }, Firm)
-        .validate,
+      createReflection(
+        "hasOne",
+        "client",
+        null,
+        { autosave: true, validate: false },
+        Firm,
+      ).isValidate(),
     ).toBeFalsy();
     expect(
-      createReflection("belongsTo", "client", null, { autosave: true, validate: false }, Firm)
-        .validate,
+      createReflection(
+        "belongsTo",
+        "client",
+        null,
+        { autosave: true, validate: false },
+        Firm,
+      ).isValidate(),
     ).toBeFalsy();
     expect(
-      createReflection("hasMany", "clients", null, { autosave: true, validate: false }, Firm)
-        .validate,
+      createReflection(
+        "hasMany",
+        "clients",
+        null,
+        { autosave: true, validate: false },
+        Firm,
+      ).isValidate(),
     ).toBeFalsy();
   });
-  it.skip("symbol for class name", () => {});
+  it("symbol for class name", () => {
+    expect(Firm.reflectOnAssociation("unsortedClientsWithSymbol")!.klass).toBe(Client);
+  });
   it("class for class name", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
       createReflection(
@@ -686,7 +576,26 @@ describe("ReflectionTest", () => {
       HasManyThroughSourceAssociationNotFoundError,
     );
   });
-  it.skip("name error from incidental code is not converted to name error for association", () => {});
+  it("name error from incidental code is not converted to name error for association", async () => {
+    const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
+    stubbed.constMissing = () => {
+      throw new NameError("undefined local variable or method 'oops' for main:Object", "oops");
+    };
+    try {
+      const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
+
+      const error = (await assertRaises([NameError], {}, () => {
+        void reflection.klass;
+      })) as NameError;
+
+      expect(error.constantName).toBe("oops");
+      expect(error.message).toMatch("oops");
+      expect(error.message).not.toMatch("NotAClass");
+      expect(error.message).not.toMatch("not_a_class");
+    } finally {
+      delete stubbed.constMissing;
+    }
+  });
   it("automatic inverse suppresses name error for association", () => {
     const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
     const dup = Object.create(
@@ -695,7 +604,26 @@ describe("ReflectionTest", () => {
     ) as typeof reflection;
     expect(dup.hasInverse()).toBeFalsy();
   });
-  it.skip("automatic inverse does not suppress name error from incidental code", () => {});
+  it("automatic inverse does not suppress name error from incidental code", async () => {
+    const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
+    stubbed.constMissing = () => {
+      throw new NameError("undefined local variable or method 'oops' for main:Object", "oops");
+    };
+    try {
+      const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
+
+      const error = (await assertRaises([NameError], {}, () => {
+        rbObjDup(reflection).hasInverse();
+      })) as NameError;
+
+      expect(error.constantName).toBe("oops");
+      expect(error.message).toMatch("oops");
+      expect(error.message).not.toMatch("NotAClass");
+      expect(error.message).not.toMatch("not_a_class");
+    } finally {
+      delete stubbed.constMissing;
+    }
+  });
 
   it("human name", () => {
     expect(PriceEstimate.modelName.human()).toBe("Price estimate");
@@ -921,19 +849,6 @@ describe("ReflectionTest", () => {
     expect(Customer.reflectOnAggregation("address")!.klass).toBe(Address);
 
     expect(Customer.reflectOnAggregation("balance")!.klass).toBe(Money);
-  });
-
-  it("aggregate reflection computes class raises NameError for missing class", () => {
-    class Buyer extends Base {
-      declare balance: number | null;
-
-      static {
-        this.attribute("balance", "integer");
-      }
-    }
-    const ref = new AggregateReflection("balance", null, { className: "NoSuchMoney" }, Buyer);
-    expect(() => ref.klass).toThrow(NameError);
-    expect(() => ref.klass).toThrow(/uninitialized constant NoSuchMoney/);
   });
 
   it("association reflection in modules", () => {

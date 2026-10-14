@@ -14,11 +14,20 @@
 import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { stripThis, isReceiverParam } from "./arity.js";
-import { normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
+import { decodeRubyString, normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
-import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
+import {
+  JS_ENUMERABLE_ALIASES,
+  NATIVE_FORM_ANALOGUES,
+  NATIVE_FORM_PREFIX,
+} from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
 import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
+import {
+  RECEIVER_KEYED_RUBY_COMPAT_EXPORTS,
+  rubyCallName,
+  rubyCompatAliases,
+} from "../parity/ruby-compat.js";
 
 /** An identifier-shaped string camelizes; anything else compares byte-for-byte.
  *  LOAD-BEARING: camelizing a SQL fragment (`" GROUP BY "`) would erase the
@@ -26,12 +35,12 @@ import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 // Leading underscore included: Rails spells plenty of private method names
 // `_ensure_no_duplicate_errors`, and those are names the port renames by
 // convention exactly as any other identifier-shaped value is.
-const IDENTIFIER_STRING = /^_?[a-z][A-Za-z0-9_]*$/;
+export const IDENTIFIER_STRING = /^_?[a-z][A-Za-z0-9_]*$/;
 
 /** Ruby conversions the extractor records as the CALL with the receiver
  *  dropped, leaving no rename signal on the Ruby side at all — see
  *  {@link refKeysEqual}. */
-const RECEIVER_DROPPING_CONVERSIONS = new Set(["toS", "toSym"]);
+export const RECEIVER_DROPPING_CONVERSIONS = new Set(["toS", "toSym"]);
 
 /** Descriptors that carry no comparable value (RFC 0095 §1). Their presence
  *  anywhere in an argument list — INCLUDING nested inside a `kwargs{}` — makes
@@ -63,12 +72,20 @@ const JS_RESERVED_WORDS = new Set([
   "for",
   "function",
   "if",
+  "implements",
   "import",
   "in",
   "instanceof",
+  "interface",
+  "let",
   "new",
   "null",
+  "package",
+  "private",
+  "protected",
+  "public",
   "return",
+  "static",
   "super",
   "switch",
   "this",
@@ -239,6 +256,13 @@ function normalizeRef(rawName: string): string {
  *   identifiers, so the port spells them `default_` / `null_` and
  *   {@link snakeToCamel} does not fold the trailing underscore back. Only the
  *   reserved words qualify, so an unrelated `foo_` local still reports.
+ *
+ * A third is a nested call ported through a receiver-keyed ruby-compat export:
+ * `public: options.delete(:public)` (metal/conditional_get.rb:294) records
+ * `ref:delete` with its receiver dropped, and the port's
+ * `hashDelete(options, "public")` records `ref:hashDelete`. The receiver is
+ * unproven on the Ruby side, so every export {@link rubyCompatAliases} names
+ * for an `expr` receiver is the same call.
  */
 function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   if (rubyKey === tsKey) return true;
@@ -246,6 +270,7 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   const tsName = tsKey.slice("ref:".length);
   if (RECEIVER_DROPPING_CONVERSIONS.has(rubyName)) return IDENTIFIER_STRING.test(tsName);
   if (JS_RESERVED_WORDS.has(rubyName) && tsName === `${rubyName}_`) return true;
+  if (rubyCompatAliases(rubyName, ["expr"]).includes(tsName)) return true;
   if (!/[?!=]$/.test(rubyName)) return false;
   return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
 }
@@ -304,13 +329,13 @@ function splitPairs(body: string): string[] {
  * whole call site is silently dropped as uncomparable, losing exactly the
  * SQL-fragment arguments RFC 0095 §2 calls load-bearing.
  *
- * Percent- rather than backslash-escaped, because a `str:` payload's backslash
- * is NOT free: literals.ts#normalizeLiteral canonicalizes `\n` and friends, so a
- * backslash escape here would consume the marker that arm reads and `"\\n"`
- * would stop comparing equal to a real newline.
+ * Percent- rather than backslash-escaped, because an `rstr:` payload's
+ * backslash is NOT free: it is Ruby source that literals.ts#decodeRubyString
+ * decodes, so a backslash escape here would be read as a Ruby one. `:` is
+ * escaped only in an `rstr:` opener, whose end it marks.
  */
 function unescapeDescriptorText(text: string): string {
-  return text.replace(/%(25|2C|3D|7B|7D)/g, (_, hex: string) =>
+  return text.replace(/%(25|2C|3A|3D|7B|7D)/g, (_, hex: string) =>
     String.fromCharCode(parseInt(hex, 16)),
   );
 }
@@ -368,6 +393,15 @@ function normalizeArgOrFailure(descriptor: string): string | ArgFailure {
   const value = descriptor.slice(sep + 1);
   if (kind === "id" || kind === "call") return `ref:${normalizeRef(value)}`;
   if (kind === "const") return normalizeConstantSpelling(value) ?? `const:${value}`;
+  if (kind === "rstr" || kind === "rsym") {
+    const openerEnd = value.indexOf(":");
+    const opener = unescapeDescriptorText(value.slice(0, openerEnd));
+    const text = decodeRubyString(
+      unescapeDescriptorText(value.slice(openerEnd + 1)),
+      opener || undefined,
+    );
+    return normalizeLiteralArg(kind === "rstr" ? "string" : "symbol", text);
+  }
   const literalKind = LITERAL_KINDS[kind];
   return literalKind === undefined
     ? OPAQUE
@@ -420,6 +454,7 @@ function classify(rubyArgs: string[], tsArgs: string[]): CallArgClass {
   if (rubyArgs.length !== tsArgs.length) return "shape";
   for (let i = 0; i < rubyArgs.length; i++) {
     if (argKeysEqual(rubyArgs[i], tsArgs[i])) continue;
+    if (kwargsDifferByRefOnly(rubyArgs[i], tsArgs[i])) continue;
     if (!rubyArgs[i].startsWith("ref:") || !tsArgs[i].startsWith("ref:")) return "shape";
   }
   // A list carrying the SAME refs in a different order is the reordering this
@@ -429,6 +464,28 @@ function classify(rubyArgs: string[], tsArgs: string[]): CallArgClass {
   // to catch. Only the gated class sees it, so it must not fall through to
   // `naming`.
   return isPermutation(rubyArgs, tsArgs) ? "shape" : "naming";
+}
+
+/** Two `kwargs{…}` descriptors with the same keys whose every differing value
+ *  is a `ref:` on both sides: `owner: owner.class` ported as
+ *  `owner: this.owner.constructor` (association.rb:250) is the rename its
+ *  positional twin would be, not a changed kwarg. */
+function kwargsDifferByRefOnly(rubyKey: string, tsKey: string): boolean {
+  if (!rubyKey.startsWith("kwargs{") || !tsKey.startsWith("kwargs{")) return false;
+  const ruby = kwargPairs(rubyKey);
+  const ts = kwargPairs(tsKey);
+  if (ruby.size !== ts.size) return false;
+  const rubyRefs: string[] = [];
+  const tsRefs: string[] = [];
+  for (const [key, rubyValue] of ruby) {
+    const tsValue = ts.get(key);
+    if (tsValue === undefined) return false;
+    if (argKeysEqual(rubyValue, tsValue)) continue;
+    if (!rubyValue.startsWith("ref:") || !tsValue.startsWith("ref:")) return false;
+    rubyRefs.push(rubyValue);
+    tsRefs.push(tsValue);
+  }
+  return !isPermutation(rubyRefs, tsRefs);
 }
 
 /** Whether the two lists hold the same argument keys in a different order.
@@ -506,6 +563,44 @@ function calleeKeys(enclosingRubyName: string): string[] {
  *  opaque `?` — falls back to {@link alignBuiltinReceiver}'s strip. */
 const SIMPLE_RECEIVER = /^(?:id|const):/;
 
+/** Bare Ruby call name → the ruby-compat exports that port it with the receiver
+ *  as argument 1, from {@link RECEIVER_KEYED_RUBY_COMPAT_EXPORTS}. */
+const RECEIVER_KEYED_EXPORTS_BY_NAME = new Map<string, Set<string>>();
+for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
+  const name = rubyCallName(mri);
+  let exports = RECEIVER_KEYED_EXPORTS_BY_NAME.get(name);
+  if (!exports) RECEIVER_KEYED_EXPORTS_BY_NAME.set(name, (exports = new Set()));
+  exports.add(tsExport);
+}
+
+/** Ruby core `Module#prepend` / `Module#include` / `Object#extend`
+ *  (`vendor/ruby/v3.3.11/eval.c:1196,1139,1778`), ported by ruby-compat's
+ *  `prepend(klass, mod)` / `include(klass, mod)` / `extend(obj, mod)` with the
+ *  Ruby receiver as argument 1. CLAUDE.md § "Module mixins" names them as the
+ *  ports; aligned by callee only, since `self.include(UrlFor)` on a live
+ *  `Module` is the method form and compares as written. A site importing the
+ *  `@blazetrails/activesupport` re-export records no `rubyCompat`, so it is
+ *  not aligned. */
+const MODULE_MIXIN_EXPORTS = new Set(["prepend", "include", "extend"]);
+
+/**
+ * Whether the TS site carries the Ruby receiver as argument 1: by name, for a
+ * {@link RECEIVER_AS_FIRST_ARG} built-in; or by callee, where the name is one
+ * Rails also defines (`Relation#merge`) and so never qualifies by name — the TS
+ * site then has to be a bare call of the ruby-compat export
+ * {@link RECEIVER_KEYED_RUBY_COMPAT_EXPORTS} names for it (`merge(a, b)` for
+ * `Hash#merge`). A method call on a receiver (`relation.merge(other)`) records
+ * no `rubyCompat`, so it compares as written.
+ */
+function receiverIsFirstArg(ruby: CallSite, ts: CallSite): boolean {
+  if (RECEIVER_AS_FIRST_ARG.has(ruby.name)) return true;
+  if (MODULE_MIXIN_EXPORTS.has(ruby.name)) return ts.rubyCompat === ruby.name;
+  return (
+    ts.rubyCompat !== undefined &&
+    RECEIVER_KEYED_EXPORTS_BY_NAME.get(ruby.name)?.has(ts.rubyCompat) === true
+  );
+}
+
 /**
  * Drop the leading argument that IS the Ruby receiver, for the built-ins TS
  * cannot define on a receiver at all (RFC 0099 — see
@@ -531,10 +626,11 @@ const SIMPLE_RECEIVER = /^(?:id|const):/;
  */
 function alignBuiltinReceiver(
   ruby: CallSite,
+  ts: CallSite,
   rubyArgs: string[],
   tsArgs: string[],
 ): { rubyArgs: string[]; tsArgs: string[] } {
-  if (tsArgs.length !== rubyArgs.length + 1 || !RECEIVER_AS_FIRST_ARG.has(ruby.name)) {
+  if (tsArgs.length !== rubyArgs.length + 1 || !receiverIsFirstArg(ruby, ts)) {
     return { rubyArgs, tsArgs };
   }
   if (ruby.recv !== undefined && SIMPLE_RECEIVER.test(ruby.recv)) {
@@ -560,7 +656,7 @@ function alignReceiverArgs(
     stripMixinReceiver(ruby.args, tsArgs),
     calleeSigs,
   );
-  const aligned = alignPortedReceiver(ruby, alignBuiltinReceiver(ruby, ruby.args, stripped));
+  const aligned = alignPortedReceiver(ruby, alignBuiltinReceiver(ruby, ts, ruby.args, stripped));
   if (ts.recv === undefined || aligned.rubyArgs.length === ruby.args.length) return aligned;
   const [rubyRecv] = normalizeArgs(aligned.rubyArgs.slice(0, 1)) ?? [];
   const [tsFirst] = normalizeArgs(aligned.tsArgs.slice(0, 1)) ?? [];
@@ -694,6 +790,22 @@ function stripBlockTailPadding(
   return tsArgs.slice(0, rubyArgs.length);
 }
 
+function stripKwargsLeadPadding(
+  rubyArgs: string[],
+  tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
+): string[] {
+  if (tsArgs.length <= rubyArgs.length) return tsArgs;
+  if (!rubyArgs.at(-1)?.startsWith("kwargs{") || !tsArgs.at(-1)?.startsWith("kwargs{")) {
+    return tsArgs;
+  }
+  const from = rubyArgs.length - 1;
+  const to = tsArgs.length - 1;
+  if (!tsArgs.slice(from, to).every((arg) => arg === "nil")) return tsArgs;
+  if (!padsDefaultedParams(calleeSigs, from, to)) return tsArgs;
+  return [...tsArgs.slice(0, from), tsArgs[to]];
+}
+
 function stripForwardedLiteralBlock(
   ruby: CallSite,
   ts: CallSite,
@@ -740,7 +852,19 @@ function argKeysEqual(rubyKey: string, tsKey: string): boolean {
   if (rubyKey.startsWith("kwargs{") && tsKey.startsWith("kwargs{")) {
     return kwargsKeysEqual(rubyKey, tsKey);
   }
-  return rubyKey === tsKey || keptSymbolColon(rubyKey, tsKey);
+  return rubyKey === tsKey || keptSymbolColon(rubyKey, tsKey) || markedMethodName(rubyKey, tsKey);
+}
+
+/**
+ * A Symbol naming a `?` / `!` / `=` method against the TS spelling of that
+ * method: `to_enum(:transform_keys!)` (strong_parameters.rb:911) is
+ * `toEnum(this, "transformKeysBang")`, by the table {@link refKeysEqual} asks.
+ */
+function markedMethodName(rubyKey: string, tsKey: string): boolean {
+  if (!rubyKey.startsWith("str:") || !tsKey.startsWith("str:")) return false;
+  const rubyName = rubyKey.slice("str:".length);
+  if (!/^[a-z_][a-z0-9_]*[?!=]$/.test(rubyName)) return false;
+  return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsKey.slice("str:".length));
 }
 
 /**
@@ -871,9 +995,32 @@ function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
  *  spelling the port actually chose. `new` is `constructor`, exactly as the
  *  call-set gate credits `new Foo()` (extract-ts-api.ts#callSiteName). */
 function tsCallNameKeys(rubyName: string): string[] {
+  const quantity = NATIVE_FORM_ANALOGUES.get(rubyName)?.argument;
+  if (quantity !== undefined) return [quantity.tsCall];
   if (rubyName === "new") return ["constructor"];
-  if (/[?!=]$/.test(rubyName)) return rubyMethodToTsIgnoringSkip(rubyName) ?? [];
-  return [snakeToCamel(rubyName)];
+  const keyed = keyedFormName(rubyName);
+  const forms = keyed === undefined ? [] : [keyed];
+  if (/[?!=]$/.test(rubyName)) return [...(rubyMethodToTsIgnoringSkip(rubyName) ?? []), ...forms];
+  return [snakeToCamel(rubyName), ...forms];
+}
+
+function keyedFormName(rubyName: string): string | undefined {
+  const analogue = NATIVE_FORM_ANALOGUES.get(rubyName);
+  return analogue?.key === true ? `${NATIVE_FORM_PREFIX}${analogue.form}` : undefined;
+}
+
+function onSameHash(ruby: CallSite, ts: CallSite): boolean {
+  const tail = ruby.recv?.match(/^(?:id|call):@*(\w+)$/)?.[1];
+  return tail !== undefined && ts.recv === `id:${snakeToCamel(tail)}`;
+}
+
+function hashFormKeys(ruby: CallSite, ts: CallSite): [string, string] | CallArgSkipReason {
+  const [, kind, rubyKey] = ruby.args[0]?.match(/^(sym|str):(.*)$/s) ?? [];
+  if (rubyKey === undefined) return "opaqueRubyArg";
+  const tsKey = ts.args[0]?.match(/^str:(.*)$/s)?.[1];
+  if (tsKey === undefined) return "opaqueTsArg";
+  if (kind === "str") return [`str:${rubyKey}`, `str:${tsKey}`];
+  return [`str:${normalizeRubyKey(rubyKey)}`, `str:${normalizeRubyKey(tsKey.replace(/^:/, ""))}`];
 }
 
 /** The descriptor of a `&blk` block-pass the Ruby site's argument list dropped
@@ -950,7 +1097,7 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
   const aligned = alignReceiverArgs(ruby, ts, forwarded, undefined);
   const sameArity =
     aligned.rubyArgs.length === aligned.tsArgs.length &&
-    (!RECEIVER_AS_FIRST_ARG.has(ruby.name) ||
+    (!receiverIsFirstArg(ruby, ts) ||
       ruby.recv === undefined ||
       ts.recv !== undefined ||
       forwarded.length === ruby.args.length + 1)
@@ -967,6 +1114,28 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
     if (argKeysEqual(rubyArgs[i], tsArgs[i])) matches++;
   }
   return sameArity * 1_000 + matches;
+}
+
+/**
+ * How closely the TS site's receiver names the Ruby receiver, modulo `@` / `_` /
+ * camelCase: 2 where the TS site keeps it as its receiver, 1 where it moved it
+ * into argument 1, 0 otherwise. The {@link pairCallSites} tie-break after
+ * {@link blockAffinity}.
+ *
+ * `attribute_set/builder.rb:36-39`'s `values.keys | types.keys | @attributes.keys`
+ * against a port whose `values` arm reads a Hash or an `IndexedRow` carries
+ * one more `keys` site than Rails; `@attributes` ties between `keys(values)`
+ * and `keys(_attributes)`, and source order took the wrong one. The kept
+ * receiver outranks the moved one so that `values` takes `values.keys()`,
+ * whose empty argument list would otherwise agree exactly with `@attributes`.
+ * Only a real Ruby `recv` counts: Ruby's argument 1 is never its receiver.
+ */
+function receiverAffinity(ruby: CallSite, ts: CallSite): number {
+  const rubyRef = ruby.recv?.match(/^id:@?(\w+)$/)?.[1];
+  if (rubyRef === undefined) return 0;
+  const tsRef = (ts.recv ?? ts.args[0])?.match(/^id:_?(\w+)$/)?.[1];
+  if (tsRef !== snakeToCamel(rubyRef)) return 0;
+  return ts.recv !== undefined ? 2 : 1;
 }
 
 /** TS names that are language punctuation rather than a ported call, so pairing
@@ -989,6 +1158,24 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
  *  call pairs against a TS `call` site only by accident, and the pairing it
  *  produced is the one baseline row this constant retires. */
 const TS_CALL_HOMONYMS = new Set(["call"]);
+
+/** A receiverless zero-argument Ruby site is a self-reader, and a TS site that
+ *  passes arguments to a plain local is a send to a collaborator, so the two
+ *  are different calls that merely share a name. `crud.rb:25`'s
+ *  `um.offset(offset)` holds both on the Ruby side: the outer `um.offset` is
+ *  `weak` and dropped by {@link comparableRubySites}, and the inner `offset`
+ *  reader has no TS site, because `this.offset` is a getter. Without this
+ *  check the reader pairs against `um.offset(this.offset)` (`crud.ts`) and
+ *  reports a shape row for a body that is line-for-line. */
+function isSelfReaderAgainstLocalSend(ruby: CallSite, ts: CallSite): boolean {
+  return (
+    ruby.recv === undefined &&
+    ruby.args.length === 0 &&
+    ruby.flags.length === 0 &&
+    ts.args.length > 0 &&
+    ts.recv?.startsWith("id:") === true
+  );
+}
 
 /**
  * Pair the call sites of one already name-matched (Ruby, TS) method pair: each
@@ -1015,29 +1202,44 @@ const TS_CALL_HOMONYMS = new Set(["call"]);
  * zip did, and nothing that used to be compared silently stops being compared.
  *
  * Greedy over the globally best-scoring candidate, ties broken by
- * {@link blockAffinity} and then by source order on the Ruby then the TS side,
+ * {@link blockAffinity}, then {@link receiverAffinity}, and then by source
+ * order on the Ruby then the TS side,
  * so the verdict never depends on the order the candidates were enumerated in.
  */
 export function pairCallSites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
 ): { ruby: CallSite; ts: CallSite }[] {
-  const candidates: { rubyIdx: number; tsIdx: number; score: number; block: number }[] = [];
+  const candidates: {
+    rubyIdx: number;
+    tsIdx: number;
+    score: number;
+    block: number;
+    receiver: number;
+  }[] = [];
   rubySites.forEach((ruby, rubyIdx) => {
     const keys = new Set(tsCallNameKeys(ruby.name));
     tsSites.forEach((ts, tsIdx) => {
       if (!keys.has(ts.name)) return;
       if (TS_CALL_HOMONYMS.has(ts.name)) return;
+      if (ts.name.startsWith(NATIVE_FORM_PREFIX) && !onSameHash(ruby, ts)) return;
+      if (isSelfReaderAgainstLocalSend(ruby, ts)) return;
       candidates.push({
         rubyIdx,
         tsIdx,
         score: argSimilarity(ruby, ts),
         block: blockAffinity(ruby, ts),
+        receiver: receiverAffinity(ruby, ts),
       });
     });
   });
   candidates.sort(
-    (a, b) => b.score - a.score || b.block - a.block || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx,
+    (a, b) =>
+      b.score - a.score ||
+      b.block - a.block ||
+      b.receiver - a.receiver ||
+      a.rubyIdx - b.rubyIdx ||
+      a.tsIdx - b.tsIdx,
   );
   const takenRuby = new Set<number>();
   const takenTs = new Set<number>();
@@ -1104,8 +1306,47 @@ export function comparableRubySites(
   return rubySites.filter(
     (ruby) =>
       !ruby.flags.includes("weak") ||
-      (!TS_CALL_HOMONYMS.has(ruby.name) && declaredInComparedFile(ruby.name) && consume(ruby.name)),
+      (!TS_CALL_HOMONYMS.has(ruby.name) &&
+        declaredInComparedFile(ruby.name) &&
+        consume(ruby.name)) ||
+      hasNativeFormSite(ruby, tsSites),
   );
+}
+
+function hasNativeFormSite(ruby: CallSite, tsSites: readonly CallSite[]): boolean {
+  const keyed = keyedFormName(ruby.name);
+  return keyed !== undefined && tsSites.some((ts) => ts.name === keyed && onSameHash(ruby, ts));
+}
+
+interface Quantity {
+  coefficient: number;
+  refs: string[];
+}
+
+function quantityOf(site: CallSite, index: number): Quantity | undefined {
+  const arg = site.args[index];
+  if (arg === undefined) return undefined;
+  let factors = [arg];
+  if (arg === "binop:*") {
+    const products = site.flags.filter((flag) => flag.startsWith("product="));
+    if (products.length !== 1) return undefined;
+    factors = products[0].slice("product=".length).split("*");
+  }
+  const quantity: Quantity = { coefficient: 1, refs: [] };
+  for (const factor of factors) {
+    if (factor.startsWith("num:"))
+      quantity.coefficient *= Number(factor.slice(4).replace(/_/g, ""));
+    else if (factor.startsWith("id:")) quantity.refs.push(normalizeRef(factor.slice(3)));
+    else return undefined;
+  }
+  if (!Number.isFinite(quantity.coefficient)) return undefined;
+  quantity.refs.sort();
+  return quantity;
+}
+
+function quantityKey(quantity: Quantity, factor: number): string {
+  const coefficient = Number((quantity.coefficient * factor).toPrecision(12));
+  return ["qty:" + coefficient, ...quantity.refs].join("*");
 }
 
 /** Compare one name-matched pair of call sites, mirroring
@@ -1217,6 +1458,18 @@ function kwargValue(tsArg: string, rubyKey: string): string | undefined {
   return undefined;
 }
 
+/** The TS signatures of a called method: the calling package's own
+ *  declarations, else the ones a dependency package declares under that name.
+ *  `ActiveSupport::Notifications.instrument` is declared in activesupport and
+ *  called from actiondispatch, and without the fallback its skipped `payload`
+ *  positional reads as a value (redirection.rb:22). */
+export function resolveCalleeSigs(
+  inPkg: ParamInfo[][],
+  inDeps: ParamInfo[][] | undefined,
+): ParamInfo[][] {
+  return inPkg.length > 0 ? inPkg : (inDeps ?? []);
+}
+
 export function compareCallArgs(
   ruby: CallSite,
   ts: CallSite,
@@ -1230,8 +1483,33 @@ export function compareCallArgs(
     rubyArgs: [],
     tsArgs: [],
   });
+  if (ts.name.startsWith(NATIVE_FORM_PREFIX)) {
+    if (hasUncomparableFlag(ruby)) return skipped("uncomparableFlag");
+    const keys = hashFormKeys(ruby, ts);
+    if (!Array.isArray(keys)) return skipped(keys);
+    const [rubyKey, tsKey] = keys;
+    return rubyKey === tsKey
+      ? { verdict: "match", rubyArgs: [rubyKey], tsArgs: [tsKey] }
+      : { verdict: "mismatch", class: "shape", rubyArgs: [rubyKey], tsArgs: [tsKey] };
+  }
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
+
+  const quantity = NATIVE_FORM_ANALOGUES.get(ruby.name)?.argument;
+  if (quantity !== undefined) {
+    const rubyQuantity = quantityOf(ruby, quantity.rubyIndex);
+    if (rubyQuantity === undefined) return skipped("opaqueRubyArg");
+    const tsQuantity = quantityOf(ts, quantity.tsIndex);
+    if (tsQuantity === undefined) return skipped("opaqueTsArg");
+    const rubyArgs = [
+      quantityKey(rubyQuantity, quantity.factor),
+      ...ruby.args.slice(quantity.rubyIndex + 1),
+    ];
+    const tsArgs = [quantityKey(tsQuantity, 1), ...ts.args.slice(quantity.tsIndex + 1)];
+    return rubyArgs.join() === tsArgs.join()
+      ? { verdict: "match", rubyArgs, tsArgs }
+      : { verdict: "mismatch", class: "shape", rubyArgs, tsArgs };
+  }
 
   const aligned = alignReceiverArgs(ruby, ts, ts.args, calleeSigs);
   const rubyArgs = normalizeArgsOrFailure(aligned.rubyArgs);
@@ -1246,7 +1524,13 @@ export function compareCallArgs(
     ruby,
     ts,
     rubyArgs,
-    stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs),
+    stripBlockTailPadding(
+      ruby,
+      ts,
+      rubyArgs,
+      stripKwargsLeadPadding(rubyArgs, normalizedTs, calleeSigs),
+      calleeSigs,
+    ),
     calleeSigs,
   );
 

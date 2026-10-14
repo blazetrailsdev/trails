@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
-import { Array as OidArray, Data, PgTextEncoderArray } from "./array.js";
+import { PG } from "../../../pg/pg.js";
+import { Array as OidArray, Data } from "./array.js";
 
 const stringSubtype = {
   type: "string",
@@ -34,7 +35,7 @@ describe("PostgreSQL::OID::Array", () => {
     const data = type.serialize(["a", "b"]) as Data;
 
     expect(data).toBeInstanceOf(Data);
-    expect(data.encoder).toBeInstanceOf(PgTextEncoderArray);
+    expect(data.encoder).toBeInstanceOf(PG.TextEncoder.Array);
     expect(data.values).toEqual(["a", "b"]);
     expect(data.encoder.encode(data.values)).toBe("{a,b}");
   });

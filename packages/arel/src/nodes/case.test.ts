@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../index.js";
 import { buildQuoted } from "./casted.js";
 import { assertNotSame } from "../test-helpers/assertions.js";
@@ -29,7 +30,7 @@ describe("NodesTest", () => {
         node.conditions = [new Nodes.When(foo, foo)];
         node.default = foo;
 
-        const dolly = node.clone();
+        const dolly = rbObjClone(node);
 
         expect(dolly.case).toEqual(node.case);
         assertNotSame(node.case, dolly.case);

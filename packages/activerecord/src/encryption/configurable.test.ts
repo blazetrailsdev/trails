@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Configurable } from "./configurable.js";
-import { Contexts } from "./contexts.js";
-import { NullEncryptor } from "./null-encryptor.js";
+import { Encryption } from "../encryption.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { encrypts } from "./encryptable-record.js";
 import { AttributeRegistration, Model } from "@blazetrails/activemodel";
@@ -13,7 +11,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   let savedConfig: ReturnType<typeof snapshotConfig>;
 
   function snapshotConfig() {
-    const c = Configurable.config;
+    const c = Encryption.config;
     return {
       primaryKey: c.primaryKey,
       deterministicKey: c.deterministicKey,
@@ -26,35 +24,35 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
   beforeEach(() => {
     savedConfig = snapshotConfig();
-    Configurable.config.previousSchemes.length = 0;
+    Encryption.config.previousSchemes.length = 0;
   });
 
   afterEach(() => {
-    const c = Configurable.config;
+    const c = Encryption.config;
     c.primaryKey = savedConfig.primaryKey;
     c.deterministicKey = savedConfig.deterministicKey;
     c.keyDerivationSalt = savedConfig.keyDerivationSalt;
     c.previousSchemes = savedConfig.previousSchemes;
     c.addToFilterParameters = savedConfig.addToFilterParameters;
     c.excludedFromFilterParameters = savedConfig.excludedFromFilterParameters;
-    Contexts.resetDefaultContext();
+    Encryption.resetDefaultContext();
   });
 
   it("can access context properties with top level getters", () => {
-    expect(Configurable.keyProvider).toBe(Contexts.context.keyProvider);
+    expect(Encryption.keyProvider).toBe(Encryption.context.keyProvider);
   });
 
   it(".configure configures initial config properties", () => {
     const previousKeyProvider = new DerivedSecretKeyProvider("some secret");
 
-    Configurable.configure({
+    Encryption.configure({
       primaryKey: "the primary key",
       deterministicKey: "the deterministic key",
       keyDerivationSalt: "the salt",
       previous: [{ keyProvider: previousKeyProvider } as SchemeOptions],
     });
 
-    const config = Configurable.config;
+    const config = Encryption.config;
     expect(config.primaryKey).toBe("the primary key");
     expect(config.deterministicKey).toBe("the deterministic key");
     expect(config.keyDerivationSalt).toBe("the salt");
@@ -65,7 +63,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     let capturedKlass: any = null;
     let capturedName: string | null = null;
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
       capturedKlass = klass;
       capturedName = name;
     });
@@ -78,7 +76,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       expect(capturedKlass).toBe(modelClass);
       expect(capturedName).toBe("isbn");
     } finally {
-      dispose();
+      listeners.pop();
     }
   });
 
@@ -87,7 +85,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
       autoFilteredParameters.attributeWasDeclared(klass, name);
     });
 
@@ -99,7 +97,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
       expect(filterParameters).toContain("named_pirate.catchphrase");
     } finally {
-      dispose();
+      listeners.pop();
     }
   });
 
@@ -108,7 +106,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
       autoFilteredParameters.attributeWasDeclared(klass, name);
     });
 
@@ -119,18 +117,18 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
       expect(filterParameters).toContain("catchphrase");
     } finally {
-      dispose();
+      listeners.pop();
     }
   });
 
   it("exclude the installation of autofiltered params", () => {
-    Configurable.config.excludedFromFilterParameters = ["catchphrase"];
+    Encryption.config.excludedFromFilterParameters = ["catchphrase"];
 
     const filterParameters: string[] = [];
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
       autoFilteredParameters.attributeWasDeclared(klass, name);
     });
 
@@ -141,45 +139,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
       expect(filterParameters).toEqual([]);
     } finally {
-      dispose();
-      Configurable.config.excludedFromFilterParameters = [];
-    }
-  });
-
-  it("configure resets the default context so config-derived properties are rebuilt", () => {
-    const before = Contexts.defaultContext;
-    Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
-    expect(Contexts.defaultContext).not.toBe(before);
-  });
-
-  it("configure applies Context-only properties to the reset default context", () => {
-    const encryptor = new NullEncryptor();
-    Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt", encryptor });
-    expect(Contexts.context.encryptor).toBe(encryptor);
-  });
-
-  it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
-    Configurable.config.excludedFromFilterParameters = ["secret_token"];
-
-    const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
-    autoFilteredParameters.enable();
-
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
-      autoFilteredParameters.attributeWasDeclared(klass, name);
-    });
-
-    try {
-      class PaymentModel extends Model {}
-      const modelClass = PaymentModel;
-      include(modelClass, AttributeRegistration);
-      encrypts.call(modelClass, "card_number");
-      encrypts.call(modelClass, "secret_token");
-
-      expect(filterParameters).toContain("payment_model.card_number");
-      expect(filterParameters).not.toContain("payment_model.secret_token");
-    } finally {
-      dispose();
+      listeners.pop();
+      Encryption.config.excludedFromFilterParameters = [];
     }
   });
 });

@@ -1,13 +1,13 @@
 import type ts from "typescript-5";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { virtualizeTse } from "./plugins/tse.js";
+import { shimScope, virtualizeTse, type TseScope } from "./plugins/tse.js";
 
 interface PluginCreateInfo {
   languageService: ts.LanguageService;
   languageServiceHost: ts.LanguageServiceHost;
   project: { getCurrentDirectory(): string };
-  config: { viewsDir?: string };
+  config: { viewsDir?: string; outDir?: string };
 }
 
 export function init(modules: { typescript: typeof ts }): {
@@ -17,9 +17,9 @@ export function init(modules: { typescript: typeof ts }): {
   const tsLib = modules.typescript;
   const viewsRootByCwd = new Map<string, string>();
 
-  const virtualize = (content: string): string => {
+  const virtualize = (content: string, scope?: TseScope): string => {
     try {
-      return virtualizeTse(content);
+      return virtualizeTse(content, scope);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return `const __tseFailure: never = ${JSON.stringify(msg)}; export default __tseFailure;\n`;
@@ -50,6 +50,7 @@ export function init(modules: { typescript: typeof ts }): {
     create(info) {
       const cwd = info.project.getCurrentDirectory();
       viewsRootByCwd.set(cwd, path.resolve(cwd, info.config.viewsDir ?? "app/views"));
+      const outViews = path.resolve(cwd, info.config.outDir ?? ".trails", "views");
       const host = info.languageServiceHost;
       const origReadFile = host.readFile?.bind(host);
       const origGetSnapshot = host.getScriptSnapshot.bind(host);
@@ -65,11 +66,33 @@ export function init(modules: { typescript: typeof ts }): {
         }
       };
 
+      const scopeOf = (p: string): TseScope | undefined => {
+        const shim = path.join(outViews, path.relative(viewsRootByCwd.get(cwd)!, p)) + ".ts";
+        let scope: TseScope | undefined;
+        try {
+          scope = shimScope(fs.readFileSync(shim, "utf8"));
+        } catch {
+          return undefined;
+        }
+        if (scope === undefined) return undefined;
+        const relocate = (typeText: string): string =>
+          typeText.replace(
+            /import\("(\.[^"]+)"\)/gu,
+            (_, target: string) =>
+              `import(${JSON.stringify(path.resolve(path.dirname(shim), target))})`,
+          );
+        return {
+          ...scope,
+          view: relocate(scope.view),
+          locals: scope.locals === undefined ? undefined : relocate(scope.locals),
+        };
+      };
+
       if (origReadFile) {
         host.readFile = (p, enc) => {
           if (!p.endsWith(".tse")) return origReadFile(p, enc);
           const raw = readTseSource(p, enc);
-          return raw === undefined ? undefined : virtualize(raw);
+          return raw === undefined ? undefined : virtualize(raw, scopeOf(p));
         };
       }
 
@@ -78,7 +101,9 @@ export function init(modules: { typescript: typeof ts }): {
         const orig = origGetSnapshot(p);
         const raw =
           orig !== undefined ? orig.getText(0, orig.getLength()) : readTseSource(p, "utf8");
-        return raw === undefined ? undefined : tsLib.ScriptSnapshot.fromString(virtualize(raw));
+        return raw === undefined
+          ? undefined
+          : tsLib.ScriptSnapshot.fromString(virtualize(raw, scopeOf(p)));
       };
 
       host.getScriptKind = (p) =>

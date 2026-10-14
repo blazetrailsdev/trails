@@ -2,12 +2,31 @@
 
 // --- Extracted API manifest ---
 
+/** One `@inlinedFrom` tag (RFC 0188) — see api-compare/inlined-from-tags.ts. */
+export interface InlinedFrom {
+  /** The Ruby module, fully qualified (`ActiveModel::API`). */
+  module: string;
+  /** `initialize` on a module, `new` on a `ClassMethods` module. */
+  hook: "initialize" | "new";
+  /** The vendored source (`rails`) and the version the span was read at (`v8.0.2`). */
+  source: string;
+  version: string;
+  /** The Ruby file, relative to `vendor/<source>/<version>/`. */
+  file: string;
+  firstLine: number;
+  lastLine: number;
+}
+
 /** A recorded literal value — a parameter default or constant RHS. `expr` marks
  *  a non-literal (call/ref/lambda), recorded so the comparer skips it rather
  *  than confusing it with "no default". See literals.ts. */
 export interface LiteralValue {
   kind: "int" | "float" | "string" | "symbol" | "bool" | "nil" | "array" | "hash" | "expr";
   value?: string | boolean; // int/float token (underscores kept), string/symbol text, or boolean
+  /** Ruby side only: the opening token of a string whose source text does not
+   *  decode by the double-quoted rules — `'`, `%q(`, or a `<<~'EOS'` heredoc.
+   *  See literals.ts `decodeRubyString`. */
+  opener?: string;
 }
 
 /**
@@ -38,6 +57,14 @@ export interface CallSite {
    * Ruby receiver into the argument list.
    */
   recv?: string;
+  /**
+   * TS side only: the `@blazetrails/ruby-compat` export a bare-identifier
+   * callee binds to (`merge` for `merge(a, b)` under
+   * `import { merge } from "@blazetrails/ruby-compat"`). It proves the port
+   * moved a Ruby built-in's receiver into argument 1, which the call NAME alone
+   * cannot where Rails defines the same name (`Relation#merge`).
+   */
+  rubyCompat?: string;
 }
 
 export interface ParamInfo {
@@ -77,8 +104,9 @@ export interface MethodInfo {
    *  `block_given?`. Compared by block-params.ts. */
   takesBlock?: boolean;
   /** TS side only (RFC 0156): a class property assigned a callable
-   *  (`static assertRaises = assertRaises`) carries no `params` of its own;
-   *  these are the target's, read by the block-parameter check alone. */
+   *  (`static assertRaises = assertRaises`), or a `declare`d one typed by a
+   *  function type (`declare transaction: (block: () => void) => void`),
+   *  carries no `params` of its own; these are the target's. */
   aliasParams?: ParamInfo[];
   /**
    * TS-side only (RFC 0084): the same call names in SOURCE ORDER, deduplicated
@@ -97,6 +125,18 @@ export interface MethodInfo {
    * Names are raw on both sides. Signal only; nothing gates on it yet.
    */
   skeleton?: string[];
+  /**
+   * TS extractor only: what `skeleton` and `callArgs` both erase, in source
+   * order — a constant receiver (`recv:Promise`), an index read (`[]`, which
+   * the skeleton spells `ref:get` like `Map#get`), a unary operator (`op:!`),
+   * a ternary (`?:`), a class expression (`class`), the fixed text of a
+   * template literal (`tpl:…`) and the string message of a thrown construction
+   * (`msg:…`), which `callArgs` drops with the rest of the site. Every node is
+   * walked: a nested function body, as in `skeleton`, and also the filtered
+   * rescue arms `skeleton` skips. Read only by report-structural-duplicates.ts,
+   * so no call gate sees it.
+   */
+  shapeTokens?: string[];
   /**
    * TS-side only (RFC 0113): the `skeleton` of a NON-exported file-local
    * helper. Kept out of `skeleton` so the compared population stays exactly
@@ -129,6 +169,18 @@ export interface MethodInfo {
    */
   callReceivers?: Record<string, string[]>;
   /**
+   * The name each non-`array` receiver of a `size` / `length` / `call` site
+   * ends in (`cursor`, `columns`, `select_rows`), `?` for a receiver with none
+   * and `a|b` for a parenthesised `a || b`. See
+   * extract-ruby-api.rb#receiver_tail_name.
+   */
+  callReceiverNames?: Record<string, string[]>;
+  /**
+   * `module_eval` / `class_eval` sites given a String, whose calls Ripper never
+   * sees. See extract-ruby-api.rb#STRING_EVAL_CALLS.
+   */
+  stringEvalCalls?: string[];
+  /**
    * Both extractors (RFC 0025 `## Call-argument fidelity`): every syntactic
    * call site in the body, in source order, with its argument descriptors.
    * `calls` / `callSeq` carry names only, so a port that calls `where` with a
@@ -157,6 +209,17 @@ export interface MethodInfo {
   /** TS-side only (RFC 0153): the Ruby identifiers this declaration receipts
    *  as permanent `naming` rows, via `@missingRailsName`. */
   missingRailsNames?: string[];
+  /** TS-side only: the skeleton tokens this declaration receipts as arms or
+   *  calls its body adds to Rails', via `@inventedArm`. */
+  inventedArms?: string[];
+  /** TS-side only (RFC 0188): the Ruby bodies a constructor names as inlined
+   *  into it, via `@inlinedFrom`, in written order. */
+  inlinedFrom?: InlinedFrom[];
+  /** Ruby-side only (RFC 0188): the line an `initialize` / `new` `def` closes
+   *  on, so an `@inlinedFrom` citation's span can be derived. */
+  endLine?: number;
+  /** Ruby-side only (RFC 0188): that `def`'s file, relative to `vendor/`. */
+  vendorFile?: string;
   /**
    * TS-side only (RFC 0099): the REASON behind each `@missingRailsCall`
    * suppression above, keyed by Ruby call. Carried so a receipt's permanence
@@ -198,6 +261,15 @@ export interface MethodInfo {
    * `ownersWithBodies` in compare.ts.
    */
   bodyless?: boolean;
+  /**
+   * TS-side only: this member was harvested from an exported object literal
+   * that declaration-merges with an `interface` of the same name. The entry's
+   * other members are the interface's signatures, which type the instance and
+   * state that seat, so the literal's no-seat rule (`ClassInfo.objectLiteral`)
+   * is carried per member here instead of on the merged entry. See
+   * compare.ts#tsMemberStatesSeat.
+   */
+  objectLiteralMember?: boolean;
   /**
    * TS-side only: this bodyless object-literal member is a bare reference to
    * ANOTHER function the same file declares — `buildHavingClause:
@@ -288,6 +360,9 @@ export interface MethodInfo {
   /** TS-side property names of the trailing options-object param; `null` when
    *  uncheckable (`any`/`Record<string, unknown>`), absent when not an object. */
   optionKeys?: string[] | null;
+  /** TS-side keys the BODY reads off that param — the counterpart of the Ruby
+   *  `option_keys`. Absent on a bodiless signature. See options-keys.ts. */
+  optionReads?: string[];
   /**
    * TS-side only, on `synthesizedMixin` pseudo-modules: the file that actually
    * declares this member, when it is NOT the file the pseudo-module is keyed
@@ -354,6 +429,14 @@ export interface ClassInfo {
   file?: string;
   reExportedFrom?: string;
   includes: string[];
+  /** Ruby-side only: the `prepend` edges, in source order. Absent when there are none. */
+  prepends?: string[];
+  /**
+   * Ruby-side only (RFC 0188): the `include` / `prepend` / `extend` statements
+   * in source order, each with its arguments as written. The three flat lists
+   * above lose how the statements interleave. Absent when there are none.
+   */
+  mixinOrder?: { kind: "include" | "prepend" | "extend"; names: string[] }[];
   extends: string[];
   /**
    * TS-side only: for each `include()`/`extend()` edge recorded on `extends` by
@@ -382,6 +465,13 @@ export interface ClassInfo {
    * Extra-surface allowed names only — not methods of this class.
    */
   forwardedMethods?: string[];
+  /**
+   * Ruby-side only: `superclass` was written `DelegateClass(X)`
+   * (`activerecord/lib/active_record/type/serialized.rb:5`), so the class
+   * answers every public instance method of `X` by forwarding
+   * (`vendor/ruby/v3.3.11/lib/delegate.rb:394-436`).
+   */
+  delegateClass?: boolean;
   instanceMethods: MethodInfo[];
   classMethods: MethodInfo[];
   /**
@@ -408,7 +498,9 @@ export interface ClassInfo {
    * the object itself, which is Ruby's module singleton seat (`class << self`,
    * `action_dispatch/http/mime_type.rb:50-67`) — and also the shape every
    * `include(Host, Mod)` mixin uses for instance methods. So, like a top-level
-   * function, a member states no seat. See compare.ts#recordTsParams.
+   * function, a member states no seat unless the literal is named after the
+   * Rails module and the module declares the name on its instance half. See
+   * compare.ts#tsMemberStatesSeat.
    */
   objectLiteral?: boolean;
   /**

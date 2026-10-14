@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Edge } from "../test-helpers/models/edge.js";
 import { CpkBook } from "../test-helpers/models/cpk.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -45,7 +45,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("collapses repeated child join rows to one instance for a single parent", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
 
     const row = aliasedRow(jd, {
       "": { id: 1, title: "foo" },
@@ -63,7 +63,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
 
   it("collapses equal rows to one parent when the root has no primary key", () => {
     registerModel(Edge);
-    const jd = new JoinDependency(Edge, null, [], Nodes.OuterJoin);
+    const jd = new JoinDependency(Edge, Edge.arelTable, [], Nodes.OuterJoin);
 
     const row = aliasedRow(jd, { "": { source_id: 1, sink_id: 2 } });
     const rows = [row, { ...row }, aliasedRow(jd, { "": { source_id: 1, sink_id: 3 } })];
@@ -92,7 +92,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
 
   it("keys composite primary keys by the value array, not a delimited string", () => {
     registerModel(CpkBook);
-    const jd = new JoinDependency(CpkBook, null, [], Nodes.OuterJoin);
+    const jd = new JoinDependency(CpkBook, CpkBook.arelTable, [], Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, { "": { author_id: "a\u0000b", id: "c" } }),
@@ -110,7 +110,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {
-    const jd = new JoinDependency(Reader, null, "post.comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Reader, Reader.arelTable, { post: "comments" }, Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {

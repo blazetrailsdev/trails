@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { include, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import {
   ScaffoldControllerGenerator,
   type ScaffoldControllerGeneratorOptions,
@@ -23,8 +24,8 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     }
 
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
     controllerConstants.set("posts", PostsController as never);
 
@@ -47,8 +48,8 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     }
 
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
     include(PostsController, routes.urlHelpers());
     controllerConstants.set("posts", PostsController as never);
@@ -71,7 +72,7 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "config/routes.ts"),
-      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+      "Trails.application!.routes().draw(function () {\n});\n",
     );
   });
   afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -119,7 +120,7 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "config/routes.ts"),
-      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+      "Trails.application!.routes().draw(function () {\n});\n",
     );
   });
   afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -147,5 +148,16 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     });
 
     expect(controller()).not.toContain("postsPath");
+  });
+
+  it("returns params.expect's permitted Parameters with no cast", async () => {
+    await ScaffoldControllerGenerator.start(["Post", "title:string"], {
+      cwd: tmpDir,
+      output: () => {},
+    });
+
+    const content = controller();
+    expect(content).toContain('return this.params.expect({ post: ["title"] });');
+    expect(content).not.toContain(" as Record<string, unknown>");
   });
 });

@@ -3,8 +3,8 @@ import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { isEmpty } from "@blazetrails/ruby-compat";
-import { rbEqq, rbObjClass } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, isEmpty } from "@blazetrails/ruby-compat";
+import { rbEqq, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
   if (object === null || object === undefined) return [];
@@ -192,14 +192,14 @@ export function toXml(
   options.root ??= (() => {
     const first = self[0];
     if (
-      rbObjClass(first) !== "Hash" &&
+      rbObjClassname(first) !== "Hash" &&
       self.every((e) =>
         typeof first === "object" && first !== null
           ? rbEqq(first.constructor, e)
-          : rbObjClass(e) === rbObjClass(first),
+          : rbObjClassname(e) === rbObjClassname(first),
       )
     ) {
-      const underscored = underscore(rbObjClass(first));
+      const underscored = underscore(rbObjClassname(first));
       return pluralize(underscored).replaceAll("/", "_");
     } else {
       return "objects";
@@ -228,3 +228,6 @@ export function toXml(
   }
   return builder.target();
 }
+
+const toFormattedS = toFs;
+Object.assign(ARRAY_METHOD_TABLE, { inGroupsOf, inGroups, toSentence, toFs, toFormattedS, toXml });

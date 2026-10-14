@@ -12,7 +12,7 @@ export function emitClass(c: ClassDecl): EmitResult {
   let ext = "";
   if (c.extends) {
     valueRefs.push(c.extends);
-    ext = ` extends ${refMeta(c.extends).name}`;
+    ext = ` extends ${refMeta(c.extends).name}${c.extendsArguments ?? ""}`;
   }
   let impl = "";
   if (c.implements?.length) {

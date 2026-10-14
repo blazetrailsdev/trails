@@ -17,7 +17,7 @@ const GOOGLE_BOT =
 describe("BrowserBlocker", () => {
   describe("expandedVersions", () => {
     it("resolves the :modern named set", () => {
-      const b = new BrowserBlocker(request(CHROME_120), "modern");
+      const b = new BrowserBlocker(request(CHROME_120), { versions: "modern" });
       expect(b.expandedVersions()).toEqual({
         safari: "17.2",
         chrome: "120",
@@ -28,136 +28,140 @@ describe("BrowserBlocker", () => {
     });
 
     it("returns an empty map for an unknown named set", () => {
-      const b = new BrowserBlocker(request(CHROME_120), "unknown" as "modern");
+      const b = new BrowserBlocker(request(CHROME_120), { versions: "unknown" as "modern" });
       expect(b.expandedVersions()).toEqual({});
     });
 
     it("returns a hash directly when given one", () => {
-      const b = new BrowserBlocker(request(CHROME_120), { chrome: "119" });
+      const b = new BrowserBlocker(request(CHROME_120), { versions: { chrome: "119" } });
       expect(b.expandedVersions()).toEqual({ chrome: "119" });
     });
 
     it("memoizes the result", () => {
-      const b = new BrowserBlocker(request(CHROME_120), "modern");
+      const b = new BrowserBlocker(request(CHROME_120), { versions: "modern" });
       expect(b.expandedVersions()).toBe(b.expandedVersions());
     });
   });
 
   describe("normalizedBrowserName", () => {
     it("normalizes 'internet explorer' to 'ie'", () => {
-      const b = new BrowserBlocker(request(IE_11), {});
+      const b = new BrowserBlocker(request(IE_11), { versions: {} });
       expect(b.normalizedBrowserName()).toBe("ie");
     });
 
     it("lowercases the browser name", () => {
-      const b = new BrowserBlocker(request(CHROME_120), {});
+      const b = new BrowserBlocker(request(CHROME_120), { versions: {} });
       expect(b.normalizedBrowserName()).toBe("chrome");
     });
   });
 
   describe("isBot", () => {
     it("returns true for a Googlebot user agent", () => {
-      const b = new BrowserBlocker(request(GOOGLE_BOT), "modern");
+      const b = new BrowserBlocker(request(GOOGLE_BOT), { versions: "modern" });
       expect(b.isBot()).toBe(true);
     });
 
     it("returns false for a regular browser", () => {
-      const b = new BrowserBlocker(request(CHROME_120), "modern");
+      const b = new BrowserBlocker(request(CHROME_120), { versions: "modern" });
       expect(b.isBot()).toBe(false);
     });
   });
 
   describe("isUserAgentVersionReported", () => {
     it("returns false when the user-agent header is empty", () => {
-      const b = new BrowserBlocker(request(""), "modern");
+      const b = new BrowserBlocker(request(""), { versions: "modern" });
       expect(b.isUserAgentVersionReported()).toBe(false);
     });
 
     it("returns true when the parsed version is present", () => {
-      const b = new BrowserBlocker(request(CHROME_120), "modern");
+      const b = new BrowserBlocker(request(CHROME_120), { versions: "modern" });
       expect(b.isUserAgentVersionReported()).toBe(true);
     });
   });
 
   describe("minimumBrowserVersionForBrowser", () => {
     it("looks up by normalized browser name", () => {
-      const b = new BrowserBlocker(request(CHROME_120), { chrome: "119" });
+      const b = new BrowserBlocker(request(CHROME_120), { versions: { chrome: "119" } });
       expect(b.minimumBrowserVersionForBrowser()).toBe("119");
     });
 
     it("returns false when the browser is explicitly disallowed", () => {
-      const b = new BrowserBlocker(request(IE_11), { ie: false });
+      const b = new BrowserBlocker(request(IE_11), { versions: { ie: false } });
       expect(b.minimumBrowserVersionForBrowser()).toBe(false);
     });
 
     it("returns undefined when the browser is not listed", () => {
-      const b = new BrowserBlocker(request(CHROME_120), { firefox: "120" });
+      const b = new BrowserBlocker(request(CHROME_120), { versions: { firefox: "120" } });
       expect(b.minimumBrowserVersionForBrowser()).toBeUndefined();
     });
   });
 
   describe("isVersionGuardedBrowser", () => {
     it("is true when an entry exists (including false)", () => {
-      expect(new BrowserBlocker(request(IE_11), { ie: false }).isVersionGuardedBrowser()).toBe(
-        true,
-      );
       expect(
-        new BrowserBlocker(request(CHROME_120), { chrome: "119" }).isVersionGuardedBrowser(),
+        new BrowserBlocker(request(IE_11), { versions: { ie: false } }).isVersionGuardedBrowser(),
+      ).toBe(true);
+      expect(
+        new BrowserBlocker(request(CHROME_120), {
+          versions: { chrome: "119" },
+        }).isVersionGuardedBrowser(),
       ).toBe(true);
     });
 
     it("is false when the browser is not listed", () => {
       expect(
-        new BrowserBlocker(request(CHROME_120), { firefox: "120" }).isVersionGuardedBrowser(),
+        new BrowserBlocker(request(CHROME_120), {
+          versions: { firefox: "120" },
+        }).isVersionGuardedBrowser(),
       ).toBe(false);
     });
   });
 
   describe("isVersionBelowMinimumRequired", () => {
     it("is true when the parsed version is below the minimum", () => {
-      const b = new BrowserBlocker(request(CHROME_118), { chrome: "119" });
+      const b = new BrowserBlocker(request(CHROME_118), { versions: { chrome: "119" } });
       expect(b.isVersionBelowMinimumRequired()).toBe(true);
     });
 
     it("is false when the parsed version meets the minimum", () => {
-      const b = new BrowserBlocker(request(CHROME_120), { chrome: "119" });
+      const b = new BrowserBlocker(request(CHROME_120), { versions: { chrome: "119" } });
       expect(b.isVersionBelowMinimumRequired()).toBe(false);
     });
 
     it("is true when the minimum is false (browser disallowed)", () => {
-      const b = new BrowserBlocker(request(IE_11), { ie: false });
+      const b = new BrowserBlocker(request(IE_11), { versions: { ie: false } });
       expect(b.isVersionBelowMinimumRequired()).toBe(true);
     });
   });
 
   describe("isUnsupportedBrowser", () => {
     it("blocks an old guarded browser that isn't a bot", () => {
-      const b = new BrowserBlocker(request(CHROME_118), "modern");
+      const b = new BrowserBlocker(request(CHROME_118), { versions: "modern" });
       expect(b.isUnsupportedBrowser()).toBe(true);
     });
 
     it("does not block a bot even when guarded and below minimum", () => {
-      const b = new BrowserBlocker(request(GOOGLE_BOT), "modern");
+      const b = new BrowserBlocker(request(GOOGLE_BOT), { versions: "modern" });
       expect(b.isUnsupportedBrowser()).toBe(false);
     });
 
     it("does not block an unguarded browser", () => {
-      const b = new BrowserBlocker(request(CHROME_120), { firefox: "200" });
+      const b = new BrowserBlocker(request(CHROME_120), { versions: { firefox: "200" } });
       expect(b.isUnsupportedBrowser()).toBe(false);
     });
   });
 
   describe("blocked", () => {
     it("is true when version is reported and the browser is unsupported", () => {
-      expect(new BrowserBlocker(request(CHROME_118), "modern").blocked).toBe(true);
+      expect(new BrowserBlocker(request(CHROME_118), { versions: "modern" }).blocked).toBe(true);
     });
 
     it("is false when no user-agent is sent", () => {
-      expect(new BrowserBlocker(request(""), "modern").blocked).toBe(false);
+      expect(new BrowserBlocker(request(""), { versions: "modern" }).blocked).toBe(false);
     });
 
     it("is false when the browser meets the minimum", () => {
-      expect(new BrowserBlocker(request(CHROME_120), "modern").blocked).toBe(false);
+      expect(new BrowserBlocker(request(CHROME_120), { versions: "modern" }).blocked).toBe(false);
     });
   });
 });

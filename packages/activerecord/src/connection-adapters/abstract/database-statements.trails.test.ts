@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { sql as arelSql } from "@blazetrails/arel";
+import { sql as arelSql, Visitors } from "@blazetrails/arel";
+import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { Rollback, StatementInvalid } from "../../errors.js";
 import { FixtureError } from "../../fixtures.js";
 import { defaultInsertValue as sqliteDefaultInsertValue } from "../sqlite3/database-statements.js";
@@ -28,6 +30,7 @@ import {
   rollbackToSavepoint,
   defaultSequenceName,
   emptyInsertStatementValue,
+  lastInsertedId,
   sanitizeLimit,
   withYamlFallback,
   highPrecisionCurrentTimestamp,
@@ -52,7 +55,7 @@ import { Transaction, TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
 import type { QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { queryTransformers } from "../../active-record.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
@@ -98,7 +101,7 @@ const hostDefaults: Pick<
   dirtyCurrentTransaction: () => {},
   castResult,
   affectedRows,
-  isWriteQuery: DatabaseStatements.isWriteQuery,
+  isWriteQuery: DatabaseStatements.instanceMethod("isWriteQuery")!.value,
   execute: async () => undefined,
   buildTruncateStatements,
   executeBatch: async () => undefined,
@@ -248,7 +251,7 @@ describe("DatabaseStatements", () => {
           savedName = name;
         },
       } as unknown as DatabaseStatementsHost;
-      await rollbackToSavepoint.call(host, "sp1");
+      await rollbackToSavepoint.call(host as never, "sp1");
       expect(savedName).toBe("sp1");
     });
   });
@@ -455,6 +458,11 @@ describe("DatabaseStatements", () => {
           columnsHash: async () => ({ name: { name: "name" } }),
         },
         lookupCastTypeFromColumn: () => ({ serialize: (value: unknown) => value }),
+        supportsVirtualColumns: async () => false,
+        defaultInsertValue,
+        get visitor() {
+          return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+        },
         executeBatch: async (statements: string[]) => {
           executed.push(...statements);
         },
@@ -607,7 +615,7 @@ describe("DatabaseStatements", () => {
 
     it("high precision current timestamp returns Arel SQL literal", () => {
       const result = highPrecisionCurrentTimestamp();
-      expect(result.toSql()).toBe("CURRENT_TIMESTAMP");
+      expect(new Visitors.ToSql(testConnection).compile(result)).toBe("CURRENT_TIMESTAMP");
     });
   });
 });
@@ -618,7 +626,7 @@ describe("performQuery", () => {
       performQuery.call({} as DatabaseStatementsHost, null, "SELECT 1", [], [], {
         prepare: false,
       }),
-    ).toThrow(/perform_query is not implemented/);
+    ).toThrow(NotImplementedError);
   });
 });
 
@@ -729,12 +737,13 @@ describe("execInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => supportsReturning,
       quoteColumnName: (c) => `"${c}"`,
+      schemaCache: { getCachedPrimaryKeys: () => null },
     };
     return host;
   }
 
   it("appends RETURNING via sqlForInsert when adapter supports it", async () => {
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       makeInsertHost(true),
       "INSERT INTO t (x) VALUES (1)",
       "id",
@@ -745,7 +754,7 @@ describe("execInsert", () => {
   });
 
   it("passes sql unchanged when adapter does not support RETURNING", async () => {
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       makeInsertHost(false),
       "INSERT INTO t (x) VALUES (1)",
       "id",
@@ -756,7 +765,7 @@ describe("execInsert", () => {
   });
 
   it("uses explicit returning list when provided", async () => {
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       makeInsertHost(true),
       "INSERT INTO t (x) VALUES (1)",
       null,
@@ -789,7 +798,10 @@ describe("internal_exec_query is a virtual call", () => {
 
   it("execQuery reaches the adapter override", async () => {
     const { host, seen } = makeOverrideHost();
-    const result = await DatabaseStatements.execQuery.call(host as never, "SELECT 1");
+    const result = await DatabaseStatements.instanceMethod("execQuery")!.value.call(
+      host as never,
+      "SELECT 1",
+    );
     expect(result.columns).toEqual(["overridden"]);
     expect(seen).toEqual(["SELECT 1"]);
   });
@@ -811,13 +823,7 @@ describe("sqlForInsert", () => {
       log,
       supportsInsertReturning: () => false,
     };
-    const [sql, binds] = await sqlForInsert.call(
-      host,
-      "INSERT INTO t (x) VALUES (1)",
-      "id",
-      [],
-      null,
-    );
+    const [sql, binds] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
     expect(binds).toEqual([]);
   });
@@ -831,7 +837,7 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
-    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
   });
 
@@ -843,8 +849,9 @@ describe("sqlForInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
+      schemaCache: { getCachedPrimaryKeys: () => null },
     };
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       host,
       "INSERT INTO t (x) VALUES (1)",
       null,
@@ -852,6 +859,20 @@ describe("sqlForInsert", () => {
       ["id", "created_at"],
     );
     expect(sql).toContain('RETURNING "id", "created_at"');
+  });
+
+  it("infers a composite primary key from the warm schema cache when pk is nil", () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      log,
+      pool,
+      typeCastedBinds,
+      supportsInsertReturning: () => true,
+      quoteColumnName: (c) => `"${c}"`,
+      schemaCache: { getCachedPrimaryKeys: (t) => (t === "t" ? ["shop_id", "id"] : null) },
+    };
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], null);
+    expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "shop_id", "id"`);
   });
 
   it("does NOT append pk-derived RETURNING when pk is false (Rails opt-out)", async () => {
@@ -862,11 +883,13 @@ describe("sqlForInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
-      primaryKey: () => {
-        throw new Error("primaryKey() must not be called when pk=false");
+      schemaCache: {
+        getCachedPrimaryKeys: () => {
+          throw new Error("getCachedPrimaryKeys() must not be called when pk=false");
+        },
       },
     };
-    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
   });
 
@@ -879,7 +902,7 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
-    const [sql] = await sqlForInsert.call(
+    const [sql] = sqlForInsert.call(
       host,
       "INSERT INTO t (x) VALUES (1)",
       false,
@@ -927,20 +950,43 @@ describe("extractTableRefFromInsertSql", () => {
 describe("defaultInsertValue", () => {
   it("returns DEFAULT SQL literal", () => {
     const result = defaultInsertValue(null);
-    expect(result.toSql()).toBe("DEFAULT");
+    expect(new Visitors.ToSql(testConnection).compile(result)).toBe("DEFAULT");
   });
 });
 
 describe("returningColumnValues", () => {
-  it("returns [first value of first row] from result", () => {
-    const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
+  it("returns [first value of first row] from result", async () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      pool,
+      typeCastedBinds,
+      log,
+      lastInsertedId,
+    };
     const result = new Result(["id"], [[42]]);
-    expect(returningColumnValues.call(host, result)).toEqual([42]);
+    expect(await returningColumnValues.call(host, result)).toEqual([42]);
   });
 
-  it("returns [undefined] for empty result", () => {
-    const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
-    expect(returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
+  it("returns [null] for empty result", async () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      pool,
+      typeCastedBinds,
+      log,
+      lastInsertedId,
+    };
+    expect(await returningColumnValues.call(host, Result.empty())).toEqual([null]);
+  });
+
+  it("answers through the adapter's own lastInsertedId", async () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      pool,
+      typeCastedBinds,
+      log,
+      lastInsertedId: async () => 7,
+    };
+    expect(await returningColumnValues.call(host, Result.empty())).toEqual([7]);
   });
 });
 
@@ -951,11 +997,12 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     isAutoIncrement?: () => boolean;
   } & Record<string, unknown>;
 
-  type FixtureHost = DatabaseStatementsHost &
+  type FixtureHost = Omit<DatabaseStatementsHost, "schemaCache"> &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
-      supportsVirtualColumns?(): Promise<boolean> | boolean;
-      defaultInsertValue?(column: unknown): unknown;
+      supportsVirtualColumns(): Promise<boolean>;
+      defaultInsertValue(column: unknown): unknown;
+      visitor: Visitors.ToSql;
       lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
     };
 
@@ -995,6 +1042,11 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       quoteColumnName: q,
       quoteString: (s: string) => s.replace(/'/g, "''"),
       lookupCastTypeFromColumn: () => ({ serialize: (value: unknown) => value }),
+      supportsVirtualColumns: async () => false,
+      defaultInsertValue,
+      get visitor() {
+        return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+      },
     };
   }
 
@@ -1103,6 +1155,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
         ...makeHost(),
         quote: (v: unknown) => (typeof v === "string" ? `E'${v}'` : String(v)),
       };
+      host.visitor = new Visitors.ToSql(host as unknown as Visitors.ArelConnection);
       const sql = await buildFixtureSql.call(host, [{ val: "x" }], "t");
       expect(sql).toContain("E'x'");
     });

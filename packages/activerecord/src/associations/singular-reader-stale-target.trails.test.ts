@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
+import { registerModel } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 type Rec = Record<string, unknown>;
 
@@ -17,8 +17,8 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Firm);
     registerModel(Client);
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
-    registerSubclass(Client);
+    registerModel(Firm);
+    registerModel(Client);
     await Company.loadSchema();
   });
 
@@ -43,6 +43,20 @@ describe("BelongsToAssociationsTest", () => {
     expect(firmWithConditionProxy.isStaleTarget()).toBe(true);
     expect(await targetId(client.firm)).toBe(anotherFirmId);
     expect(await targetId(client.firmWithCondition)).toBe(anotherFirmId);
+  });
+
+  it("loadTarget keeps a nil target loaded under a nil stale state, as load_target does (association.rb:190); the reader reloads it (singular_association.rb:10)", async () => {
+    const client = new Client() as unknown as Client & Rec;
+    const firstFirmId = (companies("first_firm") as unknown as Rec).id;
+    const firmProxy = client.association("firm");
+
+    expect(await firmProxy.loadTarget()).toBeNull();
+
+    client.client_of = firstFirmId as bigint;
+
+    expect(firmProxy.isStaleTarget()).toBe(true);
+    expect(await firmProxy.loadTarget()).toBeNull();
+    expect(await targetId(client.firm)).toBe(firstFirmId);
   });
 
   it("loadTarget re-queries a stale target instead of returning the cache", async () => {

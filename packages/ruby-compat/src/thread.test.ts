@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Thread } from "./thread.js";
 
 describe("Thread", () => {
@@ -67,6 +67,27 @@ describe("Thread", () => {
     expect(thread.exit()).toBe(thread);
   });
 
+  it("terminate ends a stopped thread, and join then returns it", async () => {
+    let resumed = false;
+    const thread = new Thread(async () => {
+      await Thread.stop();
+      resumed = true;
+    });
+    expect(await thread.join(0.01)).toBeNull();
+    expect(thread.isAlive()).toBe(true);
+    expect(thread.terminate()).toBe(thread);
+    expect(await thread.join()).toBe(thread);
+    expect(thread.isAlive()).toBe(false);
+    expect(resumed).toBe(false);
+  });
+
+  it("join with a limit returns the thread once it finishes", async () => {
+    const thread = new Thread(async () => {
+      await Thread.pass();
+    });
+    expect(await thread.join(1)).toBe(thread);
+  });
+
   it("to_s names the runtime class and the thread name", () => {
     class Worker extends Thread {}
     const thread = new Worker(() => null);
@@ -86,5 +107,36 @@ describe("Thread", () => {
     thread.set("greeting", "hi");
     expect(thread.set(":greeting", null)).toBeNull();
     expect(thread.get("greeting")).toBeNull();
+  });
+
+  it("keys names the fiber-locals", () => {
+    const thread = new Thread(() => null);
+    expect(thread.keys()).toEqual([]);
+    thread.set(":cat", "meow");
+    thread.set("dog", "woof");
+    expect(thread.keys()).toEqual(["cat", "dog"]);
+  });
+
+  it("abort_on_exception re-raises outside the thread's own promise", async () => {
+    const raised: (() => void)[] = [];
+    const queue = vi.spyOn(globalThis, "queueMicrotask").mockImplementation((fn) => {
+      raised.push(fn);
+    });
+    try {
+      const error = new Error("boom");
+      const quiet = new Thread(async () => {
+        throw error;
+      });
+      const thread = new Thread(async () => {
+        Thread.current().abortOnException = true;
+        throw error;
+      });
+      await Promise.resolve(thread.join()).catch(() => null);
+      await Promise.resolve(quiet.join()).catch(() => null);
+      expect(raised).toHaveLength(1);
+      expect(raised[0]).toThrow(error);
+    } finally {
+      queue.mockRestore();
+    }
   });
 });

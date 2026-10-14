@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Nodes } from "@blazetrails/arel";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Post } from "../test-helpers/models/post.js";
 import { Topic } from "../test-helpers/models/topic.js";

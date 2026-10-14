@@ -1,9 +1,8 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
-import { collectionProxyFor as association } from "../associations.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertDifference } from "@blazetrails/activesupport";
-import { captureSql } from "../testing/sql-capture.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 
@@ -27,7 +26,7 @@ function djasScope(owner: Base, assocName: string): any {
 }
 
 describe("HasManyThroughDisableJoinsAssociationsTest", () => {
-  const { authors } = fixtures(["posts", "authors", "comments", "authorAddresses"]);
+  const { self, authors } = fixtures(["posts", "authors", "comments", "authorAddresses"]);
 
   registerModel([Author, AuthorAddress, Post, Comment, Rating, Member, MemberType]);
 
@@ -190,64 +189,54 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     });
   });
 
+  // PERMANENT-SKIP: the through-id pluck is awaited on the way to SQL, not run at scope build (CLAUDE.md, "`Relation` is evaluated by an async query").
   it.skip("empty on disable joins through", async () => {
-    // BLOCKED: the through-id pluck runs at load, not at scope build (disable_joins_association_scope.rb:25) — converge-djar-deferred-chain-walk-mode
     const emptyAuthor = await Author.find(authors("bob").id);
     let comments: unknown;
     await assertQueriesCount(0, false, () => {
-      comments = association(emptyAuthor, "comments").all();
+      comments = emptyAuthor.comments.all();
     });
     expect(await comments).toEqual([]);
     await assertQueriesCount(1, false, () => {
-      comments = association(emptyAuthor, "noJoinsComments").all();
+      comments = emptyAuthor.noJoinsComments.all();
     });
     expect(await comments).toEqual([]);
   });
 
+  // PERMANENT-SKIP: the through-id pluck is awaited on the way to SQL, not run at scope build (CLAUDE.md, "`Relation` is evaluated by an async query").
   it.skip("empty on disable joins through using custom foreign key", async () => {
-    // BLOCKED: the through-id pluck runs at load, not at scope build (disable_joins_association_scope.rb:25) — converge-djar-deferred-chain-walk-mode
     const emptyAuthor = await Author.find(authors("bob").id);
     let comments: unknown;
     await assertQueriesCount(0, false, () => {
-      comments = association(emptyAuthor, "commentsWithForeignKey").all();
+      comments = emptyAuthor.commentsWithForeignKey.all();
     });
     expect(await comments).toEqual([]);
     await assertQueriesCount(1, false, () => {
-      comments = association(emptyAuthor, "noJoinsCommentsWithForeignKey").all();
+      comments = emptyAuthor.noJoinsCommentsWithForeignKey.all();
     });
     expect(await comments).toEqual([]);
   });
 
   it("pluck on disable joins through a through", async () => {
     const ratingIds = (await Rating.where({ comment_id: comment.id }).pluck("id")).sort(sortIds);
-    expect((await q(1, () => association(author, "ratings").pluck("id"))).sort(sortIds)).toEqual(
-      ratingIds,
-    );
-    expect(
-      (await q(3, () => association(author, "noJoinsRatings").pluck("id"))).sort(sortIds),
-    ).toEqual(ratingIds);
+    expect((await q(1, () => author.ratings.pluck("id"))).sort(sortIds)).toEqual(ratingIds);
+    expect((await q(3, () => author.noJoinsRatings.pluck("id"))).sort(sortIds)).toEqual(ratingIds);
   });
 
   it("count on disable joins through a through", async () => {
     const ratingsCount = await Rating.where({ comment_id: comment.id }).count();
-    expect(await q(1, () => association(author, "ratings").count())).toBe(ratingsCount);
-    expect(await q(3, () => association(author, "noJoinsRatings").count())).toBe(ratingsCount);
+    expect(await q(1, () => author.ratings.count())).toBe(ratingsCount);
+    expect(await q(3, () => author.noJoinsRatings.count())).toBe(ratingsCount);
   });
 
   it("count on disable joins using relation with scope", async () => {
-    expect(await q(1, () => association(author, "goodRatings").count())).toBe(2);
-    expect(await q(3, () => association(author, "noJoinsGoodRatings").count())).toBe(2);
+    expect(await q(1, () => author.goodRatings.count())).toBe(2);
+    expect(await q(3, () => author.noJoinsGoodRatings.count())).toBe(2);
   });
 
   it("to a on disable joins with multiple scopes", async () => {
-    expect(await q(1, () => association(author, "goodRatings").toArray())).toEqual([
-      rating1,
-      rating2,
-    ]);
-    expect(await q(3, () => association(author, "noJoinsGoodRatings").toArray())).toEqual([
-      rating1,
-      rating2,
-    ]);
+    expect(await q(1, () => author.goodRatings.toArray())).toEqual([rating1, rating2]);
+    expect(await q(3, () => author.noJoinsGoodRatings.toArray())).toEqual([rating1, rating2]);
   });
 
   it("preloading has many through disable joins", async () => {
@@ -262,40 +251,31 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("polymophic disable joins through counting", async () => {
-    expect(await q(1, () => association(author, "orderedMembers").count())).toBe(2);
-    expect(await q(3, () => association(author, "noJoinsOrderedMembers").count())).toBe(2);
+    expect(await q(1, () => author.orderedMembers.count())).toBe(2);
+    expect(await q(3, () => author.noJoinsOrderedMembers.count())).toBe(2);
   });
 
   it("polymophic disable joins through ordering", async () => {
-    expect(await q(1, () => association(author, "orderedMembers").toArray())).toEqual([
-      member2,
-      member,
-    ]);
-    expect(await q(3, () => association(author, "noJoinsOrderedMembers").toArray())).toEqual([
-      member2,
-      member,
-    ]);
+    expect(await q(1, () => author.orderedMembers.toArray())).toEqual([member2, member]);
+    expect(await q(3, () => author.noJoinsOrderedMembers.toArray())).toEqual([member2, member]);
   });
 
   it("polymorphic disable joins through reordering", async () => {
-    expect(
-      await q(1, () => association(author, "orderedMembers").reorder({ id: "asc" }).toArray()),
-    ).toEqual([member, member2]);
-    expect(
-      await q(3, () =>
-        association(author, "noJoinsOrderedMembers").reorder({ id: "asc" }).toArray(),
-      ),
-    ).toEqual([member, member2]);
+    expect(await q(1, () => author.orderedMembers.reorder({ id: "asc" }).toArray())).toEqual([
+      member,
+      member2,
+    ]);
+    expect(await q(3, () => author.noJoinsOrderedMembers.reorder({ id: "asc" }).toArray())).toEqual(
+      [member, member2],
+    );
   });
 
   it("polymorphic disable joins through ordered scopes", async () => {
-    expect(await q(1, () => association(author, "orderedMembers").unnamed().toArray())).toEqual([
+    expect(await q(1, () => author.orderedMembers.unnamed().toArray())).toEqual([member2, member]);
+    expect(await q(3, () => author.noJoinsOrderedMembers.unnamed().toArray())).toEqual([
       member2,
       member,
     ]);
-    expect(
-      await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().toArray()),
-    ).toEqual([member2, member]);
   });
 
   it("polymorphic disable joins through ordered chained scopes", async () => {
@@ -314,12 +294,15 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     const expected = [member3, member2, member];
     expect(
       await q(1, () =>
-        association(author, "orderedMembers").unnamed().withMemberTypeId(memberType.id).toArray(),
+        (author.association("orderedMembers") as CollectionAssociation).reader
+          .unnamed()
+          .withMemberTypeId(memberType.id)
+          .toArray(),
       ),
     ).toEqual(expected);
     expect(
       await q(3, () =>
-        association(author, "noJoinsOrderedMembers")
+        (author.association("noJoinsOrderedMembers") as CollectionAssociation).reader
           .unnamed()
           .withMemberTypeId(memberType.id)
           .toArray(),
@@ -328,52 +311,42 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("polymorphic disable joins through ordered scope limits", async () => {
-    expect(
-      await q(1, () => association(author, "orderedMembers").unnamed().limit(1).toArray()),
-    ).toEqual([member2]);
-    expect(
-      await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().limit(1).toArray()),
-    ).toEqual([member2]);
+    expect(await q(1, () => author.orderedMembers.unnamed().limit(1).toArray())).toEqual([member2]);
+    expect(await q(3, () => author.noJoinsOrderedMembers.unnamed().limit(1).toArray())).toEqual([
+      member2,
+    ]);
   });
 
   it("polymorphic disable joins through ordered scope first", async () => {
-    expect(await q(1, () => association(author, "orderedMembers").unnamed().first())).toEqual(
-      member2,
-    );
-    expect(
-      await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().first()),
-    ).toEqual(member2);
+    expect(await q(1, () => author.orderedMembers.unnamed().first())).toEqual(member2);
+    expect(await q(3, () => author.noJoinsOrderedMembers.unnamed().first())).toEqual(member2);
   });
 
   it("order applied in double join", async () => {
-    expect(await q(1, () => association(author, "members").toArray())).toEqual([member2, member]);
+    expect(await q(1, () => author.members.toArray())).toEqual([member2, member]);
     expect(await q(3, () => (author as any).noJoinsMembers.toArray())).toEqual([member2, member]);
   });
 
   it("first and scope applied in double join", async () => {
-    expect(await q(1, () => association(author, "members").unnamed().first())).toEqual(member2);
+    expect(await q(1, () => author.members.unnamed().first())).toEqual(member2);
     expect(await q(3, () => (author as any).noJoinsMembers.unnamed().first())).toEqual(member2);
   });
 
   it("first and scope in double join applies order in memory", async () => {
-    const disableJoinsSql = await captureSql(async () => {
+    const disableJoinsSql = await self().captureSql({}, async () => {
       await (author as any).noJoinsMembers.unnamed().first();
     });
     expect(disableJoinsSql[disableJoinsSql.length - 1]).not.toMatch(/ORDER BY/);
   });
 
   it("limit and scope applied in double join", async () => {
-    expect(await q(1, () => association(author, "members").unnamed().limit(1).toArray())).toEqual([
-      member2,
-    ]);
-    expect(
-      await q(3, () => association(author, "noJoinsMembers").unnamed().limit(1).toArray()),
-    ).toEqual([member2]);
+    expect(await q(1, () => author.members.unnamed().limit(1).toArray())).toEqual([member2]);
+    expect(await q(3, () => author.noJoinsMembers.unnamed().limit(1))).toEqual([member2]);
   });
 
   it("limit and scope in double join applies limit in memory", async () => {
-    const disableJoinsSql = await captureSql(async () => {
-      await association(author, "noJoinsMembers").unnamed().first();
+    const disableJoinsSql = await self().captureSql({}, async () => {
+      await author.noJoinsMembers.unnamed().first();
     });
     expect(disableJoinsSql[disableJoinsSql.length - 1]).not.toMatch(/LIMIT 1/);
   });

@@ -1,7 +1,9 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { fetch, merge } from "@blazetrails/ruby-compat";
-import { asJson, getEnv, onLoad } from "@blazetrails/activesupport";
+import { asJson, classAttribute, getEnv, included, onLoad } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
+import { UnknownPrimaryKey } from "./errors.js";
 
 export { InvalidSignature };
 
@@ -15,6 +17,20 @@ onLoad("active_record", function (this: typeof Base) {
   const secret = resolveSecret();
   this.generatedTokenVerifier ??= secret === null ? null : new MessageVerifier(secret);
 });
+
+export const TokenFor = {
+  [included](base: object): void {
+    classAttribute.call(base, "tokenDefinitions", {
+      instanceAccessor: false,
+      instancePredicate: false,
+      default: {},
+    });
+    classAttribute.call(base, "generatedTokenVerifier", {
+      instanceAccessor: false,
+      instancePredicate: false,
+    });
+  },
+};
 
 export class TokenDefinition {
   readonly definingClass: typeof Base;
@@ -43,9 +59,7 @@ export class TokenDefinition {
   }
 
   payloadFor(model: Base): unknown[] {
-    const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
-    const id = Array.isArray(model.id) ? (model.id as unknown[]).map(coerce) : coerce(model.id);
-    return this.block ? [id, asJson(this.block.call(model, model))] : [id];
+    return this.block ? [model.id, asJson(this.block.call(model, model))] : [model.id];
   }
 
   generateToken(model: Base): string {
@@ -59,12 +73,33 @@ export class TokenDefinition {
     token: string,
     block: (id: unknown) => Promise<Base | null>,
   ): Promise<Base | null> {
-    const verified = this.messageVerifier().verified(token, { purpose: this.fullPurpose() });
-    const payload = Array.isArray(verified) && verified.length > 0 ? verified : null;
-    const model = payload ? await block(payload[0]) : null;
+    const payload = this.messageVerifier().verified(token, { purpose: this.fullPurpose() }) as
+      | unknown[]
+      | null;
+    let model: Base | null = null;
+    if (payload != null) model = await block(payload[0]);
     return model && JSON.stringify(this.payloadFor(model)) === JSON.stringify(payload)
       ? model
       : null;
+  }
+}
+
+export class RelationMethods<T extends Base = Base> {
+  async findByTokenFor(this: Relation<T>, purpose: string, token: string): Promise<T | null> {
+    if (this.model.primaryKey == null) throw new UnknownPrimaryKey(this);
+    return (await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
+      token,
+      (id) => this.findBy(new Map([[this.model.primaryKey, [id]]])),
+    )) as T | null;
+  }
+
+  async findByTokenForBang(this: Relation<T>, purpose: string, token: string): Promise<T> {
+    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
+      token,
+      (id) => this.find(id) as Promise<Base>,
+    );
+    if (!record) throw new InvalidSignature();
+    return record as T;
   }
 }
 
@@ -81,7 +116,6 @@ export function generatesTokenFor(
   });
 }
 
-/** @missingRailsArgs fetch — PERMANENT */
 export function generateTokenFor(this: Base, purpose: string): string {
   return fetch<TokenDefinition>(
     (this.constructor as typeof Base).tokenDefinitions,

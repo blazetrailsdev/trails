@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Column, NullColumn } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 
@@ -60,9 +60,7 @@ describe("Column", () => {
   });
 
   it("isAutoPopulated returns true when default function set", () => {
-    const col = new Column("created_at", null, makeMetadata(), true, {
-      defaultFunction: "now()",
-    });
+    const col = new Column("created_at", null, makeMetadata(), true, "now()");
     expect(col.isAutoPopulated()).toBe(true);
   });
 
@@ -106,16 +104,33 @@ describe("NullColumn", () => {
   it("deduplicate returns self and triggers sqlTypeMetadata deduplication", () => {
     const meta = makeMetadata();
     const col = new Column("name", null, meta);
-    const spy = vi.spyOn(meta, "deduplicate");
-    const result = col.deduplicate();
-    expect(result).toBe(col);
-    expect(spy).toHaveBeenCalledOnce();
-    spy.mockRestore();
+    expect(col.deduplicate()).toBe(col);
+    expect(col.sqlTypeMetadata).toBe(meta.deduplicate());
   });
 
   it("deduplicate is a no-op when sqlTypeMetadata is null", () => {
     const col = new Column("name", null, null);
     expect(() => col.deduplicate()).not.toThrow();
     expect(col.deduplicate()).toBe(col);
+  });
+
+  it("new returns the registered instance for an equal column", () => {
+    const first = new Column("dedup_new", null, makeMetadata());
+    const second = new Column("dedup_new", null, makeMetadata());
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(second).toBe(first);
+  });
+
+  it("negate is deduplicate", () => {
+    const first = new Column("dedup_negate", null, makeMetadata());
+    expect(new Column("dedup_negate", null, makeMetadata()).negate()).toBe(first);
+    expect(makeMetadata({ sqlType: "dedup_negate" }).negate()).toBe(
+      makeMetadata({ sqlType: "dedup_negate" }).deduplicate(),
+    );
+  });
+
+  it("keeps a registry per class", () => {
+    expect(Column.registry()).toBe(Column.registry());
+    expect(Column.registry()).not.toBe(SqlTypeMetadata.registry());
   });
 });

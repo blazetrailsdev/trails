@@ -1,21 +1,41 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
+import * as EnsureNamespace from "./ensure.js";
 import { NameError } from "./name-error.js";
+import { rbModConstGet, registerConstant, unregisterConstant } from "./variable.js";
+import { Hash } from "./hash.js";
+import {
+  rbCBasicObject,
+  rbClassSuperclass,
+  rbObjClass,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rbModName,
+  rbModToS,
+  rbObjSingletonClass,
+} from "./object.js";
 import {
   include,
+  rbModConstDefined,
+  rbModConstSet,
   prepend,
   extend,
   included,
   extended,
   rbObjClone,
+  rbObjDup,
+  Kernel,
   Module,
   initialize,
   initializeIncludedModules,
   isModuleIncluded,
+  methodOwner,
+  rbModAncestors,
   defineModule,
   moduleVisibility,
   publicInstanceMethods,
   type ModuleVisibility,
   type Included,
+  type Initialized,
   type Extended,
 } from "./include.js";
 
@@ -24,6 +44,168 @@ type DynProps = Record<string, unknown>;
 type DynSymbols = Record<symbol, unknown>;
 
 describe("initializeIncludedModules", () => {
+  it("runs a generator initializer's code before its yield ahead of the initializers beneath it", () => {
+    const calls: string[] = [];
+    const Inner = new Module();
+    (Inner as unknown as Record<symbol, unknown>)[initialize] = function () {
+      calls.push("inner");
+    };
+    const Outer = new Module();
+    (Outer as unknown as Record<symbol, unknown>)[initialize] = function* (name: string) {
+      calls.push(`before ${name}`);
+      yield;
+      calls.push(`after ${name}`);
+    };
+    class Root {
+      constructor(...args: unknown[]) {
+        initializeIncludedModules(this, ...args);
+      }
+    }
+    include(Root, Inner);
+    class Sub extends Root {}
+    include(Sub, Outer);
+
+    new Sub("x");
+    expect(calls).toEqual(["before x", "inner", "after x"]);
+  });
+
+  it("closes a generator initializer when an initializer beneath it raises", () => {
+    const calls: string[] = [];
+    const Inner = new Module();
+    (Inner as unknown as Record<symbol, unknown>)[initialize] = function () {
+      throw new TypeError("inner");
+    };
+    const Outer = new Module();
+    (Outer as unknown as Record<symbol, unknown>)[initialize] = function* () {
+      try {
+        yield;
+        calls.push("after");
+      } finally {
+        calls.push("ensure");
+      }
+    };
+    class Root {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    include(Root, Inner);
+    class Sub extends Root {}
+    include(Sub, Outer);
+
+    expect(() => new Sub()).toThrow(TypeError);
+    expect(calls).toEqual(["ensure"]);
+  });
+
+  it("raises for a generator initializer that yields a second time", () => {
+    const Twice = new Module();
+    (Twice as unknown as Record<symbol, unknown>)[initialize] = function* () {
+      yield;
+      yield;
+    };
+    class Root {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    include(Root, Twice);
+
+    expect(() => new Root()).toThrow(/yields once/);
+  });
+
+  it("wraps the includer's construction in a class module's generator initializer", () => {
+    const calls: string[] = [];
+    class Root {
+      seen: unknown;
+      constructor(kwargs: Record<string, unknown> = {}) {
+        initializeIncludedModules(this);
+        this.seen = kwargs;
+        calls.push("root");
+      }
+    }
+    class Zoned {
+      declare zone?: string;
+      static *[initialize](
+        this: Zoned,
+        { zone, ...kwargs }: { zone?: string; limit?: number } = {},
+      ): Generator<[typeof kwargs]> {
+        yield [kwargs];
+        calls.push("zoned");
+        this.zone = zone;
+      }
+    }
+    class Sub extends (Root as Initialized<typeof Root, typeof Zoned>) {}
+    include(Sub, Zoned);
+
+    const sub = new Sub({ zone: "utc", limit: 3 });
+    expect(calls).toEqual(["root", "zoned"]);
+    expect(sub.seen).toEqual({ limit: 3 });
+    expect((sub as unknown as Zoned).zone).toBe("utc");
+    expect(sub).toBeInstanceOf(Root);
+    expect(rbClassSuperclass(Sub)).toBe(Root);
+    expect(Object.getPrototypeOf(new (class extends Sub {})())).toBeInstanceOf(Sub);
+  });
+
+  it("forwards its own arguments when a spliced generator initializer yields none", () => {
+    class Root {
+      constructor(public a?: number) {}
+    }
+    class Bare {
+      declare after?: boolean;
+      static *[initialize](this: Bare): Generator {
+        yield;
+        this.after = true;
+      }
+    }
+    class Sub extends Root {}
+    include(Sub, Bare);
+
+    const sub = new Sub(4);
+    expect(sub.a).toBe(4);
+    expect((sub as unknown as Bare).after).toBe(true);
+  });
+
+  it("runs a spliced generator initializer against the instance itself", () => {
+    const seen: object[] = [];
+    class Root {}
+    class Seated {
+      static *[initialize](this: Seated): Generator {
+        yield;
+        seen.push(this);
+        rbObjIvarSet(this, "@seat", 1);
+        Object.defineProperty(this, "defined", { value: 2, enumerable: true });
+      }
+    }
+    class Sub extends Root {}
+    include(Sub, Seated);
+
+    const sub = new Sub();
+    expect(seen).toEqual([sub]);
+    expect(seen[0]).toBe(sub);
+    expect(rbObjIvarGet(sub, "@seat")).toBe(1);
+    expect(Object.keys(sub)).toContain("defined");
+  });
+
+  it("leaves the code after a spliced initializer's yield unrun when the superclass constructor raises", () => {
+    const calls: string[] = [];
+    class Root {
+      constructor() {
+        throw new TypeError("root");
+      }
+    }
+    class After {
+      static *[initialize](): Generator {
+        yield;
+        calls.push("after");
+      }
+    }
+    class Sub extends Root {}
+    include(Sub, After);
+
+    expect(() => new Sub()).toThrow(TypeError);
+    expect(calls).toEqual([]);
+  });
+
   it("seats a module's per-instance state as an own property at construction", () => {
     class Controller {
       constructor() {
@@ -415,6 +597,22 @@ describe("include", () => {
     expect(order).toEqual(["included"]);
   });
 
+  it("fires the included callback for a module object, which has no instances to copy onto", () => {
+    const namespace = {};
+    const bases: unknown[] = [];
+    const mod = {
+      greet() {
+        return "hello";
+      },
+      [included](base: unknown) {
+        bases.push(base);
+      },
+    };
+    include(namespace, mod);
+    expect(bases).toEqual([namespace]);
+    expect("greet" in namespace).toBe(false);
+  });
+
   it("does not copy the included symbol onto the prototype", () => {
     class User {}
     const mod = {
@@ -612,6 +810,50 @@ describe("extend", () => {
     expect((User as unknown as DynSymbols)[extended]).toBeUndefined();
   });
 
+  it("carries the methods a plain-object module inherits from its ancestors", () => {
+    const parent = {
+      inherited() {
+        return "parent";
+      },
+      shadowed() {
+        return "parent";
+      },
+    };
+    const mod = Object.assign(Object.create(parent) as typeof parent, {
+      shadowed() {
+        return "own";
+      },
+    });
+    const obj = {};
+    extend(obj, mod);
+    expect((obj as typeof parent).inherited()).toBe("parent");
+    expect((obj as typeof parent).shadowed()).toBe("own");
+  });
+
+  it("returns the receiver", () => {
+    const obj = {};
+    expect(extend(obj, { hello() {} })).toBe(obj);
+  });
+
+  it("extends with several modules last to first, so the first one wins", () => {
+    const order: string[] = [];
+    const first = {
+      who: () => "first",
+      [extended]: () => void order.push("first"),
+    };
+    const second = {
+      who: () => "second",
+      [extended]: () => void order.push("second"),
+    };
+    const obj = extend({}, first, second);
+    expect(order).toEqual(["second", "first"]);
+    expect((obj as typeof first).who()).toBe("first");
+  });
+
+  it("raises ArgumentError with no module", () => {
+    expect(() => extend({})).toThrow("wrong number of arguments (given 0, expected 1+)");
+  });
+
   it("works without an extended callback", () => {
     class User {}
     extend(User, {
@@ -726,6 +968,53 @@ describe("extend", () => {
     (User as unknown as DynProps).tableName = "people";
     expect(seen).toEqual(["people"]);
   });
+
+  it("a module's name replaces the name a class expression is born with", () => {
+    class Parent {}
+    const delegate = class extends Parent {};
+    extend(delegate, {
+      get name(): string {
+        return "from the module";
+      },
+    });
+    expect(delegate.name).toBe("from the module");
+  });
+
+  it("a module's name replaces a declared class's born name", () => {
+    class Declared {}
+    extend(Declared, {
+      get name(): string {
+        return "from the module";
+      },
+    });
+    expect(Declared.name).toBe("from the module");
+  });
+
+  it("a class body's static name field wins over a module's", () => {
+    class Named {
+      static name = "class body";
+    }
+    extend(Named, {
+      get name(): string {
+        return "from the module";
+      },
+    });
+    expect(Named.name).toBe("class body");
+  });
+
+  it("a class body's static name wins over a module's", () => {
+    class Named {
+      static get name(): string {
+        return "class body";
+      }
+    }
+    extend(Named, {
+      get name(): string {
+        return "from the module";
+      },
+    });
+    expect(Named.name).toBe("class body");
+  });
 });
 
 describe("isModuleIncluded", () => {
@@ -763,6 +1052,65 @@ describe("isModuleIncluded", () => {
     class User {}
     include(User, Trackable);
     expect(isModuleIncluded(User, Trackable)).toBe(true);
+  });
+});
+
+describe("Module#ancestors", () => {
+  it("lists the class, its mixed-in modules most recent first, then each superclass", () => {
+    const first = { a() {} };
+    const second = { b() {} };
+    const inherited = { c() {} };
+    class Base {}
+    class User extends Base {}
+    include(Base, inherited);
+    include(User, first);
+    include(User, second);
+    expect(rbModAncestors(User)).toEqual([
+      User,
+      second,
+      first,
+      Base,
+      inherited,
+      Object,
+      Kernel,
+      rbCBasicObject,
+    ]);
+  });
+
+  it("lists MRI's ancestors for a core class", () => {
+    const names = (x: unknown) => rbModAncestors(rbObjClass(x)).map(rbModName).join(" ");
+    const named = (x: unknown) =>
+      rbModAncestors(rbObjClass(x))
+        .map(rbModName)
+        .filter((name) => name != null)
+        .join(" ");
+    const dateTime = { [Symbol.toStringTag]: "Temporal.PlainDateTime" };
+    expect(named(dateTime)).toBe("DateTime Date Comparable Object Kernel BasicObject");
+    expect(names(1)).toBe("Integer Numeric Comparable Object Kernel BasicObject");
+    expect(names(1.5)).toBe("Float Numeric Comparable Object Kernel BasicObject");
+    expect(names(null)).toBe("NilClass Object Kernel BasicObject");
+    expect(names({})).toMatch(/^Hash Enumerable /);
+    const hash = new Hash<string, number>().set("a", 1).set("b", 2);
+    const included = hash as unknown as {
+      map(block: (pair: [string, number]) => string): string[];
+    };
+    expect(included.map(([key, value]) => key + value)).toEqual(["a1", "b2"]);
+    const yielded: unknown[] = [];
+    expect(hash.each((key: string, value: number) => yielded.push(key, value))).toBe(hash);
+    expect(yielded).toEqual(["a", 1, "b", 2]);
+    expect(names(class {})).toBe("Class Module Object Kernel BasicObject");
+    expect(names("s")).toBe("String Comparable Object Kernel BasicObject");
+    expect(named(new Date(0))).toBe("Time Comparable Object Kernel BasicObject");
+    expect(rbModAncestors(rbCBasicObject)).toEqual([rbCBasicObject]);
+  });
+
+  it("answers one class object per core class, and the constructor otherwise", () => {
+    class Klass {}
+    expect(rbObjClass(1)).toBe(rbObjClass(2n));
+    expect(rbObjClass(1)).not.toBe(rbObjClass(1.5));
+    expect(rbModName(rbObjClass(() => {}))).toBe("Proc");
+    expect(rbObjClass({})).toBe(Hash);
+    expect(rbObjClass(rbObjSingletonClass(new Klass()).prototype)).toBe(Klass);
   });
 });
 
@@ -974,6 +1322,45 @@ describe("Module#superMethod", () => {
     expect(mod.superMethod(new Lonely(), "greet")).toBeUndefined();
   });
 
+  it("ends the search in Kernel, where every ancestry ends", () => {
+    class Record {
+      copiedFrom: unknown;
+      initializeCopy(orig: unknown): void {
+        this.copiedFrom = orig;
+      }
+    }
+    const mod = new Module();
+    mod.defineMethod("initializeDup", function (this: Record, orig: unknown) {
+      return mod.superMethod(this, "initializeDup")!(orig);
+    });
+    mod.defineMethod("freeze", function (this: Record) {
+      return mod.superMethod(this, "freeze")!();
+    });
+    include(Record, mod);
+
+    const orig = new Record();
+    const record = rbObjDup(orig);
+    expect(record.copiedFrom).toBe(orig);
+    expect((record as unknown as { freeze(): Record }).freeze()).toBe(record);
+    expect(Object.isFrozen(record)).toBe(true);
+  });
+
+  it("answers a method a gem defined on Kernel, and no writer", () => {
+    class Plain {}
+    const mod = new Module();
+    include(Plain, mod);
+    Kernel.defineMethod("kernelProbe", function (this: object) {
+      return this;
+    });
+    try {
+      const plain = new Plain();
+      expect(mod.superMethod(plain, "kernelProbe")!()).toBe(plain);
+      expect(mod.superMethod(plain, "kernelProbe=")).toBeUndefined();
+    } finally {
+      Kernel.removeMethod("kernelProbe");
+    }
+  });
+
   it("answers undefined for a receiver whose ancestry lacks the module", () => {
     class Outside {}
     const mod = new Module();
@@ -1065,6 +1452,49 @@ describe("Module.new", () => {
 });
 
 describe("rbObjClone", () => {
+  it("copies a class into a constructible class (rb_mod_init_copy)", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Orig extends Parent {
+      static label = "orig";
+      #secret = 7;
+      field = [1];
+      static initializeClone(this: { cloned?: unknown }, orig: unknown): void {
+        this.cloned = orig;
+      }
+      override greet(): string {
+        return `orig ${super.greet()} ${this.#secret}`;
+      }
+    }
+
+    for (const copy of [rbObjClone(Orig), rbObjDup(Orig)]) {
+      const instance = new copy();
+      expect(copy).not.toBe(Orig);
+      expect(copy.name).toBe("");
+      expect(Object.getPrototypeOf(copy)).toBe(Parent);
+      expect(copy.label).toBe("orig");
+      expect(instance).toBeInstanceOf(copy);
+      expect(instance).toBeInstanceOf(Parent);
+      expect(instance).not.toBeInstanceOf(Orig);
+      expect(instance.field).toEqual([1]);
+      expect(instance.greet()).toBe("orig parent 7");
+      expect(copy.prototype.constructor).toBe(copy);
+      expect(() => (copy as unknown as () => void)()).toThrow(/without 'new'/);
+      class Sub extends copy {}
+      expect(new Sub().greet()).toBe("orig parent 7");
+    }
+    expect((rbObjClone(Orig) as { cloned?: unknown }).cloned).toBe(Orig);
+    expect(Object.prototype.hasOwnProperty.call(rbObjDup(Orig), "cloned")).toBe(false);
+
+    const proc = function (): number {
+      return 1;
+    };
+    expect(typeof rbObjClone(proc)).toBe("object");
+  });
+
   it("copies class, ivars, singleton methods and frozen state", () => {
     const a = () => "a";
     const obj = Object.assign(new (class Host {})(), { ivar: 1 });
@@ -1074,6 +1504,130 @@ describe("rbObjClone", () => {
     expect(Object.getPrototypeOf(clone)).toBe(Object.getPrototypeOf(obj));
     expect(clone).toMatchObject({ ivar: 1, a });
     expect(Object.isFrozen(clone)).toBe(true);
+  });
+
+  it("dispatches initializeClone on the copy before freezing it", () => {
+    class Host {
+      inner = [1];
+      initializeClone(_orig: Host): void {
+        this.inner = [...this.inner];
+      }
+    }
+    const obj = Object.freeze(new Host());
+    const clone = rbObjClone(obj);
+    expect(clone.inner).not.toBe(obj.inner);
+    expect(Object.isFrozen(clone)).toBe(true);
+  });
+
+  it("returns a special object as is", () => {
+    expect(rbObjClone(1)).toBe(1);
+    expect(rbObjClone("a")).toBe("a");
+    expect(rbObjClone(null)).toBe(null);
+  });
+
+  it("allocates an array as an array holding the same elements", () => {
+    const node = {};
+    const ary = [node, 2];
+    const clone = rbObjClone(ary);
+    expect(Array.isArray(clone)).toBe(true);
+    expect(clone).not.toBe(ary);
+    expect(clone).toEqual(ary);
+    expect(clone[0]).toBe(node);
+    clone.push(3);
+    expect(ary).toHaveLength(2);
+  });
+
+  it("keeps a frozen array frozen", () => {
+    const clone = rbObjClone(Object.freeze([1, 2]));
+    expect(Array.isArray(clone)).toBe(true);
+    expect(clone).toEqual([1, 2]);
+    expect(Object.isFrozen(clone)).toBe(true);
+  });
+});
+
+describe("rbObjDup", () => {
+  it("copies ivars, drops singleton methods and frozen state, dispatches initializeDup", () => {
+    class Host {
+      ivar = 1;
+      origin: Host | null = null;
+      initializeDup(orig: Host): void {
+        this.origin = orig;
+      }
+    }
+    const obj = new Host();
+    extend(obj, { a: () => "a" });
+    const dup = rbObjDup(Object.freeze(obj));
+
+    expect(Object.getPrototypeOf(dup)).toBe(Host.prototype);
+    expect(dup.ivar).toBe(1);
+    expect(dup.origin).toBe(obj);
+    expect("a" in dup).toBe(false);
+    expect(Object.isFrozen(dup)).toBe(false);
+  });
+
+  it("falls back to initializeCopy", () => {
+    class Host {
+      copied = false;
+      initializeCopy(_orig: Host): void {
+        this.copied = true;
+      }
+    }
+    expect(rbObjDup(new Host()).copied).toBe(true);
+  });
+
+  it("returns a special object as is", () => {
+    expect(rbObjDup(1)).toBe(1);
+    expect(rbObjDup("a")).toBe("a");
+    expect(rbObjDup(null)).toBe(null);
+  });
+
+  it("allocates an array as an unfrozen array holding the same elements", () => {
+    const ary: unknown[] = Object.freeze([{}, 2]) as unknown[];
+    const dup = rbObjDup(ary);
+    expect(Array.isArray(dup)).toBe(true);
+    expect(dup).not.toBe(ary);
+    expect(dup[0]).toBe(ary[0]);
+    expect(Object.isFrozen(dup)).toBe(false);
+    dup.push(3);
+    expect(ary).toHaveLength(2);
+  });
+});
+
+describe("Module#include?", () => {
+  it("answers for a module included directly or through an included Module", () => {
+    const plain = { hello: () => "hello" };
+    const inner = new Module((mod) => mod.include(plain));
+    const outer = new Module((mod) => mod.include(inner));
+    expect(outer.isInclude(inner)).toBe(true);
+    expect(outer.isInclude(plain)).toBe(true);
+    expect(inner.isInclude(outer)).toBe(false);
+    expect(new Module().isInclude(plain)).toBe(false);
+  });
+});
+
+describe("Module#include of an accessor", () => {
+  it("carries a reader and writer pair without calling the reader", () => {
+    const mod = new Module().include({
+      get title(): string {
+        return (this as unknown as { _title: string })._title;
+      },
+      set title(value: string) {
+        (this as unknown as { _title: string })._title = value;
+      },
+    });
+    class Host {}
+    include(Host, mod);
+    const host = new Host() as { title: string; _title?: string };
+    host.title = "a";
+    expect(host._title).toBe("a");
+    expect(host.title).toBe("a");
+  });
+
+  it("installs an ES module namespace's exports as methods, not accessors", () => {
+    const mod = new Module().include(EnsureNamespace);
+    const entry = mod.instanceMethod("rbEnsure")!;
+    expect(entry.value).toBe(EnsureNamespace.rbEnsure);
+    expect(entry.get).toBeUndefined();
   });
 });
 
@@ -1124,5 +1678,247 @@ describe("Module#dup", () => {
     expect(copy.label).toBe("original");
     expect(copy.instanceMethods()).toEqual(["greet", "extra"]);
     expect(mod.instanceMethods()).toEqual(["greet"]);
+  });
+});
+
+describe("Module#const_defined?", () => {
+  it("answers whether the module or an ancestor holds the constant", () => {
+    class Topic {}
+    class Reply extends Topic {}
+    const mod = new Module();
+    expect(rbModConstDefined(Topic, "Generated")).toBe(false);
+    rbModConstSet(Topic, "Generated", 1);
+    rbModConstSet(mod, "ATTR_d697", "my");
+    expect(rbModConstDefined(Topic, "Generated")).toBe(true);
+    expect(rbModConstDefined(Reply, "Generated")).toBe(true);
+    expect(rbModConstDefined(mod, "ATTR_d697")).toBe(true);
+    expect(rbModConstDefined(mod, "Generated")).toBe(false);
+  });
+
+  it("rbModConstDefined walks a :: path from the top-level table", () => {
+    const db = { Adapters: { Mega: class {} } };
+    registerConstant("ConstDefinedTrailsDb", db);
+    try {
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb")).toBe(true);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb::Adapters::Mega")).toBe(true);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb::Adapters::Nope")).toBe(false);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsNope::Adapters")).toBe(false);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb", false)).toBe(false);
+      expect(() => rbModConstGet(Object, "ConstDefinedTrailsNope")).toThrow(
+        "uninitialized constant ConstDefinedTrailsNope",
+      );
+    } finally {
+      unregisterConstant("ConstDefinedTrailsDb", db);
+    }
+  });
+
+  it("looks at the module alone when recur is false", () => {
+    class Topic {}
+    class Reply extends Topic {}
+    rbModConstSet(Topic, "Generated", 1);
+    expect(rbModConstDefined(Topic, "Generated", false)).toBe(true);
+    expect(rbModConstDefined(Reply, "Generated", false)).toBe(false);
+  });
+
+  it("raises NameError for a name that is not a constant name", () => {
+    class Topic {}
+    expect(() => rbModConstDefined(Topic, "name")).toThrow(NameError);
+    expect(() => rbModConstDefined(Topic, "name")).toThrow("wrong constant name name");
+  });
+});
+
+describe("Module#const_set", () => {
+  it("names an anonymous module after the constant it is bound to", () => {
+    class Topic {}
+    const mod = new Module();
+    expect(mod.name).toBeNull();
+    expect(rbModConstSet(Topic, "Generated", mod)).toBe(mod);
+    expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
+    expect(mod.name).toBe("Topic::Generated");
+    expect(mod.inspect()).toBe("Topic::Generated");
+  });
+
+  it("names a class after the constant it is bound to", () => {
+    const Namespace = { name: "Namespace" };
+    class Topic {}
+    expect(rbModName(Topic)).toBe("Topic");
+    expect(rbModConstSet(Namespace, "Topic", Topic)).toBe(Topic);
+    expect(rbModName(Topic)).toBe("Namespace::Topic");
+    expect(rbModToS(Topic)).toBe("Namespace::Topic");
+    class Reply {}
+    rbModConstSet(Topic, "Reply", Reply);
+    expect(rbModName(Reply)).toBe("Namespace::Topic::Reply");
+    expect(rbModName((() => class {})())).toBeNull();
+  });
+
+  it("gives a module bound under an anonymous owner a temporary path until a named owner binds it", () => {
+    const owner = new Module();
+    const mod = new Module();
+    rbModConstSet(owner, "X", mod);
+    expect(mod.name).toBe(`${owner.inspect()}::X`);
+    class N {}
+    rbModConstSet(N, "Z", mod);
+    expect(mod.name).toBe("N::Z");
+  });
+
+  it("paths a module under an anonymous class by the class's temporary path", () => {
+    const owner = (() => class {})();
+    const mod = new Module();
+    rbModConstSet(owner, "X", mod);
+    expect(owner.name).toBe("");
+    expect(mod.name).toMatch(/^#<Class:0x[0-9a-f]{16}>::X$/);
+    expect(mod.name).toBe(`${rbModToS(owner)}::X`);
+  });
+
+  it("raises NameError for a name that is not a constant name", () => {
+    expect(() => rbModConstSet(class N {}, "foo", 1)).toThrow(
+      new NameError("wrong constant name foo", "foo"),
+    );
+  });
+});
+
+describe("include — a module's own `included` shadows the one it was extended with", () => {
+  it("sends the symbol-keyed hook after appendFeatures, not the string-named one", () => {
+    const calls: string[] = [];
+    const mod = new Module() as Module & {
+      appendFeatures(base: unknown): void;
+      included(base: unknown): void;
+      [included](base: unknown): void;
+    };
+    mod.appendFeatures = () => void calls.push("appendFeatures");
+    mod.included = () => void calls.push("extended included");
+    mod[included] = () => void calls.push("own included");
+
+    include(class Host {}, mod);
+    new Module().include(mod);
+
+    expect(calls).toEqual(["appendFeatures", "own included", "appendFeatures", "own included"]);
+  });
+});
+
+describe("Module#prependFeatures", () => {
+  it("splices the module above the class's own method, which superMethod resumes at", () => {
+    class Klass {
+      greet(name: string): string {
+        return `class ${name}`;
+      }
+      other(): string {
+        return "other";
+      }
+    }
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object, name: string) {
+        return `module > ${mod.superMethod(this, "greet")!(name)}`;
+      });
+    });
+    prepend(Klass, mod);
+
+    expect(new Klass().greet("a")).toBe("module > class a");
+    expect(new Klass().other()).toBe("other");
+    expect(Object.prototype.hasOwnProperty.call(Klass.prototype, "greet")).toBe(false);
+  });
+
+  it("puts a later prepend above an earlier one, and a later include beneath the class", () => {
+    class Klass {
+      greet(): string {
+        return "class";
+      }
+    }
+    const first: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return `first > ${first.superMethod(this, "greet")!()}`;
+      });
+    });
+    const second: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return `second > ${second.superMethod(this, "greet")!()}`;
+      });
+    });
+    const beneath: Module = new Module((m) => {
+      m.defineMethod("greet", () => "included");
+    });
+    prepend(Klass, first);
+    prepend(Klass, second);
+    include(Klass, beneath);
+
+    expect(new Klass().greet()).toBe("second > first > class");
+  });
+
+  it("answers no super method where neither the class nor an ancestor defines one", () => {
+    class Klass {}
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return mod.superMethod(this, "greet");
+      });
+    });
+    prepend(Klass, mod);
+
+    expect((new Klass() as unknown as DynMethods).greet()).toBeUndefined();
+  });
+
+  it("keeps a subclass constructor chain when prepended onto a class's singleton", () => {
+    class Parent {
+      static build(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {
+      static build(): string {
+        return "child";
+      }
+    }
+    const mod: Module = new Module((m) => {
+      m.defineMethod("build", function (this: object) {
+        return `module > ${mod.superMethod(this, "build")!()}`;
+      });
+    });
+    prepend({ prototype: Child } as never, mod);
+
+    expect(Child.build()).toBe("module > child");
+    expect(new Child()).toBeInstanceOf(Parent);
+    expect(rbClassSuperclass(Child)).toBe(Parent);
+    expect(methodOwner(Child, "build")).toBe(mod);
+  });
+
+  it("answers the class as the owner of a method moved to its origin", () => {
+    class Parent {}
+    class Klass extends Parent {
+      greet(): string {
+        return "class";
+      }
+    }
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return mod.superMethod(this, "greet")!();
+      });
+    });
+    prepend(Klass, mod);
+
+    const origin = Object.getPrototypeOf(Object.getPrototypeOf(Klass.prototype)) as object;
+    expect(methodOwner(Klass.prototype, "greet")).toBe(mod);
+    expect(methodOwner(origin, "greet")).toBe(Klass);
+    expect(rbClassSuperclass(Klass)).toBe(Parent);
+    expect(Object.getPrototypeOf(origin)).toBe(Parent.prototype);
+  });
+
+  it("raises where the class's own property of a module name cannot be moved", () => {
+    class Klass {}
+    Object.defineProperty(Klass.prototype, "greet", { value: () => "class" });
+    const mod = new Module((m) => m.defineMethod("greet", () => "module"));
+
+    expect(() => prepend(Klass, mod)).toThrow("prepend: cannot move greet");
+  });
+
+  it("leaves a method assigned to the class after the prepend above the module", () => {
+    class Klass {
+      greet(): string {
+        return "class";
+      }
+    }
+    const mod = new Module((m) => m.defineMethod("greet", () => "module"));
+    prepend(Klass, mod);
+    (Klass.prototype as unknown as DynMethods).greet = () => "reopened";
+
+    expect(new Klass().greet()).toBe("reopened");
   });
 });

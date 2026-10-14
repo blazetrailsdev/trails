@@ -77,7 +77,7 @@ describe("PooledConnectionsTest", () => {
     const pool = establishConnection(2, 0.5);
     const oldConnection = await pool.leaseConnection();
     const extraConnection = await pool.checkout();
-    pool.remove(extraConnection);
+    await pool.remove(extraConnection);
     expect(await pool.leaseConnection()).toBe(oldConnection);
   });
 });

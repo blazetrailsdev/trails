@@ -1,12 +1,16 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b } from "@blazetrails/ruby-compat";
+import { aryJoin, b, cmp, first, rbCmpint } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { defaultInsertValue as abstractDefaultInsertValue } from "../abstract/database-statements.js";
+import {
+  defaultInsertValue as abstractDefaultInsertValue,
+  returningColumnValues as abstractReturningColumnValues,
+  type DatabaseStatementsHost,
+} from "../abstract/database-statements.js";
 import { AbstractAdapter, type Version } from "../abstract-adapter.js";
 
 const READ_QUERY = AbstractAdapter.buildReadQueryRegexp(
@@ -28,8 +32,8 @@ export function isWriteQuery(sql: string | null): boolean {
 }
 
 export interface BuildExplainClauseHost {
-  isMariadb?(): Promise<boolean>;
-  databaseVersion?: Version | Promise<Version>;
+  isMariadb(): Promise<boolean>;
+  databaseVersion: Version | Promise<Version>;
 }
 
 export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
@@ -38,7 +42,7 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 
 interface SupportsInsertReturningHost {
   /** @internal */
-  supportsInsertReturning?(): Promise<boolean>;
+  supportsInsertReturning(): boolean;
 }
 
 interface AutoIncrementColumnHost {
@@ -63,27 +67,23 @@ export async function explain(
 }
 
 export async function buildExplainClause(
-  this: BuildExplainClauseHost | void,
+  this: BuildExplainClauseHost,
   options: ExplainOption[] = [],
 ): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
-  const clause = `EXPLAIN ${options
-    .map((option) => (option.startsWith(":") ? option.slice(1) : option))
-    .join(" ")
-    .toUpperCase()}`;
-  if ((await isAnalyzeWithoutExplain.call(this)) && clause.includes("ANALYZE")) {
-    return clause.replace("EXPLAIN ", "");
+
+  const explainClause = `EXPLAIN ${aryJoin(options, " ").toUpperCase()}`;
+
+  if ((await isAnalyzeWithoutExplain.call(this)) && explainClause.includes("ANALYZE")) {
+    return explainClause.replace("EXPLAIN ", "");
+  } else {
+    return explainClause;
   }
-  return clause;
 }
 
 /** @internal */
-export async function isAnalyzeWithoutExplain(
-  this: BuildExplainClauseHost | void,
-): Promise<boolean> {
-  const host = this as BuildExplainClauseHost | null;
-  if (!(await host?.isMariadb?.())) return false;
-  return ((await host?.databaseVersion)?.compare("10.1.0") ?? -1) >= 0;
+export async function isAnalyzeWithoutExplain(this: BuildExplainClauseHost): Promise<boolean> {
+  return (await this.isMariadb()) && (await this.databaseVersion).compare("10.1.0") >= 0;
 }
 
 export interface MaxAllowedPacketHost {
@@ -99,18 +99,19 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
   return abstractDefaultInsertValue(column);
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export async function returningColumnValues(
-  this: SupportsInsertReturningHost | void,
+  this: SupportsInsertReturningHost,
   result: Result,
 ): Promise<unknown[] | undefined> {
-  if (await (this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
-    return result.rows[0] as unknown[] | undefined;
+  if (this.supportsInsertReturning()) {
+    return first(result.rows);
+  } else {
+    return abstractReturningColumnValues.call(
+      this as SupportsInsertReturningHost & DatabaseStatementsHost,
+      result,
+    );
   }
-  return undefined;
 }
 
 /** @internal */
@@ -136,16 +137,18 @@ export async function isMaxAllowedPacketReached(
   currentPacket: string,
   previousPacket: string | undefined,
 ): Promise<boolean> {
+  const bytesize = Buffer.byteLength(currentPacket, "utf8");
   const maxPacket = await this.maxAllowedPacket();
-  const currentSize = Buffer.byteLength(currentPacket, "utf8");
-  if (maxPacket == null) throw new ArgumentError("comparison of Integer with nil failed");
-  if (currentSize > maxPacket) {
+  if (rbCmpint(cmp(bytesize, maxPacket), bytesize, maxPacket) > 0) {
     throw new ActiveRecordError(
-      `Fixtures set is too large ${currentSize}. Consider increasing the max_allowed_packet variable.`,
+      `Fixtures set is too large ${bytesize}. Consider increasing the max_allowed_packet variable.`,
     );
+  } else if (previousPacket == null) {
+    return true;
+  } else {
+    const combined = bytesize + Buffer.byteLength(previousPacket, "utf8") + 2;
+    return rbCmpint(cmp(combined, maxPacket), combined, maxPacket) > 0;
   }
-  if (previousPacket === undefined) return true;
-  return currentSize + Buffer.byteLength(previousPacket, "utf8") + 2 > maxPacket;
 }
 
 /** @internal */

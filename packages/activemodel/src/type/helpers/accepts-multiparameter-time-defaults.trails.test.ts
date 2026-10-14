@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
-import { Types, ValueType } from "../../index.js";
+import * as Types from "../../index.js";
+import { ValueType } from "../../index.js";
 import { AcceptsMultiparameterTime } from "./accepts-multiparameter-time.js";
 import { Timezone } from "./timezone.js";
 
@@ -23,6 +24,12 @@ describe("AcceptsMultiparameterTime defaults", () => {
     const wrapper = typeIncluding({ "4": 0 });
     const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": 15 });
     expect((result as { hour: number }).hour).toBe(15);
+  });
+
+  it("a false slot takes its default, as ||= replaces it", () => {
+    const wrapper = typeIncluding({ "4": 9 });
+    const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": false });
+    expect((result as { hour: number }).hour).toBe(9);
   });
 
   it("a blank slot is a present value and reaches ::Time", () => {

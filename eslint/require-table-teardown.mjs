@@ -30,6 +30,25 @@
  * that for each created table name a matching drop exists in the file — not that
  * the lifecycle is symmetric, since legitimate patterns mix hooks freely.
  *
+ * A table created inside a migration's `change()` (or its `up()`, when the
+ * class also defines `down()`) is also torn down by reverting that migration:
+ * `migration.migrate("down")` in an `afterEach`/`afterAll` hook or a `finally`,
+ * on the variable the migration instance was assigned to, settles every table
+ * the class creates. That is Rails' own teardown
+ * (`@migration.migrate(:down) if @migration`,
+ * vendor/rails/v8.0.2/activerecord/test/cases/migration/compatibility_test.rb:1079-1083).
+ * The create must sit in the function the hook (or the `try`) is written in,
+ * and the class must be instantiated where it is written
+ * (`migration = new (class extends … { … })()`).
+ *
+ *   ✓  afterEach(async () => { if (migration) await migration.migrate("down"); });
+ *      it("…", async () => {
+ *        migration = new (class extends Migration.Current {
+ *          async change() { await this.createTable("widgets"); }
+ *        })();
+ *        await migration.migrate("up");
+ *      });
+ *
  * Only **statically-known** table names participate: a plain string literal
  * (`"foo"`) or a template literal with no substitutions (`` `foo` ``). A name
  * built with an interpolation (`` `${schema}.foo` ``) or held in a variable
@@ -1044,6 +1063,87 @@ function inFailureSafeTeardown(node) {
   return true;
 }
 
+/**
+ * The `afterEach`/`afterAll` call or the `try` statement whose `finally` holds
+ * `node`, or null when a failing assertion can skip it or nothing guards it.
+ */
+function failureSafeTeardownRoot(node) {
+  let child = node;
+  let parent = node.parent;
+  while (parent) {
+    if (parent.type === "TryStatement" && parent.finalizer === child) return parent;
+    if (parent.type === "CallExpression" && parent.arguments.includes(child)) {
+      const name = enclosingCallName(parent);
+      if (AFTER_HOOKS.has(name)) return parent;
+      if (isTestBody(name)) return null;
+    }
+    child = parent;
+    parent = parent.parent;
+  }
+  return null;
+}
+
+/** The nearest function (or the Program) `node` is written in. */
+function enclosingFunction(node) {
+  let n = node.parent;
+  while (n.type !== "Program" && !FUNCTION_TYPES.has(n.type)) n = n.parent;
+  return n;
+}
+
+/**
+ * The class whose revert drops a table created at `node`: the create sits in
+ * an instance `change()`, or in an `up()` whose class also defines `down()`.
+ */
+function revertedMigrationClass(node) {
+  let method = node.parent;
+  while (method && method.type !== "MethodDefinition") method = method.parent;
+  if (!method || method.static || method.key.type !== "Identifier") return null;
+  const classBody = method.parent;
+  if (method.key.name === "change") return classBody.parent;
+  if (method.key.name !== "up") return null;
+  const hasDown = classBody.body.some(
+    (m) => m.type === "MethodDefinition" && !m.static && m.key.name === "down",
+  );
+  return hasDown ? classBody.parent : null;
+}
+
+/** The identifier a `new` expression's instance is assigned to, or null. */
+function instanceTarget(instance) {
+  const holder = instance.parent;
+  const target =
+    holder.type === "VariableDeclarator" && holder.init === instance
+      ? holder.id
+      : holder.type === "AssignmentExpression" && holder.right === instance
+        ? holder.left
+        : null;
+  return target?.type === "Identifier" ? target : null;
+}
+
+function instanceBindings(classNode, sourceCode) {
+  const parent = classNode.parent;
+  if (parent.type === "NewExpression" && parent.callee === classNode) {
+    const target = instanceTarget(parent);
+    return target ? [{ target, site: classNode }] : [];
+  }
+  const named =
+    classNode.type === "ClassDeclaration"
+      ? classNode
+      : parent.type === "VariableDeclarator" && parent.init === classNode
+        ? parent
+        : null;
+  if (!named) return [];
+  const targets = [];
+  for (const variable of sourceCode.getDeclaredVariables(named)) {
+    for (const { identifier } of variable.references) {
+      const instance = identifier.parent;
+      if (instance.type !== "NewExpression" || instance.callee !== identifier) continue;
+      const target = instanceTarget(instance);
+      if (target) targets.push({ target, site: instance });
+    }
+  }
+  return targets;
+}
+
 const rule = {
   meta: {
     type: "problem",
@@ -1105,6 +1205,36 @@ const rule = {
     const safelyDropped = new Set();
     const unguardedDrops = new Map();
     const memoryLocal = new Set();
+    const migrationCreates = [];
+    const reverts = [];
+
+    function variableOf(identifier) {
+      for (let scope = sourceCode.getScope(identifier); scope; scope = scope.upper) {
+        const variable = scope.set.get(identifier.name);
+        if (variable) return variable;
+      }
+      return null;
+    }
+
+    function recordMigrationCreate(table, node) {
+      const classNode = revertedMigrationClass(node);
+      if (!classNode) return;
+      const instances = instanceBindings(classNode, sourceCode).map(({ target, site }) => ({
+        variable: variableOf(target),
+        site,
+      }));
+      if (instances.length > 0) migrationCreates.push({ table, instances });
+    }
+
+    function recordRevert(call) {
+      if (staticString(call.arguments[0]) !== "down") return;
+      let receiver = call.callee.type === "MemberExpression" ? call.callee.object : null;
+      if (receiver?.type === "TSNonNullExpression") receiver = receiver.expression;
+      if (receiver?.type !== "Identifier") return;
+      const root = failureSafeTeardownRoot(call);
+      if (root === null) return;
+      reverts.push({ variable: variableOf(receiver), scope: enclosingFunction(root) });
+    }
     const sweptPrefixes = [];
     let sawSweepDrop = false;
 
@@ -1221,7 +1351,12 @@ const rule = {
           context.report({ node, messageId: "noDropAllTables" });
         } else if (name === "createTable") {
           const table = createdTableName(node);
-          if (table !== null) recordCreate(table, node);
+          if (table !== null) {
+            recordCreate(table, node);
+            recordMigrationCreate(table, node);
+          }
+        } else if (name === "migrate") {
+          recordRevert(node);
         } else if (name === "dropTable") {
           for (const table of droppedTableNames(node)) recordDrop(table, node);
           for (const arg of node.arguments) {
@@ -1254,8 +1389,20 @@ const rule = {
       // Deferred so creates and drops in any order across the file are matched.
       "Program:exit"() {
         const prefixes = sawSweepDrop ? sweptPrefixes : [];
+        for (const { table, instances } of migrationCreates) {
+          const reverted = instances.every(({ variable, site }) =>
+            reverts.some(
+              (r) => r.variable !== null && r.variable === variable && isWithin(site, r.scope),
+            ),
+          );
+          if (reverted) {
+            dropped.add(table);
+            safelyDropped.add(table);
+          }
+        }
         for (const [name, nodes] of created) {
           if (dropped.has(name)) continue;
+          if (memoryLocal.has(name)) continue;
           if (prefixes.some((p) => p.test(name))) continue;
           for (const node of nodes) {
             context.report({

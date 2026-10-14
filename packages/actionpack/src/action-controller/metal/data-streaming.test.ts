@@ -39,17 +39,17 @@ describe("sendFileHeadersBang", () => {
   });
 
   it("resolves Mime symbol-like keys via MimeType.lookup", () => {
-    sendFileHeadersBang.call(host, { type: "json" });
-    expect(host.contentType).toBe("application/json");
+    sendFileHeadersBang.call(host, { type: ":json" });
+    expect(String(host.contentType)).toBe("application/json");
   });
 
   it("raises on unknown Mime symbol", () => {
-    expect(() => sendFileHeadersBang.call(host, { type: "nope" })).toThrow(/Unknown MIME type/);
+    expect(() => sendFileHeadersBang.call(host, { type: ":nope" })).toThrow(/Unknown MIME type/);
   });
 
   it("guesses content type from filename when type omitted", () => {
     sendFileHeadersBang.call(host, { filename: "report.pdf" });
-    expect(host.contentType).toBe("application/pdf");
+    expect(String(host.contentType)).toBe("application/pdf");
   });
 
   it("falls back to default when filename extension is unknown", () => {

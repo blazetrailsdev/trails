@@ -1,10 +1,12 @@
 import {
   deleteIf,
   extend,
-  hasKey,
   include,
   InvalidURIError,
   Module,
+  NoMethodError,
+  rbFPublicSend,
+  rbObjClassname,
   rbObjClone,
   rbObjMethod,
   rbObjRespondTo,
@@ -12,10 +14,11 @@ import {
   URI,
   type Method,
 } from "@blazetrails/ruby-compat";
-import { Assertion, assertEqual, message } from "@blazetrails/activesupport";
+import { Assertion, assertEqual, Concern, message } from "@blazetrails/activesupport";
 import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
-import { TestRequest } from "../../../action-controller/test-case.js";
+import type { TestRequest } from "../../../action-controller/test-case.js";
+import { ActionController } from "../../../namespaces.js";
 import type { IntegrationTest } from "../integration.js";
 
 export interface RoutingAssertionsHost {
@@ -248,9 +251,52 @@ export function assertRouting(
   ) {
     options = { ...options, controller: `/${controller}` };
   }
-  const generateOptions = deleteIf({ ...options }, (k) => hasKey(defaults, k));
+  const generateOptions = deleteIf({ ...options }, (k) => Object.hasOwn(defaults, k));
   const pathStr = typeof path === "string" ? path : path.path;
   assertGenerates.call(this, pathStr, generateOptions, defaults, extras, message);
+}
+
+export function methodMissing(
+  this: RoutingAssertionsHost,
+  selector: string,
+  ...args: unknown[]
+): unknown {
+  if (this.controller != null && this.routes?.namedRoutes?.isRouteDefined(selector)) {
+    return rbFPublicSend(this.controller, selector, ...args);
+  } else {
+    const super_ = RoutingAssertions.superMethod(this, "methodMissing");
+    if (super_ !== undefined) return super_(selector, ...args);
+    throw new NoMethodError(
+      `undefined method '${selector}' for an instance of ${rbObjClassname(this)}`,
+      selector,
+      args,
+      false,
+      { receiver: this },
+    );
+  }
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function spliceMethodMissing(link: object): void {
+  Object.setPrototypeOf(
+    link,
+    new Proxy(Object.create(Object.getPrototypeOf(link) as object) as object, {
+      get(target, prop, receiver: RoutingAssertionsHost) {
+        const value = Reflect.get(target, prop, receiver);
+        if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+          return value;
+        }
+        if (prop === "controller" || prop === "routes") return value;
+        if (receiver.controller != null && receiver.routes?.namedRoutes?.isRouteDefined(prop)) {
+          return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
+        }
+        return value;
+      },
+    }),
+  );
 }
 
 /** @internal */
@@ -264,7 +310,9 @@ export function recognizedRequestFor(
   let pathStr = typeof path === "string" ? path : path.path;
 
   const controller = this.controller;
-  const request = TestRequest.create((controller as object | undefined)?.constructor);
+  const request = ActionController.TestRequest.create(
+    (controller as object | undefined)?.constructor ?? null,
+  );
   if (URL_FORM_RE.test(pathStr)) {
     failOn(InvalidURIError, msg, () => {
       const uri = URI.parse(pathStr);
@@ -359,3 +407,47 @@ const inspect = (v: unknown): string => {
     return String(v);
   }
 };
+
+export type RoutingAssertions = {
+  setup(): void;
+  withRouting: typeof withRouting;
+  assertRecognizes: typeof assertRecognizes;
+  assertGenerates: typeof assertGenerates;
+  assertRouting: typeof assertRouting;
+  methodMissing: typeof methodMissing;
+  /** @internal */
+  createRoutes: typeof createRoutes;
+  /** @internal */
+  resetRoutes: typeof resetRoutes;
+  /** @internal */
+  recognizedRequestFor: typeof recognizedRequestFor;
+  /** @internal */
+  failOn: typeof failOn;
+};
+
+export const RoutingAssertions = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      setup,
+      withRouting,
+      assertRecognizes,
+      assertGenerates,
+      assertRouting,
+      methodMissing,
+      createRoutes,
+      resetRoutes,
+      recognizedRequestFor,
+      failOn,
+    });
+  });
+
+  (
+    mod as unknown as { included(base: null, block: (this: { prototype: object }) => void): void }
+  ).included(null, function (this: { prototype: object }) {
+    spliceMethodMissing(Object.getPrototypeOf(this.prototype) as object);
+  });
+});

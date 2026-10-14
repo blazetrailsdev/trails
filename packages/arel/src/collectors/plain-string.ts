@@ -1,3 +1,6 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Collectors } from "../namespaces.js";
+
 export class PlainString {
   private str: string;
 
@@ -14,3 +17,5 @@ export class PlainString {
     return this;
   }
 }
+
+rbModConstSet(Collectors, "PlainString", PlainString);

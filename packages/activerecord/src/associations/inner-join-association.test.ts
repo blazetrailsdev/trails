@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { registerModel } from "../index.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   assertNothingRaised,
   assertEmpty,
@@ -9,8 +9,6 @@ import {
   assertNot,
 } from "@blazetrails/activesupport";
 import { Table, Nodes } from "@blazetrails/arel";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
-import { captureSql } from "../testing/sql-capture.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Post, CategoryPost } from "../test-helpers/models/post.js";
 import {
@@ -30,22 +28,30 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 
 describe("InnerJoinAssociationTest", () => {
-  const { authors, posts, people, categories, categoriesPosts, shardedBlogPosts, shardedComments } =
-    fixtures([
-      "authors",
-      "authorAddresses",
-      "essays",
-      "posts",
-      "comments",
-      "categories",
-      "categoriesPosts",
-      "categorizations",
-      "taggings",
-      "tags",
-      "people",
-      "shardedComments",
-      "shardedBlogPosts",
-    ]);
+  const {
+    self,
+    authors,
+    posts,
+    people,
+    categories,
+    categoriesPosts,
+    shardedBlogPosts,
+    shardedComments,
+  } = fixtures([
+    "authors",
+    "authorAddresses",
+    "essays",
+    "posts",
+    "comments",
+    "categories",
+    "categoriesPosts",
+    "categorizations",
+    "taggings",
+    "tags",
+    "people",
+    "shardedComments",
+    "shardedBlogPosts",
+  ]);
 
   Category.inheritanceColumn = "type";
   registerModel(Author);
@@ -54,17 +60,13 @@ describe("InnerJoinAssociationTest", () => {
   Comment.inheritanceColumn = "type";
   registerModel(Comment);
   registerModel(SpecialComment);
-  registerSubclass(SpecialComment);
   registerModel(SubSpecialComment);
-  registerSubclass(SubSpecialComment);
   registerModel(VerySpecialComment);
-  registerSubclass(VerySpecialComment);
   registerModel(Essay);
   registerModel(Categorization);
   registerModel(SpecialCategorization);
   registerModel(Category);
   registerModel(SpecialCategory);
-  registerSubclass(SpecialCategory);
   registerModel(CategoryPost);
   registerModel(Person);
   registerModel(Tagging);
@@ -74,9 +76,14 @@ describe("InnerJoinAssociationTest", () => {
   registerModel(Job);
 
   beforeAll(async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
-    registerModel("ShardedBlogPost", sharded.ShardedBlogPost);
-    registerModel("ShardedComment", sharded.ShardedComment);
+    registerModel(
+      "ShardedBlogPost",
+      (await import("../test-helpers/models/sharded/blog-post.js")).ShardedBlogPost,
+    );
+    registerModel(
+      "ShardedComment",
+      (await import("../test-helpers/models/sharded/comment.js")).ShardedComment,
+    );
   });
 
   it("construct finder sql applies aliases tables on association conditions", async () => {
@@ -108,7 +115,7 @@ describe("InnerJoinAssociationTest", () => {
       "JOIN people agents_people ON agents_people.primary_contact_id = agents_people_2.id AND agents_people.id > agents_people_2.id";
 
     const expected = people("susan");
-    await assertQueriesMatch(/agents_people_2/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/agents_people_2/i, {}, async () => {
       const result = await Person.joins(":agents").joins(stringJoin);
       expect(result.map((p) => p.id)).toEqual([(expected as any).id]);
     });
@@ -123,7 +130,7 @@ describe("InnerJoinAssociationTest", () => {
       .and(agents.get("id").gt(agents2.get("id")));
 
     const expected = people("susan");
-    await assertQueriesMatch(/agents_people_2/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/agents_people_2/i, {}, async () => {
       const result = await Person.joins(":agents").joins(
         new Nodes.InnerJoin(agents, new Nodes.On(constraint)),
       );
@@ -326,7 +333,8 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("joins a belongs_to association with a composite foreign key", async () => {
-    const { ShardedComment, ShardedBlogPost } = await import("../test-helpers/models/sharded.js");
+    const { ShardedComment } = await import("../test-helpers/models/sharded/comment.js");
+    const { ShardedBlogPost } = await import("../test-helpers/models/sharded/blog-post.js");
     const firstPostComments = await ShardedComment.joins(":blogPost").where({
       blogPost: { title: "My first post in my Blog1!" },
     });
@@ -345,7 +353,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("joins a has_many association with a composite foreign key", async () => {
-    const { ShardedBlogPost } = await import("../test-helpers/models/sharded.js");
+    const { ShardedBlogPost } = await import("../test-helpers/models/sharded/blog-post.js");
     const blogPosts = await ShardedBlogPost.joins(":comments").where({
       comments: { body: "Your first blog post is great!" },
     });
@@ -357,7 +365,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("inner joins includes all nested associations", async () => {
-    const [sql] = await captureSql(async () => {
+    const [sql] = await self().captureSql({}, async () => {
       await Friendship.joins([":friendFavoriteReferenceJob", ":followerFavoriteReferenceJob"]);
     });
     expect(sql).toMatch(/["`]friendships["`]\.["`]friend_id["`]/);

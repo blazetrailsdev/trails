@@ -299,11 +299,11 @@ describe("Engine", () => {
     class MountedEngine extends Engine {}
     Engine.register(MountedEngine, fixtureRoot);
     expect(MountedEngine.instance().hasRoutes()).toBe(false);
-    const r1 = MountedEngine.instance().routes((mapper) => {
-      mapper.get("/mounted", { to: "mounted#index" });
+    const r1 = MountedEngine.instance().routes(function () {
+      this.get("/mounted", { to: "mounted#index" });
     });
     expect(r1).toBeInstanceOf(RouteSet);
-    expect(MountedEngine.instance().routes(() => {})).toBe(r1);
+    expect(MountedEngine.instance().routes(function () {})).toBe(r1);
     expect(MountedEngine.instance().hasRoutes()).toBe(true);
   });
 
@@ -365,7 +365,8 @@ describe("Engine", () => {
 
   it("add_view_paths renders through the prepended path", async () => {
     resetLoadHooks();
-    const { ActionController, ActionView, Response } = await import("@blazetrails/actionpack");
+    const { ActionController, ActionView, Request, Response } =
+      await import("@blazetrails/actionpack");
     ActionView.TemplateHandlers.registerTemplateHandler("raw", new ActionView.RawHandler());
 
     class RenderEngine extends Engine {}
@@ -379,6 +380,7 @@ describe("Engine", () => {
     runLoadHooks("action_controller", PostsController);
 
     const controller = new PostsController();
+    controller.setRequestBang(new Request(MockRequest.envFor("/posts")));
     controller.setResponseBang(new Response());
     await controller.render({ action: "index" });
     expect(controller.responseBody).toBe("posts#index\n");

@@ -1,14 +1,8 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import {
-  Base,
-  collectionProxyFor as association,
-  registerModel,
-  registerSubclass,
-} from "../index.js";
+import { registerModel } from "../index.js";
 
 import { assertEmpty } from "@blazetrails/activesupport";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -21,29 +15,6 @@ registerModel(Developer);
 registerModel(AuditLog);
 registerModel(Author);
 registerModel(Post);
-
-let cbIdx = 0;
-
-function makeAuthorWithCallbacks(callbacks: any) {
-  const idx = ++cbIdx;
-  class CbAuthor extends Base {
-    static {
-      this.tableName = "authors";
-      this.attribute("name", "string");
-      this.hasMany("posts", {
-        className: "Post",
-        foreignKey: "author_id",
-        ...callbacks,
-      });
-    }
-  }
-  registerModel(`AuthorWithCallbacks${idx}`, CbAuthor);
-  return { Author: CbAuthor, Post };
-}
-
-function setupAuthorPostSuite(): void {
-  fixtures({});
-}
 
 describe("AssociationCallbacksTest", () => {
   const { authors, posts } = fixtures(["authors", "posts"]);
@@ -161,6 +132,15 @@ describe("AssociationCallbacksTest", () => {
     expect((morten as any).postLog).toEqual(["before_adding<new>", `after_adding${post.id}`]);
   });
 
+  it("has many callbacks with create!", async () => {
+    const morten = await Author.createBang({ name: "Morten" });
+    const post = await (morten as any).postsWithProcCallbacks.create({
+      title: "Hello",
+      body: "How are you doing?",
+    });
+    expect((morten as any).postLog).toEqual(["before_adding<new>", `after_adding${post.id}`]);
+  });
+
   it("has many callbacks for save on parent", async () => {
     const jack = new Author({ name: "Jack" });
     (jack as any).postsWithCallbacks.build({
@@ -194,289 +174,6 @@ describe("AssociationCallbacksTest", () => {
 });
 
 describe("AssociationCallbacksTest", () => {
-  setupAuthorPostSuite();
-
-  it("add callback on has many", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      afterAdd: (_owner: any, record: any) => {
-        log.push("added:" + (record.id ?? "<new>"));
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "Hello", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect(log.length).toBe(1);
-    expect(log[0]).toMatch(/^added:/);
-  });
-
-  it("remove callback on has many", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      afterRemove: (_owner: any, record: any) => {
-        log.push("removed:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const p = await (Post as any).create({ title: "Bye", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
-    await proxy.delete(p);
-    expect(log.length).toBe(1);
-    expect(log[0]).toBe("removed:" + p.id);
-  });
-
-  it("add callback on has many with proc", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before:" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "Proc", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect(log[0]).toMatch(/^before:/);
-    expect(log[1]).toMatch(/^after:/);
-  });
-
-  it("add callback on has many with string", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      afterAdd: (_owner: any, record: any) => {
-        log.push("string_cb:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "Str", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect(log.length).toBe(1);
-  });
-
-  it("add callback on has one", async () => {
-    const log: string[] = [];
-    const { Author } = makeAuthorWithCallbacks({
-      afterAdd: (_owner: any, record: any) => {
-        log.push("added:" + (record.id ?? "<new>"));
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    proxy.build({ title: "Hello", body: "Body" });
-    expect(log.length).toBe(1);
-    expect(log[0]).toBe("added:<new>");
-  });
-
-  it("remove callback on has one", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeRemove: (_owner: any, record: any) => {
-        log.push("removing:" + record.id);
-      },
-      afterRemove: (_owner: any, record: any) => {
-        log.push("removed:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const p = await (Post as any).create({ title: "Hi", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
-    await proxy.delete(p);
-    expect(log).toEqual(["removing:" + p.id, "removed:" + p.id]);
-  });
-
-  it("add callback fires before save", async () => {
-    let wasNew: boolean | undefined;
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        wasNew = record.isNewRecord();
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "New", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect(wasNew).toBe(true);
-  });
-
-  it("add callback fires after save", async () => {
-    let wasNew: boolean | undefined;
-    const { Author, Post } = makeAuthorWithCallbacks({
-      afterAdd: (_owner: any, record: any) => {
-        wasNew = record.isNewRecord();
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "Saved", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect(wasNew).toBe(false);
-  });
-
-  it("before add throwing abort prevents add", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: () => kernelThrow(":abort"),
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "Blocked", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    const posts = await proxy;
-    expect(posts.length).toBe(0);
-  });
-
-  it("after add is called after adding to collection", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "Confirm", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect(log.length).toBe(1);
-    expect(p.id).toBeDefined();
-    expect(log[0]).toBe("after:" + p.id);
-  });
-
-  it("before remove callback", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeRemove: (_owner: any, record: any) => {
-        log.push("before_remove:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const p = await (Post as any).create({ title: "Del", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
-    await proxy.delete(p);
-    expect(log).toEqual(["before_remove:" + p.id]);
-  });
-
-  it("after remove callback", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      afterRemove: (_owner: any, record: any) => {
-        log.push("after_remove:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const p = await (Post as any).create({ title: "Del", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
-    await proxy.delete(p);
-    expect(log).toEqual(["after_remove:" + p.id]);
-  });
-
-  it("has many callbacks", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("ba:" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("aa:" + record.id);
-      },
-      beforeRemove: (_owner: any, record: any) => {
-        log.push("br:" + record.id);
-      },
-      afterRemove: (_owner: any, record: any) => {
-        log.push("ar:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p1 = new (Post as any)({ title: "C1", body: "Body", author_id: author.id });
-    await proxy.push(p1);
-    expect(log).toContain("ba:<new>");
-    expect(log).toContain("aa:" + p1.id);
-
-    const p2 = await (Post as any).create({ title: "C2", body: "Body", author_id: author.id });
-    await proxy.delete(p2);
-    expect(log).toContain("br:" + p2.id);
-    expect(log).toContain("ar:" + p2.id);
-  });
-
-  it("has many callbacks with build", async () => {
-    const log: string[] = [];
-    const { Author } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before:" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after:" + (record.id ?? "<new>"));
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    proxy.build({ title: "Built", body: "Body" });
-    expect(log).toEqual(["before:<new>", "after:<new>"]);
-  });
-
-  it("before add abort prevents create from saving", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: () => kernelThrow(":abort"),
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = await proxy.create({ title: "Blocked", body: "Body" });
-    expect(p.isNewRecord()).toBe(true);
-    const all = await (Post as any).where({ author_id: author.id }).toArray();
-    expect(all.length).toBe(0);
-  });
-
-  it("before_remove abort halts the whole removal, not just the current record", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeRemove: (_owner: any, record: any) => {
-        if (record.title === "keep") kernelThrow(":abort");
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const p1 = await (Post as any).create({
-      title: "removable",
-      body: "Body",
-      author_id: author.id,
-    });
-    const p2 = await (Post as any).create({ title: "keep", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
-    expect((await proxy).length).toBe(2);
-    await proxy.delete(p1, p2);
-    expect((await proxy).length).toBe(2);
-  });
-
-  it("has many callbacks with create!", async () => {
-    const log: string[] = [];
-    const { Author } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before_adding" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after_adding" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = await proxy.createBang({ title: "Hello", body: "Body" });
-    expect(log).toEqual(["before_adding<new>", "after_adding" + p.id]);
-  });
-
-  it("after_add callback throwing abort propagates (not swallowed)", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({
-      afterAdd: () => kernelThrow(":abort"),
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "abc", body: "Body", author_id: author.id });
-    await expect(proxy.push(p)).rejects.toBeDefined();
-  });
-});
-
-describe("AssociationCallbacksTest", () => {
   fixtures({});
   beforeAll(async () => {
     registerModel(Company);
@@ -484,8 +181,8 @@ describe("AssociationCallbacksTest", () => {
     registerModel(Client);
     registerModel(Account);
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
-    registerSubclass(Client);
+    registerModel(Firm);
+    registerModel(Client);
   });
 
   it("has many callbacks for destroy on parent", async () => {
@@ -504,7 +201,7 @@ describe("AssociationCallbacksTest", () => {
     const david = developers("david");
     const ar = projects("active_record");
     assertEmpty(ar.developersLog);
-    const proxy = association(ar, "developersWithCallbacks");
+    const proxy = ar.developersWithCallbacks;
     await proxy.push(david);
     expect(ar.developersLog).toEqual([`before_adding${david.id}`, `after_adding${david.id}`]);
     await proxy.push(david);
@@ -519,26 +216,23 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many before add called before save", async () => {
     let dev: any = null;
     let newDev: boolean | undefined;
-    class ProjectWithCallback extends Base {
+    const klass = class extends Project {
+      static override get name() {
+        return Project.name;
+      }
       static {
-        this.tableName = "projects";
-        this.attribute("name", "string");
         this.hasAndBelongsToMany("developersWithCallbacks", {
           className: "Developer",
-          joinTable: "developers_projects",
-          foreignKey: "project_id",
-          associationForeignKey: "developer_id",
           beforeAdd: (_o: any, r: any) => {
             dev = r;
             newDev = r.isNewRecord();
           },
         });
       }
-    }
-    registerModel("ProjectWithBeforeAddCallback", ProjectWithCallback);
-    const rec = await ProjectWithCallback.create({ name: "ActiveRecord" });
+    };
+    const rec = await klass.createBang();
     const alice = new Developer({ name: "alice" });
-    await association(rec, "developersWithCallbacks").push(alice);
+    await rec.developersWithCallbacks.push(alice);
     expect(dev).toBe(alice);
     expect(newDev).toBeDefined();
     expect(newDev).toBeTruthy();
@@ -548,7 +242,7 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many after add called after save", async () => {
     const ar = projects("active_record");
     assertEmpty(ar.developersLog);
-    const proxy = association(ar, "developersWithCallbacks");
+    const proxy = ar.developersWithCallbacks;
 
     const alice = new Developer({ name: "alice" });
     await proxy.push(alice);
@@ -566,7 +260,7 @@ describe("AssociationCallbacksTest", () => {
     const jamis = developers("jamis");
     const activerecord = projects("active_record");
     assertEmpty(activerecord.developersLog);
-    const proxy = association(activerecord, "developersWithCallbacks");
+    const proxy = activerecord.developersWithCallbacks;
     await proxy.delete(david);
     expect(activerecord.developersLog).toEqual([
       `before_removing${david.id}`,
@@ -585,11 +279,11 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many does not fire callbacks on clear", async () => {
     const activerecord = projects("active_record");
     assertEmpty(activerecord.developersLog);
-    const proxy = association(activerecord, "developersWithCallbacks");
+    const proxy = activerecord.developersWithCallbacks;
     // eslint-disable-next-line blazetrails/no-conditional-in-test
     if ((await proxy.size()) === 0) {
-      await association(activerecord, "developers").push(developers("david"));
-      await association(activerecord, "developers").push(developers("jamis"));
+      await activerecord.developers.push(developers("david"));
+      await activerecord.developers.push(developers("jamis"));
       await activerecord.reload();
       expect((await proxy.size()) === 2).toBeTruthy();
     }
@@ -600,7 +294,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("has and belongs to many callbacks for save on parent", async () => {
     const project = new Project({ name: "Callbacks" });
-    const proxy = association(project, "developersWithCallbacks");
+    const proxy = project.developersWithCallbacks;
     proxy.build({ name: "Jack", salary: 95000 });
 
     const callbackLog = ["before_adding<new>", "after_adding<new>"];

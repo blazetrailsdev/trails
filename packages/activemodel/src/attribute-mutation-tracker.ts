@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { HashWithIndifferentAccess, isDuplicable } from "@blazetrails/activesupport";
+import { Hash, NoMethodError, rbEqual, TypeError } from "@blazetrails/ruby-compat";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */
@@ -26,14 +26,9 @@ function dupValue(value: unknown): unknown {
   return result;
 }
 
-function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a === "number" && typeof b === "number" && Number.isNaN(a) && Number.isNaN(b))
-    return true;
-  return false;
-}
-
 export class AttributeMutationTracker {
+  static readonly OPTION_NOT_GIVEN: unknown = Object.freeze({});
+
   protected attributes: AttributeSet;
   protected forcedChanges: Map<string, unknown> = new Map();
 
@@ -77,24 +72,18 @@ export class AttributeMutationTracker {
     return this.attrNames().some((attr) => this.isChanged(attr));
   }
 
-  isChanged(attrName: string, options?: { from?: unknown; to?: unknown }): boolean {
-    if (!this.attributeChanged(attrName)) return false;
-    if (
-      options &&
-      "from" in options &&
-      !valuesEqual(this.originalValue(attrName), this.typeCast(attrName, options.from))
-    )
-      return false;
-    if (
-      options &&
-      "to" in options &&
-      !valuesEqual(this.fetchValue(attrName), this.typeCast(attrName, options.to))
-    )
-      return false;
-    return true;
+  isChanged(attrName: string, options: { from?: unknown; to?: unknown } = {}): boolean | undefined {
+    const { OPTION_NOT_GIVEN } = AttributeMutationTracker;
+    const { from, to } = { from: OPTION_NOT_GIVEN, to: OPTION_NOT_GIVEN, ...options };
+    return (
+      this.attributeChanged(attrName) &&
+      (OPTION_NOT_GIVEN === from ||
+        rbEqual(this.originalValue(attrName), this.typeCast(attrName, from))) &&
+      (OPTION_NOT_GIVEN === to || rbEqual(this.fetchValue(attrName), this.typeCast(attrName, to)))
+    );
   }
 
-  changedInPlace(attrName: string): boolean {
+  changedInPlace(attrName: string): boolean | undefined {
     return this.attributes.getAttribute(attrName).changedInPlace();
   }
 
@@ -117,7 +106,7 @@ export class AttributeMutationTracker {
     return this.attributes.keys();
   }
 
-  protected attributeChanged(attrName: string): boolean {
+  protected attributeChanged(attrName: string): boolean | undefined {
     return this.forcedChanges.has(attrName) || this.attributes.getAttribute(attrName).isChanged();
   }
 
@@ -191,8 +180,14 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   }
 
   private cloneValue(attrName: string): unknown {
-    const value = this.fetchValue(attrName);
-    return dupValue(value);
+    let value: unknown;
+    try {
+      value = this.fetchValue(attrName);
+      return isDuplicable(value) ? dupValue(value) : value;
+    } catch (e) {
+      if (e instanceof TypeError || e instanceof NoMethodError) return value;
+      throw e;
+    }
   }
 
   /** @internal */

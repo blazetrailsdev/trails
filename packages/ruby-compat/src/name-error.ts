@@ -37,7 +37,7 @@ export class NameError extends StandardError {
   #receiver: unknown;
   #hasReceiver: boolean;
 
-  constructor(message: string, constantName?: string, options: { receiver?: unknown } = {}) {
+  constructor(message?: string, constantName?: string, options: { receiver?: unknown } = {}) {
     super(message);
     this.constantName = constantName;
     this.#hasReceiver = "receiver" in options;

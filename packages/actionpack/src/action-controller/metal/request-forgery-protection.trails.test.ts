@@ -17,6 +17,7 @@ import {
 } from "./request-forgery-protection.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
+import "../../test-helpers/abstract-unit.js";
 
 function buildRequest(): NullSessionRequest {
   const env: Record<string, unknown> = {
@@ -160,25 +161,29 @@ describe("ActionController::Base#verify_authenticity_token", () => {
   }
   PostsController.protectFromForgery({ with: "exception" });
 
-  it("accepts a valid X-CSRF-Token even when the form token is wrong", async () => {
-    const tc = new TestCase(PostsController);
+  it("accepts a valid X-CSRF-Token even when the form token is wrong", async ({ task }) => {
+    const tc = new TestCase(task.name);
+    tc.controller = new PostsController();
+    await tc.beforeSetup();
+    tc.request.env["HTTP_X_CSRF_TOKEN"] = token;
     await tc.post("create", {
       session: { _csrf_token: token },
       params: { authenticity_token: "bogus" },
-      headers: { "X-CSRF-Token": token },
     });
     tc.assertResponse("created");
   });
 
-  it("rejects a mismatched Origin when forgeryProtectionOriginCheck is on", async () => {
+  it("rejects a mismatched Origin when forgeryProtectionOriginCheck is on", async ({ task }) => {
     PostsController.forgeryProtectionOriginCheck = true;
     try {
-      const tc = new TestCase(PostsController);
+      const tc = new TestCase(task.name);
+      tc.controller = new PostsController();
+      await tc.beforeSetup();
+      tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
       await expect(
         tc.post("create", {
           session: { _csrf_token: token },
           params: { authenticity_token: token },
-          headers: { Origin: "http://bad.host" },
         }),
       ).rejects.toThrow(
         "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
@@ -204,16 +209,18 @@ describe("ActionController::Base#verify_authenticity_token", () => {
     expect(C.csrfTokenStorageStrategy).toBeInstanceOf(SessionStore);
   });
 
-  it("reset_session delegates to the controller and drops the CSRF token", async () => {
+  it("reset_session delegates to the controller and drops the CSRF token", async ({ task }) => {
     class ResetController extends Base {
       create(): void {
         this.head("created");
       }
     }
     ResetController.protectFromForgery({ with: "reset_session" });
-    const tc = new TestCase(ResetController);
+    const tc = new TestCase(task.name);
+    tc.controller = new ResetController();
+    await tc.beforeSetup();
     await tc.post("create", { session: { _csrf_token: token, user_id: 1 } });
-    expect(tc.session.get("user_id")).toBeUndefined();
-    expect(tc.session.get("_csrf_token")).toBeUndefined();
+    expect(tc.session().get("user_id")).toBeUndefined();
+    expect(tc.session().get("_csrf_token")).toBeUndefined();
   });
 });

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { typeRegistry, Types } from "@blazetrails/activemodel";
+import * as Types from "@blazetrails/activemodel";
 import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
 import { Array as ArrayType } from "../connection-adapters/postgresql/oid/array.js";
 import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
@@ -83,8 +83,8 @@ describe("TimeZoneConversionTest", () => {
   });
 
   it("wraps schema-reflected datetime column when timeZoneAwareAttributes is true", async () => {
-    const datetimeType = typeRegistry.lookup("datetime");
-    const stringType = typeRegistry.lookup("string");
+    const datetimeType = Types.Type.lookup("datetime");
+    const stringType = Types.Type.lookup("string");
     const cols = {
       published_at: { sqlType: "datetime" },
       title: { sqlType: "string" },
@@ -97,7 +97,6 @@ describe("TimeZoneConversionTest", () => {
       primaryKeys: async () => null,
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn(col: { sqlType: string }) {
         return col.sqlType === "datetime" ? datetimeType : stringType;

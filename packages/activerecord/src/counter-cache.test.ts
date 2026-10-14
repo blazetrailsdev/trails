@@ -1,26 +1,25 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerModel, registerSubclass } from "./index.js";
-import { collectionProxyFor as association } from "./associations.js";
+import { registerModel } from "./index.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Reply, UniqueReply, SillyUniqueReply, SillyReply } from "./test-helpers/models/reply.js";
-import { Car } from "./test-helpers/models/car.js";
-import { Engine } from "./test-helpers/models/engine.js";
-import { Wheel } from "./test-helpers/models/wheel.js";
-import { Aircraft } from "./test-helpers/models/aircraft.js";
-import { Tyre } from "./test-helpers/models/tyre.js";
 import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
 import { Person } from "./test-helpers/models/person.js";
+import { Car } from "./test-helpers/models/car.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
+import { Wheel } from "./test-helpers/models/wheel.js";
+import { Engine } from "./test-helpers/models/engine.js";
+import { Tyre } from "./test-helpers/models/tyre.js";
+import { Reply, UniqueReply, SillyUniqueReply, SillyReply } from "./test-helpers/models/reply.js";
+import { Category } from "./test-helpers/models/category.js";
+import { Categorization } from "./test-helpers/models/categorization.js";
 import { Dog } from "./test-helpers/models/dog.js";
 import { DogLover } from "./test-helpers/models/dog-lover.js";
 import { Friendship } from "./test-helpers/models/friendship.js";
 import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Subscription } from "./test-helpers/models/subscription.js";
 import { Book } from "./test-helpers/models/book.js";
-import { Category } from "./test-helpers/models/category.js";
-import { Categorization } from "./test-helpers/models/categorization.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
@@ -81,7 +80,7 @@ export class SpecialReply extends Reply {
 }
 
 for (const klass of [SpecialTopic, SpecialReply]) {
-  registerSubclass(klass);
+  registerModel(klass);
   registerModel(klass);
 }
 
@@ -110,7 +109,7 @@ async function assertTouching(
   attributes: string[],
   block: () => Promise<void>,
 ): Promise<void> {
-  const fiveMinutesAgo = Temporal.Now.instant().subtract({ hours: 0, minutes: 5 });
+  const fiveMinutesAgo = RubyTime.now().minus(300);
   const stale: Record<string, unknown> = {};
   for (const attr of attributes) stale[attr] = fiveMinutesAgo;
   await record.updateColumns(stale);
@@ -494,7 +493,7 @@ describe("CounterCacheTest", () => {
 
   it("counters are updated both in memory and in the database on create", async () => {
     const car = new Car({ engines_count: 0 });
-    await association(car, "engines").replace([new Engine(), new Engine()]);
+    await car.engines.replace([new Engine(), new Engine()]);
     await car.save();
 
     expect(car.engines_count).toBe(2);
@@ -504,7 +503,7 @@ describe("CounterCacheTest", () => {
 
   it("counter caches are updated in memory when the default value is nil", async () => {
     const car = new Car({ engines_count: null });
-    await association(car, "engines").replace([new Engine(), new Engine()]);
+    await car.engines.replace([new Engine(), new Engine()]);
     await car.save();
 
     expect(car.engines_count).toBe(2);
@@ -562,7 +561,7 @@ describe("CounterCacheTest", () => {
   });
 
   it("update counters doesn't touch timestamps by default", async () => {
-    await topic.updateColumn("updated_at", Temporal.Now.instant().subtract({ minutes: 5 }));
+    await topic.updateColumn("updated_at", RubyTime.now().minus(300));
     const previouslyUpdatedAt = topic.updated_at;
 
     await Topic.updateCounters(topic.id, { replies_count: -1 });
@@ -571,7 +570,7 @@ describe("CounterCacheTest", () => {
   });
 
   it("update counters doesn't touch timestamps with touch: []", async () => {
-    await topic.updateColumn("updated_at", Temporal.Now.instant().subtract({ minutes: 5 }));
+    await topic.updateColumn("updated_at", RubyTime.now().minus(300));
     const previouslyUpdatedAt = topic.updated_at;
 
     await Topic.updateCounters(topic.id, { replies_count: -1, touch: [] as string[] });
@@ -744,7 +743,7 @@ describe("CounterCacheTest", () => {
 
   it("inactive counter cache", async () => {
     const car = new Car();
-    await association(car, "bulbs").replace([new Bulb(), new Bulb()]);
+    await car.bulbs.replace([new Bulb(), new Bulb()]);
     await car.save();
 
     expect(car.bulbs_count).toEqual(2);
@@ -761,7 +760,7 @@ describe("CounterCacheTest", () => {
 
   it("active counter cache", async () => {
     const car = new Car();
-    await association(car, "tyres").replace([new Tyre(), new Tyre()]);
+    await car.tyres.replace([new Tyre(), new Tyre()]);
     await car.save();
 
     expect(car.custom_tyres_count).toEqual(2);

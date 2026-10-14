@@ -1,3 +1,6 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Arel } from "./namespaces.js";
+
 export class ArelError extends Error {
   constructor(message?: string) {
     super(message);
@@ -18,3 +21,7 @@ export class BindError extends ArelError {
     this.name = "BindError";
   }
 }
+
+rbModConstSet(Arel, "ArelError", ArelError);
+rbModConstSet(Arel, "EmptyJoinError", EmptyJoinError);
+rbModConstSet(Arel, "BindError", BindError);

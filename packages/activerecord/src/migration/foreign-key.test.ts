@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { newSqlitePool } from "../support/pooled-sqlite-adapter.js";
 import {
   ambientConnection,
@@ -19,11 +19,9 @@ import {
 import { adapterType } from "../test-adapter.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
 import type { CollectionProxy } from "../associations/collection-proxy.js";
@@ -36,7 +34,7 @@ function validating(conn: AbstractAdapter): PostgreSQLAdapter {
   return conn as PostgreSQLAdapter;
 }
 
-class SilentMigration extends Migration {
+class SilentMigration extends Migration.Current {
   write(): void {}
 }
 
@@ -56,10 +54,8 @@ class CreateCitiesAndHousesMigration extends SilentMigration {
 
 class CreateSchoolsAndClassesMigration extends SilentMigration {
   async change(): Promise<void> {
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("schools");
 
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("classes", (t) => {
       t.references("school");
     });
@@ -86,12 +82,10 @@ registerModel([Rocket, Astronaut]);
 
 class CreateRocketsMigration extends SilentMigration {
   async change(): Promise<void> {
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("rockets", (t) => {
       t.string("name");
     });
 
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("astronauts", (t) => {
       t.string("name");
       t.references("rocket", { foreignKey: true });
@@ -119,7 +113,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
   });
 
   describe("ForeignKeyTest", () => {
-    fixtures([], { useTransactionalTests: false });
+    const { self } = fixtures([], { useTransactionalTests: false });
 
     it("foreign keys", async () => {
       const conn = await ambientConnection();
@@ -210,7 +204,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           expect(fk.toTable).toBe("space_shuttles");
           expect(fk.primaryKey).toBe("pk");
         } finally {
-          await conn.removeForeignKey("astronauts", {
+          await conn.removeForeignKey("astronauts", undefined, {
             name: "custom_pk",
             toTable: "space_shuttles",
           });
@@ -350,8 +344,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
 
-        expect(await conn.foreignKeyExists("astronauts", { column: "rocket_id" })).toBeTruthy();
-        expect(await conn.foreignKeyExists("astronauts", { column: "star_id" })).toBeFalsy();
+        expect(
+          await conn.foreignKeyExists("astronauts", undefined, { column: "rocket_id" }),
+        ).toBeTruthy();
+        expect(
+          await conn.foreignKeyExists("astronauts", undefined, { column: "star_id" }),
+        ).toBeFalsy();
       });
     });
 
@@ -363,9 +361,11 @@ describeIfSupports("foreign_keys", "Migration", () => {
           name: "fancy_named_fk",
         });
 
-        expect(await conn.foreignKeyExists("astronauts", { name: "fancy_named_fk" })).toBeTruthy();
         expect(
-          await conn.foreignKeyExists("astronauts", { name: "other_fancy_named_fk" }),
+          await conn.foreignKeyExists("astronauts", undefined, { name: "fancy_named_fk" }),
+        ).toBeTruthy();
+        expect(
+          await conn.foreignKeyExists("astronauts", undefined, { name: "other_fancy_named_fk" }),
         ).toBeFalsy();
       });
     });
@@ -373,15 +373,17 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("foreign key exists in change table", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        await conn.changeTable("astronauts", async (t) => {
+        await conn.changeTable("astronauts", {}, async (t) => {
           await t.foreignKey("rockets", { column: "rocket_id", name: "fancy_named_fk" });
 
-          expect(await t.foreignKeyExists({ column: "rocket_id" })).toBeTruthy();
-          expect(await t.foreignKeyExists({ column: "star_id" })).toBeFalsy();
+          expect(await t.foreignKeyExists(undefined, { column: "rocket_id" })).toBeTruthy();
+          expect(await t.foreignKeyExists(undefined, { column: "star_id" })).toBeFalsy();
 
           if (unlessSqlite3Adapter) {
-            expect(await t.foreignKeyExists({ name: "fancy_named_fk" })).toBeTruthy();
-            expect(await t.foreignKeyExists({ name: "other_fancy_named_fk" })).toBeFalsy();
+            expect(await t.foreignKeyExists(undefined, { name: "fancy_named_fk" })).toBeTruthy();
+            expect(
+              await t.foreignKeyExists(undefined, { name: "other_fancy_named_fk" }),
+            ).toBeFalsy();
           }
         });
       });
@@ -418,7 +420,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
 
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
-        await conn.removeForeignKey("astronauts", { column: "rocket_id" });
+        await conn.removeForeignKey("astronauts", undefined, { column: "rocket_id" });
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
       });
     });
@@ -429,7 +431,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
 
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
-        await conn.removeForeignKey("astronauts", { column: "rocket_id" });
+        await conn.removeForeignKey("astronauts", undefined, { column: "rocket_id" });
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
       });
     });
@@ -443,7 +445,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         });
 
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
-        await conn.removeForeignKey("astronauts", { name: "fancy_named_fk" });
+        await conn.removeForeignKey("astronauts", undefined, { name: "fancy_named_fk" });
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
       });
     });
@@ -598,7 +600,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           validate: false,
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
 
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ validate: false \}\);$/m,
@@ -614,7 +616,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           validate: true,
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
 
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
       });
@@ -673,12 +675,10 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const connection = await pool.checkout();
 
       try {
-        // eslint-disable-next-line blazetrails/require-table-teardown -- throwaway :memory: pool, disconnected in the finally
         await connection.createTable("rockets", { force: true }, (t) => {
           t.string("name");
         });
 
-        // eslint-disable-next-line blazetrails/require-table-teardown -- throwaway :memory: pool, disconnected in the finally
         await connection.createTable("astronauts", { force: true }, (t) => {
           t.string("name");
           t.references("rocket");
@@ -758,7 +758,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets");
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
       });
     });
@@ -766,7 +766,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("schema dumping with options", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "fk_test_has_fk");
+        const output = await dumpTableSchema("fk_test_has_fk");
         if (adapterType === "sqlite") {
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("fk_test_has_fk", "fk_test_has_pk", \{ column: "fk_id", primaryKey: "pk_id" \}\);$/m,
@@ -788,7 +788,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           name: "ignored_fk_astronauts_rockets",
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
 
         SchemaDumper.fkIgnorePattern = originalPattern;
@@ -804,7 +804,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           onUpdate: "cascade",
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts",.+onUpdate: "cascade",.+onDelete: "nullify" \}\);$/m,
         );
@@ -832,7 +832,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       try {
         const migration = new CreateCitiesAndHousesMigration();
         await migration.migrate("up");
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "houses");
+        const output = await dumpTableSchema("houses");
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("houses",.+onDelete: "cascade" \}\);$/m,
         );
@@ -879,7 +879,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           });
         };
 
-        await assertQueriesMatch(deferrableClause, undefined, false, addTheKey);
+        await self().assertQueriesMatch(deferrableClause, {}, addTheKey);
 
         const foreignKeys = await conn.foreignKeys("astronauts");
         expect(foreignKeys.length).toBe(1);
@@ -953,7 +953,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           deferrable: "immediate",
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "immediate" \}\);$/m,
         );
@@ -968,7 +968,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           deferrable: false,
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
       });
     });
@@ -984,7 +984,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
             deferrable: "deferred",
           });
 
-          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          const output = await dumpTableSchema("astronauts");
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "deferred" \}\);$/m,
           );
@@ -1003,7 +1003,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
             deferrable: "immediate",
           });
 
-          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          const output = await dumpTableSchema("astronauts");
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "immediate" \}\);$/m,
           );
@@ -1021,7 +1021,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
             foreignKey: { toTable: "rockets", deferrable: "deferred" },
           });
 
-          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          const output = await dumpTableSchema("astronauts");
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ column: "røcket_id", deferrable: "deferred" \}\);$/m,
           );
@@ -1115,7 +1115,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeForeignKey(Astronaut.tableName!, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName!, undefined, { column: "rocket_id" });
 
       assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
@@ -1124,8 +1124,8 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName!, async (t) => {
-        await t.removeForeignKey({ column: "rocket_id" });
+      await connection.changeTable(Astronaut.tableName!, {}, async (t) => {
+        await t.removeForeignKey(undefined, { column: "rocket_id" });
       });
 
       assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
@@ -1225,7 +1225,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeForeignKey(Astronaut.tableName!, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName!, undefined, { column: "rocket_id" });
 
       assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
@@ -1234,8 +1234,8 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName!, async (t) => {
-        await t.removeForeignKey({ column: "rocket_id" });
+      await connection.changeTable(Astronaut.tableName!, {}, async (t) => {
+        await t.removeForeignKey(undefined, { column: "rocket_id" });
       });
 
       assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
@@ -1335,7 +1335,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeForeignKey(Astronaut.tableName!, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName!, undefined, { column: "rocket_id" });
 
       assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
@@ -1344,8 +1344,8 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName!, async (t) => {
-        await t.removeForeignKey({ column: "rocket_id" });
+      await connection.changeTable(Astronaut.tableName!, {}, async (t) => {
+        await t.removeForeignKey(undefined, { column: "rocket_id" });
       });
 
       assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
@@ -1458,7 +1458,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withCompositeRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", { primaryKey: ["tenant_id", "id"] });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema("astronauts");
 
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ column: \["rocket_tenant_id","rocket_id"\], primaryKey: \["tenant_id","id"\] \}\);$/m,

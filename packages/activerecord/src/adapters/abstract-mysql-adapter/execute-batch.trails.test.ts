@@ -5,7 +5,6 @@ import {
   Mysql2Adapter,
   MYSQL_TEST_URL,
 } from "./test-helper.js";
-import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
   let adapter: Mysql2Adapter;
@@ -34,21 +33,19 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
         multipleStatements: false,
       } as never);
       try {
-        const result = (await testAdapter.execute(
-          "SELECT 1 AS v;\nSELECT 2 AS v",
-        )) as Mysql2RawResult;
-        expect(result.rows!.length).toBeGreaterThan(0);
+        await testAdapter.executeBatch(["SELECT 1 AS v", "SELECT 2 AS v"], "Batch");
+        await expect(testAdapter.execute("SELECT 1;\nSELECT 2")).rejects.toThrow(/SQL syntax/);
       } finally {
         await testAdapter.disconnectBang();
       }
     });
 
-    it("sends the statements one at a time when the config negates MULTI_STATEMENTS", async () => {
+    it("batches when the config negates MULTI_STATEMENTS", async () => {
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         flags: ["-MULTI_STATEMENTS"],
       } as never);
-      const rawExecute = vi.spyOn(testAdapter as never, "rawExecute").mockResolvedValue(undefined);
+      const rawExecute = vi.spyOn(testAdapter as never, "rawExecute");
       let calls: unknown[][];
       try {
         await testAdapter.executeBatch(["SELECT 1", "SELECT 2"], "Batch");
@@ -58,7 +55,9 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
         await testAdapter.disconnectBang();
       }
 
-      expect(calls.map((call) => call[0])).toEqual(["SELECT 1", "SELECT 2"]);
+      expect(calls.filter((call) => call[7] === true).map((call) => call[0])).toEqual([
+        "SELECT 1;\nSELECT 2",
+      ]);
     });
 
     it("splits the statements against the server reported max_allowed_packet", async () => {

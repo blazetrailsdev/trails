@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { File as RubyFile, Tempfile } from "@blazetrails/ruby-compat";
+import { File as RubyFile, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
+import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
 import { File } from "./file.js";
 import { RenderContext } from "./render-context.js";
-import { FixtureSet } from "../fixtures.js";
+import { FixtureSet, FormatError } from "../fixtures.js";
 
 function tmpYaml<T>(name: [string, string], contents: string, block: (t: Tempfile) => T): T {
   const t = Tempfile.new(name);
@@ -21,7 +22,7 @@ describe("FixtureSet::File ordered maps (trails)", () => {
   it("accepts a !!omap document and keeps its entry order", () => {
     const yaml = "--- !!omap\n- two:\n    name: b\n- one:\n    name: a\n";
     tmpYaml(["omap", "yml"], yaml, (t) => {
-      expect(File.open(t.path()!, (fh) => [...fh.each()])).toEqual([
+      expect(File.open(t.path()!, (fh) => [...fh])).toEqual([
         ["two", { name: "b" }],
         ["one", { name: "a" }],
       ]);
@@ -30,9 +31,7 @@ describe("FixtureSet::File ordered maps (trails)", () => {
 
   it("still rejects a !!omap whose row is not a hash", () => {
     tmpYaml(["omap", "yml"], "--- !!omap\n- one: two\n", (t) => {
-      expect(() => File.open(t.path()!, (fh) => [...fh.each()])).toThrow(
-        /fixture key is not a hash/,
-      );
+      expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(/fixture key is not a hash/);
     });
   });
 });
@@ -41,9 +40,9 @@ describe("FixtureSet::File#each (trails)", () => {
   it("answers a fresh iterator that does not expose the backing rows", () => {
     const path = RubyFile.join(new URL(".", import.meta.url).pathname, "test-data/accounts.yml");
     const fh = File.open(path);
-    expect([...fh.each()]).toHaveLength(6);
-    expect([...fh.each()]).toHaveLength(6);
-    expect(Array.isArray(fh.each())).toBe(false);
+    expect([...fh]).toHaveLength(6);
+    expect([...fh]).toHaveLength(6);
+    expect(Array.isArray(fh[Symbol.iterator]())).toBe(false);
   });
 });
 
@@ -82,5 +81,43 @@ describe("FixtureSet.contextClass (trails)", () => {
     expect(FixtureSet.contextClass).toBe(FixtureSet.contextClass);
     expect(SubSet.contextClass).toBe(SubSet.contextClass);
     expect(SubSet.contextClass).not.toBe(FixtureSet.contextClass);
+  });
+});
+
+describe("FixtureSet::File#raw_rows rescue (trails)", () => {
+  function withHelper<T>(raised: Error, block: () => T): T {
+    const proto = FixtureSet.contextClass.prototype as Record<string, unknown>;
+    proto["raisingHelper"] = function raisingHelper(): never {
+      throw raised;
+    };
+    try {
+      return block();
+    } finally {
+      delete proto["raisingHelper"];
+    }
+  }
+
+  it("converts a RuntimeError raised while rendering into Fixture::FormatError", () => {
+    withHelper(new RuntimeError("boom"), () => {
+      tmpYaml(["raising", "yml"], "one:\n  name: <%= raisingHelper() %>\n", (t) => {
+        expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(new FormatError("boom"));
+      });
+    });
+  });
+
+  it("converts the YAML syntax error ConfigurationFile raises", () => {
+    tmpYaml(["broken", "yml"], "one:\n\t- [unclosed\n", (t) => {
+      expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(FormatError);
+      expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(/YAML syntax error/);
+    });
+  });
+
+  it("lets a ConfigurationFile::FormatError through unchanged", () => {
+    const raised = new ConfigurationFile.FormatError("not a RuntimeError");
+    withHelper(raised, () => {
+      tmpYaml(["raising", "yml"], "one:\n  name: <%= raisingHelper() %>\n", (t) => {
+        expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(raised);
+      });
+    });
   });
 });

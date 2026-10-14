@@ -6,7 +6,7 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
-  class SilentMigration extends Migration<PostgreSQLAdapter> {
+  class SilentMigration extends Migration.Current<PostgreSQLAdapter> {
     override write(..._args: unknown[]): void {}
   }
 
@@ -62,7 +62,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   }
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     await adapter.dropTable("enums", { ifExists: true }).catch(() => {});

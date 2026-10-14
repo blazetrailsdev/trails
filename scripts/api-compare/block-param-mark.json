@@ -6,24 +6,22 @@
     }
   },
   "actioncontroller": {
-    "total": 3,
+    "total": 2,
     "byFile": {
-      "metal/strong_parameters.rb": 3
+      "metal/strong_parameters.rb": 2
     }
   },
   "actiondispatch": {
-    "total": 44,
+    "total": 41,
     "byFile": {
       "http/headers.rb": 1,
       "http/query_parser.rb": 1,
       "http/response.rb": 5,
-      "http/url.rb": 1,
       "journey/formatter.rb": 1,
       "journey/router.rb": 1,
       "middleware/cookies.rb": 1,
       "middleware/exception_wrapper.rb": 1,
-      "middleware/stack.rb": 6,
-      "request/utils.rb": 1,
+      "middleware/stack.rb": 5,
       "routing/mapper.rb": 20,
       "system_test_case.rb": 1,
       "system_testing/driver.rb": 1,
@@ -31,46 +29,34 @@
     }
   },
   "actionview": {
-    "total": 5,
+    "total": 3,
     "byFile": {
       "helpers/number_helper.rb": 1,
       "helpers/tag_helper.rb": 1,
-      "path_set.rb": 1,
-      "renderer/streaming_template_renderer.rb": 2
+      "path_set.rb": 1
     }
   },
   "activemodel": {
-    "total": 7,
-    "byFile": {
-      "attribute.rb": 2,
-      "attribute_methods.rb": 1,
-      "model.rb": 1,
-      "validations.rb": 1,
-      "validations/with.rb": 2
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activerecord": {
-    "total": 9,
-    "byFile": {
-      "associations/has_one_through_association.rb": 1,
-      "base.rb": 2,
-      "connection_adapters/abstract/database_statements.rb": 1,
-      "connection_adapters/postgresql_adapter.rb": 1,
-      "log_subscriber.rb": 1,
-      "relation/batches.rb": 2,
-      "schema.rb": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activesupport": {
-    "total": 9,
+    "total": 8,
     "byFile": {
       "configurable.rb": 1,
       "core_ext/module/attribute_accessors.rb": 3,
-      "core_ext/object/try.rb": 4,
-      "rescuable.rb": 1
+      "core_ext/object/try.rb": 4
     }
   },
   "arel": {
+    "total": 0,
+    "byFile": {}
+  },
+  "bcrypt": {
     "total": 0,
     "byFile": {}
   },
@@ -93,14 +79,13 @@
     }
   },
   "trailties": {
-    "total": 8,
+    "total": 7,
     "byFile": {
       "application.rb": 1,
       "generators/actions.rb": 2,
       "generators/actions/create_migration.rb": 1,
       "generators/base.rb": 2,
-      "initializable.rb": 1,
-      "railtie/configuration.rb": 1
+      "initializable.rb": 1
     }
   }
 }

@@ -1,11 +1,10 @@
 {
-  "arel": {
-    "novel": 0,
-    "total": 35,
-    "inlinedFrom": 0
-  },
   "ruby-compat": {
     "novel": 0,
     "total": 52
+  },
+  "thor": {
+    "novel": 0,
+    "total": 1
   }
 }

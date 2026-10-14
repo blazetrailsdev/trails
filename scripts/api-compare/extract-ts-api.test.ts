@@ -12,6 +12,7 @@ import * as path from "path";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import {
+  loopedIncludeModules,
   resolveRelModule,
   declaringFile,
   extractClass,
@@ -21,11 +22,14 @@ import {
   extractFromProgram,
   creditMixinObjectLiteralKeys,
   harvestObjectLiteralMethods,
+  isRubyStringSubclass,
   packageFingerprint,
   seatedClassExpression,
+  staticClassExpressions,
   tsLiteralValue,
 } from "./extract-ts-api.js";
 import { collectTsFileNames } from "./extra-surface.js";
+import { partitionNegatedCalls, significantCallsForReceivers } from "./compare.js";
 import { CALL_ARG_DESCRIPTOR_VOCABULARY } from "./extractor-skew.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
@@ -83,6 +87,31 @@ describe("extractClass — a `declare` member typed `typeof fn`", () => {
   });
 });
 
+describe("extractClass — a `declare` member typed by a function type", () => {
+  it("records the declared method's parameters as aliasParams, through a named call signature too", () => {
+    const cls = extractFromSource(
+      `interface Define { (info: object, block: () => void): void }
+      class Foo {
+        declare transaction: (block: () => void) => void;
+        declare static define: Define;
+      }`,
+    );
+    const transaction = cls.instanceMethods.find((m) => m.name === "transaction")!;
+    expect(transaction.aliasParams?.map((p) => p.name)).toEqual(["block"]);
+    const define = cls.classMethods.find((m) => m.name === "define")!;
+    expect(define.aliasParams?.find((p) => p.name === "block")?.admitsFunction).toBe(true);
+  });
+
+  it("leaves a stored field holding a callable parameterless, as an attr_reader is", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        resolver!: (request: object) => string;
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "resolver")!.aliasParams).toBeUndefined();
+  });
+});
+
 function objectLiteralMethods(source: string): MethodInfo[] {
   const { sourceFile, checker } = compile(source);
   let out: MethodInfo[] = [];
@@ -97,7 +126,79 @@ function objectLiteralMethods(source: string): MethodInfo[] {
   return out;
 }
 
+describe("loopedIncludeModules", () => {
+  function includeModArgs(source: string): string[][] {
+    const { sourceFile, checker } = compile(source);
+    const out: string[][] = [];
+    const walk = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "include"
+      ) {
+        const modArg = node.arguments[1];
+        out.push((loopedIncludeModules(modArg, checker) ?? [modArg]).map((e) => e.getText()));
+      }
+      ts.forEachChild(node, walk);
+    };
+    walk(sourceFile);
+    return out;
+  }
+
+  it("unrolls an include looped over a static array of modules", () => {
+    expect(
+      includeModArgs(`
+        declare function include(klass: unknown, mod: unknown): void;
+        declare const UrlFor: object, Renderers: { All: object };
+        class API {
+          static MODULES: object[] = [UrlFor, Renderers.All];
+        }
+        for (const mod of API.MODULES) {
+          include(API, mod);
+        }
+      `),
+    ).toEqual([["UrlFor", "Renderers.All"]]);
+  });
+
+  it("leaves a direct include and a loop over a non-literal alone", () => {
+    expect(
+      includeModArgs(`
+        declare function include(klass: unknown, mod: unknown): void;
+        declare const UrlFor: object, modules: object[];
+        class API {}
+        include(API, UrlFor);
+        for (const mod of modules) include(API, mod);
+      `),
+    ).toEqual([["UrlFor"], ["mod"]]);
+  });
+});
+
 describe("harvestObjectLiteralMethods", () => {
+  it("reads a method whose name is a string literal", () => {
+    const methods = objectLiteralMethods(
+      `export const ClassMethods = {
+        strictArgsPosition(): unknown { return null; },
+        "strictArgsPosition?"(config: object): boolean { return false; },
+      };`,
+    );
+    expect(methods.map((m) => [m.name, m.params.length])).toEqual([
+      ["strictArgsPosition", 0],
+      ["strictArgsPosition?", 1],
+    ]);
+  });
+
+  it("records a plain-object module's [initialize] hook", () => {
+    const methods = objectLiteralMethods(
+      `declare const initialize: unique symbol;
+      declare const other: unique symbol;
+      export const DatabaseStatements = {
+        [initialize](this: { resetTransaction(): void }): void { this.resetTransaction(); },
+        [other](): void {},
+      };`,
+    );
+    expect(methods.map((m) => m.name)).toEqual(["[initialize]"]);
+  });
+
   it("reads @internal off the declaration a mixin entry references", () => {
     const methods = objectLiteralMethods(
       `/** @internal */
@@ -121,6 +222,25 @@ describe("harvestObjectLiteralMethods", () => {
       viaNamespace: true,
       inline: true,
     });
+  });
+
+  it("carries a skeleton for a bodied method and function-valued property, and none for a reference", () => {
+    const methods = objectLiteralMethods(
+      `function ref(a: number[]): void {}
+      export const ClassMethods = {
+        method(a: number[]): void {
+          for (const x of a) if (x) throw new Error("x");
+        },
+        fn: function (a: number[]): void {
+          for (const x of a) void x;
+        },
+        ref,
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.skeleton]));
+    expect(byName.method).toEqual(expect.arrayContaining(["loop", "if", "throw:Error"]));
+    expect(byName.fn).toContain("loop");
+    expect(byName.ref).toBeUndefined();
   });
 
   it("clears internal where a receipt rides along, through the symbol too (RFC 0121)", () => {
@@ -254,7 +374,39 @@ describe("body call capture", () => {
     // sorted + de-duped (runCallbacks appears twice, recorded once). The
     // intermediate read `obj.nested` in `obj.nested.touch()` is credited as
     // `nested` — a non-callee property read mirrors a Ruby method send.
-    expect(save.calls).toEqual([".nested", ".touch", "helper", "nested", "runCallbacks", "touch"]);
+    expect(save.calls).toEqual([
+      ".nested",
+      ".touch",
+      "@invoked:helper",
+      "@invoked:runCallbacks",
+      "@invoked:touch",
+      "helper",
+      "nested",
+      "runCallbacks",
+      "touch",
+    ]);
+  });
+
+  it("marks each callee a body invokes, through a cast or a non-null assertion, and no property read", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        keyMatcher(options) {
+          const ns = options.namespace;
+          return [ns(), (this.sameSite as () => string)(), this.tempfile!()];
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "keyMatcher")!;
+    expect(m.calls).toEqual([
+      ".namespace",
+      "@invoked:ns",
+      "@invoked:sameSite",
+      "@invoked:tempfile",
+      "namespace",
+      "ns",
+      "sameSite",
+      "tempfile",
+    ]);
   });
 
   it("records the call-set of a get accessor body, as it does for a method", () => {
@@ -273,12 +425,17 @@ describe("body call capture", () => {
       }`,
     );
     const reader = cls.instanceMethods.find((m) => m.name === "queryCache" && !m.writer)!;
-    expect(reader.calls).toEqual(["computeIfAbsent", "executionContextId"]);
+    expect(reader.calls).toEqual([
+      "@invoked:computeIfAbsent",
+      "@invoked:executionContextId",
+      "computeIfAbsent",
+      "executionContextId",
+    ]);
     expect(reader.callSeq).toEqual(["executionContextId", "computeIfAbsent"]);
     expect(reader.skeleton).toBeDefined();
 
     const writer = cls.instanceMethods.find((m) => m.name === "queryCache" && m.writer)!;
-    expect(writer.calls).toEqual(["store"]);
+    expect(writer.calls).toEqual(["@invoked:store", "store"]);
     expect(writer.callSeq).toEqual(["store"]);
   });
 
@@ -294,7 +451,7 @@ describe("body call capture", () => {
     const create = cls.instanceMethods.find((m) => m.name === "create")!;
     // `calls` is sorted, so `["build", "save"]` there says nothing about order;
     // `callSeq` is what a reordered port shows up in (RFC 0084).
-    expect(create.calls).toEqual(["build", "save"]);
+    expect(create.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(create.callSeq).toEqual(["build", "save"]);
 
     const reordered = extractFromSource(
@@ -306,7 +463,7 @@ describe("body call capture", () => {
       }`,
     );
     const swapped = reordered.instanceMethods.find((m) => m.name === "create")!;
-    expect(swapped.calls).toEqual(["build", "save"]);
+    expect(swapped.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(swapped.callSeq).toEqual(["save", "build"]);
   });
 
@@ -543,7 +700,7 @@ describe("body call capture", () => {
         },
       };`,
     );
-    expect(member.calls).toEqual(["build", "save"]);
+    expect(member.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(member.callSeq).toEqual(["save", "build"]);
 
     const info = extractFromFiles("/p", {
@@ -556,8 +713,83 @@ describe("body call capture", () => {
       `,
     });
     const quote = fileFunctionsOf(info, "quoting.ts").find((f) => f.name === "quote")!;
-    expect(quote.calls).toEqual(["quoteString", "typeCast"]);
+    expect(quote.calls).toEqual([
+      "@invoked:quoteString",
+      "@invoked:typeCast",
+      "quoteString",
+      "typeCast",
+    ]);
     expect(quote.callSeq).toEqual(["typeCast", "quoteString"]);
+  });
+
+  it("records as shapeTokens what the skeleton and the argument descriptors both erase", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": [
+        "export function a() { return Promise.resolve(); }",
+        "export function b(ary: unknown[]) { return ary[0]; }",
+        "export function c(x: boolean, y: boolean, n: number) { return x && !y ? n++ : n; }",
+        "export function d(m: Map<object, unknown>, k: object) { m.set(k, class {}); }",
+        "export function e(v: string) { throw new ArgumentError(`bad ${v} value`); }",
+        "export function f(m: Map<string, number>, k: string) { return m.get(k); }",
+        "export function g(ary: unknown[]) { return ary[1]; }",
+        'export function h(o: Record<string, unknown>, k: string) { return [o["k"], o[k]]; }',
+        "export function i(s: string) { return [...s].length; }",
+        'export function j(o: unknown) { return typeof o === "object"; }',
+      ].join("\n"),
+    });
+    const tokensOf = (n: string) =>
+      fileFunctionsOf(info, "quoting.ts").find((fn) => fn.name === n)!.shapeTokens;
+    expect(tokensOf("a")).toEqual(["recv:Promise"]);
+    expect(tokensOf("b")).toEqual(["[num:0]"]);
+    expect(tokensOf("c")).toEqual(["?:", "op:!", "op:++"]);
+    expect(tokensOf("d")).toEqual(["class"]);
+    expect(tokensOf("e")).toEqual(["tpl:bad ${} value"]);
+    expect(tokensOf("f")).toBeUndefined();
+    expect(tokensOf("g")).toEqual(["[num:1]"]);
+    expect(tokensOf("h")).toEqual(["[str:k]", "[]"]);
+    expect(tokensOf("i")).toEqual(["..."]);
+    expect(tokensOf("j")).toEqual(["op:typeof"]);
+  });
+
+  it("records the string message of a thrown construction, which callArgs drops", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": [
+        'export function a() { throw new ArgumentError("bad value"); }',
+        "export function b() { throw new ArgumentError(`wrong value`); }",
+        'export function c() { return new ArgumentError("bad value"); }',
+      ].join("\n"),
+    });
+    const fn = (n: string) => fileFunctionsOf(info, "quoting.ts").find((f) => f.name === n)!;
+    expect(fn("a").callArgs).toBeUndefined();
+    expect(fn("a").shapeTokens).toEqual(["msg:bad value"]);
+    expect(fn("b").shapeTokens).toEqual(["msg:wrong value"]);
+    expect(fn("c").shapeTokens).toBeUndefined();
+  });
+
+  it("records shapeTokens on class members and walks a callback as the skeleton does", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": [
+        "export class Quoting {",
+        "  constructor(ary: unknown[]) { this.head = ary[0]; }",
+        "  head: unknown;",
+        "  get first() { return Promise.resolve(); }",
+        "  set first(v: unknown) { this.head = !v; }",
+        "  static build(n: number) { return n ? 1 : 2; }",
+        "  each(xs: boolean[]) { return xs.map((x) => !x); }",
+        "}",
+      ].join("\n"),
+    });
+    const cls = info.classes["quoting.ts:Quoting"];
+    const tokensOf = (n: string) =>
+      [...cls.instanceMethods, ...cls.classMethods]
+        .filter((m) => m.name === n)
+        .map((m) => m.shapeTokens);
+    expect(tokensOf("constructor")).toEqual([["[num:0]"]]);
+    expect(tokensOf("first")).toContainEqual(["recv:Promise"]);
+    expect(tokensOf("first=").concat(tokensOf("first"))).toContainEqual(["op:!"]);
+    expect(tokensOf("build")).toEqual([["?:"]]);
+    expect(tokensOf("each")).toEqual([["op:!"]]);
+    expect(cls.instanceMethods.find((m) => m.name === "each")!.skeleton).toContain("ref:map");
   });
 
   it("credits an expression-bodied arrow's outermost call", () => {
@@ -568,7 +800,7 @@ describe("body call capture", () => {
       "quoting.ts": `export const f = (x: unknown) => where(x);`,
     });
     const f = fileFunctionsOf(info, "quoting.ts").find((fn) => fn.name === "f")!;
-    expect(f.calls).toEqual(["where"]);
+    expect(f.calls).toEqual(["@invoked:where", "where"]);
     expect(f.callSeq).toEqual(["where"]);
     expect(f.skeleton).toEqual(["ref:where"]);
   });
@@ -705,6 +937,236 @@ describe("body call capture", () => {
     expect(arms("listed")).toEqual(["if", "throw:ArgumentError"]);
   });
 
+  it("emits no arm for an optional positional rebound onto the keywords", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        build(name: string, scope: object | null, options: object = {}) {
+          if (typeof scope === "object" && scope !== null) {
+            options = scope;
+            scope = null;
+          }
+          return this.create(name, scope, options);
+        }
+        sum(initial: number | Function = 0, block?: Function) {
+          if (typeof initial === "function") {
+            block = initial;
+            initial = 0;
+          }
+          return this.calculate(initial, block);
+        }
+        clearedToAnotherValue(initial: number | Function = 0, block?: Function) {
+          if (typeof initial === "function") {
+            block = initial;
+            initial = 1;
+          }
+        }
+        afterSideEffect(name: string, scope: object | null, options: object = {}) {
+          this.log(name);
+          if (typeof scope === "object") {
+            options = scope;
+          }
+        }
+        notABinding(name: string, scope: object | null, options: object = {}) {
+          if (typeof scope === "object") {
+            options = this.merge(scope);
+          }
+        }
+        otherTest(flag: boolean, scope: object | null, options: object = {}) {
+          if (flag) {
+            options = scope;
+          }
+        }
+        notFromAParameter(scope: object | null, options: object = {}) {
+          if (scope) {
+            options = defaults;
+          }
+        }
+        backwards(scope: object | null, options: object = {}) {
+          if (options) {
+            scope = options;
+          }
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("build")).toEqual(["ref:create"]);
+    expect(skeleton("sum")).toEqual(["ref:calculate"]);
+    expect(skeleton("clearedToAnotherValue")).toEqual(["if"]);
+    expect(skeleton("afterSideEffect")).toEqual(["ref:log", "if"]);
+    expect(skeleton("notABinding")).toEqual(["if", "ref:merge"]);
+    expect(skeleton("otherTest")).toEqual(["if"]);
+    expect(skeleton("notFromAParameter")).toEqual(["if"]);
+    expect(skeleton("backwards")).toEqual(["if"]);
+  });
+
+  it("emits no arm for a leading guard that moves an options hash or block out of a positional parameter", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        removeIndex(t: string, columnName: unknown = null, options: object = {}) {
+          if (!(typeof columnName === "string" || Array.isArray(columnName))) {
+            options = { ...(columnName as object), ...options };
+            columnName = null;
+          }
+          return this.run(t, columnName, options);
+        }
+        removeForeignKey(t: string, toTable?: string | { toTable?: string }, options: { toTable?: string } = {}) {
+          if (typeof toTable === "object" && toTable !== null) {
+            options = toTable;
+            toTable = options.toTable;
+          }
+          return this.run(t, toTable, options);
+        }
+        block(unit: unknown, block?: () => void) {
+          if (typeof unit === "function") block = unit as () => void;
+          return this.run(unit, block)
+        }
+        absent(unit: unknown, block?: () => void) {
+          if (block === undefined && typeof unit === "function") block = unit as () => void;
+          return this.run(unit, block)
+        }
+        loose(t: string, toTable: unknown = 0, options: object = {}) {
+          if (toTable != null && typeof toTable === "object") {
+            options = toTable;
+            toTable = 0;
+          }
+          return this.run(t, toTable, options);
+        }
+        otherProperty(t: string, toTable: unknown, options: { name?: string } = {}) {
+          if (typeof toTable === "object") {
+            options = toTable as object;
+            toTable = options.name;
+          }
+          return this.run(t, toTable, options);
+        }
+        splatLast(toTable: unknown, options: object = {}, ...rest: unknown[]) {
+          if (typeof toTable === "object") options = toTable as object;
+          return this.run(toTable, options, rest);
+        }
+        destructuredLast(toTable: unknown, options: object = {}, { force }: { force?: boolean } = {}) {
+          if (typeof toTable === "object") options = toTable as object;
+          return this.run(toTable, options, force);
+        }
+        notLeading(t: string, toTable: unknown, options: object = {}) {
+          this.log(t);
+          if (typeof toTable === "object") options = toTable as object;
+          return options;
+        }
+        notAKindTest(t: string, toTable: unknown, options: object = {}) {
+          if (this.supports(toTable)) options = toTable as object;
+          return options;
+        }
+        kindOfALocal(t: string, toTable: unknown, options: object = {}) {
+          if (typeof other === "object") options = toTable as object;
+          return options;
+        }
+        coerce(error: unknown, options: object = {}) {
+          if (typeof error === "string") error = new RuntimeError(error);
+          return this.report(error, options);
+        }
+        coerceLast(queryArray: string[], queryParams: unknown) {
+          if (typeof queryParams === "string") queryParams = this.parse(queryParams);
+          queryArray.push(this.build(queryParams));
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
+    expect(arms("removeIndex")).toEqual([]);
+    expect(arms("removeForeignKey")).toEqual([]);
+    expect(arms("block")).toEqual([]);
+    expect(arms("absent")).toEqual([]);
+    expect(arms("loose")).toEqual([]);
+    for (const kept of [
+      "otherProperty",
+      "splatLast",
+      "destructuredLast",
+      "notLeading",
+      "notAKindTest",
+      "kindOfALocal",
+      "coerce",
+      "coerceLast",
+    ]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
+  });
+
+  it("reads the keywords popped off a splat as a parameter binding, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        prefix(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          const { parameters = null } = typeof last === "object" ? (prefixes.pop() as object) : {};
+          return this.run(prefixes, parameters);
+        }
+        nullSafe(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          const kwargs = typeof last === "object" && last !== null ? prefixes.pop() : {};
+          return this.run(prefixes, kwargs);
+        }
+        otherNull(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          return typeof last === "object" && prefixes !== null ? prefixes.pop() : {};
+        }
+        inline(...prefixes: unknown[]) {
+          const kwargs = typeof prefixes[prefixes.length - 1] === "object" ? prefixes.pop() : {};
+          return this.run(prefixes, kwargs);
+        }
+        notASplat(prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          return typeof last === "object" ? prefixes.pop() : {};
+        }
+        notTheLast(...prefixes: unknown[]) {
+          const first = prefixes[0];
+          return typeof first === "object" ? prefixes.pop() : {};
+        }
+        declaredAfter(...prefixes: unknown[]) {
+          const kwargs = typeof last === "object" ? prefixes.pop() : {};
+          const last = prefixes[prefixes.length - 1];
+          return this.run(kwargs, last);
+        }
+        defaulted(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          return typeof last === "object" ? prefixes.pop() : { parameters: true };
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
+    expect(arms("prefix")).toEqual([]);
+    expect(arms("inline")).toEqual([]);
+    expect(arms("nullSafe")).toEqual([]);
+    expect(arms("otherNull")).toContain("if");
+    for (const kept of ["notASplat", "notTheLast", "declaredAfter", "defaulted"]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
+  });
+
+  it("emits no arm for an optional positional bound ahead of a required one", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        update(id: unknown, attributes?: object) {
+          if (attributes === undefined) [id, attributes] = [":all", id as object];
+          return this.find(id, attributes);
+        }
+        testsTheEarlier(id: unknown, attributes?: object) {
+          if (id === undefined) [id, attributes] = [":all", id];
+        }
+        movesSomethingElse(id: unknown, attributes?: object) {
+          if (attributes === undefined) [id, attributes] = [":all", this.defaults()];
+        }
+        afterSideEffect(id: unknown, attributes?: object) {
+          this.log(id);
+          if (attributes === undefined) [id, attributes] = [":all", id];
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("update")).toEqual(["ref:find"]);
+    expect(skeleton("testsTheEarlier")).toEqual(["if"]);
+    expect(skeleton("movesSomethingElse")).toEqual(["if", "ref:defaults"]);
+    expect(skeleton("afterSideEffect")).toEqual(["ref:log", "if"]);
+  });
+
   it("still emits one arm per case clause that carries its own body", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -744,8 +1206,357 @@ describe("body call capture", () => {
       "ref:busy",
       "rescue",
       "ref:locked",
-      "throw",
     ]);
+  });
+
+  it("emits one rescue for an `||` of instanceof tests, as Ruby's `rescue A, B` is one clause", () => {
+    const cls = extractFromSource(
+      `export class Foo {
+        cloneValue() {
+          try {
+            return this.clone();
+          } catch (e) {
+            if (e instanceof TypeError || e instanceof NoMethodError) return this.value();
+            throw e;
+          }
+        }
+      }`,
+    );
+    const cloneValue = cls.instanceMethods.find((m) => m.name === "cloneValue")!;
+    expect(cloneValue.skeleton).toEqual(["try", "ref:clone", "rescue", "ref:value"]);
+  });
+
+  it("reads a typed catch's rethrow of the unmatched exception as no arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        guarded() {
+          try {
+            this.work();
+          } catch (e) {
+            if (!(e instanceof ArgumentError)) throw e;
+            this.log(e);
+          }
+        }
+        alternate() {
+          try {
+            this.work();
+          } catch (e) {
+            if (e instanceof ArgumentError) this.log(e);
+            else throw e;
+          }
+        }
+        reraised() {
+          try {
+            this.work();
+          } catch (error) {
+            if (error instanceof NoMethodError) {
+              if (this.strict) throw error;
+              this.log(error);
+            } else {
+              throw error;
+            }
+          }
+        }
+        fallsThrough() {
+          try {
+            this.work();
+          } catch (e) {
+            if (e instanceof InvalidForeignKey) this.warn(e);
+            throw e;
+          }
+        }
+        catchAll() {
+          try {
+            this.work();
+          } catch (error) {
+            if (error instanceof DatabaseAlreadyExists) return this.warn(error);
+            this.log(error);
+            throw error;
+          }
+        }
+        wrapped() {
+          try {
+            this.work();
+          } catch (e) {
+            if (e instanceof NameError) throw new ArgumentError("m");
+            throw e;
+          }
+        }
+        catchAllElse() {
+          try {
+            this.commit();
+          } catch (e) {
+            if (e instanceof ConnectionFailed) {
+              this.invalidate();
+              throw e;
+            } else {
+              this.rollback();
+              throw e;
+            }
+          }
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .skeleton!.filter((t) => !t.startsWith("ref:") && !t.startsWith("new:"));
+    expect(arms("guarded")).toEqual(["try", "rescue"]);
+    expect(arms("alternate")).toEqual(["try", "rescue"]);
+    expect(arms("reraised")).toEqual(["try", "rescue", "if", "throw"]);
+    expect(arms("wrapped")).toEqual(["try", "rescue", "throw:ArgumentError"]);
+    expect(arms("fallsThrough")).toEqual(["try", "rescue", "throw"]);
+    expect(arms("catchAll")).toEqual(["try", "rescue", "throw"]);
+    expect(arms("catchAllElse")).toEqual(["try", "rescue", "throw", "rescue", "throw"]);
+  });
+
+  it("reads `rtest(x) ? x : y` as the `or` of Ruby's `x || y`, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        delimiter() {
+          return rtest(this.cache) ? this.cache : (this.cache = this.compute());
+        }
+        other() {
+          return rtest(this.cache) ? this.compute() : this.fallback;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("delimiter")).toEqual(["ref:rtest", "ref:cache", "or", "ref:compute"]);
+    expect(skeleton("other")!.filter((t) => t === "if" || t === "or")).toEqual(["if"]);
+  });
+
+  it("reads `rtest(x) ? y : x` as the `and` of Ruby's `x && y`, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        isCurrentIsValue() {
+          return rtest(this.peek()) ? this.match(this.peek()) : this.peek();
+        }
+      }`,
+    );
+    expect(cls.instanceMethods[0].skeleton).toEqual([
+      "ref:rtest",
+      "ref:peek",
+      "and",
+      "ref:match",
+      "ref:peek",
+    ]);
+  });
+
+  it("reads the `&block` popped off a splat as a parameter binding, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        validatesWith(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as Block) : undefined;
+          for (const klass of args) this.build(klass, block);
+        }
+        other(...args: unknown[]) {
+          const block = rbBlockGivenP(args[0]) ? args.pop() : undefined;
+          return rbBlockGivenP(args[args.length - 1]) ? args.pop() : this.build(block);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("validatesWith")).toEqual(["loop", "ref:build"]);
+    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if"]);
+  });
+
+  it("reads a plain function popped off a splat as the `&block` binding too", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        withLock(...args: unknown[]) {
+          const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
+          return typeof args[args.length - 1] === "string" ? args.pop() : this.transaction(block);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("withLock")!.filter((t) => t === "if")).toEqual(["if"]);
+  });
+
+  it("reads the spread-forward of a captured `&block` as the block itself, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        validate(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          this.setCallback("validate", ...args, ...(block !== undefined ? [block as Block] : []));
+        }
+        permit(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          this.build(...args, ...(block ? [block] : []));
+        }
+        other(options: unknown, ...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          this.build(...(options !== undefined ? [options] : []), block);
+        }
+        uncaptured(block: unknown, ...args: unknown[]) {
+          this.build(...args, ...(block !== undefined ? [block] : []));
+        }
+        shadowed(block: unknown, ...args: unknown[]) {
+          for (const klass of args) {
+            const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+            this.build(klass, block);
+          }
+          this.build(...(block !== undefined ? [block] : []));
+        }
+        nested(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          return () => this.build(...(block !== undefined ? [block] : []));
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("validate")).toEqual(["ref:setCallback"]);
+    expect(skeleton("permit")).toEqual(["ref:build"]);
+    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("uncaptured")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("shadowed")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("nested")!.filter((t) => t === "if")).toEqual(["if"]);
+  });
+
+  it("reads an own-property conditional as a class-level ivar read, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        static memo() {
+          return (
+            (Object.hasOwn(this, "_memo") ? this._memo : undefined) || (this._memo = this.build())
+          );
+        }
+        static cast() {
+          const name = Object.prototype.hasOwnProperty.call(this, "_name")
+            ? (this as any)._name
+            : null;
+          return this.build(name);
+        }
+        static other(klass: typeof Foo) {
+          const a = Object.hasOwn(this, "_memo") ? this._other : undefined;
+          const b = Object.hasOwn(this, "_memo") ? klass._memo : undefined;
+          return Object.hasOwn(this, "_memo") ? this._memo : this.build(a, b);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.classMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("memo")).toEqual(["or", "ref:build"]);
+    expect(skeleton("cast")).toEqual(["ref:build"]);
+    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if", "if"]);
+  });
+
+  it("emits or, not an arm, for a write guarded by the Ruby-falsiness of its own target", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        defaults(h: Record<string, unknown>, k: string, v: unknown) {
+          if (h[k] == null || h[k] === false) h[k] = v;
+        }
+        truthy(h: Record<string, unknown>) { if (!rtest(h.a)) { h.a = this.build(); } }
+        other(h: Record<string, unknown>) { if (h.a == null || h.a === false) h.b = 1; }
+        unlessDefined() { if (this._x === undefined) this._x = 1; }
+        nil(h: Record<string, unknown>) { if (h.a == null) h.a = 1; }
+        orElse(h: Record<string, unknown>) { if (!rtest(h.a)) h.a = 1; else this.log(); }
+        more(h: Record<string, unknown>) { if (!rtest(h.a)) { h.a = 1; this.log(); } }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
+    expect(arms("defaults")).toEqual(["or"]);
+    expect(arms("truthy")).toEqual(["or"]);
+    for (const kept of ["other", "unlessDefined", "nil", "orElse", "more"]) {
+      expect(arms(kept).filter((t) => t === "if")).toEqual(["if"]);
+    }
+  });
+
+  it("emits or, not an arm, for a throw guarded by the Ruby-falsiness of the value then returned", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        bang(t: string) {
+          const fk = this.find(t);
+          if (!rtest(fk)) throw new ArgumentError("none");
+          return fk!;
+        }
+        unless(t: string) {
+          const fk = this.find(t);
+          if (!rtest(fk)) throw new ArgumentError("none");
+          this.log(fk);
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .skeleton!.filter((t) => !t.startsWith("ref:") && !t.startsWith("new:"));
+    expect(arms("bang")).toEqual(["or", "throw:ArgumentError"]);
+    expect(arms("unless")).toEqual(["if", "throw:ArgumentError"]);
+  });
+
+  it("emits nothing for the guard that raises the ArgumentError Ruby raises binding the arguments", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        required(...columnNames: unknown[]) {
+          const options = extractOptionsBang(columnNames);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+          return this.run(options);
+        }
+        positionalArray(columnNames: unknown[]) {
+          const options = extractOptionsBang(columnNames);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+        }
+        afterSideEffect(options: object) {
+          this.log(options);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+        }
+        notAnArgument(options: object) {
+          const found = this.find(options);
+          if (found === undefined) {
+            throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+          }
+        }
+        arity(columnName?: string) {
+          if (columnName === undefined) {
+            throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+          }
+          return this.run(columnName);
+        }
+        otherMessage(options: object) {
+          if (!("type" in options)) throw new ArgumentError("type is required");
+        }
+        argc(x: unknown, y: unknown) {
+          if (arguments.length !== 2) {
+            throw new ArgumentError(
+              \`wrong number of arguments (given \${arguments.length}, expected 2)\`,
+            );
+          }
+          return this.run(x, y);
+        }
+        argcOtherMessage(x: unknown) {
+          if (arguments.length !== 1) throw new ArgumentError("one argument, please");
+        }
+        popped(...classes: unknown[]) {
+          const block = classes.pop() as () => unknown;
+          const options = classes.pop() as object;
+          if (!("role" in options)) throw new ArgumentError("missing keyword: :role");
+          return this.run(classes, block);
+        }
+        poppedElsewhere(other: unknown[], ...classes: unknown[]) {
+          const options = other.pop() as object;
+          if (!("role" in options)) throw new ArgumentError("missing keyword: :role");
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("required")).toEqual(["ref:extractOptionsBang", "ref:run"]);
+    expect(skeleton("arity")).toEqual(["ref:run"]);
+    expect(skeleton("argc")).toEqual(["ref:run"]);
+    expect(skeleton("popped")).toEqual(["ref:pop", "ref:pop", "ref:run"]);
+    expect(skeleton("argcOtherMessage")!.filter((t) => !t.includes(":"))).toEqual(["if"]);
+    const arms = (name: string) => skeleton(name)!.filter((t) => !t.includes(":"));
+    for (const kept of [
+      "positionalArray",
+      "afterSideEffect",
+      "notAnArgument",
+      "otherMessage",
+      "poppedElsewhere",
+    ]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
   });
 
   it("carries the thrown class on the throw token", () => {
@@ -841,6 +1652,358 @@ describe("body call capture", () => {
     expect(skeleton("memo")).toEqual(["ref:_memo", "or", "ref:build"]);
   });
 
+  it("marks an instanceof narrowing a class-equality test on the same operand, and only that", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        eql(other: unknown) {
+          return other instanceof Foo && this.constructor === other.constructor && rbEqual(this.a, other.a);
+        }
+        guard(other: unknown, x: unknown) {
+          return x instanceof Foo && this.constructor === other.constructor;
+        }
+        lone(other: unknown) {
+          return other instanceof Foo && rbEqual(this.a, other.a);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("eql")).toEqual([
+      "and:class-narrow",
+      "ref:constructor",
+      "ref:constructor",
+      "and",
+      "ref:rbEqual",
+      "ref:a",
+      "ref:a",
+    ]);
+    expect(skeleton("guard")).toEqual(["and", "ref:constructor", "ref:constructor"]);
+    expect(skeleton("lone")).toEqual(["and", "ref:rbEqual", "ref:a", "ref:a"]);
+  });
+
+  it("marks a String test that excludes a Symbol as one test", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        group(column: string) {
+          if (typeof column === "string" && !isSymbol(column)) column = sql(column);
+        }
+        other(column: string, x: string) {
+          if (typeof column === "string" && !isSymbol(x)) column = sql(column);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("group")).toEqual(["if", "and:string-not-symbol", "ref:isSymbol", "ref:sql"]);
+    expect(skeleton("other")).toEqual(["if", "and", "ref:isSymbol", "ref:sql"]);
+  });
+
+  it("marks a type-test `||` chain on one operand with its when-list arity", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        quoted(other: unknown) {
+          if (other instanceof Node || other instanceof Arel.Table || other instanceof SqlLiteral) return other;
+        }
+        set(values: unknown) {
+          if (typeof values === "string" || values instanceof SqlLiteral || values instanceof BoundSqlLiteral) return;
+        }
+        join(relation: unknown) {
+          if (typeof relation === "string" || relation instanceof SqlLiteral) return;
+        }
+        mixed(a: unknown, b: unknown) {
+          if (a instanceof Node || b instanceof Node) return;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("quoted")).toEqual(["if", "when:3", "ref:Table"]);
+    expect(skeleton("set")).toEqual(["if", "or:string-subclass", "when:2"]);
+    expect(skeleton("join")).toEqual(["if", "or:string-subclass"]);
+    expect(skeleton("mixed")).toEqual(["if", "or"]);
+  });
+
+  it("absorbs exactly the four String subclasses the vendored Rails defines", () => {
+    const named = ["SqlLiteral", "SafeBuffer", "StringInquirer", "RenderedViewContent"];
+    expect(named.filter(isRubyStringSubclass)).toEqual(named);
+    expect(["Chars", "BoundSqlLiteral", "String", "Symbol"].filter(isRubyStringSubclass)).toEqual(
+      [],
+    );
+    const cls = extractFromSource(
+      `class Foo {
+        valid(number: unknown) {
+          if (typeof number === "string" || number instanceof SafeBuffer) return;
+        }
+        quote(value: unknown) {
+          if (typeof value === "string" || value instanceof Chars) return;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("valid")).toEqual(["if", "or:string-subclass"]);
+    expect(skeleton("quote")).toEqual(["if", "when:2"]);
+  });
+
+  it("tokens a nil-guard conditional apart from an ordinary one, in either polarity", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        guard(aliaz: string | null) {
+          return aliaz == null ? null : new Lit(aliaz);
+        }
+        flipped(aliaz: string | undefined) {
+          return aliaz !== undefined ? new Lit(aliaz) : undefined;
+        }
+        plain(aliaz: string | null) {
+          return aliaz == null ? this.build() : new Lit(aliaz);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("guard")).toEqual(["if:nil-guard", "new:Lit"]);
+    expect(skeleton("flipped")).toEqual(["if:nil-guard", "new:Lit"]);
+    expect(skeleton("plain")).toEqual(["if", "ref:build", "new:Lit"]);
+  });
+
+  it("tokens the unconditional loop a Ruby `retry` lowers to apart from a loop, and emits no arm for its rescue class guard", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        visit(object: unknown) {
+          for (;;) {
+            let name: string | undefined;
+            try {
+              return this.send(name!, object);
+            } catch (e) {
+              if (!(e instanceof NoMethodError)) throw e;
+              if (this.respondTo(name!)) throw e;
+              this.remember(object);
+            }
+          }
+        }
+        poll() {
+          for (;;) {
+            if (this.done()) return;
+          }
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("visit")).toEqual([
+      "loop:retry",
+      "try",
+      "ref:send",
+      "rescue",
+      "if",
+      "ref:respondTo",
+      "throw",
+      "ref:remember",
+    ]);
+    expect(skeleton("poll")).toEqual(["loop", "if", "ref:done"]);
+  });
+
+  it("reads a loop that only pushes an awaited element as the `map` an awaiting `collect` block lowers to", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        async create(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) records.push(await this.create(attr));
+          return records;
+        }
+        async braced(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) {
+            records.push(await this.create(attr));
+          }
+          return records;
+        }
+        async guarded(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) {
+            if (attr) records.push(await this.create(attr));
+          }
+          return records;
+        }
+        sync(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) records.push(this.build(attr));
+          return records;
+        }
+        async block(queries: string[]) {
+          const msgs: string[] = [];
+          for (const sql of queries) {
+            let msg = await this.clause(sql);
+            if (sql) msg += this.render(sql);
+            msgs.push(msg);
+          }
+          return msgs;
+        }
+        async skipping(queries: string[]) {
+          const msgs: string[] = [];
+          for (const sql of queries) {
+            if (!sql) continue;
+            const msg = await this.clause(sql);
+            msgs.push(msg);
+          }
+          return msgs;
+        }
+        syncBlock(queries: string[]) {
+          const msgs: string[] = [];
+          for (const sql of queries) {
+            const msg = this.render(sql);
+            msgs.push(msg);
+          }
+          return msgs;
+        }
+        async cast(attributes: unknown[]) {
+          const records: object[] = [];
+          for (const attr of attributes) records.push((await this.create(attr)) as object);
+          return records;
+        }
+        async spread(loaders: unknown[]) {
+          const records: unknown[] = [];
+          for (const l of loaders) records.push(...(await this.create(l)));
+          return records;
+        }
+        syncSpread(loaders: unknown[]) {
+          const records: unknown[] = [];
+          for (const l of loaders) records.push(...this.build(l));
+          return records;
+        }
+        async any(sources: unknown[]) {
+          for (const source of sources) {
+            const target = await this.clause(source);
+            if (target ? this.render(target) : false) {
+              return true;
+            }
+          }
+          return false;
+        }
+        syncAny(sources: unknown[]) {
+          for (const source of sources) {
+            if (this.render(source)) return true;
+          }
+          return false;
+        }
+        async streamed(sources: AsyncIterable<unknown>) {
+          for await (const source of sources) {
+            if (await this.clause(source)) return true;
+          }
+          return false;
+        }
+        async finding(sources: unknown[]) {
+          for (const source of sources) {
+            if (await this.clause(source)) return source;
+          }
+          return null;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("create")).toEqual(["ref:map", "ref:create"]);
+    expect(skeleton("braced")).toEqual(["ref:map", "ref:create"]);
+    expect(skeleton("guarded")).toEqual(["loop", "if", "ref:push", "ref:create"]);
+    expect(skeleton("sync")).toEqual(["loop", "ref:push", "ref:build"]);
+    expect(skeleton("block")).toEqual(["loop:collect", "ref:clause", "if", "ref:render"]);
+    expect(skeleton("skipping")).toEqual(["loop", "if", "ref:clause", "ref:push"]);
+    expect(skeleton("syncBlock")).toEqual(["loop", "ref:render", "ref:push"]);
+    expect(skeleton("cast")).toEqual(["ref:map", "ref:create"]);
+    expect(skeleton("spread")).toEqual(["loop:collect", "ref:create"]);
+    expect(skeleton("syncSpread")).toEqual(["loop", "ref:push", "ref:build"]);
+    expect(skeleton("any")).toEqual([
+      "loop:predicate",
+      "ref:clause",
+      "if:predicate",
+      "if",
+      "ref:render",
+    ]);
+    expect(skeleton("syncAny")).toEqual(["loop", "if", "ref:render"]);
+    expect(skeleton("finding")).toEqual(["loop", "if", "ref:clause"]);
+    expect(skeleton("streamed")).toEqual(["loop", "if", "ref:clause"]);
+  });
+
+  it("reads a for-of that keeps its element on an awaited test as a filter", () => {
+    // runnable.reject { |m| ran?(m) } / runnable.find_all { |m| ran?(m) }
+    // (activerecord/lib/active_record/migration.rb:1460-1469).
+    const cls = extractFromSource(
+      `class Foo {
+        async reject(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) {
+            if (!(await this.isRan(m))) kept.push(m);
+          }
+          return kept;
+        }
+        async findAll(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (await this.isRan(m)) kept.push(m);
+          return kept;
+        }
+        sync(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (this.isRan(m)) kept.push(m);
+          return kept;
+        }
+        async mapped(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (await this.isRan(m)) kept.push(this.wrap(m));
+          return kept;
+        }
+        async external(runnable: unknown[], seen: unknown[]) {
+          for (const m of runnable) if (await this.isRan(m)) seen.push(m);
+          for (const m of runnable) if (await this.isRan(m)) this.ran.push(m);
+        }
+        async consumed(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (!(await this.isRan(m))) kept.push(m);
+          if (any(kept)) this.fail();
+        }
+        async discarded(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (await this.isRan(m)) kept.push(m);
+        }
+        async early(runnable: unknown[], done: boolean) {
+          const kept: unknown[] = [];
+          if (done) return kept;
+          for (const m of runnable) if (await this.isRan(m)) kept.push(m);
+          return undefined;
+        }
+        async elsewhere(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          const visit = async () => {
+            for (const m of runnable) if (await this.isRan(m)) kept.push(m);
+          };
+          await visit();
+          return kept;
+        }
+        async alternate(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) {
+            if (await this.isRan(m)) kept.push(m);
+            else this.skip(m);
+          }
+          return kept;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("reject")).toEqual(["ref:filter", "ref:isRan"]);
+    expect(skeleton("findAll")).toEqual(["ref:filter", "ref:isRan"]);
+    expect(skeleton("consumed")).toEqual(["ref:filter", "ref:isRan", "if", "ref:any", "ref:fail"]);
+    expect(skeleton("sync")).toEqual(["loop", "if", "ref:isRan", "ref:push"]);
+    expect(skeleton("mapped")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:wrap"]);
+    expect(skeleton("alternate")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:skip"]);
+    expect(skeleton("discarded")).toEqual(["loop", "if", "ref:isRan", "ref:push"]);
+    expect(skeleton("early")).toEqual(["if", "loop", "if", "ref:isRan", "ref:push"]);
+    expect(skeleton("elsewhere")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:visit"]);
+    expect(skeleton("external")).toEqual([
+      "loop",
+      "if",
+      "ref:isRan",
+      "ref:push",
+      "loop",
+      "if",
+      "ref:isRan",
+      "ref:ran",
+      "ref:push",
+    ]);
+  });
+
   it("marks a call made in a negated position with the ! prefix", () => {
     // The faithful port of ActiveSupport's `exclude?` (`!include?`); the
     // call ratchet requires the marker before crediting a negating alias.
@@ -860,6 +2023,8 @@ describe("body call capture", () => {
       "!loaded",
       ".has",
       ".includes",
+      "@invoked:has",
+      "@invoked:includes",
       "has",
       "includes",
       "loaded",
@@ -911,6 +2076,246 @@ describe("body call capture", () => {
     expect(m.calls).toEqual([".locale", "defaults", "formats", "locale"]);
   });
 
+  it("marks a .length property read, never a length() or size() call, as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        read(xs: string[]) {
+          return xs.length;
+        }
+        called(rel: { length(): number; size(): number }) {
+          return rel.length() + rel.size();
+        }
+      }`,
+    );
+    const read = cls.instanceMethods.find((m) => m.name === "read")!;
+    expect(read.calls).toContain("@length");
+    expect(read.calls).toContain("@length:xs");
+    const called = cls.instanceMethods.find((m) => m.name === "called")!;
+    expect(called.calls).not.toContain("@length");
+  });
+
+  it("names the receiver a .length read ends in", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        async exists(c: { selectRows(): Promise<unknown[]> }, result: { columns: string[] }) {
+          return (await c.selectRows()).length === result.columns.length + wrap(ids).length;
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "exists")!;
+    expect(m.calls).toEqual(
+      expect.arrayContaining(["@length:selectRows", "@length:columns", "@length:wrap"]),
+    );
+  });
+
+  it("marks the native hash forms with the receiver each one ends in", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        options: Record<string, unknown> = {};
+        key(options: Record<string, unknown>, opts: Record<string, Record<string, unknown>>, name: string) {
+          return "a" in this.options || Object.hasOwn(options, "b") ||
+            Object.prototype.hasOwnProperty.call(opts[name], "c");
+        }
+        remove(options: Record<string, unknown>, name: string) {
+          delete this.options.a;
+          delete options[name];
+        }
+        update(options: Record<string, unknown>, other: object) {
+          Object.assign(this.options, other);
+          Object.assign(options, other);
+        }
+        merge(options: Record<string, unknown>, opts: Record<string, object>, name: string) {
+          return [{ ...this.options, a: 1 }, { ...options, ...opts[name] }];
+        }
+        eachPair(options: Record<string, unknown>) {
+          for (const [k, v] of Object.entries(this.options)) use(k, v);
+          for (const [k, v] of Object.entries(options)) use(k, v);
+        }
+      }`,
+    );
+    const marks = (name: string): string[] =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .calls!.filter((c) => /^@(in|delete|assign|spread|entries)\b/.test(c))
+        .sort();
+    expect(marks("key")).toEqual(["@in", "@in:options"]);
+    expect(marks("remove")).toEqual(["@delete", "@delete:options"]);
+    expect(marks("update")).toEqual(["@assign", "@assign:options"]);
+    expect(marks("merge")).toEqual(["@spread", "@spread:options"]);
+    expect(marks("eachPair")).toEqual(["@entries", "@entries:options"]);
+  });
+
+  it("names no receiver for a native hash form over an element access", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        key(opts: Record<string, object>, name: string) {
+          return use("a" in opts[name]);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "key")!;
+    expect(m.calls!.filter((c) => /^@in(:|$)/.test(c))).toEqual(["@in"]);
+  });
+
+  it("marks no native hash form for Object.keys, a spreadless literal or a missing-keyword guard", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        keys(recv: object) {
+          for (const k of Object.keys(recv)) use(k);
+          return { a: 1, b: recv };
+        }
+        build(kwargs: { name?: string }) {
+          if (!("name" in kwargs)) throw new ArgumentError("missing keyword: :name");
+          return kwargs.name;
+        }
+      }`,
+    );
+    for (const m of cls.instanceMethods) {
+      expect(m.calls!.filter((c) => /^@(in|delete|assign|spread|entries)\b/.test(c))).toEqual([]);
+    }
+  });
+
+  it("records a call set for a body whose only names are native hash forms", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        key(options: Record<string, unknown>) {
+          return "a" in options;
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "key")!.calls).toEqual([
+      "@in",
+      "@in:options",
+    ]);
+  });
+
+  it("marks no native hash form for a defaulted read, which is not Hash#fetch", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        fetch(h: Record<string, unknown>, d: unknown) {
+          return use(h.k ?? d, h["k"] ?? d);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "fetch")!;
+    expect(m.calls!.filter((c) => /^@(in|delete|assign|spread|entries)\b/.test(c))).toEqual([]);
+    expect(
+      significantCallsForReceivers({ fetch: ["local"] }, undefined, nativeForms(m), {
+        fetch: ["h"],
+      }).has("fetch"),
+    ).toBe(true);
+  });
+
+  it("keeps the native hash forms out of the ORDER stream", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        merge(options: Record<string, unknown>, other: object) {
+          if ("a" in options) delete options.a;
+          Object.assign(options, other);
+          for (const [k, v] of Object.entries(options)) use(k, v);
+          return { ...options };
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "merge")!;
+    expect(m.callSeq!.some((c) => c.startsWith("@"))).toBe(false);
+  });
+
+  it("marks an unshift() call as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        updateCallbacks(targets: unknown[]) {
+          targets.unshift(this);
+        }
+        prepended(mod: unknown) {
+          prepend(this, mod);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "updateCallbacks")!;
+    expect(m.calls).toContain("@unshift");
+    const prepended = cls.instanceMethods.find((m) => m.name === "prepended")!;
+    expect(prepended.calls).not.toContain("@unshift");
+  });
+
+  it("marks a dynamic import() of a computed specifier as a native form, not a literal one", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        async loadMigration(href: string) {
+          return await import(href);
+        }
+        async lazy() {
+          return await import("../migration.js");
+        }
+      }`,
+    );
+    const loaded = cls.instanceMethods.find((m) => m.name === "loadMigration")!;
+    expect(loaded.calls).toContain("@import");
+    const lazy = cls.instanceMethods.find((m) => m.name === "lazy")!;
+    expect(lazy.calls ?? []).not.toContain("@import");
+  });
+
+  it("marks only a promise-settling setTimeout as the native form of Kernel#sleep", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        backoff(counter: number): Promise<void> {
+          return new Promise((resolve) => setTimeout(resolve, 0.1 * counter * 1000));
+        }
+        poll(): void {
+          setInterval(() => this.backoff(1), 1000);
+        }
+        deadline(): void {
+          setTimeout(() => this.reap(), 1000);
+        }
+        schedule(tick: () => void): void {
+          setTimeout(tick, 1000);
+        }
+        reap(): void {}
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls ?? [];
+    expect(calls("backoff")).toContain("@timer");
+    expect(calls("poll")).not.toContain("@timer");
+    expect(calls("deadline")).not.toContain("@timer");
+    expect(calls("schedule")).not.toContain("@timer");
+  });
+
+  it("records rbFSend / rbFPublicSend of a string-literal name as a call to that name", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        first(records: unknown[], limit: number) {
+          return rbFSend(records, "limit", limit);
+        }
+        assign(record: object, k: string, v: unknown) {
+          return rbFPublicSend(record, "write", v);
+        }
+        dispatch(record: object, name: string) {
+          return rbFSend(record, name);
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
+    expect(calls("first")).toEqual(expect.arrayContaining(["rbFSend", "limit"]));
+    expect(calls("assign")).toEqual(expect.arrayContaining(["rbFPublicSend", "write"]));
+    expect(calls("dispatch")).toEqual(["@invoked:rbFSend", "rbFSend"]);
+  });
+
+  it("marks the String(x) conversion call as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        plain(order: unknown) {
+          return String(order);
+        }
+        boxed(order: unknown) {
+          return new String(order);
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
+    expect(calls("plain")).toContain("@String");
+    expect(calls("boxed") ?? []).not.toContain("@String");
+  });
+
   it("marks a call INVOKED on another object with the foreign-read prefix", () => {
     // `details.digest(x)` runs a member of `details`, not the same-file method
     // `digest` — the closure must not union that one's call-set (RFC 0108).
@@ -924,7 +2329,14 @@ describe("body call capture", () => {
     const m = cls.instanceMethods.find((m) => m.name === "cacheKey")!;
     // `defaults` is called on a class reference, whose static of that name may
     // genuinely be a same-file member, so it stays resolvable.
-    expect(m.calls).toEqual([".digest", "defaults", "digest", "name"]);
+    expect(m.calls).toEqual([
+      ".digest",
+      "@invoked:defaults",
+      "@invoked:digest",
+      "defaults",
+      "digest",
+      "name",
+    ]);
   });
 
   it("keeps a name resolvable when the same body also calls it on this", () => {
@@ -936,7 +2348,7 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "cacheKey")!;
-    expect(m.calls).toEqual(["digest"]);
+    expect(m.calls).toEqual(["@invoked:digest", "digest"]);
   });
 
   it("does not mark the identifier an X.call(...) dispatch credits", () => {
@@ -948,7 +2360,13 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "build")!;
-    expect(m.calls).toEqual([".call", "call", "emitJoinPlan"]);
+    expect(m.calls).toEqual([
+      ".call",
+      "@invoked:call",
+      "@invoked:emitJoinPlan",
+      "call",
+      "emitJoinPlan",
+    ]);
   });
 
   it("does not mark a call the ! does not actually negate", () => {
@@ -964,7 +2382,7 @@ describe("body call capture", () => {
       }`,
     );
     const check = cls.instanceMethods.find((m) => m.name === "check")!;
-    expect(check.calls).toEqual([".includes", "includes"]);
+    expect(check.calls).toEqual([".includes", "@invoked:includes", "includes"]);
   });
 
   it("omits calls entirely for a body that invokes nothing", () => {
@@ -984,7 +2402,7 @@ describe("body call capture", () => {
       }`,
     );
     const ctor = cls.instanceMethods.find((m) => m.name === "constructor")!;
-    expect(ctor.calls).toEqual(["init", "super"]);
+    expect(ctor.calls).toEqual(["@invoked:init", "@invoked:super", "init", "super"]);
   });
 
   it('records super.foo() as the property name, not "super"', () => {
@@ -994,7 +2412,7 @@ describe("body call capture", () => {
       }`,
     );
     const save = cls.instanceMethods.find((m) => m.name === "save")!;
-    expect(save.calls).toEqual(["save"]);
+    expect(save.calls).toEqual(["@invoked:save", "save"]);
   });
 
   it("credits X.call(...)/X.apply(...) to the dispatched identifier as well as call/apply", () => {
@@ -1016,6 +2434,11 @@ describe("body call capture", () => {
     expect(m.calls).toEqual([
       ".apply",
       ".call",
+      "@invoked:apply",
+      "@invoked:call",
+      "@invoked:helper",
+      "@invoked:lockBang",
+      "@invoked:transaction",
       "apply",
       "call",
       "helper",
@@ -1042,7 +2465,7 @@ describe("body call capture", () => {
       }`,
     );
     // `_x` is the non-callee read inside `typeCast(this._x)`, credited as a call.
-    const expected = ["_x", "constructor", "typeCast"];
+    const expected = ["@invoked:typeCast", "_x", "constructor", "typeCast"];
     expect(direct.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
     expect(bound.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
   });
@@ -1058,6 +2481,7 @@ describe("body call capture", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:makePool",
       "_x",
       "constructor",
       "makePool",
@@ -1075,15 +2499,18 @@ describe("body call capture", () => {
       }`,
     );
     const byName = Object.fromEntries(cls.instanceMethods.map((m) => [m.name, m.calls]));
-    expect(byName["build"]).toEqual(["leaf", "mid"]);
-    expect(byName["mid"]).toEqual(["constructor", "leaf"]);
+    expect(byName["build"]).toEqual(["@invoked:leaf", "@invoked:mid", "leaf", "mid"]);
+    expect(byName["mid"]).toEqual(["@invoked:leaf", "constructor", "leaf"]);
   });
 
   it("does not credit delegation to an unknown / inherited helper", () => {
     // `inheritedHook` is not a method of this class — nothing to union, and the
     // delegating method keeps only the literal call name.
     const cls = extractFromSource(`class Foo { build() { return this.inheritedHook(); } }`);
-    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(["inheritedHook"]);
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:inheritedHook",
+      "inheritedHook",
+    ]);
   });
 
   it("does not merge a same-named static helper into a `this.helper()` delegation", () => {
@@ -1098,6 +2525,8 @@ describe("body call capture", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:cached",
+      "@invoked:makePool",
       "cached",
       "makePool",
     ]);
@@ -1146,6 +2575,7 @@ describe("body call capture", () => {
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
       ".call",
       ".emitJoinPlan",
+      "@invoked:call",
       "call",
       "emitJoinPlan",
     ]);
@@ -1237,6 +2667,7 @@ describe("body call capture", () => {
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
       ".buildJoins",
       ".call",
+      "@invoked:call",
       "buildJoins",
       "call",
     ]);
@@ -1252,6 +2683,7 @@ describe("body call capture", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:build_",
       "build_",
       "constructor",
     ]);
@@ -1277,10 +2709,38 @@ describe("body call capture", () => {
     expect(unpin.calls).toEqual([
       ".lock",
       ".synchronize",
+      "@invoked:checkin",
+      "@invoked:synchronize",
       "checkin",
       "connection",
       "lock",
       "synchronize",
+    ]);
+  });
+
+  it("marks a moduleEval / classEval callback's first calls in the order stream, plain in the call set", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        generate(m: string, ok: boolean) {
+          if (ok) {
+            this.moduleEval((mod) => { mod[m] = () => this.scoping(() => this.evalOnly()); });
+          } else {
+            this.defineMethod(m, () => this.scoping(() => 2));
+          }
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "generate")!;
+    expect(m.callSeq).toEqual(["moduleEval", "%scoping", "%evalOnly", "defineMethod", "scoping"]);
+    expect(m.calls).toEqual([
+      "@invoked:defineMethod",
+      "@invoked:evalOnly",
+      "@invoked:moduleEval",
+      "@invoked:scoping",
+      "defineMethod",
+      "evalOnly",
+      "moduleEval",
+      "scoping",
     ]);
   });
 
@@ -1300,7 +2760,14 @@ describe("body call capture", () => {
     );
     const m = cls.instanceMethods.find((x) => x.name === "touchCallbacks")!;
     expect(m.callSeq).toEqual(["afterCreate", "afterUpdate"]);
-    expect(m.calls).toEqual(["afterCreate", "afterUpdate", "touchRecord"]);
+    expect(m.calls).toEqual([
+      "@invoked:afterCreate",
+      "@invoked:afterUpdate",
+      "@invoked:touchRecord",
+      "afterCreate",
+      "afterUpdate",
+      "touchRecord",
+    ]);
   });
 
   it("keeps an INLINE function argument in the order stream", () => {
@@ -1333,7 +2800,7 @@ describe("body call capture", () => {
       "QueryAttribute",
     );
     const inst = cls.instanceMethods.find((m) => m.name === "withCastValue")!;
-    expect(inst.calls).toEqual(["name", "type", "withCastValue"]);
+    expect(inst.calls).toEqual(["@invoked:withCastValue", "name", "type", "withCastValue"]);
   });
 
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
@@ -1344,8 +2811,13 @@ describe("body call capture", () => {
       };`,
     );
     const byName = Object.fromEntries(methods.map((m) => [m.name, m.calls]));
-    expect(byName["where"]).toEqual(["buildWhere", "spawn"]);
-    expect(byName["toArrow"]).toEqual(["records"]);
+    expect(byName["where"]).toEqual([
+      "@invoked:buildWhere",
+      "@invoked:spawn",
+      "buildWhere",
+      "spawn",
+    ]);
+    expect(byName["toArrow"]).toEqual(["@invoked:records", "records"]);
   });
 
   it("credits a get-accessor value READ as a call (Ruby reader-call semantics)", () => {
@@ -1361,7 +2833,13 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "buildJoins")!;
-    expect(m.calls).toEqual([".concat", "concat", "joinsValues", "leftOuterJoinsValues"]);
+    expect(m.calls).toEqual([
+      ".concat",
+      "@invoked:concat",
+      "concat",
+      "joinsValues",
+      "leftOuterJoinsValues",
+    ]);
   });
 
   it("does not double-record a call's callee property as a value read", () => {
@@ -1371,7 +2849,7 @@ describe("body call capture", () => {
     // fire on a callee).
     const cls = extractFromSource(`class Foo { run() { this.joinsValues(); } }`);
     const m = cls.instanceMethods.find((m) => m.name === "run")!;
-    expect(m.calls).toEqual(["joinsValues"]);
+    expect(m.calls).toEqual(["@invoked:joinsValues", "joinsValues"]);
   });
 
   it("does not credit an assignment target as a value read (write mirrors the setter)", () => {
@@ -1397,7 +2875,7 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "reset")!;
-    expect(m.calls).toEqual([".build", ".pop", "build", "pop"]);
+    expect(m.calls).toEqual([".build", ".pop", "@invoked:build", "@invoked:pop", "build", "pop"]);
   });
 });
 
@@ -1421,7 +2899,15 @@ describe("body call capture — renamed-import aliases", () => {
     const m = cls.instanceMethods.find((m) => m.name === "touchDeferredAttributes")!;
     // `touch` (resolved from `timestampTouch` via both the aliased direct call
     // and the `.call` dispatch) plus the retained literal `call`.
-    expect(m.calls).toEqual([".call", "call", "timestampTouch", "touch"]);
+    expect(m.calls).toEqual([
+      ".call",
+      "@invoked:call",
+      "@invoked:timestampTouch",
+      "@invoked:touch",
+      "call",
+      "timestampTouch",
+      "touch",
+    ]);
   });
 
   it("does not leak one file's aliases into another", () => {
@@ -1438,11 +2924,45 @@ describe("body call capture — renamed-import aliases", () => {
     // In b.ts, `renamed` is an undeclared identifier — it must stay "renamed",
     // proving a.ts's alias map was cleared before b.ts was walked.
     expect(info.classes["a.ts:A"].instanceMethods.find((m) => m.name === "run")!.calls).toEqual([
+      "@invoked:renamed",
+      "@invoked:touch",
       "renamed",
       "touch",
     ]);
     expect(info.classes["b.ts:B"].instanceMethods.find((m) => m.name === "go")!.calls).toEqual([
+      "@invoked:renamed",
       "renamed",
+    ]);
+  });
+});
+
+describe("body call capture — ruby-compat renamed imports", () => {
+  it("credits a rename forced by a module-level homonym to the original export", () => {
+    const info = extractFromFiles("/p", {
+      "finder.ts": `
+        import { first as aryFirst } from "@blazetrails/ruby-compat";
+        export function first(this: any): unknown { return aryFirst(this.records); }
+      `,
+    });
+    expect(fileFunctionsOf(info, "finder.ts").find((f) => f.name === "first")!.calls).toEqual([
+      "@invoked:aryFirst",
+      "@invoked:first",
+      "aryFirst",
+      "first",
+      "records",
+    ]);
+  });
+
+  it("keeps the local name of a rename toward the Ruby name", () => {
+    const info = extractFromFiles("/p", {
+      "insp.ts": `
+        import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+        export function show(x: unknown): unknown { return inspect(x); }
+      `,
+    });
+    expect(fileFunctionsOf(info, "insp.ts").find((f) => f.name === "show")!.calls).toEqual([
+      "@invoked:inspect",
+      "inspect",
     ]);
   });
 });
@@ -1665,10 +3185,31 @@ describe("extractClass — internal tagging", () => {
         #field = 1;
       }
     `);
-    const hidden = info.instanceMethods.find((m) => m.name === "#hidden")!;
+    const hidden = info.instanceMethods.find((m) => m.name === "hidden")!;
     expect(hidden.visibility).toBe("private");
     expect(hidden.internal).toBe(true);
     expect(info.instanceMethods.find((m) => m.name === "#field")!.internal).toBe(true);
+  });
+
+  it("credits a `#name` method, and a call to it, under the bare name", () => {
+    const info = extractFromSource(`
+      export class Foo {
+        scope() {
+          return this.#addConstraints();
+        }
+        #addConstraints() {}
+        #block = () => {};
+        run() {
+          return this.#block();
+        }
+      }
+    `);
+    expect(info.instanceMethods.find((m) => m.name === "addConstraints")!.visibility).toBe(
+      "private",
+    );
+    expect(info.instanceMethods.find((m) => m.name === "scope")!.calls).toContain("addConstraints");
+    expect(info.instanceMethods.find((m) => m.name === "#block")).toBeDefined();
+    expect(info.instanceMethods.find((m) => m.name === "run")!.calls).toContain("block");
   });
 
   it("tags static private members and keeps them on classMethods", () => {
@@ -1753,6 +3294,111 @@ describe("extractFromProgram — include() detection", () => {
     expect(mod).toBeDefined();
     expect(mod.instanceMethods.map((m) => m.name).sort()).toEqual(["eq", "gt", "lt"]);
     expect(mod.objectLiteral).toBe(true);
+  });
+
+  it("marks only the literal's members where an object literal merges with an interface", () => {
+    const info = extractFromFiles("/p", {
+      "optimistic.ts": `
+        export interface Optimistic { readonly lockOptimistically: boolean }
+        export const Optimistic = {
+          lockingEnabled(): boolean { return true; },
+        };
+      `,
+    });
+    const mod = info.modules["optimistic.ts:Optimistic"];
+    expect(mod.objectLiteral).toBeUndefined();
+    expect(mod.instanceMethods.map((m) => [m.name, m.objectLiteralMember])).toEqual([
+      ["lockingEnabled", true],
+      ["lockOptimistically", undefined],
+    ]);
+  });
+
+  it("records the methods an exported Module instance includes", () => {
+    const info = extractFromFiles("/p", {
+      "serialize-cast-value.ts": `
+        declare class Module { include(mod: object): this; }
+        export const DefaultImplementation = new Module().include({
+          serializeCastValue(value: unknown): unknown { return value; },
+        });
+      `,
+    });
+    const mod = info.modules["serialize-cast-value.ts:DefaultImplementation"];
+    expect(mod.instanceMethods.map((m) => m.name)).toEqual(["serializeCastValue"]);
+    expect(mod.instanceMethods[0].params.map((p) => p.name)).toEqual(["value"]);
+    expect(mod.objectLiteral).toBeUndefined();
+  });
+
+  it("records the methods an exported Module instance defines in its block", () => {
+    const info = extractFromFiles("/p", {
+      "core-queries.ts": `
+        declare class Module {
+          constructor(block?: (mod: Module) => void);
+          defineMethod(name: string, body: (...args: never[]) => unknown): void;
+        }
+        function findBy(...args: unknown[]): unknown { return args; }
+        export const ClassMethods = new Module((mod) => {
+          mod.defineMethod("findBy", findBy);
+          mod.defineMethod("exists", function (conditions: unknown) { return conditions; });
+          [].forEach(() => mod.defineMethod("nested", findBy));
+        });
+        export const Other = new Set([1]);
+      `,
+    });
+    const methods = info.modules["core-queries.ts:ClassMethods"].instanceMethods;
+    expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([
+      ["findBy", true],
+      ["exists", false],
+    ]);
+    expect(info.modules["core-queries.ts:Other"]).toBeUndefined();
+  });
+
+  it("records the methods a Module's block generates with delegate", () => {
+    // activesupport/lib/active_support/message_pack/serializer.rb:40.
+    const info = extractFromFiles("/p", {
+      "serializer.ts": `
+        declare class Module {
+          constructor(block?: (mod: Module) => void);
+        }
+        declare function delegate(this: object, ...methods: unknown[]): string[];
+        const other = {};
+        export const Serializer = new Module((mod) => {
+          delegate.call(mod, "registerType", { to: "messagePackFactory" });
+          delegate.call(other, "elsewhere", { to: "messagePackFactory" });
+        });
+      `,
+    });
+    const methods = info.modules["serializer.ts:Serializer"].instanceMethods;
+    expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([["registerType", false]]);
+  });
+
+  it("records the [initialize] hook a Module's block assigns as the module's initialize", () => {
+    const info = extractFromFiles("/p", {
+      "shell.ts": `
+        declare const initialize: unique symbol;
+        declare class Module {
+          constructor(block?: (mod: Module) => void);
+        }
+        export const Shell = new Module((mod) => {
+          (mod as unknown as Record<symbol, unknown>)[initialize] = function (
+            this: { shell: unknown },
+            args: unknown[] = [],
+            options: unknown = {},
+            config: { shell?: unknown } = {},
+          ) {
+            this.shell = config.shell;
+          };
+        });
+        export const Other = new Module((mod) => {
+          const other = {} as Record<symbol, unknown>;
+          other[initialize] = function () {};
+        });
+      `,
+    });
+    const methods = info.modules["shell.ts:Shell"].instanceMethods;
+    expect(methods.map((m) => [m.name, m.params.map((p) => p.name)])).toEqual([
+      ["[initialize]", ["this", "args", "options", "config"]],
+    ]);
+    expect(info.modules["shell.ts:Other"]).toBeUndefined();
   });
 
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {
@@ -1934,6 +3580,19 @@ describe("extractFromProgram — include() detection", () => {
     const iface = info.modules["sqlite3/adapter.ts:SQLite3Adapter"];
     expect(iface.extends).toContain("Quoting");
     expect(iface.extendsFiles?.["Quoting"]).toBe("sqlite3/quoting.ts");
+  });
+
+  it("reads the superclass through a parenthesized `as` cast", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `export class Base {}`,
+      "derived.ts": `
+        import { Base } from "./base.js";
+        export class Derived extends (Base as new (precision?: number) => Base) {}
+      `,
+    });
+    const cls = info.classes["derived.ts:Derived"];
+    expect(cls.superclass).toBe("Base");
+    expect(cls.superclassFile).toBe("base.ts");
   });
 
   it("omits superclassFile when the extends clause has no resolvable declaration", () => {
@@ -2147,7 +3806,9 @@ describe("extractFromProgram — extend() detection", () => {
       `,
     });
     const base = info.classes["base.ts:Base"];
-    expect(base.instanceMethods.map((m) => m.name)).toContain("humanAttributeName");
+    expect(base.classMethods.map((m) => m.name)).toContain("humanAttributeName");
+    expect(base.classMethods.every((m) => m.isStatic === true)).toBe(true);
+    expect(base.instanceMethods).toEqual([]);
     expect(base.extends).not.toContain("ClassMethods");
   });
 
@@ -2160,7 +3821,7 @@ describe("extractFromProgram — extend() detection", () => {
         extend(Base, { find() {}, findBy: () => {}, where: function () {} });
       `,
     });
-    expect(info.classes["base.ts:Base"].instanceMethods.map((m) => m.name).sort()).toEqual([
+    expect(info.classes["base.ts:Base"].classMethods.map((m) => m.name).sort()).toEqual([
       "find",
       "findBy",
       "where",
@@ -2405,9 +4066,11 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
     `,
   };
 
-  it("credits every generated accessor to the class the generator is called with", () => {
+  it("credits every generated accessor to the file the generator sits in", () => {
     const info = extractFromFiles("/p", relationFiles);
-    const methods = info.classes["relation.ts:Relation"].instanceMethods;
+    const methods = info.fileFunctions!["query-methods.ts"];
+    expect(methods.every((m) => m.file === "query-methods.ts")).toBe(true);
+    expect(info.classes["relation.ts:Relation"].instanceMethods).toEqual([]);
     const readers = methods.filter((m) => m.writer !== true).map((m) => m.name);
     expect(readers).toEqual(
       expect.arrayContaining([
@@ -2422,7 +4085,7 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
 
   it("credits the writer half of a get/set pair, and only the reader without a set", () => {
     const info = extractFromFiles("/p", relationFiles);
-    const methods = info.classes["relation.ts:Relation"].instanceMethods;
+    const methods = info.fileFunctions!["query-methods.ts"];
     const writers = methods.filter((m) => m.writer === true).map((m) => m.name);
     expect(writers).toEqual(expect.arrayContaining(["includesValues", "limitValue"]));
     // `extensions` is Ruby's `alias extensions extending_values` — a reader alone.
@@ -2548,8 +4211,8 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
         }
       `,
     });
-    const names = info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name);
-    expect(names).toEqual(["limitValue"]);
+    const names = info.fileFunctions!["query-methods.ts"].map((m) => m.name);
+    expect(names).toEqual(["install", "limitValue"]);
   });
 
   it("credits every class the generator's call sites pass, each exactly once", () => {
@@ -2572,10 +4235,8 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
         }
       `,
     });
-    const namesOf = (cls: string): string[] =>
-      info.classes[`relation.ts:${cls}`].instanceMethods.map((m) => m.name);
-    expect(namesOf("Relation")).toEqual(["limit"]);
-    expect(namesOf("AssociationRelation")).toEqual(["offset"]);
+    const names = info.fileFunctions!["query-methods.ts"].map((m) => m.name);
+    expect(names).toEqual(["defineValueMethods", "limit", "offset"]);
   });
 
   it("credits nothing when the generator function is never called with a class", () => {
@@ -2932,7 +4593,7 @@ describe("extractFromProgram — @noRailsEquivalent beats @internal (RFC 0121)",
       `,
     });
     const cls = info.classes["updater.ts:Updater"];
-    for (const name of ["factory", "priv", "prot", "#hidden"]) {
+    for (const name of ["factory", "priv", "prot", "hidden"]) {
       expect(cls.instanceMethods.find((m) => m.name === name)!.internal).toBe(true);
     }
     expect(cls.instanceMethods.find((m) => m.name === "seam")!.internal).toBeUndefined();
@@ -3012,19 +4673,22 @@ describe("extractFromProgram — re-export attribution", () => {
 
   it("re-syncs a clone's extendsFiles, which the include pass writes after cloning", () => {
     const info = extractFromFiles("/p", {
-      "type/helpers/mutable.ts": `export const MutableModule = { cast() {} };`,
+      "type/helpers/mutable.ts": `
+        export const Mutable = { cast() {} };
+        export type Mutable = typeof Mutable;
+      `,
       "type/json.ts": `
         import { include } from "@blazetrails/activesupport";
-        import { MutableModule } from "./helpers/mutable.js";
+        import { Mutable } from "./helpers/mutable.js";
         export class Json { deserialize(): void {} }
-        include(Json, MutableModule);
+        include(Json, Mutable);
       `,
       "type.ts": `export { Json } from "./type/json.js";`,
     });
 
     const declaring = info.classes["type/json.ts:Json"];
     const clone = info.classes["type.ts:Json"];
-    expect(clone.extends).toEqual(["MutableModule"]);
+    expect(clone.extends).toEqual(["Mutable"]);
     expect(clone.extendsFiles).toEqual(declaring.extendsFiles);
   });
 
@@ -3654,6 +5318,114 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toEqual(["lock", "readonly"]);
   });
 
+  it("reads option keys off an options hash carried as a keyword", () => {
+    const info = extractFromFiles("/p", {
+      "delegated-type.ts": `
+        export function defineDelegatedTypeMethods(
+          role: string,
+          { types, options }: { types: string[]; options: { foreignKey?: string; primaryKey?: string } },
+        ): void {}
+        export function bag(kwargs: { types: string[]; options: Record<string, unknown> }): void {}
+      `,
+    });
+    const fns = Object.values(info.modules).flatMap((m) => [
+      ...m.instanceMethods,
+      ...m.classMethods,
+    ]);
+    expect(fns.find((m) => m.name === "defineDelegatedTypeMethods")!.optionKeys).toEqual([
+      "foreignKey",
+      "primaryKey",
+    ]);
+    expect(fns.find((m) => m.name === "bag")!.optionKeys).toBeNull();
+  });
+
+  it("reads option keys off the body, not the options type", () => {
+    const info = extractFromFiles("/p", {
+      "schema-definitions.ts": `
+        interface ColumnOptions { limit?: number; null?: boolean; precision?: number; after?: string; type?: string; unsigned?: boolean }
+        declare function fetch(h: object, k: string, d?: unknown): unknown;
+        declare function valuesAt(h: object, ...k: string[]): unknown[];
+        export function timestamps(options: ColumnOptions = {}): void {
+          column("created_at", options);
+        }
+        export function reads(name: string, options: ColumnOptions = {}): void {
+          if (options.null) return;
+          options.unsigned = true;
+          options.limit ??= 8;
+          const { precision, ...rest } = options;
+          const copy = { ...rest };
+          if ("after" in copy) fetch(options as object, "type", null);
+        }
+        export function destructured({ limit, ...options }: ColumnOptions): void {
+          valuesAt(options, "null", "after");
+          delete options.precision;
+        }
+        export function inert(options: ColumnOptions = {}): void {
+          options.toString();
+          options.hasOwnProperty("null");
+          let limit, rest: ColumnOptions;
+          ({ limit, ...rest } = options);
+          const { after: { length } = "" } = rest;
+        }
+        export function bag({ types, options }: { types: string[]; options: ColumnOptions }): void {
+          options["limit"];
+        }
+        export declare function bodiless(options: ColumnOptions): void;
+        declare function column(name: string, options: ColumnOptions): void;
+      `,
+    });
+    const fns = Object.values(info.modules).flatMap((m) => [
+      ...m.instanceMethods,
+      ...m.classMethods,
+    ]);
+    const reads = (name: string) => fns.find((m) => m.name === name)!.optionReads;
+    expect(reads("timestamps")).toEqual([]);
+    expect(reads("reads")).toEqual(["after", "limit", "null", "precision", "type"]);
+    expect(reads("destructured")).toEqual(["after", "limit", "null", "precision"]);
+    expect(reads("inert")).toEqual(["after", "limit", "null"]);
+    expect(reads("bag")).toEqual(["limit"]);
+    expect(reads("bodiless")).toBeUndefined();
+    expect(fns.find((m) => m.name === "timestamps")!.optionKeys).toHaveLength(6);
+  });
+
+  it("follows a copy made through a ruby-compat call or a reassignment", () => {
+    const info = extractFromFiles("/p", {
+      "schema-statements.ts": `
+        interface Options { foreignKey?: object; ifExists?: boolean; column?: string }
+        declare function slice(h: object, ...k: string[]): Options;
+        export function removeReference(refName: string, { foreignKey, ...options }: Options = {}): void {
+          const conditionalOptions = slice(options, "ifExists");
+          let foreignKeyOptions: Options;
+          foreignKeyOptions = { ...foreignKey, ...conditionalOptions };
+          foreignKeyOptions.column ??= refName;
+          foreignKeyOptions = { column: refName };
+          foreignKeyOptions.reassigned;
+        }
+      `,
+    });
+    const fn = Object.values(info.modules)
+      .flatMap((m) => [...m.instanceMethods, ...m.classMethods])
+      .find((m) => m.name === "removeReference")!;
+    expect(fn.optionReads).toEqual(["column", "foreignKey"]);
+  });
+
+  it("takes a non-trailing param named options as the options hash", () => {
+    const info = extractFromFiles("/p", {
+      "collection-caching.ts": `
+        interface RenderOptions { cached?: boolean; as?: string }
+        interface View { controller: { performCaching?: boolean } }
+        export function isWillCache(options: RenderOptions, view: View): boolean {
+          return options.cached === true && view.controller.performCaching === true;
+        }
+      `,
+    });
+    const fn = Object.values(info.modules)
+      .flatMap((m) => [...m.instanceMethods, ...m.classMethods])
+      .find((m) => m.name === "isWillCache")!;
+    expect(fn.optionKeys).toEqual(["as", "cached"]);
+    expect(fn.optionReads).toEqual(["cached"]);
+  });
+
   it("extracts parameters onto a synthesized __mixin constructor", () => {
     const info = extractFromFiles("/p", {
       "attributes.ts": `
@@ -4011,6 +5783,8 @@ describe("sub-package de-overlap", () => {
   it("maps activerecord's src/support to the activerecord-test-support package", () => {
     expect(overlappingSubDirs("activerecord")).toEqual([
       packageSrcDir("activerecord-test-support"),
+      packageSrcDir("mysql2"),
+      packageSrcDir("pg"),
       packageSrcDir("sqlite3"),
     ]);
     expect(packageSrcDir("activerecord-test-support")).toBe(
@@ -4439,9 +6213,222 @@ describe("@missingRailsCall extraction", () => {
   });
 });
 
+const nativeForms = (m: MethodInfo): Set<string> =>
+  partitionNegatedCalls(m.calls ?? []).nativeForms;
+
+describe("a native hash form credits the Hash call it ports", () => {
+  const credited = (
+    rubyCall: string,
+    body: string,
+    kinds: string[],
+    names: string[] | undefined,
+  ): boolean => {
+    const cls = extractFromSource(
+      `class Foo {
+        options: Record<string, unknown> = {};
+        other: Record<string, unknown> = {};
+        m(options: Record<string, unknown>, other: Record<string, unknown>) { ${body} }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "m")!;
+    return !significantCallsForReceivers(
+      { [rubyCall]: kinds },
+      undefined,
+      nativeForms(m),
+      names === undefined ? undefined : { [rubyCall]: names },
+    ).has(rubyCall);
+  };
+
+  it("credits options.key?(:x) from a membership test on options only", () => {
+    for (const call of ["key?", "has_key?"]) {
+      expect(credited(call, `return "x" in options;`, ["local"], ["options"])).toBe(true);
+      expect(credited(call, `return Object.hasOwn(options, "x");`, ["hash"], ["options"])).toBe(
+        true,
+      );
+      expect(credited(call, `return options.x !== undefined;`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in other;`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in options;`, ["self"], undefined)).toBe(false);
+    }
+  });
+
+  it("credits @options.key?(:x) from a membership test on this.options only", () => {
+    expect(credited("key?", `return "x" in this.options;`, ["ivar"], ["@options"])).toBe(true);
+    expect(credited("key?", `return "x" in this.other;`, ["ivar"], ["@options"])).toBe(false);
+    expect(credited("key?", `return "x" in this._options;`, ["ivar"], ["@options"])).toBe(true);
+    expect(credited("key?", `return "x" in this._options;`, ["local"], ["options"])).toBe(false);
+  });
+
+  it("credits no key? for a feature probe on another value", () => {
+    expect(credited("key?", `return "then" in other;`, ["local"], ["options"])).toBe(false);
+    expect(credited("key?", `return "x" in options;`, ["expr"], ["?"])).toBe(false);
+  });
+
+  it("credits include? / member? only where every site is a proven hash", () => {
+    for (const call of ["include?", "member?"]) {
+      expect(credited(call, `return "x" in options;`, ["hash"], ["options"])).toBe(true);
+      expect(credited(call, `return "x" in options;`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in options;`, ["hash", "ivar"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in options;`, ["array"], undefined)).toBe(false);
+      expect(credited(call, `return "x" in other;`, ["hash"], ["options"])).toBe(false);
+    }
+  });
+
+  it("credits options.delete(:x) from a delete on options only", () => {
+    expect(credited("delete", `delete options.x;`, ["local"], ["options"])).toBe(true);
+    expect(credited("delete", `delete this.options[other.k];`, ["ivar"], ["@options"])).toBe(true);
+    expect(credited("delete", `options.x = undefined;`, ["local"], ["options"])).toBe(false);
+    expect(credited("delete", `delete other.x;`, ["local"], ["options"])).toBe(false);
+    for (const kind of ["self", "const", "array", "string"]) {
+      expect(credited("delete", `delete options.x;`, ["local", kind], ["options"])).toBe(false);
+    }
+  });
+
+  it("credits merge! / update from an Object.assign onto the receiver only", () => {
+    for (const call of ["merge!", "update"]) {
+      expect(credited(call, `Object.assign(options, other);`, ["local"], ["options"])).toBe(true);
+      expect(credited(call, `Object.assign(this.options, other);`, ["ivar"], ["@options"])).toBe(
+        true,
+      );
+      expect(credited(call, `Object.assign(other, options);`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return { ...options, ...other };`, ["local"], ["options"])).toBe(
+        false,
+      );
+      expect(credited(call, `Object.assign(options, other);`, ["self"], undefined)).toBe(false);
+      expect(credited(call, `Object.assign(options, other);`, ["const"], ["options"])).toBe(false);
+    }
+  });
+
+  it("credits options.merge(other) from a spread of options only", () => {
+    expect(credited("merge", `return { ...options, ...other };`, ["local"], ["options"])).toBe(
+      true,
+    );
+    expect(credited("merge", `return { ...other };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { ...options };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { ...options, a: 1 };`, ["local"], ["options"])).toBe(true);
+    expect(credited("merge", `return { ...other, ...options };`, ["local"], ["options"])).toBe(
+      false,
+    );
+    expect(credited("merge", `return { a: 1, ...options };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { a: 1, b: options };`, ["local"], ["options"])).toBe(false);
+  });
+
+  it("flags a bare merge(other) beside a spread", () => {
+    expect(credited("merge", `return { ...options, ...other };`, ["self"], undefined)).toBe(false);
+    expect(
+      credited("merge", `return { ...options, ...other };`, ["local", "self"], ["options"]),
+    ).toBe(false);
+  });
+
+  it("flags relation.merge(other) on an ivar or expr receiver beside a spread", () => {
+    const body = `return { ...options, ...other };`;
+    expect(credited("merge", body, ["ivar"], ["@relation"])).toBe(false);
+    expect(credited("merge", body, ["expr"], ["relation"])).toBe(false);
+    expect(credited("merge", body, ["expr"], ["?"])).toBe(false);
+    expect(credited("merge", body, ["const"], ["options"])).toBe(false);
+  });
+
+  it("credits options.each_pair from a loop over Object.entries(options) only", () => {
+    const loop = (over: string): string => `for (const [k, v] of ${over}) use(k, v);`;
+    expect(credited("each_pair", loop("Object.entries(options)"), ["local"], ["options"])).toBe(
+      true,
+    );
+    expect(
+      credited("each_pair", loop("Object.entries(this.options)"), ["ivar"], ["@options"]),
+    ).toBe(true);
+    expect(
+      credited(
+        "each_pair",
+        `for (const k of Object.keys(options)) use(k);`,
+        ["local"],
+        ["options"],
+      ),
+    ).toBe(false);
+    expect(credited("each_pair", loop("Object.entries(other)"), ["local"], ["options"])).toBe(
+      false,
+    );
+    expect(credited("each_pair", loop("Object.entries(options)"), ["self"], undefined)).toBe(false);
+    expect(credited("each_pair", loop("Object.entries(options)"), ["const"], ["options"])).toBe(
+      false,
+    );
+  });
+});
+
+describe("native element access as the port of Hash#[] / Hash#[]=", () => {
+  const method = (body: string): MethodInfo =>
+    extractFromSource(
+      `class Foo { m(h: Record<string, unknown>, k: string, v: unknown) { ${body} } }`,
+    ).instanceMethods.find((m) => m.name === "m")!;
+
+  it("records a read as the ref:get token Ruby records for h[k], and no call", () => {
+    expect(method(`return use(h[k]);`).skeleton).toEqual(["ref:use", "ref:get"]);
+    expect(method(`return use(h[k]);`).calls).toEqual(["@invoked:use", "use"]);
+    expect(method(`return use(hashAref(h, k));`).skeleton).toEqual(["ref:use", "ref:hashAref"]);
+    expect(method(`return use(h.k);`).skeleton).toEqual(["ref:use", "ref:k"]);
+  });
+
+  it("records a write as assign:computed, and no call", () => {
+    expect(method(`h[k] = v;`).skeleton).toEqual(["assign:computed"]);
+    expect(method(`h[k] = v;`).calls).toBeUndefined();
+    expect(method(`hashAset(h, k, v);`).skeleton).toEqual(["ref:hashAset"]);
+    expect(method(`h.k = v;`).skeleton).toBeUndefined();
+  });
+
+  it("leaves no ref:get in a body that drops the read", () => {
+    expect(method(`return use(k);`).skeleton).toEqual(["ref:use"]);
+  });
+
+  it("describes an element read argument as opaque, as Ruby describes h[k]", () => {
+    expect(method(`use(h[k]);`).callArgs![0].args).toEqual(["?"]);
+    expect(method(`use(hashAref(h, k));`).callArgs![0].args).toEqual(["call:hashAref"]);
+    expect(method(`use(h.k);`).callArgs![0].args).toEqual(["call:k"]);
+  });
+});
+
 describe("callArgs", () => {
   const site = (source: string, method = "create"): CallSite[] =>
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
+
+  it("records a native hash form's key as an @in / @delete site (RFC 0190)", () => {
+    expect(
+      site(
+        `class Foo {
+          create(options: any, key: string) {
+            if ("public" in options) delete options.public;
+            delete this.env["etag"];
+            delete options[key];
+            Object.assign(options, { a: 1 });
+          }
+        }`,
+      ).filter((s) => s.name.startsWith("@")),
+    ).toEqual([
+      { name: "@in", args: ["str:public"], flags: [], recv: "id:options" },
+      { name: "@delete", args: ["str:public"], flags: [], recv: "id:options" },
+      { name: "@delete", args: ["str:etag"], flags: [], recv: "id:env" },
+      { name: "@delete", args: ["id:key"], flags: [], recv: "id:options" },
+    ]);
+    expect(
+      site(`class Foo { create(h: any, k: string) { return Object.hasOwn(h, k); } }`).map((s) => [
+        s.name,
+        s.args,
+      ]),
+    ).toEqual([
+      ["@in", ["id:k"]],
+      ["hasOwn", ["id:h", "id:k"]],
+    ]);
+    expect(
+      site(
+        `class Foo {
+          #priv = 1;
+          create(h: any) {
+            return Object.prototype.hasOwnProperty.call(h, "k") || #priv in h;
+          }
+        }`,
+      ).filter((s) => s.name.startsWith("@")),
+    ).toEqual([
+      { name: "@in", args: ["str:k"], flags: [], recv: "id:h" },
+      { name: "@in", args: ["?"], flags: [], recv: "id:h" },
+    ]);
+  });
 
   it("records a call's own receiver, but not a namespace qualifier", () => {
     expect(
@@ -4463,6 +6450,24 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("describes an X.prototype argument as X", () => {
+    expect(
+      site(
+        `class Foo {
+          create() {
+            prepend(UniquenessValidator.prototype, EncryptedUniquenessValidator);
+          }
+        }`,
+      ),
+    ).toEqual([
+      {
+        name: "prepend",
+        args: ["const:UniquenessValidator", "const:EncryptedUniquenessValidator"],
+        flags: [],
+      },
+    ]);
+  });
+
   it("drops a thrown construction so the real construction pairs", () => {
     expect(
       site(
@@ -4474,6 +6479,17 @@ describe("callArgs", () => {
         }`,
       ),
     ).toEqual([{ name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] }]);
+  });
+
+  it("names an rbFSend argument by the method it sends", () => {
+    const sites = site(
+      `class Foo {
+        create() {
+          return sprintf("%06d", rbFSend(value, "usec"));
+        }
+      }`,
+    );
+    expect(sites?.find((s) => s.name === "sprintf")?.args).toEqual(["str:%2506d", "call:usec"]);
   });
 
   it("keeps a construction nested inside a thrown expression", () => {
@@ -4628,6 +6644,19 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("flags a product of literals and identifiers with its factors", () => {
+    const sites = site(
+      `class Foo {
+        create(counter: number) {
+          return new Promise((resolve) => setTimeout(resolve, 0.1 * counter * 1000));
+        }
+      }`,
+    );
+    const timer = sites.find((s) => s.name === "setTimeout")!;
+    expect(timer.args).toEqual(["id:resolve", "binop:*"]);
+    expect(timer.flags).toContain("product=num:0.1*id:counter*num:1000");
+  });
+
   it("describes a non-keyword or empty object literal as the opaque hash", () => {
     const sites = site(
       `class Foo {
@@ -4709,8 +6738,30 @@ describe("callArgs", () => {
         }`,
       ),
     ).toEqual([
-      { name: "mergeBang", args: ["id:data", "id:other"], flags: ["block"] },
-      { name: "block", args: [], flags: ["block"] },
+      {
+        name: "mergeBang",
+        args: ["id:data", "id:other"],
+        flags: ["block"],
+        rubyCompat: "mergeBang",
+      },
+      { name: "block", args: [], flags: ["block"], rubyCompat: "block" },
+    ]);
+  });
+
+  it("records the ruby-compat export a bare callee binds to, and not a method call's", () => {
+    expect(
+      site(
+        `import { merge as hashMerge } from "@blazetrails/ruby-compat";
+        class Foo {
+          create(other: unknown) {
+            hashMerge(this.options, other);
+            this.relation.merge(other);
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "hashMerge", args: ["id:options", "id:other"], flags: [], rubyCompat: "merge" },
+      { name: "merge", args: ["id:other"], flags: [], recv: "id:relation" },
     ]);
   });
 
@@ -4938,7 +6989,7 @@ describe("callArgs", () => {
       }`,
     );
     const create = cls.instanceMethods.find((m) => m.name === "create")!;
-    expect(create.calls).toEqual(["build", "save"]);
+    expect(create.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(create.callSeq).toEqual(["build", "save"]);
   });
 });
@@ -5301,6 +7352,46 @@ describe("extractFromProgram — defineColumnMethods() generated column methods"
     expect(blob.bodyless).toBeUndefined();
     expect(blob.aliasOf).toBe("binary");
   });
+
+  it("credits a module's included hook to every class that includes the module", () => {
+    const hooked = SRC.replace(
+      /TableDefinition\.defineColumnMethods[^]*$/,
+      `export const ColumnMethods = new Module();
+       ColumnMethods[included] = function (base) {
+         base.defineColumnMethods("bit_varying", "binary");
+         base.prototype.blob = base.prototype.binary;
+       };
+       export class Table { static defineColumnMethods(...columnTypes: string[]): void {} }
+       export interface Table extends ColumnMethods {}
+       include(TableDefinition, ColumnMethods);
+       include(Table, ColumnMethods);`,
+    );
+    const info = extractFromFiles("/p", { "schema-definitions.ts": hooked });
+    for (const name of ["TableDefinition", "Table"]) {
+      const klass = info.classes[`schema-definitions.ts:${name}`];
+      expect(klass.instanceMethods.find((m) => m.name === "bitVarying")!.bodyless).toBeUndefined();
+      expect(klass.instanceMethods.find((m) => m.name === "blob")!.aliasOf).toBe("binary");
+    }
+  });
+});
+
+describe("extractFromProgram — a Module on a static property", () => {
+  it("credits the included literal's methods under the dotted seat", () => {
+    const info = extractFromFiles("/p", {
+      "compatibility.ts": `export class V7_0 {
+        static TableDefinition = new Module().include({ column(name: string) {} });
+        static {
+          V7_0.TableDefinition.aliasMethod("change", "column");
+        }
+      }`,
+    });
+    const mod = info.modules["compatibility.ts:V7_0.TableDefinition"];
+    expect(mod.name).toBe("TableDefinition");
+    expect(mod.instanceMethods.map((m) => [m.name, m.aliasOf])).toEqual([
+      ["column", undefined],
+      ["change", "column"],
+    ]);
+  });
 });
 
 describe("extractFromProgram — classAttribute() generated accessors", () => {
@@ -5390,6 +7481,42 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     ]);
   });
 
+  it("credits a top-level Module#included block to the module const it is called on", () => {
+    const info = extractFromFiles("/p", {
+      "conversion.ts": `
+        import { classAttribute, included, Module } from "@blazetrails/activesupport";
+        export const Conversion = new Module();
+        Conversion.included(null, function (this: object) {
+          classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
+        });
+        Conversion.defineMethod("toKey", function () {});
+      `,
+      "deduplicable.ts": `
+        import { classAttribute, included, Module } from "@blazetrails/activesupport";
+        export const Deduplicable = new Module();
+        Deduplicable[included] = function (this: object) {
+          classAttribute.call(this, "registry");
+        };
+        Deduplicable.defineMethod("deduplicate", function () {});
+      `,
+    });
+    const seats = (c: ClassInfo, name: string) =>
+      [...c.classMethods, ...c.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats(info.modules["conversion.ts:Conversion"], "paramDelimiter")).toEqual([
+      "static",
+      "static writer",
+      "instance writer",
+    ]);
+    expect(seats(info.modules["deduplicable.ts:Deduplicable"], "registry")).toEqual([
+      "static",
+      "static writer",
+      "instance",
+      "instance writer",
+    ]);
+  });
+
   it("credits mattrReader / mattrAccessor with only the halves each macro installs, and no predicate", () => {
     const info = extractFromFiles("/p", {
       "configurable.ts": `
@@ -5410,6 +7537,33 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("config")).toEqual(["static", "instance"]);
     expect(seats("listeners")).toEqual(["static", "static writer", "instance", "instance writer"]);
     expect(seats("isConfig")).toEqual([]);
+  });
+
+  it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        import { Module } from "@blazetrails/ruby-compat";
+        export interface Base {
+          options: unknown;
+          args: unknown[];
+          shell: unknown;
+        }
+        import { Base as ThorBase } from "./shell.js";
+        ThorBase.attrReader("options", "args");
+        ThorBase.attrWriter("options");
+        const names = ["shell"];
+        ThorBase.attrReader(...names);
+        export const Base = Object.assign(ThorBase, {});
+      `,
+    });
+    const mod = info.classes["base.ts:Base"] ?? info.modules["base.ts:Base"];
+    const seats = (name: string) =>
+      [...mod.classMethods, ...mod.instanceMethods]
+        .filter((m) => m.name === name && m.bodyless !== true)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("options")).toEqual(["instance", "instance writer"]);
+    expect(seats("args")).toEqual(["instance"]);
+    expect(seats("shell")).toEqual([]);
   });
 
   it("does not seat an object literal with no [included] or [extended] hook", () => {
@@ -5667,5 +7821,55 @@ describe("seatedClassExpression", () => {
     for (const stmt of statements("Ns.A = class { };\nNs.B = 1;\nfoo();")) {
       expect(seatedClassExpression(stmt)).toBeUndefined();
     }
+  });
+});
+
+describe("staticClassExpressions", () => {
+  it("hosts `static CONST = new (class { ... })()` on a class named after the constant", () => {
+    const [cls] = ts
+      .createSourceFile(
+        "virtual.ts",
+        "class TestRequest { static readonly ENCODER = new (class { shouldMultipart() {} })(); }",
+        ts.ScriptTarget.Latest,
+        true,
+      )
+      .statements.filter(ts.isClassDeclaration);
+    const [nested, ...rest] = staticClassExpressions(cls, "TestRequest");
+    expect(rest).toEqual([]);
+    expect(nested.seat).toBe("TestRequest.ENCODER");
+    expect(nested.name).toBe("ENCODER");
+    expect(nested.cls.members.map((member) => member.name?.getText())).toEqual(["shouldMultipart"]);
+  });
+});
+
+describe("extractClass — @inlinedFrom on a constructor", () => {
+  const api = "ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84";
+  const core =
+    "ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482";
+
+  it("registers the one-line form", () => {
+    const [ctor] = extractFromSource(
+      `class Foo {\n  /** @inlinedFrom ${api} */\n  constructor() {}\n}`,
+    ).instanceMethods;
+    expect(ctor.inlinedFrom?.map((t) => `${t.module}#${t.hook}`)).toEqual([
+      "ActiveModel::API#initialize",
+    ]);
+  });
+
+  it("registers the multi-line form, in chain order", () => {
+    const [ctor] = extractFromSource(
+      `class Foo {\n  /**\n   * @inlinedFrom ${core}\n   * @inlinedFrom ${api}\n   */\n  constructor() {}\n}`,
+    ).instanceMethods;
+    expect(ctor.inlinedFrom?.map((t) => [t.module, t.firstLine, t.lastLine])).toEqual([
+      ["ActiveRecord::Core", 471, 482],
+      ["ActiveModel::API", 80, 84],
+    ]);
+  });
+
+  it("records nothing on an untagged constructor or a tagged method", () => {
+    const got = extractFromSource(
+      `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  save() {}\n}`,
+    ).instanceMethods;
+    expect(got.map((m) => m.inlinedFrom)).toEqual([undefined, undefined]);
   });
 });

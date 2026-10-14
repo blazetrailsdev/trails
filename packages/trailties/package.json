@@ -9,6 +9,14 @@
     ".": "./dist/cli.js",
     "./all": "./dist/all.js",
     "./generators": "./dist/generators/index.js",
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "default": "./dist/engine.js"
+    },
+    "./trailtie": {
+      "types": "./dist/trailtie.d.ts",
+      "default": "./dist/trailtie.js"
+    },
     "./test-help": {
       "types": "./dist/test-help.d.ts",
       "default": "./dist/test-help.js"
@@ -44,6 +52,7 @@
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",

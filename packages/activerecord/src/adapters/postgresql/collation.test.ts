@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.createTable("postgresql_collations", { force: true }, (t) => {
       t.string("string_c", { collation: "C" });
       t.text("text_posix", { collation: "POSIX" });
@@ -15,7 +19,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterEach(async () => {
     await adapter.dropTable("postgresql_collations", { ifExists: true });
-    await adapter.disconnectBang();
   });
 
   describe("PostgresqlCollationTest", () => {
@@ -53,7 +56,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump includes collation", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_collations");
+      const output = await dumpTableSchema("postgresql_collations");
       expect(output).toMatch(/t\.string\("string_c",\s*\{\s*collation:\s*"C"\s*\}\)/);
       expect(output).toMatch(/t\.text\("text_posix",\s*\{\s*collation:\s*"POSIX"\s*\}\)/);
     });

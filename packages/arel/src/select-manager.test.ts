@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import {
   type ArelEngine,
   Table,
@@ -146,7 +147,7 @@ describe("SelectManagerTest", () => {
     it("creates new cores", () => {
       const table = new Table("users", { as: "foo" });
       const mgr = table.from();
-      const m2 = mgr.clone();
+      const m2 = rbObjClone(mgr);
       m2.project("foo");
       expect(mgr.toSql()).not.toEqual(m2.toSql());
     });
@@ -154,8 +155,8 @@ describe("SelectManagerTest", () => {
     it("makes updates to the correct copy", () => {
       const table = new Table("users", { as: "foo" });
       const mgr = table.from();
-      const m2 = mgr.clone();
-      const m3 = m2.clone();
+      const m2 = rbObjClone(mgr);
+      const m3 = rbObjClone(m2);
       m2.project("foo");
       expect(mgr.toSql()).not.toEqual(m2.toSql());
       expect(m3.toSql()).toEqual(mgr.toSql());
@@ -239,7 +240,7 @@ describe("SelectManagerTest", () => {
     });
 
     it("should union all", () => {
-      const node = m1.union(":all", m2);
+      const node = m1.union("all", m2);
       expect(mustBeLike(visitor.compile(node))).toBe(
         mustBeLike(
           `( SELECT * FROM "users" WHERE "users"."age" < 18 UNION ALL SELECT * FROM "users" WHERE "users"."age" > 99 )`,
@@ -332,7 +333,7 @@ describe("SelectManagerTest", () => {
       const asStatement = new Nodes.As(replies, union);
 
       const manager = new SelectManager();
-      manager.withRecursive(asStatement).from(replies).project(star());
+      manager.with(":recursive", asStatement).from(replies).project(star());
 
       expect(mustBeLike(visitor.compile(manager.ast))).toBe(
         mustBeLike(`
@@ -810,7 +811,7 @@ describe("SelectManagerTest", () => {
     it("takes a string", () => {
       const mgr = new SelectManager();
       mgr.from(users);
-      const stmt = mgr.compileUpdate("foo = bar", users.get("id"));
+      const stmt = mgr.compileUpdate(new Nodes.SqlLiteral("foo = bar"), users.get("id"));
       expect(stmt.toSql()).toBe('UPDATE "users" SET foo = bar');
     });
 
@@ -1127,7 +1128,7 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager();
       mgr.from(users);
       mgr.where(users.get("id").eq(10));
-      expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10');
+      expect(mgr.whereSql()?.toString()).toBe('WHERE "users"."id" = 10');
     });
 
     it("joins wheres with AND", () => {
@@ -1135,7 +1136,7 @@ describe("SelectManagerTest", () => {
       mgr.from(users);
       mgr.where(users.get("id").eq(10));
       mgr.where(users.get("id").eq(11));
-      expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10 AND "users"."id" = 11');
+      expect(mgr.whereSql()?.toString()).toBe('WHERE "users"."id" = 10 AND "users"."id" = 11');
     });
 
     it("handles database-specific statements", () => {
@@ -1147,7 +1148,7 @@ describe("SelectManagerTest", () => {
       mgr.from(users);
       mgr.where(users.get("id").eq(10));
       mgr.where(users.get("name").matches("foo%"));
-      expect(mgr.whereSql(pgEngine)?.value).toBe(
+      expect(mgr.whereSql(pgEngine)?.toString()).toBe(
         `WHERE "users"."id" = 10 AND "users"."name" ILIKE 'foo%'`,
       );
     });

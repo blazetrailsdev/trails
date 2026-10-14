@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LogSubscriber as BaseLogSubscriber, Notifications } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
 import { Parameters } from "../../metal/strong-parameters.js";
+import { Base } from "../../base.js";
 import { LogSubscriber } from "../../log-subscriber.js";
 
 describe("LogOnUnpermittedParamsTest", () => {
@@ -23,10 +24,15 @@ describe("LogOnUnpermittedParamsTest", () => {
       return true;
     };
     const logger = { "debug?": true, debug: push, info: push, warn: push, error: push };
-    vi.spyOn(BaseLogSubscriber, "logger", "get").mockReturnValue(logger as never);
+    const oldLogger = Base.logger;
+    Base.logger = logger as never;
     Notifications.unsubscribeAll();
     LogSubscriber.attachTo("action_controller");
-    block();
+    try {
+      block();
+    } finally {
+      Base.logger = oldLogger;
+    }
     expect(log.join("\n")).toContain(message);
   }
 

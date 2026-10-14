@@ -28,6 +28,15 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     expect(row["qty"]).toBe(42);
   });
 
+  it("rollback() rolls the open transaction back and answers true, as the gem's Database#rollback does", async () => {
+    const before = await conn.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear");
+    await conn.exec("BEGIN");
+    await conn.execute("UPDATE widgets SET qty = qty + 1 WHERE name = ?", ["gear"]);
+    expect(await conn.rollback()).toBe(true);
+    expect(await conn.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear")).toBe(before);
+    await expect((async () => conn.rollback())()).rejects.toThrow();
+  });
+
   it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
     const rows = await conn.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
     expect(rows).toEqual([{ name: "sprocket" }]);

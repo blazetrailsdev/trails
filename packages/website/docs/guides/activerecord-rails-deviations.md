@@ -396,13 +396,7 @@ runtime (via `this.attribute`, `this.hasMany`, `this.scope`, `this.enum`)
 but the type system only sees them if you opt in with a `declare`:
 
 ```ts
-import {
-  Base,
-  CollectionProxy,
-  AssociationProxy,
-  Relation,
-  collectionProxyFor,
-} from "@blazetrails/activerecord";
+import { Base, CollectionProxy, AssociationProxy, Relation } from "@blazetrails/activerecord";
 
 class Author extends Base {}
 class Comment extends Base {}
@@ -417,7 +411,7 @@ class Post extends Base {
   // hasMany reader — chainable (`.where(...)`), awaitable
   // (`await post.comments` → `Comment[]`), and array-shaped over the
   // loaded target (`for...of`, `.length`, `.map`, `[0]`). Same object
-  // as what `collectionProxyFor(post, "comments")` returns. Collections have
+  // as what `post.association("comments").reader` returns. Collections have
   // no explicit loader — `await post.comments` IS the load.
   declare isDraft: () => boolean; // enum predicate
   declare draftBang: () => Promise<true | undefined>; // async: update!(status: "draft")

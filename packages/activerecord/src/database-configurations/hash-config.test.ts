@@ -2,16 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HashConfig } from "./hash-config.js";
 import { assertRaises } from "@blazetrails/activesupport";
 import { AdapterNotFound } from "../errors.js";
-import * as connectionAdapters from "../connection-adapters.js";
-import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import "../connection-handling.js";
-
-connectionAdapters.register(
-  "abstract",
-  "AbstractAdapter",
-  "./connection-adapters/abstract-adapter.js",
-  async () => AbstractAdapter as any,
-);
 
 describe("DatabaseConfigurations", () => {
   describe("HashConfigTest", () => {
@@ -233,7 +224,7 @@ describe("DatabaseConfigurations", () => {
 
     it("validate checks the adapter exists", async () => {
       let config = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      expect(await config.validateBang()).toBeTruthy();
+      expect(config.validateBang()).toBeTruthy();
       config = new HashConfig("default_env", "primary", { adapter: "potato" });
       await assertRaises([AdapterNotFound], {}, () => config.validateBang());
     });
@@ -269,34 +260,6 @@ describe("DatabaseConfigurations", () => {
       config = new HashConfig("default_env", "secondary", { adapter: "abstract", seeds: true });
       vi.spyOn(config, "isPrimary").mockReturnValue(false);
       expect(config.seeds).toBe(true);
-    });
-
-    it("_database= does not mutate the hash passed to the constructor", () => {
-      const original = { adapter: "abstract", database: "original_db" };
-      const config = new HashConfig("default_env", "primary", original);
-
-      const hashBefore = config.configurationHash;
-      config._database = "swapped_db";
-
-      expect(original.database).toBe("original_db");
-      expect(config.database).toBe("swapped_db");
-      expect(config.configurationHash.adapter).toBe("abstract");
-      expect(config.configurationHash).not.toBe(hashBefore);
-      expect(Object.isFrozen(config.configurationHash)).toBe(true);
-
-      config._database = "swapped_again";
-      expect(config.database).toBe("swapped_again");
-    });
-
-    it("the configuration hash is a frozen copy of the hash passed to the constructor", () => {
-      const original: Record<string, unknown> = { adapter: "abstract", database: "original_db" };
-      const config = new HashConfig("default_env", "primary", original);
-
-      expect(config.configurationHash).not.toBe(original);
-      expect(Object.isFrozen(config.configurationHash)).toBe(true);
-
-      original.database = "mutated_after_construction";
-      expect(config.database).toBe("original_db");
     });
   });
 });

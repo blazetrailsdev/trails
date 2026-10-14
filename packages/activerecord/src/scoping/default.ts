@@ -1,10 +1,10 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjIsKindOf, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";
-import { Scoping } from "../namespaces.js";
+import { ActiveRecord, Scoping } from "../namespaces.js";
 
 type DefaultScopeBody<R = any> = ((this: R) => any) | { call(): any };
 
@@ -22,69 +22,41 @@ export class Default {
   /** @internal */
   static buildDefaultScope(
     this: any,
-    relation: any,
+    relation: any = this.relation(),
     { allQueries }: { allQueries?: boolean | null } = {},
   ): any {
     if (this.abstractClass) return undefined;
 
     if (this.defaultScopeOverride == null) {
-      this.defaultScopeOverride = hasDefaultScopeOverride(this);
+      this.defaultScopeOverride = !rbObjIsKindOf(
+        ActiveRecord.Base,
+        rbObjMethod(this, "defaultScope").owner(),
+      );
     }
 
     if (this.defaultScopeOverride) {
-      return evaluateDefaultScope.call(this, () => {
-        const prev = ScopeRegistry.currentScope(this);
-        this.setCurrentScope(relation);
-        try {
-          return this.defaultScope();
-        } finally {
-          this.setCurrentScope(prev);
-        }
-      });
-    }
-
-    const scopes: DefaultScope[] = this.defaultScopes ?? [];
-    if (any(scopes)) {
-      return evaluateDefaultScope.call(this, () => {
-        let combinedScope = relation;
-        for (const scopeObj of scopes) {
+      return evaluateDefaultScope.call(this, () => relation.scoping(() => this.defaultScope()));
+    } else if (any(this.defaultScopes)) {
+      return evaluateDefaultScope.call(this, () =>
+        (this.defaultScopes as DefaultScope[]).reduce((combinedScope, scopeObj) => {
           if (isExecuteScope(allQueries, scopeObj)) {
             const scope =
               typeof scopeObj.scope === "function"
                 ? scopeObj.scope
                 : scopeObj.scope.call.bind(scopeObj.scope);
 
-            combinedScope = scope.call(combinedScope) || combinedScope;
+            return scope.call(combinedScope) || combinedScope;
+          } else {
+            return combinedScope;
           }
-        }
-        return combinedScope;
-      });
+        }, relation),
+      );
     }
   }
 
   static unscoped(this: any, block?: () => any): any {
     return block ? this.relation().scoping(block) : this.relation();
   }
-}
-
-/** @internal */
-function defaultScopeMethod(modelClass: any): ((this: any) => any) | undefined {
-  let klass = modelClass;
-  while (typeof klass === "function") {
-    if (Object.prototype.hasOwnProperty.call(klass, "defaultScope")) {
-      return klass.defaultScope === defaultScope ? undefined : klass.defaultScope;
-    }
-    klass = Object.getPrototypeOf(klass);
-  }
-  return undefined;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function hasDefaultScopeOverride(modelClass: any): boolean {
-  return defaultScopeMethod(modelClass) !== undefined;
 }
 
 export function defaultScope<T extends typeof Base>(
@@ -132,15 +104,19 @@ export function unscoped<T extends typeof Base, R>(
   return Default.unscoped.call(this, block) as Relation<InstanceType<T>> | Promise<R>;
 }
 
-/** @missingRailsCall any? — PERMANENT */
+/**
+ * @inventedArm rbObjIsKindOf — PERMANENT
+ * @inventedArm rbObjMethod — PERMANENT
+ * @inventedArm owner — PERMANENT
+ */
 export function isScopeAttributes(this: {
   currentScope?(skipInheritedScope?: boolean): unknown;
-  defaultScopes?: DefaultScope[];
+  defaultScopes: DefaultScope[];
 }): boolean {
   return (
     baseIsScopeAttributes.call(this) ||
-    (this.defaultScopes?.length ?? 0) > 0 ||
-    hasDefaultScopeOverride(this)
+    any(this.defaultScopes) ||
+    !rbObjIsKindOf(ActiveRecord.Base, rbObjMethod(this, "defaultScope").owner())
   );
 }
 

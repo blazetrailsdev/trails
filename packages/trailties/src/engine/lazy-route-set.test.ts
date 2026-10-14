@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mapper } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
 import { RouteSet, controllerConstants } from "@blazetrails/actionpack";
 import { LazyRouteSet } from "./lazy-route-set.js";
@@ -33,13 +32,13 @@ describe("LazyRouteSet", () => {
   });
 
   it("reloads routes when draw is called", () => {
-    routes.draw(() => {});
+    routes.draw(function () {});
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it("reloads routes when recognize_path is called", () => {
-    routes.draw((m: Mapper) => {
-      m.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
     reload.mockClear();
     routes.recognizePath("/posts");
@@ -47,8 +46,8 @@ describe("LazyRouteSet", () => {
   });
 
   it("reloads routes when recognize_path_with_request is called", () => {
-    routes.draw((m: Mapper) => {
-      m.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
     reload.mockClear();
     routes.recognizePathWithRequest(routes.makeRequest(MockRequest.envFor("/posts")), "/posts", {});
@@ -56,8 +55,8 @@ describe("LazyRouteSet", () => {
   });
 
   it("reloads routes when generate_extras is called", () => {
-    routes.draw((m: Mapper) => {
-      m.get("/posts", { to: "posts#index", as: "posts" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", as: "posts" });
     });
     reload.mockClear();
     routes.generateExtras({ useRoute: "posts" });
@@ -84,7 +83,7 @@ describe("LazyRouteSet", () => {
 
   it("tolerates a missing application", () => {
     Trails.application = null;
-    expect(() => routes.draw(() => {})).not.toThrow();
+    expect(() => routes.draw(function () {})).not.toThrow();
   });
 
   function loadRoutesLazily(): () => Promise<boolean | null> | undefined {
@@ -92,8 +91,8 @@ describe("LazyRouteSet", () => {
     reload.mockImplementation(() => {
       if (loading) return Promise.resolve(null);
       return (loading = Promise.resolve().then(() => {
-        routes.draw((m: Mapper) => {
-          m.root({ to: "posts#index" });
+        routes.draw(function () {
+          this.root({ to: "posts#index" });
         });
         return true;
       }));

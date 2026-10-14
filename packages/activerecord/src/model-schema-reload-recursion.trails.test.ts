@@ -3,7 +3,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { reloadSchemaFromCache } from "./model-schema.js";
-import { registerSubclass } from "./inheritance.js";
+import { registerModel } from "./associations.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -18,9 +18,9 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
     dataSourceExists: async () => true,
     columnsHash: async () => columns,
     primaryKeys: async () => null,
+    getCachedPrimaryKeys: () => null,
   };
   return adapterDouble({
-    internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return column.sqlType === "uuid" ? new UuidType() : null;
@@ -40,11 +40,11 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
       }
     }
     class Circle extends Shape {}
-    registerSubclass(Circle);
+    registerModel(Circle);
     class Ticket extends Circle {
       static override tableName = "tickets";
     }
-    registerSubclass(Ticket);
+    registerModel(Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
@@ -55,11 +55,11 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeDefined();
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(true);
     Ticket.columnNames();
-    expect(own<unknown>(Ticket, "_columnNamesMemo")).toBeDefined();
+    expect(own<unknown>(Ticket, "_columnNames")).toBeDefined();
 
     reloadSchemaFromCache.call(Shape as never);
 
-    expect(own<unknown>(Ticket, "_columnNamesMemo")).toBeUndefined();
+    expect(own<unknown>(Ticket, "_columnNames")).toBeUndefined();
 
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeUndefined();
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(false);
@@ -74,11 +74,11 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
       }
     }
     class Circle extends Shape {}
-    registerSubclass(Circle);
+    registerModel(Circle);
     class Ticket extends Circle {
       static override tableName = "tickets";
     }
-    registerSubclass(Ticket);
+    registerModel(Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
@@ -103,7 +103,7 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     class Ticket extends Shape {
       static override tableName = "tickets";
     }
-    registerSubclass(Ticket);
+    registerModel(Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Ticket]) {

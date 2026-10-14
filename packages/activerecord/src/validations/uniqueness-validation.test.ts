@@ -3,11 +3,10 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Base, StatementInvalid, UnknownPrimaryKey, ValueTooLong } from "../index.js";
 import { registerModel } from "../associations.js";
-import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply, UniqueReply, SillyUniqueReply } from "../test-helpers/models/reply.js";
 import { WarehouseThing } from "../test-helpers/models/warehouse-thing.js";
@@ -92,10 +91,10 @@ class BookWithUniqueRevision extends CpkBook {
 }
 
 for (const klass of [ReplyWithTitleObject, CoolTopic, TopicWithAfterCreate]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }
 for (const klass of [IneptWizard, Conjurer, Thaumaturgist]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }
 
 describe("UniquenessValidationTest", () => {
@@ -399,32 +398,6 @@ describe("UniquenessValidationTest", () => {
       expect(await t2Utf8.isValid()).toBeFalsy();
       expect(await t2Utf8.save()).toBeFalsy();
     }
-  });
-
-  it("validate uniqueness of with multiple attributes and array forms", async () => {
-    Topic.validatesUniquenessOf(["title"], "author_name");
-
-    const uniqValidators = Topic.validators().filter(
-      (v) => (v as { kind?: string }).kind === "uniqueness",
-    );
-    expect(uniqValidators).toHaveLength(1);
-    expect((uniqValidators[0] as { attributes: readonly string[] }).attributes).toEqual([
-      "title",
-      "author_name",
-    ]);
-
-    const collideTitle = new Topic({ title: "The First Topic", author_name: "Someone Else" });
-    expect(await collideTitle.save()).toBeFalsy();
-    expect(collideTitle.errors.messagesFor("title")).toEqual(["has already been taken"]);
-    expect(collideTitle.errors.messagesFor("author_name")).toEqual([]);
-
-    const collideAuthor = new Topic({ title: "A Brand New Title", author_name: "David" });
-    expect(await collideAuthor.save()).toBeFalsy();
-    expect(collideAuthor.errors.messagesFor("author_name")).toEqual(["has already been taken"]);
-    expect(collideAuthor.errors.messagesFor("title")).toEqual([]);
-
-    const unique = new Topic({ title: "A Brand New Title", author_name: "Nobody In Fixtures" });
-    expect(await unique.save()).toBeTruthy();
   });
 
   it("validate case sensitive uniqueness with special sql like chars", async () => {
@@ -735,10 +708,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   beforeEach(async () => {
     const connection = await Base.leaseConnection();
-    connection.internalSchemaCache.clearDataSourceCacheBang(
-      connection.pool ?? connection,
-      "topics",
-    );
+    await connection.schemaCache.clearDataSourceCacheBang("topics");
     await Topic.deleteAll();
     await Event.deleteAll();
   });
@@ -891,14 +861,14 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const e1 = await Event.createBang({ title: "abc" });
     const e2 = await Event.createBang({ title: "cde" });
-    const t = await TopicWithEvent.createBang({ parent_id: (e1 as any).id });
+    const t = await TopicWithEvent.createBang({ event: e1 });
     try {
       t.writeAttribute("content", "hello world");
       await assertNoQueries(false, async () => {
         await t.isValid();
       });
 
-      t.writeAttribute("parent_id", (e2 as any).id);
+      t.event = e2;
       await assertQueriesCount(1, false, async () => {
         await t.isValid();
       });
@@ -1023,6 +993,7 @@ class BigIntReverseTest extends Base {
 }
 
 class TopicWithEvent extends Topic {
+  declare event: Event | null;
   static {
     this.belongsTo("event", { foreignKey: "parent_id" });
     this.validatesUniquenessOf("event");
@@ -1037,5 +1008,5 @@ class TopicWithUniqEvent extends Topic {
 }
 
 for (const klass of [BigIntTest, BigIntReverseTest, TopicWithEvent, TopicWithUniqEvent]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

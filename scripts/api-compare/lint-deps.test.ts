@@ -7,8 +7,13 @@ import {
   collectDirectImports,
   collectImportAliases,
   collectTaintedSymbols,
+  declaredConstantName,
   isImportFromPackage,
+  isUnportedRubyRef,
   methodUsesDepImport,
+  moduleFunctionOwner,
+  rubyRefSpellings,
+  visitMethodDeclarations,
 } from "./lint-deps.js";
 
 function makeSourceFile(source: string): ts.SourceFile {
@@ -338,6 +343,30 @@ describe("isImportFromPackage", () => {
   });
 });
 
+describe("rubyRefSpellings", () => {
+  it("answers a Ruby dep ref by its leaf or by its whole path joined", () => {
+    expect(rubyRefSpellings("ActiveSupport::JSON")).toEqual([
+      "json",
+      "json",
+      "_json",
+      "activesupportjson",
+    ]);
+    expect(rubyRefSpellings("ActiveModel::Type::Binary::Data")).toContain("data");
+  });
+
+  it("answers nothing for a namespace root or a method ref", () => {
+    expect(rubyRefSpellings("ActiveSupport")).toEqual([]);
+    expect(rubyRefSpellings("arel_table")).toEqual([]);
+  });
+});
+
+describe("isUnportedRubyRef", () => {
+  it("is true for the Zeitwerk load interlock and nothing else", () => {
+    expect(isUnportedRubyRef("ActiveSupport::Dependencies")).toBe(true);
+    expect(isUnportedRubyRef("ActiveSupport::Benchmark")).toBe(false);
+  });
+});
+
 describe("collectTaintedSymbols — transitive dep usage", () => {
   const tmpDirs: string[] = [];
   afterEach(() => {
@@ -376,6 +405,157 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       skipLibCheck: true,
     });
   }
+
+  it("credits an imported module function to the module its file mirrors", () => {
+    const dir = writePkg({
+      "type.ts": `
+        export class ValueType {}
+        export function defaultValue() { return new ValueType(); }
+      `,
+      "consumer.ts": `
+        import { ValueType, defaultValue } from "./type.js";
+        export const procForBinds = () => [defaultValue(), new ValueType()];
+      `,
+    });
+    const program = programFor(dir);
+    const checker = program.getTypeChecker();
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    const owners = new Map<string, string | null>();
+    const visit = (n: ts.Node) => {
+      if (ts.isIdentifier(n) && (ts.isCallExpression(n.parent) || ts.isNewExpression(n.parent))) {
+        owners.set(n.text, moduleFunctionOwner(n, checker));
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(consumerSf);
+    expect(owners.get("defaultValue")).toBe("type");
+    expect(owners.get("ValueType")).toBe(null);
+  });
+
+  it("records the module of an imported module function as a ref of the calling method", () => {
+    const dir = writePkg({
+      "attribute-set.ts": `
+        export class Builder {}
+        export const fromHash = () => new Builder();
+        const local = () => 1;
+        export const aliased = local;
+      `,
+      "consumer.ts": `
+        import { Builder, fromHash, aliased } from "./attribute-set.js";
+        export class Model {
+          attributes() { return [fromHash(), new Builder(), aliased()]; }
+        }
+      `,
+    });
+    const program = programFor(dir);
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    let method: ts.Node | undefined;
+    const find = (n: ts.Node) => {
+      if (ts.isMethodDeclaration(n)) method = n;
+      ts.forEachChild(n, find);
+    };
+    find(consumerSf);
+    const collect = (transitive?: {
+      checker: ts.TypeChecker;
+      taintedSymbols: Set<ts.Symbol>;
+      depRoot?: string;
+    }) => {
+      const refs = new Set<string>();
+      methodUsesDepImport(
+        method!,
+        new Set(["Builder", "fromHash", "aliased"]),
+        new Set(),
+        "activemodel",
+        consumerSf,
+        method,
+        transitive,
+        refs,
+      );
+      return [...refs].sort();
+    };
+    expect(collect({ checker: program.getTypeChecker(), taintedSymbols: new Set() })).toEqual([
+      "Builder",
+      "aliased",
+      "attributeset",
+      "fromHash",
+    ]);
+    expect(collect()).toEqual(["Builder", "aliased", "fromHash"]);
+    const checker = program.getTypeChecker();
+    expect(collect({ checker, taintedSymbols: new Set(), depRoot: dir + path.sep })).toContain(
+      "attributeset",
+    );
+    expect(
+      collect({
+        checker,
+        taintedSymbols: new Set(),
+        depRoot: path.join(dir, "elsewhere") + path.sep,
+      }),
+    ).toEqual(["Builder", "aliased", "fromHash"]);
+  });
+
+  it("records an imported constant under the name it is declared by", () => {
+    const dir = writePkg({
+      "dep/binary.ts": `
+        export class Data {}
+      `,
+      "dep/duration.ts": `
+        export class ParsingError extends Error {}
+        export class ISO8601Parser { static ParsingError = ParsingError; }
+        export class Duration { static ISO8601Parser = ISO8601Parser; }
+      `,
+      "dep/index.ts": `
+        export { Data as BinaryData } from "./binary.js";
+        export { Duration } from "./duration.js";
+        export namespace SerializeCastValue {
+          export function serialize(value: unknown) { return value; }
+        }
+        export const Nodes = { Not: class {} };
+      `,
+      "consumer.ts": `
+        import { BinaryData, Duration, Nodes, SerializeCastValue } from "./dep/index.js";
+        export function textToDatabaseType(value: unknown) { return new BinaryData(); }
+        export function valuesList(value: unknown) { return SerializeCastValue.serialize(value); }
+        export function castValue(error: unknown) {
+          return error instanceof Duration.ISO8601Parser.ParsingError;
+        }
+        export function invert() { return new Nodes.Not(); }
+      `,
+    });
+    const program = programFor(dir);
+    const checker = program.getTypeChecker();
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    const imported = new Set(["BinaryData", "Duration", "Nodes", "SerializeCastValue"]);
+    const refsOf = (name: string, transitive?: { checker: ts.TypeChecker }) => {
+      const fn = consumerSf.statements.find(
+        (stmt): stmt is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(stmt) && stmt.name?.text === name,
+      )!;
+      const refs = new Set<string>();
+      methodUsesDepImport(
+        fn,
+        imported,
+        new Set(),
+        "activemodel",
+        consumerSf,
+        fn,
+        transitive && { ...transitive, taintedSymbols: new Set() },
+        refs,
+      );
+      return [...refs].sort();
+    };
+    expect(refsOf("textToDatabaseType", { checker })).toEqual(["BinaryData", "Data"]);
+    expect(refsOf("textToDatabaseType")).toEqual(["BinaryData"]);
+    expect(refsOf("valuesList", { checker })).toEqual(["SerializeCastValue", "serialize"]);
+    expect(refsOf("valuesList")).toEqual(["serialize"]);
+    expect(refsOf("castValue", { checker })).toEqual(["Duration", "ISO8601Parser", "ParsingError"]);
+    expect(refsOf("invert", { checker })).toEqual(["Nodes", "Not"]);
+
+    const bare = consumerSf.statements
+      .filter(ts.isFunctionDeclaration)
+      .map((fn) => fn.name!)
+      .map((id) => declaredConstantName(id, checker));
+    expect(bare).toEqual([null, null, null, null]);
+  });
 
   it("credits a method that calls a same-package wrapper of the dep", () => {
     const pkg = "@blazetrails/activesupport";
@@ -539,6 +719,38 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
     expect(refs.has("executionContextId")).toBe(true);
   });
 
+  it("credits a wrapper sent through its own .call", () => {
+    const pkg = "@blazetrails/arel";
+    const dir = writePkg({
+      "query-methods.ts": `
+        import { sql } from "${pkg}";
+        export function arelColumn(this: unknown, field: string) { return sql(field); }
+        export function arelColumnAliasesFromHash(this: unknown, key: string) {
+          return arelColumn.call(this, key);
+        }
+      `,
+    });
+    const program = programFor(dir);
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "arel");
+    const sf = program.getSourceFiles().find((f) => f.fileName.endsWith("query-methods.ts"))!;
+    const fn = sf.statements.filter((s): s is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(s),
+    )[1];
+    const refs = new Set<string>();
+    const uses = methodUsesDepImport(
+      fn,
+      collectDirectImports(sf, pkg),
+      new Set(),
+      "arel",
+      sf,
+      fn,
+      { checker: program.getTypeChecker(), taintedSymbols: tainted },
+      refs,
+    );
+    expect(uses).toBe(true);
+    expect(refs.has("arelColumn")).toBe(true);
+  });
+
   it("inherits a wrapper's alias-resolved refs through taint", () => {
     const pkg = "@blazetrails/activemodel";
     const dir = writePkg({
@@ -601,5 +813,66 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       expect(tainted.has(sym)).toBe(true);
       expect(taintedRefs.get(sym)?.has("Attribute")).toBe(true);
     }
+  });
+});
+
+describe("visitMethodDeclarations", () => {
+  it("visits the methods of an object literal standing in for a Ruby `extend self` module", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        install(registry: Factory): void {},
+        writeRecord(record: Base, packer: Packer): void {},
+      };
+      export const helper = () => 1;
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual(["install", "writeRecord", "helper"]);
+  });
+
+  it("visits an object literal's function-valued properties and skips its data", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        install: (registry: Factory): void => {},
+        readRecord: function (unpacker: Unpacker) {},
+        version: 1,
+        writeRecord: () => {
+          throw new NotImplementedError();
+        },
+      };
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual(["install", "readRecord"]);
+  });
+
+  it("does not visit a function-valued property of a literal that is not a const's initializer", () => {
+    const sf = makeSourceFile(`
+      registerFoo({ handler: () => {} });
+      class Host {
+        static table = { fn: () => {} };
+      }
+      export const Extensions = { nested: { deep: () => {} } };
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual([]);
+  });
+
+  it("anchors an object literal's member on the member, so an opt-out is per member", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        // lint-deps-ignore: arel
+        install(registry: Factory): void {},
+        // lint-deps-ignore: arel
+        writeRecord: (record: Base): void => {},
+        readRecord(unpacker: Unpacker) {},
+      };
+    `);
+    const covered: Record<string, boolean> = {};
+    visitMethodDeclarations(sf, (name, node, anchor) => {
+      covered[name] = methodUsesDepImport(node, new Set(["Nodes"]), new Set(), "arel", sf, anchor);
+    });
+    expect(covered).toEqual({ install: true, writeRecord: true, readRecord: false });
   });
 });

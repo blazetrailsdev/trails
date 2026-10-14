@@ -10,6 +10,7 @@ import { controllerConstants } from "../http/request.js";
 import { Cookies } from "../middleware/cookies.js";
 import { CookieStore } from "../middleware/session/cookie-store.js";
 import { assertNil } from "@blazetrails/activesupport";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 
 function buildApp(routes: RouteSet): RackApp {
   const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
@@ -33,7 +34,7 @@ describe("ContentSecurityPolicyTest", () => {
   it("dup", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("'self'");
-    const copy = policy.dup();
+    const copy = rbObjDup(policy);
     copy.scriptSrc("'unsafe-inline'");
     expect(policy.build()).toBe("default-src 'self'");
     expect(copy.build()).toContain("script-src");
@@ -367,7 +368,7 @@ describe("ContentSecurityPolicyTest", () => {
   it("dup preserves bare-directive sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.upgradeInsecureRequests();
-    const copy = policy.dup();
+    const copy = rbObjDup(policy);
     expect(copy.getDirectives().get("upgrade-insecure-requests")).toBe(true);
     expect(copy.build()).toBe("upgrade-insecure-requests");
   });
@@ -465,17 +466,17 @@ CspIntegrationController.contentSecurityPolicy({ only: ["api"] }, (p) => {
 });
 
 function buildCspApp() {
-  const app = new IntegrationTest();
-  app.routes.draw((r) => {
-    r.get("/", { to: "csp#index" });
-    r.get("/inline", { to: "csp#inline" });
-    r.get("/conditional", { to: "csp#conditional" });
-    r.get("/report-only", { to: "csp#reportOnly" });
-    r.get("/script-src", { to: "csp#scriptSrc" });
-    r.get("/style-src", { to: "csp#styleSrc" });
-    r.get("/no-policy", { to: "csp#noPolicy" });
-    r.get("/api", { to: "csp#api" });
-    r.get("/not-modified", { to: "csp#notModified" });
+  const app = new IntegrationTest(expect.getState().currentTestName!);
+  app.routes.draw(function () {
+    this.get("/", { to: "csp#index" });
+    this.get("/inline", { to: "csp#inline" });
+    this.get("/conditional", { to: "csp#conditional" });
+    this.get("/report-only", { to: "csp#reportOnly" });
+    this.get("/script-src", { to: "csp#scriptSrc" });
+    this.get("/style-src", { to: "csp#styleSrc" });
+    this.get("/no-policy", { to: "csp#noPolicy" });
+    this.get("/api", { to: "csp#api" });
+    this.get("/not-modified", { to: "csp#notModified" });
   });
   app.app = buildApp(app.routes);
   controllerConstants.set("csp", CspIntegrationController);
@@ -596,15 +597,15 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
     );
   });
 
-  it("redirect works with dynamic sources", async () => {
+  it("redirect works with dynamic sources", async ({ task }) => {
     const dynamicPolicy = new ContentSecurityPolicy((p) => {
       p.defaultSrc(() => ":self");
       p.scriptSrc(() => ":https");
     });
-    const app = new IntegrationTest();
-    app.routes.draw((r) => {
-      r.get("/redirect", { to: "csp#redirect" });
-      r.get("/", { to: "csp#index" });
+    const app = new IntegrationTest(task.name);
+    app.routes.draw(function () {
+      this.get("/redirect", { to: "csp#redirect" });
+      this.get("/", { to: "csp#index" });
     });
     app.app = buildApp(app.routes);
 
@@ -627,15 +628,15 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
 });
 
 describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
-  it("generate nonce only specified in nonce directives", async () => {
+  it("generate nonce only specified in nonce directives", async ({ task }) => {
     const policy = new ContentSecurityPolicy((p) => {
       p.defaultSrc(() => ":self");
       p.scriptSrc(() => ":https");
       p.styleSrc(() => ":https");
     });
-    const app = new IntegrationTest();
-    app.routes.draw((r) => {
-      r.get("/", { to: "csp#index" });
+    const app = new IntegrationTest(task.name);
+    app.routes.draw(function () {
+      this.get("/", { to: "csp#index" });
     });
     app.app = buildApp(app.routes);
 

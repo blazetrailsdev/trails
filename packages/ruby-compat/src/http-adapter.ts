@@ -15,10 +15,26 @@ export interface HttpResponse {
   end(chunk?: string | Uint8Array): unknown;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface HttpSocket {
+  write(chunk: string | Uint8Array): unknown;
+  end(chunk?: string | Uint8Array): unknown;
+  destroy(): unknown;
+  unshift(chunk: Uint8Array): unknown;
+  on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
+  on(event: "close" | "end", listener: () => void): unknown;
+  on(event: "error", listener: (error: Error) => void): unknown;
+  removeListener(event: "error", listener: (error: Error) => void): unknown;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export type HttpUpgradeListener = (req: HttpRequest, socket: HttpSocket, head: Uint8Array) => void;
+
 export interface HttpServer {
   listen(port: number, host: string, listener?: () => void): unknown;
   close(callback?: (error?: Error) => void): unknown;
   address(): string | { port: number } | null;
+  on(event: "upgrade", listener: HttpUpgradeListener): unknown;
 }
 
 export interface HttpAdapter {

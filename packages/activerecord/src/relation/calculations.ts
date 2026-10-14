@@ -1,9 +1,40 @@
 import { TypeError } from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
-import { Nodes, Table, SelectManager, sql, star } from "@blazetrails/arel";
-import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
-import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
-import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
+import {
+  Expressions,
+  Nodes,
+  Table,
+  SelectManager,
+  arelNode,
+  sql,
+  star,
+  type ArelNode,
+} from "@blazetrails/arel";
+import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  any,
+  defineModule,
+  isPresent,
+  kernelArray,
+  many,
+  pick as enumerablePick,
+  tryCall,
+} from "@blazetrails/activesupport";
+import {
+  block,
+  fetch,
+  first,
+  hashAref,
+  Hash,
+  isEmpty,
+  isModuleIncluded,
+  rbFPublicSend,
+  rbObjRespondTo,
+  rtest,
+  toD,
+  toI,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
@@ -20,20 +51,21 @@ import { ONE_AS_ONE } from "./finder-methods.js";
 
 export class ColumnAliasTracker {
   private connection: AliasingConnection;
-  private aliases: Map<string, number> = new Map();
+  private aliases: Hash<string, number>;
 
   constructor(connection: AliasingConnection) {
     this.connection = connection;
+    this.aliases = new Hash<string, number>(0);
   }
 
   aliasFor(field: string): string {
     const aliasedName = this.columnAliasFor(field);
 
-    if ((this.aliases.get(aliasedName) ?? 0) === 0) {
+    if (this.aliases.get(aliasedName) === 0) {
       this.aliases.set(aliasedName, 1);
       return aliasedName;
     } else {
-      const count = (this.aliases.get(aliasedName) ?? 0) + 1;
+      const count = this.aliases.get(aliasedName)! + 1;
       this.aliases.set(aliasedName, count);
       return `${this.truncate(aliasedName)}_${count}`;
     }
@@ -61,17 +93,14 @@ interface AliasingConnection {
 
 interface CalculationConnection {
   adapterName: string;
-  visitor?: { compile(node: any, collector?: any): any };
+  visitor: { compile(node: any, collector?: any): any };
   toSql(arel: unknown): string;
   quote(value: unknown): string;
   quoteTableName(name: unknown): string;
   quoteColumnName(name: unknown): string;
   tableAliasFor(tableName: string): string;
   tableAliasLength(): number;
-  columnsForDistinct(
-    columns: string | string[],
-    orders?: (string | Nodes.Node)[],
-  ): string | string[];
+  columnsForDistinct(columns: string | string[], orders?: (string | ArelNode)[]): string | string[];
   execute(sql: string): Promise<Record<string, unknown>[]>;
   selectAll(
     arel: unknown,
@@ -89,12 +118,13 @@ interface CalculationRelation {
     primaryKey: string | string[];
     name: string;
     typeForAttribute?(name: string, block?: () => ColumnType): ColumnType | null;
-    attributeTypes(): Record<string, ColumnType>;
+    attributeTypes(): ColumnTypes | Hash<string, ColumnType>;
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
     ensureSchemaLoaded(): Promise<void>;
-    disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
+    disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
     attributeNames(): string[];
+    attributeAliases: Record<string, string>;
   };
   withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
   limitValue: number | string | null;
@@ -112,23 +142,31 @@ interface CalculationRelation {
   arel(): SelectManager;
   buildSubquery(subqueryAlias: string | Nodes.SqlLiteral, selectValue: unknown): SelectManager;
   spawn(): CalculationRelation;
+  /** @internal */
+  aggregateColumn(columnName: string | ArelNode | number | null): unknown;
   _values: Record<string, unknown>;
-  groupValues: Array<string | Nodes.Node>;
-  orderValues: Array<string | Nodes.Node>;
+  groupValues: Array<string | ArelNode>;
+  orderValues: Array<string | ArelNode>;
   whereClause: { isContradiction(): boolean };
   havingClause: { isEmpty(): boolean; ast: Nodes.Node };
-  selectValues: (string | symbol | Nodes.Node)[];
+  selectValues: (string | symbol | ArelNode)[];
   withValues: Array<Record<string, unknown>>;
+  /** @internal */
+  applyJoinDependency(options?: {
+    eagerLoading?: boolean;
+  }): CalculationRelation | Promise<CalculationRelation>;
   /** @internal */
   applyJoinDependency<R>(
     options: { eagerLoading?: boolean },
     block: (relation: CalculationRelation, joinDependency: JoinDependency) => R | Promise<R>,
-  ): Promise<R>;
-  calculate(operation: string, columnName?: string | Nodes.Node | number | null): Promise<unknown>;
+  ): R | Promise<R>;
+  calculate(operation: string, columnName?: string | ArelNode | number | null): Promise<unknown>;
   toArray(): Promise<any[]>;
   loaded: boolean;
   /** @internal */
   readonly isScheduled: boolean;
+  /** @internal */
+  readonly _loadResult?: Promise<unknown>;
   records(): Promise<
     Array<{ _readAttribute(name: string): unknown; get(attrName: string): unknown }>
   >;
@@ -161,15 +199,15 @@ interface CalculationRelation {
   ): Promise<unknown>;
   ids(): Promise<unknown[]> | unknown[];
   count(
-    columnName?: string | Nodes.Node | null | CountBlock,
+    columnName?: string | ArelNode | null | CountBlock,
     block?: CountBlock,
   ): Promise<number | Map<unknown, number>>;
   sum(
-    initialValueOrColumn?: string | Nodes.Node | number | null,
+    initialValueOrColumn?: string | ArelNode | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  average(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  minimum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  maximum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  average(columnName: string | ArelNode): Promise<unknown | null | Map<unknown, unknown>>;
+  minimum(columnName: string | ArelNode): Promise<unknown | null | Map<unknown, unknown>>;
+  maximum(columnName: string | ArelNode): Promise<unknown | null | Map<unknown, unknown>>;
   arelColumns(columns: unknown[]): unknown[];
   flattenedArgs(args: unknown[]): unknown[];
   skipQueryCacheIfNecessary<R>(block: () => R): R;
@@ -198,12 +236,11 @@ export type CountBlock = (record: any) => unknown;
 
 export async function count(
   this: CalculationRelation,
-  columnName?: string | Nodes.Node | null | CountBlock,
+  columnName?: string | ArelNode | null | CountBlock,
   block?: CountBlock,
-  ...rest: unknown[]
 ): Promise<number | Map<unknown, number>> {
-  if (rest.length > 0 || (block !== undefined && typeof block !== "function")) {
-    throw new ArgumentError(`wrong number of arguments (given ${rest.length + 2}, expected 0..1)`);
+  if (arguments.length > 2) {
+    throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 0..1)`);
   }
   if (typeof columnName === "function") {
     block = columnName;
@@ -232,42 +269,42 @@ export function asyncCount(
 
 export async function average(
   this: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.calculate("average", columnName as string);
 }
 
 export function asyncAverage(
   this: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.async().average(columnName);
 }
 
 export async function minimum(
   this: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.calculate("minimum", columnName as string);
 }
 
 export function asyncMinimum(
   this: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.async().minimum(columnName);
 }
 
 export async function maximum(
   this: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.calculate("maximum", columnName as string);
 }
 
 export function asyncMaximum(
   this: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.async().maximum(columnName);
 }
@@ -308,7 +345,7 @@ function sumAdd(
 
 export async function sum(
   this: CalculationRelation,
-  initialValueOrColumn: string | Nodes.Node | number | null | SumBlock = 0,
+  initialValueOrColumn: string | ArelNode | number | null | SumBlock = 0,
   block?: SumBlock,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
   if (typeof initialValueOrColumn === "function") {
@@ -321,14 +358,14 @@ export async function sum(
       | number
       | bigint;
   }
-  const sum = await this.calculate("sum", initialValueOrColumn as string);
-  if (this.groupValues.length > 0) return sum as Map<unknown, number | bigint>;
-  return (sum as number | bigint) ?? 0;
+  return this.calculate("sum", initialValueOrColumn as string) as Promise<
+    number | bigint | Map<unknown, number | bigint>
+  >;
 }
 
 export function asyncSum(
   this: CalculationRelation,
-  identityOrColumn: string | Nodes.Node | number | null = null,
+  identityOrColumn: string | ArelNode | number | null = null,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
   return this.async().sum(identityOrColumn);
 }
@@ -336,7 +373,7 @@ export function asyncSum(
 export async function calculate(
   this: CalculationRelation,
   operation: string,
-  columnName?: string | Nodes.Node | number | null,
+  columnName?: string | ArelNode | number | null,
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
@@ -352,33 +389,33 @@ export async function calculate(
     }
   }
 
-  if (hasInclude(this, columnName ?? null)) {
-    return this.applyJoinDependency({}, async (relation) => {
-      if (operation === "count") {
-        if (
-          !this.distinctValue &&
-          !isDistinctSelect(this, columnName ?? (await selectForCount(this)))
-        ) {
-          relation.distinctBang();
-          const primaryKey = this.model.primaryKey;
-          relation.selectValues =
-            primaryKey == null
-              ? [new Nodes.SqlLiteral("*")]
-              : Array.isArray(primaryKey)
-                ? [...primaryKey]
-                : [primaryKey];
-        }
-        if (this.groupValues.length === 0) relation.orderValues = [];
-      }
+  if (hasInclude.call(this, columnName ?? null)) {
+    const relation = await this.applyJoinDependency();
 
-      return relation.calculate(operation, columnName);
-    });
+    if (operation === "count") {
+      if (
+        !this.distinctValue &&
+        !isDistinctSelect.call(this, columnName ?? (await selectForCount.call(this)))
+      ) {
+        relation.distinctBang();
+        const primaryKey = this.model.primaryKey;
+        relation.selectValues =
+          primaryKey == null
+            ? [new Nodes.SqlLiteral("*")]
+            : Array.isArray(primaryKey)
+              ? [...primaryKey]
+              : [primaryKey];
+      }
+      if (this.groupValues.length === 0) relation.orderValues = [];
+    }
+
+    return relation.calculate(operation, columnName);
   } else {
-    return performCalculation(this, operation, columnName ?? null);
+    return performCalculation.call(this, operation, columnName ?? null);
   }
 }
 
-/** @missingRailsName first — PERMANENT */
+/** @missingRailsName async — PERMANENT */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -391,7 +428,7 @@ export async function pluck(
 ): Promise<unknown[]> {
   if (this.isNullRelation()) return [];
 
-  if (this.loaded && isAllAttributes(this, columnNames as unknown as string[])) {
+  if (this.loaded && isAllAttributes.call(this, columnNames as unknown as string[])) {
     const records = await this.records();
     return records.map((record) =>
       columnNames.length > 1
@@ -400,16 +437,15 @@ export async function pluck(
     );
   }
 
-  if (hasInclude(this as any, columnNames.at(0))) {
-    return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
+  if (hasInclude.call(this, first(columnNames))) {
+    const relation = await this.applyJoinDependency();
+    return relation.pluck(...columnNames);
   }
 
-  this._model.disallowRawSqlBang(
-    this.flattenedArgs(columnNames) as (string | symbol | Nodes.Node)[],
-  );
+  this._model.disallowRawSqlBang(this.flattenedArgs(columnNames) as (string | symbol | ArelNode)[]);
   const relation = this.spawn();
   const columns = relation.arelColumns(columnNames);
-  relation.selectValues = columns as (string | Nodes.Node)[];
+  relation.selectValues = columns as (string | ArelNode)[];
   const result = await this.skipQueryCacheIfNecessary(() =>
     this.whereClause.isContradiction()
       ? Result.empty({ async: this._async })
@@ -444,17 +480,13 @@ export async function pick(
     | Record<string, string | string[]>
   >
 ): Promise<unknown> {
-  if (this.loaded && isAllAttributes(this, columnNames as unknown as string[])) {
-    const records = await this.records();
-    if (records.length === 0) return null;
-    const first = records[0] as unknown as { get(attrName: string): unknown };
-    return columnNames.length > 1
-      ? columnNames.map((columnName) => first.get(String(columnName)))
-      : first.get(String(columnNames[0]));
+  if (this.loaded && isAllAttributes.call(this, columnNames as unknown as string[])) {
+    return enumerablePick(await this.records(), ...(columnNames as never[])) ?? null;
   }
 
-  const values = await this.limit(1).pluck(...columnNames);
-  return values[0] ?? null;
+  return this.limit(1)
+    .pluck(...columnNames)
+    .then((values) => first(values) ?? null);
 }
 
 export function asyncPick(
@@ -472,11 +504,7 @@ export function asyncPick(
 
 export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
   const primaryKey = this.model.primaryKey as string | string[] | null;
-  const primaryKeyArray = Array.isArray(primaryKey)
-    ? primaryKey
-    : primaryKey == null
-      ? []
-      : [primaryKey];
+  const primaryKeyArray = kernelArray<string>(primaryKey);
 
   if (this.loaded) {
     const toId = (record: { _readAttribute(name: string): unknown }): unknown => {
@@ -485,18 +513,21 @@ export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
       }
       return primaryKeyArray.map((column) => record._readAttribute(column));
     };
-    return this.isScheduled
+    return this.isScheduled || this._loadResult
       ? this.records().then((records) => records.map(toId))
       : this._records.map(toId);
   }
 
-  if (hasInclude(this as any, primaryKey as string)) {
-    return this.applyJoinDependency({}, (relation) => relation.group(...primaryKeyArray).ids());
+  if (hasInclude.call(this, primaryKey as string)) {
+    return (async () => {
+      const relation = (await this.applyJoinDependency()).group(...primaryKeyArray);
+      return relation.ids();
+    })();
   }
 
   const columns = this.arelColumns(primaryKeyArray);
   const relation = this.spawn();
-  relation.selectValues = columns as (string | Nodes.Node)[];
+  relation.selectValues = columns as (string | ArelNode)[];
 
   return (async () => {
     const result = relation.whereClause.isContradiction()
@@ -516,36 +547,38 @@ export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
   return Promise.resolve(this.async().ids());
 }
 
-export interface CalculationMethods {
-  calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
+type Grouped<G extends boolean, S, M> = boolean extends G ? S | M : G extends true ? M : S;
+
+export interface CalculationMethods<G extends boolean = boolean> {
+  calculate(operation: "count", column?: string): Promise<Grouped<G, number, Map<unknown, number>>>;
   calculate(
     operation: "sum",
-    column: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+    column: string | ArelNode | number | null,
+  ): Promise<Grouped<G, number | bigint, Map<unknown, number | bigint>>>;
   calculate(
     operation: "average" | "minimum" | "maximum",
     column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
-  calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
+  ): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  calculate(operation: string, column?: string | ArelNode | number | null): Promise<unknown>;
   count(
-    column?: string | Nodes.Node | null | CountBlock,
+    column?: string | ArelNode | null | CountBlock,
     block?: CountBlock,
-  ): Promise<number | Map<unknown, number>>;
+  ): Promise<Grouped<G, number, Map<unknown, number>>>;
   sum(block: SumBlock): Promise<number | bigint>;
   sum(initialValue: number | string, block: SumBlock): Promise<number | bigint>;
   sum(
-    initialValueOrColumn?: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  maximum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncCount(columnName?: string): Promise<number | Map<unknown, number>>;
+    initialValueOrColumn?: string | ArelNode | number | null,
+  ): Promise<Grouped<G, number | bigint, Map<unknown, number | bigint>>>;
+  average(column: string | ArelNode): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  minimum(column: string | ArelNode): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  maximum(column: string | ArelNode): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  asyncCount(columnName?: string): Promise<Grouped<G, number, Map<unknown, number>>>;
   asyncSum(
-    identityOrColumn?: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  asyncAverage(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncMinimum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncMaximum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+    identityOrColumn?: string | ArelNode | number | null,
+  ): Promise<Grouped<G, number | bigint, Map<unknown, number | bigint>>>;
+  asyncAverage(columnName: string | ArelNode): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  asyncMinimum(columnName: string | ArelNode): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  asyncMaximum(columnName: string | ArelNode): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
   pluck(
     ...columns: Array<
       | string
@@ -593,10 +626,9 @@ export interface CalculationMethods {
 function inQueryConnection<F extends (this: CalculationRelation, ...args: never[]) => Promise<any>>(
   fn: F,
 ): F {
-  const materialized = withDeferredDistinctPkPredicates(fn);
   return function (this: CalculationRelation, ...args: unknown[]) {
     const modelClass = (this as { _model?: unknown })._model as typeof Base;
-    return modelClass.withConnection(() => materialized.apply(this, args as never[]));
+    return modelClass.withConnection(() => fn.apply(this, args as never[]));
   } as unknown as F;
 }
 
@@ -612,7 +644,8 @@ function withDeferredDistinctPkPredicates<
   } as unknown as F;
 }
 
-export const Calculations = {
+/** @internal */
+export const CalculationsPublicInstanceMethods = {
   count: inQueryConnection(count),
   asyncCount,
   average: inQueryConnection(average),
@@ -623,7 +656,7 @@ export const Calculations = {
   asyncMaximum,
   sum: inQueryConnection(sum),
   asyncSum,
-  calculate: inQueryConnection(calculate),
+  calculate: inQueryConnection(withDeferredDistinctPkPredicates(calculate)),
   pluck: withDeferredDistinctPkPredicates(pluck),
   asyncPluck,
   pick,
@@ -633,94 +666,132 @@ export const Calculations = {
 } as const;
 
 /** @internal */
+export const CalculationsProtectedInstanceMethods = {
+  aggregateColumn,
+} as const;
+
+/** @internal */
+export const CalculationsPrivateInstanceMethods = {
+  isAllAttributes,
+  hasInclude,
+  performCalculation,
+  isDistinctSelect,
+  operationOverAggregateColumn,
+  executeSimpleCalculation,
+  executeGroupedCalculation,
+  typeFor,
+  lookupCastTypeFromJoinDependencies,
+  typeCastPluckValues,
+  typeCastCalculatedValue,
+  selectForCount,
+  isBuildCountSubquery,
+  buildCountSubquery,
+} as const;
+
+export const Calculations = defineModule(
+  CalculationsPublicInstanceMethods,
+  CalculationsProtectedInstanceMethods,
+  CalculationsPrivateInstanceMethods,
+);
+
+/** @internal */
 export function aggregateColumn(
-  rel: CalculationRelation,
-  columnName: string | Nodes.Node | number | null,
+  this: CalculationRelation,
+  columnName: string | ArelNode | number | null,
 ): unknown {
-  if (columnName instanceof Nodes.Node) return columnName;
+  if (
+    columnName != null &&
+    typeof columnName === "object" &&
+    isModuleIncluded(columnName.constructor, Expressions)
+  ) {
+    return columnName;
+  }
   if (columnName === ":all") return star();
-  return arelColumn.call(rel as never, columnName);
+  return arelColumn.call(this as never, columnName);
 }
 
 /** @internal */
-export function isAllAttributes(rel: CalculationRelation, columnNames: string[]): boolean {
-  const model = rel.model as any;
-  const known = new Set<string>([
-    ...(typeof model.attributeNames === "function" ? (model.attributeNames() as string[]) : []),
-    ...Object.keys(model.attributeAliases ?? {}),
-  ]);
-  return isEmpty(columnNames.map(String).filter((c) => !known.has(c)));
+export function isAllAttributes(this: CalculationRelation, columnNames: string[]): boolean {
+  const attributeNames: string[] = this.model.attributeNames();
+  const attributeAliases = Object.keys(this.model.attributeAliases);
+  return isEmpty(
+    columnNames
+      .map(String)
+      .filter((name) => !attributeNames.includes(name))
+      .filter((name) => !attributeAliases.includes(name)),
+  );
 }
 
 /** @internal */
-export function hasInclude(rel: CalculationRelation, columnName: unknown): boolean {
+export function hasInclude(this: CalculationRelation, columnName: unknown): boolean {
   return (
-    rel.isEagerLoading ||
-    (isPresent(rel.includesValues) && columnName != null && columnName !== ":all")
+    this.isEagerLoading ||
+    (isPresent(this.includesValues) && columnName != null && columnName !== ":all")
   );
 }
 
 /** @internal */
 function aggregateTarget(
-  columnName: string | string[] | Nodes.Node | number | null,
-): string | Nodes.Node | number | null {
+  columnName: string | string[] | ArelNode | number | null,
+): string | ArelNode | number | null {
   return Array.isArray(columnName) ? columnName.join(",") : columnName;
 }
 
 /** @internal */
 export async function performCalculation(
-  rel: CalculationRelation,
+  this: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | number | null,
+  columnName: string | string[] | ArelNode | number | null,
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
-  let distinct: boolean | null = rel.distinctValue;
+  let distinct: boolean | null = this.distinctValue;
   if (operation === "count") {
-    columnName ??= await selectForCount(rel);
+    columnName ??= await selectForCount.call(this);
     if (columnName === ":all") {
       if (!distinct) {
-        if (rel.groupValues.length === 0)
-          distinct = isDistinctSelect(rel, await selectForCount(rel));
+        if (this.groupValues.length === 0)
+          distinct = isDistinctSelect.call(this, await selectForCount.call(this));
       } else if (
-        any(rel.groupValues) ||
-        (rel.selectValues.length === 0 && rel.orderValues.length === 0)
+        any(this.groupValues) ||
+        (this.selectValues.length === 0 && this.orderValues.length === 0)
       ) {
-        columnName = rel.primaryKey;
+        columnName = this.primaryKey;
       }
-    } else if (isDistinctSelect(rel, columnName)) {
+    } else if (isDistinctSelect.call(this, columnName)) {
       distinct = null;
     }
   }
 
-  if (any(rel.groupValues)) {
-    return executeGroupedCalculation(rel, operation, columnName, distinct);
+  if (any(this.groupValues)) {
+    return executeGroupedCalculation.call(this, operation, columnName, distinct);
   }
-  return executeSimpleCalculation(rel, operation, columnName, distinct);
+  return executeSimpleCalculation.call(this, operation, columnName, distinct);
 }
 
 /** @internal */
 export function isDistinctSelect(
-  _rel: CalculationRelation,
-  columnName: string | string[] | Nodes.Node | number,
+  this: CalculationRelation,
+  columnName: string | string[] | ArelNode | number,
 ): boolean {
   return typeof columnName === "string" && /\bDISTINCT[\s(]/i.test(columnName);
 }
 
 /** @internal */
 export function operationOverAggregateColumn(
+  this: CalculationRelation,
   column: any,
   operation: string,
   distinct: boolean,
 ): unknown {
-  if (operation === "count") return column.count(distinct);
-  return typeof column[operation] === "function" ? column[operation]() : column;
+  return operation === "count" ? column.count(distinct) : rbFPublicSend(column, operation);
 }
 
 /** @internal */
 function buildCountSubquery(
+  this: CalculationRelation,
   relation: CalculationRelation,
-  columnName: string | Nodes.Node | number | null,
+  columnName: string | ArelNode | number | null,
   distinct: boolean,
 ): SelectManager {
   const isAll = columnName === ":all";
@@ -730,48 +801,47 @@ function buildCountSubquery(
     if (!distinct) relation.selectValues = [sql(ONE_AS_ONE)];
   } else {
     columnAlias = sql("count_column");
-    const column = aggregateColumn(relation, columnName) as Nodes.Node & {
+    const column = relation.aggregateColumn(columnName) as ArelNode & {
       as(alias: Nodes.SqlLiteral): Nodes.Node;
     };
     relation.selectValues = [column.as(columnAlias)];
   }
 
   const subqueryAlias = sql("subquery_for_count", { retryable: true });
-  const selectValue = operationOverAggregateColumn(columnAlias, "count", false);
+  const selectValue = operationOverAggregateColumn.call(this, columnAlias, "count", false);
 
   return isAll
     ? relation.unscope(":order").buildSubquery(subqueryAlias, selectValue)
     : relation.buildSubquery(subqueryAlias, selectValue);
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export async function executeSimpleCalculation(
-  rel: CalculationRelation,
+  this: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | number | null,
+  columnName: string | string[] | ArelNode | number | null,
   distinct: boolean | null,
 ): Promise<unknown> {
   let relation: CalculationRelation;
   let queryBuilder: unknown;
   let column: unknown = null;
 
-  if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
-    if (rel.limitValue === 0) return 0;
+  if (isBuildCountSubquery.call(this, operation, columnName, distinct === true)) {
+    if (this.limitValue === 0) return 0;
 
-    relation = rel;
-    queryBuilder = buildCountSubquery(
-      rel.spawn(),
-      columnName as string | Nodes.Node | null,
+    relation = this;
+    queryBuilder = buildCountSubquery.call(
+      this,
+      this.spawn(),
+      columnName as string | ArelNode | null,
       distinct === true,
     );
   } else {
-    relation = rel.unscope(":order").distinctBang(false) as CalculationRelation;
+    relation = this.unscope(":order").distinctBang(false) as CalculationRelation;
 
-    column = aggregateColumn(relation, columnName as string | Nodes.Node | number | null);
-    const selectValue = operationOverAggregateColumn(
+    column = relation.aggregateColumn(columnName as string | ArelNode | number | null);
+    const selectValue = operationOverAggregateColumn.call(
+      this,
       column,
       operation,
       distinct === true,
@@ -784,18 +854,18 @@ export async function executeSimpleCalculation(
   }
 
   const queryResult = relation.whereClause.isContradiction()
-    ? rel._async
+    ? this._async
       ? FutureResult.wrap(Result.empty())
       : Result.empty()
     : (
-        rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
+        this as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
       ).skipQueryCacheIfNecessary(() =>
-        rel.model.withConnection((c) =>
+        this.model.withConnection((c) =>
           c.selectAll(
             queryBuilder,
-            `${rel.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
+            `${this.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
             [],
-            { async: rel._async },
+            { async: this._async },
           ),
         ),
       );
@@ -806,134 +876,122 @@ export async function executeSimpleCalculation(
   if (operation !== "count") {
     type =
       typeCasterFor(column) ??
-      lookupCastTypeFromJoinDependencies(rel, String(columnName ?? "")) ??
+      lookupCastTypeFromJoinDependencies.call(this, String(columnName ?? "")) ??
       defaultValue();
     if (type instanceof EnumType) type = type.subtype;
   }
 
-  return typeCastCalculatedValue(result.castValues()[0], operation, type);
+  return typeCastCalculatedValue.call(this, first(result.castValues()), operation, type);
 }
 
-/**
- * @internal
- * @missingRailsArgs fetch — PERMANENT
- */
+/** @internal */
 export async function executeGroupedCalculation(
-  rel: CalculationRelation,
+  this: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | number | null,
+  columnName: string | string[] | ArelNode | number | null,
   distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
   columnName = aggregateTarget(columnName);
-  let groupFields: unknown[] = rel.groupValues;
-  if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
+  let groupFields: unknown[] = this.groupValues;
+  if (groupFields.length > 1) groupFields = uniq(groupFields);
   let association: any = null;
   let associated = false;
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
-    association = (rel.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
+    association = (this.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
     associated = association != null && association.belongsTo?.() === true;
-    if (associated) {
-      groupFields = Array.isArray(association.foreignKey())
-        ? [...(association.foreignKey() as string[])]
-        : [association.foreignKey() as string];
-    }
+    if (associated) groupFields = kernelArray(association.foreignKey());
   }
-  const relation = rel.except("group").distinctBang(false) as CalculationRelation;
-  const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
+  const relation = this.except("group").distinctBang(false) as CalculationRelation;
+  const groupNodes = arelColumns.call(relation as never, groupFields) as ArelNode[];
 
-  return rel.model.withConnection(async (connection) => {
+  return this.model.withConnection(async (connection) => {
     const columnAliasTracker = new ColumnAliasTracker(connection);
 
-    const groupAliases = groupNodes.map((field) =>
-      columnAliasTracker.aliasFor(
-        (field instanceof Nodes.Node
-          ? (connection.visitor?.compile(field) ?? String(field))
-          : String(field)
-        ).toLowerCase(),
-      ),
-    );
+    const groupAliases = groupNodes.map((field: ArelNode | string) => {
+      if (arelNode(field)) field = connection.visitor.compile(field);
+      return columnAliasTracker.aliasFor(String(field).toLowerCase());
+    });
     const groupColumns = groupAliases.map((aliaz, i) => [aliaz, groupNodes[i]] as const);
 
-    const column = aggregateColumn(relation, columnName);
+    const column = relation.aggregateColumn(columnName);
     const columnAlias = columnAliasTracker.aliasFor(
       `${fn} ${(columnName == null ? "" : String(columnName)).toLowerCase()}`,
     );
-    const selectValue = operationOverAggregateColumn(column, fn, distinct ?? false) as any;
+    const selectValue = operationOverAggregateColumn.call(
+      this,
+      column,
+      fn,
+      distinct ?? false,
+    ) as any;
 
-    const selectValues: Nodes.Node[] = [selectValue.as(connection.quoteColumnName(columnAlias))];
-    if (!rel.havingClause.isEmpty()) {
+    const selectValues: ArelNode[] = [selectValue.as(connection.quoteColumnName(columnAlias))];
+    if (!this.havingClause.isEmpty()) {
       selectValues.push(
-        ...(arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[]),
+        ...(arelColumns.call(this as never, this.selectValues as never[]) as ArelNode[]),
       );
     }
     selectValues.push(
-      ...groupColumns.map(
-        ([aliaz, field]) =>
-          new Nodes.As(field, new Nodes.SqlLiteral(connection.quoteColumnName(aliaz))),
-      ),
+      ...groupColumns.map(([aliaz, field]) => {
+        aliaz = connection.quoteColumnName(aliaz);
+        if (rbObjRespondTo(field, "as")) {
+          return (field as unknown as { as(aliaz: string): ArelNode }).as(aliaz);
+        } else {
+          return `${field} AS ${aliaz}` as unknown as ArelNode;
+        }
+      }),
     );
 
     relation.groupValues = groupNodes;
-    relation.selectValues = selectValues as (string | Nodes.Node)[];
+    relation.selectValues = selectValues as (string | ArelNode)[];
 
     const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
     const calculatedData = await (
-      rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
+      this as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
     ).skipQueryCacheIfNecessary(() =>
-      connection.selectAll(relation.arel(), `${rel.model.name} ${opName}`),
+      connection.selectAll(relation.arel(), `${this.model.name} ${opName}`),
     );
-    const rows = calculatedData.toArray();
 
-    const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
-    let keyRecords: Map<string, unknown> | null = null;
+    let keyRecords: Record<string | number, Base> | undefined;
     if (association) {
-      const klass = association.klass.baseClass ?? association.klass;
-      const primaryKey = (
-        Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]
-      ) as string[];
-      const keyIds = rows
-        .map((row) => groupAliases.map((aliaz) => row[aliaz]))
-        .filter((vals) => vals.every((v) => v != null));
-      const records: any[] = await klass.where(new Map([[primaryKey, keyIds]])).toArray();
-      keyRecords = new Map(
-        records.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
-      );
+      const keyIds = calculatedData.toArray().map((row) => row[first(groupAliases)!]);
+      keyRecords = await (association.klass.baseClass as typeof Base)
+        .where(new Map([[association.klass.baseClass.primaryKey, keyIds]]))
+        .indexBy((record) => record.id as string | number);
     }
 
-    const keyTypes = groupColumns.map(
-      ([aliaz, colName]) =>
-        (typeCasterFor(colName) ??
-          typeFor(rel, colName, () =>
-            fetch(calculatedData.columnTypes, aliaz, defaultValue()),
-          )) as { deserialize?(v: unknown): unknown } | null,
-    );
+    const keyTypes: ColumnTypes = {};
+    for (const [aliaz, colName] of groupColumns) {
+      keyTypes[aliaz] = (typeCasterFor(colName) ??
+        typeFor.call(this, colName, () =>
+          fetch(calculatedData.columnTypes, aliaz, defaultValue()),
+        )) as ColumnType;
+    }
+
+    const hashRows = (calculatedData.castValues(keyTypes) as unknown[][]).map((row) => {
+      const hash: Record<string, unknown> = {};
+      for (const [i, colName] of calculatedData.columns.entries()) {
+        hash[colName] = row[i];
+      }
+      return hash;
+    });
 
     let type: unknown;
     if (fn !== "count") {
       type =
         typeCasterFor(column) ??
-        lookupCastTypeFromJoinDependencies(rel, String(columnName)) ??
+        lookupCastTypeFromJoinDependencies.call(this, String(columnName)) ??
         defaultValue();
       if (type instanceof EnumType) type = type.subtype;
     }
 
     const result = new Map<unknown, unknown>();
-    for (const row of rows) {
-      const key = groupAliases.map((aliaz, i) => {
-        const raw = row[aliaz];
-        const keyType = keyTypes[i];
-        return raw == null
-          ? null
-          : typeof keyType?.deserialize === "function"
-            ? keyType.deserialize(raw)
-            : raw;
-      });
-      let resultKey: unknown = key.length === 1 ? key[0] : key;
-      if (associated) {
-        resultKey = key.every((v) => v != null) ? (keyRecords?.get(keyOf(key)) ?? null) : null;
-      }
-      result.set(resultKey, typeCastCalculatedValue(row[columnAlias] ?? null, fn, type));
+    for (const row of hashRows) {
+      let key: unknown = groupAliases.map((aliaz) => row[aliaz]);
+      if ((key as unknown[]).length === 1) key = (key as unknown[])[0];
+      if (associated) key = hashAref(keyRecords!, key);
+
+      result.set(key, typeCastCalculatedValue.call(this, row[columnAlias], fn, type));
     }
     return result;
   });
@@ -947,46 +1005,39 @@ function typeCasterFor(column: unknown): unknown {
 
 /** @internal */
 export function typeFor(
-  rel: CalculationRelation,
-  field: string | Nodes.Node | number,
+  this: CalculationRelation,
+  field: string | ArelNode | number,
   block?: () => ColumnType,
 ): unknown {
   const fieldName =
     (field as unknown as { name?: unknown }).name != null
       ? String((field as unknown as { name: unknown }).name)
       : (String(field).split(".").pop() ?? "");
-  return rel.model.typeForAttribute?.(fieldName, block);
+  return this.model.typeForAttribute?.(fieldName, block);
 }
 
-/**
- * @internal
- * @missingRailsArgs fetch — PERMANENT
- */
+/** @internal */
 export function lookupCastTypeFromJoinDependencies(
-  rel: CalculationRelation,
+  this: CalculationRelation,
   name: string,
-  joinDependencies?: JoinDependency[],
+  joinDependencies: JoinDependency[] = buildJoinDependencies.call(this as any),
 ): unknown {
   let found: unknown = null;
-  eachJoinDependencies.call(rel as any, joinDependencies, (join: any) => {
-    if (found != null) return;
+  eachJoinDependencies.call(this as any, joinDependencies, (join: any) => {
     const type = fetch(join.baseKlass.attributeTypes(), name, null);
-    if (type) found = type;
+    if (rtest(type)) found ??= type;
   });
   return found;
 }
 
-/**
- * @internal
- * @missingRailsCall size — PERMANENT
- */
+/** @internal */
 export async function typeCastPluckValues(
   this: CalculationRelation,
   result: Result,
-  columns: Array<string | Nodes.Node | unknown>,
+  columns: Array<string | ArelNode | unknown>,
 ): Promise<unknown[]> {
   await this.model.ensureSchemaLoaded();
-  let castTypes: ColumnTypes | ColumnType[];
+  let castTypes: ColumnTypes | Hash<string, ColumnType> | ColumnType[];
   if (result.columns.length !== columns.length) {
     castTypes = this.model.attributeTypes();
   } else {
@@ -1000,7 +1051,7 @@ export async function typeCastPluckValues(
           block(() => {
             joinDependencies ??= buildJoinDependencies.call(this as any);
             return (
-              (lookupCastTypeFromJoinDependencies(this, name, joinDependencies) as
+              (lookupCastTypeFromJoinDependencies.call(this, name, joinDependencies) as
                 | ColumnType
                 | undefined) ??
               result.columnTypes[i] ??
@@ -1014,62 +1065,53 @@ export async function typeCastPluckValues(
 }
 
 /** @internal */
-export function typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
+export function typeCastCalculatedValue(
+  this: CalculationRelation,
+  value: unknown,
+  operation: string,
+  type: any,
+): unknown {
   switch (operation) {
     case "count":
-      return Number(value ?? 0);
+      return toI(value);
     case "sum":
-      if (type instanceof BigIntegerType) return type.deserialize(value ?? 0) ?? 0n;
-      return Number(value ?? 0);
-    case "average": {
-      switch ((type as { type?(): string } | null)?.type?.()) {
+      return type.deserialize(rtest(value) ? value : 0);
+    case "average":
+      switch (type.type()) {
         case "integer":
         case "decimal":
-          return value == null
-            ? null
-            : value instanceof BigDecimal
-              ? value
-              : new BigDecimal(value as string | number | bigint);
-        default: {
-          if (value === null || value === undefined) return null;
-          const ct = type as { deserialize?(v: unknown): unknown } | null;
-          if (typeof ct?.deserialize === "function") return ct.deserialize(value);
-          return value;
-        }
+          return value == null ? null : toD(String(value));
+        default:
+          return type.deserialize(value);
       }
-    }
-    default: {
-      if (value === null || value === undefined) return null;
-      const ct = type as { deserialize?(v: unknown): unknown } | null;
-      if (typeof ct?.deserialize === "function") return ct.deserialize(value);
-      return value;
-    }
+    default:
+      return type.deserialize(value);
   }
 }
 
 /** @internal */
-export async function selectForCount(rel: CalculationRelation): Promise<string> {
-  if (isEmpty(rel.selectValues)) return ":all";
-  return rel.withConnection((conn) =>
-    (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
-      .map((column) => (conn.visitor ? conn.visitor.compile(column) : String(column)))
+export async function selectForCount(this: CalculationRelation): Promise<string> {
+  if (isEmpty(this.selectValues)) return ":all";
+  return this.withConnection((conn) =>
+    (arelColumns.call(this as never, this.selectValues as never[]) as ArelNode[])
+      .map((column) => conn.visitor.compile(column))
       .join(", "),
   );
 }
 
 /** @internal */
 export function isBuildCountSubquery(
-  rel: CalculationRelation,
+  this: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | number | null,
+  columnName: string | string[] | ArelNode | number | null,
   distinct: boolean,
 ): boolean {
   const isAll = columnName === ":all";
-  const selectValues = rel.selectValues ?? [];
+  const selectValues = this.selectValues ?? [];
   return (
     operation === "count" &&
     (((isAll || many(selectValues)) && distinct) ||
-      rel.limitValue !== null ||
-      rel.offsetValue !== null)
+      this.limitValue !== null ||
+      this.offsetValue !== null)
   );
 }

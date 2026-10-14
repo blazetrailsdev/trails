@@ -11,7 +11,17 @@ import {
   type DateParts,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import {
+  Marshal,
+  Rational,
+  rbCDate,
+  rbCBasicObject,
+  rbCDateTime,
+  rbCTime,
+  rbModAncestors,
+  rbObjClass,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat";
 
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
@@ -41,6 +51,15 @@ describe("Date", () => {
     expect(d.complexDatP()).toBe(false);
     expect(d.toS()).toBe("2001-02-03");
     expect(RubyDate.civil(2001, 2, 3.5).equals(RubyDate.civil(2001, 2, 3))).toBe(true);
+  });
+
+  it("checks every argument Date.new is given, as date_initialize's argc switch does", () => {
+    const nil = undefined as unknown as number;
+    expect(() => new RubyDate(2020, nil)).toThrow(new TypeError("invalid month (not numeric)"));
+    expect(() => new RubyDate(2020, 6, nil)).toThrow(new TypeError("invalid day (not numeric)"));
+    expect(() => new RubyDate(nil, 6)).toThrow(new TypeError("invalid year (not numeric)"));
+    expect(new RubyDate(2020).toS()).toBe("2020-01-01");
+    expect(new RubyDate().toS()).toBe("-4712-01-01");
   });
 
   it("seats Date.today's civil triple under GREGORIAN, so the reform only changes the start", () => {
@@ -1870,5 +1889,82 @@ describe("Date#marshalLoad legacy dumps", () => {
 
   it("raises TypeError on any other size", () => {
     expect(() => new RubyDate().marshalLoad([1, 2, 3, 4])).toThrow(TypeError);
+  });
+});
+
+describe("Marshal over Date", () => {
+  it("dumps a Date and a DateTime as ruby does", () => {
+    expect(Marshal.dump(new RubyDate(2016, 1, 1))).toBe(
+      "\x04\bU:\tDate[\x0bi\x00i\x03-\x7f%i\x00i\x00i\x00f\f2299161",
+    );
+    expect(Marshal.dump(new RubyDate(2016, 1, 1, RubyDate.JULIAN))).toBe(
+      "\x04\bU:\tDate[\x0bi\x00i\x03:\x7f%i\x00i\x00i\x00f\binf",
+    );
+    expect(Marshal.dump(new RubyDate(-4712, 1, 1))).toBe(
+      "\x04\bU:\tDate[\x0bi\x00i\x00i\x00i\x00i\x00f\f2299161",
+    );
+    expect(Marshal.dump(new RubyDateTime(2016, 1, 1, 12, 30, new Rational(1, 2), "+09:00"))).toBe(
+      "\x04\bU:\rDateTime[\x0bi\x00i\x03-\x7f%i\x0281i\x04\x00e\xcd\x1di\x02\x90~f\f2299161",
+    );
+    expect(Marshal.dump(new RubyDateTime(2016, 1, 1, 0, 0, new Rational(1, 3)))).toBe(
+      "\x04\bU:\rDateTime[\x0bi\x00i\x03-\x7f%i\x00U:\rRational[\x07i\x04\x00\xca\x9a;i\x08i\x00f\f2299161",
+    );
+  });
+
+  it("loads a Date and a DateTime through their allocators, equal to what was dumped", () => {
+    const d = new RubyDate(2016, 1, 1, RubyDate.JULIAN);
+    const d2 = Marshal.load(Marshal.dump(d)) as RubyDate;
+    expect(d2).toBeInstanceOf(RubyDate);
+    expect(d2.equals(d)).toBe(true);
+    expect(d2.inspect()).toBe(d.inspect());
+
+    for (const second of [new Rational(1, 2), new Rational(1, 3)]) {
+      const dt = new RubyDateTime(2016, 1, 1, 12, 30, second, "+09:00");
+      const dt2 = Marshal.load(Marshal.dump(dt)) as RubyDateTime;
+      expect(dt2).toBeInstanceOf(RubyDateTime);
+      expect(dt2.equals(dt)).toBe(true);
+      expect(dt2.inspect()).toBe(dt.inspect());
+    }
+  });
+
+  it("dumps a Temporal.PlainDate as the Date it seats, and loads it back equal", () => {
+    const date = Temporal.PlainDate.from("2016-01-01");
+    expect(Marshal.dump(date)).toBe(Marshal.dump(new RubyDate(2016, 1, 1)));
+
+    const loaded = Marshal.load(Marshal.dump([date, date])) as RubyDate[];
+    expect(loaded[0]).toBeInstanceOf(RubyDate);
+    expect(loaded[0].equals(date)).toBe(true);
+    expect(loaded[0].cmp(Temporal.PlainDate.from("2016-01-02"))).toBe(-1);
+    expect(loaded[1].equals(date)).toBe(true);
+  });
+
+  it("answers one class object for a Temporal seat and the instance it seats", () => {
+    expect(rbObjClass(Temporal.PlainDate.from("2016-01-01"))).toBe(RubyDate);
+    expect(rbObjClass(new RubyDate(2016, 1, 1))).toBe(RubyDate);
+    expect(rbObjClass(Temporal.PlainDateTime.from("2016-01-01T10:00"))).toBe(RubyDateTime);
+    expect(rbObjClass(new RubyDateTime(2016, 1, 1, 10))).toBe(RubyDateTime);
+    expect(rbObjClass(Temporal.Now.zonedDateTimeISO())).toBe(RubyTime);
+    expect(rbObjClass(RubyTime.now())).toBe(RubyTime);
+    expect(rbObjIsKindOf(new RubyDateTime(2016, 1, 1, 10), rbCDateTime)).toBe(true);
+    expect(rbObjIsKindOf(Temporal.PlainDateTime.from("2016-01-01T10:00"), rbCDate)).toBe(true);
+    expect(rbObjIsKindOf(Temporal.PlainDateTime.from("2016-01-01T10:00"), rbCTime)).toBe(false);
+    expect(rbModAncestors(RubyDateTime).filter((k) => typeof k === "function")).toEqual([
+      RubyDateTime,
+      RubyDate,
+      Object,
+      rbCBasicObject,
+    ]);
+  });
+
+  it("reads every DateTime seat as a DateTime, a zoned one included", () => {
+    const utc = RubyDateTime.civil(2016, 1, 1, 10, 0, 0, 0);
+    const zoned = RubyDateTime.civil(2016, 1, 1, 10, 0, 0, "+09:00");
+    const subMinute = RubyDateTime.civil(2016, 1, 1, 10, 0, 0, new Rational(1, 86400));
+    for (const seat of [utc, zoned, subMinute, RubyDateTime.now()]) {
+      expect(rbObjClass(seat)).toBe(RubyDateTime);
+      expect(rbObjIsKindOf(seat, rbCDateTime)).toBe(true);
+      expect(rbObjIsKindOf(seat, rbCTime)).toBe(false);
+    }
+    expect(Object.keys(zoned)).toEqual([]);
   });
 });

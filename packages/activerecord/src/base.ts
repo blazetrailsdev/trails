@@ -1,5 +1,18 @@
-import { type Hash } from "@blazetrails/ruby-compat";
+import {
+  type Hash,
+  block as rbBlock,
+  fetch,
+  hasKey,
+  eachPair,
+  hashAref,
+  isEmpty,
+  keys,
+  rbDeclareIvar,
+  rbModConstSet,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
+import { NotImplementedError } from "./errors.js";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
 import { Transaction as _UserTransaction } from "./transaction.js";
@@ -16,9 +29,6 @@ import {
   JSONSerializer,
   Model,
   ValueType,
-  type AttributeOptions,
-  type CallbackConditions,
-  type CallbackObject,
   ValidationsCallbacks,
 } from "@blazetrails/activemodel";
 import { Table, Nodes } from "@blazetrails/arel";
@@ -34,7 +44,7 @@ import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.
 import { _registerBase as _registerBaseWithAsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { _registerBase as _registerBaseWithDatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import {
-  discriminateClassForRecord,
+  discriminateClassForRecord as _discriminateClassForRecord,
   stiName,
   polymorphicName as inheritancePolymorphicName,
   computeType as inheritanceComputeType,
@@ -43,33 +53,34 @@ import {
   primaryAbstractClass,
   stiClassFor,
   polymorphicClassFor,
-  initializeInternalsCallback as inheritanceInitializeInternalsCallback,
   baseClass as _inheritanceBaseClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
-  subclassFromAttributesForNew,
+  subclassFromAttributes as _subclassFromAttributes,
+  findStiClass as _findStiClass,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
-  qualifiedName,
 } from "./inheritance.js";
-import { NotImplementedError } from "./errors.js";
 import {
   AutosaveAssociation,
-  reload as _autosaveReload,
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
   _registerAssociationBuilderExtension,
-  initInternals as _autosaveInitInternals,
 } from "./autosave-association.js";
 import { Association as AssociationBuilder } from "./associations/builder/association.js";
 import { idsName as _idsName } from "./associations/builder/collection-association.js";
 import {
   isValid as validationsIsValid,
   defaultValidationContext,
-  _setSuperIsValid,
   type ValidationContextArg,
 } from "./validations.js";
 import * as _Validations from "./validations.js";
+import { ClassMethods as _AssociatedClassMethods } from "./validations/associated.js";
+import { ClassMethods as _UniquenessClassMethods } from "./validations/uniqueness.js";
+import { ClassMethods as _PresenceClassMethods } from "./validations/presence.js";
+import { ClassMethods as _AbsenceClassMethods } from "./validations/absence.js";
+import { ClassMethods as _LengthClassMethods } from "./validations/length.js";
+import { ClassMethods as _NumericalityClassMethods } from "./validations/numericality.js";
 import {
   EncryptableRecord as _EncryptableRecord,
   encrypts as _encrypts,
@@ -78,11 +89,9 @@ import {
   ciphertextFor as _ciphertextFor,
   encrypt as _encrypt,
   decrypt as _decrypt,
-  hasEncryptedAttributes as _hasEncryptedAttributes,
   cantModifyEncryptedAttributesWhenFrozen as _cantModifyEncryptedAttributesWhenFrozen,
   sourceAttributeFromPreservedAttribute as _sourceAttributeFromPreservedAttribute,
 } from "./encryption/encryptable-record.js";
-import { Contexts as _Contexts } from "./encryption/contexts.js";
 import type { EncryptsOptions } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
@@ -93,29 +102,27 @@ import {
   resetDefaultAttributes as _resetDefaultAttributes,
 } from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
-import * as TouchLater from "./touch-later.js";
+import * as _TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
-import {
-  ConnectionHandler,
-  _registerBase as _registerBaseWithConnectionHandler,
-} from "./connection-adapters/abstract/connection-handler.js";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
+import type { IndexedRow } from "./result.js";
 import * as ModelSchema from "./model-schema.js";
 import {
+  type ClassMethods,
   createOrUpdate as callbacksCreateOrUpdate,
+  destroy as callbacksDestroy,
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
-  InstanceMethods as CallbacksInstanceMethods,
 } from "./callbacks.js";
 import {
   Access,
   sanitizeForMassAssignment,
-  isMassAssignmentEmpty,
+  type PermittedAttributes,
   assertAssignedSynchronously,
   type DirtyOptions,
-  dirtyInitAttributes,
 } from "@blazetrails/activemodel";
 import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
@@ -125,6 +132,7 @@ import {
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
 import {
+  TokenFor as _TokenFor,
   generatesTokenFor as _generatesTokenFor,
   generateTokenFor as _generateTokenFor,
   findByTokenFor as _findByTokenFor,
@@ -132,7 +140,12 @@ import {
 } from "./token-for.js";
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { DescendantsTracker, ReloadedClassesFiltering } from "@blazetrails/activesupport";
+import {
+  DescendantsTracker,
+  ReloadedClassesFiltering,
+  camelize,
+  type CallbackChain,
+} from "@blazetrails/activesupport";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import {
@@ -154,14 +167,12 @@ import {
   type BenchmarkLogger,
   runLoadHooks,
   type PrependMethod,
-  type Included,
-  type ParameterFilter,
-  peekCallbackChain,
-  runCallbacks,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
   isRespondTo as _isRespondTo,
+  respondToMissing as _respondToMissing,
+  methodMissing as _methodMissing,
   hasAttribute as _hasAttribute,
   _hasAttribute as _privateHasAttribute,
   attributePresent as _attributePresent,
@@ -176,9 +187,12 @@ import {
   aliasAttribute as _aliasAttribute,
   undefineAttributeMethods as _undefineAttributeMethods,
   initializeGeneratedModules as _initializeGeneratedModules,
+  generatedAttributeMethods as _generatedAttributeMethods,
   GeneratedAttributeMethods,
   generateAliasAttributes as _generateAliasAttributes,
   eagerlyGenerateAliasAttributeMethods as _eagerlyGenerateAliasAttributeMethods,
+  generateAliasAttributeMethods as _generateAliasAttributeMethods,
+  aliasAttributeMethodDefinition as _aliasAttributeMethodDefinition,
   attributesWithValues as _attributesWithValues,
   formatForInspect as _formatForInspect,
   pkAttribute as _pkAttribute,
@@ -216,7 +230,7 @@ import {
   isDangerousAttributeMethod as _pkIsDangerousAttributeMethod,
   isCompositePrimaryKey as _isCompositePrimaryKey,
 } from "./attribute-methods/primary-key.js";
-import { CompositePrimaryKey as _CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
+import "./attribute-methods/composite-primary-key.js";
 import {
   defineMethodAttribute as _defineMethodAttribute,
   Read as _Read,
@@ -232,7 +246,10 @@ import {
   attributeCameFromUser as _attributeCameFromUser,
 } from "./attribute-methods/before-type-cast.js";
 import { Query as _Query } from "./attribute-methods/query.js";
-import { Serialization as _AttrSerialization } from "./attribute-methods/serialization.js";
+import {
+  Serialization as _AttrSerialization,
+  type SerializeOptions,
+} from "./attribute-methods/serialization.js";
 import {
   toParam as _toParam,
   Integration as _Integration,
@@ -249,6 +266,7 @@ import * as _NoTouching from "./no-touching.js";
 import * as _Transactions from "./transactions.js";
 import * as _Callbacks from "./callbacks.js";
 import { suppress as _suppressBlock } from "./suppressor.js";
+import * as _Suppressor from "./suppressor.js";
 import {
   inspect as _inspect,
   equals as _equals,
@@ -257,13 +275,10 @@ import {
   hash as _hash,
   isPresent as _isPresent,
   isBlank as _isBlank,
-  filterAttributes as _coreFilterAttributes,
 } from "./core.js";
 import * as _Core from "./core.js";
-import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
 import { Dirty as _Dirty } from "./attribute-methods/dirty.js";
 import * as _DirtyModule from "./attribute-methods/dirty.js";
-import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
 import {
@@ -272,10 +287,7 @@ import {
   renderBind as _renderBind,
   buildExplainClause as _buildExplainClause,
 } from "./explain.js";
-import {
-  delegatedType as _delegatedType,
-  defineDelegatedTypeMethods as _defineDelegatedTypeMethods,
-} from "./delegated-type.js";
+import * as DelegatedType from "./delegated-type.js";
 import * as _Reflection from "./reflection.js";
 import "./associations/belongs-to-association.js";
 import "./associations/belongs-to-polymorphic-association.js";
@@ -291,7 +303,6 @@ import {
   setCurrentScope as _setCurrentScope,
   globalCurrentScope as _globalCurrentScope,
   setGlobalCurrentScope as _setGlobalCurrentScope,
-  scopeAttributes,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
 } from "./scoping.js";
 import {
@@ -314,12 +325,10 @@ import {
   afterCommit as _afterCommit,
   afterRollback as _afterRollback,
   setCallback as _txSetCallback,
-  InstanceMethods as TransactionsInstanceMethods,
   afterSaveCommit as _afterSaveCommit,
   afterCreateCommit as _afterCreateCommit,
   afterUpdateCommit as _afterUpdateCommit,
   afterDestroyCommit as _afterDestroyCommit,
-  initInternals as _transactionsInitInternals,
 } from "./transactions.js";
 
 import {
@@ -335,8 +344,6 @@ import {
   associationInstanceGet as _associationInstanceGet,
   association as _association,
   associationInstanceSet as _associationInstanceSet,
-  initInternals as _associationsInitInternals,
-  initializeDup as _associationsInitializeDup,
 } from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
@@ -357,21 +364,19 @@ import {
   writeStoreAttribute as _writeStoreAttribute,
   storeAccessorFor as _storeAccessorFor,
 } from "./store.js";
-import { methodMissing, respondToMissing } from "./dynamic-matchers.js";
+import { DynamicMatchers } from "./dynamic-matchers.js";
 
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 
-function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
-  return ctor.isScopeAttributes();
-}
-
 function beforeOrAroundCallbackSources(
   proto: object,
   event: string,
 ): { sources: string[]; opaque: boolean } {
-  const chain = peekCallbackChain(proto, event);
+  const chain = (proto as Record<string, CallbackChain | undefined>)[
+    `_${camelize(event, false)}Callbacks`
+  ];
   if (!chain) return { sources: [], opaque: false };
   const sources: string[] = [];
   let opaque = false;
@@ -434,32 +439,6 @@ function expandCallbackSourcesWithHelpers(
   return result;
 }
 
-function _applyScopeAttributes(
-  ctor: typeof Base,
-  record: InstanceType<typeof Base>,
-  explicitKeys: Set<string>,
-): void {
-  if (!_shouldApplyScopeAttributes(ctor)) return;
-  const attrs = scopeAttributes.call(ctor as any);
-  if (!attrs || Object.keys(attrs).length === 0) return;
-  const toApply: Record<string, unknown> = Object.create(null);
-  const cold = !ModelSchema.isSchemaLoaded.call(ctor as never);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (cold && !ctor.hasAttribute(k)) continue;
-    if (!explicitKeys.has(k)) {
-      toApply[k] = v;
-    }
-  }
-  if (Object.keys(toApply).length > 0) {
-    const assocPending = _extractAssociationAttrs(ctor, toApply);
-    const rest = assocPending ? assocPending.rest : toApply;
-    if (Object.keys(rest).length > 0) {
-      assertAssignedSynchronously((record as any)._assignAttributes(rest), "Model.new");
-    }
-    if (assocPending) _dispatchAssociationAttrs(record as unknown as Base, assocPending.assocs);
-  }
-}
-
 /** @internal */
 interface _AssociationDefLike {
   name: string;
@@ -487,35 +466,32 @@ function _collectionIdsKeyOwner(
 
 /** @internal */
 function _extractAssociationAttrs(
-  ctor: typeof Base | undefined,
-  attrs: Record<string, unknown>,
+  ctor: typeof Base,
+  attrs: Record<string, unknown> | Map<string, unknown>,
 ): {
   rest: Record<string, unknown>;
   assocs: _PendingAssociationAttr[];
 } | null {
-  const reflections = (ctor as { _reflections?: Record<string, _AssociationDefLike> } | undefined)
-    ?._reflections;
-  if (!reflections) return null;
-  const defs = Object.values(reflections);
+  const defs = Object.values(ctor._reflections);
   if (defs.length === 0) return null;
   let assocs: _PendingAssociationAttr[] | null = null;
-  for (const k of Object.keys(attrs)) {
+  for (const k of keys(attrs)) {
     const named = defs.find((a) => a.name === k);
     if (named) {
-      (assocs ??= []).push({ name: k, value: attrs[k], assoc: named, idsKey: false });
+      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: named, idsKey: false });
       continue;
     }
     const idsOwner = _collectionIdsKeyOwner(defs, k);
     if (idsOwner) {
-      (assocs ??= []).push({ name: k, value: attrs[k], assoc: idsOwner, idsKey: true });
+      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: idsOwner, idsKey: true });
     }
   }
   if (!assocs) return null;
   const rest = Object.create(null) as Record<string, unknown>;
   const assocNames = new Set(assocs.map((a) => a.name));
-  for (const [k, v] of Object.entries(attrs)) {
+  eachPair(attrs, (k, v) => {
     if (!assocNames.has(k)) rest[k] = v;
-  }
+  });
   return { rest, assocs };
 }
 
@@ -572,44 +548,23 @@ export class Base extends Model {
   declare static hasOne: typeof _Associations.hasOne;
   declare static hasMany: typeof _Associations.hasMany;
   declare static hasAndBelongsToMany: typeof _Associations.hasAndBelongsToMany;
-  static get i18nScope(): string {
-    return Translation.i18nScope.call(this);
-  }
 
   static _tableName: string | null = null;
-  declare static _primaryKey?: string | string[];
-  static readonly _isActiveRecordBase = true;
+  declare static _primaryKey?: string | string[] | null;
+  static _compositePrimaryKey = false;
 
-  /** @internal */
-  declare static _registryKeys: string[];
+  declare static filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[];
 
-  static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
+  declare static inspectionFilter: typeof _Core.ClassMethods.inspectionFilter;
 
-  static get filterAttributes(): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
-    return _coreFilterAttributes.call(this);
-  }
-
-  static set filterAttributes(
-    value: (string | RegExp | ((key: string, value: unknown) => unknown))[],
-  ) {
-    _coreFilterAttributes.call(this, value);
-  }
-
-  static inspectionFilter(): ParameterFilter {
-    return _Core.inspectionFilter.call(this);
-  }
-
-  static _abstractClass = false;
-  static _connectionClass = false;
   declare static automaticScopeInversing: boolean;
   declare static automaticallyInvertPluralAssociations: boolean;
-  static hasManyInversing = false;
+  declare static hasManyInversing: boolean;
   static paramDelimiter = "_";
   declare static cacheVersioning: boolean;
   declare static cacheTimestampFormat: "usec" | "number";
   declare static collectionCacheVersioning: boolean;
   static _protectedEnvironments: string[] = ["production"];
-  static _lockingColumn: string = "lock_version";
 
   declare static timeZoneAwareAttributes: boolean;
 
@@ -636,48 +591,19 @@ export class Base extends Model {
     | undefined;
   declare static isSignedIdVerifierSecret: boolean;
 
-  static _requireConcreteClass(): void {
-    if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {
-      // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
-      throw new NotImplementedError(
-        `${qualifiedName(this)} is an abstract class and cannot be instantiated.`,
-      );
-    }
-  }
+  declare static connectionClass: boolean;
 
-  static get connectionClass(): boolean {
-    return Object.prototype.hasOwnProperty.call(this, "_connectionClass")
-      ? this._connectionClass
-      : false;
-  }
+  static isConnectionClass = _Core.isConnectionClass;
 
-  static set connectionClass(value: boolean) {
-    this._connectionClass = value;
-  }
+  static asynchronousQueriesSession = _Core.asynchronousQueriesSession;
 
-  static isConnectionClass(): boolean {
-    return !!this.connectionClass;
-  }
+  static asynchronousQueriesTracker = _Core.asynchronousQueriesTracker;
 
-  static asynchronousQueriesSession(): Session {
-    return _Core.asynchronousQueriesSession();
-  }
+  static currentPreventingWrites = _Core.currentPreventingWrites;
 
-  static asynchronousQueriesTracker(): AsynchronousQueriesTracker {
-    return _Core.asynchronousQueriesTracker();
-  }
+  static currentRole = _Core.currentRole;
 
-  static currentPreventingWrites(): boolean {
-    return _Core.currentPreventingWrites.call(this);
-  }
-
-  static currentRole(): string {
-    return _Core.currentRole.call(this);
-  }
-
-  static currentShard(): string {
-    return _Core.currentShard.call(this);
-  }
+  static currentShard = _Core.currentShard;
 
   static connectionClassForSelf(): typeof Base {
     let klass: typeof Base = this;
@@ -701,7 +627,7 @@ export class Base extends Model {
   }
 
   static set tableName(name: string | null) {
-    ModelSchema.tableName.call(this, name);
+    ModelSchema.setTableName.call(this, name);
   }
 
   static get primaryKey(): string | string[] {
@@ -718,15 +644,13 @@ export class Base extends Model {
 
   declare static lockingEnabled: boolean;
 
-  static get compositePrimaryKey(): boolean {
-    return _isCompositePrimaryKey.call(this);
-  }
+  static isCompositePrimaryKey = _isCompositePrimaryKey;
 
   static _buildPkWhere(idValue: unknown): string {
     return ModelSchema.buildPkWhere.call(this, idValue);
   }
 
-  static _buildPkWhereNode(idValue: unknown): InstanceType<typeof Nodes.Node> {
+  static _buildPkWhereNode(idValue: unknown): Nodes.Node | Nodes.SqlLiteral {
     return ModelSchema.buildPkWhereNode.call(this, idValue);
   }
 
@@ -739,28 +663,29 @@ export class Base extends Model {
   /** @internal */
   static hookAttributeType(name: string, type: ValueType): ValueType {
     const tzType = tzHookAttributeType.call(this as any, name, type);
-    return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
+    return LockingOptimistic.hookAttributeType.call(
+      this as any,
+      (attribute, castType) =>
+        AttributeRegistration.ClassMethods.hookAttributeType.call(this as any, attribute, castType),
+      name,
+      tzType,
+    );
   }
 
   static typeForAttribute(name: string, block?: () => ValueType): ValueType | null {
     (ModelSchema.loadSchema as any).call(this);
     const resolved = (this as any).attributeAliases?.[name] ?? name;
     if (block) {
-      const attributeTypes = this.attributeTypes();
-      return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
+      return fetch(this.attributeTypes(), resolved, rbBlock(block));
     }
-    return this.attributeTypes()[resolved];
+    return hashAref(this.attributeTypes(), resolved) as ValueType | null;
   }
 
-  static get arelTable(): Table {
-    return _Core.arelTable.call(this);
-  }
+  declare static readonly arelTable: Table;
 
   static typeCaster = _Core.typeCaster;
 
-  static get predicateBuilder(): import("./relation/predicate-builder.js").PredicateBuilder {
-    return _Core.predicateBuilder.call(this);
-  }
+  declare static readonly predicateBuilder: import("./relation/predicate-builder.js").PredicateBuilder;
 
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
@@ -770,11 +695,13 @@ export class Base extends Model {
     ) {
       state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
     }
+    const promise = state._schemaLoadPromise;
     try {
-      await state._schemaLoadPromise;
-    } catch (e) {
-      state._schemaLoadPromise = undefined;
-      throw e;
+      await promise;
+    } finally {
+      if (!ModelSchema.isSchemaLoaded.call(this as never) && state._schemaLoadPromise === promise) {
+        state._schemaLoadPromise = undefined;
+      }
     }
   }
 
@@ -797,13 +724,7 @@ export class Base extends Model {
     return this.loadSchema();
   }
 
-  static get connectionHandler(): ConnectionHandler {
-    return _Core.connectionHandler.call(this);
-  }
-
-  static set connectionHandler(handler: ConnectionHandler) {
-    _Core.setConnectionHandler.call(this, handler);
-  }
+  declare static connectionHandler: ConnectionHandler;
 
   static async establishConnection(
     configOrEnv?:
@@ -888,9 +809,9 @@ export class Base extends Model {
   declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassHalf["isInstanceMethodAlreadyImplemented"];
   declare static isDangerousAttributeMethod: (methodName: string) => boolean;
   /** @internal */
-  declare static _aliasesByAttributeName: Map<string, string[]>;
+  declare static _aliasesByAttributeName: Hash<string, string[]>;
   /** @internal */
-  declare static generatedAttributeMethods: AttributeMethodsClassHalf["generatedAttributeMethods"];
+  declare static generatedAttributeMethods: typeof _generatedAttributeMethods;
   /** @internal */
   declare static attributeMethodPatternsCache: AttributeMethodsClassHalf["attributeMethodPatternsCache"];
   /** @internal */
@@ -977,7 +898,6 @@ export class Base extends Model {
     return polymorphicClassFor(this, name);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   declare static readonly subclasses: (typeof Base)[];
 
   static get descendants(): (typeof Base)[] {
@@ -1000,15 +920,7 @@ export class Base extends Model {
   /** @internal */
   declare static timestampAttributesForUpdate: typeof Timestamp.timestampAttributesForUpdate;
 
-  static _recordTimestamps = true;
-
-  static get recordTimestamps(): boolean {
-    return this._recordTimestamps;
-  }
-
-  static set recordTimestamps(value: boolean) {
-    this._recordTimestamps = value;
-  }
+  declare static recordTimestamps: boolean;
 
   declare static partialUpdates: boolean;
   declare static partialInserts: boolean;
@@ -1021,12 +933,12 @@ export class Base extends Model {
 
   static _sequenceName: string | null = null;
 
-  static get sequenceName(): string | null {
+  static get sequenceName(): Promise<string | null> {
     return ModelSchema.sequenceName.call(this);
   }
 
   static set sequenceName(name: string | null) {
-    ModelSchema.sequenceName.call(this, name);
+    ModelSchema.setSequenceName.call(this, name);
   }
 
   static _ignoredColumns: string[] = [];
@@ -1036,12 +948,12 @@ export class Base extends Model {
   }
 
   static set ignoredColumns(columns: string[]) {
-    ModelSchema.ignoredColumns.call(this, columns);
+    ModelSchema.setIgnoredColumns.call(this, columns);
   }
 
-  static _suppressInitializeCallback = false;
-
   static _suppressAbstractCheck = false;
+
+  declare static _suppressStiNewDispatch?: unknown;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static isReadonlyAttribute: typeof ReadonlyAttributes.isReadonlyAttribute;
@@ -1054,6 +966,7 @@ export class Base extends Model {
     string,
     import("./nested-attributes.js").NestedAttributeOptions
   >;
+  declare static readonly isNestedAttributesOptions: boolean;
 
   static acceptsNestedAttributesFor = _NestedAttributes.acceptsNestedAttributesFor;
 
@@ -1062,7 +975,7 @@ export class Base extends Model {
   declare static generatedTokenVerifier: _MessageVerifier | null;
 
   declare static encrypts: (...args: Array<string | EncryptsOptions>) => void;
-  declare static deterministicEncryptedAttributes: () => Set<string> | undefined;
+  declare static deterministicEncryptedAttributes: () => string[] | undefined;
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
     return _suppressBlock(this, fn);
@@ -1071,9 +984,11 @@ export class Base extends Model {
   declare static encryptedAttributes: Set<string> | undefined;
   declare static readonly isEncryptedAttributes: boolean;
   declare static _attrReadonly: string[];
+  declare static is_attrReadonly: boolean;
   declare static defaultScopes: import("./scoping/default.js").DefaultScope[];
   declare static defaultScopeOverride: boolean | null;
   declare static _reflections: Record<string, _Reflection.AssociationReflection>;
+  declare static is_reflections: boolean;
   declare static aggregateReflections: Record<string, _Reflection.AggregateReflection>;
   declare static isAggregateReflections: boolean;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
@@ -1088,7 +1003,11 @@ export class Base extends Model {
   declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
-  static _enums: Map<string, Record<string, number | string | boolean | null>> = new Map();
+  declare static definedEnums: Record<
+    string,
+    HashWithIndifferentAccess<number | string | boolean | null>
+  >;
+  declare static isDefinedEnums: boolean;
 
   declare static enum: typeof _EnumModule.enum;
 
@@ -1117,29 +1036,10 @@ export class Base extends Model {
   /** @internal */
   declare static buildExplainClause: typeof _buildExplainClause;
 
-  static delegatedType(
-    role: string,
-    options: import("./delegated-type.js").DelegatedTypeOptions,
-  ): void {
-    _delegatedType(this, role, options);
-  }
+  declare static delegatedType: typeof DelegatedType.delegatedType;
 
   /** @internal */
-  static defineDelegatedTypeMethods(
-    role: string,
-    {
-      types,
-      options,
-    }: {
-      types: string[];
-      options: Omit<import("./delegated-type.js").DelegatedTypeOptions, "types">;
-    },
-  ): void {
-    _defineDelegatedTypeMethods(this, role, {
-      types,
-      options: options as import("./delegated-type.js").DelegatedTypeOptions,
-    });
-  }
+  declare static defineDelegatedTypeMethods: typeof DelegatedType.defineDelegatedTypeMethods;
 
   declare static store: typeof _StoreClassMethods.store;
 
@@ -1163,13 +1063,7 @@ export class Base extends Model {
 
   declare static defaultColumnSerializer: unknown;
 
-  declare static serialize: (
-    attribute: string,
-    options?: AttributeOptions & {
-      coder?: unknown;
-      type?: "Array" | "Hash" | (new (...args: any[]) => any);
-    },
-  ) => void;
+  declare static serialize: (attribute: string, options?: SerializeOptions) => void;
 
   declare static localStoredAttributes: typeof _localStoredAttributes;
 
@@ -1231,24 +1125,21 @@ export class Base extends Model {
 
   declare static findBy: <T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown>,
+    arg: Record<string, unknown> | string,
+    ...args: unknown[]
   ) => Promise<InstanceType<T> | null>;
 
   declare static initializeFindByCache: typeof _Core.initializeFindByCache;
   declare static cachedFindByStatement: typeof _Core.cachedFindByStatement;
-  declare static _findByStatementCache?: Map<boolean, Map<unknown, unknown>>;
+  declare static _findByStatementCache?: ReturnType<typeof _Core.initializeFindByCache>;
 
   declare static configurations: typeof _Core.configurations;
 
   declare static findByBang: <T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown> | string,
-    ...rest: unknown[]
+    arg: Record<string, unknown> | string,
+    ...args: unknown[]
   ) => Promise<InstanceType<T>>;
-
-  static respondToMissing = respondToMissing;
-
-  static methodMissing = methodMissing;
 
   static async findSoleBy<T extends typeof Base>(
     this: T,
@@ -1282,7 +1173,7 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    sql: string,
+    sql: string | Nodes.SqlLiteral,
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
@@ -1295,133 +1186,19 @@ export class Base extends Model {
       | string
       | string[]
       | unknown[]
-      | Nodes.Node,
+      | Nodes.Node
+      | Nodes.SqlLiteral,
     ...rest: unknown[]
   ): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>> {
-    if (conditionsOrSql === undefined) {
-      return this.all().where();
-    }
-    if (conditionsOrSql instanceof Nodes.Node) {
-      return this.all().where(conditionsOrSql);
-    }
-    if (typeof conditionsOrSql === "string") {
-      return this.all().where(conditionsOrSql, ...rest);
-    }
-    if (Array.isArray(conditionsOrSql)) {
-      return this.all().where(conditionsOrSql as unknown[]);
-    }
-    return this.all().where(conditionsOrSql as Record<string, unknown>);
+    const all: {
+      where(...args: unknown[]): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>>;
+    } = this.all();
+    return all.where(conditionsOrSql, ...rest);
   }
 
-  static update<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static update<T extends typeof Base>(
-    this: T,
-    sentinel: ":all",
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static update<T extends typeof Base>(
-    this: T,
-    ids: unknown[],
-    attrs: Record<string, unknown>[],
-  ): Promise<InstanceType<T>[]>;
-  static update<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>>;
-  static async update<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
-  ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
-    if (Array.isArray(id)) {
-      if (id.some((oneId) => oneId instanceof Base)) {
-        throw new ArgumentError(
-          "You are passing an array of ActiveRecord::Base instances to `update`. " +
-            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
-        );
-      }
-      const objects: InstanceType<T>[] = [];
-      for (const oneId of id) objects.push(await this.find(oneId));
-      for (const [idx, object] of objects.entries()) {
-        await object.update((attributes as Record<string, unknown>[])[idx]);
-      }
-      return objects;
-    } else if (id === ":all") {
-      const records = await this.all();
-      for (const record of records) await record.update(attributes as Record<string, unknown>);
-      return records;
-    } else {
-      if (id instanceof Base) {
-        throw new ArgumentError(
-          "You are passing an instance of ActiveRecord::Base to `update`. " +
-            "Please pass the id of the object by calling `.id`.",
-        );
-      }
-      const object = await this.find(id);
-      await object.update(attributes as Record<string, unknown>);
-      return object;
-    }
-  }
-
-  static updateBang<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static updateBang<T extends typeof Base>(
-    this: T,
-    sentinel: ":all",
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static updateBang<T extends typeof Base>(
-    this: T,
-    ids: unknown[],
-    attrs: Record<string, unknown>[],
-  ): Promise<InstanceType<T>[]>;
-  static updateBang<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>>;
-  static async updateBang<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
-  ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
-    if (Array.isArray(id)) {
-      if (id.some((oneId) => oneId instanceof Base)) {
-        throw new ArgumentError(
-          "You are passing an array of ActiveRecord::Base instances to `update!`. " +
-            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
-        );
-      }
-      const objects: InstanceType<T>[] = [];
-      for (const oneId of id) objects.push(await this.find(oneId));
-      for (const [idx, object] of objects.entries()) {
-        await object.updateBang((attributes as Record<string, unknown>[])[idx]);
-      }
-      return objects;
-    } else if (id === ":all") {
-      const records = await this.all();
-      for (const record of records) await record.updateBang(attributes as Record<string, unknown>);
-      return records;
-    } else {
-      if (id instanceof Base) {
-        throw new ArgumentError(
-          "You are passing an instance of ActiveRecord::Base to `update!`. " +
-            "Please pass the id of the object by calling `.id`.",
-        );
-      }
-      const object = await this.find(id);
-      await object.updateBang(attributes as Record<string, unknown>);
-      return object;
-    }
-  }
+  declare static update: typeof _Persistence.ClassMethods.update;
+  declare static updateBang: typeof _Persistence.ClassMethods.updateBang;
+  declare static queryConstraintsList: typeof _Persistence.queryConstraintsList;
 
   static createOrFindBy<T extends typeof Base>(
     this: T,
@@ -1439,55 +1216,18 @@ export class Base extends Model {
     return this.all().createOrFindByBang(conditions, block);
   }
 
-  static new<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>[],
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>[];
-  static new<T extends typeof Base>(
-    this: T,
-    attrs?: Record<string, unknown>,
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>;
-  static new<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T> | InstanceType<T>[] {
-    if (Array.isArray(attrs)) {
-      return attrs.map((a) => this.new(a, block));
-    }
-    const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
-    if (block) block(record);
-    return record;
-  }
-
-  static build<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>[],
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>[];
-  static build<T extends typeof Base>(
-    this: T,
-    attrs?: Record<string, unknown>,
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>;
-  static build<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T> | InstanceType<T>[] {
-    return Array.isArray(attrs) ? this.new(attrs, block) : this.new(attrs, block);
-  }
-
-  private static _mergeCurrentScopeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
-    const scope = this.currentScope();
-    if (scope) {
-      const scopeAttrs = scope.scopeForCreate?.() ?? {};
-      return { ...scopeAttrs, ...attrs };
-    }
-    return attrs;
-  }
+  declare static build: {
+    <T extends typeof Base>(
+      this: T,
+      attributes: Record<string, unknown>[],
+      block?: (record: InstanceType<T>) => void,
+    ): InstanceType<T>[];
+    <T extends typeof Base>(
+      this: T,
+      attributes?: Record<string, unknown> | PermittedAttributes,
+      block?: (record: InstanceType<T>) => void,
+    ): InstanceType<T>;
+  };
 
   static async create<T extends typeof Base>(
     this: T,
@@ -1496,12 +1236,12 @@ export class Base extends Model {
   ): Promise<InstanceType<T>[]>;
   static async create<T extends typeof Base>(
     this: T,
-    attrs?: Record<string, unknown>,
+    attrs?: Record<string, unknown> | PermittedAttributes,
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>>;
   static async create<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
     return _Persistence.create.call(this, attrs, block);
@@ -1514,12 +1254,12 @@ export class Base extends Model {
   ): Promise<InstanceType<T>[]>;
   static async createBang<T extends typeof Base>(
     this: T,
-    attrs?: Record<string, unknown>,
+    attrs?: Record<string, unknown> | PermittedAttributes,
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>>;
   static async createBang<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
     return _Persistence.createBang.call(this, attrs, block);
@@ -1527,12 +1267,15 @@ export class Base extends Model {
 
   static instantiate<T extends typeof Base>(
     this: T,
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | IndexedRow,
     columnTypes?: Record<string, unknown>,
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> {
     return _Persistence.instantiate.call(this, attributes, columnTypes, block);
   }
+
+  /** @internal */
+  static instantiateInstanceOf = _Persistence.instantiateInstanceOf;
 
   declare static findBySql: typeof Querying.findBySql;
   declare static asyncFindBySql: typeof Querying.asyncFindBySql;
@@ -1655,122 +1398,99 @@ export class Base extends Model {
   declare static resetCounters: typeof CounterCache.resetCounters;
   declare static isCounterCacheColumn: typeof CounterCache.isCounterCacheColumn;
   declare static _counterCacheColumns: string[];
+  declare static is_counterCacheColumns: boolean;
   declare static counterCachedAssociationNames: string[];
+  declare static isCounterCachedAssociationNames: boolean;
 
   /** @noRailsEquivalent PERMANENT */
   static allocate<T extends typeof Base>(this: T): InstanceType<T> {
-    const hadOwnSuppress = Object.prototype.hasOwnProperty.call(
-      this,
-      "_suppressInitializeCallback",
-    );
-    const prevSuppress = this._suppressInitializeCallback;
-    this._suppressInitializeCallback = true;
-    const hadOwnAbstractSuppress = Object.prototype.hasOwnProperty.call(
-      this,
-      "_suppressAbstractCheck",
-    );
-    const prevAbstractSuppress = this._suppressAbstractCheck;
-    this._suppressAbstractCheck = true;
-    let record: InstanceType<T>;
+    const previous = _Core._allocation.klass;
+    _Core._allocation.klass = this;
     try {
-      record = new this() as InstanceType<T>;
+      return new this() as InstanceType<T>;
     } finally {
-      if (hadOwnSuppress) {
-        this._suppressInitializeCallback = prevSuppress;
-      } else {
-        delete (this as any)._suppressInitializeCallback;
-      }
-      if (hadOwnAbstractSuppress) {
-        this._suppressAbstractCheck = prevAbstractSuppress;
-      } else {
-        delete (this as any)._suppressAbstractCheck;
-      }
+      _Core._allocation.klass = previous;
     }
-    return record;
-  }
-
-  static _instantiate<T extends typeof Base>(
-    this: T,
-    row: Record<string, unknown>,
-    block?: (record: InstanceType<T>) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): InstanceType<T> {
-    const klass = discriminateClassForRecord(this, row);
-    if (klass !== this) {
-      return klass._instantiate(
-        row,
-        block as ((record: Base) => void) | undefined,
-        columnTypes,
-      ) as InstanceType<T>;
-    }
-
-    (ModelSchema.loadSchema as any).call(this);
-
-    const attributes = (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {});
-    return (this.allocate() as any).initWithAttributes(attributes, false, block);
   }
 
   _newRecord = true;
   _destroyed = false;
-  _destroyCallbackAlreadyCalled = false;
   _readonly = false;
   _previouslyNewRecord = false;
-  private _destroyedByAssociation: unknown = null;
-  _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
 
-  /** @missingRailsCall init_internals — CONVERGEABLE base-constructor-calls-init-internals-not-activemodel */
-  constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
-    (new.target as typeof Base | undefined)?._requireConcreteClass();
-    attrs ??= {};
-    if (!isMassAssignmentEmpty(attrs)) {
-      attrs = sanitizeForMassAssignment(attrs);
-    }
-    if (
-      (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
-        ?._suppressStiNewDispatch !== new.target
-    ) {
-      const stiTarget = subclassFromAttributesForNew(new.target, attrs);
-      if (stiTarget && stiTarget !== new.target) {
-        return new stiTarget(attrs, initBlock);
-      }
-    }
-    let assocPending = _extractAssociationAttrs(new.target, attrs);
-    if (assocPending) attrs = assocPending.rest;
-    const ctor = new.target;
-    const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
-    const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
-    const wasSuppressed = suppressor._suppressInitializeCallback;
-    suppressor._suppressInitializeCallback = true;
-    try {
-      super(attrs);
-    } finally {
-      if (hadOwn) {
-        suppressor._suppressInitializeCallback = wasSuppressed;
-      } else {
-        delete (suppressor as { _suppressInitializeCallback?: boolean })
-          ._suppressInitializeCallback;
-      }
-    }
-    if (!wasSuppressed) {
-      inheritanceInitializeInternalsCallback.call(this as any);
-      if (_shouldApplyScopeAttributes(ctor)) {
-        _applyScopeAttributes(
-          ctor,
-          this as any,
-          new Set(Object.keys(attrs).map((key) => key.split("(")[0])),
+  constructor(
+    attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes = {},
+    initBlock?: (record: Base) => void,
+  ) {
+    const allocating = _Core._allocation.klass === new.target;
+    if (allocating) _Core._allocation.klass = null;
+    if (!allocating) {
+      const klass = new.target;
+      if ((klass.abstractClass || klass === Base) && !klass._suppressAbstractCheck) {
+        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
+        throw new NotImplementedError(
+          `${rbModName(klass)} is an abstract class and cannot be instantiated.`,
         );
       }
-      if (assocPending) {
-        _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
-        assocPending = null;
+
+      if (klass._suppressStiNewDispatch !== klass) {
+        let subclass: typeof Base | null = null;
+        if (klass._hasAttribute(klass.inheritanceColumn as string)) {
+          subclass = klass.subclassFromAttributes(attributes);
+
+          let scopeAttributes;
+          if (
+            subclass == null &&
+            (scopeAttributes = klass.currentScope()?.scopeForCreate()) != null
+          ) {
+            subclass = klass.subclassFromAttributes(scopeAttributes);
+          }
+
+          if (subclass == null && klass.isBaseClass()) {
+            subclass = klass.subclassFromAttributes(klass.columnDefaults);
+          }
+        }
+
+        if (subclass != null && subclass !== klass) {
+          return new subclass(attributes, initBlock);
+        }
       }
-      initBlock?.(this as unknown as Base);
-      void runCallbacks(this, "initialize", undefined, { strict: "sync" });
     }
+    attributes ??= {};
+    let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
+    const assocPending = _extractAssociationAttrs(new.target, attrs);
+    if (assocPending) attrs = assocPending.rest;
+    if (allocating) _Core._allocation.klass = new.target;
+    super(attrs);
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
     }
+    if (!allocating) {
+      initBlock?.(this as unknown as Base);
+      this._runInitializeCallbacks();
+    }
   }
+
+  /** @internal */
+  declare _runInitializeCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runFindCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runTouchCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runSaveCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runCreateCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runUpdateCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runDestroyCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runBeforeCommitCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runCommitCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runRollbackCallbacks: (block?: () => unknown) => unknown;
 
   declare isNewRecord: typeof _Persistence.isNewRecord;
   declare isPersisted: typeof _Persistence.isPersisted;
@@ -1787,14 +1507,6 @@ export class Base extends Model {
   declare isStrictLoadingNPlusOneOnly: typeof _Core.isStrictLoadingNPlusOneOnly;
   declare isFrozen: typeof _Core.isFrozen;
   declare freeze: () => this;
-
-  get destroyedByAssociation(): unknown {
-    return this._destroyedByAssociation;
-  }
-
-  set destroyedByAssociation(assoc: unknown) {
-    this._destroyedByAssociation = assoc;
-  }
 
   declare cacheKey: () => string;
   declare cacheKeyWithVersion: () => string;
@@ -1814,44 +1526,8 @@ export class Base extends Model {
 
   declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
 
-  private async _createOrUpdate(block?: (record: this) => void): Promise<boolean> {
-    const ctor = this.constructor as typeof Base;
-    let saved = false;
-    let wasNewRecord = false;
-
-    const saveOk = await runCallbacks(this, "save", async () => {
-      wasNewRecord = this._newRecord;
-      if (wasNewRecord) {
-        const result = await this._createRecord(undefined, block);
-        saved = result !== false;
-      } else {
-        const result = await this._updateRecord(undefined, block);
-        saved = result !== false;
-      }
-
-      if (saved) {
-        this._transactionAction = wasNewRecord ? "create" : "update";
-        (this as any)._newRecordBeforeLastCommit = wasNewRecord;
-      }
-
-      return saved;
-    });
-
-    if (!saveOk) return false;
-
-    return saved;
-  }
-
   private _touchRecord: boolean | null = null;
-  private _instanceRecordTimestamps: boolean | null = null;
-
-  get recordTimestamps(): boolean {
-    return this._instanceRecordTimestamps ?? (this.constructor as typeof Base).recordTimestamps;
-  }
-
-  set recordTimestamps(value: boolean) {
-    this._instanceRecordTimestamps = value;
-  }
+  declare recordTimestamps: boolean;
 
   /** @internal */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
@@ -1876,47 +1552,6 @@ export class Base extends Model {
         assoc?.setTarget?.(null);
       }
     }
-  }
-
-  /** @internal */
-  private async _runBelongsToDefaults(): Promise<void> {
-    const ctor = this.constructor as typeof Base;
-    if (typeof (this as any).association !== "function") return;
-    for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
-      const block = (ref as any).options?.default;
-      if (block == null) continue;
-      const assoc = (this as any).association(ref.name);
-      if (typeof assoc?.default === "function") {
-        await assoc.default(block);
-      }
-    }
-  }
-
-  private async _destroyRow(): Promise<boolean> {
-    await this._preloadBelongsToForDestroyCallbacks();
-
-    let didDelete = false;
-    const destroyResult = await runCallbacks(this, "destroy", async () => {
-      await (this as any).destroyAssociations();
-
-      if (this.isPersisted()) didDelete = (await (this as any).destroyRow()) > 0;
-
-      this._destroyed = true;
-      this._previouslyNewRecord = false;
-      this.freeze();
-      return true;
-    });
-
-    if (!destroyResult) return false;
-
-    if (didDelete) {
-      this._transactionAction = "destroy";
-      (this as any)._triggerDestroyCallback = true;
-      (this as any)._newRecordBeforeLastCommit = false;
-      (this as any)._triggerUpdateCallback = false;
-    }
-
-    return true;
   }
 
   static async delete(id: unknown): Promise<number> {
@@ -1955,7 +1590,7 @@ export class Base extends Model {
 
   declare inspect: () => string;
   declare prettyPrint: typeof _Core.prettyPrint;
-  declare attributeForInspect: (attrName: string) => string;
+  declare attributeForInspect: (attrName: string) => string | _Core.InspectionMask;
 
   declare toGlobalId: typeof Identification.toGlobalId;
   declare toGid: typeof Identification.toGid;
@@ -1965,25 +1600,27 @@ export class Base extends Model {
   declare toSgidParam: typeof Identification.toSgidParam;
 
   declare touch: typeof _Persistence.touch;
-  declare touchLater: typeof TouchLater.touchLater;
-  declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
+  declare touchLater: typeof _TouchLater.touchLater;
+  declare beforeCommittedBang: typeof _TouchLater.beforeCommittedBang;
 
   declare hasAttribute: (attrName: string) => boolean;
   declare attributePresent: (attrName: string) => boolean;
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
-  declare attributesBeforeTypeCast: () => Record<string, unknown>;
+  declare attributes: Record<string, unknown>;
+  declare attributesBeforeTypeCast: () => Record<string, unknown> | Hash<string, unknown>;
+  declare attributesForDatabase: () => Record<string, unknown> | Hash<string, unknown>;
   declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType | null;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
   declare queryAttribute: (attrName: string) => boolean;
   declare _queryAttribute: (attrName: string) => boolean;
-  declare readAttribute: (name: string, block?: (name: string) => unknown) => unknown;
+  declare readAttribute: (attrName: string, block?: (name: string) => unknown) => unknown;
   declare get: (attrName: string) => unknown;
   declare set: (attrName: string, value: unknown) => void;
   /** @internal */
-  declare _readAttribute: (name: string) => unknown;
-  declare _writeAttribute: (name: string, value: unknown) => void;
+  declare _readAttribute: (attrName: string, block?: (name: string) => unknown) => unknown;
+  declare _writeAttribute: (attrName: string, value: unknown) => void;
   declare readStoreAttribute: (storeAttribute: string, key: string) => unknown;
   declare writeStoreAttribute: (storeAttribute: string, key: string, value: unknown) => void;
   /** @internal */
@@ -2010,39 +1647,15 @@ export class Base extends Model {
     return ModelSchema.columnDefaults.call(this as any);
   }
 
-  static _strictLoadingByDefault = false;
+  declare static strictLoadingByDefault: boolean;
 
-  static get strictLoadingByDefault(): boolean {
-    return this._strictLoadingByDefault;
-  }
-
-  static set strictLoadingByDefault(value: boolean) {
-    this._strictLoadingByDefault = value;
-  }
-
-  static _strictLoadingMode: _Core.StrictLoadingMode = "all";
-
-  static get strictLoadingMode(): _Core.StrictLoadingMode {
-    return this._strictLoadingMode;
-  }
-
-  static set strictLoadingMode(value: _Core.StrictLoadingMode) {
-    this._strictLoadingMode = value;
-  }
+  declare static strictLoadingMode: _Core.StrictLoadingMode;
 
   declare static storeFullStiClass: boolean;
 
   declare static storeFullClassName: boolean;
 
-  static _runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
-
-  static get runCommitCallbacksOnFirstSavedInstancesInTransaction(): boolean {
-    return this._runCommitCallbacksOnFirstSavedInstancesInTransaction;
-  }
-
-  static set runCommitCallbacksOnFirstSavedInstancesInTransaction(value: boolean) {
-    this._runCommitCallbacksOnFirstSavedInstancesInTransaction = value;
-  }
+  declare static runCommitCallbacksOnFirstSavedInstancesInTransaction: boolean;
 
   declare static defaultConnectionHandler: ConnectionHandler;
   declare static isDefaultConnectionHandler: () => boolean;
@@ -2051,15 +1664,20 @@ export class Base extends Model {
   declare static defaultShard: string;
   declare static isDefaultShard: () => boolean;
 
-  static belongsToRequiredByDefault = false;
+  declare static belongsToRequiredByDefault: boolean | null | undefined;
 
-  static enumerateColumnsInSelectStatements = false;
+  declare static enumerateColumnsInSelectStatements: boolean;
 
-  static shardSelector: unknown = null;
+  declare static shardSelector: unknown;
 
-  static _destroyAssociationAsyncJob: unknown = null;
+  declare static attributesForInspect: ":all" | string[];
+  declare static isAttributesForInspect: () => boolean;
 
-  static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
+  declare static _destroyAssociationAsyncJob: unknown;
+  declare static is_destroyAssociationAsyncJob: boolean;
+
+  declare static destroyAssociationAsyncJob: any;
+  declare destroyAssociationAsyncJob: any;
 
   declare static destroyAssociationAsyncBatchSize: number | null;
 
@@ -2089,7 +1707,16 @@ export class Base extends Model {
   static isDescendsFromActiveRecord = _isDescendsFromActiveRecord;
 
   /** @internal */
+  static discriminateClassForRecord = _discriminateClassForRecord;
+
+  /** @internal */
   static usingSingleTableInheritance = _usingSingleTableInheritance;
+
+  /** @internal */
+  static findStiClass = _findStiClass;
+
+  /** @internal */
+  static subclassFromAttributes = _subclassFromAttributes;
 
   /** @internal */
   static generateAssociationWriter = _NestedAttributes.generateAssociationWriter;
@@ -2145,8 +1772,9 @@ export class Base extends Model {
 
   declare equals: (other: unknown) => boolean;
   declare encodeWith: (coder: Record<string, unknown>) => void;
+  declare isAssociationCached: (name: string) => boolean;
 
-  declare eql: (other: unknown) => boolean;
+  declare eql: (comparisonObject: unknown) => boolean;
 
   declare compare: (other: unknown) => number | undefined;
 
@@ -2174,140 +1802,35 @@ export class Base extends Model {
     );
   }
 
-  declare static afterInitialize: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterInitialize: ClassMethods["afterInitialize"];
 
-  declare static afterFind: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterFind: ClassMethods["afterFind"];
 
-  declare static afterTouch: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterTouch: ClassMethods["afterTouch"];
 
-  declare static beforeSave: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeSave: ClassMethods["beforeSave"];
 
-  declare static beforeCreate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeCreate: ClassMethods["beforeCreate"];
 
-  declare static beforeUpdate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeUpdate: ClassMethods["beforeUpdate"];
 
-  declare static beforeDestroy: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeDestroy: ClassMethods["beforeDestroy"];
 
-  declare static afterSave: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterSave: ClassMethods["afterSave"];
 
-  declare static afterCreate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterCreate: ClassMethods["afterCreate"];
 
-  declare static afterUpdate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterUpdate: ClassMethods["afterUpdate"];
 
-  declare static afterDestroy: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterDestroy: ClassMethods["afterDestroy"];
 
-  declare static aroundSave: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundSave: ClassMethods["aroundSave"];
 
-  declare static aroundCreate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundCreate: ClassMethods["aroundCreate"];
 
-  declare static aroundUpdate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundUpdate: ClassMethods["aroundUpdate"];
 
-  declare static aroundDestroy: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundDestroy: ClassMethods["aroundDestroy"];
 
   static beforeCommit = _beforeCommit;
 
@@ -2339,14 +1862,12 @@ export class Base extends Model {
     return ModelSchema.tableExists.call(this);
   }
 
-  static inspect(): string {
-    return _Core.ClassMethods.inspect.call(this);
-  }
+  declare static inspect: typeof _Core.ClassMethods.inspect;
 
   static hasAttribute(attrName: string): boolean {
     attrName = String(attrName);
     attrName = this.attributeAliases[attrName] ?? attrName;
-    return Object.hasOwn(this.attributeTypes(), attrName);
+    return hasKey(this.attributeTypes(), attrName);
   }
 
   generateTokenFor(purpose: string): string {
@@ -2354,10 +1875,12 @@ export class Base extends Model {
   }
 }
 
-ActiveRecord.Base = Base;
+rbModConstSet(ActiveRecord, "Base", Base);
+rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
+rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {
+export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   normalizeAttribute(name: string): void;
   /** @internal */
   normalizeChangedInPlaceAttributes(): void;
@@ -2369,6 +1892,11 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _associationCache: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
+  initWithAttributes(
+    attributes: unknown,
+    newRecord?: boolean,
+    block?: (record: this) => void,
+  ): this;
   readonly savedChanges: Hash<string, [unknown, unknown]>;
   readonly hasChangesToSave: boolean;
   readonly changesToSave: HashWithIndifferentAccess<[unknown, unknown]>;
@@ -2376,7 +1904,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   readonly attributesInDatabase: HashWithIndifferentAccess<unknown>;
   readonly idInDatabase: unknown;
   isSavedChanges(): boolean;
-  isSavedChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
+  isSavedChangeToAttribute(attr: string | string[], options?: DirtyOptions): boolean;
   attributeBeforeLastSave(attr: string): unknown;
   isWillSaveChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
   attributeChangeToBeSaved(attr: string): [unknown, unknown] | null;
@@ -2402,14 +1930,16 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
   ): Promise<boolean | undefined>;
+  /** @internal */
+  createOrUpdate(touch?: boolean, block?: (record: any) => void): Promise<boolean>;
   saveBang(
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
   ): Promise<true | undefined>;
-  destroy(): Promise<this | false>;
+  destroy(): Promise<this | boolean>;
   destroyBang(): Promise<this>;
-  update(attrs: Record<string, unknown>): Promise<boolean | undefined>;
-  updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
+  update(attrs: Record<string, unknown> | PermittedAttributes): Promise<boolean | undefined>;
+  updateBang(attrs: Record<string, unknown> | PermittedAttributes): Promise<true | undefined>;
   delete(): Promise<this>;
   reload(options?: { lock?: boolean | string; unscoped?: boolean }): Promise<this>;
   initializeDup(other: unknown): void;
@@ -2434,12 +1964,14 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
-  assignAttributes(attrs: Record<string, unknown>): void;
-  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+  assignAttributes(attrs: Record<string, unknown> | PermittedAttributes): void;
+  setAttributes(
+    attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+  ): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
-  updateColumns(attrs: Record<string, unknown>): Promise<boolean>;
+  updateColumns(attributes: Record<string, unknown> | Map<string, unknown>): Promise<boolean>;
   clone(): this;
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
@@ -2459,10 +1991,13 @@ extend(Base, ConnectionHandling.ConnectionHandling);
 extend(Base, Inheritance.ClassMethods);
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
+extend(Base, _Persistence.ClassMethods);
+extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
+include(Base, _Persistence.Persistence);
 include(Base, Inheritance.Inheritance);
+include(Base, ActiveRecord.Scoping);
 include(Base, _Integration);
-include(Base, LockingOptimistic.Optimistic);
 include(Base, SignedId.SignedId);
 extend(Base, QueryCacheClassMethods.ClassMethods);
 
@@ -2491,11 +2026,12 @@ extend(Base, {
   initializeFindByCache: _Core.initializeFindByCache,
   cachedFindByStatement: _Core.cachedFindByStatement,
 });
+extend(Base, DynamicMatchers);
 extend(Base, Querying);
 Object.setPrototypeOf(
   Base,
   new Proxy(Object.getPrototypeOf(Base) as object, {
-    get(target, prop, receiver: typeof Base) {
+    get(target, prop, receiver: typeof Base & typeof DynamicMatchers) {
       const value = Reflect.get(target, prop, receiver);
       if (
         value !== undefined ||
@@ -2505,13 +2041,14 @@ Object.setPrototypeOf(
       ) {
         return value;
       }
-      if (receiver.respondToMissing(prop)) {
+      if (receiver.respondToMissing(prop, false)) {
         return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
       }
       return value;
     },
   }),
 );
+extend(Base, { build: _Persistence.build });
 extend(Base, {
   _updateRecord: _Persistence._updateRecord,
   _deleteRecord: _Persistence._deleteRecord,
@@ -2522,9 +2059,11 @@ extend(Base, {
   hasMany: _Associations.hasMany,
   hasAndBelongsToMany: _Associations.hasAndBelongsToMany,
 });
-extend(Base, Translation.ClassMethods);
+extend(Base, Translation.Translation);
 extend(Base, Sanitization.ClassMethods);
+include(Base, ReadonlyAttributes.ReadonlyAttributes);
 extend(Base, ReadonlyAttributes.ClassMethods);
+include(Base, CounterCache.CounterCache);
 extend(Base, CounterCache.ClassMethods);
 {
   const superUpdateCounters = CounterCache.updateCounters;
@@ -2540,30 +2079,20 @@ extend(Base, CounterCache.ClassMethods);
   });
 }
 extend(Base, NamedScoping.ClassMethods);
-extend(Base, _Validations.ClassMethods);
-Object.assign(Base, {
-  AssociatedValidator: _Validations.AssociatedValidator,
-  UniquenessValidator: _Validations.UniquenessValidator,
-  PresenceValidator: _Validations.PresenceValidator,
-  AbsenceValidator: _Validations.AbsenceValidator,
-  LengthValidator: _Validations.LengthValidator,
-  NumericalityValidator: _Validations.NumericalityValidator,
-});
-include(Base, CallbacksInstanceMethods);
-include(Base, TransactionsInstanceMethods);
+extend(Base, _AssociatedClassMethods);
+extend(Base, _UniquenessClassMethods);
+extend(Base, _PresenceClassMethods);
+extend(Base, _AbsenceClassMethods);
+extend(Base, _LengthClassMethods);
+extend(Base, _NumericalityClassMethods);
+include(Base, LockingOptimistic.Optimistic);
+include(Base, _Callbacks.Callbacks);
+include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
-include(Base, Normalization.InstanceMethods);
+include(Base, Normalization.Normalization);
 include(Base, Marshalling.Methods);
-extend(Base, {
-  enum: _EnumModule.enum,
-  _enum: _EnumModule._enum,
-  _enumMethodsModule: _EnumModule._enumMethodsModule,
-  detectEnumConflictBang: _EnumModule.detectEnumConflictBang,
-  raiseConflictError: _EnumModule.raiseConflictError,
-  assertValidEnumDefinitionValues: _EnumModule.assertValidEnumDefinitionValues,
-  assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
-  detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
-});
+extend(Base, _EnumModule.Enum);
+extend(Base, DelegatedType);
 extend(Base, {
   collectingQueriesForExplain: _collectingQueriesForExplain,
   execExplain: _execExplain,
@@ -2572,8 +2101,6 @@ extend(Base, {
 });
 extend(Base, _Reflection.ClassMethods);
 include(Base, _Reflection.Reflection);
-classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
-classAttribute.call(Base, "_attrReadonly", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "defaultScopes", {
   instanceWriter: false,
   instancePredicate: false,
@@ -2584,11 +2111,7 @@ classAttribute.call(Base, "defaultScopeOverride", {
   instancePredicate: false,
   default: null,
 });
-classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
-classAttribute.call(Base, "encryptedAttributes");
-Base.validate(":cantModifyEncryptedAttributesWhenFrozen", {
-  if: (record: any) => _hasEncryptedAttributes.call(record) && _Contexts.context.frozenEncryption,
-});
+include(Base, _EncryptableRecord);
 extend(Base, {
   encrypts: _encrypts,
   deterministicEncryptedAttributes: _deterministicEncryptedAttributes,
@@ -2601,19 +2124,7 @@ include(Base, {
   decrypt: _decrypt,
   cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
 });
-classAttribute.call(Base, "tokenDefinitions", {
-  instanceAccessor: false,
-  instancePredicate: false,
-  default: {},
-});
-classAttribute.call(Base, "generatedTokenVerifier", {
-  instanceAccessor: false,
-  instancePredicate: false,
-});
-classAttribute.call(Base, "counterCachedAssociationNames", {
-  instanceWriter: false,
-  default: [],
-});
+include(Base, _TokenFor);
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,
@@ -2628,9 +2139,12 @@ extend(Base, {
   undefineAttributeMethods: _undefineAttributeMethods,
   aliasAttribute: _aliasAttribute,
   initializeGeneratedModules: _initializeGeneratedModules,
+  generatedAttributeMethods: _generatedAttributeMethods,
   generatedAssociationMethods: _Core.generatedAssociationMethods,
   generateAliasAttributes: _generateAliasAttributes,
   eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,
+  generateAliasAttributeMethods: _generateAliasAttributeMethods,
+  aliasAttributeMethodDefinition: _aliasAttributeMethodDefinition,
   _defaultAttributes: _arDefaultAttributes,
   resolveTypeName: _resolveTypeName,
   resetDefaultAttributes: _resetDefaultAttributes,
@@ -2672,18 +2186,13 @@ include(Base, {
   increment: _Persistence.increment,
   decrement: _Persistence.decrement,
   toggle: _Persistence.toggle,
-  incrementBang: _Persistence.incrementBang,
   decrementBang: _Persistence.decrementBang,
   toggleBang: _Persistence.toggleBang,
-  save: _Persistence.save,
-  saveBang: _Persistence.saveBang,
-  destroy: _Persistence.destroy,
   destroyBang: _Persistence.destroyBang,
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
   delete: _Persistence.delete,
   _updateRow: _Persistence._updateRow,
-  reload: _Persistence.reload,
   slice: Access.prototype.slice,
   valuesAt: Access.prototype.valuesAt,
   updateAttribute: _Persistence.updateAttribute,
@@ -2719,6 +2228,8 @@ include(Base, {
   serializableHash: Serialization.serializableHash,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   isRespondTo: _isRespondTo,
+  respondToMissing: _respondToMissing,
+  methodMissing: _methodMissing,
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,
@@ -2731,65 +2242,30 @@ include(Base, {
   writeStoreAttribute: _writeStoreAttribute,
   storeAccessorFor: _storeAccessorFor,
 });
-include(Base, ModelSchema.InstanceMethods);
 include(Base, _Read);
 include(Base, _Write);
 include(Base, _BeforeTypeCast);
 include(Base, _Query);
 include(Base, _PrimaryKey);
-include(Base, _CompositePrimaryKey);
 include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
+include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initAttributes)));
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
-include(Base, LockingPessimistic.InstanceMethods);
-include(Base, LockingOptimistic.InstanceMethods);
-include(Base, Timestamp.InstanceMethods);
-include(Base, TouchLater.InstanceMethods);
+include(Base, LockingPessimistic.Pessimistic);
+include(Base, Timestamp.Timestamp);
+include(Base, ActiveRecord.Associations);
+include(Base, _TouchLater.TouchLater);
+include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
-prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
-prepend(Base.prototype, {
-  initInternals: _AttributeMethodsDirty.initInternals as PrependMethod,
-});
-prepend(Base.prototype, { initInternals: Timestamp.initInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _associationsInitInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _autosaveInitInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _transactionsInitInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: TouchLater.initInternals as PrependMethod });
-prepend(Base.prototype, { initializeDup: _Core.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: Inheritance.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: Timestamp.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: _associationsInitializeDup as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
-{
-  const inheritedReload = (Base.prototype as any).reload as (
-    this: Base,
-    options?: { lock?: boolean | string; unscoped?: boolean },
-  ) => Promise<Base>;
-  Object.defineProperty(Base.prototype, "reload", {
-    value: function (
-      this: Base,
-      options?: { lock?: boolean | string; unscoped?: boolean },
-    ): Promise<Base> {
-      return _autosaveReload.call(this, options, inheritedReload);
-    },
-    writable: true,
-    configurable: true,
-  });
-}
-include(Base, _NestedAttributes.InstanceMethods);
+include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
-include(Base, {
-  readAttributeForValidation: _Validations.readAttributeForValidation,
-  validate: _Validations.validate,
-  customValidationContext: _Validations.customValidationContext,
-});
+include(Base, _Validations.Validations);
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
@@ -2797,11 +2273,9 @@ include(Base, {
   initWith: _Core.initWith,
   initWithAttributes: _Core.initWithAttributes,
   encodeWith: _Core.encodeWith,
-  initAttributes: _Core.initAttributes,
   fullInspect: _Core.fullInspect,
-  destroyAssociationAsyncJob: _Core.destroyAssociationAsyncJob,
-  initializeInternalsCallback: _Core.initializeInternalsCallback,
   isCustomInspectMethodDefined: _Core.isCustomInspectMethodDefined,
+  inspectionFilter: _Core.inspectionFilter,
   inspectWithAttributes: _Core.inspectWithAttributes,
   attributesForInspect: _Core.attributesForInspect,
   allAttributesForInspect: _Core.allAttributesForInspect,
@@ -2846,7 +2320,7 @@ include(Base, {
   attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
   isSavedChanges: _isSavedChanges,
   hasDeferTouchAttrs(this: Base) {
-    return TouchLater.hasDeferTouchAttrs(this);
+    return _TouchLater.hasDeferTouchAttrs(this);
   },
   _foreignKeysEqual: CounterCache._foreignKeysEqual,
   isAssociationCached: _isAssociationCached,
@@ -2868,18 +2342,48 @@ include(Base, {
   rememberTransactionRecordState: _rememberTransactionRecordState,
   restoreTransactionRecordState: _restoreTransactionRecordState,
   isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
-  surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
-  touchDeferredAttributes: TouchLater.touchDeferredAttributes,
+  surreptitiouslyTouch: _TouchLater.surreptitiouslyTouch,
+  touchDeferredAttributes: _TouchLater.touchDeferredAttributes,
 });
 
-prepend(Base.prototype, { initAttributes: dirtyInitAttributes as PrependMethod });
-
 for (const [name, fn] of [
+  [
+    "save",
+    function (
+      this: Base,
+      options?: { validate?: boolean; touch?: boolean },
+      block?: (record: Base) => void,
+    ): Promise<boolean | undefined> {
+      return _Suppressor.save.call(this, () =>
+        _Transactions.save.call(this, () =>
+          _Validations.save.call(this, options, () => _Persistence.save.call(this, options, block)),
+        ),
+      ) as Promise<boolean | undefined>;
+    },
+  ],
+  [
+    "saveBang",
+    function (
+      this: Base,
+      options?: { validate?: boolean; touch?: boolean },
+      block?: (record: Base) => void,
+    ): Promise<true | undefined> {
+      return _Suppressor.saveBang.call(this, () =>
+        _Transactions.saveBang.call(this, () =>
+          _Validations.saveBang.call(this, options, () =>
+            _Persistence.saveBang.call(this, options, block),
+          ),
+        ),
+      ) as Promise<true | undefined>;
+    },
+  ],
   [
     "createOrUpdate",
     function (this: Base, touch = true, block?: (record: Base) => void): Promise<boolean> {
       return Timestamp.createOrUpdate.call(this as any, touch, () =>
-        callbacksCreateOrUpdate.call(this, block),
+        callbacksCreateOrUpdate.call(this, () =>
+          _Persistence.createOrUpdate.call(this as any, block),
+        ),
       );
     },
   ],
@@ -2896,25 +2400,12 @@ for (const [name, fn] of [
     },
   ],
   [
-    "touchLater",
-    function (this: Base, ...names: string[]): Promise<void> | undefined {
-      return _NoTouching.touchLater.call(this, names, () =>
-        TouchLater.touchLater.call(this, ...names),
-      );
-    },
-  ],
-  [
-    "touch",
-    function (this: Base, ...args: unknown[]): Promise<boolean> | undefined {
-      return _NoTouching.touch.call(this, args, () =>
-        TouchLater.touch.call(this, args as any, (laterArgs: unknown[]) =>
-          _Transactions.touch.call(this, laterArgs, () =>
-            _Callbacks.touch.call(this, laterArgs, () =>
-              _Persistence.touch.call(this, ...(laterArgs as any)),
-            ),
-          ),
-        ),
-      );
+    "destroy",
+    function (this: Base): Promise<unknown> {
+      return _Transactions.destroy.call(this, async () => {
+        await this["_preloadBelongsToForDestroyCallbacks"]();
+        return callbacksDestroy.call(this, () => _Persistence.destroy.call(this as any));
+      });
     },
   ],
   [
@@ -2988,8 +2479,6 @@ for (const [name, fn] of [
   });
 }
 
-_setSuperIsValid(Model.prototype.isValid);
-
 {
   Object.defineProperty(Base.prototype, "attributes", {
     get(this: Base): Record<string, unknown> {
@@ -3023,6 +2512,5 @@ _registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
-_registerBaseWithConnectionHandler(Base);
 _registerBaseWithAsynchronousQueriesTracker(Base);
 _registerBaseWithDatabaseStatements(Base);

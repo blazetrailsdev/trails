@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { registerModel, modelRegistry } from "./associations.js";
+import { registerModel } from "./associations.js";
 import { constantize } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -10,9 +10,9 @@ describe("registerModel array form", () => {
     registerModel([Author, Comment, SpecialComment, SubSpecialComment]);
 
     expect(constantize("Author")).toBe(Author);
-    expect(modelRegistry.get("Comment")).toBe(Comment);
-    expect(modelRegistry.get("SpecialComment")).toBe(SpecialComment);
-    expect(modelRegistry.get("SubSpecialComment")).toBe(SubSpecialComment);
+    expect(constantize("Comment")).toBe(Comment);
+    expect(constantize("SpecialComment")).toBe(SpecialComment);
+    expect(constantize("SubSpecialComment")).toBe(SubSpecialComment);
   });
 
   it("auto-routes STI subclasses into the parent's _subclasses", () => {
@@ -55,5 +55,20 @@ describe("registerModel array form", () => {
 
     registerModel("AuthorAlias", Author);
     expect(constantize("AuthorAlias")).toBe(Author);
+  });
+
+  it("registers a direct child of Base in every form, as inherited does", () => {
+    class RegisterModelDirectChild extends Base {}
+    class RegisterModelNamedChild extends Base {}
+    registerModel(RegisterModelDirectChild);
+    registerModel("RegisterModelNamedChildAlias", RegisterModelNamedChild);
+
+    expect(Base.subclasses).toContain(RegisterModelDirectChild);
+    expect(Base.subclasses).toContain(RegisterModelNamedChild);
+  });
+
+  it("seats Base and registers nothing for it", () => {
+    expect(() => registerModel(Base)).not.toThrow();
+    expect(constantize("Base")).toBe(Base);
   });
 });

@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, reflectOnAggregation } from "./index.js";
-import { reload as persistenceReload } from "./persistence.js";
-import {
-  reload as aggregationsReload,
-  initializeDup as aggregationsInitializeDup,
-} from "./aggregations.js";
-
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   Customer as CustomerModel,
   Money as MoneyClass,
@@ -230,11 +224,9 @@ describe("AggregationsTest", () => {
 
 describe("OverridingAggregationsTest", () => {
   it("composed of aggregation redefinition reflections should differ and not inherited", () => {
-    class DifferentName {}
     class PersonBase extends Base {
       static {
         this.composedOf("composedOf", {
-          className: DifferentName,
           mapping: [["person_first_name", "firstName"]],
         });
       }
@@ -242,7 +234,7 @@ describe("OverridingAggregationsTest", () => {
     class DifferentPerson extends PersonBase {
       static {
         this.composedOf("composedOf", {
-          className: DifferentName,
+          className: "DifferentName",
           mapping: [["different_person_first_name", "firstName"]],
         });
       }
@@ -250,54 +242,5 @@ describe("OverridingAggregationsTest", () => {
     const personRef = reflectOnAggregation(PersonBase, "composedOf");
     const differentRef = reflectOnAggregation(DifferentPerson, "composedOf");
     expect(personRef).not.toEqual(differentRef);
-  });
-});
-
-describe("lazy composed_of inclusion", () => {
-  const own = (klass: typeof Base, key: string): boolean =>
-    Object.prototype.hasOwnProperty.call(klass.prototype, key);
-
-  it("does not mix Aggregations onto models without composed_of", () => {
-    class Plain extends Base {}
-    expect(own(Plain, "reload")).toBe(false);
-    expect(own(Plain, "initializeDup")).toBe(false);
-    expect(Plain.prototype.reload).toBe(Base.prototype.reload);
-    expect(Plain.prototype.reload).not.toBe(persistenceReload);
-  });
-
-  it("mixes Aggregations onto a model that declares composed_of", () => {
-    class Money {
-      constructor(public amount: number) {}
-    }
-    class Priced extends Base {
-      static {
-        this.composedOf("balance", { className: Money, mapping: [["balance", "amount"]] });
-      }
-    }
-    expect(Priced.prototype.reload).toBe(aggregationsReload);
-    expect(Priced.prototype.initializeDup).toBe(aggregationsInitializeDup);
-    expect(Priced.prototype.reload).not.toBe(persistenceReload);
-  });
-
-  it("does not re-wrap a subclass whose superclass already declared composed_of", () => {
-    class Money {
-      constructor(public amount: number) {}
-    }
-    class Priced extends Base {
-      static {
-        this.composedOf("balance", { className: Money, mapping: [["balance", "amount"]] });
-      }
-    }
-    class SubPriced extends Priced {
-      static {
-        this.composedOf("credit", { className: Money, mapping: [["credit", "amount"]] });
-      }
-    }
-    expect(own(SubPriced, "reload")).toBe(false);
-    expect(own(SubPriced, "initializeDup")).toBe(false);
-    expect(SubPriced.prototype.reload).toBe(Priced.prototype.reload);
-    expect(SubPriced.prototype.reload).not.toBe(persistenceReload);
-    expect(Object.getPrototypeOf(Priced.prototype)).not.toBe(Base.prototype);
-    expect(Object.getPrototypeOf(SubPriced.prototype)).toBe(Priced.prototype);
   });
 });

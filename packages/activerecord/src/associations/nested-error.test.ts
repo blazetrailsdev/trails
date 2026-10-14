@@ -1,8 +1,9 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "../active-record.js";
 import { NestedError } from "./nested-error.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { Guitar } from "../test-helpers/models/guitar.js";
 import { TuningPeg } from "../test-helpers/models/tuning-peg.js";
@@ -23,7 +24,7 @@ describe("AssociationsNestedErrorInAssociationOrderTest", () => {
 
     expect(error.constructor).toBe(NestedError);
     expect(error.innerError).toBe(peg2.errors.objects[0]);
-    expect(error.attribute).toBe("tuning_pegs[1].pitch");
+    expect(error.attribute).toBe(":tuning_pegs[1].pitch");
     expect(error.type).toBe(":not_a_number");
     expect(error.message).toBe("is not a number");
     expect(error.base).toBe(guitar);
@@ -43,8 +44,8 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
         indexErrors: "nestedAttributesOrder",
       });
       this.acceptsNestedAttributesFor("tuningPegs", {
-        rejectIf: (attrs: Record<string, unknown>) =>
-          attrs["pitch"] != null && Number(attrs["pitch"]) % 2 === 1,
+        rejectIf: (attrs) =>
+          hashAref(attrs, "pitch") != null && Number(hashAref(attrs, "pitch")) % 2 === 1,
       });
     }
   }
@@ -59,7 +60,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
 
     expect(error.constructor).toBe(NestedError);
     expect(error.innerError).toBe(peg2.errors.objects[0]);
-    expect(error.attribute).toBe("tuning_pegs[0].pitch");
+    expect(error.attribute).toBe(":tuning_pegs[0].pitch");
     expect(error.type).toBe(":not_a_number");
     expect(error.message).toBe("is not a number");
     expect(error.base).toBe(guitar);
@@ -75,7 +76,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     const error = guitar.errors.objects[0] as NestedError;
 
     expect(error.constructor).toBe(NestedError);
-    expect(error.attribute).toBe("tuning_pegs[1].pitch");
+    expect(error.attribute).toBe(":tuning_pegs[1].pitch");
     expect(error.type).toBe(":not_a_number");
     expect(error.message).toBe("is not a number");
     expect(error.base).toBe(guitar);
@@ -88,7 +89,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
       static tableName = "pets";
       declare name: string | null;
       static {
-        this._primaryKey = "pet_id";
+        this.primaryKey = "pet_id";
         this.validates("name", { presence: true });
       }
     }
@@ -96,7 +97,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     class PetOwner extends Base {
       static tableName = "owners";
       static {
-        this._primaryKey = "owner_id";
+        this.primaryKey = "owner_id";
         this.hasOne("pet", { className: "NestedErrorValidatedPet", foreignKey: "owner_id" });
         this.acceptsNestedAttributesFor("pet");
         this.validatesAssociated("pet");
@@ -122,7 +123,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
 
         expect(error.constructor).toBe(NestedError);
         expect(error.innerError).toStrictEqual(pet.errors.objects[0]);
-        expect(error.attribute).toBe("pet.name");
+        expect(error.attribute).toBe(":pet.name");
         expect(error.type).toBe(":blank");
         expect(error.message).toBe("can't be blank");
         expect(error.base).toBe(owner);

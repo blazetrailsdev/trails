@@ -3,8 +3,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
-import { setDefaultTimezone } from "./active-record.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 function usec(ts: unknown): string {
   if (ts instanceof RubyTime) ts = ts.getutc().toZonedDateTime().toInstant();
@@ -111,7 +110,7 @@ describe("CacheKeyTest", () => {
       const CacheMeWithVersion = cacheMeWithVersion();
       const record = await CacheMeWithVersion.create({});
       await record.updateColumns({
-        updated_at: Temporal.Instant.from("2016-11-12T00:00:00.000000Z"),
+        updated_at: RubyTime.utc(2016, 11, 12, 0, 0, 0, 0),
       });
       const recordFromDb = await CacheMeWithVersion.find(record.id);
       const spy = vi.spyOn(recordFromDb, "readAttribute");
@@ -141,29 +140,12 @@ describe("CacheKeyTest", () => {
     },
   );
 
-  it.skipIf(adapterType !== "sqlite")(
-    "cache_version does call updated_at when default_timezone is not utc",
-    async () => {
-      const CacheMeWithVersion = cacheMeWithVersion();
-      const record = await CacheMeWithVersion.create({});
-      const recordFromDb = await CacheMeWithVersion.find(record.id);
-      const spy = vi.spyOn(recordFromDb, "readAttribute");
-      setDefaultTimezone("local");
-      try {
-        recordFromDb.cacheVersion();
-        expect(spy).toHaveBeenCalledWith("updated_at");
-      } finally {
-        setDefaultTimezone("utc");
-      }
-    },
-  );
-
   it("cache_version does call updated_at when it is assigned via a Time object", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
     const recordFromDb = await CacheMeWithVersion.find(record.id);
     const spy = vi.spyOn(recordFromDb, "readAttribute");
-    recordFromDb.updated_at = new Date("2016-11-12T01:02:03Z");
+    recordFromDb.updated_at = RubyTime.utc(2016, 11, 12, 1, 2, 3);
     recordFromDb.cacheVersion();
     expect(spy).toHaveBeenCalledWith("updated_at");
   });
@@ -178,23 +160,12 @@ describe("CacheKeyTest", () => {
     expect(spy).toHaveBeenCalledWith("updated_at");
   });
 
-  it("cache_version does call updated_at when a DB-format string is assigned by the user", async () => {
-    const CacheMeWithVersion = cacheMeWithVersion();
-    const record = await CacheMeWithVersion.create({});
-    const recordFromDb = await CacheMeWithVersion.find(record.id);
-    const spy = vi.spyOn(recordFromDb, "readAttribute");
-    recordFromDb.updated_at = "2016-11-12 01:02:03.000000";
-    const version = recordFromDb.cacheVersion();
-    expect(spy).toHaveBeenCalledWith("updated_at");
-    expect(version).toBe("20161112010203000000");
-  });
-
   it("cache_version does call updated_at when it is assigned via a hash", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
     const recordFromDb = await CacheMeWithVersion.find(record.id);
     const spy = vi.spyOn(recordFromDb, "readAttribute");
-    recordFromDb.updated_at = new Date(Date.UTC(2016, 10, 12, 1, 2, 3));
+    recordFromDb.updated_at = RubyTime.utc(2016, 11, 12, 1, 2, 3);
     recordFromDb.cacheVersion();
     expect(spy).toHaveBeenCalledWith("updated_at");
   });

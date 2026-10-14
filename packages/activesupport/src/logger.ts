@@ -142,7 +142,11 @@ export class Logger {
   static readonly FATAL = 4;
   static readonly UNKNOWN = 5;
 
-  constructor(output: LoggerOutput | null = defaultOutput) {
+  constructor(
+    ...args: [output?: LoggerOutput | null, kwargs?: { level?: number | LogLevel | string }]
+  ) {
+    const [output = defaultOutput, kwargs = {}] = args;
+    if (Object.hasOwn(kwargs, "level")) this.level = kwargs.level!;
     this._defaultFormatter = new Formatter();
     this.output = output;
     this._formatter ??= new SimpleFormatter();

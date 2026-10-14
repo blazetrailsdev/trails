@@ -1,25 +1,20 @@
 import { ArgumentError } from "./argument-error.js";
+import {
+  getAsyncContext,
+  type AsyncContext,
+  type AsyncContextAdapter,
+} from "./async-context-adapter.js";
 import { rbObjAsString } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
+import { TypeError } from "./type-error.js";
 import { getCrypto } from "./crypto-adapter.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
-import { env, stderr } from "./process-adapter.js";
+import { chdir, env } from "./process-adapter.js";
 import { Process } from "./process.js";
 import type { TempfileBasename } from "./tempfile.js";
-import { verbose } from "./verbose.js";
+import { warn } from "./kernel-warn.js";
 import { FileUtils } from "./file-utils.js";
-
-/**
- * `Kernel#warn` (`vendor/ruby/v3.3.11/error.c:555` `rb_warn_m`), which writes nothing
- * at all while `$VERBOSE` is `nil` (`error.c:561`, `!NIL_P(ruby_verbose)`) —
- * `false` still warns, so the guard is against `nil` alone — and terminates
- * the message with a newline where it lacks one (`error.c:573`).
- */
-function warn(message: string): void {
-  if (verbose() == null) return;
-  stderr.write(`${message}\n`);
-}
 
 /** `W_OK` (`vendor/ruby/v3.3.11/file.c:1898` `rb_file_writable_p`). */
 const W_OK = 2;
@@ -34,6 +29,22 @@ function isWritable(dir: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** `chdir_blocking` (`vendor/ruby/v3.3.11/dir.c:1044`), the count of open `Dir.chdir` blocks. */
+let chdirBlocking = 0;
+
+let chdirThread: symbol | null = null;
+let chdirStorage: AsyncContext<symbol> | null = null;
+let chdirAdapter: AsyncContextAdapter | null = null;
+
+function chdirContext(): AsyncContext<symbol> {
+  const adapter = getAsyncContext();
+  if (!chdirStorage || chdirAdapter !== adapter) {
+    chdirStorage = adapter.create<symbol>();
+    chdirAdapter = adapter;
+  }
+  return chdirStorage;
 }
 
 /** `Dir::SYSTMPDIR` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:20`). */
@@ -73,7 +84,7 @@ function braceExpand(pattern: string): string[] {
   return alternatives.flatMap((alternative) => braceExpand(`${prefix}${alternative}${suffix}`));
 }
 
-function fnmatch(segment: string, name: string): boolean {
+function fnmatch(segment: string, name: string, flags = 0): boolean {
   let source = "";
   for (let i = 0; i < segment.length; i++) {
     const char = segment[i];
@@ -93,6 +104,7 @@ function fnmatch(segment: string, name: string): boolean {
     } else source += char.replace(/[.*+?^${}()|[\]\\]/, "\\$&");
   }
   if (!new RegExp(`^${source}$`).test(name)) return false;
+  if ((flags & File.FNM_DOTMATCH) !== 0) return true;
   return !name.startsWith(".") || segment.startsWith(".");
 }
 
@@ -108,8 +120,8 @@ function unescape(segment: string): string {
   return segment.replace(/\\(.)/g, "$1");
 }
 
-function segmentMatches(segment: string, name: string): boolean {
-  return MAGIC.test(segment) ? fnmatch(segment, name) : unescape(segment) === name;
+function segmentMatches(segment: string, name: string, flags = 0): boolean {
+  return MAGIC.test(segment) ? fnmatch(segment, name, flags) : unescape(segment) === name;
 }
 
 function globHelper(base: string, segments: string[], found: string[], enumerated: boolean): void {
@@ -138,6 +150,62 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
   }
 }
 
+async function childrenAsync(dirname: string, skipdot: boolean): Promise<string[]> {
+  let names: string[];
+  try {
+    names = (await Dir.childrenAsync(dirname)).sort();
+  } catch {
+    return [];
+  }
+  return skipdot ? names : [".", ...names];
+}
+
+async function isDirectoryAsync(path: string): Promise<boolean> {
+  const fs = getFs();
+  try {
+    return (fs.lstat ? await fs.lstat(path) : fs.lstatSync(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function globHelperAsync(
+  base: string,
+  segments: string[],
+  found: string[],
+  enumerated: boolean,
+  flags: number,
+  skipdot: boolean,
+): Promise<void> {
+  const [segment, ...rest] = segments;
+  if (segment === undefined) {
+    if (enumerated || (await getFs().exists(base))) found.push(base);
+    return;
+  }
+  const join = (name: string): string =>
+    base.endsWith(File.SEPARATOR) ? `${base}${name}` : `${base}${File.SEPARATOR}${name}`;
+  const dotmatch = (flags & File.FNM_DOTMATCH) !== 0;
+  if (segment === "**" && rest.length > 0) {
+    for (const name of await childrenAsync(base, skipdot || !dotmatch)) {
+      if (name.startsWith(".") && !dotmatch) continue;
+      if (segmentMatches(rest[0], name, flags))
+        await globHelperAsync(join(name), rest.slice(1), found, true, flags, true);
+      if (name === ".") continue;
+      if (await isDirectoryAsync(join(name)))
+        await globHelperAsync(join(name), segments, found, true, flags, true);
+    }
+    return;
+  }
+  if (!MAGIC.test(segment)) {
+    await globHelperAsync(join(unescape(segment)), rest, found, false, flags, skipdot);
+    return;
+  }
+  for (const name of await childrenAsync(base, skipdot)) {
+    if (!fnmatch(segment === "**" ? "*" : segment, name, flags)) continue;
+    await globHelperAsync(join(name), rest, found, true, flags, true);
+  }
+}
+
 /**
  * `Dir` (`vendor/ruby/v3.3.11/dir.c:3632` `rb_cDir`), the sliver of it trails calls.
  *
@@ -161,6 +229,71 @@ export class Dir {
    */
   static pwd(): string {
     return getFs().cwd();
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/dir.c:1172` `dir_s_chdir` — `HOME`, then `LOGDIR`,
+   * when no path is given, and `rb_get_path`'s `TypeError` for a given `nil` — and `chdir_path` (`dir.c:1080-1107`): given a
+   * block, changes into `path`, yields it, and restores the previous directory
+   * in `rb_ensure`'s `chdir_restore` (`dir.c:1066-1076`), answering the
+   * block's value; without one, changes directory and answers `0`.
+   *
+   * A block that returns a promise has not finished when it returns, so the
+   * restore waits for it to settle, resolved or rejected. `chdir_path`'s
+   * `conflicting chdir` `RuntimeError` (`dir.c:1083-1084`) raises from another
+   * thread than the block's, which here is a call from outside the open
+   * block's async context: a sibling promise, where a nested call shares it.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.chdir`
+   * (`vendor/ruby/v3.3.11/dir.c:1172`).
+   */
+  static chdir(path?: string): number;
+  static chdir<T>(path: string | undefined, block: (path: string) => T): T;
+  static chdir<T>(path?: string | null, block?: (path: string) => T): number | T {
+    if (path !== undefined) {
+      if (path === null) throw new TypeError("no implicit conversion of nil into String");
+    } else {
+      const dist = env["HOME"] ?? env["LOGDIR"];
+      if (dist == null) throw new ArgumentError("HOME/LOGDIR not set");
+      path = dist;
+    }
+
+    const storage = chdirContext();
+    if (chdirBlocking > 0) {
+      if (storage.getStore() !== chdirThread) {
+        throw new RuntimeError("conflicting chdir during another chdir block");
+      }
+      if (block == null) warn("warning: conflicting chdir during another chdir block");
+    }
+
+    if (block != null) {
+      const oldPath = Dir.pwd();
+      chdir(path);
+      chdirBlocking++;
+      if (chdirThread === null) chdirThread = Symbol("chdir");
+      const thread = chdirThread;
+      const chdirRestore = (): void => {
+        chdirBlocking--;
+        if (chdirBlocking === 0) chdirThread = null;
+        chdir(oldPath);
+      };
+      let result: T;
+      try {
+        result = storage.run(thread, () => block(path));
+      } catch (error) {
+        chdirRestore();
+        throw error;
+      }
+      if (result != null && typeof (result as { then?: unknown }).then === "function") {
+        return Promise.resolve(result).finally(chdirRestore) as T;
+      }
+      chdirRestore();
+      return result;
+    } else {
+      chdir(path);
+    }
+
+    return 0;
   }
 
   /**
@@ -252,18 +385,27 @@ export class Dir {
       },
     );
     if (block != null) {
-      try {
-        return block(path);
-      } finally {
+      const ensure = () => {
         if (base == null) {
           const stat = File.stat(File.dirname(path));
           if ((stat.mode & 0o002) !== 0 && (stat.mode & 0o1000) === 0) {
-            // eslint-disable-next-line no-unsafe-finally
             throw new ArgumentError("parent directory is world writable but not sticky");
           }
         }
         FileUtils.removeEntry(path);
+      };
+      let result: T;
+      try {
+        result = block(path);
+      } catch (e) {
+        ensure();
+        throw e;
       }
+      if (typeof (result as PromiseLike<unknown> | undefined)?.then === "function") {
+        return Promise.resolve(result).finally(ensure) as T;
+      }
+      ensure();
+      return result;
     } else {
       return path;
     }
@@ -293,6 +435,14 @@ export class Dir {
    */
   static children(dirname: string): string[] {
     return getFs().readdirSync(dirname);
+  }
+
+  /** {@link Dir.children} over the backend's async `readdir`, or its `readdirSync`.
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.children` (`vendor/ruby/v3.3.11/dir.c:3421`).
+   */
+  static async childrenAsync(dirname: string): Promise<string[]> {
+    const fs = getFs();
+    return fs.readdir ? await fs.readdir(dirname) : fs.readdirSync(dirname);
   }
 
   /**
@@ -365,6 +515,32 @@ export class Dir {
       const segments = expanded.split(File.SEPARATOR);
       if (absolute) segments.shift();
       globHelper(absolute ? File.SEPARATOR : ".", segments, found, false);
+    }
+    if (pattern.startsWith(".")) return found;
+    return found.map((entry) => (entry.startsWith("./") ? entry.slice(2) : entry));
+  }
+
+  /**
+   * {@link Dir.glob} over the backend's async `readdir` / `lstat` / `exists`
+   * (its sync `readdirSync` / `lstatSync` where it has no async one), taking
+   * the `flags` `dir_s_glob` does. `File::FNM_DOTMATCH` is the one flag read,
+   * as `glob_helper` (`vendor/ruby/v3.3.11/dir.c:2528`) reads it: a wildcard
+   * then matches a leading dot (`dir.c:325`), `**` descends dot directories
+   * (`dir.c:2762`) though never a symlink (`dir.c:2759`), and `.` is among the
+   * entries of the first directory read — `Dir.glob("g/*", File::FNM_DOTMATCH)`
+   * answers `g/.` — until `FNM_GLOB_SKIPDOT` is set for the ones beneath it
+   * (`dir.c:2692-2693`). `..` never is (`dir.c:2713`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
+   * (`vendor/ruby/v3.3.11/dir.c:3227`).
+   */
+  static async globAsync(pattern: string, flags: number = 0): Promise<string[]> {
+    const found: string[] = [];
+    for (const expanded of braceExpand(pattern)) {
+      const absolute = expanded.startsWith(File.SEPARATOR);
+      const segments = expanded.split(File.SEPARATOR);
+      if (absolute) segments.shift();
+      await globHelperAsync(absolute ? File.SEPARATOR : ".", segments, found, false, flags, false);
     }
     if (pattern.startsWith(".")) return found;
     return found.map((entry) => (entry.startsWith("./") ? entry.slice(2) : entry));

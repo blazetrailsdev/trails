@@ -1,27 +1,30 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { EnvironmentInquirer, TopLevel } from "@blazetrails/activesupport";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks, checkCurrentProtectedEnvironmentBang } from "./database-tasks.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import {
   EnvironmentMismatchError,
   NoEnvironmentInSchemaError,
+  PendingMigrationError,
   ProtectedEnvironmentError,
 } from "../migration.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { adapterType } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
+import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => {
   const dirs: string[] = [];
   const env = "storyenv";
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
-    clearRegisteredTasks();
+    Base.configurations({});
+    resetRegisteredTasks();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 
@@ -29,7 +32,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
     const dir = await mkdtemp(join(tmpdir(), "trails-protected-env-"));
     dirs.push(dir);
     const dbFile = join(dir, "primary.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [env]: { primary: { adapter: "sqlite3", database: dbFile, pool: 1 } },
     });
     DatabaseTasks.registerTask(
@@ -63,7 +66,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "compares the stored environment against the global default environment",
     async () => {
-      await stampedConfig(DatabaseTasks.env);
+      await stampedConfig(DEFAULT_ENV());
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     },
   );
@@ -71,7 +74,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "reports the global default environment as current on a mismatch",
     async () => {
-      const current = DatabaseTasks.env;
+      const current = DEFAULT_ENV();
       expect(current).not.toBe(env);
       await stampedConfig("otherenv");
       const error = await DatabaseTasks.checkProtectedEnvironmentsBang(env).catch(
@@ -80,6 +83,12 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
       expect(error).toBeInstanceOf(EnvironmentMismatchError);
       expect((error as Error).message).toMatch(
         new RegExp(`last run in \`otherenv\`[\\s\\S]*running in \`${current}\``),
+      );
+      expect((error as Error).message).toBe(
+        "You are attempting to modify a database that was last run in `otherenv` environment.\n" +
+          `You are running in \`${current}\` environment. ` +
+          "If you are sure you want to continue, first set the environment using:\n\n" +
+          "        bin/trails db environment:set\n\n",
       );
     },
   );
@@ -106,8 +115,8 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   const env = "storyenv";
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
-    clearRegisteredTasks();
+    Base.configurations({});
+    resetRegisteredTasks();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 
@@ -121,7 +130,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     const dir = await mkdtemp(join(tmpdir(), "trails-current-protected-env-"));
     dirs.push(dir);
     const dbFile = join(dir, "primary.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [env]: { primary: { adapter: "sqlite3", database: dbFile, pool: 1 } },
     });
     DatabaseTasks.registerTask(
@@ -154,7 +163,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     } finally {
       await adapter.disconnectBang();
     }
-    return DatabaseTasks.databaseConfiguration.configsFor({ envName: env })[0];
+    return Base.configurations().configsFor({ envName: env })[0];
   }
 
   const skipUnlessFileSqlite = adapterType !== "sqlite" || inMemoryDb();
@@ -177,7 +186,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   });
 
   it.skipIf(skipUnlessFileSqlite)("passes when environments match", async () => {
-    const config = await seededConfig({ storedEnv: DatabaseTasks.env });
+    const config = await seededConfig({ storedEnv: DEFAULT_ENV() });
     await expect(checkCurrentProtectedEnvironmentBang(config)).resolves.toBeUndefined();
   });
 
@@ -202,7 +211,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   );
 
   it.skipIf(skipUnlessFileSqlite)("passes for an unprotected stored environment", async () => {
-    const current = DatabaseTasks.env;
+    const current = DEFAULT_ENV();
     const config = await seededConfig({ storedEnv: current });
     const protectedEnvironments = Base.protectedEnvironments;
     Base.protectedEnvironments = ["production"];
@@ -212,5 +221,108 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     } finally {
       Base.protectedEnvironments = protectedEnvironments;
     }
+  });
+});
+
+describe("EnvironmentMismatchError message", () => {
+  const msg =
+    "You are attempting to modify a database that was last run in `staging` environment.\n" +
+    "You are running in `development` environment. " +
+    "If you are sure you want to continue, first set the environment using:\n\n" +
+    "        bin/trails db environment:set";
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+  });
+
+  it("ends at the command when Trails.env is not defined", () => {
+    TopLevel.Trails = undefined;
+    const error = new EnvironmentMismatchError({ current: "development", stored: "staging" });
+    expect(error.message).toBe(`${msg}\n\n`);
+  });
+
+  it("appends the TRAILS_ENV assignment when Trails.env is defined", () => {
+    TopLevel.Trails = { env: "development" } as unknown as typeof TopLevel.Trails;
+    const error = new EnvironmentMismatchError({ current: "development", stored: "staging" });
+    expect(error.message).toBe(`${msg} TRAILS_ENV=development\n\n`);
+  });
+});
+
+describe("NoEnvironmentInSchemaError message", () => {
+  const msg =
+    "Environment data not found in the schema. To resolve this issue, run: \n\n" +
+    "        bin/trails db environment:set";
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+  });
+
+  it("ends at the command when Trails.env is not defined", () => {
+    TopLevel.Trails = undefined;
+    expect(new NoEnvironmentInSchemaError().message).toBe(msg);
+  });
+
+  it("appends the TRAILS_ENV assignment when Trails.env is defined", () => {
+    TopLevel.Trails = { env: "development" } as unknown as typeof TopLevel.Trails;
+    expect(new NoEnvironmentInSchemaError().message).toBe(`${msg} TRAILS_ENV=development`);
+  });
+});
+
+describe("PendingMigrationError message", () => {
+  const pendingMigrations = [{ filename: "db/migrate/1_create_people.ts" }] as never;
+  const command =
+    "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db migrate";
+  const tail = "\n\nYou have 1 pending migration:\n\ndb/migrate/1_create_people.ts\n";
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+  });
+
+  it("ends at the command when Trails.env is not defined", () => {
+    TopLevel.Trails = undefined;
+    expect(new PendingMigrationError({ pendingMigrations }).message).toBe(`${command}${tail}`);
+  });
+
+  it("ends at the command in a local environment", () => {
+    TopLevel.Trails = {
+      env: new EnvironmentInquirer("development"),
+    } as unknown as typeof TopLevel.Trails;
+    expect(new PendingMigrationError({ pendingMigrations }).message).toBe(`${command}${tail}`);
+  });
+
+  it("appends the TRAILS_ENV assignment outside a local environment", () => {
+    TopLevel.Trails = {
+      env: new EnvironmentInquirer("production"),
+    } as unknown as typeof TopLevel.Trails;
+    expect(new PendingMigrationError({ pendingMigrations }).message).toBe(
+      `${command} TRAILS_ENV=production${tail}`,
+    );
+  });
+});
+
+describe("DatabaseTasks.env", () => {
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+    DatabaseTasks.env = null;
+  });
+
+  it("memoizes Trails.env itself and finds its configs through it", () => {
+    const inquirer = new EnvironmentInquirer("staging");
+    TopLevel.Trails = { env: inquirer } as unknown as typeof TopLevel.Trails;
+    DatabaseTasks.env = null;
+
+    expect(DatabaseTasks.env).toBe(inquirer);
+
+    const configurations = new DatabaseConfigurations({
+      staging: { adapter: "sqlite3", database: "db/staging.sqlite3" },
+      test: { adapter: "sqlite3", database: "db/test.sqlite3" },
+    });
+    const configs = configurations.configsFor({ envName: DatabaseTasks.env });
+    expect(configs.map((dbConfig) => dbConfig.envName)).toEqual(["staging"]);
   });
 });

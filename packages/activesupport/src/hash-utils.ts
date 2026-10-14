@@ -1,14 +1,20 @@
 import {
   ArgumentError,
+  FrozenError,
   Hash,
   dup,
+  hashAset,
   hashDelete,
   isSymbol,
+  rbFSend,
+  rbInspect,
+  rbObjDup,
   rbObjRespondTo,
   symbolToS,
   valuesAt,
 } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
+import { isDuplicable } from "./core-ext/object/duplicable.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
 import { ActiveSupportJSON } from "./json.js";
@@ -79,15 +85,18 @@ export function deepDup<T>(obj: T): T {
     }
     return hash as T;
   }
-  if (typeof (obj as { deepDup?: unknown }).deepDup === "function") {
-    return (obj as unknown as { deepDup(): T }).deepDup();
-  }
   if (typeof obj === "object" && isPlainObject(obj)) {
     const result: AnyObject = {};
     for (const key of Object.keys(obj as AnyObject)) {
       result[key] = deepDup((obj as AnyObject)[key]);
     }
     return result as T;
+  }
+  if (rbObjRespondTo(obj, "deepDup")) {
+    return (obj as unknown as { deepDup(): T }).deepDup();
+  }
+  if (isDuplicable(obj)) {
+    return rbObjRespondTo(obj, "dup") ? (rbFSend(obj, "dup") as T) : rbObjDup(obj);
   }
   return obj;
 }
@@ -100,16 +109,6 @@ export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K
     }
   }
   return result;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function merge<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
-  return { ...hash, ...otherHash } as T;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function mergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
-  return Object.assign(hash, otherHash);
 }
 
 export function deepTransformKeys(obj: unknown, block: (key: string) => string): unknown {
@@ -281,26 +280,27 @@ export function _deepTransformKeysInObjectBang(
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function transformKeys<V>(
-  hash: Map<string, V>,
-  block: (key: string) => string,
-): Map<string, V>;
+export function transformKeys<K, V, T = K>(hash: Map<K, V>, block: (key: K) => T): Map<T, V>;
 export function transformKeys<T extends AnyObject>(
   hash: T,
   block: (key: string) => string,
 ): Record<string, unknown>;
-export function transformKeys(
-  hash: AnyObject | Map<string, unknown>,
+export function transformKeys<V>(
+  hash: AnyObject | Map<string, V>,
   block: (key: string) => string,
-): Record<string, unknown> | Map<string, unknown> {
+): Record<string, unknown> | Map<string, V>;
+export function transformKeys(
+  hash: AnyObject | Map<unknown, unknown>,
+  block: ((key: string) => string) | ((key: unknown) => unknown),
+): Record<string, unknown> | Map<unknown, unknown> {
   if (hash instanceof Map) {
-    const result = new Map<string, unknown>();
-    for (const [key, value] of hash) result.set(block(key), value);
+    const result = new Map<unknown, unknown>();
+    for (const [key, value] of hash) result.set((block as (key: unknown) => unknown)(key), value);
     return result;
   }
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(hash)) {
-    result[block(key)] = hash[key];
+    result[(block as (key: string) => string)(key)] = hash[key];
   }
   return result;
 }
@@ -330,16 +330,28 @@ export function transformKeysBang(
   return hash;
 }
 
-export function reverseMerge<T extends AnyObject>(obj: T, otherHash: AnyObject): T {
-  return { ...otherHash, ...obj } as T;
+export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
+  if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
+    return rbFSend(otherHash, "merge", obj) as T;
+  }
+  return { ...(otherHash instanceof Map ? Object.fromEntries(otherHash) : otherHash), ...obj };
 }
 
 export const withDefaults = reverseMerge;
 
-export function reverseMergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
+export function reverseMergeBang<T extends object>(hash: T, otherHash: object): T {
+  if (
+    !isPlainObject(hash) &&
+    (!(hash instanceof Map) || rbObjRespondTo(hash, "reverseMergeBang"))
+  ) {
+    return rbFSend(hash, "reverseMergeBang", otherHash) as T;
+  }
   const merged = reverseMerge(hash, otherHash);
-  for (const key of Object.keys(hash)) delete hash[key];
-  Object.assign(hash, merged);
+  if (Object.isFrozen(hash)) {
+    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
+  }
+  for (const key of Object.keys(hash)) hashDelete(hash, key);
+  for (const [key, value] of Object.entries(merged)) hashAset(hash, key, value);
   return hash;
 }
 
@@ -421,7 +433,7 @@ export function toParam(value: unknown): string | boolean | null {
       .join("/");
   }
   if (typeof value === "object") {
-    if (typeof (value as any).toParam === "function") {
+    if (rbObjRespondTo(value, "toParam")) {
       return (value as any).toParam();
     }
     if (value instanceof Map) return toQuery(value);
@@ -432,6 +444,7 @@ export function toParam(value: unknown): string | boolean | null {
       return toQuery(value as Record<string, unknown>);
     }
   }
+  if (isSymbol(value)) return symbolToS(value);
   return String(value);
 }
 
@@ -450,6 +463,9 @@ function buildQueryParts(value: unknown, key: string): string {
     return value.map((v) => buildQueryParts(v, prefix)).join("&");
   }
   if (isPlainObject(value) || value instanceof Map) return toQuery(value, key);
+  if (rbObjRespondTo(value, "toQuery")) {
+    return (value as { toQuery(key: string): string }).toQuery(key);
+  }
   return `${encodeQueryKey(key)}=${encodeQueryValue(toParam(value))}`;
 }
 

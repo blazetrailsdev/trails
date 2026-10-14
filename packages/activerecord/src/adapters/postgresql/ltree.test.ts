@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { Base } from "../../index.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write", async () => {
-      const ltree = Ltree.new({ path: "1.2.3.4" });
+      const ltree = new Ltree({ path: "1.2.3.4" });
       expect(await ltree.saveBang()).toBeTruthy();
     });
 
@@ -59,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "ltrees");
+      const output = await dumpTableSchema("ltrees");
       expect(output).toMatch(/t\.ltree\("path"\)/);
     });
   });

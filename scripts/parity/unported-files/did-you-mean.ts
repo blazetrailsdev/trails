@@ -10,7 +10,7 @@ export const DID_YOU_MEAN_UNPORTED_FILES: UnportedFile[] = [
   // The DidYouMean port is scoped to the algorithms Rails consumes
   // (SpellChecker + Jaro/JaroWinkler/Levenshtein). The remaining files
   // patch Ruby's exception hierarchy (NameError#corrections via
-  // core_ext/name_error.rb + formatter.rb), or implement checkers that
+  // core_ext/name_error.rb), or implement checkers that
   // suggest names for Ruby-only failure modes — NoMethodError method
   // names, NameError class/variable names, KeyError keys,
   // NoMatchingPatternKeyError keys, $LOAD_PATH require targets. None of
@@ -24,13 +24,6 @@ export const DID_YOU_MEAN_UNPORTED_FILES: UnportedFile[] = [
       "`detailed_message`, `spell_checker`. JS has no NameError; trails " +
       "errors carry their own per-subclass `corrections` getter (see " +
       "ActionNotFound, ParameterMissing, AssociationNotFoundError, etc.).",
-  },
-  {
-    package: "did-you-mean",
-    pattern: "/formatter.rb",
-    reason:
-      "Formats `Did you mean? …` suffix for Ruby's Exception#detailed_message " +
-      "integration. JS error stringification is per-error, not via a stdlib hook.",
   },
   {
     package: "did-you-mean",

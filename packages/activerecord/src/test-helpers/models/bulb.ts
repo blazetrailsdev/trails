@@ -1,8 +1,9 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 import { association as associationInstance } from "../../associations.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bulb extends Base {
@@ -43,6 +44,7 @@ export class Bulb extends Base {
     this.writeAttribute("color", color.toUpperCase() + "!");
   }
 }
+registerModel(Bulb);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Bulb {
   get car(): Car | null | Promise<Car | null>;
@@ -63,14 +65,16 @@ export class CustomBulb extends Bulb {
     }
   }
 }
+registerModel(CustomBulb);
 
 export class FunkyBulb extends Bulb {
   static {
     this.beforeDestroy(async function () {
-      throw new Error("before_destroy was called");
+      throw new RuntimeError("before_destroy was called");
     });
   }
 }
+registerModel(FunkyBulb);
 
 export class FailedBulb extends Bulb {
   static {
@@ -79,3 +83,4 @@ export class FailedBulb extends Bulb {
     });
   }
 }
+registerModel(FailedBulb);

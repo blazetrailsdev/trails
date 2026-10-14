@@ -9,24 +9,38 @@ import {
   _setHtmlContentType,
   _setRenderedContentType,
   _setVaryHeader,
-  processAction,
-  render,
-  renderToBody,
-  renderToString,
+  Rendering,
   RENDER_FORMATS_IN_PRIORITY,
 } from "./rendering.js";
+import { include } from "@blazetrails/activesupport";
 import {
   DoubleRenderError,
   _normalizeArgs,
   _normalizeRender,
+  render,
+  renderToString,
 } from "../../abstract-controller/rendering.js";
+
+function including<T extends object>(parent: T): Record<string, any> {
+  class Host {}
+  Object.setPrototypeOf(Host.prototype, parent);
+  include(Host, Rendering);
+  return new Host();
+}
 
 const normalizeRender = {
   _normalizeRender,
   _normalizeArgs,
   _processVariant: () => {},
-  _normalizeOptions,
+  _normalizeOptions: (options: Record<string, unknown>) => options,
+  render,
+  renderToString,
 };
+
+const normalizeOptions = (options: Record<string, unknown>): Record<string, unknown> =>
+  including(normalizeRender)._normalizeOptions(options);
+const renderToBody = (options: Record<string, unknown>): unknown =>
+  including({ renderToBody: () => undefined }).renderToBody(options);
 
 describe("_renderInPriorities", () => {
   test("returns first present priority key, ignoring prototype chain", () => {
@@ -53,7 +67,7 @@ describe("_normalizeText", () => {
 
 describe("_normalizeOptions", () => {
   test("html-escapes :html, resolves symbolic status, runs _normalize_text first", () => {
-    const out = _normalizeOptions({
+    const out = normalizeOptions({
       html: "<b>&\"'</b>",
       status: "not_found",
       plain: { toText: () => "<plain>" },
@@ -64,23 +78,27 @@ describe("_normalizeOptions", () => {
   });
 
   test("Ruby-truthy gate: '' and 0 are processed, null/false skip", () => {
-    expect(String(_normalizeOptions({ html: "" }).html)).toBe("");
-    expect(_normalizeOptions({ status: 0 }).status).toBe(0);
-    expect(_normalizeOptions({ html: null }).html).toBeNull();
-    expect(_normalizeOptions({ status: false }).status).toBe(false);
+    expect(String(normalizeOptions({ html: "" }).html)).toBe("");
+    expect(normalizeOptions({ status: 0 }).status).toBe(0);
+    expect(normalizeOptions({ html: null }).html).toBeNull();
+    expect(normalizeOptions({ status: false }).status).toBe(false);
   });
 });
 
 describe("_processVariant", () => {
   test("copies present variant onto options; ignores absent/empty", () => {
     const opts: Record<string, unknown> = {};
-    _processVariant.call({ request: { variant: Symbol.for("mobile") } }, opts);
+    const request = (variant: unknown) => ({
+      request: { variant, shouldApplyVaryHeader: () => true },
+    });
+    _processVariant.call(request(Symbol.for("mobile")), opts);
     expect(opts.variant).toBe(Symbol.for("mobile"));
 
     const opts2: Record<string, unknown> = {};
-    _processVariant.call({ request: { variant: undefined } }, opts2);
-    _processVariant.call({ request: { variant: [] } }, opts2);
-    _processVariant.call({}, opts2);
+    _processVariant.call(request(undefined), opts2);
+    _processVariant.call(request([]), opts2);
+    _processVariant.call({ request: null }, opts2);
+    _processVariant.call({} as { request: null }, opts2);
     expect(opts2).toEqual({});
   });
 });
@@ -117,15 +135,12 @@ describe("_setRenderedContentType", () => {
 describe("_setVaryHeader", () => {
   function makeHost(initial?: string, shouldApply = true) {
     const headers = new Map<string, string>();
-    if (initial !== undefined) headers.set("vary", initial);
+    if (initial !== undefined) headers.set("Vary", initial);
     return {
       headers,
       host: {
         request: { shouldApplyVaryHeader: () => shouldApply },
-        response: {
-          getHeader: (n: string) => headers.get(n.toLowerCase()),
-          setHeader: (n: string, v: string) => headers.set(n.toLowerCase(), v),
-        },
+        response: { headers },
       },
     };
   }
@@ -133,22 +148,23 @@ describe("_setVaryHeader", () => {
   test("sets Vary: Accept when missing and request opts in; preserves existing or opt-out", () => {
     const a = makeHost();
     _setVaryHeader.call(a.host);
-    expect(a.headers.get("vary")).toBe("Accept");
+    expect(a.headers.get("Vary")).toBe("Accept");
 
     const b = makeHost("Cookie");
     _setVaryHeader.call(b.host);
-    expect(b.headers.get("vary")).toBe("Cookie");
+    expect(b.headers.get("Vary")).toBe("Cookie");
 
     const c = makeHost(undefined, false);
     _setVaryHeader.call(c.host);
-    expect(c.headers.has("vary")).toBe(false);
+    expect(c.headers.has("Vary")).toBe(false);
   });
 });
 
 describe("_processOptions", () => {
   test("applies status / contentType / location, ignoring missing keys", () => {
     const setHeaderCalls: Array<[string, string]> = [];
-    const host = {
+    const host = including({
+      _processOptions() {},
       _status: 200,
       get status(): number {
         return this._status;
@@ -159,8 +175,8 @@ describe("_processOptions", () => {
       contentType: null as string | null,
       headers: { set: (n: string, v: string) => setHeaderCalls.push([n, v]) },
       urlFor: (s: string) => `/url/${s}`,
-    };
-    _processOptions.call(host, {
+    });
+    host._processOptions({
       status: "created",
       contentType: "text/plain",
       location: "post-1",
@@ -169,39 +185,41 @@ describe("_processOptions", () => {
     expect(host.contentType).toBe("text/plain");
     expect(setHeaderCalls).toEqual([["Location", "/url/post-1"]]);
 
-    _processOptions.call(host, {});
+    host._processOptions({});
     expect(host.status).toBe(201);
   });
 
   test("Ruby-truthy gate: '' / 0 are applied, null/false skip", () => {
-    const host = {
+    const host = including({
+      _processOptions() {},
       status: 200,
       contentType: null as string | null,
       headers: { set: () => undefined },
       urlFor: (s: string) => s,
-    };
-    _processOptions.call(host, { status: 0, contentType: "" });
+    });
+    host._processOptions({ status: 0, contentType: "" });
     expect(host.status).toBe(0);
     expect(host.contentType).toBe("");
 
     host.status = 200;
     host.contentType = null;
-    _processOptions.call(host, { status: null, contentType: false });
+    host._processOptions({ status: null, contentType: false });
     expect(host.status).toBe(200);
     expect(host.contentType).toBeNull();
   });
 });
 
 describe("Metal wiring", () => {
-  test("exposes the rendering privates as static members", async () => {
-    const { Metal } = await import("../metal.js");
-    expect(Metal._renderInPriorities).toBe(_renderInPriorities);
-    expect(Metal._normalizeText).toBe(_normalizeText);
-    expect(Metal._normalizeOptions).toBe(_normalizeOptions);
-    expect(Metal._setHtmlContentType).toBe(_setHtmlContentType);
-    expect(Metal._setRenderedContentType).toBe(_setRenderedContentType);
-    expect(Metal._setVaryHeader).toBe(_setVaryHeader);
-    expect(Metal._processOptions).toBe(_processOptions);
+  test("exposes the rendering privates as static members", () => {
+    expect(Rendering.instanceMethod("_renderInPriorities")!.value).toBe(_renderInPriorities);
+    expect(Rendering.instanceMethod("_normalizeText")!.value).toBe(_normalizeText);
+    expect(Rendering.instanceMethod("_normalizeOptions")!.value).toBe(_normalizeOptions);
+    expect(Rendering.instanceMethod("_processOptions")!.value).toBe(_processOptions);
+    expect(Rendering.instanceMethod("_setHtmlContentType")!.value).toBe(_setHtmlContentType);
+    expect(Rendering.instanceMethod("_setRenderedContentType")!.value).toBe(
+      _setRenderedContentType,
+    );
+    expect(Rendering.instanceMethod("_setVaryHeader")!.value).toBe(_setVaryHeader);
   });
 
   test("renderToBody routes through _renderInPriorities and falls back to ' '", () => {
@@ -220,17 +238,19 @@ describe("Metal wiring", () => {
   });
 
   test("render throws DoubleRenderError when performed is already set", () => {
-    const host = {
+    const host = including({
       performed: true,
-      responseBody: null,
+      responseBody: "ignored",
       renderToBody: () => "ignored",
       ...normalizeRender,
-    };
-    expect(() => render.call(host)).toThrow(DoubleRenderError);
+    });
+    expect(() => host.render()).toThrow(DoubleRenderError);
   });
 
   test("render delegates to abstract render when not yet performed", () => {
-    const host = {
+    const host = including({
+      request: { shouldApplyVaryHeader: () => false },
+      response: { headers: new Map<string, string>() },
       performed: false,
       responseBody: null as unknown,
       renderToBody: (opts: Record<string, unknown>) => `body:${String(opts.plain ?? "")}`,
@@ -239,42 +259,48 @@ describe("Metal wiring", () => {
       _setVaryHeader: () => {},
       renderedFormat: () => null,
       ...normalizeRender,
-    };
-    render.call(host, { plain: "hi" });
+    });
+    host.render({ plain: "hi" });
     expect(host.responseBody).toBe("body:hi");
   });
 
   test("renderToString collapses iterable results into a string", () => {
-    const host = {
+    const host = including({
       responseBody: null as unknown,
       renderToBody: () => ["a", "b", "c"],
       ...normalizeRender,
-    };
-    expect(renderToString.call(host, {})).toBe("abc");
+    });
+    expect(host.renderToString({})).toBe("abc");
   });
 
   test("renderToString passes non-iterable results through unchanged", () => {
-    const host = { responseBody: null as unknown, renderToBody: () => 42, ...normalizeRender };
-    expect(renderToString.call(host, {})).toBe(42);
+    const host = including({
+      responseBody: null as unknown,
+      renderToBody: () => 42,
+      ...normalizeRender,
+    });
+    expect(host.renderToString({})).toBe(42);
   });
 
   test("processAction sets formats from request.formats via ref()", () => {
-    const host: { request: { formats: { ref: () => string }[] }; formats?: unknown } = {
+    const host = including({
+      processAction() {},
       request: {
         formats: [{ ref: () => "html" }, { ref: () => "json" }],
       },
-    };
-    processAction.call(host);
+    });
+    host.processAction();
     expect(host.formats).toEqual(["html", "json"]);
   });
 
   test("processAction filters out null refs (filter_map &:ref parity)", () => {
-    const host: { request: { formats: { ref: () => unknown }[] }; formats?: unknown } = {
+    const host = including({
+      processAction() {},
       request: {
         formats: [{ ref: () => "html" }, { ref: () => null }, { ref: () => "json" }],
       },
-    };
-    processAction.call(host);
+    });
+    host.processAction();
     expect(host.formats).toEqual(["html", "json"]);
   });
 });

@@ -1,8 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 # Emits a JSON manifest of Rails test model classes.
-# Output: [{ package, file, classes: [{ name, parent, tableName, associations, validations, scopes, callbacks, attributes, attrs }] }]
+# Output: [{ package, file, classes: [{ name, parent, tableName, tableNamePrefix, abstractClass, pluralizeTableNames, associations, validations, scopes, callbacks, attributes, attrs }] }]
 require "json"
+require "ripper"
 
 MODELS_PATHS_JSON = ENV.fetch("MODELS_PATHS_JSON") do
   abort "extract-ruby-models: MODELS_PATHS_JSON env var not set. Run it via `pnpm parity:fixtures`."
@@ -62,65 +63,86 @@ def attr_names(line)
   line.sub(/^attr_\w+\s*\(?/, "").scan(/\A\s*:(\w+)|,\s*:(\w+)/).flatten.compact
 end
 
+# Module name => the string its `def self.table_name_prefix` returns.
+TABLE_NAME_PREFIXES = {}
+
+# Every `class` / `module` / `class << self` body in a file, with the lines it
+# spans. A parser event fires when its `end` is read, so `lineno` is that line.
+class Scopes < Ripper
+  attr_reader :scopes
+
+  def initialize(*)
+    super
+    @scopes = []
+  end
+
+  def on_const(tok) = [tok, lineno]
+  def on_kw(tok) = [tok, lineno]
+  def on_const_path_ref(left, right) = left
+  def on_top_const_ref(const) = const
+
+  def on_class(name, _superclass, _body) = scope(:class, name)
+  def on_module(name, _body) = scope(:module, name)
+  def on_sclass(target, _body) = scope(:sclass, target)
+
+  private
+    def scope(kind, head)
+      @scopes << { kind: kind, first: head[1], last: lineno }
+    end
+end
+
 def parse_file(path)
-  lines = File.readlines(path, chomp: true)
+  source = File.read(path)
+  lines = source.lines(chomp: true)
+  parser = Scopes.new(source)
+  parser.parse
+  abort "extract-ruby-models: #{path}: does not parse" if parser.error?
+  # Outermost first: a later start, or the same start with an earlier end, is nested.
+  scopes = parser.scopes.sort_by { |scope| [scope[:first], -scope[:last]] }
+  prefix_module = nil
   classes = []
-  stack = []   # [{cls:, depth:}]
-  modules = [] # [{name:, depth:}]
-  singletons = []
-  depth = 0    # simple brace/do/end depth approximation
 
-  lines.each do |raw|
+  lines.each.with_index(1) do |raw, lineno|
     line = raw.strip
-
-    # Track nesting depth to know which class we're in.
-    # Count `do`, `begin`, `def`, `if`, `unless`, `module`, `class` as +1;
-    # `end` as -1. We only need rough depth to detect class end.
-    opens = line.scan(/\b(?:do|begin|def|if|unless|module|class|case|for|while|until)\b/).count
-    # Inline `if`/`unless` modifiers (trailing) don't open a block.
-    opens -= line.scan(/\s+(?:if|unless)\s+/).count if line !~ /^\s*(?:if|unless)\b/
-    closes = line.scan(/\bend\b/).count
-    # Ruby 3 single-line `def foo = expr` opens `def` but has no `end`.
-    # Cancel the `def` from opens (not closes) so net delta stays 0.
-    opens -= 1 if line =~ /^\s*def\s+\w[\w?!]*\s*=/ && !line.include?(" end")
+    enclosing = scopes.select { |scope| scope[:first] <= lineno && lineno <= scope[:last] }
 
     if (m = line.match(/^module\s+(\w+(?:::\w+)*)\s*$/))
-      depth += 1
-      modules << { name: m[1], depth: depth }
-      depth += (opens - 1) - closes
-      modules.pop while modules.last && depth < modules.last[:depth]
+      enclosing.last[:name] = m[1]
       next
     end
 
     if (m = line.match(/^class\s+(\w+(?:::\w+)*)(?:\s*<\s*([\w:]+))?/))
-      # Enter the class body at depth+1, then apply remaining tokens on this line.
-      # `class` itself counted in opens; remaining opens = opens-1, closes = closes.
-      # e.g. `class Foo; end` → depth+1, then -1 → back to parent depth, stack popped.
-      depth += 1
-      namespace = modules.map { |mod| mod[:name] }.join("::")
+      namespace = enclosing[0...-1].filter_map { |scope| scope[:name] }.join("::")
       cls = { name: m[1], qualifiedName: namespace.empty? ? m[1] : "#{namespace}::#{m[1]}", parent: m[2], tableName: nil,
               associations: [], validations: [], scopes: [], callbacks: [], attributes: [], attrs: [] }
-      stack << { cls: cls, depth: depth }
+      enclosing.last[:name] = m[1]
+      enclosing.last[:cls] = cls
       classes << cls
-      depth += (opens - 1) - closes
-      stack.pop while stack.last && depth < stack.last[:depth]
       next
     end
 
-    singleton = line.match?(/^class\s*<<\s*self\b/)
-    depth += opens - closes
-    singletons << depth if singleton
+    modules = enclosing.select { |scope| scope[:kind] == :module }
 
-    # Pop classes whose depth we've left.
-    stack.pop while stack.last && depth < stack.last[:depth]
-    modules.pop while modules.last && depth < modules.last[:depth]
-    singletons.pop while singletons.last && depth < singletons.last
+    if prefix_module
+      m = line.match(/^["']([^"']*)["']$/) or abort "extract-ruby-models: #{path}: unrecognized table_name_prefix body: #{line}"
+      TABLE_NAME_PREFIXES[prefix_module] = m[1]
+      prefix_module = nil
+    elsif line.match?(/^def self\.table_name_prefix\b/)
+      prefix_module = modules.map { |mod| mod[:name] }.join("::")
+      if (m = line.match(/^def self\.table_name_prefix\s*(?:=|;)\s*["']([^"']*)["']/))
+        TABLE_NAME_PREFIXES[prefix_module] = m[1]
+        prefix_module = nil
+      end
+    end
 
-    next if stack.empty?
-    cls = stack.last[:cls]
+    cls = enclosing.reverse.find { |scope| scope[:cls] }&.fetch(:cls) or next
 
-    if (m = line.match(/^self\.table_name\s*=\s*["']([^"']+)["']/))
-      cls[:tableName] = m[1]
+    if (m = line.match(/^self\.table_name\s*=\s*(?:["']([^"']+)["']|:(\w+))/))
+      cls[:tableName] = m[1] || m[2]
+    elsif line.match?(/^self\.abstract_class\s*=\s*true\b/)
+      cls[:abstractClass] = true
+    elsif line.match?(/^self\.pluralize_table_names\s*=\s*false\b/)
+      cls[:pluralizeTableNames] = false
     elsif (kind = ASSOC_KINDS.find { |k| line =~ /^#{Regexp.escape(k)}\b/ })
       name = first_symbol(line)
       cls[:associations] << { kind: kind, name: name, options: extract_options(line), hasScope: scope_lambda?(line) } if name
@@ -135,7 +157,7 @@ def parse_file(path)
       cls[:validations] << { kind: kind, attributes: [name].compact, options: extract_options(line) }
     elsif (m = line.match(/^attribute\s+:(\w+),\s*:(\w+)/))
       cls[:attributes] << { name: m[1], type: m[2] }
-    elsif singletons.empty? && (m = line.match(/^attr_(reader|writer|accessor)\b/))
+    elsif enclosing.none? { |scope| scope[:kind] == :sclass } && (m = line.match(/^attr_(reader|writer|accessor)\b/))
       attr_names(line).each { |name| cls[:attrs] << { kind: m[1], name: name } }
     end
   end
@@ -153,6 +175,12 @@ MODELS_DIRS.each do |package, models_dir|
     rel = f.delete_prefix(File.expand_path("../..", models_dir) + "/")
     classes = parse_file(f)
     result << { package: package, file: rel, classes: classes } unless classes.empty?
+  end
+end
+result.each do |entry|
+  entry[:classes].each do |cls|
+    mod = TABLE_NAME_PREFIXES.keys.select { |name| cls[:qualifiedName].start_with?("#{name}::") }.max_by(&:size)
+    cls[:tableNamePrefix] = TABLE_NAME_PREFIXES[mod] if mod
   end
 end
 puts JSON.generate(result)

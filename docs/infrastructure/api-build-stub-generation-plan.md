@@ -494,6 +494,14 @@ Two boundaries follow from the extra set being a flat set of bare names:
 per package as `totalInterfaceExempt` in the JSON, so the one allowance with no
 tag to count stays measurable.
 
+A second allowance has no tag either. A class whose name appears nowhere in
+Rails cannot hold a misplaced port, so a `moved` name it overrides from the
+class it `extends` is not scored, provided the ancestor declares the name in
+the TS file mirroring a `.rb` that declares it too. An override on a class
+Rails does name stays scored, and so does an override of a member the ancestor
+itself carries as extra surface. The report prints the count ("Excluded as
+overrides: N") and the JSON carries it per package as `totalOverrideExempt`.
+
 ### Permanence claim: the receipt is `PERMANENT` or `CONVERGEABLE <story-id>`
 
 The RFC 0080 tag audit found 42 of 79 `@noRailsEquivalent` tags describing

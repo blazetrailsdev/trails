@@ -185,6 +185,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // umbrella files it owns real surface. trails ports it to `src/i18n.ts`;
   // without this the default rule would expect `../i18n.ts`, outside src.
   "i18n:../i18n.rb": "i18n.ts",
+  "msgpack:../msgpack.rb": "msgpack.ts",
   // `interpolate/ruby.rb` reopens `module I18n`, which `backend/cache.rb`
   // defines first — so without an entry here its `interpolate` /
   // `interpolate_hash` are measured against `backend/cache.ts` and, since
@@ -382,9 +383,12 @@ export function railsCommandFileToTs(rubyFile: string): string | undefined {
  * Ruby source paths are POSIX, the rest of api-compare keys files by
  * POSIX paths, and the default `path.join` would return backslashes
  * on Windows.
+ *
+ * `overrides: false` answers the file the path itself mirrors, past any
+ * `RUBY_FILE_TS_OVERRIDES` entry.
  */
-export function rubyFileToTs(rubyFile: string, pkg?: string): string {
-  const override = rubyFileTsOverride(rubyFile, pkg);
+export function rubyFileToTs(rubyFile: string, pkg?: string, overrides = true): string {
+  const override = overrides ? rubyFileTsOverride(rubyFile, pkg) : undefined;
   if (override !== undefined) return override;
   const command = railsCommandFileToTs(rubyFile);
   if (command !== undefined) return command;
@@ -491,9 +495,12 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
   "activerecord-test-support",
   "activesupport",
   "arel",
+  "bcrypt",
   "did-you-mean",
   "globalid",
   "i18n",
+  "mysql2",
+  "pg",
   "rack",
   "rack-session",
   "rack-test",
@@ -517,9 +524,12 @@ export const PROTOCOL_CALL_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<stri
   "activemodel",
   "activerecord-test-support",
   "arel",
+  "bcrypt",
   "did-you-mean",
   "globalid",
   "i18n",
+  "mysql2",
+  "pg",
   "rack",
   "rack-session",
   "rack-test",
@@ -533,30 +543,24 @@ export const SKIP_GROUPS: SkipGroup[] = [
   {
     reason:
       "Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity " +
-      "(`object_id`, `equal?`, `nil?`, `class`), reflection (`instance_of?`, " +
+      "(`object_id`, `equal?`, `class`), reflection (`instance_of?`, " +
       "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
       "dispatch (`send`, `public_send`, `tap`, " +
-      "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), " +
-      "`clone` / `initialize_clone` / `freeze`, and `to_ary` / `then`, which JS " +
-      "would read as array destructuring and as a thenable `await` calls.",
+      "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and " +
+      "`clone`.",
     names: [
       "clone",
-      "freeze",
       "object_id",
       "class",
       "send",
       "public_send",
       "tap",
-      "then",
       "yield_self",
       "instance_of?",
-      "nil?",
       "equal?",
       "instance_variable_get",
       "instance_variable_set",
       "instance_variables",
-      "initialize_clone",
-      "to_ary",
       "to_i",
       "to_f",
       "to_r",
@@ -608,51 +612,9 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
-      "NoTouching: TS uses a Map-based depth counter (_noTouchingDepth) instead " +
-      "of a thread-local array; klasses() is the Rails internal accessor for " +
-      "that array.",
-    names: ["klasses"],
-  },
-  {
-    reason:
       'CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and ' +
       "the ActiveRecord::Tasks infrastructure that has no JS equivalent.",
     names: ["any_schema_needs_update?", "db_configs_in_current_env", "load_schema!"],
-  },
-  {
-    reason:
-      "Migrator internal index helpers — Rails stores @target_version / " +
-      "@direction as instance variables; our TS Migrator passes them as method " +
-      "parameters instead, so these zero-arg helpers can't be faithfully ported.",
-    names: ["target", "start", "finish"],
-  },
-  {
-    reason:
-      "Underscore-prefixed `class_attribute` storage slots whose camelCased name " +
-      "IS the dynamically-assigned class field trails reads/writes directly " +
-      "(`Model._reflections`, `Model._counterCacheColumns`). Exposing a same-named " +
-      "reader method would clobber the storage slot, so the field IS the accessor; " +
-      "there is no separate method to match. `_attr_readonly` is likewise trails' " +
-      "private `_readonlyAttributes` set — its public reader is `readonlyAttributes` " +
-      "(Rails: `readonly_attributes` reads `_attr_readonly`), which is ported. " +
-      "`_destroy_association_async_job` is likewise the underscore storage slot " +
-      "(trails' `_destroyAssociationAsyncJob` field) behind the ported public " +
-      "accessor `destroyAssociationAsyncJob` (Rails aliases " +
-      "`destroy_association_async_job=` to `_destroy_association_async_job=`).",
-    names: [
-      "_reflections",
-      "_reflections=",
-      "_reflections?",
-      "_counter_cache_columns",
-      "_counter_cache_columns=",
-      "_counter_cache_columns?",
-      "_attr_readonly",
-      "_attr_readonly=",
-      "_attr_readonly?",
-      "_destroy_association_async_job",
-      "_destroy_association_async_job=",
-      "_destroy_association_async_job?",
-    ],
   },
 ];
 
@@ -696,18 +658,39 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
-      "Ruby's match operators on ActiveModel::Name, which delegates `=~` and " +
-      "`!~` to `@name` along with `==`/`===`/`<=>`/`eql?`/`match?` " +
-      "(naming.rb:151-152). `String#=~` answers the Integer OFFSET of the " +
-      "match (string.c `rb_str_match`) and `!~` its negation " +
-      "(Object#!~, object.c) — a different value from the boolean `match?` " +
-      "already ported as `match`, so neither can share that spelling, and " +
-      "TypeScript has no operator to overload for either. Nothing in trails " +
-      "consumes a match offset, so a port would exist only to be named. " +
-      "Scoped to naming.rb so the operators stay expected wherever a real " +
-      "offset-returning surface is ported.",
-    names: ["=~", "!~"],
-    rubyFiles: ["naming.rb"],
+      "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
+      "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
+      "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +
+      "`Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, " +
+      "`thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles " +
+      "installed under `~/.thor`. railties never reaches them. Scoped to thor's " +
+      "util.rb.",
+    names: [
+      "namespaces_in_content",
+      "load_thorfile",
+      "user_home",
+      "thor_root",
+      "thor_root_glob",
+      "globs_for",
+    ],
+    rubyFiles: ["util.rb"],
+  },
+  {
+    reason:
+      "`Thor::Util.escape_html` (util.rb:280-282) is `CGI.escapeHTML`, called " +
+      "only by `Thor::Shell::HTML`, which is not ported: there is no terminal " +
+      "rendering HTML. Scoped to thor's util.rb.",
+    names: ["escape_html"],
+    rubyFiles: ["util.rb"],
+  },
+  {
+    reason:
+      "`Thor::Base.subclass_files` (base.rb:137-139) groups subclasses by the " +
+      "`caller` file that defined them (`register_klass_file`, base.rb:144-150), " +
+      "and its only reader is `Thor::Runner`, which is not ported. Scoped to " +
+      "thor's base.rb.",
+    names: ["subclass_files"],
+    rubyFiles: ["base.rb"],
   },
   {
     reason:
@@ -840,23 +823,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in " +
-      "ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails " +
-      "realizes dedup via the `deduplicate` free function plus the " +
-      "DeduplicableBase constructor, so the alias has no separate TS surface on " +
-      "these value objects. Scoped to the AR adapter value-object files so it " +
-      "can't silence ActiveSupport::Duration#-@ (ported as `Duration#negate`).",
-    names: ["-@"],
-    rubyFiles: [
-      "connection_adapters/deduplicable.rb",
-      "connection_adapters/column.rb",
-      "connection_adapters/sql_type_metadata.rb",
-      "connection_adapters/mysql/type_metadata.rb",
-      "connection_adapters/postgresql/type_metadata.rb",
-    ],
-  },
-  {
-    reason:
       "`config` / `config_file` / `read_config` are the memoized read of " +
       "test/config.yml; trails ships no config.yml — the `connections:` hash " +
       "is expressed directly as the CONNECTIONS table in " +
@@ -868,24 +834,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "reopened-module bucketing is fixed.",
     names: ["config", "config_file", "read_config"],
     rubyFiles: ["config.rb"],
-  },
-  {
-    reason:
-      "`ActiveSupport::Messages::Rotator#initialize` (messages/rotator.rb:6-12) " +
-      "is an `initialize` on a module Rails installs with `prepend`, so it runs " +
-      "as part of the *host's* constructor chain via `super`. TypeScript has no " +
-      "expression for that: `prepend()` " +
-      "(packages/ruby-compat/src/prepend.ts) wraps methods on the prototype " +
-      "and cannot wrap a constructor, so the port keeps the Rails name as an " +
-      "exported `initialize` function that each rotatable class calls from its " +
-      "own constructor (message-verifier.ts, message-encryptor.ts). There is no " +
-      "TS `constructor` at the mapped site for the comparison to find — the same " +
-      "shape as the `included`/`extended`/`inherited` hooks. Scoped to " +
-      "messages/rotator.rb so a real class's `initialize` is still expected to " +
-      "map to a `constructor`.",
-    names: ["initialize"],
-    rubyFiles: ["messages/rotator.rb"],
-    tsMirrorName: "initialize",
   },
   {
     reason:
@@ -920,6 +868,23 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "to map to a `constructor`.",
     names: ["initialize"],
     rubyFiles: ["fixtures.rb", "encryption/encrypted_fixtures.rb"],
+    tsMirrorName: "initialize",
+  },
+  {
+    reason:
+      "`Thor::Option#initialize` (parser/option.rb:7-16) assigns " +
+      "`@check_default_type` and `@repeatable` and only then calls `super`, and " +
+      "`Thor::Argument#initialize` (parser/argument.rb:8-26) ends in `validate!`, " +
+      "whose `Option` override reads both ivars (option.rb:126-158). A JS " +
+      "constructor cannot touch `this` before `super()` returns, so the port " +
+      "keeps the Ruby name as an `initialize` method `Argument`'s constructor " +
+      "delegates to and `Option` overrides, calling `super.initialize` where " +
+      "Ruby calls `super` — the same shape `ActiveRecord::Fixture#initialize` " +
+      "above already carries. Scoped to thor's parser/argument.rb and " +
+      "parser/option.rb so a real class's `initialize` is still expected to map " +
+      "to a `constructor`.",
+    names: ["initialize"],
+    rubyFiles: ["parser/argument.rb", "parser/option.rb"],
     tsMirrorName: "initialize",
   },
   {
@@ -1133,22 +1098,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "ActiveSupport::Concurrency::LoadInterlockAwareMonitor " +
-      "(concurrency/load_interlock_aware_monitor.rb) is a Ruby `Monitor` " +
-      "subclass whose only purpose is to release the Dependencies interlock " +
-      "while a thread blocks on the lock, so a competing thread can keep " +
-      "autoloading. Both halves are absent from the port: JS has no threads to " +
-      "serialize with a reentrant mutex and no `Thread.handle_interrupt`, and " +
-      "there is no interlock to permit loads through (see the dependencies.rb " +
-      "group). RFC 0073's permanent-connection-checkout work does not change " +
-      "that — it converges where a connection is held, not what guards constant " +
-      "loading — and trails' load-interlock suite is a permanent skip. Scoped to " +
-      "this file so `synchronize` and `initialize` stay expected elsewhere.",
-    names: ["mon_enter", "synchronize", "initialize", "mon_try_enter", "mon_exit"],
-    rubyFiles: ["concurrency/load_interlock_aware_monitor.rb"],
-  },
-  {
-    reason:
       "MemoryStore#synchronize (memory_store.rb:191-193) is `@monitor." +
       "synchronize(&block)` — the Monitor that makes MemoryStore thread-safe " +
       "across Ruby threads. JavaScript has no threads and no preemption inside " +
@@ -1186,6 +1135,35 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     names: ["key?"],
     rubyFiles: ["headers.rb"],
     tsMirrorName: "hasKey",
+  },
+  {
+    reason:
+      "PERMANENT — `ActiveRecord::Core#to_ary` (core.rb:822-832) is private and answers " +
+      "`nil`, defined only so `Array#flatten` does not reach a record's " +
+      "`method_missing`. A trails record has no `method_missing` to reach " +
+      '(CLAUDE.md § "Records are not Proxies"), and a private method is ' +
+      'visible to `rbObjRespondTo` (CLAUDE.md § "Method visibility is ' +
+      'compile-time only"), so a `toAry` member would make every record ' +
+      "answer `respond_to?(:to_ary)`, which Rails' record does not: " +
+      "`serializable_hash` (active_model/serialization.rb:141) and " +
+      "`fields_for_with_nested_attributes` (form_helper.rb:2713-2718) branch " +
+      "on it. Scoped to core.rb, and to base.rb, which includes `Core`, so " +
+      "every other `to_ary` stays scored.",
+    names: ["to_ary"],
+    rubyFiles: ["core.rb", "base.rb"],
+  },
+  {
+    reason:
+      "`ActiveRecord::Relation#then` (relation.rb:1157-1165) chains a block " +
+      "onto the relation's `@future_result`, else falls to `Kernel#then`. A " +
+      "trails relation is evaluated by an async query, so `Relation.prototype` " +
+      "carries the `then` / `catch` / `finally` that `await rel` calls, " +
+      "installed by `applyThenable` and declared on the class without a body " +
+      '(packages/activerecord/CLAUDE.md § "`Relation` is evaluated by an ' +
+      'async query"). Scoped to relation.rb so `FutureResult#then` and any ' +
+      "other definition stay scored.",
+    names: ["then"],
+    rubyFiles: ["relation.rb"],
   },
 ];
 
@@ -1651,23 +1629,31 @@ export function rubyMethodToTsIgnoringSkip(
   return [...new Set([...candidates, ...underscored])];
 }
 
+/**
+ * The TS candidates for a class's own `self.new`, or for a `ClassMethods#new`
+ * a class in the same Ruby file extends (RFC 0188). Ruby's `Klass.new` and
+ * JS's `new Klass` are one operation, so it is the constructor whether or not
+ * an `initialize` sits beside it. `rubyMethodToTs("new", …)` is the rule for
+ * every other `new`.
+ */
+export const OWN_NEW_TS_CANDIDATES: readonly string[] = ["constructor"];
+
 function rubyMethodToTsWithoutUnderscore(
   name: string,
   siblingRubyNames?: ReadonlySet<string>,
 ): string[] | null {
   if (OPERATORS.has(name)) return null;
-  // A same-file `new` beside `initialize` (`ActionController::Renderer.new`,
-  // `renderer.rb:72`, next to `#initialize` at `:111`) WRAPS the constructor;
-  // it is a second Ruby member, not a second spelling of the same one.
+  // An instance-level or module-level `new` beside `initialize`
+  // (`ActionController::Renderer#new`, `renderer.rb:72`, next to `#initialize`
+  // at `:111`) WRAPS the constructor; it is a second Ruby member, not a second
+  // spelling of the same one.
   if (name === "new" && siblingRubyNames?.has("initialize") === true) return null;
   if (name === "initialize" || name === "new") return ["constructor"];
   if (name === "to_s" || name === "to_str") return ["toString"];
   if (name === "to_json") return ["toJSON"];
   if (name === "to_sql") return ["toSql"];
   // Ruby unary minus (`-@`) ports to a named `negate` method (e.g.
-  // ActiveSupport::Duration#-@ → Duration#negate). Files where `-@` has no TS
-  // surface (the AR Deduplicable value objects, where `-@` is just Ruby's
-  // `alias :-@ :deduplicate`) suppress it via SCOPED_SKIP_GROUPS instead.
+  // ActiveSupport::Duration#-@ → Duration#negate).
   if (name === "-@") return ["negate"];
   if (name === "to_a") return ["toA", "toArray"];
   if (COPY_HOOKS.has(name)) {
@@ -1864,11 +1850,21 @@ matches the first candidate present in the target file), not a call expression.
 | \`-@\` (unary minus) | \`negate\` | \`-@\` → ${example("-@")} |
 | everything else | \`snake_case\` → \`camelCase\` | \`has_many\` → ${example("has_many")} |
 
-Constructor details: \`new\` maps to \`constructor\` only when its Ruby file does
-NOT also define \`initialize\`. A same-file \`new\` beside \`initialize\`
-(\`ActionController::Renderer.new\`, \`renderer.rb:72\`, next to \`#initialize\`
-at \`:111\`) is an ordinary singleton method that WRAPS the constructor, so it
-is a second Ruby member, not a second spelling of the same one.
+Constructor details: a class's own \`self.new\` is the constructor, as
+\`initialize\` is: Ruby's \`Klass.new\` and JS's \`new Klass\` are one operation
+(\`ActiveSupport::TimeZone.new\`, \`values/time_zone.rb:216\`, beside
+\`#initialize\` at \`:301\`). Where a class defines both, the call gates compare
+the constructor against \`new\` then \`initialize\`, with \`new\`'s \`super\` spent
+on \`initialize\`. A \`ClassMethods#new\` in the class's own Ruby file pairs the
+same way. A module's \`initialize\`, or a \`ClassMethods#new\`, defined in another
+Ruby file is matched through the \`@inlinedFrom\` tag on the constructor it is
+inlined into (RFC 0188).
+
+Any other \`new\`, an instance method or a module's own \`self.new\`, maps to
+\`constructor\` only when its Ruby file does NOT also define \`initialize\`.
+Beside \`initialize\` (\`ActionController::Renderer#new\`, \`renderer.rb:72\`,
+next to \`#initialize\` at \`:111\`) it WRAPS the constructor, so it is a second
+Ruby member, not a second spelling of the same one.
 
 Predicate-form details: a predicate whose Ruby file ALSO defines the bare name
 (\`Logger#debug\` next to \`Logger#debug?\`) offers the QUOTED LITERAL spelling

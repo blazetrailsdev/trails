@@ -1,19 +1,9 @@
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { dasherize, underscore } from "@blazetrails/activesupport";
+import { Module, rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 
-import {
-  defaultRender as _defaultRender,
-  sendAction as _sendAction,
-} from "./basic-implicit-render.js";
-
-/** @internal */
-export function sendAction(
-  this: { performed: boolean; head(status: number | string): void },
-  method: () => unknown,
-): unknown {
-  return _sendAction.call(this, method);
-}
+import { BasicImplicitRender } from "./basic-implicit-render.js";
 
 export interface ImplicitRenderHost {
   performed: boolean;
@@ -42,18 +32,26 @@ export interface ImplicitRenderHost {
 
 /**
  * @missingRailsArgs inspect — PERMANENT
+ * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
  * @internal
  */
 export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
   const name = this.constructor.name;
   if (
-    this.templateExists?.(String(this.actionName), this._prefixes?.(), false, [], {
-      variants: variantsFor(this.request?.variant),
-    })
+    this.templateExists?.(
+      dasherize(underscore(String(this.actionName))),
+      this._prefixes?.(),
+      false,
+      [],
+      {
+        variants: variantsFor(this.request?.variant),
+      },
+    )
   ) {
     return this.render();
   }
-  if (this.isAnyTemplates?.(String(this.actionName), this._prefixes?.())) {
+  if (this.isAnyTemplates?.(dasherize(underscore(String(this.actionName))), this._prefixes?.())) {
     const message =
       `${name}#${this.actionName} is missing a template ` +
       "for this request format and variant.\n" +
@@ -67,7 +65,7 @@ export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
     throw new MissingExactTemplate(message, this.constructor, this.actionName);
   }
   this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
-  _defaultRender.call(this);
+  return ImplicitRender.superMethod(this, "defaultRender")!() as void | Promise<void>;
 }
 
 /** @internal */
@@ -76,14 +74,18 @@ function variantsFor(variant: unknown): readonly (string | symbol)[] {
   return Array.isArray(variant) ? [...(variant as readonly string[])] : [String(variant)];
 }
 
-/** @internal */
-export function methodForAction(
-  this: ImplicitRenderHost & { _superMethodForAction?(name: string): string | undefined },
-  actionName: string,
-): string | undefined {
-  const sup = this._superMethodForAction?.(actionName);
+/**
+ * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
+ * @internal
+ */
+export function methodForAction(this: ImplicitRenderHost, actionName: string): string | undefined {
+  const sup = ImplicitRender.superMethod(this, "methodForAction")!(actionName) as
+    | string
+    | undefined;
   if (sup) return sup;
-  if (this.templateExists?.(String(actionName), this._prefixes?.())) return "defaultRender";
+  if (this.templateExists?.(dasherize(underscore(String(actionName))), this._prefixes?.()))
+    return "defaultRender";
   return undefined;
 }
 
@@ -93,3 +95,11 @@ export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   if (!req) return false;
   return req.isGet?.() === true && req.format?.symbol === ":html" && req.xhr !== true;
 }
+
+export const ImplicitRender = new Module((mod) => {
+  mod.include(BasicImplicitRender);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { defaultRender, methodForAction, isInteractiveBrowserRequest });
+  });
+});

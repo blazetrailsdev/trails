@@ -1,6 +1,6 @@
-import { sql as arelSql } from "@blazetrails/arel";
-import { ArgumentError, Attribute as ModelAttribute, FloatType } from "@blazetrails/activemodel";
-import { b, StandardError } from "@blazetrails/ruby-compat";
+import * as Arel from "@blazetrails/arel";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { b, first, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
@@ -72,8 +72,12 @@ export async function execRollbackDbTransaction(this: InternalBeginTransactionHo
   });
 }
 
-export function highPrecisionCurrentTimestamp(): string {
-  return "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')";
+const HIGH_PRECISION_CURRENT_TIMESTAMP = Arel.sql("STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')", {
+  retryable: true,
+});
+
+export function highPrecisionCurrentTimestamp(): Arel.Nodes.SqlLiteral {
+  return HIGH_PRECISION_CURRENT_TIMESTAMP;
 }
 
 export async function execute(
@@ -119,7 +123,6 @@ interface PerformQueryHost {
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
   verifiedBang(): void;
   _lastAffectedRows: number;
-  _lastInsertRowid: number | bigint;
 }
 
 interface ExecuteBatchHost {
@@ -187,16 +190,6 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  if (Array.isArray(typeCastedBinds)) {
-    typeCastedBinds = typeCastedBinds.map((value, i) => {
-      const bind = binds[i];
-      return typeof value === "bigint" &&
-        bind instanceof ModelAttribute &&
-        bind.type instanceof FloatType
-        ? bind.valueForDatabase
-        : value;
-    });
-  }
   let result: Result;
   if (batch) {
     await rawConnection.exec(sql);
@@ -232,7 +225,6 @@ export async function performQuery(
     }
   }
   this._lastAffectedRows = await rawConnection.changes();
-  this._lastInsertRowid = await rawConnection.lastInsertRowId();
   this.verifiedBang();
   if (notificationPayload) notificationPayload.row_count = result.length;
   return result;
@@ -270,24 +262,18 @@ export function buildTruncateStatement(this: QuoteTableNameHost | void, tableNam
   return `DELETE FROM ${quoted}`;
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export function returningColumnValues(result: Result): unknown[] | undefined {
-  return result.rows[0] as unknown[] | undefined;
+  return first(result.rows);
 }
 
-/**
- * @internal
- * @missingRailsCall sql — PERMANENT
- */
+/** @internal */
 export function defaultInsertValue(column: {
   defaultFunction?: string | null;
   default?: unknown;
 }): unknown {
   if (column.defaultFunction) {
-    return arelSql(column.defaultFunction);
+    return Arel.sql(column.defaultFunction);
   }
   return column.default;
 }

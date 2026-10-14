@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   ownerRecordsNothing,
+  skeletonIsAnotherOwners,
+  skeletonsOfOwner,
+  skeletonsByOwner,
+  recordSkeletonBody,
+  type SkeletonBodies,
   nameMatches,
   superclassesMatch,
   primaryClassesPerFile,
@@ -9,7 +14,11 @@ import {
   methodInMode,
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
+  bodyInDefiningFile,
+  crossFileCredit,
+  includerConstructorIsInitializeSeat,
   mixinMethodCreditedToOwnFile,
+  moduleInitializeCandidates,
   reopeningMethodCreditedToOwnFile,
   resolveModuleName,
   buildModuleIncluderFqns,
@@ -29,6 +38,8 @@ import {
   resolveEntityByDeclaringFile,
   significantMissingCalls,
   suppressedCallClaims,
+  invokeForms,
+  invokedNames,
   narrowPredicateCandidates,
   ambiguousTsNames,
   reorderedCalls,
@@ -36,6 +47,7 @@ import {
   resolvePortedWithArgsSigs,
   newTsPortedWithArgsMaps,
   recordTsPortedWithArgs,
+  optionKeyPair,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
   NEGATED_ALIASES,
@@ -57,6 +69,9 @@ import {
   ownersWithBodies,
   ambiguousRubyOwner,
   rubyOwnerSeat,
+  tsMemberStatesSeat,
+  recordTsSeatOwners,
+  rubyModuleInstanceNamesByTsFile,
   tsOwnerSeat,
   crossPackageIncludedMethodNames,
   predicatePairedWithBareTwin,
@@ -75,6 +90,7 @@ import {
   copyHookClaimed,
   rubyCallToTsForReceivers,
 } from "./compare.js";
+import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
   COPY_HOOKS,
   PROTOCOL_DEFINITION_ENROLLED_PACKAGES,
@@ -370,6 +386,13 @@ describe("significantMissingCalls", () => {
     }
   });
 
+  it("drops nil?, which ports as `x == null` on a receiver that may be nil and so emits no callee", () => {
+    expect(SIGNIFICANT_CALLS.has("nil?")).toBe(false);
+    expect(
+      significantMissingCalls("translate", ["nil?", "lookup"], new Set(["lookup"]), () => true),
+    ).toEqual([]);
+  });
+
   it("significantCallsForReceivers drops a positional-array name only when EVERY site of THIS row proved array", () => {
     const sig = significantCallsForReceivers({ first: ["array"], last: ["array", "expr"] });
     // Every site proven array: dropped.
@@ -393,6 +416,264 @@ describe("significantMissingCalls", () => {
     // into the call-alias names RECEIVER_KEYED_RUBY_COMPAT_EXPORTS already owns.
     const sig = significantCallsForReceivers({ fetch: ["array"] });
     expect(sig.has("fetch")).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops size and length for a TS body that reads .length", () => {
+    const sig = significantCallsForReceivers(
+      { size: ["expr", "local"], length: ["array", "expr"] },
+      undefined,
+      new Set(["length", "length:selectRows", "length:notFoundIds", "length:columns"]),
+      { size: ["not_found_ids", "select_rows"], length: ["columns"] },
+    );
+    expect(sig.has("size")).toBe(false);
+    expect(sig.has("length")).toBe(false);
+    expect(sig.has("first")).toBe(true);
+  });
+
+  it("significantCallsForReceivers still flags size when no .length read is off the Ruby receiver's name", () => {
+    const sig = significantCallsForReceivers(
+      { size: ["expr", "local"] },
+      undefined,
+      new Set(["length", "length:s", "length:cursor"]),
+      { size: ["cursor", "records"] },
+    );
+    expect(sig.has("size")).toBe(true);
+    const unnamed = significantCallsForReceivers(
+      { size: ["expr"] },
+      undefined,
+      new Set(["length", "length:s"]),
+      { size: ["?"] },
+    );
+    expect(unnamed.has("size")).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops key? off a SCREAMING_CASE constant only for that constant's in form", () => {
+    const credited = significantCallsForReceivers(
+      { "key?": ["const"] },
+      undefined,
+      new Set(["in", "in:STATUS_WITH_NO_ENTITY_BODY"]),
+      { "key?": ["STATUS_WITH_NO_ENTITY_BODY"] },
+    );
+    expect(credited.has("key?")).toBe(false);
+    const other = significantCallsForReceivers(
+      { "key?": ["const"] },
+      undefined,
+      new Set(["in", "in:HEADERS"]),
+      { "key?": ["STATUS_WITH_NO_ENTITY_BODY"] },
+    );
+    expect(other.has("key?")).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops new when every site is an argument-less Hash.new / Array.new", () => {
+    expect(significantCallsForReceivers({ new: ["literal-new"] }).has("new")).toBe(false);
+    expect(significantCallsForReceivers({ new: ["const"] }).has("new")).toBe(true);
+    expect(significantCallsForReceivers({ new: ["const", "literal-new"] }).has("new")).toBe(true);
+    expect(significantCallsForReceivers({}).has("new")).toBe(true);
+    expect(significantCallsForReceivers(undefined).has("new")).toBe(true);
+  });
+
+  it("significantCallsForReceivers credits String.new(x) only to a TS body making the String(x) conversion call", () => {
+    const conversion = new Set(["String"]);
+    expect(
+      significantCallsForReceivers({ new: ["string-new"] }, undefined, conversion).has("new"),
+    ).toBe(false);
+    expect(significantCallsForReceivers({ new: ["string-new"] }).has("new")).toBe(true);
+    expect(
+      significantCallsForReceivers({ new: ["const", "string-new"] }, undefined, conversion).has(
+        "new",
+      ),
+    ).toBe(true);
+    expect(significantCallsForReceivers({ new: ["const"] }, undefined, conversion).has("new")).toBe(
+      true,
+    );
+  });
+
+  it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {
+    expect(significantCallsForReceivers({ size: ["expr"] }).has("size")).toBe(true);
+    expect(significantCallsForReceivers({ size: ["expr"] }, undefined, new Set()).has("size")).toBe(
+      true,
+    );
+  });
+
+  it("significantCallsForReceivers still flags an ivar or implicit-self size beside an unrelated .length read", () => {
+    const lengthRead = new Set(["length"]);
+    expect(
+      significantCallsForReceivers({ size: ["ivar"] }, undefined, lengthRead).has("size"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ size: ["local", "self"] }, undefined, lengthRead).has("size"),
+    ).toBe(true);
+    expect(significantCallsForReceivers({}, undefined, lengthRead).has("size")).toBe(true);
+    expect(
+      significantCallsForReceivers({ length: ["const"] }, undefined, lengthRead).has("length"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops Array#prepend for a TS body with an unshift() call", () => {
+    const unshifted = new Set(["unshift"]);
+    expect(
+      significantCallsForReceivers({ prepend: ["expr"] }, undefined, unshifted).has("prepend"),
+    ).toBe(false);
+    expect(significantCallsForReceivers({ prepend: ["expr"] }).has("prepend")).toBe(true);
+    expect(significantCallsForReceivers({}, undefined, unshifted).has("prepend")).toBe(true);
+    for (const kind of ["self", "const"]) {
+      expect(
+        significantCallsForReceivers({ prepend: ["expr", kind] }, undefined, unshifted).has(
+          "prepend",
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("significantCallsForReceivers drops an implicit-self load for a TS body with a computed import()", () => {
+    const imported = new Set(["import"]);
+    expect(significantCallsForReceivers({}, undefined, imported).has("load")).toBe(false);
+    expect(significantCallsForReceivers({ load: ["expr"] }, undefined, imported).has("load")).toBe(
+      true,
+    );
+    expect(
+      significantCallsForReceivers({ load: ["expr", "self"] }, undefined, imported).has("load"),
+    ).toBe(true);
+    expect(significantCallsForReceivers({}).has("load")).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops an implicit-self sleep for a TS body with a setTimeout", () => {
+    const timer = new Set(["timer"]);
+    expect(significantCallsForReceivers({}, undefined, timer).has("sleep")).toBe(false);
+    expect(significantCallsForReceivers({ sleep: ["expr"] }, undefined, timer).has("sleep")).toBe(
+      true,
+    );
+    expect(significantCallsForReceivers({}).has("sleep")).toBe(true);
+    expect(significantCallsForReceivers({}, undefined, new Set(["setInterval"])).has("sleep")).toBe(
+      true,
+    );
+  });
+
+  it("significantCallsForReceivers drops Proc#call for a TS body that invokes the receiver", () => {
+    const resolver = new Set(invokeForms(["tableNameResolver"]));
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, resolver, {
+        call: ["table_name_resolver"],
+      }).has("call"),
+    ).toBe(false);
+    expect(
+      significantCallsForReceivers({ call: ["expr", "self"] }, undefined, resolver, {
+        call: ["table_name_resolver"],
+      }).has("call"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, resolver, {}).has("call"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers(
+        { call: ["ivar"] },
+        undefined,
+        new Set(invokeForms(["_block"])),
+        {
+          call: ["@block"],
+        },
+      ).has("call"),
+    ).toBe(false);
+  });
+
+  it("significantCallsForReceivers keeps Proc#call when the TS body drops the invocation", () => {
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, new Set(invokeForms(["other"])), {
+        call: ["table_name_resolver"],
+      }).has("call"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, new Set(invokeForms(["x"])), {
+        call: ["?"],
+      }).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops Proc#call on a constant the TS body invokes", () => {
+    const names = { call: ["DEFAULT_ENV"] };
+    expect(
+      significantCallsForReceivers(
+        { call: ["const"] },
+        undefined,
+        new Set(invokeForms(["DEFAULT_ENV"])),
+        names,
+      ).has("call"),
+    ).toBe(false);
+    expect(
+      significantCallsForReceivers(
+        { call: ["const"] },
+        undefined,
+        new Set(invokeForms(["env"])),
+        names,
+      ).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops Proc#call on an || receiver when the TS body invokes an operand", () => {
+    const names = { call: ["callable|block"] };
+    for (const operand of ["callable", "block"]) {
+      expect(
+        significantCallsForReceivers(
+          { call: ["expr"] },
+          undefined,
+          new Set(invokeForms([operand])),
+          names,
+        ).has("call"),
+      ).toBe(false);
+    }
+    expect(
+      significantCallsForReceivers(
+        { call: ["expr"] },
+        undefined,
+        new Set(invokeForms(["build"])),
+        names,
+      ).has("call"),
+    ).toBe(true);
+  });
+
+  it("invokedNames reads only the callee names the extractor marked as invoked", () => {
+    expect(invokedNames(["length", "length:ns", "invoked:ns", "invoked:DEFAULT_ENV"])).toEqual([
+      "ns",
+      "DEFAULT_ENV",
+    ]);
+    const forms = new Set(invokeForms(invokedNames(["invoked:ns"])));
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, forms, {
+        call: ["namespace"],
+      }).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers matches a raw constant name for call only", () => {
+    expect(
+      significantCallsForReceivers(
+        { size: ["expr"] },
+        undefined,
+        new Set(["length", "length:MAX_ROWS"]),
+        { size: ["MAX_ROWS"] },
+      ).has("size"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers keeps a ported call on another receiver", () => {
+    const forms = new Set(invokeForms(["records"]));
+    expect(
+      significantCallsForReceivers({ call: ["local"] }, undefined, forms, {
+        call: ["preloader"],
+      }).has("call"),
+    ).toBe(true);
+    expect(
+      significantMissingCalls(
+        "preload",
+        ["call"],
+        new Set(["records"]),
+        () => true,
+        () => ["call"],
+        significantCallsForReceivers({ call: ["local"] }, new Set(["call"]), forms, {
+          call: ["preloader"],
+        }),
+      ),
+    ).toEqual(["call → call"]);
   });
 
   it("does not flag an omitted symbolize_keys even where symbolizeKeys is ported with args", () => {
@@ -1867,6 +2148,15 @@ describe("dedupeRubyMethodInto", () => {
     expect(skipped.size).toBe(0);
   });
 
+  it("expects then everywhere but the file its scoped skip names", () => {
+    const scored = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(scored, rm("then"), "Arel::Nodes::Case", "nodes/case.rb");
+    expect([...scored.keys()]).toEqual(["then"]);
+    const skipped = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(skipped, rm("then"), "ActiveRecord::Relation", "relation.rb");
+    expect(skipped.size).toBe(0);
+  });
+
   it("keeps a class method and an instance method of one name as two rows", () => {
     const seen = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(seen, rm("attribute_method?"), "ActiveRecord::AttributeMethods");
@@ -2797,6 +3087,140 @@ describe("tsOwnerSeat", () => {
   });
 });
 
+describe("tsMemberStatesSeat", () => {
+  const names = rubyModuleInstanceNamesByTsFile(
+    {
+      "ActiveRecord::Timestamp": {
+        file: "timestamp.rb",
+        instanceMethods: [{ name: "current_time_from_proper_timezone" }],
+      },
+      "ActiveRecord::Timestamp::ClassMethods": {
+        file: "timestamp.rb",
+        instanceMethods: [{ name: "current_time_from_proper_timezone" }, { name: "touch_all" }],
+      },
+    },
+    "activerecord",
+  ).get("timestamp.ts");
+  const literal = { name: "Timestamp", objectLiteral: true };
+  const member = { name: "currentTimeFromProperTimezone" };
+
+  it("reads a const named after the Rails module as the instance seat", () => {
+    expect(tsMemberStatesSeat(literal, member, names)).toBe(true);
+    const owners = new Set(["", "Timestamp"]);
+    const instanceOwners = new Set(["Timestamp"]);
+    expect(tsOwnerSeat("Timestamp", undefined, instanceOwners)).toBe("instance");
+    expect(tsDeclaresOnLevel("instance", owners, undefined, instanceOwners)).toBe("seat");
+    expect(tsDeclaresOnLevel("class", owners, undefined, instanceOwners)).toBe("neutral");
+  });
+
+  it("pairs a classAttribute.call credit under the const with both class_attribute rows", () => {
+    const staticOwners = new Map<string, Map<string, Set<string>>>();
+    const instanceOwners = new Map<string, Map<string, Set<string>>>();
+    const credit = (name: string, isStatic: boolean) => ({
+      name,
+      isStatic,
+      visibility: "public" as const,
+      params: [],
+    });
+    recordTsSeatOwners(
+      staticOwners,
+      instanceOwners,
+      [
+        {
+          name: "Normalization",
+          file: "normalization.ts",
+          objectLiteral: true,
+          includes: [],
+          extends: [],
+          instanceMethods: [
+            credit("normalizedAttributes", false),
+            credit("isNormalizedAttributes", false),
+            credit("normalizeAttribute", false),
+            credit("hidden", false),
+          ],
+          classMethods: [
+            credit("normalizedAttributes", true),
+            credit("isNormalizedAttributes", true),
+          ],
+        },
+      ],
+      (m) => m.name !== "hidden",
+      rubyModuleInstanceNamesByTsFile(
+        {
+          "ActiveRecord::Normalization": {
+            file: "normalization.rb",
+            instanceMethods: [
+              { name: "normalized_attributes" },
+              { name: "normalized_attributes?" },
+              { name: "normalize_attribute" },
+              { name: "hidden" },
+            ],
+          },
+        },
+        "activerecord",
+      ),
+    );
+    const seats = (name: string) =>
+      [staticOwners, instanceOwners].map((by) => by.get("normalization.ts")?.get(name));
+    for (const name of ["normalizedAttributes", "isNormalizedAttributes"]) {
+      const [statics, instances] = seats(name);
+      expect(tsOwnerOnBothSeats("Normalization", statics, instances)).toBe(true);
+      expect(tsDeclaresOnLevel("class", new Set(["Normalization"]), statics, instances)).toBe(
+        "seat",
+      );
+      expect(tsDeclaresOnLevel("instance", new Set(["Normalization"]), statics, instances)).toBe(
+        "seat",
+      );
+    }
+    expect(seats("normalizeAttribute")).toEqual([undefined, new Set(["Normalization"])]);
+    expect(seats("hidden")).toEqual([undefined, undefined]);
+  });
+
+  it("states no seat for a name the module does not declare on its instance half", () => {
+    expect(
+      tsMemberStatesSeat(
+        { name: "Mime", objectLiteral: true },
+        { name: "symbols" },
+        new Map([["Mime", new Set<string>()]]),
+      ),
+    ).toBe(false);
+    expect(tsMemberStatesSeat(literal, { name: "touchAll" }, names)).toBe(false);
+    expect(tsMemberStatesSeat(literal, member, undefined)).toBe(false);
+  });
+
+  it("treats a namespace's functions as an object literal's members", () => {
+    const naming = { name: "Naming", declaredAsNamespace: true, isInterface: true };
+    expect(tsMemberStatesSeat(naming, { name: "plural" }, undefined)).toBe(false);
+    expect(tsMemberStatesSeat(naming, { name: "modelName", bodyless: true }, undefined)).toBe(true);
+  });
+
+  it("keeps an interface member's seat where the interface merges with an object literal", () => {
+    const optimistic = { name: "Optimistic", isInterface: true };
+    expect(
+      tsMemberStatesSeat(optimistic, { name: "lockOptimistically", bodyless: true }, undefined),
+    ).toBe(true);
+    expect(
+      tsMemberStatesSeat(
+        optimistic,
+        { name: "lockingEnabled", objectLiteralMember: true },
+        undefined,
+      ),
+    ).toBe(false);
+    expect(
+      tsMemberStatesSeat(
+        optimistic,
+        { name: "lockingEnabled", objectLiteralMember: true },
+        new Map([["Optimistic", new Set(["lockingEnabled"])]]),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a class member's staticness", () => {
+    expect(tsMemberStatesSeat({ name: "Base" }, { name: "create" }, undefined)).toBe(true);
+    expect(tsMemberStatesSeat(literal, { name: "x", isStatic: true }, undefined)).toBe(true);
+  });
+});
+
 describe("rubyOwnerSeat", () => {
   it("reads the ClassMethods suffix as the singleton seat", () => {
     expect(rubyOwnerSeat("ActiveRecord::Persistence::ClassMethods", false)).toBe("class");
@@ -2998,6 +3422,75 @@ describe("splitOverriddenFileBuckets", () => {
   });
 });
 
+describe("includerConstructorIsInitializeSeat", () => {
+  const seat = [["@invoked:initializeIncludedModules", "initializeIncludedModules"]];
+
+  it("recognizes a constructor that only runs the included module's initialize", () => {
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
+        seat,
+      ),
+    ).toBe(true);
+  });
+
+  it("holds a constructor that inlines the module's body to its call set", () => {
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
+        [...seat, ["classOptions", "merge"]],
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
+        [["initializeIncludedModules", "classOptions", "merge"]],
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
+        undefined,
+      ),
+    ).toBe(false);
+  });
+
+  it("leaves the class's own initialize, and any other method, alone", () => {
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize" },
+        "group.rb",
+        "constructor",
+        seat,
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "group.rb" },
+        "group.rb",
+        "constructor",
+        seat,
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "help", mixinFile: "base.rb" },
+        "group.rb",
+        "help",
+        seat,
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("mixinMethodCreditedToOwnFile", () => {
   const encryptableTs = new Set(["encryptedAttributes", "encrypts", "schemeFor"]);
   const tsMethodsByFile = new Map([["encryption/encryptable-record.ts", encryptableTs]]);
@@ -3041,6 +3534,53 @@ describe("mixinMethodCreditedToOwnFile", () => {
       tsName: "quotedDate",
       tsFile: "connection-adapters/postgresql/quoting.ts",
     });
+  });
+
+  it("credits an includer's inherited initialize to the mixin file's [initialize] hook", () => {
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "initialize", rubyModule: "Host", mixinFile: "metal/url_for.rb" },
+        "api.rb",
+        "actioncontroller",
+        (f) => f === "metal/url_for.rb",
+        new Map([["metal/url-for.ts", new Set(["[initialize]", "urlOptions"])]]),
+      ),
+    ).toEqual({ tsName: "[initialize]", tsFile: "metal/url-for.ts" });
+  });
+
+  it("leaves an includer's own initialize to its constructor", () => {
+    const seen = new Map<string, SeenRubyMethod>();
+    const initialize: MethodInfo = { name: "initialize", visibility: "public", params: [] };
+    dedupeRubyMethodInto(seen, initialize, "ActionController::Metal", "metal.rb");
+    dedupeRubyMethodInto(
+      seen,
+      { ...initialize, mixinFile: "metal/url_for.rb" },
+      "ActionController::Metal",
+      "metal.rb",
+    );
+    const [own] = [...seen.values()];
+    expect(own.mixinFile).toBeUndefined();
+    expect(
+      mixinMethodCreditedToOwnFile(
+        own,
+        "metal.rb",
+        "actioncontroller",
+        (f) => f === "metal/url_for.rb",
+        new Map([["metal/url-for.ts", new Set(["[initialize]", "urlOptions"])]]),
+      ),
+    ).toBeNull();
+  });
+
+  it("does not credit an inherited initialize to a mixin file with no [initialize] hook", () => {
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "initialize", rubyModule: "Host", mixinFile: "metal/url_for.rb" },
+        "api.rb",
+        "actioncontroller",
+        (f) => f === "metal/url_for.rb",
+        new Map([["metal/url-for.ts", new Set(["urlOptions"])]]),
+      ),
+    ).toBeNull();
   });
 
   it("credits a method a TS-less includer's first file inherits from a mixin's own file", () => {
@@ -3099,6 +3639,281 @@ describe("mixinMethodCreditedToOwnFile", () => {
         tsMethodsByFile,
       ),
     ).toBeNull();
+  });
+});
+
+describe("bodyInDefiningFile", () => {
+  const tsMethodsByFile = new Map([
+    ["naming.ts", new Set(["modelName"])],
+    ["validations/acceptance.ts", new Set(["validatesAcceptanceOf"])],
+    ["model.ts", new Set(["modelName", "validatesAcceptanceOf"])],
+  ]);
+  const hasBucket = (f: string) => f === "naming.rb" || f === "validations/absence.rb";
+  const bodied = new Map([
+    ["naming.ts", new Map([["modelName", new Set(["Naming"])]])],
+    ["validations/acceptance.ts", new Map([["validatesAcceptanceOf", new Set(["HelperMethods"])]])],
+  ]);
+  const none = new Map<string, Map<string, Set<string>>>();
+
+  it("names the mixin's own file when the body is there", () => {
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toEqual({ tsName: "modelName", tsFile: "naming.ts" });
+  });
+
+  it("names a reopening's own file when the mixin's first file does not hold it", () => {
+    expect(
+      bodyInDefiningFile(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::Validations",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        "validations.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toEqual({ tsName: "validatesAcceptanceOf", tsFile: "validations/acceptance.ts" });
+  });
+
+  it("is null when the defining file only declares the name", () => {
+    const bodyless = new Map([["naming.ts", new Map([["modelName", new Set(["Naming"])]])]]);
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        bodyless,
+        none,
+      ),
+    ).toBeNull();
+  });
+
+  it("is null for a method the host's own file defines", () => {
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "persisted?", rubyModule: "ActiveModel::API" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("crossFileCredit", () => {
+  const tsMethodsByFile = new Map([
+    ["naming.ts", new Set(["modelName"])],
+    ["validations/acceptance.ts", new Set(["validatesAcceptanceOf"])],
+    ["model.ts", new Set(["modelName", "validatesAcceptanceOf", "insert"])],
+  ]);
+  const hasBucket = (f: string) => f === "naming.rb" || f === "validations/absence.rb";
+  const bodied = new Map([
+    ["naming.ts", new Map([["modelName", new Set(["Naming"])]])],
+    ["validations/acceptance.ts", new Map([["validatesAcceptanceOf", new Set(["HelperMethods"])]])],
+  ]);
+  const none = new Map<string, Map<string, Set<string>>>();
+  const credit = (
+    rm: Parameters<typeof crossFileCredit>[0],
+    viaInclude: Parameters<typeof crossFileCredit>[8],
+    bodyless = none,
+    withBody = bodied,
+  ) =>
+    crossFileCredit(
+      rm,
+      "api.rb",
+      "activemodel",
+      hasBucket,
+      tsMethodsByFile,
+      bodyless,
+      withBody,
+      undefined,
+      viaInclude,
+    );
+
+  const includer = (tsName: string) => ({ tsName, tsFile: "model.ts" });
+
+  it("names the mixin's own member in the move and still compares the includer's", () => {
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("modelName"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: { tsName: "modelName", tsFile: "naming.ts", inDefiningFile: true },
+      compared: includer("modelName"),
+    });
+  });
+
+  it("names a reopening's own member in the move when an includer declares the name", () => {
+    expect(
+      credit(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::API",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        includer("validatesAcceptanceOf"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: {
+        tsName: "validatesAcceptanceOf",
+        tsFile: "validations/acceptance.ts",
+        inDefiningFile: true,
+      },
+      compared: includer("validatesAcceptanceOf"),
+    });
+  });
+
+  it("takes the move's name from the defining file, not from the includer's candidate", () => {
+    expect(
+      crossFileCredit(
+        {
+          rubyName: "initialize_dup",
+          rubyModule: "ActiveModel::Type::Value",
+          mixinFile: "type/serialize_cast_value.rb",
+        },
+        "type/value.rb",
+        "activemodel",
+        () => true,
+        new Map([["type/serialize-cast-value.ts", new Set(["_initializeDup"])]]),
+        none,
+        new Map([
+          [
+            "type/serialize-cast-value.ts",
+            new Map([["_initializeDup", new Set(["SerializeCastValue"])]]),
+          ],
+        ]),
+        undefined,
+        { tsName: "initializeDup", tsFile: "type/value.ts" },
+      )?.move,
+    ).toEqual({
+      tsName: "_initializeDup",
+      tsFile: "type/serialize-cast-value.ts",
+      inDefiningFile: true,
+    });
+  });
+
+  it("reports the includer as a relocation when no body sits in the defining file", () => {
+    expect(
+      credit(
+        { rubyName: "insert", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("insert"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: { ...includer("insert"), inDefiningFile: false },
+      compared: includer("insert"),
+    });
+
+    const bodyless = new Map([["naming.ts", new Map([["modelName", new Set(["Naming"])]])]]);
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("modelName"),
+        bodyless,
+        none,
+      )?.move,
+    ).toEqual({ ...includer("modelName"), inDefiningFile: false });
+  });
+
+  it("flags the mixin arm and compares nothing", () => {
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        null,
+      ),
+    ).toEqual({
+      arm: "mixin",
+      move: { tsName: "modelName", tsFile: "naming.ts", inDefiningFile: true },
+      compared: null,
+    });
+  });
+
+  it("flags the reopening arm and compares the reopening's member", () => {
+    const reopening = { tsName: "validatesAcceptanceOf", tsFile: "validations/acceptance.ts" };
+    expect(
+      credit(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::API",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        null,
+      ),
+    ).toEqual({
+      arm: "reopening",
+      move: { ...reopening, inDefiningFile: true },
+      compared: reopening,
+    });
+  });
+
+  it("is null when nothing ports it", () => {
+    expect(credit({ rubyName: "persisted?", rubyModule: "ActiveModel::API" }, null)).toBeNull();
+  });
+});
+
+describe("moduleInitializeCandidates", () => {
+  const withHook = new Set(["[initialize]", "itselfIfSerializeCastValueCompatible"]);
+
+  it("offers a module's initialize its [initialize] hook first", () => {
+    expect(moduleInitializeCandidates("initialize", true, withHook, ["constructor"])).toEqual([
+      "[initialize]",
+      "constructor",
+    ]);
+  });
+
+  it("leaves a class's initialize as the constructor", () => {
+    expect(moduleInitializeCandidates("initialize", false, withHook, ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
+  it("leaves a module without the hook to report through its other arms", () => {
+    expect(moduleInitializeCandidates("initialize", true, new Set(), ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
+  it("offers a module's new its own new member first", () => {
+    const withNew = new Set(["new", "registry"]);
+    expect(moduleInitializeCandidates("new", true, withNew, ["constructor"])).toEqual([
+      "new",
+      "constructor",
+    ]);
+    expect(moduleInitializeCandidates("new", false, withNew, ["constructor"])).toEqual([
+      "constructor",
+    ]);
+    expect(moduleInitializeCandidates("new", true, withHook, ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
+  it("leaves every other name alone", () => {
+    expect(moduleInitializeCandidates("serialize", true, withHook, ["serialize"])).toEqual([
+      "serialize",
+    ]);
   });
 });
 
@@ -3372,6 +4187,38 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
   });
 });
 
+describe("reorderedCalls — moduleEval / classEval callbacks", () => {
+  const tsSeq = ["moduleEval", "%scoping", "defineMethod", "scoping"];
+  const ruby = ["module_eval", "define_method", "scoping"];
+  const map = (rc: string) =>
+    ({ module_eval: ["moduleEval"], define_method: ["defineMethod"], scoping: ["scoping"] })[
+      rc as "scoping"
+    ] ?? null;
+  const significant = new Set(ruby);
+
+  it("drops the callback's positions against a String module_eval", () => {
+    expect(
+      reorderedCalls(
+        "generate_method",
+        ruby,
+        tsSeq,
+        () => true,
+        map,
+        significant,
+        ruby,
+        undefined,
+        true,
+      ),
+    ).toEqual([]);
+  });
+
+  it("positions the callback's calls against a block module_eval", () => {
+    expect(
+      reorderedCalls("generate_method", ruby, tsSeq, () => true, map, significant, ruby),
+    ).toEqual([`${ORDER_PREFIX}scoping,defineMethod → defineMethod,scoping`]);
+  });
+});
+
 describe("suppressedCallClaims", () => {
   it("claims the TS spelling of a call the ported-with-args gate suppresses", () => {
     const claimed = suppressedCallClaims(
@@ -3382,6 +4229,17 @@ describe("suppressedCallClaims", () => {
       new Set(["method_defined?", "include?"]),
     );
     expect([...claimed]).toEqual(["has"]);
+  });
+
+  it("leaves the alias spelling free when the body ports the call under its convention name", () => {
+    const claimed = suppressedCallClaims(
+      ["method_defined?", "include?"],
+      new Set(["isMethodDefined", "has"]),
+      (ts) => ts === "include",
+      (rc) => (rc === "method_defined?" ? ["isMethodDefined"] : ["include"]),
+      new Set(["method_defined?", "include?"]),
+    );
+    expect([...claimed]).toEqual(["isMethodDefined"]);
   });
 
   it("claims nothing for a NO_JS_CALL_FORM name, whose port emits no callee", () => {
@@ -3402,6 +4260,102 @@ describe("suppressedCallClaims", () => {
       () => ["methodDefined"],
     );
     expect([...claimed]).toEqual([]);
+  });
+});
+
+describe("skeletonIsAnotherOwners", () => {
+  // `validations/with.ts`: the top-level instance `validatesWith` (owner "")
+  // records the file's one skeleton; `ClassMethods.validatesWith` has a body
+  // and no skeleton.
+  const owners = new Set([""]);
+
+  it("refuses the instance function's skeleton for the object-literal ClassMethods body", () => {
+    expect(skeletonIsAnotherOwners(true, "ClassMethods", owners)).toBe(true);
+  });
+
+  it("keeps a bodyless declaration paired with the file's top-level body", () => {
+    expect(skeletonIsAnotherOwners(false, "Dirty", owners)).toBe(false);
+  });
+
+  it("keeps an owner paired with the skeleton it recorded, and an unresolved owner", () => {
+    expect(skeletonIsAnotherOwners(true, "Errors", new Set(["Errors"]))).toBe(false);
+    expect(skeletonIsAnotherOwners(false, undefined, owners)).toBe(false);
+  });
+});
+
+describe("skeletonsOfOwner", () => {
+  const instance = ["ref:extractOptionsBang", "ref:constructor", "loop"];
+  const classMethod = ["ref:extractOptionsBang", "loop", "if"];
+  const byName = [classMethod, instance];
+  const byOwner = new Map([
+    ["ClassMethods", [classMethod]],
+    ["", [instance]],
+  ]);
+
+  it("pairs a module member and the top-level function each with its own body", () => {
+    expect(skeletonsOfOwner(byName, byOwner, "ClassMethods", undefined)).toEqual([classMethod]);
+    expect(skeletonsOfOwner(byName, byOwner, "", undefined)).toEqual([instance]);
+  });
+
+  it("reads by name for an unresolved owner, a class owner and a single body", () => {
+    expect(skeletonsOfOwner(byName, byOwner, undefined, undefined)).toBe(byName);
+    expect(skeletonsOfOwner(byName, byOwner, "ClassMethods", new Set(["ClassMethods"]))).toBe(
+      byName,
+    );
+    expect(skeletonsOfOwner([instance], new Map([["", [instance]]]), "", undefined)).toEqual([
+      instance,
+    ]);
+  });
+
+  it("answers the one body a synthesized file module re-listed, for any owner", () => {
+    const relisted = [instance, instance];
+    const one = new Map([["", [instance]]]);
+    expect(skeletonsOfOwner(relisted, one, undefined, undefined)).toEqual([instance]);
+    expect(skeletonsOfOwner(relisted, one, "Deprecator", undefined)).toEqual([instance]);
+  });
+});
+
+describe("recordSkeletonBody", () => {
+  const instance = ["ref:extractOptionsBang", "loop"];
+  const classMethod = ["ref:extractOptionsBang", "loop", "if"];
+  const record = (order: [string, string, string[]][]) => {
+    const bodies: SkeletonBodies = new Map();
+    for (const [site, owner, skeleton] of order) recordSkeletonBody(bodies, site, owner, skeleton);
+    return skeletonsByOwner(bodies);
+  };
+  const expected = new Map([
+    ["", [instance]],
+    ["ClassMethods", [classMethod]],
+  ]);
+
+  it("keeps a re-listed top-level body under the top level when the namespace entity comes first", () => {
+    const byOwner = record([
+      ["with.ts:148", "With", instance],
+      ["with.ts:88", "ClassMethods", classMethod],
+      ["with.ts:148", "", instance],
+    ]);
+    expect(byOwner).toEqual(expected);
+    expect(skeletonsOfOwner([instance, classMethod, instance], byOwner, "", undefined)).toEqual([
+      instance,
+    ]);
+  });
+
+  it("keeps it there when the top-level function comes first", () => {
+    expect(
+      record([
+        ["with.ts:148", "", instance],
+        ["with.ts:148", "With", instance],
+        ["with.ts:88", "ClassMethods", classMethod],
+      ]),
+    ).toEqual(expected);
+  });
+
+  it("holds a body shared by two owners once, so the pair compares one body", () => {
+    const byOwner = record([
+      ["inflector.ts:42", "Inflector", instance],
+      ["inflector.ts:42", "", instance],
+    ]);
+    expect(skeletonsOfOwner([instance, instance], byOwner, "", undefined)).toEqual([instance]);
   });
 });
 
@@ -3786,6 +4740,78 @@ describe("ported-with-args population", () => {
     expect(sigs("relation.ts", "buildFrom")).toHaveLength(1);
     expect(sigs("test-helpers/fixtures.ts", "fixtures")).toEqual([]);
   });
+
+  it("pairs option keys by owner, so a sibling class masks neither side", () => {
+    const maps = newTsPortedWithArgsMaps();
+    const file = "schema-definitions.ts";
+    const member = (optionKeys: string[], optionReads: string[]): MethodInfo => ({
+      ...method("isDefinedFor", file),
+      optionKeys,
+      optionReads,
+    });
+    recordTsPortedWithArgs(maps, member(["name"], ["name"]), file, "IndexDefinition");
+    recordTsPortedWithArgs(
+      maps,
+      member(["name", "validate"], ["name", "invented"]),
+      file,
+      "ForeignKeyDefinition",
+    );
+    const params = [{ name: "options", kind: "keyword_rest" as const }];
+    const owned = (keys: string[]) => ({ keys, params });
+    const ns = "ActiveRecord::ConnectionAdapters";
+    const ruby = {
+      byName: new Map([["defined_for?", owned(["name", "validate", "invented"])]]),
+      byOwnerName: new Map([
+        [
+          rubyBodyKey(`${ns}::IndexDefinition`, "instance", "defined_for?"),
+          owned(["name", "validate"]),
+        ],
+        [rubyBodyKey(`${ns}::IndexDefinition`, "class", "defined_for?"), owned(["unrelated"])],
+        [
+          rubyBodyKey(`${ns}::ForeignKeyDefinition`, "instance", "defined_for?"),
+          owned(["name", "validate"]),
+        ],
+        [
+          rubyBodyKey(`${ns}::CheckConstraintDefinition`, "instance", "defined_for?"),
+          owned(["invented"]),
+        ],
+      ]),
+    };
+    const verdict = (owner: string) => {
+      const pair = optionKeyPair(
+        "defined_for?",
+        "isDefinedFor",
+        file,
+        `${ns}::${owner}`,
+        "instance",
+        ruby,
+        maps,
+      )!;
+      return matchOptionKeysAgainst(pair.ruby.keys, pair.candidates, [], pair.reads);
+    };
+
+    expect(verdict("IndexDefinition")).toEqual({
+      comparable: true,
+      missingInTs: ["validate"],
+      extraInTs: [],
+    });
+    expect(verdict("ForeignKeyDefinition")).toEqual({
+      comparable: true,
+      missingInTs: [],
+      extraInTs: ["invented"],
+    });
+    const mixin = optionKeyPair(
+      "defined_for?",
+      "isDefinedFor",
+      file,
+      "Mixin",
+      "instance",
+      ruby,
+      maps,
+    );
+    expect(mixin?.owned).toBe(false);
+    expect(mixin?.ruby.keys).toEqual(["name", "validate", "invented"]);
+  });
 });
 
 describe("predicateKindMismatch", () => {
@@ -3864,6 +4890,19 @@ describe("rubyDefinitionBreakdown", () => {
       sameNameCollapse: 1,
       ownRow: 4,
     });
+  });
+
+  it("gives then its own row everywhere but the file its scoped skip names", () => {
+    const breakdown = rubyDefinitionBreakdown(
+      [
+        entity("Arel::Nodes::Case", "nodes/case.rb", ["then"]),
+        entity("ActiveRecord::Relation", "relation.rb", ["then", "load"]),
+      ],
+      "activerecord",
+      () => true,
+    );
+    expect(breakdown.ownRow).toBe(2);
+    expect(breakdown.scopedSkip).toBe(1);
   });
 
   it("counts only the definitions the mode admits", () => {

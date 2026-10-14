@@ -8,7 +8,7 @@ function databaseName(url: string): string {
 describeIfPg("AdapterTest", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(() => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     await adapter.disconnectBang();
@@ -21,7 +21,7 @@ describeIfPg("AdapterTest", () => {
 
 describeIfPg("AdvisoryLocksEnabledTest", () => {
   it("advisory locks enabled?", async () => {
-    const base = new PostgreSQLAdapter(PG_TEST_URL);
+    const base = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       expect(base.isAdvisoryLocksEnabled()).toBe(true);
     } finally {

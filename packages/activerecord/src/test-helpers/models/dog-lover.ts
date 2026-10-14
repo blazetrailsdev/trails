@@ -1,6 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Dog } from "./dog.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class DogLover extends Base {
   declare trainedDogs: AssociationProxy<Dog>;
@@ -20,3 +21,4 @@ export class DogLover extends Base {
     this.hasMany("dogs");
   }
 }
+registerModel(DogLover);

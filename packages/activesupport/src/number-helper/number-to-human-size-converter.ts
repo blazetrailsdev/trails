@@ -1,4 +1,3 @@
-import { hasKey } from "@blazetrails/ruby-compat";
 import { kernelFloat } from "@blazetrails/ruby-compat";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
@@ -7,17 +6,16 @@ import type { NumberToHumanSizeOptions } from "../number-helper.js";
 const STORAGE_UNITS = ["byte", "kb", "mb", "gb", "tb", "pb", "eb", "zb"];
 
 export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSizeOptions> {
-  static override namespace = "human";
-
-  protected get validateFloat(): boolean {
-    return true;
+  static {
+    this.namespace = "human";
+    this.validateFloat = true;
   }
 
   protected convert(): string {
     this.number = kernelFloat(this.number);
 
     const options = this.options;
-    if (!hasKey(options, "stripInsignificantZeros")) {
+    if (!("stripInsignificantZeros" in options)) {
       options.stripInsignificantZeros = true;
     }
 

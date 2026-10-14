@@ -1,5 +1,11 @@
-import { asJson, isBlank } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
+import {
+  hashAset,
+  rbCheckArrayType,
+  rbFSend,
+  rbModInstanceMethod,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
@@ -50,16 +56,7 @@ export function serializableHash(
   const result = this.serializableAttributes(attributeNames);
 
   for (const method of rubyArray(options.methods)) {
-    const value = (this as unknown as Record<string, unknown>)[method];
-    if (typeof value === "function") {
-      safeSet(result, method, (value as () => unknown).call(this));
-    } else if (method in this) {
-      safeSet(result, method, value);
-    } else {
-      throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${this.constructor.name}`,
-      );
-    }
+    hashAset(result, method, rbFSend(this, method));
   }
 
   this.serializableAddIncludes(options, (assocName, records, opts) => {
@@ -71,8 +68,9 @@ export function serializableHash(
             `includes / preload) — synchronous serialization cannot query the database.`,
         );
       }
-      const items = Array.isArray(records) ? records : Array.from(records);
-      safeSet(
+      const items = rbCheckArrayType(records);
+      if (items == null) throw new NoMethodError("undefined method 'map' for nil");
+      hashAset(
         result,
         assocName,
         items.map((a) => {
@@ -90,7 +88,7 @@ export function serializableHash(
           `undefined method 'serializableHash' for an instance of ${(records as object).constructor.name}`,
         );
       }
-      safeSet(
+      hashAset(
         result,
         assocName,
         (records as { serializableHash(o: SerializeOptions): unknown }).serializableHash(opts),
@@ -127,30 +125,7 @@ export interface SerializeOptions {
 }
 
 export function readAttributeForSerialization(this: SerializationRecord, key: string): unknown {
-  const attrStore = this._attributes as AttributeStore;
-  const hasStore =
-    (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") ||
-    attrStore instanceof Map;
-
-  const inRecord = key in (this as object);
-  const reader = inRecord ? (this as unknown as Record<string, unknown>)[key] : undefined;
-
-  if (inRecord && typeof reader !== "function") return reader;
-
-  const storeHasKey =
-    attrStore instanceof Map
-      ? attrStore.has(key)
-      : attrStore && typeof (attrStore as { keys?: unknown }).keys === "function"
-        ? (attrStore as { keys(): string[] }).keys().includes(key)
-        : false;
-  if (hasStore && storeHasKey) {
-    return attrStore instanceof Map
-      ? attrStore.get(key)
-      : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
-  }
-
-  if (inRecord) return (reader as () => unknown).call(this);
-  throw new NoMethodError(`undefined method '${key}' for an instance of ${this.constructor.name}`);
+  return rbFSend(this, key);
 }
 
 /** @internal */
@@ -185,11 +160,15 @@ export function serializableAttributes(
   this: SerializationRecord,
   attributeNames: readonly string[],
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const n of attributeNames) {
-    safeSet(result, n, this.readAttributeForSerialization(n));
-  }
-  return result;
+  const readable = attributeNames.filter((n) => {
+    if (Object.hasOwn(this, n) || !(n in this) || n in Object.prototype) return true;
+    let link = Object.getPrototypeOf(this) as object;
+    while (!Object.hasOwn(link, n)) link = Object.getPrototypeOf(link) as object;
+    if (typeof Object.getOwnPropertyDescriptor(link, n)!.value !== "function") return true;
+    const { owner } = rbModInstanceMethod(this.constructor as never, n);
+    return typeof owner === "function" && this instanceof owner;
+  });
+  return Object.fromEntries(indexWith(readable, (n) => this.readAttributeForSerialization(n)));
 }
 
 /** @internal */
@@ -214,9 +193,9 @@ export function serializableAddIncludes(
     includes = {};
     for (const n of Array.isArray(includeOpt) ? includeOpt : [includeOpt]) {
       if (isIncludeHash(n)) {
-        for (const [k, v] of Object.entries(n)) safeSet(includes as Record<string, unknown>, k, v);
+        for (const [k, v] of Object.entries(n)) hashAset(includes, k, v);
       } else {
-        safeSet(includes as Record<string, unknown>, n, {});
+        hashAset(includes, n, {});
       }
     }
   }
@@ -239,7 +218,6 @@ function isIncludeHash(value: unknown): value is Record<string, SerializeOptions
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** @noRailsEquivalent PERMANENT */
 async function preloadIncludes(
   record: SerializationRecord,
   options: SerializeOptions,
@@ -254,9 +232,7 @@ async function preloadIncludes(
   for (const [name, opts] of entries) {
     const records = await resolveIncludeAsync(record, name);
     const children = isSerializableCollection(records)
-      ? Array.isArray(records)
-        ? records
-        : Array.from(records)
+      ? (rbCheckArrayType(records) ?? [])
       : records != null && typeof records === "object"
         ? [records]
         : [];
@@ -295,15 +271,11 @@ async function resolveIncludeAsync(record: SerializationRecord, name: string): P
 /** @noRailsEquivalent PERMANENT */
 export function asJsonThenable(
   serialize: () => Record<string, unknown>,
-  root: boolean | string | null | undefined,
-  element: () => string,
+  block: (hash: Record<string, unknown>) => Record<string, unknown>,
   options: SerializeOptions,
 ): Record<string, unknown> {
-  const finalize = (raw: unknown): Record<string, unknown> => {
-    const hash = asJson(raw) as Record<string, unknown>;
-    if (root === false || root == null) return hash;
-    return { [root === true ? element() : root]: hash };
-  };
+  const finalize = (raw: unknown): Record<string, unknown> =>
+    block(asJson(raw) as Record<string, unknown>);
   if (options.include == null || (options.include as unknown) === false)
     return finalize(serialize());
   return thenableHash(
@@ -362,20 +334,7 @@ function sendAssociation(record: SerializationRecord, name: string): unknown {
 
 /** @internal */
 function isSerializableCollection(value: unknown): value is Iterable<unknown> {
-  if (Array.isArray(value)) return true;
-  if (value == null || typeof value !== "object") return false;
-  if ((value as SerializationRecord)._attributes) return false;
-  return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
-}
-
-/** @noRailsEquivalent PERMANENT */
-function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
-  Object.defineProperty(target, key, {
-    value,
-    writable: true,
-    enumerable: true,
-    configurable: true,
-  });
+  return rbObjRespondTo(value, "toAry");
 }
 
 function rubyArray(value: string | string[] | null | undefined): string[] {

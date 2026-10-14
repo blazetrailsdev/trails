@@ -2,6 +2,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Rating extends Base {
@@ -32,6 +33,7 @@ export class Rating extends Base {
     );
   }
 }
+registerModel(Rating);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Rating {
   get comment(): Comment | null | Promise<Comment | null>;

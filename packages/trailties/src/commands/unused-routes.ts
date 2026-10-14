@@ -6,12 +6,12 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { underscore } from "@blazetrails/activesupport";
+import { underscore, dasherize } from "@blazetrails/activesupport";
 import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { bootApplicationBang } from "../command/actions.js";
+import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
 import { Trails } from "../rails.js";
 
@@ -20,7 +20,7 @@ interface ViewPathRoot {
 }
 
 interface ControllerClass {
-  prototype: object;
+  actionMethods(): string[];
   viewPaths?: () => Iterable<unknown>;
 }
 
@@ -52,10 +52,18 @@ export class RouteInfo {
     );
   }
 
-  /** @internal */
+  /**
+   * @inventedArm underscore — PERMANENT
+   * @inventedArm dasherize — PERMANENT
+   * @internal
+   */
   private async viewPath(root: ViewPathRoot): Promise<string> {
     const path = getPath();
-    return path.join(root.path, String(this.controllerName), String(this.actionName));
+    return path.join(
+      root.path,
+      dasherize(String(this.controllerName)),
+      dasherize(underscore(String(this.actionName))),
+    );
   }
 
   /** @internal */
@@ -77,7 +85,7 @@ export class RouteInfo {
   /** @internal */
   private actionMissing(): boolean {
     if (this.controllerClass == null) return false;
-    return !(String(this.actionName) in this.controllerClass.prototype);
+    return !this.controllerClass.actionMethods().includes(String(this.actionName));
   }
 }
 
@@ -99,7 +107,7 @@ export class UnusedRoutesCommand extends Base {
   }
 
   async perform(): Promise<void> {
-    await bootApplicationBang();
+    await Actions.bootApplicationBang();
     await Trails.application!.reloadRoutesUnlessLoaded();
 
     this.say((await this.inspector()).format(this.formatter(), this.routesFilter()));

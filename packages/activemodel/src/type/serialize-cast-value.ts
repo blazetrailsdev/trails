@@ -1,50 +1,92 @@
-export interface SerializeCastValue {
-  itselfIfSerializeCastValueCompatible(): unknown;
+import { Concern, extend, include, included, Module } from "@blazetrails/activesupport";
+import {
+  rbModAncestors,
+  rbModInstanceMethod,
+  rbModPublicMethodDefined,
+} from "@blazetrails/ruby-compat";
+
+interface SerializeCastValueHost {
+  constructor: { serializeCastValueCompatible(): boolean };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace SerializeCastValue {
-  export interface ClassMethods {
-    serializeCastValueCompatible(): boolean;
-  }
+interface SerializeCastValueType {
+  serializeCastValue(value: unknown): unknown;
+  serialize(value: unknown): unknown;
+}
 
-  export interface DefaultImplementation {
-    serializeCastValue(value: unknown): unknown;
-  }
+export const SerializeCastValue = new Module() as Module<{
+  itselfIfSerializeCastValueCompatible: typeof itselfIfSerializeCastValueCompatible;
+}> & {
+  ClassMethods: typeof ClassMethods;
+  DefaultImplementation: Module;
+  [included](klass: { prototype: object }): void;
+  serialize(type: SerializeCastValueType, value: unknown): unknown;
+};
+extend(SerializeCastValue, Concern);
 
-  export function serializeCastValue(value: unknown): unknown {
+export const ClassMethods = {
+  serializeCastValueCompatible(this: {
+    prototype: object;
+    _serializeCastValueCompatible?: boolean;
+  }): boolean {
+    if (Object.hasOwn(this, "_serializeCastValueCompatible")) {
+      return this._serializeCastValueCompatible as boolean;
+    }
+    const ancestors = rbModAncestors(this);
+    const compatible =
+      ancestors.indexOf(rbModInstanceMethod(this, "serializeCastValue").owner) <=
+      ancestors.indexOf(rbModInstanceMethod(this, "serialize").owner);
+    Object.defineProperty(this, "_serializeCastValueCompatible", {
+      value: compatible,
+      writable: true,
+      configurable: true,
+    });
+    return compatible;
+  },
+};
+
+export const DefaultImplementation = new Module().include({
+  serializeCastValue(value: unknown): unknown {
     return value;
-  }
+  },
+});
 
-  export function serialize(
-    type: {
-      serializeCastValue(value: unknown): unknown;
-      serialize(value: unknown): unknown;
-    } & CompatibleType<unknown>,
-    value: unknown,
-  ): unknown {
-    return itselfIfSerializeCastValueCompatible(type) === type
-      ? type.serializeCastValue(value)
-      : type.serialize(value);
-  }
-}
+SerializeCastValue.ClassMethods = ClassMethods;
+SerializeCastValue.DefaultImplementation = DefaultImplementation;
 
-type CompatibleType<T> = {
-  itselfIfSerializeCastValueCompatible?: () => T | null;
+SerializeCastValue[included] = function (klass: { prototype: object }): void {
+  if (!rbModPublicMethodDefined(klass, "serializeCastValue")) {
+    include(klass, DefaultImplementation);
+  }
 };
 
-type CompatibleCtor = {
-  serializeCastValueCompatible?: () => boolean;
-};
-
-export function itselfIfSerializeCastValueCompatible<T>(type: CompatibleType<T>): T | null {
-  return typeof type.itselfIfSerializeCastValueCompatible === "function"
-    ? type.itselfIfSerializeCastValueCompatible()
-    : null;
+export function serialize(type: SerializeCastValueType, value: unknown): unknown {
+  if (
+    type ===
+    (() => {
+      try {
+        return (
+          type as unknown as { itselfIfSerializeCastValueCompatible(): unknown }
+        ).itselfIfSerializeCastValueCompatible();
+      } catch {
+        return null;
+      }
+    })()
+  ) {
+    return type.serializeCastValue(value);
+  } else {
+    return type.serialize(value);
+  }
 }
+SerializeCastValue.serialize = serialize;
 
-export function serializeCastValueCompatible(typeCtor: CompatibleCtor): boolean {
-  return typeof typeCtor.serializeCastValueCompatible === "function"
-    ? typeCtor.serializeCastValueCompatible()
-    : false;
+export function itselfIfSerializeCastValueCompatible<T extends SerializeCastValueHost>(
+  this: T,
+): T | null {
+  if (this.constructor.serializeCastValueCompatible()) return this;
+  return null;
 }
+SerializeCastValue.defineMethod(
+  "itselfIfSerializeCastValueCompatible",
+  itselfIfSerializeCastValueCompatible,
+);

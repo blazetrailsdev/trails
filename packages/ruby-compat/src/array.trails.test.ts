@@ -1,8 +1,41 @@
 import { describe, expect, it } from "vitest";
+import { IndexError } from "./index-error.js";
+import { Hash, block } from "./hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
-import { aryDelete, aryPop, arySlice, compact, pack, sort, toA, uniq, unpack1 } from "./array.js";
+import {
+  aryCount,
+  aryReject,
+  rbFArray,
+  toH,
+  zip,
+  aryDelete,
+  aryDeleteIf,
+  aryFetch,
+  aryIncludes,
+  aryJoin,
+  aryPop,
+  deleteAt,
+  arySlice,
+  compact,
+  compactBang,
+  first,
+  isIntersect,
+  last,
+  pack,
+  each,
+  groupBy,
+  partition,
+  sort,
+  toA,
+  union,
+  uniq,
+  flatten,
+  unpack,
+  unpack1,
+} from "./array.js";
 import { Range } from "./range.js";
+import { rbFSend, rbObjRespondTo } from "./object.js";
 import { byteslice } from "./string/byte-methods.js";
 
 describe("Array#pack", () => {
@@ -129,6 +162,25 @@ describe("Array#pack integer, float and position directives", () => {
   });
 });
 
+describe("String#unpack", () => {
+  it("answers every item the format pushes, and packs L as it unpacks it", () => {
+    const packed = pack([1, 0xffffffff, 2n], "CL>*");
+    expect(packed).toBe("\x01\xff\xff\xff\xff\x00\x00\x00\x02");
+    expect(unpack(packed, "CL>*")).toEqual([1, 0xffffffff, 2]);
+    expect(unpack(Uint8Array.of(7, 0, 0), "CL>*")).toEqual([7]);
+    expect(unpack1(packed, "L>", { offset: 1 })).toBe(0xffffffff);
+  });
+
+  it("packs q and Q as 64-bit integers, and unpacks one past 2**53 as a bigint", () => {
+    const packed = pack([-1, 2n ** 63n], "q>Q>");
+    expect(packed).toBe("\xff".repeat(8) + "\x80" + "\x00".repeat(7));
+    expect(unpack(packed, "q>Q>")).toEqual([-1, 2n ** 63n]);
+    expect(unpack(pack([1], "q<"), "q<")).toEqual([1]);
+    const max: number | bigint | null = unpack1(pack([2n ** 63n - 1n], "q>"), "q>");
+    expect(max).toBe(2n ** 63n - 1n);
+  });
+});
+
 describe("String#unpack1", () => {
   const packed = "\x00\x11" + pack([0x81, 1.5, -1], "CEl<") + "ab";
 
@@ -138,6 +190,20 @@ describe("String#unpack1", () => {
     expect(unpack1(packed, "@11l<")).toBe(-1);
     expect(unpack1("\x00\x00\x00\x01", "l>")).toBe(1);
     expect(unpack1("\x00\x00\x00\x80", "l<")).toBe(-2147483648);
+  });
+
+  it("reads h as hex digits, low nibble first", () => {
+    expect(unpack1("a", "h*")).toBe("16");
+    expect(unpack1("\xc3\xa9(", "h*")).toBe("3c9a82");
+    expect(unpack1("ab", "h3")).toBe("162");
+  });
+
+  it("reads H as hex digits, high nibble first, off a String or its binary seat", () => {
+    expect(unpack1("\xc3\xa9(", "H*")).toBe("c3a928");
+    expect(unpack1("ab", "H3")).toBe("616");
+    expect(unpack1("a", "H")).toBe("6");
+    expect(unpack1(new Uint8Array([0xc3, 0xa9, 0x28]), "H*")).toBe("c3a928");
+    expect(unpack1(new Uint8Array(0), "H*")).toBe("");
   });
 
   it("answers nil when the string is short of an item's bytes", () => {
@@ -167,6 +233,27 @@ describe("String#byteslice over an ASCII-8BIT string", () => {
   });
 });
 
+describe("Array#flatten", () => {
+  it("flattens every level and converts an element that answers to_ary", () => {
+    const pair = { toAry: () => ["c", ["d"]] };
+    expect(flatten(["a", [["b"], pair], null])).toEqual(["a", "b", "c", "d", null]);
+  });
+
+  it("leaves an element whose to_ary answers nil and raises when it answers a non-Array", () => {
+    const none = { toAry: () => null };
+    expect(flatten([none])).toEqual([none]);
+    expect(() => flatten([{ toAry: () => 1 }])).toThrow(
+      "can't convert Hash to Array (Hash#to_ary gives Integer)",
+    );
+  });
+
+  it("raises on an array nested in itself", () => {
+    const ary: unknown[] = [1];
+    ary.push(ary);
+    expect(() => flatten(ary)).toThrow(ArgumentError);
+  });
+});
+
 describe("Array#to_a", () => {
   it("answers the receiver itself for an Array", () => {
     const ary = [1, 2];
@@ -183,10 +270,127 @@ describe("Array#to_a", () => {
   });
 });
 
+describe("Array#zip", () => {
+  it("pairs each element with the same index of every argument", () => {
+    expect(zip([1, 2], ["a", "b"])).toEqual([
+      [1, "a"],
+      [2, "b"],
+    ]);
+    expect(zip<number, string | boolean>([1, 2], ["a", "b"], [true, false])).toEqual([
+      [1, "a", true],
+      [2, "b", false],
+    ]);
+  });
+
+  it("is as long as the receiver, nil past an argument's end", () => {
+    expect(zip([1, 2, 3], ["a"])).toEqual([
+      [1, "a"],
+      [2, undefined],
+      [3, undefined],
+    ]);
+    expect(zip([1], ["a", "b"])).toEqual([[1, "a"]]);
+  });
+});
+
+describe("Array#to_h", () => {
+  it("builds a Hash from [key, value] pairs, the last of a repeated key winning", () => {
+    const hash = toH<string, number>([
+      ["a", 1],
+      ["b", 2],
+      ["a", 3],
+    ]);
+    expect([...hash]).toEqual([
+      ["a", 3],
+      ["b", 2],
+    ]);
+  });
+
+  it("raises TypeError for an element that is not an array", () => {
+    expect(() => toH([["a", 1], "b"])).toThrow("wrong element type String at 1 (expected array)");
+  });
+
+  it("raises ArgumentError for a pair of the wrong length", () => {
+    expect(() => toH([["a", 1, 2]])).toThrow("wrong array length at 0 (expected 2, was 3)");
+  });
+});
+
+describe("Array#reject", () => {
+  it("keeps the elements the block does not answer truthily for", async () => {
+    expect(await aryReject([1, 2, 3, 4], (i) => i % 2 === 0)).toEqual([1, 3]);
+    expect(await aryReject([0, "", null, false], (i) => i)).toEqual([null, false]);
+  });
+
+  it("awaits each block result before yielding the next element", async () => {
+    const order: string[] = [];
+    const rejected = await aryReject([1, 2, 3], async (i) => {
+      order.push(`enter ${i}`);
+      await Promise.resolve();
+      order.push(`leave ${i}`);
+      return i !== 2;
+    });
+    expect(rejected).toEqual([2]);
+    expect(order).toEqual(["enter 1", "leave 1", "enter 2", "leave 2", "enter 3", "leave 3"]);
+  });
+});
+
+describe("Array#count", () => {
+  it("counts the elements the block answers truthily for", () => {
+    expect(aryCount([1, 2, 3, 4], (i) => i % 2 === 0)).toBe(2);
+    expect(aryCount([0, "", null, false], (i) => i)).toBe(2);
+  });
+
+  it("answers the length with no block", () => {
+    expect(aryCount([1, null, 3])).toBe(3);
+  });
+});
+
+describe("Array#each", () => {
+  it("yields each element and returns the receiver, with or without a block", () => {
+    const ary = [1, 2];
+    const seen: number[] = [];
+    expect(each(ary, (i) => seen.push(i))).toBe(ary);
+    expect(seen).toEqual([1, 2]);
+    expect(each(ary)).toBe(ary);
+  });
+});
+
+describe("Enumerable#group_by", () => {
+  it("groups the elements under the block's result, keeping order", () => {
+    const hash = groupBy(["apple", "avocado", "banana"], (i) => i[0]);
+    expect([...hash]).toEqual([
+      ["a", ["apple", "avocado"]],
+      ["b", ["banana"]],
+    ]);
+  });
+});
+
+describe("Enumerable#partition", () => {
+  it("splits on the block's truthiness, keeping order", () => {
+    expect(partition([1, 2, 3, 4], (i) => i % 2 === 0)).toEqual([
+      [2, 4],
+      [1, 3],
+    ]);
+  });
+
+  it("counts 0 and the empty string as truthy, nil and false as not", () => {
+    expect(partition([0, "", null, false, undefined], (i) => i)).toEqual([
+      [0, ""],
+      [null, false, undefined],
+    ]);
+  });
+});
+
 describe("Array#compact and Array#uniq", () => {
   it("drops every nil element and keeps the rest in order", () => {
     expect(compact([1, null, 2, undefined, 3])).toEqual([1, 2, 3]);
     expect(compact([0, "", false])).toEqual([0, "", false]);
+  });
+
+  it("compact! removes nils in place and answers nil when there were none", () => {
+    const ary = [1, null, 2, undefined, 3];
+    expect(compactBang(ary)).toBe(ary);
+    expect(ary).toEqual([1, 2, 3]);
+    expect(compactBang(ary)).toBeNull();
   });
 
   it("dedups by eql?, not identity, keeping the first of each", () => {
@@ -229,6 +433,117 @@ describe("arySlice", () => {
   });
 });
 
+describe("arySlice index and length coercion", () => {
+  const ary = [1, 2, 3];
+  const slice = arySlice as (ary: unknown[], ...argv: unknown[]) => unknown;
+
+  it("raises rb_num2long's TypeError for nil", () => {
+    expect(() => slice(ary, null)).toThrow("no implicit conversion from nil to integer");
+    expect(() => slice(ary, 0, null)).toThrow("no implicit conversion from nil to integer");
+  });
+
+  it("raises a TypeError naming the operand's class", () => {
+    expect(() => slice(ary, "1")).toThrow(TypeError);
+    expect(() => slice(ary, "1")).toThrow("no implicit conversion of String into Integer");
+    expect(() => slice(ary, "1", 2)).toThrow("no implicit conversion of String into Integer");
+    expect(() => slice(ary, 0, "2")).toThrow("no implicit conversion of String into Integer");
+    expect(() => slice(ary, true)).toThrow("no implicit conversion of true into Integer");
+  });
+
+  it("truncates a Float toward zero", () => {
+    expect(slice(ary, 1.9)).toBe(2);
+    expect(slice(ary, -1.2)).toBe(3);
+    expect(slice(ary, 1.5, 1.9)).toEqual([2]);
+  });
+
+  it("takes an in-range bigint and raises RangeError past long", () => {
+    expect(slice(ary, 1n)).toBe(2);
+    expect(slice(ary, 2n ** 40n)).toBeNull();
+    expect(() => slice(ary, 2n ** 64n)).toThrow("bignum too big to convert into `long'");
+  });
+
+  it("answers nil for a start past the end and an empty array at the end", () => {
+    expect(slice(ary, 5, 1)).toBeNull();
+    expect(slice(ary, 3, 1)).toEqual([]);
+  });
+});
+
+describe("aryDeleteIf", () => {
+  it("removes every element the block answers truthily for, in place", () => {
+    const ary = [1, 2, 3, 4];
+    expect(aryDeleteIf(ary, (item) => item % 2 === 0)).toBe(ary);
+    expect(ary).toEqual([1, 3]);
+  });
+
+  it("keeps an element the block answers nil or false for", () => {
+    const ary = [0, "", null, false];
+    aryDeleteIf(ary, (item) => item);
+    expect(ary).toEqual([null, false]);
+  });
+
+  it("returns the receiver when nothing matched", () => {
+    const ary = [1, 2];
+    expect(aryDeleteIf(ary, () => false)).toBe(ary);
+    expect(ary).toEqual([1, 2]);
+  });
+
+  it("keeps the unvisited elements when the block raises", () => {
+    const ary = [1, 2, 3, 4, 5];
+    expect(() =>
+      aryDeleteIf(ary, (item) => {
+        if (item === 4) throw new Error("boom");
+        return item % 2 === 0;
+      }),
+    ).toThrow("boom");
+    expect(ary).toEqual([1, 3, 4, 5]);
+  });
+});
+
+describe("aryIncludes", () => {
+  it("asks each element's == with the item", () => {
+    const seen: unknown[] = [];
+    const e = {
+      equals(other: unknown) {
+        seen.push(other);
+        return other === "wanted";
+      },
+    };
+    expect(aryIncludes([1, e], "wanted")).toBe(true);
+    expect(aryIncludes([1, e], "other")).toBe(false);
+    expect(seen).toEqual(["wanted", "other"]);
+  });
+
+  it("compares with ==, not identity", () => {
+    expect(aryIncludes([[1, 2], 3], [1, 2])).toBe(true);
+    expect(aryIncludes([[1, 2], 3], [2, 1])).toBe(false);
+    expect(aryIncludes([], 1)).toBe(false);
+  });
+});
+
+describe("aryFetch", () => {
+  it("answers the element, the block's value, the default, or raises IndexError", () => {
+    const ary = ["foo", "bar", 2];
+    expect([aryFetch(ary, 1), aryFetch(ary, -1), aryFetch(ary, 1, null)]).toEqual([
+      "bar",
+      2,
+      "bar",
+    ]);
+    expect(
+      aryFetch(
+        ary,
+        50,
+        block((index: number) => `Value for ${index}`),
+      ),
+    ).toBe("Value for 50");
+    expect(aryFetch(ary, 50, null)).toBeNull();
+    expect(() => aryFetch(ary, 50)).toThrow(
+      new IndexError("index 50 outside of array bounds: -3...3"),
+    );
+    expect(() => aryFetch(ary, -4)).toThrow("index -4 outside of array bounds: -3...3");
+    expect(() => aryFetch(ary, 1, 2, 3)).toThrow(/\(given 3, expected 1\.\.2\)/);
+  });
+});
+
 describe("aryDelete", () => {
   it("removes every == element in place and returns the last one removed", () => {
     const a = { equals: (o: unknown) => o === a || o === b };
@@ -249,6 +564,45 @@ describe("aryDelete", () => {
     expect(aryDelete(ary, 3)).toBeUndefined();
     expect(aryDelete(ary, 3, (item) => `not found: ${item}`)).toBe("not found: 3");
     expect(ary).toEqual([1, 2]);
+  });
+});
+
+describe("first", () => {
+  it("answers the first element, or nil for an empty array", () => {
+    expect(first([1, 2, 3])).toBe(1);
+    expect(first([])).toBeUndefined();
+  });
+
+  it("reads only the first element of a Set", () => {
+    expect(first(new Set(["a", "b"]))).toBe("a");
+    expect(first(new Set())).toBeUndefined();
+    let yielded = 0;
+    function* each(): Generator<number> {
+      for (const i of [1, 2, 3]) {
+        yielded++;
+        yield i;
+      }
+    }
+    expect(first(each())).toBe(1);
+    expect(yielded).toBe(1);
+  });
+});
+
+describe("last", () => {
+  it("answers the last element, or nil for an empty array", () => {
+    expect(last([1, 2, 3])).toBe(3);
+    expect(last([])).toBeUndefined();
+  });
+
+  it("answers the last n elements in order", () => {
+    expect(last([1, 2, 3], 2)).toEqual([2, 3]);
+    expect(last([1, 2, 3], 0)).toEqual([]);
+    expect(last([1], 5)).toEqual([1]);
+  });
+
+  it("raises on a negative n", () => {
+    expect(() => last([1], -1)).toThrow(ArgumentError);
+    expect(() => last([1], -1)).toThrow("negative array size");
   });
 });
 
@@ -281,5 +635,152 @@ describe("Array#sort", () => {
       new ArgumentError("comparison of Integer with A failed"),
     );
     expect(() => sort(["a", 1])).toThrow(new ArgumentError("comparison of String with 1 failed"));
+  });
+});
+
+describe("Array#|", () => {
+  it("keeps first occurrences across both arrays, deduplicated by eql?", () => {
+    expect(union<unknown>([["a", "asc"], "b", "b"], [["a", "asc"], { x: 1 }, { x: 1 }, 1])).toEqual(
+      [["a", "asc"], "b", { x: 1 }, 1],
+    );
+  });
+});
+
+describe("Array#intersect?", () => {
+  it("answers whether the arrays share an element, compared by eql?", () => {
+    expect(isIntersect([1, 2, 3], [3, 4, 5])).toBe(true);
+    expect(isIntersect([1, 2, 3], [5, 6, 7])).toBe(false);
+    expect(isIntersect<unknown>([["a", "asc"]], [["a", "asc"]])).toBe(true);
+  });
+
+  it("answers false when either array is empty", () => {
+    expect(isIntersect([], [1])).toBe(false);
+    expect(isIntersect([1], [])).toBe(false);
+  });
+});
+
+describe("rbFArray", () => {
+  it("answers an Array, a to_ary or a to_a, else wraps the argument", () => {
+    const ary = [0, 1, 2];
+    expect(rbFArray(ary)).toBe(ary);
+    expect(rbFArray(null)).toEqual([]);
+    expect(rbFArray({ a: 1, b: 2 })).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
+    expect(rbFArray(new Set([1, 2]))).toEqual([1, 2]);
+    expect(rbFArray(new Range(1, 3))).toEqual([1, 2, 3]);
+    expect(() => rbFArray(new Range(1, null))).toThrow(
+      new RangeError("cannot convert endless range to an array"),
+    );
+    expect(() => rbFArray(new Range(null, 3))).toThrow(
+      new globalThis.TypeError("can't iterate from NilClass"),
+    );
+    expect(rbFArray({ toAry: () => [1] })).toEqual([1]);
+    expect(rbFArray("json")).toEqual(["json"]);
+    expect(rbFArray(false)).toEqual([false]);
+  });
+});
+
+describe("deleteAt", () => {
+  it("removes the element at a non-negative index and answers it", () => {
+    const ary = ["foo", "bar", 2];
+    expect(deleteAt(ary, 1)).toBe("bar");
+    expect(ary).toEqual(["foo", 2]);
+  });
+
+  it("counts a negative index back from the end", () => {
+    const ary = ["foo", "bar", 2];
+    expect(deleteAt(ary, -2)).toBe("bar");
+    expect(ary).toEqual(["foo", 2]);
+  });
+
+  it("converts the index as NUM2LONG does before indexing", () => {
+    const ary = ["a", "b", "c", "d"];
+    expect(deleteAt(ary, 1.9)).toBe("b");
+    expect(deleteAt(ary, -1.9)).toBe("d");
+    expect(ary).toEqual(["a", "c"]);
+    expect(() => deleteAt(ary, NaN)).toThrow();
+    expect(ary).toEqual(["a", "c"]);
+  });
+
+  it("answers nil and leaves the array alone when the index is out of range", () => {
+    const ary = ["foo"];
+    expect(deleteAt(ary, 1)).toBeNull();
+    expect(deleteAt(ary, -2)).toBeNull();
+    expect(ary).toEqual(["foo"]);
+  });
+});
+
+describe("aryJoin", () => {
+  it("sends each element to_s, so a Symbol contributes its name", () => {
+    expect(aryJoin([":analyze", ":verbose"], ", ")).toBe("analyze, verbose");
+    expect(aryJoin([":a", "b", null, 1], ", ")).toBe("a, b, , 1");
+  });
+
+  it("joins a nested array in place with the same separator", () => {
+    expect(aryJoin([":a", ["b", [":c"]], null, 1], ", ")).toBe("a, b, c, , 1");
+    expect(aryJoin([1, [], 2], ",")).toBe("1,,2");
+  });
+
+  it("puts nothing between the elements when no separator is given", () => {
+    expect(aryJoin([1, [2, 3]])).toBe("123");
+    expect(aryJoin([], "-")).toBe("");
+  });
+
+  it("raises ArgumentError for an array that contains itself", () => {
+    const ary: unknown[] = [1];
+    ary.push(ary);
+    expect(() => aryJoin(ary)).toThrow(ArgumentError);
+    expect(() => aryJoin(ary)).toThrow("recursive array join");
+  });
+});
+
+describe("the first and to_h sends on a receiver that is not an Array", () => {
+  it("first raises NoMethodError for a receiver with no each", () => {
+    expect(() => first(1 as never)).toThrow("undefined method 'first' for an instance of Integer");
+    expect(() => first(null as never)).toThrow("undefined method 'first' for nil");
+    expect(first(new Set([7, 8]))).toBe(7);
+  });
+
+  it("to_h answers the receiver's own toH, and a plain object itself", () => {
+    const hash = { a: 1 };
+    expect(toH(hash)).toBe(hash);
+    expect(toH({ toH: () => hash })).toBe(hash);
+  });
+});
+
+describe("ARRAY_METHOD_TABLE", () => {
+  const a = [3, 1, 2, 1];
+
+  it("answers respond_to? for the names a JS array has no member for", () => {
+    expect(rbObjRespondTo(a, "eachCons")).toBe(true);
+    expect(rbObjRespondTo(a, "push")).toBe(true);
+    expect(rbObjRespondTo(a, "exists")).toBe(false);
+  });
+
+  it("dispatches a send with MRI's answers", () => {
+    expect(rbFSend(a, "rotate", -1)).toEqual([1, 3, 1, 2]);
+    expect(rbFSend(a, "rindex", 1)).toBe(3);
+    expect(rbFSend(a, "index", (i: number) => i < 3)).toBe(1);
+    expect(rbFSend(a, "intersection", [1, 1, 3])).toEqual([3, 1]);
+    expect(rbFSend(a, "difference", [1])).toEqual([3, 2]);
+    expect(rbFSend(a, "union", [5])).toEqual([3, 1, 2, 5]);
+    expect(rbFSend(a, "sortBy", (i: number) => -i)).toEqual([3, 2, 1, 1]);
+    expect(rbFSend([], "sample")).toBeNull();
+    expect(rbFSend(a, "detect", undefined, (i: number) => i < 3)).toBe(1);
+    expect(rbFSend(a, "detect", () => 0)).toEqual(a);
+    expect(rbFSend(a, "groupBy")).toEqual(a);
+    expect(rbFSend(a, "findAll")).toEqual(a);
+    expect((rbFSend(a, "groupBy", (i: number) => i % 2) as Hash<number, number[]>).get(1)).toEqual([
+      3, 1, 1,
+    ]);
+    expect(rbFSend(a, "isOne", 3)).toBe(true);
+    expect(rbFSend(a, "isAll", (i: number) => i > 0)).toBe(true);
+    expect(rbFSend(a, "isAll", Number)).toBe(true);
+    expect(rbFSend([Number, String], "index", String)).toBe(1);
+    expect(rbFSend(a, "collect")).not.toBe(a);
+    expect(rbFSend(a, "eachCons", 3)).toHaveLength(2);
+    expect([...(rbFSend(a, "shuffle") as number[])].sort()).toEqual([1, 1, 2, 3]);
   });
 });

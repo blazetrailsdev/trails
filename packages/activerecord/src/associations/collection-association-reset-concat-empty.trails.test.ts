@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { registerModel } from "../index.js";
-import { resetCallbacks } from "../support/reset-callbacks.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Car } from "../test-helpers/models/car.js";
 import { Tyre } from "../test-helpers/models/tyre.js";
 import { Person } from "../test-helpers/models/person.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface CollectionAssociationLike {
   target: Post[];
@@ -31,7 +30,7 @@ const assocOf = (author: Author): CollectionAssociationLike =>
   );
 
 describe("CollectionAssociation reset / insert_record block / empty?", () => {
-  const { authors } = fixtures(["authors", "posts", "cars"]);
+  const { self, authors } = fixtures(["authors", "posts", "cars"]);
 
   beforeAll(() => {
     registerModel(Author);
@@ -45,7 +44,7 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     const author = await Author.find(authors("david").id);
     const assoc = assocOf(author);
 
-    const built = Post.new({ title: "reset", body: "me" });
+    const built = new Post({ title: "reset", body: "me" });
     assoc.addToTarget(built);
     expect(assoc._replacedOrAddedTargets.has(built)).toBe(true);
 
@@ -59,7 +58,7 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     const author = await Author.find(authors("david").id);
     const assoc = assocOf(author);
 
-    const record = Post.new({ title: "block", body: "yield" });
+    const record = new Post({ title: "block", body: "yield" });
     const seen: Array<boolean | null> = [];
     await assoc.insertRecord(record, true, false, () => {
       assoc._wasLoaded = assoc.isLoaded();
@@ -73,7 +72,7 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     const author = await Author.find(authors("david").id);
     const assoc = assocOf(author);
 
-    await resetCallbacks(Post, "create", async () => {
+    await self().resetCallbacks(Post, "create", async () => {
       Post.afterCreate(async () => {
         await assoc.loadTarget();
       });

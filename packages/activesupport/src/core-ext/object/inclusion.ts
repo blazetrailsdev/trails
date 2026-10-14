@@ -1,3 +1,4 @@
+import { OBJECT_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { ArgumentError, isPlainObject } from "../../hash-utils.js";
 
@@ -15,6 +16,8 @@ export function isIn<T>(
   }
   throw new ArgumentError("The parameter passed to #in? must respond to #include?");
 }
+
+OBJECT_METHOD_TABLE.isIn = isIn;
 
 /** @missingRailsArgs in? — PERMANENT */
 export function presenceIn<T>(

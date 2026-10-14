@@ -2,21 +2,19 @@ import { assertDifference, assertNothingRaised } from "@blazetrails/activesuppor
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { describeIfSupports, itIfSupports } from "../support/supports.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { Base } from "../base.js";
 import { Migration } from "../migration.js";
 
-class CreateDogsMigration extends Migration {
+class CreateDogsMigration extends Migration.Current {
   write(): void {}
 
   async change(): Promise<void> {
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("dog_owners");
 
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("dogs", (t) => {
       t.references("dog_owner", { foreignKey: true });
     });
@@ -51,7 +49,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const conn = await ambientConnection();
       await withTestingTables(conn, async () => {
         await conn.createTable("testings");
-        await conn.changeTable("testings", async (t) => {
+        await conn.changeTable("testings", {}, async (t) => {
           await t.references("testing_parent", { foreignKey: true });
         });
 
@@ -65,7 +63,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const conn = await ambientConnection();
       await withTestingTables(conn, async () => {
         await conn.createTable("testings");
-        await conn.changeTable("testings", async (t) => {
+        await conn.changeTable("testings", {}, async (t) => {
           await t.references("testing_parent");
         });
 
@@ -76,11 +74,11 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("foreign keys accept options when changing the table", async () => {
       const conn = await ambientConnection();
       await withTestingTables(conn, async () => {
-        await conn.changeTable("testing_parents", async (t) => {
+        await conn.changeTable("testing_parents", {}, async (t) => {
           await t.references("other", { index: { unique: true } });
         });
         await conn.createTable("testings");
-        await conn.changeTable("testings", async (t) => {
+        await conn.changeTable("testings", {}, async (t) => {
           await t.references("testing_parent", { foreignKey: { primaryKey: "other_id" } });
         });
 
@@ -95,7 +93,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const conn = await ambientConnection();
       await withTestingTables(conn, async () => {
         await conn.createTable("testings");
-        await conn.changeTable("testings", async (t) => {
+        await conn.changeTable("testings", {}, async (t) => {
           await expect(
             t.references("testing_parent", { polymorphic: true, foreignKey: true }),
           ).rejects.toThrow(ArgumentError);
@@ -196,7 +194,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       try {
         await withTestingTables(conn, async () => {
           await conn.createTable("testing");
-          await conn.changeTable("testing_parents", async (t) => {
+          await conn.changeTable("testing_parents", {}, async (t) => {
             await t.references("testing", { foreignKey: true });
           });
 
@@ -311,7 +309,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("options hash can be passed", async () => {
       const conn = await ambientConnection();
       await withTestingTables(conn, async () => {
-        await conn.changeTable("testing_parents", async (t) => {
+        await conn.changeTable("testing_parents", {}, async (t) => {
           await t.references("other", { index: { unique: true } });
         });
         await conn.createTable("testings", (t) => {

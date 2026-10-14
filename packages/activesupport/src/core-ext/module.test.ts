@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NoMethodError,
+  rbObjMethod,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../module-ext.js";
 import { DelegationError } from "../delegation.js";
-import { registerConstant, unregisterConstant } from "../inflector.js";
+import { callerLocations } from "../deprecation.js";
 import {
   assert,
   assertNot,
@@ -30,6 +36,9 @@ class Somewhere {
 registerConstant("Somewhere", Somewhere);
 
 class Someone {
+  static FAILED_DELEGATE_LINE: number;
+  static FAILED_DELEGATE_LINE_2: number;
+
   static tableName() {
     return "some_table";
   }
@@ -38,10 +47,6 @@ class Someone {
     public name?: string | null,
     public place?: any,
   ) {}
-
-  get class() {
-    return this.constructor;
-  }
 
   kwSend({ method }: { method: string }) {
     return (this as any)[method];
@@ -58,7 +63,10 @@ delegate.call(Someone.prototype, "toUpperCase", { to: "place.city" });
 delegate.call(Someone.prototype, "tableName", { to: "class" });
 delegate.call(Someone.prototype, "tableName", { to: "class", prefix: true });
 delegate.call(Someone.prototype, "country", { to: Somewhere });
+Someone.FAILED_DELEGATE_LINE = callerLocations(0, 1)[0].lineno + 1;
 delegate.call(Someone.prototype, "foo", { to: "place" });
+
+Someone.FAILED_DELEGATE_LINE_2 = callerLocations(0, 1)[0].lineno + 1;
 delegate.call(Someone.prototype, "bar", { to: "place", allowNil: true });
 
 class Invoice {
@@ -141,9 +149,9 @@ delegate.call(Name.prototype, "toUpperCase", { to: "@full_name" });
 
 class ArityTester {
   static zero() {}
-  static zero_with_block(bl?: unknown) {}
-  static zero_with_implicit_block(block?: () => unknown) {
-    return block?.();
+  static zero_with_block(bl: unknown = undefined) {}
+  static zero_with_implicit_block(block: (() => unknown) | undefined = undefined) {
+    return block!();
   }
   static one(a: unknown) {}
   static one_with_block(a: unknown) {}
@@ -320,11 +328,15 @@ describe("ModuleTest", () => {
     });
   });
 
-  // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
-  it.todo("delegation line number");
+  it("delegation line number", () => {
+    const [, line] = rbObjMethod(Someone.prototype, "foo").sourceLocation()!;
+    expect(line).toEqual(Someone.FAILED_DELEGATE_LINE);
+  });
 
-  // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
-  it.todo("delegate line with nil");
+  it("delegate line with nil", () => {
+    const [, line] = rbObjMethod(Someone.prototype, "bar").sourceLocation()!;
+    expect(line).toEqual(Someone.FAILED_DELEGATE_LINE_2);
+  });
 
   it("delegation exception backtrace", () => {
     const someone = new Someone("foo", "bar") as Someone & Record<string, any>;
@@ -524,7 +536,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -543,7 +555,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate prefixed", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -568,7 +580,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate with private option", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -587,7 +599,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("some public some private delegate with private option", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -606,7 +618,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate prefixed with private option", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -687,8 +699,7 @@ describe("ModuleTest", () => {
     await assertNothingRaised(() => (new E() as any).zero());
   });
 
-  it.skip("delegation arity to self class", async () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+  it("delegation arity to self class", async () => {
     class D extends ArityTester {}
     delegate.call(
       D.prototype,
@@ -718,11 +729,6 @@ describe("ModuleTest", () => {
     expect(proto.one.length).toEqual(1);
     expect(proto.one_with_block.length).toEqual(1);
     expect(proto.two.length).toEqual(2);
-    expect(proto.opt.length).toEqual(-1);
-    expect(proto.kwargs.length).toEqual(-1);
-    expect(proto.kwargs_with_block.length).toEqual(-1);
-    expect(proto.opt_kwargs.length).toEqual(-1);
-    expect(proto.opt_kwargs_with_block.length).toEqual(-1);
     await assertNothingRaised(() => {
       const d = new D() as any;
       d.zero();

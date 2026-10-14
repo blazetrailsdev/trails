@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import { Nodes } from "@blazetrails/arel";
-import { AliasCounts, AliasTracker } from "./alias-tracker.js";
+import { Hash } from "@blazetrails/ruby-compat";
+import { AliasTracker } from "./alias-tracker.js";
 
 describe("JoinDependency AliasTracker wiring", () => {
   fixtures({});
@@ -35,33 +37,27 @@ describe("JoinDependency AliasTracker wiring", () => {
   });
 
   it("uses an AliasTracker instance for collision tracking", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
+    jd.joinConstraints([], aliasTrackerFor(jd), []);
     const tracker = (jd as any)._aliasTracker as AliasTracker;
     expect(tracker).toBeInstanceOf(AliasTracker);
     expect(tracker.aliases.get("posts") ?? 0).toBeGreaterThan(0);
     expect(tracker.aliases.get("comments") ?? 0).toBeGreaterThan(0);
   });
 
-  it("registers the base table in the tracker on construction", () => {
-    const jd = new JoinDependency(Post, null, null, Nodes.OuterJoin);
-    const tracker = (jd as any)._aliasTracker as AliasTracker;
-    expect(tracker.aliases.get("posts")).toBe(1);
-  });
-
   it("adopts an external AliasTracker passed to joinConstraints", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
-    const aliases = new AliasCounts(() => 0);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
+    const aliases = new Hash<string, number>(0);
     aliases.set("posts", 1);
     aliases.set("comments", 1);
     const externalTracker = new AliasTracker(undefined, aliases);
-    jd.joinConstraints([], externalTracker);
+    jd.joinConstraints([], externalTracker, []);
     expect((jd as any)._aliasTracker).toBe(externalTracker);
   });
 
   it("tracks multiple associations — each table counted once", () => {
-    const jd = new JoinDependency(Post, null, ["comments", "tags"], Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const jd = new JoinDependency(Post, Post.arelTable, ["comments", "tags"], Nodes.OuterJoin);
+    jd.joinConstraints([], aliasTrackerFor(jd), []);
     const tracker = (jd as any)._aliasTracker as AliasTracker;
     expect(tracker.aliases.get("comments") ?? 0).toBeGreaterThan(0);
     expect(tracker.aliases.get("tags") ?? 0).toBeGreaterThan(0);

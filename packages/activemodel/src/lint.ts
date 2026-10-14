@@ -1,41 +1,29 @@
+import { assert, assertEqual, assertKindOf, assertRespondTo } from "@blazetrails/activesupport";
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Lint {}
 
-/** @noRailsEquivalent PERMANENT */
-export class MinitestAssertion extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "MinitestAssertion";
-  }
-}
-
 /** @internal */
-export function model<T>(m: T | { toModel(): T }): T {
-  if (m && typeof (m as { toModel?: unknown }).toModel === "function") {
-    return (m as { toModel(): T }).toModel();
-  }
-  return m as T;
+export function model<T>(model: { toModel(): T }): T {
+  assertRespondTo(model, "toModel");
+  return model.toModel();
 }
 
 /** @internal */
 export function assertBoolean(result: unknown, name: string): void {
-  if (result !== true && result !== false) {
-    throw new MinitestAssertion(`${name} should be a boolean`);
-  }
+  assert(result === true || result === false, `${name} should be a boolean`);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Tests {
   type ToKeyHost = { toKey(): unknown[] | null; isPersisted(): boolean };
-  export function testToKey(input: ToKeyHost | { toModel(): ToKeyHost }): void {
-    const m = model(input);
-    if (typeof m.toKey !== "function") {
-      throw new MinitestAssertion("model must respond to toKey");
-    }
-    m.isPersisted = () => false;
-    if (m.toKey() !== null) {
-      throw new MinitestAssertion("toKey should return null when `isPersisted` returns false");
-    }
+  export function testToKey(input: { toModel(): ToKeyHost }): void {
+    assertRespondTo(model(input), "toKey");
+    model(input).isPersisted = () => false;
+    assert(
+      model(input).toKey() == null,
+      "to_key should return nil when `persisted?` returns false",
+    );
   }
 
   type ToParamHost = {
@@ -43,70 +31,49 @@ export namespace Tests {
     toKey(): unknown[] | null;
     isPersisted(): boolean;
   };
-  export function testToParam(input: ToParamHost | { toModel(): ToParamHost }): void {
-    const m = model(input);
-    if (typeof m.toParam !== "function") {
-      throw new MinitestAssertion("model must respond to toParam");
-    }
-    m.toKey = () => [1];
-    m.isPersisted = () => false;
-    if (m.toParam() !== null) {
-      throw new MinitestAssertion("toParam should return null when `isPersisted` returns false");
-    }
+  export function testToParam(input: { toModel(): ToParamHost }): void {
+    assertRespondTo(model(input), "toParam");
+    model(input).toKey = () => [1];
+    model(input).isPersisted = () => false;
+    assert(
+      model(input).toParam() == null,
+      "to_param should return nil when `persisted?` returns false",
+    );
   }
 
   type ToPartialPathHost = { toPartialPath(): string };
-  export function testToPartialPath(
-    input: ToPartialPathHost | { toModel(): ToPartialPathHost },
-  ): void {
-    const m = model(input);
-    if (typeof m.toPartialPath !== "function") {
-      throw new MinitestAssertion("model must respond to toPartialPath");
-    }
-    if (typeof m.toPartialPath() !== "string") {
-      throw new MinitestAssertion("toPartialPath must return a string");
-    }
+  export function testToPartialPath(input: { toModel(): ToPartialPathHost }): void {
+    assertRespondTo(model(input), "toPartialPath");
+    assertKindOf(String, model(input).toPartialPath());
   }
 
   type PersistedHost = { isPersisted(): boolean };
-  export function testPersisted(input: PersistedHost | { toModel(): PersistedHost }): void {
-    const m = model(input);
-    if (typeof m.isPersisted !== "function") {
-      throw new MinitestAssertion("model must respond to isPersisted");
-    }
-    assertBoolean(m.isPersisted(), "isPersisted");
+  export function testPersisted(input: { toModel(): PersistedHost }): void {
+    assertRespondTo(model(input), "isPersisted");
+    assertBoolean(model(input).isPersisted(), "persisted?");
   }
 
-  type ModelNamingHost = {
-    modelName: { human: () => string; singular: string; plural: string };
-    constructor: { modelName?: { human: () => string; singular: string; plural: string } };
-  };
-  export function testModelNaming(model: ModelNamingHost): void {
-    const modelName = model.constructor.modelName;
-    if (!modelName) {
-      throw new MinitestAssertion("model.constructor.modelName must be defined");
-    }
-    if (typeof modelName.human() !== "string") {
-      throw new MinitestAssertion("modelName.human must return a string");
-    }
-    if (typeof modelName.singular !== "string") {
-      throw new MinitestAssertion("modelName.singular must return a string");
-    }
-    if (typeof modelName.plural !== "string") {
-      throw new MinitestAssertion("modelName.plural must return a string");
-    }
-    if (model.modelName !== modelName) {
-      throw new MinitestAssertion("model.modelName must equal model.constructor.modelName");
-    }
+  type ModelName = { human(): string; singular: string; plural: string };
+  type ModelNamingHost = { modelName: ModelName; constructor: object };
+  export function testModelNaming(input: { toModel(): ModelNamingHost }): void {
+    assertRespondTo(model(input).constructor, "modelName");
+    const modelName = (model(input).constructor as { modelName: ModelName }).modelName;
+    assertRespondTo(modelName, "toString");
+    assertRespondTo(modelName.human(), "toStr");
+    assertRespondTo(modelName.singular, "toStr");
+    assertRespondTo(modelName.plural, "toStr");
+
+    assertRespondTo(model(input), "modelName");
+    assertEqual(
+      model(input).modelName,
+      (model(input).constructor as { modelName: ModelName }).modelName,
+    );
   }
 
-  export function testErrorsAref(model: {
-    errors: { messagesFor(attribute: string): string[] };
-  }): void {
-    const result = model.errors.messagesFor("hello");
-    if (!Array.isArray(result) || result.length !== 0) {
-      throw new MinitestAssertion("errors#[] should return an empty Array");
-    }
+  type ErrorsArefHost = { errors: { get(attribute: string): unknown } };
+  export function testErrorsAref(input: { toModel(): ErrorsArefHost }): void {
+    assertRespondTo(model(input), "errors");
+    assertEqual([], model(input).errors.get("hello"), "errors#[] should return an empty Array");
   }
 }
 

@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Ordering } from "./ordering.js";
 
 export class Descending extends Ordering {
@@ -17,17 +18,8 @@ export class Descending extends Ordering {
   isDescending(): boolean {
     return true;
   }
-
-  nullsFirst(): NullsFirst {
-    return new NullsFirst(this);
-  }
-
-  nullsLast(): NullsLast {
-    return new NullsLast(this);
-  }
 }
 
 import { Ascending } from "./ascending.js";
-import { NullsFirst, NullsLast } from "./ordering.js";
 
-Nodes.Descending = Descending;
+rbModConstSet(Nodes, "Descending", Descending);

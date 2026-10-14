@@ -2,6 +2,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Dashboard } from "./dashboard.js";
 import type { Minivan } from "./minivan.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Speedometer extends Base {
@@ -11,11 +12,12 @@ export class Speedometer extends Base {
   declare speedometer_id: string;
 
   static {
-    this._primaryKey = "speedometer_id";
+    this.primaryKey = "speedometer_id";
     this.belongsTo("dashboard");
     this.hasMany("minivans");
   }
 }
+registerModel(Speedometer);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Speedometer {
   get dashboard(): Dashboard | null | Promise<Dashboard | null>;

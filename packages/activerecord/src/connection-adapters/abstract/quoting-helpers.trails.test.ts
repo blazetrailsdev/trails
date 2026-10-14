@@ -1,3 +1,4 @@
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { quotingHost } from "../../support/quoting-host.js";
 import { NotImplementedError } from "../../errors.js";
 import { describe, expect, it } from "vitest";
@@ -9,10 +10,13 @@ import {
   quote,
   quoteTableName,
   quotedBinary,
-  quotedDate,
+  quotedDate as quotedDateFn,
   quotedTime,
   typeCast,
 } from "./quoting.js";
+
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(quotingHost(), value);
 
 describe("quotedDate", () => {
   it("formats a Temporal.Instant as UTC datetime string", () => {
@@ -54,8 +58,16 @@ describe("quotedDate", () => {
     expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
   });
 
+  it("formats in local time when the connection's default_timezone is local", () => {
+    const v = RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456);
+    const local = v.getlocal();
+    expect(quotedDateFn.call({ defaultTimezone: "local" }, v)).toBe(
+      `${local.strftime("%Y-%m-%d %H:%M:%S")}.123456`,
+    );
+  });
+
   it("throws for unrecognised types", () => {
-    expect(() => quotedDate("2026-04-26" as never)).toThrow("quotedDate: cannot format");
+    expect(() => quotedDate("2026-04-26" as never)).toThrow(NoMethodError);
   });
 });
 
@@ -127,18 +139,10 @@ describe("quote dispatches through quoted_binary", () => {
     expect(received).toBe(data);
   });
 
-  it("passes normalized bytes to this.quotedBinary for a raw byte view", () => {
-    let received: unknown;
-    const host = quotingHost({
-      quotedBinary: (value: unknown) => {
-        received = value;
-        return "";
-      },
-    });
-    const bytes = new Uint8Array([0xde, 0xad]);
-    quote.call(host, bytes);
-    expect(received).toBeInstanceOf(BinaryData);
-    expect((received as BinaryData).bytes).toEqual(bytes);
+  it("raises for a bare byte view, which only Type::Binary::Data carries to quoted_binary", () => {
+    expect(() => quote.call(quotingHost(), new Uint8Array([0xde, 0xad]))).toThrow(
+      "can't quote String",
+    );
   });
 
   it("falls back to the module quoted_binary helper without a host", () => {

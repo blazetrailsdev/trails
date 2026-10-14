@@ -166,30 +166,30 @@ class SessionsController extends Base {
 describe("ActionDispatch::IntegrationTest", () => {
   let app: IntegrationTest;
 
-  beforeEach(() => {
-    app = new IntegrationTestWithSession();
-    app.routes.draw((r) => {
-      r.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
-      r.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
-      r.get("/posts/html", { to: "posts#renderHtml", as: "posts_html" });
-      r.get("/posts/error", { to: "posts#serverError", as: "posts_error" });
-      r.get("/posts/redirect", { to: "posts#redirectToIndex", as: "posts_redirect" });
-      r.get("/posts/header", { to: "posts#customHeader", as: "posts_header" });
-      r.get("/posts/session", { to: "posts#readSession", as: "posts_session" });
-      r.post("/posts/create-and-redirect", {
+  beforeEach(({ task }) => {
+    app = new IntegrationTestWithSession(task.name);
+    app.routes.draw(function () {
+      this.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
+      this.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
+      this.get("/posts/html", { to: "posts#renderHtml", as: "posts_html" });
+      this.get("/posts/error", { to: "posts#serverError", as: "posts_error" });
+      this.get("/posts/redirect", { to: "posts#redirectToIndex", as: "posts_redirect" });
+      this.get("/posts/header", { to: "posts#customHeader", as: "posts_header" });
+      this.get("/posts/session", { to: "posts#readSession", as: "posts_session" });
+      this.post("/posts/create-and-redirect", {
         to: "posts#createAndRedirect",
         as: "posts_create_and_redirect",
       });
-      r.get("/posts/flash", { to: "posts#showFlash", as: "posts_flash" });
-      r.get("/posts/set-cookie", { to: "posts#setCookie", as: "posts_set_cookie" });
-      r.get("/posts/read-cookie", { to: "posts#readCookie", as: "posts_read_cookie" });
-      r.resources("posts", {}, (posts) => {
-        posts.resources("comments");
+      this.get("/posts/flash", { to: "posts#showFlash", as: "posts_flash" });
+      this.get("/posts/set-cookie", { to: "posts#setCookie", as: "posts_set_cookie" });
+      this.get("/posts/read-cookie", { to: "posts#readCookie", as: "posts_read_cookie" });
+      this.resources("posts", {}, () => {
+        this.resources("comments");
       });
-      r.namespace("admin", (admin) => {
-        admin.resources("posts");
+      this.namespace("admin", () => {
+        this.resources("posts");
       });
-      r.resource("session");
+      this.resource("session");
     });
     app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
     controllerConstants.set("posts", PostsController);
@@ -208,25 +208,25 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("GET /posts returns JSON", async () => {
       await app.get("/posts");
       expect(app.response.mediaType).toBe("application/json");
-      expect(app.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(app.response.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it("GET /posts/:id returns show", async () => {
       await app.get("/posts/42");
       app.assertResponse(200);
-      expect(app.parsedBody).toEqual({ id: "42" });
+      expect(app.response.parsedBody).toEqual({ id: "42" });
     });
 
     it("POST /posts creates resource", async () => {
       await app.post("/posts", { params: { title: "Test" } });
       app.assertResponse("created");
-      expect(app.parsedBody).toEqual({ title: "Test", created: true });
+      expect(app.response.parsedBody).toEqual({ title: "Test", created: true });
     });
 
     it("PUT /posts/:id updates resource", async () => {
       await app.put("/posts/5", { params: { title: "Updated" } });
       app.assertResponse("success");
-      expect((app.parsedBody as any).updated).toBe(true);
+      expect((app.response.parsedBody as any).updated).toBe(true);
     });
 
     it("PATCH /posts/:id updates resource", async () => {
@@ -249,19 +249,19 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("nested resources work", async () => {
       await app.get("/posts/1/comments");
       app.assertResponse("success");
-      expect((app.parsedBody as any).postId).toBe("1");
+      expect((app.response.parsedBody as any).postId).toBe("1");
     });
 
     it("nested resource POST works", async () => {
       await app.post("/posts/3/comments", { params: { body: "Nice" } });
       app.assertResponse("created");
-      expect((app.parsedBody as any).postId).toBe("3");
+      expect((app.response.parsedBody as any).postId).toBe("3");
     });
 
     it("namespaced resources work", async () => {
       await app.get("/admin/posts");
       app.assertResponse("success");
-      expect((app.parsedBody as any).admin).toBe(true);
+      expect((app.response.parsedBody as any).admin).toBe(true);
     });
 
     it("singular resource works", async () => {
@@ -275,8 +275,8 @@ describe("ActionDispatch::IntegrationTest", () => {
     });
 
     it("unregistered controller throws", async () => {
-      app.routes.draw((r) => {
-        r.get("/unknown", { to: "unknown#index" });
+      app.routes.draw(function () {
+        this.get("/unknown", { to: "unknown#index" });
       });
       app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
       await expect(app.get("/unknown")).rejects.toThrow(/uninitialized constant UnknownController/);
@@ -294,7 +294,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.get("/posts/redirect");
       await app.followRedirectBang();
       app.assertResponse("success");
-      expect(app.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(app.response.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it("followRedirect throws when no redirect", async () => {
@@ -336,7 +336,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("session persists across requests", async () => {
       await app.post("/posts", { params: { title: "Persisted" } });
       await app.get("/posts/session");
-      expect((app.parsedBody as any).lastPost).toBe("Persisted");
+      expect((app.response.parsedBody as any).lastPost).toBe("Persisted");
     });
 
     it("login flow with session", async () => {
@@ -344,7 +344,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.assertResponse("redirect");
 
       await app.get("/session");
-      expect((app.parsedBody as any).userId).toBe(42);
+      expect((app.response.parsedBody as any).userId).toBe(42);
 
       await app.delete("/session");
       app.assertResponse("no_content");
@@ -354,7 +354,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.post("/posts", { params: { title: "Before Reset" } });
       app.reset();
       await app.get("/posts/session");
-      expect((app.parsedBody as any).lastPost).toBe("none");
+      expect((app.response.parsedBody as any).lastPost).toBe("none");
     });
   });
 
@@ -364,21 +364,21 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(app.cookies.get("token")).toBe("abc123");
 
       await app.get("/posts/read-cookie");
-      expect(app.responseBody).toContain("token=abc123");
+      expect(app.body).toContain("token=abc123");
     });
 
     it("reset clears cookies", async () => {
       await app.get("/posts/set-cookie");
       app.reset();
       await app.get("/posts/read-cookie");
-      expect(app.responseBody).not.toContain("token=abc123");
+      expect(app.body).not.toContain("token=abc123");
     });
   });
 
   describe("flash", () => {
     it("flash is accessible after request", async () => {
       await app.post("/posts", { params: { title: "Flash!" } });
-      expect(app.flash.get("notice")).toBe("Post created!");
+      expect(app.flash().get("notice")).toBe("Post created!");
     });
 
     it("flash survives a redirect and is swept on the request after", async () => {
@@ -386,27 +386,27 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.assertResponse(302);
 
       await app.followRedirectBang();
-      expect(app.responseBody).toBe("Post created!");
+      expect(app.body).toBe("Post created!");
 
       await app.get("/posts/flash");
-      expect(app.responseBody).toBe("none");
+      expect(app.body).toBe("none");
     });
 
     it("assertFlash throws when not set", async () => {
       await app.get("/posts");
-      expect(app.flash.get("notice")).toBeUndefined();
+      expect(app.flash().get("notice")).toBeUndefined();
     });
   });
 
   describe("response body", () => {
     it("responseBody returns response body", async () => {
       await app.get("/posts");
-      expect(app.responseBody).toContain("[");
+      expect(app.body).toContain("[");
     });
 
     it("parsedBody returns parsed JSON", async () => {
       await app.get("/posts");
-      expect(Array.isArray(app.parsedBody)).toBe(true);
+      expect(Array.isArray(app.response.parsedBody)).toBe(true);
     });
 
     it("status accessor returns status code", async () => {
@@ -517,20 +517,22 @@ describe("ActionDispatch::IntegrationTest", () => {
       await expect(app.followRedirectBang()).rejects.toThrow(/not a redirect/);
     });
 
-    it("createSession propagates routes/controllers/app; app falls back to class default", async () => {
+    it("createSession propagates routes/controllers/app; app falls back to class default", async ({
+      task,
+    }) => {
       const sentinel = IntegrationTest.buildApp(app.routes, useCookieStore);
       app.app = sentinel;
-      const sess = app.createSession();
+      const sess = app.createSession(sentinel);
       expect(sess.routes).toBe(app.routes);
       expect(sess.app).toBe(sentinel);
       await sess.get("/posts");
       sess.assertResponse("success");
 
-      const fresh = new IntegrationTest();
+      const fresh = new IntegrationTest(task.name);
       expect(fresh.app).toBe(IntegrationTest.app);
       const Stub = class extends IntegrationTest {};
       Stub.app = { name: "class-default" };
-      const stubbed = new Stub();
+      const stubbed = new Stub(task.name);
       expect(stubbed.app).toEqual({ name: "class-default" });
     });
 
@@ -639,8 +641,8 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("follow_redirect! preserves HTTP_REFERER on 404 target", () => {
     let redirectApp: IntegrationTest;
 
-    beforeEach(() => {
-      redirectApp = new IntegrationTestWithSession();
+    beforeEach(({ task }) => {
+      redirectApp = new IntegrationTestWithSession(task.name);
     });
 
     afterEach(() => {
@@ -653,8 +655,8 @@ describe("ActionDispatch::IntegrationTest", () => {
           this.redirectTo("/this-path-does-not-exist");
         }
       }
-      redirectApp.routes.draw((r) => {
-        r.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
+      redirectApp.routes.draw(function () {
+        this.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
       controllerConstants.set("redirector", RedirectToMissingController);
@@ -675,8 +677,8 @@ describe("ActionDispatch::IntegrationTest", () => {
           this.redirectTo("/no-route-here");
         }
       }
-      redirectApp.routes.draw((r) => {
-        r.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
+      redirectApp.routes.draw(function () {
+        this.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
       controllerConstants.set("redirector2", RedirectToMissing2Controller);

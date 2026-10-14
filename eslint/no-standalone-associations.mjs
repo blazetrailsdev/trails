@@ -97,6 +97,16 @@ export function macroOfCall(callee) {
   return MACROS.has(inner.property.name) ? inner.property.name : null;
 }
 
+/**
+ * Whether `code` can hold a call {@link macroOfCall} matches: its callee is
+ * rooted at the identifier `Associations`, which source text spells either
+ * literally or with a `\u` escape. A sound text prefilter for callers that
+ * would otherwise parse every file; widen it with `macroOfCall`.
+ */
+export function mayContainMacroCall(code) {
+  return code.includes("Associations") || code.includes("\\u");
+}
+
 /** Static name of a string-literal first-arg, else "<dynamic>". */
 export function assocName(arg) {
   if (arg && arg.type === "Literal" && typeof arg.value === "string") return arg.value;

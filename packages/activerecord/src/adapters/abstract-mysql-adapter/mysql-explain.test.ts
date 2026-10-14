@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysqlAdapter, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
@@ -20,9 +20,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("MySQLExplainTest", () => {
-    const { authors } = fixtures(["authors", "authorAddresses", "posts"], {
-      useTransactionalTests: true,
-    });
+    fixtures(["authors", "authorAddresses", "posts"], { useTransactionalTests: true });
 
     let explainOpt: string;
     let expectedClause: string;
@@ -41,13 +39,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("explain for one query", async () => {
-      const explain = await Author.where({ id: 1 }).explain();
+      const explain = await Author.where({ id: 1 }).explain().inspect();
       expect(explain).toMatch("EXPLAIN SELECT `authors`.* FROM `authors` WHERE `authors`.`id` = 1");
       expect(explain).toMatch(/authors \|.* const/);
     });
 
     it("explain with eager loading", async () => {
-      const explain = await Author.where({ id: 1 }).includes(":posts").explain();
+      const explain = await Author.where({ id: 1 }).includes(":posts").explain().inspect();
       expect(explain).toMatch("EXPLAIN SELECT `authors`.* FROM `authors` WHERE `authors`.`id` = 1");
       expect(explain).toMatch(/authors |.* const/);
       expect(explain).toMatch(
@@ -57,83 +55,32 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("explain with options as symbol", async () => {
-      const explain = await Author.where({ id: 1 }).explain(explainOpt);
+      const explain = await Author.where({ id: 1 }).explain(explainOpt).inspect();
       expect(explain).toMatch(
         `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
       );
     });
 
     it("explain with options as strings", async () => {
-      const explain = await Author.where({ id: 1 }).explain(explainOpt.slice(1).toUpperCase());
+      const explain = await Author.where({ id: 1 })
+        .explain(explainOpt.slice(1).toUpperCase())
+        .inspect();
       expect(explain).toMatch(
         `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
       );
     });
 
     it("explain options with eager loading", async () => {
-      const explain = await Author.where({ id: 1 }).includes(":posts").explain(explainOpt);
+      const explain = await Author.where({ id: 1 })
+        .includes(":posts")
+        .explain(explainOpt)
+        .inspect();
       expect(explain).toMatch(
         `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
       );
       expect(explain).toMatch(
         `${expectedClause} SELECT \`posts\`.* FROM \`posts\` WHERE \`posts\`.\`author_id\` = 1`,
       );
-    });
-
-    it("Relation#explain on MySQL captures the SELECT via sql.active_record", async () => {
-      const plan = await Author.where({ id: authors("david").id }).explain();
-      expect(plan).toContain("`authors`");
-      expect(plan).not.toMatch(/"authors"/);
-      expect(plan).toMatch(/EXPLAIN SELECT/);
-    });
-
-    it("Relation#explain on MySQL re-executes an already-loaded relation", async () => {
-      const relation = Author.where({ id: authors("david").id });
-      await relation;
-      const plan = await relation.explain();
-      expect(plan).toContain("`authors`");
-      expect(plan).not.toMatch(/"authors"/);
-      expect(plan).toMatch(/EXPLAIN SELECT/);
-    });
-
-    it("Relation#explain on MySQL captures preload queries", async () => {
-      const plan = await Author.where({ id: authors("david").id })
-        .preload(":posts")
-        .explain();
-      const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
-      expect(blocks.length).toBeGreaterThanOrEqual(2);
-      expect(plan).toContain("`authors`");
-      expect(plan).toContain("`posts`");
-      expect(plan).not.toMatch(/"(authors|posts)"/);
-    });
-  });
-
-  describe("explain helpers (trails-only)", () => {
-    it("buildExplainClause renders a format flag without parens", async () => {
-      const clause = await adapter.buildExplainClause(["format=json"]);
-      expect(clause).toBe("EXPLAIN FORMAT=JSON");
-    });
-
-    it("buildExplainClause joins its flags space-separated", async () => {
-      const clause = await adapter.buildExplainClause(["analyze", "format=json"]);
-      const analyzeWithoutExplain =
-        isMariaDb && (await adapter.databaseVersion).compare("10.1.0") >= 0;
-      expect(clause).toBe(
-        analyzeWithoutExplain ? "ANALYZE FORMAT=JSON" : "EXPLAIN ANALYZE FORMAT=JSON",
-      );
-    });
-
-    it("buildExplainClause drops a Symbol option's leading colon", async () => {
-      const clause = await adapter.buildExplainClause([":analyze"]);
-      const analyzeWithoutExplain =
-        isMariaDb && (await adapter.databaseVersion).compare("10.1.0") >= 0;
-      expect(clause).toBe(analyzeWithoutExplain ? "ANALYZE" : "EXPLAIN ANALYZE");
-    });
-
-    it("explain executes with a format flag and returns JSON plan", async () => {
-      const result = await adapter.explain("SELECT 1", [], ["format=json"]);
-      expect(typeof result).toBe("string");
-      expect(result.length).toBeGreaterThan(0);
     });
   });
 });

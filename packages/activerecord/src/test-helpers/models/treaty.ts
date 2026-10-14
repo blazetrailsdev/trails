@@ -1,6 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Country } from "./country.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Treaty extends Base {
   declare countries: AssociationProxy<Country>;
@@ -11,3 +12,4 @@ export class Treaty extends Base {
     this.hasAndBelongsToMany("countries");
   }
 }
+registerModel(Treaty);

@@ -16,6 +16,7 @@ import {
   concernHookNames,
   concernHookKey,
   inlinedModuleMembers,
+  moduleInitializeFiles,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -595,6 +596,68 @@ describe("buildReport — hook-injected mixins", () => {
       topN: 50,
     });
     expect(report.packages[0]?.extraFiles ?? []).toEqual([]);
+  });
+
+  it("credits ReloadedClassesFiltering to a cross-package extender of DescendantsTracker", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Base": {
+              ...rubyClass({ name: "Base", file: "base.rb" }),
+              extends: ["ActiveSupport::DescendantsTracker"],
+            },
+          },
+          modules: {},
+        },
+        activesupport: {
+          classes: {},
+          modules: {
+            "ActiveSupport::DescendantsTracker": rubyClass({
+              name: "DescendantsTracker",
+              file: "descendants_tracker.rb",
+              instance: [method("descendants")],
+              klass: [method("clear")],
+            }),
+            "ActiveSupport::DescendantsTracker::ReloadedClassesFiltering": rubyClass({
+              name: "ReloadedClassesFiltering",
+              file: "descendants_tracker.rb",
+              instance: [method("subclasses")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activesupport: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            Base: {
+              name: "Base",
+              file: "base.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [method("subclasses"), method("descendants"), method("clear")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
+    expect(f!.extras.map((e) => [e.name, e.kind])).toEqual([["clear", "moved"]]);
   });
 });
 
@@ -1454,6 +1517,108 @@ describe("buildReport — novel vs moved classification", () => {
     ]);
   });
 
+  it("credits a DelegateClass(X) superclass's public instance methods to the delegating class", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::Value": {
+              ...rubyClass({
+                name: "Value",
+                file: "type/value.rb",
+                instance: [method("cast"), method("type"), method("cast_value", true)],
+                includes: ["SerializeCastValue"],
+              }),
+              superclass: "Root",
+            },
+            "ActiveModel::Type::Root": rubyClass({
+              name: "Root",
+              file: "type/root.rb",
+              instance: [method("inherited_reader"), method("inherited_private", true)],
+              klass: [method("root_class_method")],
+            }),
+          },
+          modules: {
+            "ActiveModel::Type::SerializeCastValue": rubyClass({
+              name: "SerializeCastValue",
+              file: "type/serialize_cast_value.rb",
+              instance: [method("serialize_cast_value"), method("mixin_private", true)],
+              klass: [method("serialize_cast_value_compatible?")],
+            }),
+          },
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Locking::LockingType": {
+              ...rubyClass({
+                name: "LockingType",
+                file: "locking/optimistic.rb",
+                instance: [method("deserialize")],
+              }),
+              superclass: "Type::Value",
+              delegateClass: true,
+            },
+            "ActiveRecord::Type::Time::Value": rubyClass({
+              name: "Value",
+              file: "type/time.rb",
+              instance: [method("unrelated")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            LockingType: {
+              name: "LockingType",
+              file: "locking/optimistic.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [
+                method("deserialize"),
+                method("cast"),
+                method("type"),
+                method("serializeCastValue"),
+                method("inheritedReader"),
+                method("castValue"),
+                method("mixinPrivate"),
+                method("isSerializeCastValueCompatible"),
+                method("inheritedPrivate"),
+                method("rootClassMethod"),
+                method("unrelated"),
+              ],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "locking/optimistic.ts");
+    expect(f!.extras.map((e) => e.name)).toEqual([
+      "castValue",
+      "inheritedPrivate",
+      "isSerializeCastValueCompatible",
+      "mixinPrivate",
+      "rootClassMethod",
+      "unrelated",
+    ]);
+  });
+
   it("cross-package fallback does NOT let a bare short-name include pollute across gems", () => {
     // A bare `Helper` include in package `a` must resolve ONLY against a's own
     // module map — package `b`'s same-short-name `B::Helper` must not leak in
@@ -1632,64 +1797,6 @@ describe("buildReport — novel vs moved classification", () => {
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "host.ts");
     expect(f).toBeDefined();
     // detailedMessage folded back in; only the genuinely-novel name remains.
-    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
-  });
-
-  it("folds railtie-reexported ControllerRuntime methods on the Railtie host into allowed", () => {
-    // trailtie.ts re-exports Railties::ControllerRuntime (railtie.rb:267,
-    // on_load(:action_controller) { include … }); its source
-    // controller_runtime.rb is unported, so the ported process_action /
-    // cleanup_view_runtime / append_info_to_payload mirrors would show as moved
-    // extras without the PORTED_METHODS_FROM_UNPORTED_MIXINS["ActiveRecord::Railtie"]
-    // fold-back. Guards the exact host FQN + method names against a typo.
-    const ruby: ApiManifest = {
-      source: "ruby",
-      generatedAt: "",
-      packages: {
-        activerecord: {
-          classes: {
-            "ActiveRecord::Railtie": rubyClass({ name: "Railtie", file: "railtie.rb" }),
-          },
-          modules: {},
-        },
-      },
-    };
-    const ts: ApiManifest = {
-      source: "typescript",
-      generatedAt: "",
-      packages: {
-        activerecord: {
-          classes: {},
-          modules: {
-            Trailtie: {
-              name: "Trailtie",
-              file: "trailtie.ts",
-              includes: [],
-              extends: [],
-              instanceMethods: [],
-              classMethods: [
-                method("processAction"),
-                method("cleanupViewRuntime"),
-                method("appendInfoToPayload"),
-                method("genuinelyNovel"),
-              ],
-            },
-          },
-        },
-      },
-    };
-    const report = buildReport(ruby, ts, {
-      filterPkg: "activerecord",
-      excludeGlobs: [],
-      novelOnly: false,
-      topN: 50,
-    });
-    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "trailtie.ts");
-    expect(f).toBeDefined();
-    // `Trailtie` is the declaration name, and railtie.rb declares `Railtie`.
-    // `TS_CLASS_RENAMES` sanctions that rename and `parity:api` already
-    // resolves the pair through it, so the declaration-name pass admits it
-    // rather than reporting the port as drift.
     expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
   });
 
@@ -2531,6 +2638,82 @@ describe("buildReport — declaration names", () => {
   });
 });
 
+describe("buildReport — bare namespace bindings", () => {
+  const run = (ruby: ApiManifest, ts: ApiManifest) =>
+    buildReport(ruby, ts, { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 });
+
+  // `module Collectors` is reopened by every file under it and stamped with
+  // the first one read — collectors/bind.rb — so no TS file "mirrors" it.
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      arel: {
+        classes: {
+          "Arel::Collectors::Bind": rubyClass({ name: "Bind", file: "collectors/bind.rb" }),
+          "Arel::Table": rubyClass({ name: "Table", file: "table.rb" }),
+        },
+        modules: {
+          "Arel::Collectors": rubyClass({ name: "Collectors", file: "collectors/bind.rb" }),
+        },
+      },
+    },
+  };
+
+  const tsWith = (name: string, extra: Partial<ClassInfo> = {}): ApiManifest => ({
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      arel: {
+        classes: {},
+        modules: {
+          [`index.ts:${name}`]: {
+            name,
+            file: "index.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [],
+            classMethods: [],
+            declaredAsNamespace: true,
+            ...extra,
+          },
+        },
+      },
+    },
+  });
+
+  it("does not count a member-less namespace binding of a Rails module as moved", () => {
+    expect(run(ruby, tsWith("Collectors")).packages[0].extraFiles).toEqual([]);
+  });
+
+  it("still scores a namespace binding that declares members", () => {
+    const report = run(ruby, tsWith("Collectors", { instanceMethods: [method("build")] }));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "build", kind: "novel" },
+      { name: "Collectors", kind: "moved" },
+    ]);
+  });
+
+  it("still scores a namespace binding named after a Rails CLASS declared elsewhere", () => {
+    const report = run(ruby, tsWith("Table"));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "Table", kind: "moved" },
+    ]);
+  });
+
+  it("still scores a namespace merged onto an interface of the same name", () => {
+    const report = run(ruby, tsWith("Collectors", { isInterface: true }));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "Collectors", kind: "moved" },
+    ]);
+  });
+
+  it("still scores a namespace binding no Rails module is named after", () => {
+    const report = run(ruby, tsWith("Helpers"));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Helpers", kind: "novel" }]);
+  });
+});
+
 describe("buildReport — interface declaration names", () => {
   const run = (ruby: ApiManifest, ts: ApiManifest) =>
     buildReport(ruby, ts, {
@@ -2692,6 +2875,151 @@ describe("buildReport — interface declaration names", () => {
     // the by-kind exemption — and its members keep inheriting the reason.
     expect(report.packages[0].totalInterfaceExempt).toBe(0);
     expect(report.packages[0].totalAllowlisted).toBe(2);
+  });
+});
+
+describe("buildReport — overrides on a class with no Rails counterpart", () => {
+  const run = (ruby: ApiManifest, ts: ApiManifest) =>
+    buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Binary": rubyClass({
+            name: "Binary",
+            file: "binary.rb",
+            instance: [method("initialize"), method("invert")],
+          }),
+          "ActiveModel::Quoting": rubyClass({
+            name: "Quoting",
+            file: "quoting.rb",
+            instance: [method("quoted_table_name")],
+          }),
+        },
+        modules: {},
+      },
+    },
+  };
+
+  const tsClass = (name: string, file: string, members: string[], superclass?: string) => ({
+    name,
+    file,
+    includes: [],
+    extends: [],
+    instanceMethods: members.map((m) => method(m)),
+    classMethods: [],
+    ...(superclass !== undefined ? { superclass, superclassFile: "binary.ts" } : {}),
+  });
+
+  const tsWith = (...subclasses: ClassInfo[]): ApiManifest => ({
+    source: "typescript" as const,
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "binary.ts:Binary": tsClass("Binary", "binary.ts", ["constructor", "invert"]),
+          ...Object.fromEntries(subclasses.map((c) => [`${c.file}:${c.name}`, c])),
+        },
+        modules: {},
+      },
+    },
+  });
+
+  it("does not count a trails-only subclass's override of an inherited member as moved", () => {
+    const report = run(
+      ruby,
+      tsWith(
+        tsClass("DeferredIn", "deferred.ts", ["constructor", "innerRelations", "invert"], "Binary"),
+      ),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toEqual([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "innerRelations", kind: "novel" },
+    ]);
+    expect(report.packages[0].totalMoved).toBe(0);
+    expect(report.packages[0].totalOverrideExempt).toBe(2);
+  });
+
+  it("follows the chain past an intermediate class that does not declare the member", () => {
+    const report = run(
+      ruby,
+      tsWith(tsClass("DeferredBase", "deferred-base.ts", [], "Binary"), {
+        ...tsClass("DeferredIn", "deferred.ts", ["invert"], "DeferredBase"),
+        superclassFile: "deferred-base.ts",
+      }),
+    );
+    expect(report.packages[0].totalMoved).toBe(0);
+    expect(report.packages[0].totalOverrideExempt).toBe(1);
+  });
+
+  it("still scores an override on a class Rails names elsewhere", () => {
+    const report = run(ruby, tsWith(tsClass("Quoting", "deferred.ts", ["invert"], "Binary")));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "invert", kind: "moved" },
+      { name: "Quoting", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
+  it("still scores a moved name no ancestor declares", () => {
+    const report = run(
+      ruby,
+      tsWith(tsClass("DeferredIn", "deferred.ts", ["quotedTableName"], "Binary")),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "quotedTableName", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
+  it("still scores an override of a member the ancestor carries but Rails declares elsewhere", () => {
+    const ts = tsWith(tsClass("DeferredIn", "deferred.ts", ["quotedTableName"], "Binary"));
+    ts.packages.activemodel.classes["binary.ts:Binary"].instanceMethods.push(
+      method("quotedTableName"),
+    );
+    const report = run(ruby, ts);
+    expect(
+      report.packages[0].extraFiles.find((f) => f.tsFile === "deferred.ts")?.extras,
+    ).toMatchObject([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "quotedTableName", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
+  it("still scores an override name a class with no superclass also declares", () => {
+    const report = run(
+      ruby,
+      tsWith(
+        tsClass("DeferredIn", "deferred.ts", ["invert"], "Binary"),
+        tsClass("Standalone", "deferred.ts", ["invert"]),
+      ),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "Standalone", kind: "novel" },
+      { name: "invert", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
+  it("keeps a tag on an exempt override matching, so the tag is not stale", () => {
+    const ts = tsWith(tsClass("DeferredIn", "deferred.ts", ["invert"], "Binary"));
+    ts.packages.activemodel.classes["deferred.ts:DeferredIn"].instanceMethods[0].noRailsEquivalent =
+      "PERMANENT";
+    const report = run(ruby, ts);
+    expect(report.tagged.stale).toEqual([]);
+    expect(report.tagged.matched).toBe(1);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
   });
 });
 
@@ -4019,9 +4347,9 @@ describe("buildReport — Ruby operator methods", () => {
       packages: {
         arel: {
           classes: {
-            "Arel::Collectors::PlainString": rubyClass({
-              name: "PlainString",
-              file: "collectors/plain_string.rb",
+            "Arel::Collectors::Unpinned": rubyClass({
+              name: "Unpinned",
+              file: "collectors/unpinned.rb",
               instance: [method("<<")],
             }),
           },
@@ -4049,9 +4377,9 @@ describe("buildReport — Ruby operator methods", () => {
               instanceMethods: [method("multiply"), method("bitwiseShiftLeft")],
               classMethods: [],
             },
-            PlainString: {
-              name: "PlainString",
-              file: "collectors/plain-string.ts",
+            Unpinned: {
+              name: "Unpinned",
+              file: "collectors/unpinned.ts",
               includes: [],
               extends: [],
               instanceMethods: [method("append")],
@@ -4085,7 +4413,7 @@ describe("buildReport — Ruby operator methods", () => {
       novelOnly: false,
       topN: 50,
     });
-    const f = report.packages[0].extraFiles.find((f) => f.tsFile === "collectors/plain-string.ts");
+    const f = report.packages[0].extraFiles.find((f) => f.tsFile === "collectors/unpinned.ts");
     expect(f?.extras.map((e) => e.name)).toEqual(["append"]);
   });
 });
@@ -4265,5 +4593,266 @@ describe("inlinedModuleMembers", () => {
   it("reports nothing when the includer's file declares no body for the name", () => {
     const bodied = new Map([["select-manager.ts", new Set(["project"])]]);
     expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);
+  });
+
+  it("leaves a host name that only shares a predicate's alternate spelling alone", () => {
+    expect(
+      inlinedModuleMembers(
+        "activerecord",
+        {
+          "ActiveRecord::Base": rubyClass({ name: "Base", file: "base.rb", includes: ["Core"] }),
+        },
+        {
+          "ActiveRecord::Core": rubyClass({
+            name: "Core",
+            file: "core.rb",
+            instance: [method("readonly?")],
+          }),
+        },
+        new Map([["Core", ["ActiveRecord::Core"]]]),
+        new Map([
+          ["base.ts", new Set(["isReadonly", "readonly"])],
+          ["core.ts", new Set(["isReadonly"])],
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("still reports a predicate the module's own twin does not body", () => {
+    expect(
+      inlinedModuleMembers(
+        "activerecord",
+        {
+          "ActiveRecord::Base": rubyClass({ name: "Base", file: "base.rb", includes: ["Core"] }),
+        },
+        {
+          "ActiveRecord::Core": rubyClass({
+            name: "Core",
+            file: "core.rb",
+            instance: [method("readonly?")],
+          }),
+        },
+        new Map([["Core", ["ActiveRecord::Core"]]]),
+        new Map([
+          ["base.ts", new Set(["isReadonly"])],
+          ["core.ts", new Set<string>()],
+        ]),
+      ),
+    ).toEqual([
+      { tsFile: "base.ts", tsName: "isReadonly", moduleRubyFile: "core.rb", rubyName: "readonly?" },
+    ]);
+  });
+
+  describe("an includer's own `_name` method beside a module's `name`", () => {
+    const delegationModules = {
+      "ActiveRecord::Delegation": rubyClass({
+        name: "Delegation",
+        file: "relation/delegation.rb",
+        klass: [method("create")],
+      }),
+    };
+    const delegationShort = new Map([["Delegation", ["ActiveRecord::Delegation"]]]);
+    const bodied = new Map([
+      ["relation.ts", new Set(["create", "_create"])],
+      ["relation/delegation.ts", new Set(["create"])],
+    ]);
+    const relation = (instance: MethodInfo[]) => ({
+      "ActiveRecord::Relation": rubyClass({
+        name: "Relation",
+        file: "relation.rb",
+        includes: ["Delegation"],
+        instance,
+      }),
+    });
+
+    it("leaves the body that ports the includer's own method alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "activerecord",
+          relation([method("create"), method("_create")]),
+          delegationModules,
+          delegationShort,
+          bodied,
+        ),
+      ).toEqual([]);
+    });
+
+    it("still reports the underscored body of an includer with no such method", () => {
+      expect(
+        inlinedModuleMembers(
+          "activerecord",
+          relation([method("create")]),
+          delegationModules,
+          delegationShort,
+          bodied,
+        ),
+      ).toEqual([
+        {
+          tsFile: "relation.ts",
+          tsName: "_create",
+          moduleRubyFile: "relation/delegation.rb",
+          rubyName: "create",
+        },
+      ]);
+    });
+  });
+
+  describe("a module `new` override beside the includer's constructor", () => {
+    const dedupModules = {
+      "ActiveRecord::ConnectionAdapters::Deduplicable": rubyClass({
+        name: "Deduplicable",
+        file: "connection_adapters/deduplicable.rb",
+        klass: [method("new")],
+      }),
+    };
+    const dedupShort = new Map([
+      ["Deduplicable", ["ActiveRecord::ConnectionAdapters::Deduplicable"]],
+    ]);
+    const bodied = new Map([
+      ["connection-adapters/column.ts", new Set(["constructor"])],
+      ["connection-adapters/deduplicable.ts", new Set(["new"])],
+    ]);
+    const column = (instance: MethodInfo[]) => ({
+      "ActiveRecord::ConnectionAdapters::Column": rubyClass({
+        name: "Column",
+        file: "connection_adapters/column.rb",
+        includes: ["Deduplicable"],
+        instance,
+      }),
+    });
+
+    it("leaves the constructor of an includer that defines `initialize` alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "activerecord",
+          column([method("initialize")]),
+          dedupModules,
+          dedupShort,
+          bodied,
+        ),
+      ).toEqual([]);
+    });
+
+    it("still reports the constructor of an includer with no `initialize`", () => {
+      expect(
+        inlinedModuleMembers("activerecord", column([]), dedupModules, dedupShort, bodied),
+      ).toEqual([
+        {
+          tsFile: "connection-adapters/column.ts",
+          tsName: "constructor",
+          moduleRubyFile: "connection_adapters/deduplicable.rb",
+          rubyName: "new",
+        },
+      ]);
+    });
+  });
+});
+
+describe("buildReport — members Ruby supplies without a def in the mapped file", () => {
+  function tsClass(file: string, instance: string[], klass: string[] = []): ClassInfo {
+    return {
+      name: "",
+      file,
+      includes: [],
+      extends: [],
+      instanceMethods: instance.map((n) => method(n)),
+      classMethods: klass.map((n) => method(n)),
+    };
+  }
+
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::NullMutationTracker": rubyClass({
+            name: "NullMutationTracker",
+            file: "attribute_mutation_tracker.rb",
+            includes: ["Singleton"],
+          }),
+          "ActiveModel::Plain": rubyClass({ name: "Plain", file: "plain.rb" }),
+          "ActiveModel::Type::Value": rubyClass({
+            name: "Value",
+            file: "type/value.rb",
+            includes: ["SerializeCastValue"],
+            instance: [method("serialize")],
+          }),
+          "ActiveModel::Type::Other": rubyClass({ name: "Other", file: "type/other.rb" }),
+        },
+        modules: {
+          "ActiveModel::Type::SerializeCastValue": rubyClass({
+            name: "SerializeCastValue",
+            file: "type/serialize_cast_value.rb",
+            instance: [method("initialize")],
+          }),
+          "ActiveModel::Type::SerializeCastValue::DefaultImplementation": rubyClass({
+            name: "DefaultImplementation",
+            file: "type/serialize_cast_value.rb",
+            instance: [method("serialize_cast_value")],
+          }),
+        },
+      },
+    },
+  };
+
+  function extrasByFile(classes: Record<string, ClassInfo>): Record<string, string[]> {
+    for (const [name, info] of Object.entries(classes)) info.name = name;
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: { activemodel: { classes, modules: {} } },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    return Object.fromEntries(
+      report.packages[0].extraFiles.map((f) => [f.tsFile, f.extras.map((e) => e.name)]),
+    );
+  }
+
+  it("credits Singleton's instance to a class that includes it, and to no other", () => {
+    expect(
+      extrasByFile({
+        NullMutationTracker: tsClass("attribute-mutation-tracker.ts", [], ["instance"]),
+        Plain: tsClass("plain.ts", [], ["instance"]),
+      }),
+    ).toEqual({ "plain.ts": ["instance"] });
+  });
+
+  it("credits the DefaultImplementation that SerializeCastValue.included injects", () => {
+    expect(
+      extrasByFile({
+        ValueType: tsClass("type/value.ts", ["serialize", "serializeCastValue"]),
+        Other: tsClass("type/other.ts", ["serializeCastValue"]),
+      }),
+    ).toEqual({ "type/other.ts": ["serializeCastValue"] });
+  });
+
+  it("finds the files in which a module defines initialize", () => {
+    expect([...moduleInitializeFiles(ruby.packages.activemodel)]).toEqual([
+      "type/serialize_cast_value.rb",
+    ]);
+  });
+
+  it("does not report a host constructor as inlined once the module twin carries [initialize]", () => {
+    const { classes, modules } = ruby.packages.activemodel;
+    const byShort = new Map([["SerializeCastValue", ["ActiveModel::Type::SerializeCastValue"]]]);
+    const inlined = (twin: string[]) =>
+      inlinedModuleMembers(
+        "activemodel",
+        classes,
+        modules,
+        byShort,
+        new Map([
+          ["type/value.ts", new Set(["constructor"])],
+          ["type/serialize-cast-value.ts", new Set(twin)],
+        ]),
+      ).map((f) => f.tsName);
+    expect(inlined([])).toEqual(["constructor"]);
+    expect(inlined(["[initialize]"])).toEqual([]);
   });
 });

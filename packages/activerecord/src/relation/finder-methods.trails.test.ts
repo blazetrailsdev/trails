@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  find,
   findOne,
   findWithIds,
   findSome,
@@ -13,7 +14,7 @@ import { NoMethodError } from "@blazetrails/ruby-compat";
 import { RecordNotFound } from "../errors.js";
 
 describe("findWithIds — composite primary key", () => {
-  const rel: any = { primaryKey: ["shop_id", "id"], model: { compositePrimaryKey: true } };
+  const rel: any = { primaryKey: ["shop_id", "id"], model: { isCompositePrimaryKey: () => true } };
 
   it("raises NoMethodError from ids.first.first when the first id is not a tuple", async () => {
     await expect(findWithIds.call(rel, 1)).rejects.toThrow(
@@ -32,6 +33,22 @@ describe("findWithIds — composite primary key", () => {
       [1, 2],
       [1n, 3],
     ]);
+  });
+});
+
+describe("find — with a block", () => {
+  const rel: any = { each: (fn: (i: number) => void) => Promise.resolve([1, 2, 3].forEach(fn)) };
+
+  it("is Enumerable#find over each", async () => {
+    await expect(find.call(rel, (i: number) => i > 1)).resolves.toBe(2);
+    await expect(find.call(rel, (i: number) => i > 3)).resolves.toBeNull();
+    await expect(
+      find.call(
+        rel,
+        () => "none",
+        (i: number) => i > 3,
+      ),
+    ).resolves.toBe("none");
   });
 });
 
@@ -298,7 +315,8 @@ function makeRelForOrder(mc: {
   implicitOrderColumn?: string | null;
   _queryConstraintsList?: string[] | null;
 }): any {
-  return { _model: mc, model: mc, primaryKey: mc.primaryKey };
+  const model = { queryConstraintsList: () => mc._queryConstraintsList ?? null, ...mc };
+  return { _model: model, model, primaryKey: mc.primaryKey };
 }
 
 describe("_orderColumns — Rails _order_columns precedence", () => {

@@ -2,7 +2,7 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
 
@@ -25,7 +25,7 @@ describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
   });
 
   it("alter-table rebuild preserves pre-existing generated columns", async () => {
-    await adapter.changeTable("virtual_columns", async (t) => {
+    await adapter.changeTable("virtual_columns", {}, async (t) => {
       await t.virtual("decr_column1", { type: "integer", as: "column1 - 1", stored: true });
     });
 

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
+import { mysql2Client } from "../mysql2/client.js";
 
-describe("Mysql2Adapter base _connection field", () => {
+describe("Mysql2Adapter base _rawConnection field", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -14,15 +15,15 @@ describe("Mysql2Adapter base _connection field", () => {
       connection: { _handshakePacket: { serverVersion: "8.0.28" } },
       query: () => Promise.resolve([[]]),
     };
-    vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
+    vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(mysql2Client(fakeConn));
     return { end };
   }
 
   function connectionOf(adapter: Mysql2Adapter): unknown {
-    return (adapter as unknown as { _connection: unknown })._connection;
+    return (adapter as unknown as { _rawConnection: unknown })._rawConnection;
   }
 
-  it("populates the base _connection field on connectBang", async () => {
+  it("populates the base _rawConnection field on connectBang", async () => {
     stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
@@ -33,7 +34,7 @@ describe("Mysql2Adapter base _connection field", () => {
     expect(await adapter.active()).toBe(true);
   });
 
-  it("nulls _connection on disconnectBang and repopulates it on the next connect", async () => {
+  it("nulls _rawConnection on disconnectBang and repopulates it on the next connect", async () => {
     const { end } = stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
@@ -46,7 +47,7 @@ describe("Mysql2Adapter base _connection field", () => {
     expect(connectionOf(adapter)).not.toBeNull();
   });
 
-  it("repopulates _connection across a reconnect", async () => {
+  it("repopulates _rawConnection across a reconnect", async () => {
     stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
@@ -56,7 +57,29 @@ describe("Mysql2Adapter base _connection field", () => {
     expect(adapter.isConnected()).toBe(true);
   });
 
-  it("nulls _connection on discardBang", async () => {
+  it("discardBang during an in-flight reconnect abandons the client the connect installs", async () => {
+    const end = vi.fn(() => Promise.resolve());
+    const fakeConn = { end, query: () => Promise.resolve([[]]) };
+    let resolve!: (conn: never) => void;
+    const spy = vi
+      .spyOn(Mysql2Adapter, "newClient")
+      .mockReturnValue(new Promise((r) => (resolve = r)) as never);
+    const adapter = new Mysql2Adapter({ host: "localhost" });
+
+    const reconnect = adapter.reconnect();
+    for (let i = 0; i < 1000 && spy.mock.calls.length < 1; i++) await Promise.resolve();
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    adapter.discardBang();
+    resolve(mysql2Client(fakeConn) as never);
+    await reconnect;
+    await adapter.lock.synchronize(() => {});
+
+    expect(connectionOf(adapter)).toBeNull();
+    expect(end).not.toHaveBeenCalled();
+  });
+
+  it("nulls _rawConnection on discardBang", async () => {
     stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
@@ -65,7 +88,7 @@ describe("Mysql2Adapter base _connection field", () => {
     expect(connectionOf(adapter)).toBeNull();
   });
 
-  it("nulls _connection on close", async () => {
+  it("nulls _rawConnection on close", async () => {
     stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { BindError } from "../errors.js";
 
 describe("BoundSqlLiteralTest", () => {
@@ -15,6 +16,28 @@ describe("BoundSqlLiteralTest", () => {
     it("throws when other is not an Arel node", () => {
       const bsl = new Nodes.BoundSqlLiteral("a = ?", [1], null);
       expect(() => bsl.plus("not a node" as unknown as Nodes.Node)).toThrow(/Expected Arel node/);
+    });
+  });
+
+  describe("#inspect", () => {
+    it("renders the class name, the SQL and the positional binds", () => {
+      const bsl = new Nodes.BoundSqlLiteral("a = ? AND b = ?", [1, "two"], null);
+      expect(bsl.inspect()).toBe('#<Arel::Nodes::BoundSqlLiteral "a = ? AND b = ?" [1, "two"]>');
+    });
+
+    it("renders the named binds in place of the positional ones", () => {
+      const bsl = new Nodes.BoundSqlLiteral("a = :name", null, { name: "x" });
+      expect(bsl.inspect()).toBe('#<Arel::Nodes::BoundSqlLiteral "a = :name" {:name=>"x"}>');
+    });
+
+    it("renders nil when there are no binds", () => {
+      const bsl = new Nodes.BoundSqlLiteral("a = 1", null, null);
+      expect(bsl.inspect()).toBe('#<Arel::Nodes::BoundSqlLiteral "a = 1" nil>');
+    });
+
+    it("is what rbInspect renders the node as", () => {
+      const bsl = new Nodes.BoundSqlLiteral("a = ?", [1], null);
+      expect(rbInspect([bsl])).toBe('[#<Arel::Nodes::BoundSqlLiteral "a = ?" [1]>]');
     });
   });
 

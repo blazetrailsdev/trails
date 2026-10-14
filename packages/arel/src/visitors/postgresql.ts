@@ -1,4 +1,5 @@
 import { Nodes, Visitors } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
@@ -117,4 +118,4 @@ export class PostgreSQL extends ToSql {
   }
 }
 
-Visitors.PostgreSQL = PostgreSQL;
+rbModConstSet(Visitors, "PostgreSQL", PostgreSQL);

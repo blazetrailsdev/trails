@@ -38,7 +38,6 @@ export class ProcTransliterator {
     this.rule = rule;
   }
 
-  /** @missingRailsCall call — PERMANENT */
   transliterate(string: string, _replacement: string | null = null): string {
     return this.rule(string);
   }

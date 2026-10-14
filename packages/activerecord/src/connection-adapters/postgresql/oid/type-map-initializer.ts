@@ -28,7 +28,7 @@ export class TypeMapInitializer {
     this.store = store;
   }
 
-  run(records: PgTypeRow[]): void {
+  run(records: PgTypeRow[]): PgTypeRow[] {
     const nodes = records.filter((row) => !this.store.isKey(toI(row.oid) as number));
     const mapped = extract(nodes, (row) => this.store.isKey(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
@@ -44,7 +44,7 @@ export class TypeMapInitializer {
     ranges.forEach((row) => this.registerRangeType(row));
     composites.forEach((row) => this.registerCompositeType(row));
 
-    records.forEach((row) => this.registerSqlTypeName(row));
+    return composites;
   }
 
   queryConditionsForKnownTypeNames(): string {
@@ -131,15 +131,6 @@ export class TypeMapInitializer {
   private assertValidRegistration(oid: number | string, oidType: unknown): number {
     if (oidType == null) throw new ArgumentError(`can't register nil type for OID ${oid}`);
     return toI(oid) as number;
-  }
-
-  private registerSqlTypeName(row: PgTypeRow): void {
-    const oid = toI(row.oid) as number;
-    if (!this.store.isKey(oid)) return;
-    for (const name of [row.formatType, row.aliasName]) {
-      if (name == null || this.store.isKey(name)) continue;
-      this.store.aliasType(name, oid);
-    }
   }
 }
 

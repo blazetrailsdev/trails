@@ -1,9 +1,23 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Assertion } from "@blazetrails/activesupport";
+import {
+  Assertion,
+  assertEqual,
+  assertNothingRaised,
+  assertRaise,
+} from "@blazetrails/activesupport";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
+import { deprecator } from "../../action-dispatch/deprecator.js";
+import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
+
+registerConstant("Admin", { name: "Admin" });
+import "../../test-helpers/abstract-unit.js";
 
 class ActionPackAssertionsController extends Base {
+  declare routeOneUrl: () => string;
+  declare routeTwoUrl: () => string;
+
   async nothing() {
     this.head(200);
   }
@@ -15,6 +29,9 @@ class ActionPackAssertionsController extends Base {
   }
   async redirectExternalProtocolRelative() {
     this.redirectTo("//www.rubyonrails.org");
+  }
+  async redirectToNamedRoute() {
+    this.redirectTo(this.routeOneUrl());
   }
   async redirectToPath() {
     this.redirectTo("http://test.host/some/path");
@@ -87,45 +104,169 @@ class AssertResponseWithUnexpectedErrorController extends Base {
   }
 }
 
+class InnerModuleController extends Base {
+  declare adminInnerModulePath: () => string;
+  declare topLevelUrl: (options: { id: string }) => string;
+  declare topLevelPath: (id: string) => string;
+
+  index() {
+    this.head("ok");
+  }
+
+  redirectToIndex() {
+    this.redirectTo(this.adminInnerModulePath());
+  }
+
+  redirectToAbsoluteController() {
+    this.redirectTo({ controller: "/content" });
+  }
+
+  redirectToFellowController() {
+    this.redirectTo({ controller: "user" });
+  }
+
+  redirectToTopLevelNamedRoute() {
+    this.redirectTo(this.topLevelUrl({ id: "foo" }));
+  }
+}
+Object.defineProperty(InnerModuleController, "name", { value: "Admin::InnerModuleController" });
+const Admin = { InnerModuleController };
+
 describe("ActionPackAssertionsControllerTest", () => {
-  let tc: TestCase;
-  const assertRedirectedTo = (expected: string | RegExp): void => tc.assertRedirectedTo(expected);
-  beforeEach(() => {
-    tc = new TestCase(ActionPackAssertionsController);
+  let tc: TestCase &
+    Pick<ActionPackAssertionsController, "routeTwoUrl"> &
+    Pick<InnerModuleController, "adminInnerModulePath" | "topLevelPath">;
+  const assertRedirectedTo = (...args: Parameters<TestCase["assertRedirectedTo"]>): true =>
+    tc.assertRedirectedTo(...args);
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name) as typeof tc;
+    tc.controller = new ActionPackAssertionsController();
+    await tc.beforeSetup();
   });
 
+  // BLOCKED: action-pack-assertions-port-render-file-tests-and-park-the-builder-three
   it.skip("render file absolute path", () => {});
   it.skip("render file relative path", () => {});
 
   it("get request", async () => {
     await expect(tc.get("raiseExceptionOnGet")).rejects.toThrow("get");
     await tc.get("raiseExceptionOnPost");
-    expect(tc.responseBody).toContain("GET");
+    expect(tc.response.body).toContain("GET");
   });
 
   it("post request", async () => {
     await expect(tc.post("raiseExceptionOnPost")).rejects.toThrow("post");
     await tc.post("raiseExceptionOnGet");
-    expect(tc.responseBody).toContain("POST");
+    expect(tc.response.body).toContain("POST");
   });
 
   it("get post request switch", async () => {
     await tc.post("raiseExceptionOnGet");
-    expect(tc.responseBody).toContain("POST");
+    expect(tc.response.body).toContain("POST");
     await tc.get("raiseExceptionOnPost");
-    expect(tc.responseBody).toContain("GET");
+    expect(tc.response.body).toContain("GET");
     await tc.post("raiseExceptionOnGet");
-    expect(tc.responseBody).toContain("POST");
+    expect(tc.response.body).toContain("POST");
     await tc.get("raiseExceptionOnPost");
-    expect(tc.responseBody).toContain("GET");
+    expect(tc.response.body).toContain("GET");
   });
 
-  it.skip("string constraint", () => {});
+  it("string constraint", async () => {
+    await assertNothingRaised(() => {
+      tc.withRouting((set: RouteSet) => {
+        set.draw(function () {
+          this.get("photos", {
+            to: "action_pack_assertions#nothing",
+            constraints: { subdomain: "admin" },
+          });
+        });
+      });
+    });
+  });
+
+  // BLOCKED: api-redirect-to-override-and-head-response-are-invented
   it.skip("with routing works with api only controllers", () => {});
-  it.skip("assert redirect to named route failure", () => {});
-  it.skip("assert redirect to nested named route", () => {});
-  it.skip("assert redirected to top level named route from nested controller", () => {});
-  it.skip("assert redirected to top level named route with same controller name in both namespaces", () => {});
+
+  it("assert redirect to named route failure", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("route_one", { to: "action_pack_assertions#nothing", as: "route_one" });
+        this.get("route_two", { to: "action_pack_assertions#nothing", id: "two", as: "route_two" });
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+      await tc.process("redirectToNamedRoute");
+      await assertRaise([Assertion], {}, () => {
+        assertRedirectedTo("http://test.host/route_two");
+      });
+      await assertRaise([Assertion], {}, () => {
+        assertRedirectedTo(/^http:\/\/test.host\/route_two/);
+      });
+      await assertRaise([Assertion], {}, () => {
+        assertRedirectedTo({ controller: "action_pack_assertions", action: "nothing", id: "two" });
+      });
+      await assertRaise([Assertion], {}, () => {
+        assertRedirectedTo(tc.routeTwoUrl());
+      });
+    });
+  });
+
+  it("assert redirect to nested named route", async () => {
+    tc.controller = new Admin.InnerModuleController();
+
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("admin/inner_module", {
+          to: "admin/inner_module#index",
+          as: "admin_inner_module",
+        });
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+      await tc.process("redirectToIndex");
+      assertRedirectedTo(tc.adminInnerModulePath());
+    });
+  });
+
+  it("assert redirected to top level named route from nested controller", async () => {
+    tc.controller = new Admin.InnerModuleController();
+
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("/action_pack_assertions/:id", {
+          to: "action_pack_assertions#index",
+          as: "top_level",
+        });
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+      await tc.process("redirectToTopLevelNamedRoute");
+      assertRedirectedTo("/action_pack_assertions/foo");
+      assertRedirectedTo(/\/action_pack_assertions\/foo/);
+    });
+  });
+
+  it("assert redirected to top level named route with same controller name in both namespaces", async () => {
+    tc.controller = new Admin.InnerModuleController();
+
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("/user/:id", { to: "user#index", as: "top_level" });
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+      await tc.process("redirectToTopLevelNamedRoute");
+      assertRedirectedTo(tc.topLevelPath("foo"));
+    });
+  });
   it("assert redirect failure message with protocol relative url", async () => {
     try {
       await tc.process("redirectExternalProtocolRelative");
@@ -151,23 +292,23 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("empty flash", async () => {
     await tc.get("flashMeNaked");
-    expect(tc.flash.empty).toBe(true);
+    expect(tc.flash().isEmpty()).toBe(true);
   });
 
   it("flash exist", async () => {
     await tc.get("flashMe");
-    expect(tc.flash.empty).toBe(false);
-    expect(tc.flash.get("hello")).toBeTruthy();
+    expect(tc.flash().isEmpty()).toBe(false);
+    expect(tc.flash().get("hello")).toBeTruthy();
   });
 
   it("flash does not exist", async () => {
     await tc.get("nothing");
-    expect(tc.flash.empty).toBe(true);
+    expect(tc.flash().isEmpty()).toBe(true);
   });
 
   it("session exist", async () => {
     await tc.get("sessionStuffing");
-    expect(tc.session.get("xmas")).toBe("turkey");
+    expect(tc.session().get("xmas")).toBe("turkey");
   });
 
   it("redirection location", async () => {
@@ -205,18 +346,18 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("redirect url match", async () => {
     await tc.get("redirectExternal");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toMatch(/rubyonrails/);
     expect(tc.response.redirectUrl).not.toMatch(/perloffrails/);
   });
 
   it("redirection", async () => {
     await tc.get("redirectInternal");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     await tc.get("redirectExternal");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     await tc.get("nothing");
-    expect(tc.response.redirection).toBe(false);
+    expect(tc.response.isRedirection).toBe(false);
   });
 
   it("successful response code", async () => {
@@ -231,7 +372,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("render based on parameters", async () => {
     await tc.get("renderBasedOnParameters", { params: { name: "David" } });
-    expect(tc.responseBody).toBe("Mr. David");
+    expect(tc.response.body).toBe("Mr. David");
   });
 
   it("assert redirection fails with incorrect controller", async () => {
@@ -243,7 +384,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("assert redirection with extra controller option", async () => {
     await tc.get("redirectToAction");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toContain("flash_me");
   });
 
@@ -269,11 +410,17 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("assert redirection with symbol", async () => {
     await tc.get("redirectToControllerWithSymbol");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toContain("elsewhere");
   });
 
-  it.skip("assert redirection with custom message", () => {});
+  it("assert redirection with custom message", async () => {
+    const error = await assertRaise([Assertion], {}, () => {
+      assertRedirectedTo("http://test.host/some/path", "wrong redirect");
+    });
+
+    assertEqual("wrong redirect", error.message);
+  });
 
   it("assert redirection with status", async () => {
     await tc.get("redirectToPath");
@@ -284,27 +431,41 @@ describe("ActionPackAssertionsControllerTest", () => {
     tc.assertRedirectedTo("http://test.host/some/path");
   });
 
-  it.skip("redirected to with nested controller", () => {});
+  it("redirected to with nested controller", async () => {
+    tc.controller = new Admin.InnerModuleController();
+    await tc.get("redirectToAbsoluteController");
+    assertRedirectedTo({ controller: "/content" });
 
-  it("assert response uses exception message", async () => {
-    const tc2 = new TestCase(AssertResponseWithUnexpectedErrorController);
+    await tc.get("redirectToFellowController");
+    assertRedirectedTo({ controller: "admin/user" });
+  });
+
+  it("assert response uses exception message", async ({ task }) => {
+    const tc2 = new TestCase(task.name);
+    tc2.controller = new AssertResponseWithUnexpectedErrorController();
+    await tc2.beforeSetup();
     await expect(tc2.get("index")).rejects.toThrow("FAIL");
   });
 
-  it("assert response failure response with no exception", async () => {
-    const tc2 = new TestCase(AssertResponseWithUnexpectedErrorController);
+  it("assert response failure response with no exception", async ({ task }) => {
+    const tc2 = new TestCase(task.name);
+    tc2.controller = new AssertResponseWithUnexpectedErrorController();
+    await tc2.beforeSetup();
     await tc2.get("show");
     tc2.assertResponse(500);
-    expect(tc2.responseBody).toBe("Boom");
+    expect(tc2.response.body).toBe("Boom");
   });
 });
 
 describe("ActionPackHeaderTest", () => {
   let tc: TestCase;
-  beforeEach(() => {
-    tc = new TestCase(ActionPackAssertionsController);
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new ActionPackAssertionsController();
+    await tc.beforeSetup();
   });
 
+  // BLOCKED: action-pack-assertions-port-render-file-tests-and-park-the-builder-three
   it.skip("rendering xml sets content type", () => {});
   it.skip("rendering xml respects content type", () => {});
   it.skip("rendering xml respects content type when set in the header", () => {});

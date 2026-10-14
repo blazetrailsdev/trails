@@ -9,9 +9,9 @@ export { describeIfPg, pgServerVersion, PG_TEST_URL } from "../../support/descri
 export const pgSupportsOptimizerHints = pgAvailable && pgHasHintPlan;
 export const pgSupportsNativePartitioning = pgServerVersion >= 100000;
 
-import { removeNativeDatabaseTypesMemo } from "../../support/with-postgresql-datetime-type.js";
-
-export { withPostgresqlDatetimeType } from "../../support/with-postgresql-datetime-type.js";
+function removeNativeDatabaseTypesMemo(adapter: unknown): void {
+  (adapter as { _nativeDatabaseTypes?: unknown })._nativeDatabaseTypes = undefined;
+}
 
 export async function withNativeDatabaseTypeOverrides<T>(
   overrides: Record<string, string | { name?: string; limit?: number }>,

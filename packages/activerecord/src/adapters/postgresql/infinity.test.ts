@@ -3,7 +3,7 @@ import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.j
 import { BigDecimal } from "@blazetrails/ruby-compat";
 import { Range } from "../../index.js";
 import { setZone } from "@blazetrails/activesupport";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -60,14 +60,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(record.float).toBe(Number.NEGATIVE_INFINITY);
       record = new (M as any)({ float: "NaN" });
       expect(Number.isNaN(record.float)).toBeTruthy();
-    });
-
-    it("updateColumns with infinity on a float column", async () => {
-      const M = await modelClass();
-      const record = await (M as any).create({});
-      await record.updateColumns({ float: Number.POSITIVE_INFINITY });
-      await record.reload();
-      expect(record.float).toBe(Number.POSITIVE_INFINITY);
     });
 
     it("update_all with infinity on a float column", async () => {

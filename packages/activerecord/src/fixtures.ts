@@ -1,10 +1,10 @@
-import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { ActiveRecordError, StatementInvalid } from "./errors.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
   camelize,
+  cattrAccessor,
   OID_NAMESPACE,
   runLoadHooks,
   safeConstantize,
@@ -15,8 +15,15 @@ import {
   ArgumentError,
   Dir,
   File as RubyFile,
+  type Hash,
+  RuntimeError,
+  StandardError,
   Zlib,
+  rbModConstSet,
   rbObjRespondTo,
+  slice,
+  update,
+  valuesAt,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { TableRows } from "./fixture-set/table-rows.js";
@@ -33,21 +40,6 @@ export class FixtureClassNotFound extends ActiveRecordError {
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
 
-/** @internal */
-export async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
-  if (!verifyForeignKeysForFixtures()) return;
-
-  try {
-    await conn.checkAllForeignKeysValidBang();
-  } catch (e) {
-    if (!(e instanceof StatementInvalid)) throw e;
-    throw new Error(
-      `Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations. Error from database:\n\n${e.message}`,
-      { cause: e },
-    );
-  }
-}
-
 const contextClasses = new WeakMap<object, new () => object>();
 
 const allCachedFixtures = new Map<ConnectionPool, Record<string, FixtureSet>>();
@@ -55,7 +47,12 @@ const allCachedFixtures = new Map<ConnectionPool, Record<string, FixtureSet>>();
 export class FixtureSet {
   static readonly MAX_ID = 2 ** 30 - 1;
 
-  static allLoadedFixtures: Record<string, FixtureSet> = {};
+  declare static allLoadedFixtures: Record<string, FixtureSet>;
+  declare allLoadedFixtures: Record<string, FixtureSet>;
+
+  static {
+    cattrAccessor.call(this, "allLoadedFixtures", { default: {} });
+  }
 
   static defaultFixtureModelName(fixtureSetName: string, config: typeof Base = Base): string {
     return config.pluralizeTableNames
@@ -87,9 +84,9 @@ export class FixtureSet {
   static cachedFixtures(
     connectionPool: ConnectionPool,
     keysToFetch: readonly string[] | null = null,
-  ): FixtureSet[] {
+  ): (FixtureSet | undefined)[] {
     if (keysToFetch) {
-      return keysToFetch.map((key) => this.cacheForConnectionPool(connectionPool)[key]);
+      return valuesAt(this.cacheForConnectionPool(connectionPool), ...keysToFetch);
     } else {
       return Object.values(this.cacheForConnectionPool(connectionPool));
     }
@@ -99,7 +96,7 @@ export class FixtureSet {
     connectionPool: ConnectionPool,
     fixturesMap: Record<string, FixtureSet>,
   ): void {
-    Object.assign(this.cacheForConnectionPool(connectionPool), fixturesMap);
+    update(this.cacheForConnectionPool(connectionPool), fixturesMap);
   }
 
   static async instantiateFixtures(
@@ -167,12 +164,12 @@ export class FixtureSet {
     classNames: Record<string, BaseClass | string | null> = {},
     config: typeof Base = Base,
   ): Promise<FixtureSet[]> {
-    const names = (typeof fixtureSetNames === "string" ? [fixtureSetNames] : fixtureSetNames).map(
-      String,
-    );
+    fixtureSetNames = (
+      typeof fixtureSetNames === "string" ? [fixtureSetNames] : fixtureSetNames
+    ).map(String);
 
     const connectionPool = config.connectionPool();
-    const fixtureFilesToRead = names.filter(
+    const fixtureFilesToRead = fixtureSetNames.filter(
       (fsName) => !this.isFixtureIsCached(connectionPool, fsName),
     );
 
@@ -185,7 +182,7 @@ export class FixtureSet {
       );
       this.cacheFixtures(connectionPool, fixturesMap);
     }
-    return this.cachedFixtures(connectionPool, names);
+    return this.cachedFixtures(connectionPool, fixtureSetNames) as FixtureSet[];
   }
 
   private static async readAndInsert(
@@ -229,19 +226,15 @@ export class FixtureSet {
 
       for (const fixtureSet of set) {
         await fixtureSet.modelClass?.loadSchema();
-        for (const [table, rows] of Object.entries(fixtureSet.tableRows())) {
+        for (const [table, rows] of fixtureSet.tableRows()) {
           (tableRowsForConnection[table] ??= []).unshift(...rows);
         }
       }
 
       await pool.withConnection(async (conn) => {
-        await insertFixturesSet.call(
-          conn as unknown as ThisParameterType<typeof insertFixturesSet>,
-          tableRowsForConnection,
-          Object.keys(tableRowsForConnection),
-        );
+        await conn.insertFixturesSet(tableRowsForConnection, Object.keys(tableRowsForConnection));
 
-        await checkAllForeignKeysValidBang(conn);
+        await this.checkAllForeignKeysValidBang(conn);
 
         if (rbObjRespondTo(conn, "resetPkSequenceBang")) {
           for (const fs of set)
@@ -253,8 +246,22 @@ export class FixtureSet {
     }
   }
 
+  private static async checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
+    if (!verifyForeignKeysForFixtures()) return;
+
+    try {
+      await conn.checkAllForeignKeysValidBang();
+    } catch (e) {
+      if (!(e instanceof StatementInvalid)) throw e;
+      throw new RuntimeError(
+        `Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations. Error from database:\n\n${e.message}`,
+        { cause: e },
+      );
+    }
+  }
+
   private static updateAllLoadedFixtures(fixturesMap: Record<string, FixtureSet>): void {
-    Object.assign(this.allLoadedFixtures, fixturesMap);
+    update(this.allLoadedFixtures, fixturesMap);
   }
 
   readonly tableName: string;
@@ -309,7 +316,7 @@ export class FixtureSet {
     return Object.keys(this.fixtures).length;
   }
 
-  tableRows(): Record<string, Record<string, unknown>[]> {
+  tableRows(): Hash<string, Record<string, unknown>[]> {
     for (const label of this.ignoredFixtures ?? []) delete this.fixtures[label];
 
     return new TableRows(this.tableName, {
@@ -352,7 +359,8 @@ export class FixtureSet {
 
     if (yamlFiles.length === 0) throw new ArgumentError(`No fixture files found for ${this.name}`);
 
-    return yamlFiles.reduce<Record<string, Fixture>>((fixtures, file) => {
+    const fixtures: Record<string, Fixture> = {};
+    for (const file of yamlFiles) {
       File.open(file, (fh) => {
         if (this.modelClass == null && fh.modelClass) this.setModelClass(fh.modelClass as string);
         if (this.modelClass == null) this.setModelClass(this.defaultFixtureModelClass());
@@ -361,8 +369,8 @@ export class FixtureSet {
           fixtures[fixtureName] = new Fixture(row as FixtureAttrs, this.modelClass);
         });
       });
-      return fixtures;
-    }, {});
+    }
+    return fixtures;
   }
 
   private defaultFixtureModelClass(): BaseClass | null {
@@ -373,7 +381,7 @@ export class FixtureSet {
   }
 }
 
-export class FixtureError extends Error {
+export class FixtureError extends StandardError {
   constructor(message: string) {
     super(message);
     this.name = "ActiveRecord::Fixture::FixtureError";
@@ -425,10 +433,7 @@ export class Fixture {
     const modelClass = this.modelClass;
     const object = await modelClass.unscoped(() => {
       const pk = modelClass.primaryKey;
-      const pkClauses: FixtureAttrs = {};
-      for (const key of Array.isArray(pk) ? pk : pk == null ? [] : [pk]) {
-        if (key in this.fixture) pkClauses[key] = this.fixture[key];
-      }
+      const pkClauses = slice(this.fixture, ...(Array.isArray(pk) ? pk : pk == null ? [] : [pk]));
       return modelClass.findByBang(pkClauses);
     });
     object._strictLoading = false;
@@ -437,5 +442,7 @@ export class Fixture {
 }
 
 ActiveRecord.Fixture = Fixture;
+rbModConstSet(ActiveRecord, "FixtureSet", FixtureSet);
+rbModConstSet(FixtureSet, "File", File);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);

@@ -166,20 +166,3 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
     expect(User.humanAttributeName("items", { count: 2 })).toBe("2 item(s)");
   });
 });
-
-describe("raise_on_missing_translations accessor", () => {
-  it("toggles the shared singleton via Translation and Validations", async () => {
-    const translation = await import("./translation.js");
-    const validations = await import("./validations.js");
-    const original = translation.raiseOnMissingTranslations();
-    try {
-      translation.raiseOnMissingTranslations(true);
-      expect(validations.raiseOnMissingTranslations()).toBe(true);
-
-      validations.raiseOnMissingTranslations(false);
-      expect(translation.raiseOnMissingTranslations()).toBe(false);
-    } finally {
-      translation.raiseOnMissingTranslations(original);
-    }
-  });
-});

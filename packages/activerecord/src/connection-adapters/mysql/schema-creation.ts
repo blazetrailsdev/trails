@@ -107,7 +107,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected async visitIndexDefinition(o: IndexDefinition, create = false): Promise<string> {
-    const indexType = o.type?.toUpperCase() ?? (o.unique ? "UNIQUE" : undefined);
+    const indexType = o.type?.toUpperCase() || (o.unique && "UNIQUE");
 
     const parts: string[] = create ? ["CREATE"] : [];
     if (indexType) parts.push(indexType);

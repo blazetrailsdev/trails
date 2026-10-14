@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Attribute, Attributes, Table, Nodes, SelectManager } from "./index.js";
+import { Attribute, Attributes, Table, Nodes, SelectManager, type ArelNode } from "./index.js";
 import { Predications } from "./predications.js";
 
 const users = new Table("users");
@@ -28,7 +28,7 @@ describe("Predications.groupingAny / groupingAll", () => {
     const attr = users.get("id");
     const any = Predications.groupingAny.call(attr, "eq", []);
     expect(any.expr).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((any.expr as Nodes.SqlLiteral).value).toBe("NULL");
+    expect((any.expr as Nodes.SqlLiteral).toString()).toBe("NULL");
     expect(attr.eqAny([])).toEqual(any);
 
     const all = Predications.groupingAll.call(attr, "eq", []);
@@ -61,10 +61,10 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   const host = {
     quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node,
     quotedArray: (vs: unknown[]): Nodes.Node[] => vs as Nodes.Node[],
-    isInfinity(this: unknown, v: unknown): 1 | -1 | 0 {
+    isInfinity(this: unknown, v: unknown): 1 | -1 | null | false {
       return Predications.isInfinity.call(this as never, v);
     },
-    isUnboundable(this: unknown, v: unknown): 1 | -1 | 0 {
+    isUnboundable(this: unknown, v: unknown): 1 | -1 | false {
       return Predications.isUnboundable.call(this as never, v);
     },
   };
@@ -72,11 +72,11 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   const isUnboundable = (v: unknown) => Predications.isUnboundable.call(host, v);
   const isOpenEnded = (v: unknown) => Predications.isOpenEnded.call(host, v);
 
-  it("isInfinity yields the sign for ±Infinity, 0 otherwise", () => {
+  it("isInfinity yields the sign for ±Infinity, nil for a finite number, false otherwise", () => {
     expect(isInfinity(Infinity)).toBe(1);
     expect(isInfinity(-Infinity)).toBe(-1);
-    expect(isInfinity(0)).toBe(0);
-    expect(isInfinity("x")).toBe(0);
+    expect(isInfinity(0)).toBe(null);
+    expect(isInfinity("x")).toBe(false);
   });
 
   it("isInfinity duck-types a value exposing isInfinite()", () => {
@@ -87,24 +87,24 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   it("isInfinity reaches a Quoted through its own infinite?, not a structural unwrap", () => {
     expect(isInfinity(new Nodes.Quoted({ isInfinite: () => 1 as const }))).toBe(1);
     expect(isInfinity(new Nodes.Quoted({ isInfinite: () => -1 as const }))).toBe(-1);
-    expect(isInfinity(new Nodes.Quoted(3))).toBe(0);
+    expect(isInfinity(new Nodes.Quoted(3))).toBe(null);
   });
 
   it("isInfinity does not unwrap Casted, which defines no infinite? in Rails", () => {
-    expect(isInfinity(new Nodes.Casted(Infinity, users.get("id")))).toBe(0);
+    expect(isInfinity(new Nodes.Casted(Infinity, users.get("id")))).toBe(false);
     expect(isOpenEnded(new Nodes.Casted(Infinity, users.get("id")))).toBe(false);
   });
 
   it("isUnboundable duck-types the protocol and yields the sign", () => {
     expect(isUnboundable({ isUnboundable: () => 1 as const })).toBe(1);
     expect(isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
-    expect(isUnboundable({ isUnboundable: () => false as const })).toBe(0);
+    expect(isUnboundable({ isUnboundable: () => false as const })).toBe(false);
   });
 
-  it("isUnboundable is 0 for values with no unboundable? — including ±Infinity", () => {
-    expect(isUnboundable(Infinity)).toBe(0);
-    expect(isUnboundable(undefined)).toBe(0);
-    expect(isUnboundable(1)).toBe(0);
+  it("isUnboundable is false for values with no unboundable? — including ±Infinity", () => {
+    expect(isUnboundable(Infinity)).toBe(false);
+    expect(isUnboundable(undefined)).toBe(false);
+    expect(isUnboundable(1)).toBe(false);
   });
 
   it("isOpenEnded is true for null/undefined/Infinity/unboundable, false otherwise", () => {
@@ -115,6 +115,11 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
     expect(isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
     expect(isOpenEnded(0)).toBe(false);
     expect(isOpenEnded("x")).toBe(false);
+  });
+
+  it("isOpenEnded is false for a nil unboundable? answer", () => {
+    expect(isOpenEnded({ isUnboundable: () => undefined })).toBe(false);
+    expect(isOpenEnded({ isUnboundable: () => null })).toBe(false);
   });
 
   it("isOpenEnded dispatches infinity?/unboundable? through `this` so host overrides win", () => {
@@ -136,8 +141,8 @@ describe("Attribute private helpers (mirror Predications)", () => {
   type AttributePrivates = Attribute & {
     groupingAny: (methodId: string, others: unknown[]) => Nodes.Grouping;
     groupingAll: (methodId: string, others: unknown[]) => Nodes.Grouping;
-    isInfinity: (value: unknown) => 1 | -1 | 0;
-    isUnboundable: (value: unknown) => 1 | -1 | 0;
+    isInfinity: (value: unknown) => 1 | -1 | null | false;
+    isUnboundable: (value: unknown) => 1 | -1 | false;
     isOpenEnded: (value: unknown) => boolean;
   };
 
@@ -151,8 +156,8 @@ describe("Attribute private helpers (mirror Predications)", () => {
     const attr = users.get("id") as AttributePrivates;
     expect(attr.isInfinity(Infinity)).toBe(1);
     expect(attr.isInfinity(-Infinity)).toBe(-1);
-    expect(attr.isInfinity(0)).toBe(0);
-    expect(attr.isUnboundable(0)).toBe(0);
+    expect(attr.isInfinity(0)).toBe(null);
+    expect(attr.isUnboundable(0)).toBe(false);
     expect(attr.isOpenEnded(null)).toBe(true);
     expect(attr.isOpenEnded(Infinity)).toBe(true);
     expect(attr.isOpenEnded(0)).toBe(false);
@@ -167,7 +172,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
 
 describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () => {
   class OverridingAttribute extends Attributes.Attribute {
-    override isInfinity(_value: unknown): 1 | -1 | 0 {
+    override isInfinity(_value: unknown): 1 | -1 | null | false {
       return 1;
     }
   }
@@ -190,7 +195,7 @@ describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () 
 
 describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   class TestManager extends SelectManager {
-    callCollapse(exprs: unknown[]): Nodes.Node {
+    callCollapse(exprs: unknown[]): ArelNode {
       return (this as unknown as { collapse(e: unknown[]): Nodes.Node }).collapse(exprs);
     }
   }
@@ -205,7 +210,7 @@ describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   it("wraps a bare string as SqlLiteral", () => {
     const out = mgr.callCollapse(["LOWER(name) = 'x'"]);
     expect(out).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((out as Nodes.SqlLiteral).value).toBe("LOWER(name) = 'x'");
+    expect((out as Nodes.SqlLiteral).toString()).toBe("LOWER(name) = 'x'");
   });
 
   it("folds multiple exprs into an And via createAnd", () => {

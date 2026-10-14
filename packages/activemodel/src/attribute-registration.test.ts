@@ -1,9 +1,12 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ValueType } from "./index.js";
 import type { AttributeSet } from "./attribute-set.js";
 import { AttributeRegistration } from "./attribute-registration.js";
-import { typeRegistry } from "./type/registry.js";
+import { registry } from "./type.js";
 import { include, assertNil } from "@blazetrails/activesupport";
+
+const typeRegistry = registry();
 
 class MyType extends ValueType<unknown> {}
 typeRegistry.register(MyType.name, MyType);
@@ -74,9 +77,9 @@ describe("AttributeRegistrationTest", () => {
     });
 
     expect(attributes.getAttribute("foo").type).toBe(TYPE_1);
-    expect(attributes.getAttribute("foo").value).toEqual(123);
+    expect(attributes.getAttribute("foo").value()).toEqual(123);
     expect(attributes.getAttribute("bar").type).toBe(TYPE_2);
-    expect(attributes.getAttribute("bar").value).toEqual(456);
+    expect(attributes.getAttribute("bar").value()).toEqual(456);
   });
 
   it("default value can be nil", () => {
@@ -93,14 +96,14 @@ describe("AttributeRegistrationTest", () => {
     const klass = classWith(null, (klass) => {
       klass.attribute("foo", TYPE_1);
     });
-    expect(klass.attributeTypes()["foo"]).toBe(TYPE_1);
+    expect(hashAref(klass.attributeTypes(), "foo")).toBe(TYPE_1);
   });
 
   it(".attribute_types returns the default type when key is missing", () => {
     const klass = classWith(null, (klass) => {
       klass.attribute("foo", TYPE_1);
     });
-    expect(klass.attributeTypes()["bar"]).toEqual(new ValueType());
+    expect(hashAref(klass.attributeTypes(), "bar")).toEqual(new ValueType());
   });
 
   it(".type_for_attribute returns the registered attribute type", () => {
@@ -124,13 +127,13 @@ describe("AttributeRegistrationTest", () => {
     });
     expect(klass._defaultAttributes().keys()).toContain("foo");
     expect(klass._defaultAttributes().keys()).not.toContain("bar");
-    expect(klass.attributeTypes()["foo"]).toBe(TYPE_1);
+    expect(hashAref(klass.attributeTypes(), "foo")).toBe(TYPE_1);
 
     klass.attribute("bar", TYPE_2);
     expect(klass._defaultAttributes().keys()).toContain("foo");
     expect(klass._defaultAttributes().keys()).toContain("bar");
-    expect(klass.attributeTypes()["foo"]).toBe(TYPE_1);
-    expect(klass.attributeTypes()["bar"]).toBe(TYPE_2);
+    expect(hashAref(klass.attributeTypes(), "foo")).toBe(TYPE_1);
+    expect(hashAref(klass.attributeTypes(), "bar")).toBe(TYPE_2);
   });
 
   it("attributes are inherited", () => {
@@ -143,8 +146,8 @@ describe("AttributeRegistrationTest", () => {
     expect(parent._defaultAttributes().getAttribute("foo").type).toBe(
       child._defaultAttributes().getAttribute("foo").type,
     );
-    expect(parent._defaultAttributes().getAttribute("foo").value).toBe(
-      child._defaultAttributes().getAttribute("foo").value,
+    expect(parent._defaultAttributes().getAttribute("foo").value()).toBe(
+      child._defaultAttributes().getAttribute("foo").value(),
     );
   });
 
@@ -209,10 +212,10 @@ describe("AttributeRegistrationTest", () => {
 
     expect(child._defaultAttributes().getAttribute("foo").type).toBe(TYPE_1);
     expect(child._defaultAttributes().getAttribute("bar").type).toBe(TYPE_2);
-    expect(child._defaultAttributes().getAttribute("foo").value).toEqual(456);
-    expect(child._defaultAttributes().getAttribute("bar").value).toEqual(789);
-    expect(parent._defaultAttributes().getAttribute("foo").value).toEqual(123);
-    assertNil(parent._defaultAttributes().getAttribute("bar").value);
+    expect(child._defaultAttributes().getAttribute("foo").value()).toEqual(456);
+    expect(child._defaultAttributes().getAttribute("bar").value()).toEqual(789);
+    expect(parent._defaultAttributes().getAttribute("foo").value()).toEqual(123);
+    assertNil(parent._defaultAttributes().getAttribute("bar").value());
   });
 
   it(".decorate_attributes decorates specified attributes", () => {

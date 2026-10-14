@@ -1,3 +1,5 @@
+import { extractOptionsBang } from "@blazetrails/activesupport";
+import { flatten } from "@blazetrails/ruby-compat";
 import type { ValidatableRecord } from "../validator.js";
 import { HelperMethods as AbsenceHelperMethods } from "./absence.js";
 import { HelperMethods as AcceptanceHelperMethods } from "./acceptance.js";
@@ -25,16 +27,9 @@ export interface HelperMethodsHost {
 export const HelperMethods = {
   /** @internal */
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown> {
-    const last = attrNames[attrNames.length - 1];
-    const options: Record<string, unknown> =
-      last !== null &&
-      typeof last === "object" &&
-      !Array.isArray(last) &&
-      last.constructor === Object
-        ? { ...(attrNames.pop() as Record<string, unknown>) }
-        : {};
-    const flat = attrNames.flat(Infinity).map((n) => String(n));
-    options.attributes = flat;
+    const options: Record<string, unknown> = { ...extractOptionsBang(attrNames) };
+    attrNames.splice(0, attrNames.length, ...flatten(attrNames));
+    options.attributes = attrNames;
     return options;
   },
 

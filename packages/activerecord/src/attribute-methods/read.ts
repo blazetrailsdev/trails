@@ -1,11 +1,12 @@
 import type { AttributeSet } from "@blazetrails/activemodel";
-import { AttrNames, AttributeMethods, completeHalfAccessor } from "@blazetrails/activemodel";
+import { AttrNames, completeHalfAccessor } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
+import { rbFCaller } from "@blazetrails/ruby-compat";
 import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
 export interface Read {
-  readAttribute(name: string): unknown;
-  _readAttribute(name: string): unknown;
+  readAttribute(attrName: string, block?: (name: string) => unknown): unknown;
+  _readAttribute(attrName: string, block?: (name: string) => unknown): unknown;
   /** @internal */
   attribute(name: string): unknown;
 }
@@ -60,21 +61,21 @@ export function defineMethodAttribute(
   canonicalName: string,
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName);
-  const tempMethodName = AttributeMethods.ClassMethods.buildMangledName(methodName);
   completeHalfAccessor(this, as, "get", function (this: ReadRecord) {
     return readGeneratedAttribute(this, canonicalName);
   });
-  owner.defineCachedMethod(tempMethodName, { namespace: "active_record", as }, (batch) => {
-    batch.push((mod) => {
-      Object.defineProperty(mod, tempMethodName, {
-        get(this: ReadRecord) {
-          return readGeneratedAttribute(this, canonicalName);
-        },
-        set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
-          this.writeAttribute(canonicalName, value);
-        },
-        configurable: true,
+  AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {}, (tempMethodName) => {
+    owner.defineCachedMethod(tempMethodName, { namespace: "active_record", as }, (batch) => {
+      batch.push((mod) => {
+        Object.defineProperty(mod, tempMethodName, {
+          get(this: ReadRecord) {
+            return readGeneratedAttribute(this, canonicalName);
+          },
+          set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
+            this.writeAttribute(canonicalName, value);
+          },
+          configurable: true,
+        });
       });
     });
   });
@@ -83,12 +84,12 @@ export function defineMethodAttribute(
 interface ReadRecord {
   _attributes: AttributeSet;
   _readAttribute(n: string, block: (n: string) => unknown): unknown;
-  missingAttribute(n: string, stack?: string): never;
+  missingAttribute(n: string, stack: string[]): never;
 }
 
 /** @internal */
 function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
-  return record._readAttribute(canonicalName, (n) => record.missingAttribute(n));
+  return record._readAttribute(canonicalName, (n) => record.missingAttribute(n, rbFCaller()));
 }
 
 AttributeMethodsNamespace.Read = Read;

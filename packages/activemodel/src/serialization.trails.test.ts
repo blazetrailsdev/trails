@@ -148,6 +148,59 @@ describe("Serialization — trails-only coverage", () => {
     ).toBe("Hi Bob");
   });
 
+  it("read_attribute_for_serialization sends the method a stored value shares its name with", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+        this.attribute("greeting", "string");
+      }
+      greeting(): string {
+        return "Hi " + (this._readAttribute("name") as string);
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Bob" });
+    p._writeAttribute("greeting", "stored");
+    expect(p.attribute("greeting")).toBe("stored");
+    expect(
+      readAttributeForSerialization.call(p as unknown as SerializationRecord, "greeting"),
+    ).toBe("Hi Bob");
+    expect({ ...p.serializableHash() }).toEqual({ name: "Bob", greeting: "Hi Bob" });
+  });
+
+  it("serializable_hash leaves out a stored value an included module's method shares its name with", () => {
+    class Greets {
+      greeting(): string {
+        return "Hi";
+      }
+    }
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        include(this, Greets);
+        this.attribute("name", "string");
+        this.attribute("greeting", "string");
+      }
+    }
+    interface Person extends Attributes, SerializersJSON, Greets {}
+
+    const p = new Person({ name: "Bob" });
+    p._writeAttribute("greeting", "stored");
+    expect({ ...p.serializableHash() }).toEqual({ name: "Bob" });
+    expect({ ...p.serializableHash({ methods: ["greeting"] }) }).toEqual({
+      name: "Bob",
+      greeting: "Hi",
+    });
+  });
+
   it("a caller option named __sync does not hijack the internal sync re-entry", () => {
     class Person extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
@@ -235,6 +288,28 @@ describe("Serialization — trails-only coverage", () => {
     expect((result.comments as any[])[0].author).toBeUndefined();
   });
 
+  it("include naming a method that returns a Set raises NoMethodError", async () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: new Set([new Tag({ name: "rails" })]) });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+    await expect(p.serializableHash({ include: "tags" })).rejects.toThrow(NoMethodError);
+  });
+
+  it("include naming a to_ary that answers nil raises rather than serializing nothing", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { toAry: () => null } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+  });
+
+  it("include naming an object that answers toArray but not to_ary is sent serializable_hash", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { toArray: () => Promise.resolve([]) } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+  });
+
   it("awaited nested include preloads through an attributes-less PORO", async () => {
     const comment = { _attributes: new Map([["text", "Nice"]]) };
     const comments = {
@@ -243,8 +318,8 @@ describe("Serialization — trails-only coverage", () => {
         this.loaded = true;
         return Promise.resolve();
       },
-      [Symbol.iterator](): Iterator<unknown> {
-        return [comment][Symbol.iterator]();
+      toAry(): unknown[] {
+        return [comment];
       },
     };
     const author = { name: "Bob", comments };
@@ -327,7 +402,7 @@ describe("Serialization — trails-only coverage", () => {
       interface Weird extends Attributes, SerializersJSON {}
 
       const w = new Weird({ toJSON: "raw-value", name: "w" });
-      expect(JSON.parse(JSON.stringify(w))).toEqual({ toJSON: "raw-value", name: "w" });
+      expect(JSON.parse(JSON.stringify(w))).toEqual({ name: "w" });
       expect(w.attribute("toJSON")).toBe("raw-value");
     });
 

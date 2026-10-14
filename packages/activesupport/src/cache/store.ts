@@ -1,3 +1,4 @@
+import { Time } from "@blazetrails/date";
 import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
 import {
@@ -16,6 +17,7 @@ import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
 import { toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
+import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
@@ -91,8 +93,14 @@ export class WriteOptions {
 
 /** @internal */
 export abstract class Store {
-  static logger: CacheLogger | null = null;
-  static raiseOnInvalidCacheExpirationTime = false;
+  declare static logger: CacheLogger | null | undefined;
+  declare logger: CacheLogger | null | undefined;
+  declare static raiseOnInvalidCacheExpirationTime: boolean;
+
+  static {
+    cattrAccessor.call(this, "logger", { instanceWriter: true });
+    cattrAccessor.call(this, "raiseOnInvalidCacheExpirationTime", { default: false });
+  }
 
   static with<T>(options: { logger: CacheLogger }, fn: () => T): T {
     const prev = Store.logger;
@@ -444,7 +452,7 @@ export abstract class Store {
     payload: EventPayload,
     block?: (payload: EventPayload) => T,
   ): T {
-    if (Store.logger?.isDebug?.() && !this.silence) {
+    if (this.logger?.isDebug?.() && !this.silence) {
       const key = payload.key;
       const multiSize = Array.isArray(key)
         ? key.length
@@ -458,7 +466,7 @@ export abstract class Store {
           : "";
       const debugOptions =
         options && Object.keys(options).length > 0 ? ` (${JSON.stringify(options)})` : "";
-      Store.logger.debug?.(`Cache ${operation}${debugKey}${debugOptions}`);
+      this.logger.debug?.(`Cache ${operation}${debugKey}${debugOptions}`);
     }
     payload.store = this.constructor.name;
     if (options) Object.assign(payload, options);
@@ -533,7 +541,6 @@ export abstract class Store {
     return entries.filter((key) => this.deleteEntry(key, options)).length;
   }
 
-  /** @missingRailsCall merge — PERMANENT */
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
     if (!callOptions) return this.options;
 
@@ -545,7 +552,7 @@ export abstract class Store {
 
     const expiresAt = call.expiresAt as number | undefined;
     if (expiresAt != null) {
-      call.expiresIn = (expiresAt - Date.now()) / 1000;
+      call.expiresIn = (expiresAt - Time.now().toF() * 1000) / 1000;
       delete call.expiresAt;
     }
 
@@ -559,7 +566,7 @@ export abstract class Store {
     if (call.expiresIn != null && (call.expiresIn as number) < 0) {
       const expiresIn = call.expiresIn;
       delete call.expiresIn;
-      Store.handleInvalidExpiresIn(
+      this.handleInvalidExpiresIn(
         `Cache expiration time is invalid, cannot be negative: ${expiresIn}`,
       );
     }
@@ -602,13 +609,14 @@ export abstract class Store {
     return options;
   }
 
-  static handleInvalidExpiresIn(message: string): void {
+  /** @internal */
+  private handleInvalidExpiresIn(message: string): void {
     const error = new ArgumentError(message);
     if (Store.raiseOnInvalidCacheExpirationTime) {
       throw error;
     } else {
       currentErrorReporter.report(error, { handled: true, severity: "warning" });
-      Store.logger?.error?.(`${error.name}: ${error.message}`);
+      this.logger?.error?.(`${error.name}: ${error.message}`);
     }
   }
 
@@ -618,10 +626,13 @@ export abstract class Store {
     return this.namespaceKey(strKey, options);
   }
 
-  /** @missingRailsCall call — PERMANENT */
   protected keyMatcher(pattern: RegExp, options?: StoreOptions): RegExp {
-    const ns = options && "namespace" in options ? options.namespace : this.options.namespace;
-    const prefix = typeof ns === "function" ? (ns as () => string)() : (ns as string | undefined);
+    const namespace =
+      options && "namespace" in options ? options.namespace : this.options.namespace;
+    const prefix =
+      typeof namespace === "function"
+        ? (namespace as () => string)()
+        : (namespace as string | undefined);
     if (prefix) {
       let source = pattern.source;
       source = source.startsWith("^") ? source.slice(1) : `.*${source}`;
@@ -692,8 +703,8 @@ export abstract class Store {
   ): Entry | null {
     if (entry && entry.isExpired()) {
       const raceTtl = typeof options.raceConditionTtl === "number" ? options.raceConditionTtl : 0;
-      if (raceTtl > 0 && Date.now() - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
-        entry.expiresAt = Date.now() + raceTtl * 1000;
+      if (raceTtl > 0 && Time.now().toF() * 1000 - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
+        entry.expiresAt = Time.now().toF() * 1000 + raceTtl * 1000;
         this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });
       } else {
         this.deleteEntry(key, options);

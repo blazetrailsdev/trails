@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Metal } from "../metal.js";
+import { Head } from "../metal/head.js";
+import { include, type Included } from "@blazetrails/ruby-compat";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
 import { Parameters } from "../metal/strong-parameters.js";
@@ -49,5 +51,140 @@ describe("Metal#response_body=", () => {
     c.responseBody = htmlSafe("<p>hi</p>");
     expect(c.response.body).toBe("<p>hi</p>");
     expect(c.response.getHeader("content-length")).toBe("9");
+  });
+});
+
+describe("Metal#response_body= / #status=", () => {
+  it("joins an Array body", () => {
+    const c = new (class extends Metal {})();
+    c.setResponseBang(makeResponse());
+    c.responseBody = ["a", "b"];
+    expect(c.responseBody).toBe("ab");
+  });
+
+  it("a nil body resets the response's", () => {
+    const c = new (class extends Metal {})();
+    c.setResponseBang(makeResponse());
+    c.responseBody = "hi";
+    c.responseBody = null;
+    expect(c.response.body).toBe("");
+  });
+
+  it("status= and head raise on an unknown status symbol", () => {
+    const klass = class extends Metal {};
+    include(klass, Head);
+    const c = new klass() as Metal & Included<typeof Head>;
+    c.setResponseBang(makeResponse());
+    expect(() => {
+      c.status = "bogus";
+    }).toThrow("Unrecognized status code :bogus");
+    expect(() => c.head("bogus")).toThrow("Unrecognized status code :bogus");
+  });
+});
+
+describe("Metal#dispatch", () => {
+  it("seats the controller on the request's action_controller.instance", async () => {
+    class TestController extends Metal {
+      index(): void {
+        this.responseBody = "ok";
+      }
+    }
+    const c = new TestController();
+    const req = makeRequest();
+    await c.dispatch("index", req, makeResponse());
+    expect(req.controllerInstance).toBe(c);
+    expect(req.env["action_controller.instance"]).toBe(c);
+  });
+});
+
+describe("Metal.middlewareStack", () => {
+  it("a subclass reads a copy of its superclass's stack, and writes stay local", () => {
+    const middleware = (app: unknown) => app;
+    class ParentController extends Metal {}
+    ParentController.use(middleware as never);
+    class ChildController extends ParentController {}
+    ChildController.use(middleware as never);
+
+    expect(Metal.middlewareStack.isAny()).toBe(false);
+    expect(ParentController.middleware().middlewares.length).toBe(1);
+    expect(ChildController.middleware().middlewares.length).toBe(2);
+    expect(ChildController.middleware()).toBe(ChildController.middlewareStack);
+    expect(new ChildController().middlewareStack).toBe(ChildController.middlewareStack);
+    expect(ChildController.isMiddlewareStack).toBe(true);
+  });
+});
+
+describe("Metal#response_code / #to_a", () => {
+  it("response_code is an alias of status", () => {
+    const c = new (class extends Metal {})();
+    c.setResponseBang(makeResponse());
+    c.status = 404;
+    expect(c.responseCode).toBe(404);
+  });
+
+  it("to_a is the response's Rack triple", async () => {
+    class TestController extends Metal {
+      index(): void {
+        this.responseBody = "hi";
+      }
+    }
+    const c = new TestController();
+    const triple = await c.dispatch("index", makeRequest(), makeResponse());
+    expect(triple[0]).toBe(200);
+    expect(c.toA()[0]).toBe(200);
+  });
+});
+
+describe("AbstractController::Base instance readers", () => {
+  class PostsController extends Metal {
+    index(): void {}
+    private secret(name: string): string {
+      return `secret ${name}`;
+    }
+  }
+
+  it("controller_path and action_methods delegate to the class", () => {
+    const c = new PostsController();
+    expect(c.controllerPath()).toBe(PostsController.controllerPath());
+    expect(c.actionMethods()).toEqual(PostsController.actionMethods());
+  });
+
+  it("inspect carries the object id", () => {
+    expect(new PostsController().inspect()).toMatch(/^#<PostsController:0x[0-9a-f]{14}>$/);
+  });
+
+  it("send_action sends the method with its arguments", () => {
+    expect(new PostsController().sendAction("secret", "x")).toBe("secret x");
+  });
+});
+
+describe("Parameters.alwaysPermittedParameters", () => {
+  it("is shared between the class and its instances", () => {
+    const original = Parameters.alwaysPermittedParameters;
+    try {
+      Parameters.alwaysPermittedParameters = ["controller", "action", "format"];
+      expect(new Parameters({}).alwaysPermittedParameters).toEqual([
+        "controller",
+        "action",
+        "format",
+      ]);
+    } finally {
+      Parameters.alwaysPermittedParameters = original;
+    }
+  });
+});
+
+describe("Base etag seats", () => {
+  it("etaggers and etag_with_template_digest are declared by their modules", async () => {
+    const { Base } = await import("../base.js");
+    class PostsController extends Base {}
+    PostsController.etag(() => "mine");
+
+    expect(Base.etaggers.length).toBe(2);
+    expect(PostsController.etaggers.length).toBe(3);
+    expect(Base.etagWithTemplateDigest).toBe(true);
+    PostsController.etagWithTemplateDigest = false;
+    expect(Base.etagWithTemplateDigest).toBe(true);
+    expect(new PostsController().etagWithTemplateDigest).toBe(false);
   });
 });

@@ -1,33 +1,26 @@
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import { rbEqual } from "@blazetrails/ruby-compat";
-import { isDuplicable, registerConstant } from "@blazetrails/activesupport";
+import {
+  hasKey,
+  rbEqual,
+  rbHash,
+  rbModConstSet,
+  rbDeclareIvar,
+  rbObjAsString,
+  rbObjDup,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { isDuplicable } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
-import type { Coder } from "@blazetrails/activesupport/yaml";
-
-function dupValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.slice();
-  if (value instanceof Map) return new Map(value);
-  if (value instanceof Set) return new Set(value);
-  if (typeof value === "object" && value !== null) {
-    const proto = Object.getPrototypeOf(value) as object | null;
-    if (proto === Object.prototype || proto === null) return { ...value };
-  }
-  return value;
-}
+import type { Psych } from "@blazetrails/ruby-compat/psych";
 
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
   "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
 );
 
-const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
-
 export abstract class Attribute {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [rubyNamespace]: string = "ActiveModel";
-
   declare static UserProvidedDefault: typeof UserProvidedDefault;
   declare static FromDatabase: typeof FromDatabase;
   declare static FromUser: typeof FromUser;
@@ -40,10 +33,8 @@ export abstract class Attribute {
   readonly type: ValueType | null;
   /** @internal */
   originalAttribute: Attribute | null;
-  private _value: unknown;
-  private _hasValue: boolean;
-  private _cachedValueForDatabase: unknown;
-  protected _hasValueForDatabase: boolean;
+  declare protected _value: unknown;
+  declare protected __valueForDatabase: unknown;
 
   static fromDatabase(
     name: string | null,
@@ -95,22 +86,11 @@ export abstract class Attribute {
     this.type = type;
     this.originalAttribute = originalAttribute;
 
-    if (value != null) {
-      this._value = value;
-      this._hasValue = true;
-    } else {
-      this._value = undefined;
-      this._hasValue = false;
-    }
-    this._cachedValueForDatabase = undefined;
-    this._hasValueForDatabase = false;
+    if (value != null) this._value = value;
   }
 
-  get value(): unknown {
-    if (!this._hasValue) {
-      this._value = this.typeCast(this.valueBeforeTypeCast);
-      this._hasValue = true;
-    }
+  value(_?: (name: string) => unknown): unknown {
+    if (!Object.hasOwn(this, "_value")) this._value = this.typeCast(this.valueBeforeTypeCast);
     return this._value;
   }
 
@@ -121,34 +101,34 @@ export abstract class Attribute {
     return this.typeCast(this.valueBeforeTypeCast);
   }
 
-  /** @missingRailsArgs changed_in_place? — PERMANENT */
+  /** @missingRailsName valueForDatabase — PERMANENT */
   get valueForDatabase(): unknown {
     if (
-      !this._hasValueForDatabase ||
-      this.type!.isChangedInPlace(this._cachedValueForDatabase, this.value)
+      !Object.hasOwn(this, "__valueForDatabase") ||
+      this.type!.isChangedInPlace(this.__valueForDatabase, this.value())
     ) {
-      this._cachedValueForDatabase = this._valueForDatabase();
-      this._hasValueForDatabase = true;
+      this.__valueForDatabase = this._valueForDatabase();
     }
-    return this._cachedValueForDatabase;
+    return this.__valueForDatabase;
   }
 
   /** @internal */
   protected _valueForDatabase(): unknown {
-    return this.type!.serialize(this.value);
+    return this.type!.serialize(this.value());
   }
 
   isSerializable(block?: (castValue: unknown) => void): boolean {
-    return this.type!.isSerializable(this.value, block);
+    return this.type!.isSerializable(this.value(), block);
   }
 
-  isChanged(): boolean {
+  isChanged(): boolean | undefined {
     return this.changedFromAssignment() || this.changedInPlace();
   }
 
-  changedInPlace(): boolean {
+  changedInPlace(): boolean | undefined {
     return (
-      this.hasBeenRead() && this.type!.isChangedInPlace(this.originalValueForDatabase(), this.value)
+      this.hasBeenRead() &&
+      this.type!.isChangedInPlace(this.originalValueForDatabase(), this.value())
     );
   }
 
@@ -171,7 +151,7 @@ export abstract class Attribute {
 
   withType(type: ValueType | null): Attribute {
     if (this.changedInPlace()) {
-      return this.withValueFromUser(this.value).withType(type);
+      return this.withValueFromUser(this.value()).withType(type);
     }
     const Ctor = this.constructor as new (
       name: string | null,
@@ -193,16 +173,22 @@ export abstract class Attribute {
   }
 
   hasBeenRead(): boolean {
-    return this._hasValue;
+    return Object.hasOwn(this, "_value");
   }
 
   equals(other: Attribute): boolean {
     return (
       this.constructor === other.constructor &&
       this.name === other.name &&
-      this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
+      rbEqual(this.valueBeforeTypeCast, other.valueBeforeTypeCast) &&
       rbEqual(this.type, other.type)
     );
+  }
+
+  declare eql: Attribute["equals"];
+
+  hash(): number {
+    return rbHash([this.constructor, this.name, this.valueBeforeTypeCast, this.type]);
   }
 
   originalValueForDatabase(): unknown {
@@ -223,39 +209,35 @@ export abstract class Attribute {
 
   /** @missingRailsName value — PERMANENT */
   private initializeDup(_other: Attribute): void {
-    if (isDuplicable(this._value)) {
-      this._value = dupValue(this._value);
+    if (this._value != null && isDuplicable(this._value)) {
+      this._value = rbObjDup(this._value);
     }
   }
 
   private changedFromAssignment(): boolean {
-    if (!this.isAssigned()) return false;
-    return this.type!.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
+    return (
+      this.isAssigned() &&
+      this.type!.isChanged(this.originalValue, this.value(), this.valueBeforeTypeCast)
+    );
   }
 
-  /** @missingRailsCall key? — PERMANENT */
-  initWith(coder: Coder): void {
+  initWith(coder: Psych.Coder): void {
     const self = this as { -readonly [K in "name" | "type"]: Attribute[K] };
     self.name = (coder["name"] ?? null) as string | null;
     this._valueBeforeTypeCast = coder["value_before_type_cast"] ?? null;
     self.type = (coder["type"] ?? null) as ValueType | null;
     this.originalAttribute = (coder["original_attribute"] ?? null) as Attribute | null;
-    this._hasValue = Object.hasOwn(coder, "value");
-    if (this._hasValue) this._value = coder["value"];
+    if (hasKey(coder, "value")) this._value = coder["value"];
   }
 
-  encodeWith(coder: Coder): void {
+  encodeWith(coder: Psych.Coder): void {
     coder["name"] = this.name;
     if (this.valueBeforeTypeCast != null) {
       coder["value_before_type_cast"] = this.valueBeforeTypeCast;
     }
     if (this.type) coder["type"] = this.type;
     if (this.originalAttribute) coder["original_attribute"] = this.originalAttribute;
-    if (this._hasValue) coder["value"] = this.value;
-  }
-
-  deepDup(): Attribute {
-    return this.dup();
+    if (Object.hasOwn(this, "_value")) coder["value"] = this.value();
   }
 
   withUserDefault(value: unknown): Attribute {
@@ -268,21 +250,21 @@ export abstract class Attribute {
   }
 
   dup(): Attribute {
-    const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
-    dup.initializeDup(this);
-    return dup;
+    return rbObjDup(this);
   }
 }
 
+rbDeclareIvar(Attribute, "@value_before_type_cast", "_valueBeforeTypeCast");
+rbDeclareIvar(Attribute, "@value", "_value");
+rbDeclareIvar(Attribute, "@value_for_database", "__valueForDatabase");
+
 export class FromDatabase extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type!.deserialize(value);
   }
 
   override forgettingAssignment(): Attribute {
-    if (!this._hasValueForDatabase && !this.changedInPlace()) {
+    if (!Object.hasOwn(this, "__valueForDatabase") && !this.changedInPlace()) {
       return this.withValueFromDatabase(this.valueBeforeTypeCast);
     } else {
       return super.forgettingAssignment();
@@ -296,8 +278,6 @@ export class FromDatabase extends Attribute {
 }
 
 export class FromUser extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type!.cast(value);
   }
@@ -310,15 +290,13 @@ export class FromUser extends Attribute {
   protected override _valueForDatabase(): unknown {
     const compatible = this.type!.itselfIfSerializeCastValueCompatible();
     if (compatible === this.type) {
-      return this.type!.serializeCastValue(this.value);
+      return this.type!.serializeCastValue(this.value());
     }
-    return this.type!.serialize(this.value);
+    return this.type!.serialize(this.value());
   }
 }
 
 export class WithCastValue extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return value;
   }
@@ -329,8 +307,6 @@ export class WithCastValue extends Attribute {
 }
 
 export class Null extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string | null) {
     super(name, null, defaultValue());
   }
@@ -344,27 +320,34 @@ export class Null extends Attribute {
   }
 
   withValueFromDatabase(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+    throw new MissingAttributeError(
+      `can't write unknown attribute \`${rbObjAsString(this.name)}\``,
+    );
   }
 
   withValueFromUser(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+    throw new MissingAttributeError(
+      `can't write unknown attribute \`${rbObjAsString(this.name)}\``,
+    );
   }
 
   withCastValue(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+    throw new MissingAttributeError(
+      `can't write unknown attribute \`${rbObjAsString(this.name)}\``,
+    );
   }
 }
 
 export class Uninitialized extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string | null, type: ValueType | null) {
     super(name, null, type);
   }
 
-  get value(): unknown {
-    return undefined;
+  override value(block?: (name: string) => unknown): unknown {
+    if (block !== undefined) {
+      return block(this.name!);
+    }
+    return null;
   }
 
   override get originalValue(): unknown {
@@ -392,12 +375,14 @@ export class Uninitialized extends Attribute {
   }
 }
 
-Attribute.FromDatabase = FromDatabase;
-Attribute.FromUser = FromUser;
-Attribute.WithCastValue = WithCastValue;
-Attribute.Null = Null;
-Attribute.Uninitialized = Uninitialized;
-ActiveModel.Attribute = Attribute;
+Attribute.prototype.eql = Attribute.prototype.equals;
+
+rbModConstSet(ActiveModel, "Attribute", Attribute);
+rbModConstSet(Attribute, "FromDatabase", FromDatabase);
+rbModConstSet(Attribute, "FromUser", FromUser);
+rbModConstSet(Attribute, "WithCastValue", WithCastValue);
+rbModConstSet(Attribute, "Null", Null);
+rbModConstSet(Attribute, "Uninitialized", Uninitialized);
 
 registerConstant("ActiveModel::Attribute", Attribute);
 registerConstant("ActiveModel::Attribute::FromDatabase", FromDatabase);

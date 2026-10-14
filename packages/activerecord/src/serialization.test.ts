@@ -5,7 +5,7 @@ import { Book } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
 import { SerializedPost } from "./test-helpers/models/post.js";
 import { bookFixtureData } from "./test-helpers/fixtures/books.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 beforeAll(() => {
   registerModel(Author);

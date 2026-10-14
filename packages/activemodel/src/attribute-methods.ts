@@ -1,17 +1,34 @@
-import { basicObjRespondTo, hasKey } from "@blazetrails/ruby-compat";
+import {
+  b,
+  basicObjRespondTo,
+  block,
+  Concurrent,
+  excSetBacktrace,
+  fetch,
+  Hash,
+  isInclude,
+  rbFCaller,
+  rbFSend,
+  rbObjRespondTo,
+  rbModConstDefined,
+  rbModConstSet,
+  regexpEscape,
+  unpack1,
+} from "@blazetrails/ruby-compat";
 import {
   camelize,
   classAttribute,
   CodeGenerator,
   extend,
+  filterMap,
   include,
   included,
-  prepend,
   type Extended,
   type Included,
   Module,
 } from "@blazetrails/activesupport";
 import { NoMethodError } from "./attribute-assignment.js";
+import { AttributeRegistration } from "./attribute-registration.js";
 
 export interface AttributeMethods {
   methodMissing(method: string, ...args: unknown[]): unknown;
@@ -29,33 +46,28 @@ export class MissingAttributeError extends globalThis.Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace AttrNames {
-  const DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
+export class AttrNames {
+  static readonly DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
 
-  export function defineAttributeAccessorMethod(
+  static defineAttributeAccessorMethod(
     owner: unknown,
     attrName: string,
-    { writer = false }: { writer?: boolean } = {},
-  ): { methodName: string; attrNameRef: string } {
-    const methodName = writer ? `${attrName}=` : attrName;
-    if (DEF_SAFE_NAME.test(attrName)) {
-      return { methodName, attrNameRef: `'${attrName}'` };
+    { writer = false }: { writer?: boolean },
+    block: (tempMethodName: string, attrNameExpr: string) => void,
+  ): void {
+    const methodName = `${attrName}${writer ? "=" : ""}`;
+    // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (attribute_methods.rb:579)
+    if (/^[\x00-\x7f]*$/.test(attrName) && AttrNames.DEF_SAFE_NAME.test(attrName)) {
+      block(methodName, `'${attrName}'`);
+    } else {
+      const safeName = unpack1(b(attrName), "h*");
+      const constName = `ATTR_${safeName}`;
+      if (!rbModConstDefined(this, constName)) rbModConstSet(this, constName, attrName);
+      const tempMethodName = `__temp__${safeName}${writer ? "=" : ""}`;
+      const attrNameExpr = `::ActiveModel::AttributeMethods::AttrNames::${constName}`;
+      block(tempMethodName, attrNameExpr);
     }
-    const escaped = attrName
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'")
-      .replace(/\r/g, "\\r")
-      .replace(/\n/g, "\\n");
-    return { methodName, attrNameRef: `'${escaped}'` };
   }
-}
-
-export class AttributeMethod {
-  constructor(
-    readonly proxyTarget: string,
-    readonly attrName: string,
-  ) {}
 }
 
 export class AttributeMethodPattern {
@@ -63,6 +75,7 @@ export class AttributeMethodPattern {
   readonly suffix: string;
   readonly proxyTarget: string;
   readonly parameters: string | false;
+  private readonly regex: RegExp;
 
   constructor({
     prefix = "",
@@ -73,23 +86,20 @@ export class AttributeMethodPattern {
     this.prefix = prefix;
     this.suffix = bang ? suffix.slice(0, -1) : suffix;
     this.parameters = parameters == null ? "..." : bang && parameters === false ? "" : parameters;
+    this.regex = new RegExp(
+      `^(?:${regexpEscape(this.prefix)})(.*)(?:${regexpEscape(this.suffix)})$`,
+    );
     this.proxyTarget = `${prefix}${this.camelJoined ? "Attribute" : "attribute"}${this.suffix}${
       bang ? "Bang" : ""
     }`;
   }
 
   match(methodName: string): AttributeMethod | null {
-    if (this.prefix && !methodName.startsWith(this.prefix)) return null;
-    if (this.suffix && !methodName.endsWith(this.suffix)) return null;
-    const attr = methodName.slice(
-      this.prefix.length,
-      this.suffix ? -this.suffix.length : undefined,
-    );
-    if (!attr) return null;
-    return new AttributeMethod(
-      this.proxyTarget,
-      this.camelJoined ? attr.charAt(0).toLowerCase() + attr.slice(1) : attr,
-    );
+    const md = this.regex.exec(methodName);
+    if (md) {
+      return new AttributeMethod(this.proxyTarget, this.attrName(md[1]));
+    }
+    return null;
   }
 
   methodName(attrName: string): string {
@@ -97,9 +107,20 @@ export class AttributeMethodPattern {
     return `${this.prefix}${name}${this.suffix}`;
   }
 
+  private attrName(name: string): string {
+    return this.camelJoined ? name.charAt(0).toLowerCase() + name.slice(1) : name;
+  }
+
   private get camelJoined(): boolean {
     return this.prefix !== "" && !this.prefix.endsWith("_");
   }
+}
+
+export class AttributeMethod {
+  constructor(
+    readonly proxyTarget: string,
+    readonly attrName: string,
+  ) {}
 }
 
 export interface ReadWriteHost {
@@ -113,12 +134,8 @@ export interface ReadWriteHost {
 export interface AttributeMethodHost {
   attributeNames(): string[];
   attributeMethodPatterns: AttributeMethodPattern[];
-  /** @internal */
-  _patternsGeneratedFor?: Map<string, AttributeMethodPattern[]>;
-  /** @internal */
-  _patternsAtLastResurrection?: AttributeMethodPattern[];
   attributeAliases: Record<string, string>;
-  _aliasesByAttributeName: Map<string, string[]>;
+  _aliasesByAttributeName: Hash<string, string[]>;
   _generatedAttributeMethods?: Module;
 }
 
@@ -131,18 +148,23 @@ export interface InstanceHost {
   constructor: AttributeMethodHost;
 }
 
-export interface InstanceMethodsHost extends InstanceHost, Included<typeof InstanceMethods> {
+export interface InstanceMethodsHost extends InstanceHost, Included<typeof AttributeMethods> {
   constructor: ClassMethodsHost;
 }
 
 const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
+const CALL_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?]?$/;
 
 export const ClassMethods = {
   attributeMethodPrefix(
     this: ClassMethodsHost,
-    ...prefixes: Array<string | { parameters?: string | null | false }>
+    ...prefixes: string[] | [...prefixes: string[], kwargs: { parameters?: string | null | false }]
   ): void {
-    const parameters = extractParameters(prefixes);
+    const last = prefixes[prefixes.length - 1];
+    const { parameters = null } =
+      typeof last === "object" && last !== null
+        ? (prefixes.pop() as { parameters?: string | null | false })
+        : {};
     this.attributeMethodPatterns = [
       ...this.attributeMethodPatterns,
       ...(prefixes as string[]).map((prefix) => new AttributeMethodPattern({ prefix, parameters })),
@@ -152,9 +174,13 @@ export const ClassMethods = {
 
   attributeMethodSuffix(
     this: ClassMethodsHost,
-    ...suffixes: Array<string | { parameters?: string | null | false }>
+    ...suffixes: string[] | [...suffixes: string[], kwargs: { parameters?: string | null | false }]
   ): void {
-    const parameters = extractParameters(suffixes);
+    const last = suffixes[suffixes.length - 1];
+    const { parameters = null } =
+      typeof last === "object" && last !== null
+        ? (suffixes.pop() as { parameters?: string | null | false })
+        : {};
     this.attributeMethodPatterns = [
       ...this.attributeMethodPatterns,
       ...(suffixes as string[]).map((suffix) => new AttributeMethodPattern({ suffix, parameters })),
@@ -175,10 +201,7 @@ export const ClassMethods = {
 
   aliasAttribute(this: ClassMethodsHost, newName: string, oldName: string): void {
     this.attributeAliases = { ...this.attributeAliases, [newName]: oldName };
-    const aliases = this.aliasesByAttributeName();
-    if (!aliases.has(oldName)) aliases.set(oldName, []);
-    aliases.get(oldName)!.push(newName);
-
+    this.aliasesByAttributeName().get(oldName)!.push(newName);
     this.eagerlyGenerateAliasAttributeMethods(newName, oldName);
   },
 
@@ -217,20 +240,10 @@ export const ClassMethods = {
     const targetName = pattern.methodName(oldName);
     const parameters = pattern.parameters;
 
-    if (
-      typeof (this as unknown as Record<string, unknown>)[generateMethodFor(pattern)] === "function"
-    ) {
-      this.defineAttributeMethodPattern(pattern, oldName, {
-        owner: codeGenerator,
-        as: newName,
-        override: true,
-      });
-      return;
-    }
-
     const mangledName = this.buildMangledName(targetName);
 
     const callArgs: string[] = [];
+    if (parameters) callArgs.push(parameters);
 
     this.defineCall(codeGenerator, methodName, targetName, mangledName, parameters, callArgs, {
       namespace: "alias_attribute",
@@ -239,7 +252,7 @@ export const ClassMethods = {
   },
 
   isAttributeAlias(this: ClassMethodsHost, newName: string): boolean {
-    return hasKey(this.attributeAliases, newName);
+    return Object.hasOwn(this.attributeAliases, newName);
   },
 
   attributeAlias(this: ClassMethodsHost, name: string): string | undefined {
@@ -250,12 +263,8 @@ export const ClassMethods = {
     CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (owner) => {
       for (const attrName of attrNames) {
         this.defineAttributeMethod(attrName, { _owner: owner });
-        const aliases = this.aliasesByAttributeName();
-        const attrAliases = aliases.get(attrName);
-        if (attrAliases) {
-          for (const aliasedName of attrAliases) {
-            this.generateAliasAttributeMethods(owner, aliasedName, attrName);
-          }
+        for (const aliasedName of this.aliasesByAttributeName().get(attrName)!) {
+          this.generateAliasAttributeMethods(owner, aliasedName, attrName);
         }
       }
     });
@@ -273,12 +282,12 @@ export const ClassMethods = {
       }
       this.attributeMethodPatternsCache().clear();
     });
-    if (!Object.prototype.hasOwnProperty.call(this, "_patternsGeneratedFor")) {
-      this._patternsGeneratedFor = new Map(this._patternsGeneratedFor ?? []);
-    }
-    this._patternsGeneratedFor!.set(as, this.attributeMethodPatterns);
   },
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm answersWithAMethod — PERMANENT
+   */
   defineAttributeMethodPattern(
     this: ClassMethodsHost,
     pattern: AttributeMethodPattern,
@@ -296,13 +305,10 @@ export const ClassMethods = {
       return;
     }
 
-    const generator = (this as unknown as Record<string, unknown>)[generateMethodFor(pattern)];
-    if (typeof generator === "function") {
-      (generator as (attrName: string, options: { owner: CodeGenerator; as: string }) => void).call(
-        this,
-        attrName,
-        { owner, as },
-      );
+    const generateMethod = camelize(`define_method_${pattern.proxyTarget}`, false);
+
+    if (rbObjRespondTo(this, generateMethod, true)) {
+      rbFSend(this, generateMethod, String(attrName), { owner, as });
     } else {
       this.defineProxyCall(
         owner,
@@ -321,26 +327,34 @@ export const ClassMethods = {
   undefineAttributeMethods(this: ClassMethodsHost): void {
     const mod = this.generatedAttributeMethods();
     mod.undefMethod(...mod.instanceMethods());
-    if (Object.hasOwn(this, "_attributeMethodPatternsCache")) {
-      (
-        this as ClassMethodsHost & { _attributeMethodPatternsCache: Map<unknown, unknown> }
-      )._attributeMethodPatternsCache.clear();
-    }
+    this.attributeMethodPatternsCache().clear();
   },
 
-  aliasesByAttributeName(this: ClassMethodsHost): Map<string, string[]> {
+  /** @inventedArm if — PERMANENT */
+  aliasesByAttributeName(this: ClassMethodsHost): Hash<string, string[]> {
     if (!Object.prototype.hasOwnProperty.call(this, "_aliasesByAttributeName")) {
-      this._aliasesByAttributeName = new Map<string, string[]>();
+      this._aliasesByAttributeName = new Hash<string, string[]>((h, k) => {
+        const v: string[] = [];
+        h.set(k, v);
+        return v;
+      });
     }
     return this._aliasesByAttributeName;
   },
 
   /** @internal */
   resolveAttributeName(this: ClassMethodsHost, name: string): string {
-    return this.attributeAliases?.[name] ?? name;
+    return fetch(
+      this.attributeAliases,
+      AttributeRegistration.ClassMethods.resolveAttributeName.call(this, name),
+      block((key) => key),
+    );
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   generatedAttributeMethods(this: ClassMethodsHost): Module {
     if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
       const mod = new Module();
@@ -357,14 +371,18 @@ export const ClassMethods = {
 
   /**
    * @internal
-   * @missingRailsArgs new — PERMANENT
+   * @inventedArm if — PERMANENT
    */
-  attributeMethodPatternsCache(this: ClassMethodsHost): Map<string, Array<AttributeMethod>> {
+  attributeMethodPatternsCache(
+    this: ClassMethodsHost,
+  ): InstanceType<typeof Concurrent.Map<string, Array<AttributeMethod>>> {
     const h = this as AttributeMethodHost & {
-      _attributeMethodPatternsCache?: Map<string, Array<AttributeMethod>>;
+      _attributeMethodPatternsCache?: InstanceType<
+        typeof Concurrent.Map<string, Array<AttributeMethod>>
+      >;
     };
     if (!Object.prototype.hasOwnProperty.call(h, "_attributeMethodPatternsCache")) {
-      h._attributeMethodPatternsCache = new Map();
+      h._attributeMethodPatternsCache = new Concurrent.Map({ initialCapacity: 4 });
     }
     return h._attributeMethodPatternsCache!;
   },
@@ -374,14 +392,9 @@ export const ClassMethods = {
     this: ClassMethodsHost,
     methodName: string,
   ): Array<AttributeMethod> {
-    const cache = this.attributeMethodPatternsCache();
-    if (cache.has(methodName)) return cache.get(methodName)!;
-    const matches = this.attributeMethodPatterns.flatMap((pattern) => {
-      const m = pattern.match(methodName);
-      return m ? [m] : [];
-    });
-    cache.set(methodName, matches);
-    return matches;
+    return this.attributeMethodPatternsCache().computeIfAbsent(methodName, () =>
+      filterMap(this.attributeMethodPatterns, (pattern) => pattern.match(methodName)),
+    );
   },
 
   /** @internal */
@@ -397,6 +410,8 @@ export const ClassMethods = {
     const callArgs = rest.slice(0, -1) as string[];
     const mangledName = this.buildMangledName(name);
 
+    if (parameters) callArgs.push(parameters);
+
     const namespace = `${options.namespace}_${proxyTarget}`;
 
     this.defineCall(codeGenerator, name, proxyTarget, mangledName, parameters, callArgs, {
@@ -408,47 +423,90 @@ export const ClassMethods = {
   /** @internal */
   buildMangledName(name: string): string {
     if (NAME_COMPILABLE_REGEXP.test(name)) return name;
-    const hex = Array.from(name)
-      .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
-      .join("");
-    return `__temp__${hex}`;
+    return `__temp__${unpack1(b(name), "h*")}`;
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   * @inventedArm rbObjRespondTo — PERMANENT
+   * @inventedArm slice — PERMANENT
+   */
   defineCall(
+    this: ClassMethodsHost,
     codeGenerator: CodeGenerator,
-    _name: string,
+    name: string,
     targetName: string,
     mangledName: string,
     parameters: string | null | false,
     callArgs: string[],
     { namespace, as }: { namespace: string; as: string },
   ): void {
-    codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
+    const reader =
+      this.attributeAliases[name] === targetName &&
+      rbObjRespondTo(this, "defineMethodAttribute", true);
+    type Body = (self: ReadWriteHost, args: unknown[]) => unknown;
+    let descriptor: (body: Body) => PropertyDescriptor;
+    let cachedName = mangledName;
+    if (reader) {
+      cachedName = `${mangledName}__reader`;
+      descriptor = (body) => ({
+        get(this: ReadWriteHost) {
+          return body(this, []);
+        },
+        set(this: ReadWriteHost, value: unknown) {
+          rbFSend(this, `${targetName}=`, value);
+        },
+        configurable: true,
+      });
+    } else if (parameters === false) {
+      cachedName = `${mangledName}__getter`;
+      descriptor = (body) => ({
+        get(this: ReadWriteHost) {
+          return body(this, []);
+        },
+        configurable: true,
+      });
+    } else {
+      descriptor = (body) => ({
+        value: function (this: ReadWriteHost, ...args: unknown[]) {
+          return body(this, args);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    codeGenerator.defineCachedMethod(cachedName, { namespace, as }, (batch) => {
+      let body: Body;
+      if (CALL_COMPILABLE_REGEXP.test(targetName)) {
+        body = (self, args) => rbFSend(self, targetName, ...sent, ...args);
+      } else {
+        callArgs.unshift(targetName);
+        body = (self, args) => rbFSend(self, ...(sent as [string, ...string[]]), ...args);
+      }
+      const sent = parameters ? callArgs.slice(0, -1) : callArgs;
+
       batch.push((mod) => {
-        if (parameters === false) {
-          Object.defineProperty(mod, mangledName, {
-            get(this: ReadWriteHost) {
-              return sendProxyTarget(this, targetName, callArgs);
-            },
-            configurable: true,
-          });
-          return;
-        }
-        Object.defineProperty(mod, mangledName, {
-          value: function (this: ReadWriteHost, ...args: unknown[]) {
-            return sendProxyTarget(this, targetName, [...callArgs, ...args]);
-          },
-          writable: true,
-          configurable: true,
-        });
+        Object.defineProperty(mod, cachedName, descriptor(body));
       });
     });
   },
 };
 
-export const InstanceMethods = {
-  /** @missingRailsCall super — PERMANENT */
+export const AttributeMethods = {
+  ClassMethods,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+  [included](base: (new (...args: any[]) => any) & { prototype: object }): void {
+    extend(base, ClassMethods);
+
+    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
+    classAttribute.call(base, "attributeMethodPatterns", {
+      instanceWriter: false,
+      default: [new AttributeMethodPattern()],
+    });
+  },
+
   methodMissing(this: InstanceMethodsHost, method: string, ...args: unknown[]): unknown {
     if (this.isRespondToWithoutAttributes(method, true)) {
       throw new NoMethodError(
@@ -468,13 +526,7 @@ export const InstanceMethods = {
     match: AttributeMethod,
     ...args: unknown[]
   ): unknown {
-    const target = (this as Record<string, (...a: unknown[]) => unknown>)[match.proxyTarget];
-    if (typeof target !== "function") {
-      throw new NoMethodError(
-        `undefined method '${match.proxyTarget}' for an instance of ${(this as { constructor?: { name?: string } }).constructor?.name ?? "unknown"}`,
-      );
-    }
-    return target.call(this, match.attrName, ...args);
+    return rbFSend(this, match.proxyTarget, match.attrName, ...args);
   },
 
   isRespondToWithoutAttributes(
@@ -501,9 +553,7 @@ export const InstanceMethods = {
 
   /** @internal */
   isAttributeMethod(this: InstanceMethodsHost, attrName: string): boolean {
-    return (
-      this.isRespondToWithoutAttributes("attributes") && Object.hasOwn(this.attributes, attrName)
-    );
+    return this.isRespondToWithoutAttributes("attributes") && isInclude(this.attributes, attrName);
   },
 
   /** @internal */
@@ -513,71 +563,20 @@ export const InstanceMethods = {
   },
 
   /** @internal */
-  missingAttribute(this: InstanceHost, attrName: string, stack?: string): never {
+  missingAttribute(this: InstanceHost, attrName: string, stack: string[]): never {
     const err = new MissingAttributeError(
       `missing attribute '${attrName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
     );
-    if (stack !== undefined) err.stack = stack;
+    excSetBacktrace(err, stack);
     throw err;
   },
 
   /** @internal */
   _readAttribute(this: InstanceMethodsHost, attr: string): unknown {
-    if (!this.isRespondToWithoutAttributes(attr)) {
-      return this.methodMissing(attr);
-    }
-    return (this as unknown as Record<string, unknown>)[attr];
+    return rbFSend(this, attr);
   },
 };
 
-export const AttributeMethods = {
-  ClassMethods,
-  InstanceMethods,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-  [included](base: (new (...args: any[]) => any) & { prototype: object }): void {
-    include(base, InstanceMethods);
-    extend(base, ClassMethods);
-
-    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
-    classAttribute.call(base, "attributeMethodPatterns", {
-      instanceWriter: false,
-      default: [new AttributeMethodPattern()],
-    });
-    prepend(base.prototype, { initInternals });
-  },
-};
-
-/** @noRailsEquivalent PERMANENT */
-function generateMethodFor(pattern: AttributeMethodPattern): string {
-  return pattern.proxyTarget.endsWith("=")
-    ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
-    : camelize(`define_method_${pattern.proxyTarget}`, false);
-}
-
-function sendProxyTarget(record: ReadWriteHost, targetName: string, args: unknown[]): unknown {
-  const target = record[targetName] as ((...a: unknown[]) => unknown) | undefined;
-  if (typeof target !== "function") {
-    if (targetName in record) return target;
-    const [attrName, ...rest] = args as [string, ...unknown[]];
-    return (record as unknown as AttributeMethods).attributeMissing(
-      { proxyTarget: targetName, attrName },
-      ...rest,
-    );
-  }
-  return target.call(record, ...args);
-}
-
-/** @noRailsEquivalent PERMANENT */
-function extractParameters(
-  affixes: Array<string | { parameters?: string | null | false }>,
-): string | null | false {
-  const last = affixes[affixes.length - 1];
-  if (last === undefined || typeof last === "string") return null;
-  affixes.pop();
-  return last.parameters ?? null;
-}
-
-/** @noRailsEquivalent PERMANENT */
 function answersWithAMethod(klass: unknown, name: string): boolean {
   const start = (klass as { prototype?: object }).prototype;
   for (
@@ -626,48 +625,28 @@ export function defineMethodAttribute(
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
   if (as === canonicalName && isDefinedByAClassBody(this, as)) return;
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName);
-  const mangledName = ClassMethods.buildMangledName(methodName);
-  owner.defineCachedMethod(mangledName, { namespace: "active_model", as }, (sources) => {
-    sources.push((mod) => {
-      Object.defineProperty(mod, mangledName, {
-        get(
-          this: ReadWriteHost & {
-            attribute(n: string): unknown;
-            _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+  AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {}, (tempMethodName) => {
+    owner.defineCachedMethod(tempMethodName, { namespace: "active_model", as }, (sources) => {
+      sources.push((mod) => {
+        Object.defineProperty(mod, tempMethodName, {
+          get(
+            this: ReadWriteHost &
+              Pick<InstanceMethodsHost, "missingAttribute"> & {
+                attribute(n: string): unknown;
+                _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+              },
+          ) {
+            if (!this._attributes.getAttribute(canonicalName).isInitialized()) {
+              this.missingAttribute(canonicalName, rbFCaller());
+            }
+            return this.attribute(canonicalName);
           },
-        ) {
-          if (!this._attributes.getAttribute(canonicalName).isInitialized()) {
-            throw new MissingAttributeError(
-              `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-            );
-          }
-          return this.attribute(canonicalName);
-        },
-        set(this: ReadWriteHost, value: unknown) {
-          this._writeAttribute(canonicalName, value);
-        },
-        configurable: true,
+          set(this: ReadWriteHost, value: unknown) {
+            this._writeAttribute(canonicalName, value);
+          },
+          configurable: true,
+        });
       });
     });
   });
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function initInternals(this: { constructor: ClassMethodsHost }, super_: () => void): void {
-  _resurrectAttributeMethods(this.constructor);
-  super_();
-}
-
-export function _resurrectAttributeMethods(klass: ClassMethodsHost): void {
-  const patterns = klass.attributeMethodPatterns;
-  if (klass._patternsAtLastResurrection === patterns) return;
-  klass._patternsAtLastResurrection = patterns;
-  const stale = [...(klass._patternsGeneratedFor ?? [])]
-    .filter(([, generatedWith]) => generatedWith !== patterns)
-    .map(([attrName]) => attrName);
-  if (stale.length > 0) klass.defineAttributeMethods(...stale);
 }

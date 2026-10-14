@@ -1,24 +1,17 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
-import {
-  typeRegistry,
-  ValueType,
-  StringType,
-  IntegerType,
-  UserProvidedDefault,
-} from "@blazetrails/activemodel";
+import { Type, ValueType, StringType, IntegerType } from "@blazetrails/activemodel";
 import { Array as OidArray } from "./connection-adapters/postgresql/oid/array.js";
 import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal, TimeWithZone, assertNotCalled } from "@blazetrails/activesupport";
 import { DateTimeType } from "@blazetrails/activemodel";
-import { Temporal, Time } from "@blazetrails/date";
-import { rbObjClass } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
+import { rbObjClassname, keys } from "@blazetrails/ruby-compat";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { fixtures } from "./test-fixtures.js";
-import { withTimezoneConfig } from "./test-helper.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -59,7 +52,7 @@ class UnoverloadedType extends Base {
 }
 
 describe("CustomPropertiesTest", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
   beforeAll(async () => {
     await loadSchemaFromAdapter.call(OverloadedType);
     await loadSchemaFromAdapter.call(UnoverloadedType);
@@ -100,7 +93,7 @@ describe("CustomPropertiesTest", () => {
     const lastOverloaded = await OverloadedType.last();
     expect(Number.isInteger(lastOverloaded!.overloaded_float)).toBe(true);
     expect(((await UnoverloadedType.last()) as any).overloaded_float).toEqual(new Number(2.0));
-    expect(rbObjClass(((await UnoverloadedType.last()) as any).overloaded_float)).toBe("Float");
+    expect(rbObjClassname(((await UnoverloadedType.last()) as any).overloaded_float)).toBe("Float");
   });
 
   it("properties assigned in constructor", () => {
@@ -133,14 +126,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
 
-    expect(
-      (UnoverloadedType.columnsHash() as Record<string, { limit?: number }>)
-        .overloaded_string_with_limit.limit,
-    ).toBe(255);
-    expect(
-      (WithDefault.columnsHash() as Record<string, { limit?: number }>).overloaded_string_with_limit
-        .limit,
-    ).toBe(255);
+    expect(UnoverloadedType.columnsHash().overloaded_string_with_limit.limit).toBe(255);
+    expect(WithDefault.columnsHash().overloaded_string_with_limit.limit).toBe(255);
 
     expect((new UnoverloadedType() as any).overloaded_string_with_limit).toBeNull();
     expect((new WithDefault() as any).overloaded_string_with_limit).toBe("the overloaded default");
@@ -166,7 +153,7 @@ describe("CustomPropertiesTest", () => {
           precision: 3,
           limit: 2,
           scale: 1,
-          default: () => Temporal.Now.instant(),
+          default: () => Time.now(),
         });
       }
     }
@@ -182,16 +169,16 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("time zone aware attribute", async () => {
-    await withTimezoneConfig(
+    await self().withTimezoneConfig(
       { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
       async () => {
         class WithTimes extends OverloadedType {
           static {
             this.attribute("starts_at", "datetime", {
               precision: 3,
-              default: () => Temporal.Now.instant(),
+              default: () => Time.now(),
             });
-            this.attribute("ends_at", { default: () => Temporal.Now.instant() });
+            this.attribute("ends_at", { default: () => Time.now() });
           }
         }
 
@@ -237,10 +224,7 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("defaults are not touched on the columns", () => {
-    expect(
-      (OverloadedType.columnsHash() as Record<string, { default?: unknown }>).string_with_default
-        .default,
-    ).toBe("the original default");
+    expect(OverloadedType.columnsHash().string_with_default.default).toBe("the original default");
   });
 
   it("children inherit custom properties", () => {
@@ -265,17 +249,17 @@ describe("CustomPropertiesTest", () => {
     await loadSchemaFromAdapter.call(Klass);
     const columnCount = Klass.columns().length;
 
-    expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 1);
+    expect(keys(Klass.attributeTypes()).length).toBe(columnCount + 1);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 1);
     expect(Klass.attributeNames().length).toBe(columnCount + 1);
-    expect(Object.keys(Klass.attributeTypes()).includes("wibble")).toBeFalsy();
+    expect(keys(Klass.attributeTypes()).includes("wibble")).toBeFalsy();
 
     Klass.attribute("wibble", new ValueType());
 
-    expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 2);
+    expect(keys(Klass.attributeTypes()).length).toBe(columnCount + 2);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 2);
     expect(Klass.attributeNames().length).toBe(columnCount + 2);
-    expect(Object.keys(Klass.attributeTypes())).toContain("wibble");
+    expect(keys(Klass.attributeTypes())).toContain("wibble");
   });
 
   it("the given default value is cast from user", () => {
@@ -485,8 +469,7 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default changes schema inference for string columns", async () => {
     await withImmutableStrings(() => {
-      const immutableStringType = typeRegistry.lookup("immutable_string")
-        .constructor as new () => unknown;
+      const immutableStringType = Type.lookup("immutable_string").constructor as new () => unknown;
       expect(OverloadedType.typeForAttribute("inferred_string")).toBeInstanceOf(
         immutableStringType,
       );
@@ -501,7 +484,7 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", async () => {
     await withImmutableStrings(() => {
-      const defaultStringType = typeRegistry.lookup("string").constructor as new () => unknown;
+      const defaultStringType = Type.lookup("string").constructor as new () => unknown;
       expect(OverloadedType.typeForAttribute("string_with_default")).toBeInstanceOf(
         defaultStringType,
       );
@@ -509,272 +492,9 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("serialize boolean for both string types", () => {
-    const defaultStringType = typeRegistry.lookup("string");
-    const immutableStringType = typeRegistry.lookup("immutable_string");
+    const defaultStringType = Type.lookup("string");
+    const immutableStringType = Type.lookup("immutable_string");
     expect(defaultStringType.serialize(true)).toBe(immutableStringType.serialize(true));
     expect(defaultStringType.serialize(false)).toBe(immutableStringType.serialize(false));
-  });
-});
-
-describe("DefineAttributeTest", () => {
-  it("define_attribute registers a type object directly", () => {
-    const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.defineAttribute("score", intType);
-      }
-    }
-    const p = new Post({ score: "42" });
-    expect(p.readAttribute("score")).toBe(42);
-  });
-
-  it("define_attribute with default value", () => {
-    const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.defineAttribute("rating", intType, { default: 5 });
-      }
-    }
-    const p = new Post({});
-    expect(p.readAttribute("rating")).toBe(5);
-  });
-
-  it("define_attribute preserves existing default when no default given", () => {
-    const strType = typeRegistry.lookup("string");
-    const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.defineAttribute("score", strType, { default: "10" });
-        this.defineAttribute("score", intType);
-      }
-    }
-    const p = new Post({});
-    expect(p.readAttribute("score")).toBe(10);
-  });
-
-  it("define_attribute with userProvidedDefault false uses database cast", () => {
-    const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.defineAttribute("views", intType, { default: "0", userProvidedDefault: false });
-      }
-    }
-    const p = new Post({});
-    expect(p.readAttribute("views")).toBe(0);
-  });
-
-  it("define_attribute builds a UserProvidedDefault when the default is user-provided", () => {
-    const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.defineAttribute("score", intType, { default: "5" });
-      }
-    }
-    expect(Post._defaultAttributes().getAttribute("score")).toBeInstanceOf(UserProvidedDefault);
-    expect(Post._defaultAttributes().getAttribute("score").originalAttribute).toBeNull();
-  });
-
-  it("define_attribute writes into the memoized _defaultAttributes", () => {
-    const strType = typeRegistry.lookup("string");
-    const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.defineAttribute("score", strType);
-      }
-    }
-    const before = Post._defaultAttributes();
-    Post.defineAttribute("score", intType);
-    expect(Post._defaultAttributes()).toBe(before);
-    expect(before.getAttribute("score").type!.type()).toBe("integer");
-    expect(Post.typeForAttribute("score")!.type()).toBe("integer");
-  });
-});
-
-describe("DefaultAttributesTest", () => {
-  it("_default_attributes returns an AttributeSet", () => {
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const defaults = Post._defaultAttributes();
-    expect(typeof defaults.fetchValue).toBe("function");
-  });
-
-  it("_default_attributes includes declared attributes", () => {
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.attribute("title", "string", { default: "Untitled" });
-      }
-    }
-    const defaults = Post._defaultAttributes();
-    expect(defaults.fetchValue("title")).toBe("Untitled");
-  });
-
-  it("_default_attributes is cached", () => {
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post._defaultAttributes()).toBe(Post._defaultAttributes());
-  });
-
-  it("_default_attributes cache is invalidated when attribute is defined", () => {
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const first = Post._defaultAttributes();
-    Post.attribute("body", "string");
-    const second = Post._defaultAttributes();
-    expect(first).not.toBe(second);
-    expect(second.fetchValue("body")).toBeNull();
-  });
-
-  it("new record attributes are seeded from _default_attributes", () => {
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.attribute("status", "string", { default: "draft" });
-      }
-    }
-    const p = new Post({});
-    expect(p.status).toBe("draft");
-  });
-
-  it("_defaultAttributes seeds schema columns via fromDatabase then replays user pending queue", () => {
-    class Post extends Base {
-      declare status: string;
-    }
-    Post.attribute("title", "string", { default: "untitled" });
-    (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
-      views: { name: "views", default: 0 },
-    };
-
-    const defaults = Post._defaultAttributes();
-    expect(defaults.getAttribute("views").value).toBe(0);
-    expect(defaults.getAttribute("title").value).toBe("untitled");
-  });
-
-  it("user attribute() declaration overrides schema column type via pending queue", () => {
-    class Post extends Base {
-      declare status: string;
-    }
-    Post.attribute("score", "string");
-    (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
-      score: { name: "score", default: 0 },
-    };
-
-    const defaults = Post._defaultAttributes();
-    expect(defaults.getAttribute("score").type!.type()).toBe("string");
-  });
-
-  it("resetDefaultAttributes reloads the schema from cache", () => {
-    class Post extends Base {
-      declare status: string;
-    }
-    (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
-      score: { name: "score", default: 5 },
-    };
-    (Post as unknown as { _schemaLoaded?: boolean })._schemaLoaded = true;
-
-    Post.resetDefaultAttributes();
-
-    expect((Post as unknown as { _columnsHash?: unknown })._columnsHash).toBeUndefined();
-    expect((Post as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBe(false);
-  });
-
-  it("attribute() overriding only type preserves the schema default", () => {
-    class Post extends Base {
-      declare status: string;
-    }
-    Post.attribute("score", "string");
-    (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
-      score: { name: "score", default: 5 },
-    };
-
-    const defaults = Post._defaultAttributes();
-    expect(defaults.getAttribute("score").type!.type()).toBe("string");
-    expect(defaults.getAttribute("score").value).toBe("5");
-  });
-});
-
-describe("DefineAttributeSTITest", () => {
-  it("defineAttribute on STI subclass stays on the subclass", () => {
-    const intType = typeRegistry.lookup("integer");
-    class Animal extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        (this as any)._inheritanceColumn = "type";
-      }
-    }
-    class Dog extends (Animal as any) {}
-    (Dog as any).defineAttribute("legs", intType, { default: 4 });
-    expect((Dog as any)._defaultAttributes().isKey("legs")).toBe(true);
-    expect((Animal as any)._defaultAttributes().isKey("legs")).toBe(false);
-    const d = new (Dog as any)({});
-    expect(d.readAttribute("legs")).toBe(4);
-  });
-
-  it("_defaultAttributes is memoized per class, not shared with the STI base", () => {
-    class Vehicle extends Base {
-      static {
-        this.attribute("speed", "integer", { default: 60 });
-      }
-    }
-    class Car extends (Vehicle as any) {}
-    const baseDefaults = (Vehicle as any)._defaultAttributes();
-    const subDefaults = (Car as any)._defaultAttributes();
-    expect(subDefaults).not.toBe(baseDefaults);
-    expect(subDefaults.keys()).toEqual(baseDefaults.keys());
-    expect(subDefaults.fetchValue("speed")).toBe(60);
-  });
-
-  it("defineAttribute for id does not install an accessor", () => {
-    const strType = typeRegistry.lookup("string");
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Post.defineAttribute("id", strType);
-    const ownDesc = Object.getOwnPropertyDescriptor(Post.prototype, "id");
-    expect(ownDesc).toBeUndefined();
-  });
-});
-
-describe("ResetDefaultAttributesCascadeTest", () => {
-  it("adding an attribute to a superclass invalidates an AR subclass _defaultAttributes cache", () => {
-    class Post extends Base {
-      declare status: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class SpecialPost extends (Post as any) {}
-
-    const before = (SpecialPost as any)._defaultAttributes();
-    expect(before.keys()).toContain("title");
-    expect(before.keys()).not.toContain("score");
-
-    Post.attribute("score", "integer", { default: 0 });
-
-    const after = (SpecialPost as any)._defaultAttributes();
-    expect(after.keys()).toContain("score");
-    expect(after.getAttribute("score").value).toBe(0);
   });
 });

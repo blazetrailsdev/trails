@@ -1,14 +1,16 @@
-import { File, NoMethodError } from "@blazetrails/ruby-compat";
+import { File, NoMethodError, rbModConstSet } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
 
 import { CookieJar, type RequestCookieMethodsHost } from "../middleware/cookies.js";
 import type { FlashHash } from "../middleware/flash.js";
+import type { Session } from "../request/session.js";
 import { UploadedFile } from "@blazetrails/rack-test";
+import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */
 export interface TestProcessRequest extends RequestCookieMethodsHost {
-  session: Record<string, unknown>;
+  session: Session;
   flash: FlashHash;
 }
 
@@ -49,7 +51,7 @@ export function assigns(this: TestProcessHost, _key?: string | symbol): never {
   );
 }
 
-export function session(this: TestProcessHost): Record<string, unknown> {
+export function session(this: TestProcessHost): Session {
   return this.request.session;
 }
 
@@ -82,3 +84,4 @@ export const FixtureFile = {
   fileFixtureUpload,
   fixtureFileUpload,
 };
+rbModConstSet(ActionDispatch, "TestProcess", TestProcess);

@@ -1,11 +1,16 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
-import { currentTimeInstant, indexWith } from "@blazetrails/activesupport";
+import { Time as RubyTime } from "@blazetrails/date";
+import { Module, Rational, max } from "@blazetrails/ruby-compat";
+import {
+  classAttribute,
+  currentTimeInstant,
+  filterMap,
+  included,
+  indexWith,
+} from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
-import { defaultTimezone } from "./active-record.js";
 
 export interface TouchOptions {
-  time?: Date | RubyTime | null;
+  time?: RubyTime | null;
 }
 
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
@@ -15,31 +20,32 @@ const UPDATED_ATTRS = ["updated_at", "updated_on"];
 
 export interface TimestampHost {
   attributeAliases?: Record<string, string>;
-  columnNames?: string[] | (() => string[]);
-  _timestampAttributesForCreateInModel?: string[];
-  _timestampAttributesForUpdateInModel?: string[];
-  _allTimestampAttributesInModel?: string[];
+  columnNames(): readonly string[];
+  _timestampAttributesForCreateInModel?: readonly string[];
+  _timestampAttributesForUpdateInModel?: readonly string[];
+  _allTimestampAttributesInModel?: readonly string[];
   timestampAttributesForCreate(): string[];
   timestampAttributesForUpdate(): string[];
-  timestampAttributesForCreateInModel(): string[];
-  timestampAttributesForUpdateInModel(): string[];
-  allTimestampAttributesInModel(): string[];
-  currentTimeFromProperTimezone(): RubyTime;
+  timestampAttributesForCreateInModel(): readonly string[];
+  timestampAttributesForUpdateInModel(): readonly string[];
+  allTimestampAttributesInModel(): readonly string[];
+  currentTimeFromProperTimezone(): Promise<RubyTime>;
+  withConnection<T>(fn: (c: { defaultTimezone: string }) => T): Promise<T>;
 }
 
 interface TimestampInstanceHost {
   _touchRecord: boolean | null;
-  readAttribute?(name: string): unknown;
+  readAttribute(name: string): unknown;
   _readAttribute?(name: string): unknown;
   _writeAttribute?(name: string, val: unknown): void;
   isWillSaveChangeToAttribute?(name: string): boolean;
   clearAttributeChange?(name: string): void;
   hasChangesToSave?: boolean;
   id?: unknown;
-  recordTimestamps?: boolean;
-  timestampAttributesForUpdateInModel(): string[];
-  allTimestampAttributesInModel(): string[];
-  currentTimeFromProperTimezone(): RubyTime;
+  recordTimestamps: boolean;
+  timestampAttributesForUpdateInModel(): readonly string[];
+  allTimestampAttributesInModel(): readonly string[];
+  currentTimeFromProperTimezone(): Promise<RubyTime>;
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
 }
 
@@ -47,17 +53,17 @@ export type TouchAllOptions = { time?: RubyTime };
 
 export type TouchAllArgs = string[] | [...names: string[], options: TouchAllOptions];
 
-export function touchAttributesWithTime(
+export async function touchAttributesWithTime(
   this: TimestampHost,
   ...args: [...names: string[], time: RubyTime | undefined]
-): Record<string, RubyTime> {
+): Promise<Record<string, RubyTime>> {
   let names = args.slice(0, -1) as string[];
   const time = args[args.length - 1] as RubyTime | undefined;
   names = names.map((name) => this.attributeAliases?.[name] ?? name);
   let attributeNames = this.timestampAttributesForUpdateInModel();
   attributeNames = [...new Set([...attributeNames, ...names])];
   return Object.fromEntries(
-    indexWith(attributeNames, time ?? this.currentTimeFromProperTimezone()),
+    indexWith(attributeNames, time ?? (await this.currentTimeFromProperTimezone())),
   );
 }
 
@@ -67,41 +73,30 @@ export type CounterCacheTouchOption =
   | Array<string | { time?: RubyTime }>
   | { time?: RubyTime };
 
-export function timestampAttributesForCreateInModel(this: TimestampHost): string[] {
-  if (this._timestampAttributesForCreateInModel) return this._timestampAttributesForCreateInModel;
-  const names =
-    typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
-  const cols = new Set(names);
-  this._timestampAttributesForCreateInModel = this.timestampAttributesForCreate().filter((a) =>
-    cols.has(a),
-  );
-  return this._timestampAttributesForCreateInModel;
+export function timestampAttributesForCreateInModel(this: TimestampHost): readonly string[] {
+  return (this._timestampAttributesForCreateInModel ??= Object.freeze(
+    this.timestampAttributesForCreate().filter((name) => this.columnNames().includes(name)),
+  ));
 }
 
-export function timestampAttributesForUpdateInModel(this: TimestampHost): string[] {
-  if (this._timestampAttributesForUpdateInModel) return this._timestampAttributesForUpdateInModel;
-  const names =
-    typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
-  const cols = new Set(names);
-  this._timestampAttributesForUpdateInModel = this.timestampAttributesForUpdate().filter((a) =>
-    cols.has(a),
-  );
-  return this._timestampAttributesForUpdateInModel;
+export function timestampAttributesForUpdateInModel(this: TimestampHost): readonly string[] {
+  return (this._timestampAttributesForUpdateInModel ??= Object.freeze(
+    this.timestampAttributesForUpdate().filter((name) => this.columnNames().includes(name)),
+  ));
 }
 
-export function allTimestampAttributesInModel(this: TimestampHost): string[] {
-  if (this._allTimestampAttributesInModel) return this._allTimestampAttributesInModel;
-  this._allTimestampAttributesInModel = [
+export function allTimestampAttributesInModel(this: TimestampHost): readonly string[] {
+  return (this._allTimestampAttributesInModel ??= Object.freeze([
     ...this.timestampAttributesForCreateInModel(),
     ...this.timestampAttributesForUpdateInModel(),
-  ];
-  return this._allTimestampAttributesInModel;
+  ]));
 }
 
-/** @missingRailsCall with_connection — PERMANENT */
-export function currentTimeFromProperTimezone(): RubyTime {
-  const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
-  return defaultTimezone() === "utc" ? now.getutc() : now.getlocal();
+export function currentTimeFromProperTimezone(this: TimestampHost): Promise<RubyTime> {
+  return this.withConnection((c) => {
+    const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
+    return c.defaultTimezone === "utc" ? now.getutc() : now.getlocal();
+  });
 }
 
 /** @internal */
@@ -125,17 +120,13 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
 }
 
 /** @internal */
-export function initInternals(this: TimestampInstanceHost, super_: () => void): void {
-  super_();
+export function initInternals(this: TimestampInstanceHost): void {
+  Timestamp.superMethod(this, "initInternals")!();
   this._touchRecord = null;
 }
 
-export function initializeDup(
-  this: TimestampInstanceHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeDup(this: TimestampInstanceHost, other: unknown): void {
+  Timestamp.superMethod(this, "initializeDup")!(other);
   clearTimestampAttributes.call(this);
 }
 
@@ -144,8 +135,8 @@ export async function _createRecord(
   this: TimestampInstanceHost,
   superFn: () => Promise<unknown>,
 ): Promise<unknown> {
-  if ((this.recordTimestamps ?? this.constructor.recordTimestamps) !== false) {
-    const currentTime = this.currentTimeFromProperTimezone();
+  if (this.recordTimestamps) {
+    const currentTime = await this.currentTimeFromProperTimezone();
 
     for (const column of this.allTimestampAttributesInModel()) {
       if (this._readAttribute?.(column) == null) {
@@ -183,41 +174,32 @@ export async function recordUpdateTimestamps<T>(
   block?: () => Promise<T>,
 ): Promise<T | undefined> {
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
-    const currentTime = this.currentTimeFromProperTimezone();
+    const currentTime = await this.currentTimeFromProperTimezone();
+
     for (const column of this.timestampAttributesForUpdateInModel()) {
-      if (!this.isWillSaveChangeToAttribute?.(column)) {
-        this._writeAttribute?.(column, currentTime);
-      }
+      if (this.isWillSaveChangeToAttribute?.(column)) continue;
+      this._writeAttribute?.(column, currentTime);
     }
   }
 
-  return block?.();
+  if (block) return block();
 }
 
 /** @internal */
 export function shouldRecordTimestamps(this: TimestampInstanceHost): boolean {
-  const recordTs = this.recordTimestamps ?? this.constructor.recordTimestamps;
   return (
-    recordTs !== false && (!this.constructor.partialUpdates || this.hasChangesToSave !== false)
+    this.recordTimestamps && (!this.constructor.partialUpdates || this.hasChangesToSave !== false)
   );
 }
 
 /** @internal */
 export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): RubyTime | null {
-  const attrs = this.timestampAttributesForUpdateInModel();
-  let max: RubyTime | null = null;
-  for (const attr of attrs) {
-    const v = this.readAttribute?.(attr);
-    if (v == null) continue;
-    const inst: RubyTime =
-      v instanceof RubyTime
-        ? v
-        : RubyTime.at(
-            new Rational(Temporal.Instant.from(String(v)).epochNanoseconds, 1_000_000_000n),
-          );
-    if (max === null || inst.toR().cmp(max.toR()) > 0) max = inst;
-  }
-  return max;
+  return max(
+    filterMap(this.timestampAttributesForUpdateInModel(), (attr) => {
+      const v = this.readAttribute(attr) as RubyTime | { toTime(): RubyTime } | null | false;
+      return v != null && v !== false && (v instanceof RubyTime ? v : v.toTime());
+    }),
+  );
 }
 
 /** @internal */
@@ -228,22 +210,43 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
-  recordUpdateTimestamps,
-  shouldRecordTimestamps,
-  timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): string[] {
+export const Timestamp = Object.assign(new Module(), {
+  [included](base: object): void {
+    classAttribute.call(base, "recordTimestamps", { default: true });
+  },
+});
+
+Timestamp.defineMethod("recordUpdateTimestamps", recordUpdateTimestamps);
+Timestamp.defineMethod("shouldRecordTimestamps", shouldRecordTimestamps);
+Timestamp.defineMethod(
+  "timestampAttributesForCreateInModel",
+  function timestampAttributesForCreateInModel(this: {
+    constructor: TimestampHost;
+  }): readonly string[] {
     return this.constructor.timestampAttributesForCreateInModel();
   },
-  timestampAttributesForUpdateInModel(this: { constructor: TimestampHost }): string[] {
+);
+Timestamp.defineMethod(
+  "timestampAttributesForUpdateInModel",
+  function timestampAttributesForUpdateInModel(this: {
+    constructor: TimestampHost;
+  }): readonly string[] {
     return this.constructor.timestampAttributesForUpdateInModel();
   },
-  allTimestampAttributesInModel(this: { constructor: TimestampHost }): string[] {
+);
+Timestamp.defineMethod(
+  "allTimestampAttributesInModel",
+  function allTimestampAttributesInModel(this: { constructor: TimestampHost }): readonly string[] {
     return this.constructor.allTimestampAttributesInModel();
   },
-  currentTimeFromProperTimezone(this: { constructor: TimestampHost }): RubyTime {
+);
+Timestamp.defineMethod(
+  "currentTimeFromProperTimezone",
+  function currentTimeFromProperTimezone(this: { constructor: TimestampHost }): Promise<RubyTime> {
     return this.constructor.currentTimeFromProperTimezone();
   },
-  maxUpdatedColumnTimestamp,
-  clearTimestampAttributes,
-};
+);
+Timestamp.defineMethod("maxUpdatedColumnTimestamp", maxUpdatedColumnTimestamp);
+Timestamp.defineMethod("clearTimestampAttributes", clearTimestampAttributes);
+Timestamp.defineMethod("initInternals", initInternals);
+Timestamp.defineMethod("initializeDup", initializeDup);

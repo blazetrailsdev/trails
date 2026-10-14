@@ -217,7 +217,7 @@ describe("ar models:dump", { timeout: 30_000 }, () => {
     ]);
     expect(code, `stderr: ${stderr}`).toBe(0);
     expect(stdout).toMatch(/export class Membership extends Base \{/);
-    expect(stdout).toMatch(/this\._primaryKey = \["user_id","group_id"\]/);
+    expect(stdout).toMatch(/this\.primaryKey = \["user_id","group_id"\]/);
   });
 
   it("models a UUID-primary-key table", async () => {

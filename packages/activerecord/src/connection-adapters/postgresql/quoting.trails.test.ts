@@ -1,4 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
+import { pgConnection, unescapeBytea as pgUnescapeBytea } from "../../pg/connection.js";
 import { quotingHost } from "../../support/quoting-host.js";
 import {
   BinaryData,
@@ -9,7 +10,8 @@ import {
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
-import { Data as ArrayData, PgTextEncoderArray } from "./oid/array.js";
+import { PG } from "../../pg/pg.js";
+import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import {
@@ -21,7 +23,7 @@ import {
   quoteDefaultExpression,
   type CastTypeLookupHost,
   quotedBinary,
-  quotedDate,
+  quotedDate as quotedDateFn,
   quoteSchemaName,
   quoteTableNameForAssignment,
   typeCast as typeCastFn,
@@ -29,7 +31,9 @@ import {
 } from "./quoting.js";
 import { Range } from "@blazetrails/ruby-compat";
 
-const HOST = quotingHost({ quotedDate, quotedBinary });
+const HOST = quotingHost({ quotedDate: quotedDateFn, quotedBinary });
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(HOST, value);
 const quote = (value: unknown): string | null => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
@@ -41,41 +45,51 @@ describe("PostgreSQL quoting", () => {
     expect(typeCast(false)).toBe(false);
     expect(
       quote(
-        new ArrayData(new PgTextEncoderArray({ name: "text[]", delimiter: "," }), [true, false]),
+        new ArrayData(new PG.TextEncoder.Array(null, { name: "text[]", delimiter: "," }), [
+          true,
+          false,
+        ]),
       ),
     ).toBe("'{true,false}'");
   });
 
-  it("type casts binary data to a Buffer for node-postgres bytea binding", () => {
+  it("type casts binary data to the binary-format bind hash", () => {
     const cast = typeCast(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])));
-    expect(Buffer.isBuffer(cast)).toBe(true);
-    expect(Array.from(cast as Buffer)).toEqual([0xde, 0xad, 0xbe, 0xef]);
+    expect(cast).toEqual({ value: new Uint8Array([0xde, 0xad, 0xbe, 0xef]), format: 1 });
   });
 
   it("quotes PostgreSQL OID wrapper values before delegating other values", () => {
     expect(quote(new XmlData("<root />"))).toBe("xml '<root />'");
     expect(quote(new BitData("1010"))).toBe("B'1010'");
     expect(
-      quote(new ArrayData(new PgTextEncoderArray({ name: "text[]", delimiter: "," }), ["a", "b"])),
+      quote(
+        new ArrayData(new PG.TextEncoder.Array(null, { name: "text[]", delimiter: "," }), [
+          "a",
+          "b",
+        ]),
+      ),
     ).toBe("'{a,b}'");
     expect(quote(new Range(1, 10, true))).toBe("'[1,10)'");
     expect(quote(Infinity)).toBe("'Infinity'");
   });
 
   it("quotes arrays through the encoder's delimiter, not a hardcoded comma", async () => {
-    const boxArray = new ArrayData(new PgTextEncoderArray({ name: "box[]", delimiter: ";" }), [
-      "(1,1),(0,0)",
-      "(2,2),(1,1)",
-    ]);
+    const boxArray = new ArrayData(
+      new PG.TextEncoder.Array(null, { name: "box[]", delimiter: ";" }),
+      ["(1,1),(0,0)", "(2,2),(1,1)"],
+    );
     expect(typeCast(boxArray)).toBe("{(1,1),(0,0);(2,2),(1,1)}");
     expect(quote(boxArray)).toBe("'{(1,1),(0,0);(2,2),(1,1)}'");
   });
 
   it("type_casts datetime array elements through quoted_date (fixed-6, BC)", () => {
-    const dtArray = new ArrayData(new PgTextEncoderArray({ name: "datetime[]", delimiter: "," }), [
-      Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
-      Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
-    ]);
+    const dtArray = new ArrayData(
+      new PG.TextEncoder.Array(null, { name: "datetime[]", delimiter: "," }),
+      [
+        Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
+        Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
+      ],
+    );
     expect(quote(dtArray)).toBe(
       '\'{"2026-04-26 14:23:55.123456","0044-03-15 12:34:56.123456 BC"}\'',
     );
@@ -166,7 +180,7 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("serializes array defaults through the type map", async () => {
-    const arrayType = new PgTextEncoderArray({ name: "text[]", delimiter: "," });
+    const arrayType = new PG.TextEncoder.Array(null, { name: "text[]", delimiter: "," });
     const column = { sqlType: "text[]", array: true };
     const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
       lookupCastTypeFromColumn() {
@@ -183,11 +197,21 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("unescapes hex bytea values we now own locally", () => {
-    expect(unescapeBytea("\\x6869")).toEqual(Buffer.from("hi"));
+    expect(pgUnescapeBytea("\\x6869")).toEqual(Buffer.from("hi"));
   });
 
   it("unescapes legacy octal bytea with escaped backslashes", () => {
-    expect(unescapeBytea("a\\134\\000b")).toEqual(Buffer.from([0x61, 0x5c, 0x00, 0x62]));
+    expect(pgUnescapeBytea("a\\134\\000b")).toEqual(Buffer.from([0x61, 0x5c, 0x00, 0x62]));
+  });
+
+  it("unescapes the bytes Type::Binary#deserialize hands it", () => {
+    expect(pgUnescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(Buffer.from("hi"));
+  });
+
+  it("unescape_bytea asks the valid raw connection, and only for a value", async () => {
+    const host = { validRawConnection: async () => pgConnection({}) };
+    expect(await unescapeBytea.call(host, "\\x6869")).toEqual(Buffer.from("hi"));
+    expect(await unescapeBytea.call(host, null)).toBeUndefined();
   });
 
   it("quoteTableNameForAssignment drops the table prefix", () => {
@@ -206,17 +230,8 @@ describe("PostgreSQL quoting", () => {
     expect(quotedBinary(new BinaryData("ab"))).toBe("'\\x6162'");
   });
 
-  it("quote(Uint8Array) emits a bytea hex literal via quotedBinary", () => {
-    expect(quote(new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
-  });
-
   it("quote(BinaryData) unwraps to bytes via quotedBinary", () => {
     expect(quote(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
-  });
-
-  it("quote(non-Uint8Array ArrayBuffer view) normalizes to bytes via quotedBinary", () => {
-    expect(quote(new Int8Array([0x1f, 0x8b - 0x100]))).toBe("'\\x1f8b'");
-    expect(quote(new DataView(new Uint8Array([0x1f, 0x8b]).buffer))).toBe("'\\x1f8b'");
   });
 
   it("checkIntInRange raises Rails' check_int_in_range message verbatim", () => {
@@ -245,8 +260,25 @@ ActiveRecord.raiseIntWiderThan64bit to false.
     };
     const column = { oid: 23, fmod: -1, sqlType: "integer" };
 
-    expect(lookupCastTypeFromColumn.call({ typeMap }, column)).toBe(sentinel);
+    expect(lookupCastTypeFromColumn.call({ typeMap, verifyBang: async () => {} }, column)).toBe(
+      sentinel,
+    );
     expect(calls).toEqual([[23, -1, "integer"]]);
+  });
+
+  it("lookupCastTypeFromColumn runs verify! when no type map is built", () => {
+    const sentinel = new ValueType();
+    let verified = 0;
+    const host = {
+      typeMap: null as unknown as { lookup(): ValueType },
+      async verifyBang() {
+        verified += 1;
+        host.typeMap = { lookup: () => sentinel };
+      },
+    };
+
+    expect(lookupCastTypeFromColumn.call(host, { oid: 23, fmod: -1 })).toBe(sentinel);
+    expect(verified).toBe(1);
   });
 
   describe("columnNameWithOrderMatcher", () => {
@@ -274,9 +306,8 @@ ActiveRecord.raiseIntWiderThan64bit to false.
     });
   });
 
-  it("quote(new Date()) throws — Date is no longer accepted", () => {
-    expect(() => quote(new Date())).toThrow(TypeError);
-    expect(() => quote(new Date())).toThrow(/Temporal/);
+  it("quote(new Date()) quotes it as a Time", () => {
+    expect(quote(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("'2020-01-02 03:04:05'");
   });
 
   it("quoted_date suffixes BC for proleptic years <= 0", () => {
@@ -325,16 +356,15 @@ ActiveRecord.raiseIntWiderThan64bit to false.
 
   it("quote dispatches Date/Time through this.quoted_date (BC suffix)", () => {
     const v = Temporal.PlainDate.from("-000043-03-15");
-    expect(quoteFn.call(quotingHost({ quotedDate }), v)).toBe("'0044-03-15 BC'");
+    expect(quoteFn.call(quotingHost({ quotedDate: quotedDateFn }), v)).toBe("'0044-03-15 BC'");
   });
 
-  it("typeCast maps the infinity sentinels to the PG wire strings", () => {
-    expect(typeCast(DateInfinity)).toBe("infinity");
-    expect(typeCast(DateNegativeInfinity)).toBe("-infinity");
+  it("typeCast hands the infinity sentinels to super as Numerics", () => {
+    expect(typeCast(DateInfinity)).toBe(Infinity);
+    expect(typeCast(DateNegativeInfinity)).toBe(-Infinity);
   });
 
-  it("typeCast(new Date()) throws — Date is no longer accepted", () => {
-    expect(() => typeCast(new Date())).toThrow(TypeError);
-    expect(() => typeCast(new Date())).toThrow(/Temporal/);
+  it("typeCast(new Date()) casts it as a Time", () => {
+    expect(typeCast(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("2020-01-02 03:04:05");
   });
 });

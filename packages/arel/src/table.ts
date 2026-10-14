@@ -1,7 +1,7 @@
-import { rbEqual, rbHash } from "@blazetrails/activesupport";
+import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
-import { _engine, ArelEngine, Node } from "./nodes/node.js";
+import { _engine, ArelEngine } from "./nodes/node.js";
 import { Arel } from "./namespaces.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
@@ -10,18 +10,21 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
-import { setRubyNamespace } from "./visitors/ruby-class.js";
+import {
+  isEmpty,
+  isSymbol,
+  rbModConstSet,
+  rbObjAsString,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
+import { FactoryMethods, type FactoryMethodsModule } from "./factory-methods.js";
+import { AliasPredication, type AliasPredicationModule } from "./alias-predication.js";
+import type { ArelNode } from "./arel.js";
 
 export interface TableKlass {
-  readonly attributeAliases?: Record<string, string>;
+  readonly attributeAliases: Record<string, string>;
   /** @internal */
-  typeCaster?(): unknown;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export interface TypeCaster {
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
-  typeForAttribute(name: string | Node | null): unknown;
+  typeCaster(): unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -34,23 +37,32 @@ export class Table {
     _engine.current = value;
   }
 
-  name: string | Node;
+  name: string | ArelNode;
   readonly tableAlias: string | null;
-  readonly klass?: TableKlass;
+  private readonly klass: TableKlass | null;
 
   constructor(
-    name: string | Node,
-    options?: { as?: string; klass?: TableKlass; typeCaster?: unknown },
+    name: string | ArelNode,
+    {
+      as = null,
+      klass = null,
+      typeCaster = klass?.typeCaster() ?? null,
+    }: { as?: string | null; klass?: TableKlass | null; typeCaster?: unknown } = {},
   ) {
+    if (isSymbol(name)) name = symbolToS(name);
+
     this.name = name;
-    const as = options?.as ?? null;
-    this.tableAlias = as === name ? null : as;
-    this.klass = options?.klass;
-    this.typeCaster = options?.typeCaster ?? options?.klass?.typeCaster?.() ?? null;
+    this.klass = klass;
+    this.typeCaster = typeCaster as Table["typeCaster"];
+
+    if (rbObjAsString(as) === this.name) {
+      as = null;
+    }
+    this.tableAlias = as;
   }
 
-  alias(name?: string): TableAlias {
-    return new TableAlias(this, name ?? `${this.name}_2`);
+  alias(name: string = `${this.name}_2`): TableAlias {
+    return new TableAlias(this, name);
   }
 
   from(): SelectManager {
@@ -58,37 +70,36 @@ export class Table {
   }
 
   join(
-    relation: Node | Table | string | null | undefined,
-    klass: new (left: Node | Table, right: Node | null) => Join = InnerJoin,
+    relation: ArelNode | Table | string | null | undefined,
+    klass: new (left: ArelNode | Table, right: ArelNode | null) => Join = InnerJoin,
   ): SelectManager {
     if (relation == null) return this.from();
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
-      const text = typeof relation === "string" ? relation : relation.value;
-      if (text.length === 0) throw new EmptyJoinError();
-      klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
+      if (isEmpty(relation)) throw new EmptyJoinError();
+      klass = StringJoin;
     }
 
     return this.from().join(relation, klass);
   }
 
-  outerJoin(relation: Node | Table | string): SelectManager {
+  outerJoin(relation: ArelNode | Table | string): SelectManager {
     return this.join(relation, OuterJoin);
   }
 
-  group(...columns: (Node | string)[]): SelectManager {
+  group(...columns: (ArelNode | string)[]): SelectManager {
     return this.from().group(...columns);
   }
 
-  order(...expr: (Node | string)[]): SelectManager {
+  order(...expr: (ArelNode | string)[]): SelectManager {
     return this.from().order(...expr);
   }
 
-  where(condition: Node): SelectManager {
+  where(condition: ArelNode): SelectManager {
     return this.from().where(condition);
   }
 
-  project(...things: (Node | string)[]): SelectManager {
+  project(...things: (ArelNode | string)[]): SelectManager {
     return this.from().project(...things);
   }
 
@@ -100,14 +111,19 @@ export class Table {
     return this.from().skip(amount);
   }
 
-  having(expr: Node): SelectManager {
+  having(expr: ArelNode): SelectManager {
     return this.from().having(expr);
   }
 
-  get(name: Node | string | null, table?: Attribute["relation"]): Attribute {
-    const resolved =
-      name === null || name instanceof Node ? name : (this.klass?.attributeAliases?.[name] ?? name);
-    return new Attribute(table ?? this, resolved);
+  get(name: ArelNode | string | null, table: Attribute["relation"] = this): Attribute {
+    if (isSymbol(name)) name = symbolToS(name);
+    if (this.klass != null) {
+      name =
+        (Object.getOwnPropertyDescriptor(this.klass.attributeAliases, name as string)?.value as
+          | string
+          | undefined) ?? name;
+    }
+    return new Attribute(table, name);
   }
 
   hash(): number {
@@ -123,14 +139,17 @@ export class Table {
     );
   }
 
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
-    return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName, value);
+  typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown {
+    return this.typeCaster!.typeCastForDatabase(attrName, value);
   }
 
-  private readonly typeCaster: unknown;
+  private readonly typeCaster: {
+    typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown;
+    typeForAttribute(name: string | ArelNode | null): unknown;
+  } | null;
 
-  typeForAttribute(name: string | Node | null): unknown {
-    return (this.typeCaster as TypeCaster).typeForAttribute(name);
+  typeForAttribute(name: string | ArelNode | null): unknown {
+    return this.typeCaster!.typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {
@@ -138,11 +157,10 @@ export class Table {
   }
 }
 
-type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
-type _AliasPredication = import("./alias-predication.js").AliasPredicationModule;
-
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
-export interface Table extends _FactoryMethodsModule, _AliasPredication {}
+export interface Table extends FactoryMethodsModule, AliasPredicationModule {}
 
-Arel.Table = Table;
-setRubyNamespace(Table, "Arel");
+include(Table, FactoryMethods);
+include(Table, AliasPredication);
+
+rbModConstSet(Arel, "Table", Table);

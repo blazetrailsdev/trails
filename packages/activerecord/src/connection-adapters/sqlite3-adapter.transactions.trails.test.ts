@@ -14,12 +14,12 @@ describe("SQLite3Adapter transaction control", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-tx-"));
     adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
     await adapter.execute(
-      "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
+      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
   });
 
   afterEach(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS items");
+    await adapter.execute("DROP TABLE IF EXISTS gadgets");
     await adapter.disconnectBang();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -27,10 +27,10 @@ describe("SQLite3Adapter transaction control", () => {
   describe("BEGIN IMMEDIATE / COMMIT", () => {
     it("commits inserted rows", async () => {
       await adapter.beginDbTransaction();
-      await adapter.execute("INSERT INTO items (name) VALUES ('apple')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('apple')");
       await adapter.commitDbTransaction();
 
-      const rows = (await adapter.execute("SELECT name FROM items"))!;
+      const rows = (await adapter.execute("SELECT name FROM gadgets"))!;
       expect(rows.map((r: any) => r.name)).toEqual(["apple"]);
     });
   });
@@ -38,10 +38,10 @@ describe("SQLite3Adapter transaction control", () => {
   describe("BEGIN DEFERRED / COMMIT", () => {
     it("commits inserted rows via deferred transaction", async () => {
       await adapter.beginDeferredTransaction();
-      await adapter.execute("INSERT INTO items (name) VALUES ('deferred')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('deferred')");
       await adapter.commitDbTransaction();
 
-      const rows = (await adapter.execute("SELECT name FROM items"))!;
+      const rows = (await adapter.execute("SELECT name FROM gadgets"))!;
       expect(rows.map((r: any) => r.name)).toEqual(["deferred"]);
     });
   });
@@ -49,10 +49,10 @@ describe("SQLite3Adapter transaction control", () => {
   describe("BEGIN / ROLLBACK", () => {
     it("discards inserted rows on rollback", async () => {
       await adapter.beginDbTransaction();
-      await adapter.execute("INSERT INTO items (name) VALUES ('banana')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('banana')");
       await adapter.rollbackDbTransaction();
 
-      const rows = (await adapter.execute("SELECT name FROM items"))!;
+      const rows = (await adapter.execute("SELECT name FROM gadgets"))!;
       expect(rows).toHaveLength(0);
     });
   });
@@ -60,63 +60,63 @@ describe("SQLite3Adapter transaction control", () => {
   describe("savepoints", () => {
     it("releases savepoint on success, keeping outer changes", async () => {
       await adapter.beginDbTransaction();
-      await adapter.execute("INSERT INTO items (name) VALUES ('outer')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('outer')");
       await adapter.createSavepoint("sp1");
-      await adapter.execute("INSERT INTO items (name) VALUES ('inner')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('inner')");
       await adapter.releaseSavepoint("sp1");
       await adapter.commitDbTransaction();
 
-      const rows = (await adapter.execute("SELECT name FROM items ORDER BY id"))!;
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
       expect(rows.map((r: any) => r.name)).toEqual(["outer", "inner"]);
     });
 
     it("rolls back to savepoint on error, keeping outer changes", async () => {
       await adapter.beginDbTransaction();
-      await adapter.execute("INSERT INTO items (name) VALUES ('outer')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('outer')");
       await adapter.createSavepoint("sp1");
-      await adapter.execute("INSERT INTO items (name) VALUES ('inner')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('inner')");
       await adapter.rollbackToSavepoint("sp1");
       await adapter.commitDbTransaction();
 
-      const rows = (await adapter.execute("SELECT name FROM items ORDER BY id"))!;
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
       expect(rows.map((r: any) => r.name)).toEqual(["outer"]);
     });
 
     it("supports multiple nested savepoints independently", async () => {
       await adapter.beginDbTransaction();
       await adapter.createSavepoint("sp1");
-      await adapter.execute("INSERT INTO items (name) VALUES ('a')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('a')");
       await adapter.createSavepoint("sp2");
-      await adapter.execute("INSERT INTO items (name) VALUES ('b')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('b')");
       await adapter.rollbackToSavepoint("sp2");
       await adapter.releaseSavepoint("sp1");
       await adapter.commitDbTransaction();
 
-      const rows = (await adapter.execute("SELECT name FROM items ORDER BY id"))!;
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
       expect(rows.map((r: any) => r.name)).toEqual(["a"]);
     });
   });
 
   describe("error mapping", () => {
     it("maps UNIQUE constraint violation to RecordNotUnique", async () => {
-      await adapter.execute("INSERT INTO items (name) VALUES ('dup')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('dup')");
       await expect(
-        adapter.insert("INSERT INTO items (name) VALUES ('dup')"),
+        adapter.insert("INSERT INTO gadgets (name) VALUES ('dup')"),
       ).rejects.toBeInstanceOf(RecordNotUnique);
     });
 
     it("rolls back savepoint on UNIQUE constraint error and continues outer transaction", async () => {
-      await adapter.execute("INSERT INTO items (name) VALUES ('dup')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('dup')");
       await adapter.beginDbTransaction();
-      await adapter.execute("INSERT INTO items (name) VALUES ('safe')");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('safe')");
       await adapter.createSavepoint("sp1");
       await expect(
-        adapter.insert("INSERT INTO items (name) VALUES ('dup')"),
+        adapter.insert("INSERT INTO gadgets (name) VALUES ('dup')"),
       ).rejects.toBeInstanceOf(RecordNotUnique);
       await adapter.rollbackToSavepoint("sp1");
       await adapter.commitDbTransaction();
 
-      const rows = (await adapter.execute("SELECT name FROM items ORDER BY id"))!;
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
       expect(rows.map((r: any) => r.name)).toEqual(["dup", "safe"]);
     });
   });
@@ -142,19 +142,19 @@ describe("SQLite3Adapter transaction control", () => {
         readonly: true,
       });
       try {
-        await expect(reader.insert("INSERT INTO items (name) VALUES ('x')")).rejects.toThrow(
+        await expect(reader.insert("INSERT INTO gadgets (name) VALUES ('x')")).rejects.toThrow(
           /readonly/i,
         );
 
         await adapter.beginDbTransaction();
-        await adapter.execute("INSERT INTO items (name) VALUES ('secret')");
+        await adapter.execute("INSERT INTO gadgets (name) VALUES ('secret')");
 
-        const beforeCommit = (await reader.execute("SELECT name FROM items"))!;
+        const beforeCommit = (await reader.execute("SELECT name FROM gadgets"))!;
         expect(beforeCommit).toHaveLength(0);
 
         await adapter.commitDbTransaction();
 
-        const afterCommit = (await reader.execute("SELECT name FROM items"))!;
+        const afterCommit = (await reader.execute("SELECT name FROM gadgets"))!;
         expect(afterCommit.map((r: any) => r.name)).toEqual(["secret"]);
       } finally {
         await reader.disconnectBang();

@@ -1,3 +1,6 @@
+import { rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Collectors } from "../namespaces.js";
+
 export class SubstituteBinds {
   private quoter: { quote(value: unknown): string };
   private delegate: { append(str: string): unknown; value: string };
@@ -12,14 +15,13 @@ export class SubstituteBinds {
     this.delegate = delegateCollector;
   }
 
+  append(str: string): this {
+    this.delegate.append(str);
+    return this;
+  }
+
   addBind(bind: unknown, _block: (index: number) => string): this {
-    if (bind != null && typeof bind === "object" && "valueForDatabase" in bind) {
-      const valueForDatabase = (bind as Record<string, unknown>).valueForDatabase;
-      bind =
-        typeof valueForDatabase === "function"
-          ? (valueForDatabase as () => unknown).call(bind)
-          : valueForDatabase;
-    }
+    if (rbObjRespondTo(bind, "valueForDatabase")) bind = rbFSend(bind, "valueForDatabase");
     return this.append(this.quoter.quote(bind));
   }
 
@@ -35,9 +37,6 @@ export class SubstituteBinds {
   get value(): string {
     return this.delegate.value;
   }
-
-  append(str: string): this {
-    this.delegate.append(str);
-    return this;
-  }
 }
+
+rbModConstSet(Collectors, "SubstituteBinds", SubstituteBinds);

@@ -1,3 +1,4 @@
+import { stringValue } from "./string/support.js";
 /**
  * Ruby's `Regexp.escape` (`re.c` `rb_reg_s_quote`,
  * `vendor/ruby/v3.3.11/re.c:4144`): the metacharacters of `string` escaped so it
@@ -15,4 +16,163 @@
  */
 export function regexpEscape(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * `Regexp.union` (`rb_reg_s_union_m` / `rb_reg_s_union`,
+ * `vendor/ruby/v3.3.11/re.c:4192`): the alternation of `args0`, or of the one
+ * array passed alone. A String is escaped ({@link regexpEscape}) and a Regexp
+ * is embedded as its `to_s` ({@link rbRegToS}), which carries its own options
+ * in JS's modifier syntax, so the union is a pattern only where the engine has
+ * modifiers. No pattern is `/(?!)/`, and a lone Regexp is returned itself. MRI's
+ * encoding compatibility checks have nothing to read (CLAUDE.md, "A String has
+ * no encoding tag either").
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegSUnion(
+  ...args0: (string | RegExp)[] | [readonly (string | RegExp)[]]
+): RegExp {
+  const args = (args0.length === 1 && Array.isArray(args0[0]) ? args0[0] : args0) as readonly (
+    | string
+    | RegExp
+  )[];
+  const argc = args.length;
+
+  if (argc === 0) {
+    return new RegExp("(?!)");
+  } else if (argc === 1) {
+    const arg = args[0];
+    if (arg instanceof RegExp) return arg;
+    else {
+      const quoted = regexpEscape(arg);
+      return new RegExp(quoted);
+    }
+  } else {
+    let source = "";
+    for (let i = 0; i < argc; i++) {
+      const e = args[i];
+
+      if (0 < i) source += "|";
+
+      let v: string;
+      if (e instanceof RegExp) {
+        v = rbRegToS(e);
+      } else {
+        v = regexpEscape(e);
+      }
+      source += v;
+    }
+    return new RegExp(source);
+  }
+}
+
+/**
+ * `rb_reg_to_s` (`vendor/ruby/v3.3.11/re.c:565`): the source in a non-capturing
+ * group carrying the pattern's own options, so it means the same spliced into
+ * another pattern. Ruby's `m` is JS's `s`, and JS's `m` (Ruby's always-on line
+ * anchors) is carried too, so a `^` ported from `\A` stays `\A`. The group is
+ * spelled with JS's modifiers (`(?i-ms:a)` for MRI's `(?i-mx:a)`), so it is a
+ * pattern only where the engine has them: Node 23, Chrome 125, Firefox 132,
+ * Safari 18.4.
+ *
+ * `syntax: "onig"` spells the group with MRI's own option letters instead
+ * (`option_to_str`, `vendor/ruby/v3.3.11/re.c:322`), the bytes MRI's `to_s`
+ * writes: JS's `s` is MRI's `m`, and JS has no `x`. That string is a pattern
+ * for MRI, not for JS, and {@link rbRegInitStr} reads it back. MRI has three
+ * options, so a JS flag that is none of them is not written: `m`, since an MRI
+ * `^` / `$` is a line anchor under every option, and `g`, `y`, `d`, `u` and
+ * `v`, which {@link rbRegEqual} does not compare either.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegToS(re: RegExp, syntax: "js" | "onig" = "js"): string {
+  let on = "";
+  let off = "";
+  if (syntax === "onig") {
+    for (const [opt, flag] of [
+      ["m", "s"],
+      ["i", "i"],
+      ["x", ""],
+    ]) {
+      if (flag !== "" && re.flags.includes(flag)) on += opt;
+      else off += opt;
+    }
+    return `(?${on}${off ? `-${off}` : ""}:${re.source})`;
+  }
+  for (const opt of "ims") {
+    if (re.flags.includes(opt)) on += opt;
+    else off += opt;
+  }
+  return `(?${on}${off ? `-${off}` : ""}:${re.source})`;
+}
+
+/**
+ * `Regexp.new(string)` (`rb_reg_init_str`, `vendor/ruby/v3.3.11/re.c:3360`) for
+ * a pattern in MRI's syntax. MRI keeps a `(?on-off:…)` wrapper in the source
+ * and folds it into the options again in `rb_reg_str_with_term`
+ * (`vendor/ruby/v3.3.11/re.c:582-640`); a JS pattern cannot hold MRI's option
+ * letters, so that fold is made here: a pattern that is wholly one such group
+ * becomes the group's body under the JS flags its options name. Anything else
+ * is compiled as it stands, so an MRI-only construct (`(?x:…)`) is a
+ * `SyntaxError`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegInitStr(s: string | Uint8Array): RegExp {
+  s = stringValue(s);
+  const m = /^\(\?([mi]*)(?:-[mix]*)?:/.exec(s);
+  if (m && s.endsWith(")")) {
+    let depth = 1;
+    let inClass = false;
+    let i = m[0].length;
+    for (; i < s.length && depth > 0; i++) {
+      const c = s[i];
+      if (c === "\\") i++;
+      else if (inClass) inClass = c !== "]";
+      else if (c === "[") inClass = true;
+      else if (c === "(") depth++;
+      else if (c === ")") depth--;
+    }
+    if (depth === 0 && i === s.length) {
+      const flags = (m[1].includes("i") ? "i" : "") + (m[1].includes("m") ? "s" : "");
+      return new RegExp(s.slice(m[0].length, -1), flags);
+    }
+  }
+  return new RegExp(s);
+}
+
+/**
+ * `rb_reg_equal` (`vendor/ruby/v3.3.11/re.c:3486`): the same source under the
+ * same options. `g`, `y`, `d`, `u` and `v` are how a JS pattern is run, not
+ * options Ruby has, and are not compared.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegEqual(re1: RegExp, re2: unknown): boolean {
+  if (re1 === re2) return true;
+  if (!(re2 instanceof RegExp)) return false;
+  for (const opt of "ims") {
+    if (re1.flags.includes(opt) !== re2.flags.includes(opt)) return false;
+  }
+  return re1.source === re2.source;
+}
+
+/**
+ * `Regexp#match?` (`rb_reg_match_p`, `vendor/ruby/v3.3.11/re.c:3811`): whether
+ * `re` matches `str`, keeping no state. A JS pattern carrying `g` or `y`
+ * searches from its `lastIndex` and advances it on a match, which MRI has no
+ * counterpart for, so the search starts at 0 and `lastIndex` is put back.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegMatchP(re: RegExp, str: string | null | undefined): boolean {
+  if (str == null) return false;
+  const { lastIndex } = re;
+  try {
+    re.lastIndex = 0;
+    return re.test(str);
+  } finally {
+    re.lastIndex = lastIndex;
+  }
 }

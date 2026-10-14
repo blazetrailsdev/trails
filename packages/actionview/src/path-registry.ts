@@ -62,7 +62,7 @@ export class PathRegistry {
     };
     for (const r of this._fileSystemResolvers.values()) add(r);
     for (const paths of this._viewPathsByClass.values()) {
-      for (const r of paths.toArray() as unknown as PathSetResolver[]) add(r);
+      for (const r of paths.toAry() as unknown as PathSetResolver[]) add(r);
     }
     return out;
   }

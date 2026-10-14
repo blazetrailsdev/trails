@@ -22,13 +22,13 @@ export class PostsController extends ApplicationController {
   async show(): Promise<void> {}
 
   async new(): Promise<void> {
-    this.post = Post.new();
+    this.post = new Post();
   }
 
   async edit(): Promise<void> {}
 
   async create(): Promise<void> {
-    this.post = Post.new(this.postParams());
+    this.post = new Post(this.postParams());
 
     if (await this.post.save()) {
       this.redirectTo(this.post, { notice: "Post was successfully created." });
@@ -54,8 +54,8 @@ export class PostsController extends ApplicationController {
     this.post = await Post.find(this.params.expect("id"));
   }
 
-  private postParams(): Record<string, unknown> {
-    return this.params.expect({ post: ["title", "views"] }) as Record<string, unknown>;
+  private postParams() {
+    return this.params.expect({ post: ["title", "views"] });
   }
 }
 "

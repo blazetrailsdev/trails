@@ -6,5 +6,9 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../activesupport" }, { "path": "../ruby-compat" }]
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../bcrypt" },
+    { "path": "../ruby-compat" }
+  ]
 }

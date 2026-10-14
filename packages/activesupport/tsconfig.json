@@ -10,6 +10,7 @@
     { "path": "../ruby-compat" },
     { "path": "../date" },
     { "path": "../i18n" },
+    { "path": "../msgpack" },
     { "path": "../nokogiri" },
     { "path": "../tse-compiler" }
   ]

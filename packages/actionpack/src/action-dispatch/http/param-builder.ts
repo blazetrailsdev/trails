@@ -1,11 +1,23 @@
-import { forceEncoding } from "@blazetrails/ruby-compat";
+import {
+  bytes,
+  forceEncoding,
+  isValidEncoding,
+  type Encoding,
+  type Hash,
+} from "@blazetrails/ruby-compat";
+import { cattrAccessor } from "@blazetrails/activesupport";
 import { deprecator } from "../deprecator.js";
 import { UploadedFile } from "./upload.js";
 import { QueryParser, type QueryPair } from "./query-parser.js";
-import { RequestUtils, type ParamHash, type ParamValue } from "../request/utils.js";
+import {
+  CustomParamEncoder,
+  RequestUtils,
+  type ParamHash,
+  type ParamValue,
+} from "../request/utils.js";
 import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./param-error.js";
 
-export type EncodingTemplate = Record<string, string>;
+export type EncodingTemplate = Hash<string, Encoding | string>;
 
 /** @internal */
 const LEADING_BRACKETS_COMPAT = false;
@@ -21,9 +33,16 @@ export class ParamBuilder {
     return new ParamBuilder(paramDepthLimit);
   }
 
-  static ignoreLeadingBrackets: boolean | null = null;
+  declare static ignoreLeadingBrackets: boolean | null | undefined;
+  declare ignoreLeadingBrackets: boolean | null | undefined;
+  declare static default: ParamBuilder;
+  declare default: ParamBuilder;
 
-  static default: ParamBuilder = ParamBuilder.makeDefault(100);
+  static {
+    cattrAccessor.call(this, "ignoreLeadingBrackets");
+    cattrAccessor.call(this, "default");
+    this.default = this.makeDefault(100);
+  }
 
   static fromQueryString(
     qs: string | null | undefined,
@@ -87,9 +106,15 @@ export class ParamBuilder {
 
   fromHash(
     hash: ParamHash,
-    _options: { encodingTemplate?: EncodingTemplate | false | null } = {},
+    options: { encodingTemplate?: EncodingTemplate | false | null } = {},
   ): ParamHash {
-    return RequestUtils.normalizeEncodeParams(hash) as ParamHash;
+    hash = CustomParamEncoder.encodeForTemplate(hash, options.encodingTemplate);
+
+    RequestUtils.checkParamEncoding(hash);
+
+    hash = RequestUtils.normalizeEncodeParams(hash) as ParamHash;
+
+    return hash;
   }
 
   /** @internal */
@@ -100,7 +125,7 @@ export class ParamBuilder {
     depth: number,
     encodingTemplate: EncodingTemplate | false | null = null,
   ): ParamValue {
-    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError("param depth limit exceeded");
+    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError();
 
     let k: string;
     let after: string;
@@ -108,8 +133,8 @@ export class ParamBuilder {
     if (name === null || name === undefined) {
       k = after = "";
     } else if (depth === 0) {
-      const ignoreLeading = ParamBuilder.ignoreLeadingBrackets;
-      if (ignoreLeading === true || (ignoreLeading === null && LEADING_BRACKETS_COMPAT)) {
+      const ignoreLeading = this.ignoreLeadingBrackets;
+      if (ignoreLeading === true || (ignoreLeading == null && LEADING_BRACKETS_COMPAT)) {
         const m = name.match(/^([[\]]*)([^[\]]+)\]*/);
         if (m) {
           k = m[2];
@@ -157,12 +182,19 @@ export class ParamBuilder {
     if (k === "") return null;
 
     if (depth === 0 && typeof v === "string") {
-      let designatedEncoding: string | undefined;
-      if (encodingTemplate && (designatedEncoding = encodingTemplate[k])) {
+      let designatedEncoding: Encoding | string | undefined;
+      let validEncoding: boolean;
+      if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
+        v = bytes(v)
+          .map((b) => String.fromCharCode(b))
+          .join("");
+        validEncoding = isValidEncoding(v, designatedEncoding);
         v = forceEncoding(v, designatedEncoding);
+      } else {
+        validEncoding = !/\p{Cs}/u.test(v);
       }
 
-      if (/\p{Cs}/u.test(v)) {
+      if (!validEncoding) {
         throw new InvalidParameterError(
           `Invalid encoding for parameter: ${v.replace(/\p{Cs}/gu, "\uFFFD")}`,
         );

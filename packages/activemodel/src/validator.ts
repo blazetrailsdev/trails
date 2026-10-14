@@ -23,7 +23,7 @@ export abstract class Validator<TBase extends object = object> {
     return (this.constructor as typeof Validator).kind;
   }
 
-  abstract validate(_record: ValidatableRecord<TBase>): void | Promise<void>;
+  abstract validate(_record: ValidatableRecord<TBase>): unknown;
 }
 
 export class EachValidator<TBase extends object = object> extends Validator<TBase> {
@@ -42,14 +42,23 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     this.checkValidityBang();
   }
 
-  async validate(record: ValidatableRecord<TBase>): Promise<void> {
+  async validate(record: ValidatableRecord<TBase>): Promise<readonly string[]> {
     for (const attribute of this.attributes) {
-      let value = this.readAttributeForValidation(record, attribute);
-      if (value == null && this.options.allowNil === true) continue;
-      if (isBlank(value) && this.options.allowBlank === true) continue;
+      let value = await (
+        record as ValidatableRecord<TBase> & {
+          readAttributeForValidation(attribute: string): unknown;
+        }
+      ).readAttributeForValidation(attribute);
+      if (
+        (value == null && this.options.allowNil === true) ||
+        (isBlank(value) && this.options.allowBlank === true)
+      ) {
+        continue;
+      }
       value = this.prepareValueForValidation(value, record, attribute);
       await this.validateEach(record, attribute, value);
     }
+    return this.attributes;
   }
 
   validateEach(
@@ -73,28 +82,14 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
   ): unknown {
     return value;
   }
-
-  protected readAttributeForValidation(
-    record: ValidatableRecord<TBase>,
-    attribute: string,
-  ): unknown {
-    const rec = record as unknown as Record<string, unknown>;
-    if (typeof rec.readAttributeForValidation === "function") {
-      return (rec.readAttributeForValidation as (a: string) => unknown)(attribute);
-    }
-    if (typeof rec._readAttribute === "function") {
-      return (rec._readAttribute as (a: string) => unknown)(attribute);
-    }
-    return rec[attribute];
-  }
 }
 
 export class BlockValidator<TBase extends object = object> extends EachValidator<TBase> {
-  private block: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void;
+  private block?: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void;
 
   constructor(
     options: Record<string, unknown> & { attributes?: string | string[] },
-    block: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void,
+    block?: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void,
   ) {
     super(options);
     this.block = block;
@@ -102,6 +97,6 @@ export class BlockValidator<TBase extends object = object> extends EachValidator
 
   /** @internal */
   validateEach(record: ValidatableRecord<TBase>, attribute: string, value: unknown): void {
-    this.block(record, attribute, value);
+    this.block!(record, attribute, value);
   }
 }

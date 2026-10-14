@@ -2,7 +2,44 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, env, rbFSend, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
+
+describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
+  afterEach(() => {
+    resetLocalTimeZoneId();
+  });
+
+  it("answers a zoned time at the same instant", () => {
+    resetLocalTimeZoneId("America/New_York");
+    const instant = Temporal.Instant.from("2020-01-02T03:04:05.123456Z");
+    const date = new globalThis.Date(globalThis.Date.UTC(2020, 0, 2, 3, 4, 5));
+
+    for (const time of [instant, date]) {
+      expect(rbObjRespondTo(time, "getutc")).toBe(true);
+      expect(rbFSend(time, "isUtc")).toBe(false);
+    }
+    expect(String(rbFSend(instant, "getutc"))).toBe("2020-01-02T03:04:05.123456+00:00[UTC]");
+    expect(String(rbFSend(date, "getutc"))).toBe("2020-01-02T03:04:05+00:00[UTC]");
+    expect(String(rbFSend(date, "getlocal"))).toBe("2020-01-01T22:04:05-05:00[America/New_York]");
+    expect(rbObjRespondTo(Temporal.PlainDate.from("2020-01-02"), "getutc")).toBe(false);
+  });
+});
+
+describe('Time.now after ENV["TZ"] is assigned', () => {
+  it("reads the new zone with no reset of its own", () => {
+    const oldTz = env.TZ;
+    const zone = Time.now().zone;
+    try {
+      setEnv("TZ", "America/New_York");
+      expect(Time.now().zone).toMatch(/^E[SD]T$/);
+      setEnv("TZ", "Asia/Tokyo");
+      expect(Time.now().zone).toBe("JST");
+    } finally {
+      setEnv("TZ", oldTz);
+    }
+    expect(Time.now().zone).toBe(zone);
+  });
+});
 
 describe("Time", () => {
   afterEach(() => {
@@ -25,6 +62,26 @@ describe("Time", () => {
     expect(Time.at(new Rational(1, 3)).nsec).toBe(333333333);
     expect(Time.at(-0.5).nsec).toBe(500000000);
     expect(Time.at(-0.5).strftime("%Y-%m-%d %H:%M:%S")).toBe("1969-12-31 23:59:59");
+  });
+
+  it("Time.new carries a day past the end of the month into the next, as MRI does", () => {
+    const wall = (t: Time) => [t.year, t.mon, t.day, t.hour, t.min, t.sec];
+    expect(wall(Time.new(2026, 2, 30, 1, 2, 3, 0))).toEqual([2026, 3, 2, 1, 2, 3]);
+    expect(wall(Time.new(2025, 2, 29, 24, 0, 0, 0))).toEqual([2025, 3, 2, 0, 0, 0]);
+    expect(wall(Time.new(2024, 2, 29, 0, 0, 0, 0))).toEqual([2024, 2, 29, 0, 0, 0]);
+    expect(wall(Time.new(1900, 2, 29, 0, 0, 0, 0))).toEqual([1900, 3, 1, 0, 0, 0]);
+    expect(Time.new(2026, 2, 30, 1, 2, 3, 0).toI()).toBe(1772413323);
+  });
+
+  it("utc keeps the wall clock at offset zero and moves it from any other offset", () => {
+    const wall = (t: Time) => [t.year, t.mon, t.day, t.hour, t.min, t.sec];
+    const zero = Time.new(2026, 10, 11, 12, 34, 56, 0);
+    expect(wall(zero)).toEqual([2026, 10, 11, 12, 34, 56]);
+    expect(wall(zero.utc())).toEqual([2026, 10, 11, 12, 34, 56]);
+    const east = Time.new(2026, 4, 31, 0, 0, 0, 3600);
+    expect(wall(east)).toEqual([2026, 5, 1, 0, 0, 0]);
+    expect(wall(east.utc())).toEqual([2026, 4, 30, 23, 0, 0]);
+    expect(east.toI()).toBe(1777590000);
   });
 
   it("Time.new builds a time at the given offset", () => {
@@ -203,6 +260,11 @@ describe("Time", () => {
     );
     expect(time.utcOffset).toBe(Number(local.offsetNanoseconds) / 1_000_000_000);
     expect(time.strftime("%z")).toBe(local.offset.replace(":", ""));
+  });
+
+  it("Time.utc reads a nil usec as none, and an Integer one as microseconds", () => {
+    expect(Time.utc(2008, 3, 1, 6, 0, 1, null).nsec).toBe(0);
+    expect(Time.utc(2008, 3, 1, 6, 0, 1, 5n).usec).toBe(5);
   });
 
   it("Time.utc keeps a fractional second", () => {
@@ -482,6 +544,14 @@ describe("Time", () => {
       expect(summer.zone).toBe(tz);
       expect(summer.utcOffset).toBe(-14400);
       expect(summer.isdst).toBe(true);
+      const utc = summer.getutc();
+      expect(utc.zone).toBe("UTC");
+      expect(utc.isdst).toBe(false);
+      expect(utc.eql(summer)).toBe(true);
+      expect(summer.zone).toBe(tz);
+      expect(summer.isdst).toBe(true);
+      expect(summer.utc()).toBe(summer);
+      expect(summer.isdst).toBe(false);
       expect(Time.utc(2020, 1, 1).getlocal(new Rational(3600, 1)).utcOffset).toBe(3600);
       expect(() => Time.utc(2020, 1, 1).getlocal({})).toThrow(TypeError);
     });
@@ -777,5 +847,17 @@ describe("Time", () => {
 
   it("new takes a Rational utc_offset", () => {
     expect(Time.new(2000, 1, 1, 12, 0, 0, new Rational(19800, 1)).utcOffset).toBe(19800);
+  });
+});
+
+describe("Time#hash", () => {
+  it("answers alike for two Times that are eql?", () => {
+    expect(Time.utc(2000).hash()).toBe(Time.utc(2000).hash());
+    expect(Time.utc(2000).hash()).toBe(Time.utc(2000).getlocal(3600).hash());
+  });
+
+  it("differs for a different instant", () => {
+    expect(Time.utc(2000).hash()).not.toBe(Time.utc(2000, 1, 1, 0, 0, 1).hash());
+    expect(Time.at(0).hash()).not.toBe(Time.at(new Rational(1, 3_000_000_000)).hash());
   });
 });

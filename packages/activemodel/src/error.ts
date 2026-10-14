@@ -1,5 +1,15 @@
 import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { except, kernelCatch, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  except,
+  kernelCatch,
+  rbHash,
+  rbInspect,
+  rbModConstSet,
+  rbModName,
+  rbObjDup,
+  rbObjRespondTo,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { ActiveModel } from "./namespaces.js";
@@ -8,14 +18,15 @@ type ModelBase = object | null;
 
 interface ValidatableBase {
   readAttributeForValidation(attribute: string): unknown;
+  modelName: { human(): string };
+  constructor: ModelClass;
 }
 
 interface ModelClass {
-  name?: string;
   i18nScope?: string;
-  modelName?: { i18nKey?: string; human?: () => string };
-  humanAttributeName?: (attr: string, options?: { default?: string; base?: ModelBase }) => string;
-  lookupAncestors?: () => ModelClass[];
+  modelName: { i18nKey: string };
+  humanAttributeName(attr: string, options?: { default?: string; base?: ModelBase }): string;
+  lookupAncestors(): ModelClass[];
 }
 
 const CALLBACKS_OPTIONS: string[] = [
@@ -72,10 +83,16 @@ export class Error {
   rawType: string | null;
   options: Record<string, unknown>;
 
-  static fullMessage(attribute: string, message: string | null, base: ModelBase): string | null {
-    if (attribute === "base") return message;
+  static fullMessage(attribute: string, message: string | null, base: ModelBase): string | null;
+  static fullMessage(
+    attribute: string,
+    message: string | null,
+    base: ValidatableBase,
+  ): string | null {
+    if (attribute === ":base") return message;
 
-    const baseClass = base!.constructor as ModelClass;
+    const baseClass = base.constructor;
+    attribute = toS(attribute);
 
     let defaults: unknown[];
     if (this.i18nCustomizeFullMessage && rbObjRespondTo(baseClass, "i18nScope")) {
@@ -86,15 +103,19 @@ export class Error {
       const attributesScope = `${baseClass.i18nScope}.errors.models`;
 
       if (namespace) {
-        defaults = baseClass.lookupAncestors!().map((klass) => [
-          `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.attributes.${attributeName}.format`,
-          `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.format`,
-        ]);
+        defaults = baseClass
+          .lookupAncestors()
+          .map((klass) => [
+            `:${attributesScope}.${klass.modelName.i18nKey}/${namespace}.attributes.${attributeName}.format`,
+            `:${attributesScope}.${klass.modelName.i18nKey}/${namespace}.format`,
+          ]);
       } else {
-        defaults = baseClass.lookupAncestors!().map((klass) => [
-          `:${attributesScope}.${klass.modelName!.i18nKey}.attributes.${attributeName}.format`,
-          `:${attributesScope}.${klass.modelName!.i18nKey}.format`,
-        ]);
+        defaults = baseClass
+          .lookupAncestors()
+          .map((klass) => [
+            `:${attributesScope}.${klass.modelName.i18nKey}.attributes.${attributeName}.format`,
+            `:${attributesScope}.${klass.modelName.i18nKey}.format`,
+          ]);
       }
 
       defaults = defaults.flat(Infinity);
@@ -106,7 +127,7 @@ export class Error {
     defaults.push("%{attribute} %{message}");
 
     let attrName: string = humanize(attribute.replace(/\.base$/, "").replace(/\./g, "_"));
-    attrName = baseClass.humanAttributeName!(attribute, {
+    attrName = baseClass.humanAttributeName(attribute, {
       default: attrName,
       base,
     });
@@ -122,7 +143,13 @@ export class Error {
     attribute: string,
     type: string,
     base: ModelBase,
-    options: Record<string, unknown> = {},
+    options: Record<string, unknown>,
+  ): string;
+  static generateMessage(
+    attribute: string,
+    type: string,
+    base: ValidatableBase,
+    options: Record<string, unknown>,
   ): string {
     const msgOpt = options.message;
     if (typeof msgOpt === "string" && msgOpt.startsWith(":")) {
@@ -132,33 +159,27 @@ export class Error {
     }
     const typeName = type.slice(1);
 
-    const baseClass = base!.constructor as ModelClass;
-    const value =
-      attribute !== "base" && base != null
-        ? "readAttributeForValidation" in base
-          ? (base as ValidatableBase).readAttributeForValidation(attribute)
-          : (base as Record<string, unknown>)[attribute]
-        : undefined;
+    const value = attribute !== ":base" ? base.readAttributeForValidation(attribute) : null;
 
     options = {
-      model: baseClass?.modelName?.human?.(),
-      attribute: baseClass?.humanAttributeName
-        ? baseClass.humanAttributeName(attribute, { base })
-        : humanize(attribute),
+      model: base.modelName.human(),
+      attribute: base.constructor.humanAttributeName(attribute, { base }),
       value,
       object: base,
       ...options,
     };
 
     let defaults: unknown[];
-    if (baseClass?.i18nScope != null) {
-      const i18nScope = baseClass.i18nScope;
-      attribute = attribute.replace(/\[\d+\]/g, "");
+    if (rbObjRespondTo(base.constructor, "i18nScope")) {
+      const i18nScope = base.constructor.i18nScope;
+      attribute = toS(attribute).replace(/\[\d+\]/g, "");
 
-      defaults = baseClass.lookupAncestors!().flatMap((klass) => [
-        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.attributes.${attribute}.${typeName}`,
-        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.${typeName}`,
-      ]);
+      defaults = base.constructor
+        .lookupAncestors()
+        .flatMap((klass) => [
+          `:${i18nScope}.errors.models.${klass.modelName.i18nKey}.attributes.${attribute}.${typeName}`,
+          `:${i18nScope}.errors.models.${klass.modelName.i18nKey}.${typeName}`,
+        ]);
       defaults.push(`:${i18nScope}.errors.messages.${typeName}`);
 
       if (options.message == null || options.message === false) {
@@ -177,7 +198,7 @@ export class Error {
       defaults = [];
     }
 
-    defaults.push(`:errors.attributes.${attribute}.${typeName}`);
+    defaults.push(`:errors.attributes.${toS(attribute)}.${typeName}`);
     defaults.push(`:errors.messages.${typeName}`);
 
     const key = defaults.shift();
@@ -205,6 +226,9 @@ export class Error {
   }
 
   initializeDup(_other: Error): void {
+    this.attribute = rbObjDup(this.attribute);
+    this.rawType = rbObjDup(this.rawType);
+    this.type = rbObjDup(this.type);
     this.options = deepDup(this.options);
   }
 
@@ -235,14 +259,21 @@ export class Error {
     return (this.constructor as typeof Error).fullMessage(this.attribute, this.message, this.base);
   }
 
-  match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
-    if (this.attribute !== attribute) return false;
-    if (type !== undefined && this.type !== type) return false;
-    if (options) {
-      for (const [key, value] of Object.entries(options)) {
-        if (!optionsEqual(this.options[key], value)) return false;
+  match(
+    attribute: string,
+    type: string | null = null,
+    options: Record<string, unknown> = {},
+  ): boolean {
+    if (this.attribute !== attribute || (type != null && this.type !== type)) {
+      return false;
+    }
+
+    for (const [key, value] of Object.entries(options)) {
+      if (!optionsEqual(this.options[key], value)) {
+        return false;
       }
     }
+
     return true;
   }
 
@@ -262,26 +293,22 @@ export class Error {
     );
   }
 
+  declare eql: Error["equals"];
+
+  hash(): number {
+    return rbHash(this.attributesForHash());
+  }
+
   /** @internal */
   protected attributesForHash(): [ModelBase, string, string | null, Record<string, unknown>] {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
   }
 
-  deepDup(): this {
-    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
-    copy.initializeDup(this);
-    return copy;
-  }
-
   inspect(): string {
-    let optionsStr: string;
-    try {
-      optionsStr = JSON.stringify(this.options);
-    } catch {
-      optionsStr = "{...}";
-    }
-    return `#<ActiveModel::Error attribute=${this.attribute}, type=${this.type}, options=${optionsStr}>`;
+    return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${toS(this.attribute)}, type=${toS(this.type)}, options=${rbInspect(this.options)}>`;
   }
 }
 
-ActiveModel.Error = Error;
+Error.prototype.eql = Error.prototype.equals;
+
+rbModConstSet(ActiveModel, "Error", Error);

@@ -190,12 +190,24 @@ const bareCandidates = (name: string, siblings?: ReadonlySet<string>): string[] 
 const bareCandidatesIgnoringSkip = (name: string): string[] | null =>
   rubyMethodToTsIgnoringSkip(name)?.filter((c) => !c.startsWith("_")) ?? null;
 
+describe("freeze / initialize_clone / klasses are scored, not skipped", () => {
+  it("maps each to its camelCase spelling", () => {
+    expect(bareCandidates("freeze")).toEqual(["freeze"]);
+    expect(bareCandidates("initialize_clone")).toEqual(["initializeClone"]);
+    expect(bareCandidates("klasses")).toEqual(["klasses"]);
+  });
+});
+
 describe("rubyMethodToTsIgnoringSkip", () => {
   it("maps SKIP names that rubyMethodToTs refuses", () => {
-    expect(rubyMethodToTs("freeze")).toBeNull();
-    expect(bareCandidatesIgnoringSkip("freeze")).toEqual(["freeze"]);
+    expect(rubyMethodToTs("clone")).toBeNull();
+    expect(bareCandidatesIgnoringSkip("clone")).toEqual(["clone"]);
     expect(bareCandidatesIgnoringSkip("lookup_cast_type")).toEqual(["lookupCastType"]);
     expect(bareCandidatesIgnoringSkip("pretty_print")).toEqual(["prettyPrint"]);
+  });
+
+  it("maps nil? as a predicate, with no SKIP gate", () => {
+    expect(bareCandidates("nil?")).toEqual(["isNil", "nil"]);
   });
 
   it("still refuses operators", () => {
@@ -278,6 +290,12 @@ describe("SKIP_TS_MIRROR_IS_DRIFT", () => {
 });
 
 describe("rubyMethodToTs", () => {
+  it("maps any new that is not a class's own to the constructor only away from initialize", () => {
+    const beside = new Set(["new", "initialize"]);
+    expect(rubyMethodToTs("new", beside)).toBeNull();
+    expect(rubyMethodToTs("new")).toEqual(["constructor"]);
+  });
+
   it("special-cases the common Ruby → JS aliases", () => {
     expect(rubyMethodToTs("to_s")).toEqual(["toString"]);
     expect(rubyMethodToTs("to_str")).toEqual(["toString"]);
@@ -660,7 +678,7 @@ describe("SCOPED_SKIP_GROUPS", () => {
   });
 
   it("never overlaps the global SKIP set (scoped names stay file-local)", () => {
-    for (const g of SCOPED_SKIP_GROUPS) {
+    for (const g of SCOPED_SKIP_GROUPS.filter((g) => g.tsMirrorName === undefined)) {
       for (const name of g.names) expect(SKIP.has(name)).toBe(false);
     }
   });
@@ -686,18 +704,21 @@ describe("SCOPED_SKIP_GROUPS", () => {
     }
   });
 
-  it("scopes `initialize` to the prepended Rotator module, not to real classes", () => {
-    expect(isScopedSkip("initialize", "messages/rotator.rb")).toBe(true);
-    expect(isScopedSkip("initialize", "messages/message_verifier.rb")).toBe(false);
-    expect(rubyMethodToTs("initialize")).toEqual(["constructor"]);
-  });
-
   it("names the faithful TS spelling only where the scoped skip declares one", () => {
-    expect(scopedSkipMirrorName("initialize", "messages/rotator.rb")).toEqual(["initialize"]);
     expect(scopedSkipMirrorName("initialize", "messages/message_verifier.rb")).toBeNull();
     expect(
       scopedSkipMirrorName("lookup_cast_type", "connection_adapters/postgresql/quoting.rb"),
     ).toBeNull();
+  });
+
+  it("scores then by name and skips it only in relation.rb", () => {
+    expect(rubyMethodToTs("then")).toEqual(["then", "_then"]);
+    expect(isScopedSkip("then", "relation.rb")).toBe(true);
+    expect(isScopedSkip("then", "nodes/case.rb")).toBe(false);
+    expect(isScopedSkip("then", "future_result.rb")).toBe(false);
+    expect(rubyMethodToTs("to_ary")).toEqual(["toAry", "_toAry"]);
+    expect(isScopedSkip("to_ary", "core.rb")).toBe(true);
+    expect(isScopedSkip("to_ary", "result.rb")).toBe(false);
   });
 
   it("names every spelling of a port spread over several TS declarations", () => {
@@ -726,12 +747,12 @@ describe("SCOPED_SKIP_GROUPS", () => {
     });
   });
 
-  it("scopes `-@` to AR value objects but not ActiveSupport::Duration", () => {
-    expect(isScopedSkip("-@", "connection_adapters/deduplicable.rb")).toBe(true);
+  it("does not scope-skip `-@` (Deduplicable#-@ is ported as `negate`)", () => {
+    expect(isScopedSkip("-@", "connection_adapters/deduplicable.rb")).toBe(false);
     expect(isScopedSkip("-@", "duration.rb")).toBe(false);
   });
 
-  it("maps Ruby `-@` to `negate` globally (real surface outside the skip files)", () => {
+  it("maps Ruby `-@` to `negate` globally", () => {
     expect(rubyMethodToTs("-@")).toEqual(["negate"]);
   });
 });

@@ -567,6 +567,29 @@ describe("Ruby extractor gate detection", () => {
     });
   });
 
+  it("gates a mixed-in module's tests by the conditional they sit under", () => {
+    const cases = rubyCases({
+      "cases/legacy_test.rb": `
+        module LegacyTestCases
+          included do
+            if current_adapter?(:Mysql2Adapter)
+              def test_auto_incremented; end
+            else
+              def test_not_auto_incremented; end
+            end
+          end
+        end
+        class LegacyTest < ActiveRecord::TestCase
+          include LegacyTestCases
+        end
+      `,
+    });
+    expect(cases.map((c) => [c.description, c.gate?.adapters])).toEqual([
+      ["auto incremented", ["mysql"]],
+      ["not auto incremented", ["postgresql", "sqlite"]],
+    ]);
+  });
+
   it("keeps a never-included module's definition-site gate", () => {
     const g = rubyGates({
       "cases/some_test.rb": `
@@ -636,6 +659,25 @@ describe("Ruby extractor gate detection", () => {
     });
     expect(cases.map((c) => [c.rubyClass, c.ancestors])).toEqual([
       ["AttributesTest", ["AttributesTest", "Attributes", "equality"]],
+    ]);
+  });
+
+  it("materializes string-named shared examples under a nested constant describe", () => {
+    const cases = rubyCases({
+      "error_spec.rb": `
+        describe "Errors" do
+          shared_examples "descends from BCrypt::Error" do
+            specify "can be rescued" do; end
+          end
+
+          describe BCrypt::Errors::InvalidCost do
+            include_examples "descends from BCrypt::Error"
+          end
+        end
+      `,
+    });
+    expect(cases.map((c) => [c.description, c.ancestors])).toEqual([
+      ["can be rescued", ["Errors", "BCrypt::Errors::InvalidCost"]],
     ]);
   });
 });

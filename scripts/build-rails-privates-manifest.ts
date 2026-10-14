@@ -82,6 +82,7 @@ import {
 } from "@blazetrails/parity/write-json-manifest";
 import { PACKAGE_DIRS } from "./api-compare/config.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
+import { scopeOf } from "./api-compare/scope.js";
 import { entitiesByTsFile } from "./api-compare/privates-entities.js";
 import { projectPrivateNames } from "./api-compare/privates-projection.js";
 import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
@@ -154,6 +155,8 @@ const hasRailsApi = railsApiAvailable({
   argv: process.argv.slice(2),
 });
 
+const scope = scopeOf(process.argv.slice(2));
+
 // This script emits three manifests per run. Collect their writes and format
 // them all in one prettier spawn (~330ms of startup, once instead of thrice).
 beginManifestBatch();
@@ -161,12 +164,12 @@ beginManifestBatch();
 // The deprecation-parity manifest scans the vendored Ruby source directly and
 // does NOT depend on rails-api.json, so emit it up front — before the early
 // exit below that fires when rails-api.json is missing.
-emitDeprecatedManifest();
+if (scope === null) emitDeprecatedManifest();
 
 // The callback-invocation manifest likewise scans the vendored Ruby source
 // directly (the run_callbacks event symbol is not carried in MethodInfo.calls),
 // so emit it here too — before the rails-api.json early exit.
-emitCallbackInvocationsManifest();
+if (scope === null) emitCallbackInvocationsManifest();
 
 if (!hasRailsApi) {
   writeJsonManifest(OUT, { files: {}, entities: {}, instanceFiles: {}, entityInstanceFiles: {} });
@@ -177,6 +180,8 @@ if (!hasRailsApi) {
 interface RubyMethod {
   name: string;
   visibility: "public" | "private" | "protected";
+  included?: boolean;
+  file?: string;
 }
 interface RubyEntity {
   fqn: string;
@@ -352,13 +357,24 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
             noteEntityInstance(host.file, hostName, m.name, m.visibility);
           }
         }
+        if (ent !== host) {
+          for (const m of ent.classMethods ?? []) {
+            if (m.included) note(host.file, m.name, m.visibility);
+          }
+        }
       }
       // Extend / extended-via-Concern: a module's *instance* methods
       // become class methods on the host. Plus the host's own class
       // methods.
       for (const ent of klass) {
         if (ent === host) {
-          for (const m of ent.classMethods ?? []) note(host.file, m.name, m.visibility);
+          for (const m of ent.classMethods ?? []) {
+            note(host.file, m.name, m.visibility);
+            if (m.file && m.file !== host.file) {
+              if (m.visibility !== "public") noteEntity(m.file, host.fqn);
+              note(m.file, m.name, m.visibility);
+            }
+          }
         } else {
           for (const m of ent.instanceMethods ?? []) note(host.file, m.name, m.visibility);
           for (const m of ent.classMethods ?? []) note(host.file, m.name, m.visibility);
@@ -424,7 +440,7 @@ const final: Manifest = {
 
 writeJsonManifest(OUT, final);
 flushManifestBatch();
-emitRuntimePrivateMethods(final.files);
+if (scope === null) emitRuntimePrivateMethods(final.files);
 const fileCount = Object.keys(final.files).length;
 const fileNames = Object.values(final.files).reduce((n, a) => n + a.length, 0);
 console.log(`Wrote ${OUT} — ${fileCount} files (${fileNames} names)`);

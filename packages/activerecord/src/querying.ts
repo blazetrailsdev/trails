@@ -1,3 +1,4 @@
+import { Nodes } from "@blazetrails/arel";
 import { hasKey, toI, type Module } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
@@ -6,7 +7,12 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { FutureResult, Complete } from "./future-result.js";
 import type { FindEachOptions, Relation } from "./relation.js";
 import type { Result } from "./result.js";
-import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
+import type {
+  AssociationSpec,
+  ExceptSkip,
+  JoinSpec,
+  UnscopeArg,
+} from "./relation/query-methods.js";
 import type { SumBlock } from "./relation/calculations.js";
 
 export const QUERYING_METHODS = [
@@ -129,53 +135,41 @@ export async function findBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  opts:
-    | { allowRetry?: boolean; preparable?: boolean | null }
-    | ((record: InstanceType<T>) => void)
-    | null = {},
+  {
+    preparable = null,
+    allowRetry = false,
+  }: { preparable?: boolean | null; allowRetry?: boolean } = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
-  const resolvedBlock = typeof opts === "function" ? opts : block;
   const result = await this.withConnection(
     (c) =>
       _queryBySql.call(this, c, sql, binds, {
-        preparable: resolvedOpts.preparable,
-        allowRetry: resolvedOpts.allowRetry,
+        preparable,
+        allowRetry,
       }) as Promise<Result>,
   );
-  return _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
-    this,
-    result,
-    resolvedBlock,
-  );
+  return _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(this, result, block);
 }
 
 export async function asyncFindBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  opts:
-    | { allowRetry?: boolean; preparable?: boolean | null }
-    | ((record: InstanceType<T>) => void)
-    | null = {},
+  {
+    preparable = null,
+    allowRetry = false,
+  }: { preparable?: boolean | null; allowRetry?: boolean } = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
-  const resolvedBlock = typeof opts === "function" ? opts : block;
   return this.withConnection(
     (c) =>
       _queryBySql.call(this, c, sql, binds, {
-        preparable: resolvedOpts.preparable,
-        allowRetry: resolvedOpts.allowRetry,
+        preparable,
+        allowRetry,
         async: true,
       }) as Promise<Result>,
   ).then((result) =>
-    _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
-      this,
-      result,
-      resolvedBlock,
-    ),
+    _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(this, result, block),
   );
 }
 
@@ -183,9 +177,8 @@ export async function countBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number | bigint> {
-  const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
   return this.withConnection(async (c) => {
-    return toI(await c.selectValue(sanitized, `${this.name} Count`));
+    return toI(await c.selectValue(this.sanitizeSql(sql) as string, `${this.name} Count`));
   });
 }
 
@@ -193,7 +186,13 @@ export function asyncCountBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number | bigint> {
-  return countBySql.call(this, sql);
+  return this.withConnection((c) => {
+    return c
+      .selectValue(this.sanitizeSql(sql) as string, `${this.name} Count`, undefined, {
+        async: true,
+      })
+      .then((value) => toI(value));
+  });
 }
 
 /** @internal */
@@ -241,16 +240,18 @@ export function _loadFromSql<T extends typeof Base>(
 
   return messageBus.instrument("instantiation.active_record", payload, () => {
     if (resultSet.includesColumn(this.inheritanceColumn)) {
-      return resultSet.toArray().map((record) => this.instantiate(record, columnTypes, block));
+      return resultSet.indexedRows.map((record) => this.instantiate(record, columnTypes, block));
     } else {
-      return resultSet.toArray().map((record) => this._instantiate(record, block, columnTypes));
+      return resultSet.indexedRows.map((record) =>
+        this.instantiateInstanceOf(this, record, columnTypes, block),
+      );
     }
   });
 }
 
 export function from<T extends typeof Base>(
   this: T,
-  source: string | Relation<any> | import("@blazetrails/arel").Nodes.Node,
+  source: string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode,
   subqueryName?: string,
 ): Relation<InstanceType<T>> {
   return this.all().from(source, subqueryName);
@@ -258,7 +259,7 @@ export function from<T extends typeof Base>(
 
 export function select<T extends typeof Base>(
   this: T,
-  ...columns: (string | import("@blazetrails/arel").Nodes.Node | Record<string, unknown>)[]
+  ...columns: (string | import("@blazetrails/arel").ArelNode | Record<string, unknown>)[]
 ): Relation<InstanceType<T>> {
   return this.all().select(...columns);
 }
@@ -272,8 +273,8 @@ export function order<T extends typeof Base>(
 
 export function group<T extends typeof Base>(
   this: T,
-  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
-): Relation<InstanceType<T>> {
+  ...columns: (string | import("@blazetrails/arel").ArelNode)[]
+): Relation<InstanceType<T>, true> {
   return this.all().group(...columns);
 }
 
@@ -409,16 +410,10 @@ export async function updateAll<T extends typeof Base>(
   this: T,
   updates: Record<string, unknown> | string | [string, ...unknown[]],
 ): Promise<number> {
-  if (this.abstractClass) {
-    throw new Error(`Cannot call updateAll on abstract class ${this.name}`);
-  }
   return this.all().updateAll(updates);
 }
 
 export async function deleteAll<T extends typeof Base>(this: T): Promise<number> {
-  if (this.abstractClass) {
-    throw new Error(`Cannot call deleteAll on abstract class ${this.name}`);
-  }
   return this.all().deleteAll();
 }
 
@@ -543,11 +538,11 @@ export function sum<T extends typeof Base>(
 ): Promise<number | bigint>;
 export function sum<T extends typeof Base>(
   this: T,
-  column?: string | import("@blazetrails/arel").Nodes.Node | number,
+  column?: string | import("@blazetrails/arel").ArelNode | number,
 ): Promise<number | bigint | Map<unknown, number | bigint>>;
 export function sum<T extends typeof Base>(
   this: T,
-  column?: string | import("@blazetrails/arel").Nodes.Node | number | SumBlock,
+  column?: string | import("@blazetrails/arel").ArelNode | number | SumBlock,
   block?: SumBlock,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
   const rel = this.all() as ReturnType<T["all"]>;
@@ -794,28 +789,25 @@ export function extending<T extends typeof Base, M extends Record<string, (...ar
   this: T,
   mod: M,
 ): Relation<InstanceType<T>> & M;
+export function extending<T extends typeof Base>(this: T, mod: Module): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(
   this: T,
-  fn: (rel: Relation<InstanceType<T>>) => void,
+  block: (mod: Module) => void,
 ): Relation<InstanceType<T>>;
-export function extending<T extends typeof Base>(this: T, mod: Module): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(
   this: T,
-  mod?:
-    | Record<string, (...args: any[]) => any>
-    | Module
-    | ((rel: Relation<InstanceType<T>>) => void),
+  mod?: Record<string, (...args: any[]) => any> | Module | ((mod: Module) => void),
 ): Relation<InstanceType<T>> {
   return mod
     ? this.all().extending(mod as Record<string, (...args: any[]) => any>)
     : this.all().extending();
 }
 
-export function unscope<T extends typeof Base>(
+export function unscope<T extends typeof Base, A extends UnscopeArg[]>(
   this: T,
-  ...args: Parameters<Relation<InstanceType<T>>["unscope"]>
-): Relation<InstanceType<T>> {
+  ...args: A
+): Relation<InstanceType<T>, UnscopeArg extends A[number] ? boolean : false> {
   return this.all().unscope(...args);
 }
 
@@ -843,13 +835,13 @@ export function rewhere<T extends typeof Base>(
 export function regroup<T extends typeof Base>(
   this: T,
   ...columns: string[]
-): Relation<InstanceType<T>> {
+): Relation<InstanceType<T>, true> {
   return this.all().regroup(...columns);
 }
 
 export function having<T extends typeof Base>(
   this: T,
-  condition: string,
+  condition: string | import("@blazetrails/arel").Nodes.SqlLiteral,
   ...binds: unknown[]
 ): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
@@ -862,10 +854,16 @@ export function having<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
   this: T,
-  condition: string | Record<string, unknown> | import("@blazetrails/arel").Nodes.Node,
+  condition:
+    | string
+    | Record<string, unknown>
+    | import("@blazetrails/arel").Nodes.Node
+    | import("@blazetrails/arel").Nodes.SqlLiteral,
   ...binds: unknown[]
 ): Relation<InstanceType<T>> {
-  if (typeof condition === "string") return this.all().having(condition, ...binds);
+  if (typeof condition === "string" || condition instanceof Nodes.SqlLiteral) {
+    return this.all().having(condition, ...binds);
+  }
   return this.all().having(condition as Record<string, unknown>);
 }
 
@@ -927,7 +925,7 @@ export function and<T extends typeof Base>(
 
 export function inOrderOf<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
   values: unknown[],
   filter?: boolean,
 ): Relation<InstanceType<T>> {
@@ -959,17 +957,17 @@ export function without<T extends typeof Base>(
   return this.all().without(...records);
 }
 
-export function only<T extends typeof Base>(
+export function only<T extends typeof Base, A extends ExceptSkip[]>(
   this: T,
-  ...types: Parameters<Relation<InstanceType<T>>["only"]>
-): Relation<InstanceType<T>> {
+  ...types: A
+): Relation<InstanceType<T>, string extends A[number] ? boolean : false> {
   return this.all().only(...types);
 }
 
-export function merge<T extends typeof Base, U extends Base>(
+export function merge<T extends typeof Base, U extends Base, H extends boolean>(
   this: T,
-  other: Relation<U>,
-): Relation<InstanceType<T>> {
+  other: Relation<U, H>,
+): Relation<InstanceType<T>, [H] extends [true] ? true : false | H> {
   return this.all().merge(other);
 }
 
@@ -981,10 +979,10 @@ export function extractAssociated<T extends typeof Base>(this: T, name: string):
   return this.all().extractAssociated(name);
 }
 
-export function except<T extends typeof Base>(
+export function except<T extends typeof Base, A extends ExceptSkip[]>(
   this: T,
-  ...skips: Array<import("./relation/query-methods.js").ExceptSkip>
-): Relation<InstanceType<T>> {
+  ...skips: A
+): Relation<InstanceType<T>, string extends A[number] ? boolean : false> {
   return this.all().except(...skips);
 }
 
@@ -1007,21 +1005,21 @@ export function asyncCount<T extends typeof Base>(
 
 export function asyncAverage<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
 ): ReturnType<Relation<InstanceType<T>>["asyncAverage"]> {
   return this.all().asyncAverage(column);
 }
 
 export function asyncMinimum<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
 ): ReturnType<Relation<InstanceType<T>>["asyncMinimum"]> {
   return this.all().asyncMinimum(column);
 }
 
 export function asyncMaximum<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
 ): ReturnType<Relation<InstanceType<T>>["asyncMaximum"]> {
   return this.all().asyncMaximum(column);
 }

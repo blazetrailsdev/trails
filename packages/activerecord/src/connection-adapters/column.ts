@@ -1,14 +1,27 @@
-import { deduplicate } from "./deduplicable.js";
-import type { Deduplicable } from "./deduplicable.js";
+import { Deduplicable } from "./deduplicable.js";
+import type { ClassMethods } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
-import { Encoding, rbHash } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  include,
+  type Included,
+  rbHash,
+  registerConstant,
+  strUminus,
+} from "@blazetrails/ruby-compat";
 
-export class Column implements Deduplicable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Deduplicable` (`column.rb:8`); the class/interface merge is how a mixin surfaces on the type side.
+export interface Column extends Included<typeof Deduplicable> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class Column {
+  declare static registry: typeof ClassMethods.registry;
+
   name: string;
   sqlTypeMetadata: SqlTypeMetadata | null;
   null: boolean;
-  default: unknown;
+  default: string | Uint8Array | null;
   defaultFunction: string | null;
   collation: string | null;
   comment: string | null;
@@ -33,13 +46,14 @@ export class Column implements Deduplicable {
     return this.sqlTypeMetadata?.sqlType ?? null;
   }
 
+  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
   constructor(
     name: string,
-    defaultValue: unknown,
+    defaultValue: string | Uint8Array | null,
     sqlTypeMetadata: SqlTypeMetadata | null = null,
     null_: boolean = true,
+    defaultFunction: string | null = null,
     options: {
-      defaultFunction?: string | null;
       collation?: string | null;
       comment?: string | null;
     } = {},
@@ -48,9 +62,10 @@ export class Column implements Deduplicable {
     this.default = defaultValue;
     this.sqlTypeMetadata = sqlTypeMetadata;
     this.null = null_;
-    this.defaultFunction = options.defaultFunction ?? null;
+    this.defaultFunction = defaultFunction;
     this.collation = options.collation ?? null;
     this.comment = options.comment ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   get hasDefault(): boolean {
@@ -86,6 +101,10 @@ export class Column implements Deduplicable {
     );
   }
 
+  eql(other: unknown): boolean {
+    return this.equals(other);
+  }
+
   hash(): number {
     return (
       rbHash(Column) ^
@@ -106,17 +125,20 @@ export class Column implements Deduplicable {
 
   /** @internal */
   deduplicated(): this {
-    if (this.sqlTypeMetadata) {
-      this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
-    }
-    return Object.freeze(this);
+    this.name = strUminus(this.name);
+    if (this.sqlTypeMetadata) this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
+    if (this.default != null) this.default = strUminus(this.default);
+    if (this.defaultFunction != null) this.defaultFunction = strUminus(this.defaultFunction);
+    if (this.collation != null) this.collation = strUminus(this.collation);
+    if (this.comment != null) this.comment = strUminus(this.comment);
+    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
   }
 
   initWith(coder: ColumnCoder): void {
     this.name = coder["name"] as string;
     this.sqlTypeMetadata = (coder["sql_type_metadata"] as SqlTypeMetadata | null) ?? null;
     this.null = coder["null"] as boolean;
-    this.default = coder["default"];
+    this.default = coder["default"] as string | Uint8Array | null;
     this.defaultFunction = (coder["default_function"] as string | null) ?? null;
     this.collation = (coder["collation"] as string | null) ?? null;
     this.comment = (coder["comment"] as string | null) ?? null;
@@ -131,11 +153,9 @@ export class Column implements Deduplicable {
     coder["collation"] = this.collation;
     coder["comment"] = this.comment;
   }
-
-  deduplicate(): this {
-    return deduplicate(this);
-  }
 }
+
+include(Column, Deduplicable);
 
 /** @internal */
 function metadataEquals(a: SqlTypeMetadata | null, b: SqlTypeMetadata | null): boolean {
@@ -148,5 +168,9 @@ export type ColumnCoder = Record<string, unknown>;
 export class NullColumn extends Column {
   constructor(name: string) {
     super(name, null);
+    if (new.target === NullColumn) return this.deduplicate();
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::Column", Column);
+registerConstant("ActiveRecord::ConnectionAdapters::NullColumn", NullColumn);

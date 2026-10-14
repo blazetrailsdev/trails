@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
@@ -9,7 +9,6 @@ import {
   assertEncryptedAttribute,
   assertNotEncryptedAttribute,
 } from "./test-helpers.js";
-import { Configurable } from "./configurable.js";
 import { Encryption } from "../encryption.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { Configuration as ConfigurationError } from "./errors.js";
@@ -27,9 +26,9 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
 
   beforeEach(async () => {
     configSnapshot = snapshotEncryptionConfig();
-    Configurable.config.previousSchemes = [];
+    Encryption.config.previousSchemes = [];
     configureEncryption();
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
 
     EncryptedPost = class EncryptedPost extends Base {
       static {
@@ -89,21 +88,21 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   it(".with_encryption_context can be nested multiple times", () => {
     const encryptor1 = new NullEncryptor();
     Encryption.withEncryptionContext({ encryptor: encryptor1 }, () => {
-      expect(Configurable.encryptor).toBe(encryptor1);
+      expect(Encryption.encryptor).toBe(encryptor1);
 
       const encryptor2 = new NullEncryptor();
       Encryption.withEncryptionContext({ encryptor: encryptor2 }, () => {
-        expect(Configurable.encryptor).toBe(encryptor2);
+        expect(Encryption.encryptor).toBe(encryptor2);
 
         const encryptor3 = new NullEncryptor();
         Encryption.withEncryptionContext({ encryptor: encryptor3 }, () => {
-          expect(Configurable.encryptor).toBe(encryptor3);
+          expect(Encryption.encryptor).toBe(encryptor3);
         });
 
-        expect(Configurable.encryptor).toBe(encryptor2);
+        expect(Encryption.encryptor).toBe(encryptor2);
       });
 
-      expect(Configurable.encryptor).toBe(encryptor1);
+      expect(Encryption.encryptor).toBe(encryptor1);
     });
   });
 

@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Exception, RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { BestHardback } from "./hardback.js";
 import type { Book } from "./book.js";
@@ -29,6 +29,7 @@ import type { VerySpecialComment } from "./comment.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { FirstPost } from "./post.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Author extends Base {
@@ -395,7 +396,7 @@ export class Author extends Base {
         return this.where({ title: "So I was thinking" });
       },
       {
-        dependent: "delete",
+        dependent: "deleteAll",
         className: "Post",
       },
     );
@@ -554,13 +555,13 @@ export class Author extends Base {
         kernelThrow(":abort");
       },
       afterAdd: (_owner: any, _r: any) => {
-        throw new Error("ensure_not_called");
+        throw new RuntimeError("unhandled exception");
       },
       beforeRemove: (_owner: any, _r: any) => {
         kernelThrow(":abort");
       },
       afterRemove: (_owner: any, _r: any) => {
-        throw new Error("ensure_not_called");
+        throw new RuntimeError("unhandled exception");
       },
     });
     this.hasMany("postsWithProcCallbacks", {
@@ -584,7 +585,7 @@ export class Author extends Base {
     this.hasMany("unchangeablePosts", {
       className: "Post",
       beforeAdd: (_owner: any, _object: any) => {
-        throw new Error("You can't add a post");
+        throw new Exception("You can't add a post");
       },
       afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
     });
@@ -906,6 +907,7 @@ export class Author extends Base {
     return ["twitter", "github"];
   }
 }
+registerModel(Author);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Author {
   get post(): Post | null | Promise<Post | null>;
@@ -959,6 +961,7 @@ export class AuthorAddress extends Base {
     });
   }
 }
+registerModel(AuthorAddress);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorAddress {
   get author(): Author | null | Promise<Author | null>;
@@ -975,6 +978,7 @@ export class AuthorFavorite extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
+registerModel(AuthorFavorite);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavorite {
   get author(): Author | null | Promise<Author | null>;
@@ -994,6 +998,7 @@ export class AuthorFavoriteWithScope extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
+registerModel(AuthorFavoriteWithScope);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavoriteWithScope {
   get author(): Author | null | Promise<Author | null>;

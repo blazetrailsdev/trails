@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("AndTest", () => {

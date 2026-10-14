@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { sql as arelSql } from "@blazetrails/arel";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -46,10 +46,10 @@ describe("FieldOrderedValuesTest", () => {
     await Book.create({ status: "published" });
 
     const statuses = (Book as any).statuses;
-    const order = [statuses.written, statuses.published, statuses.proposed];
+    const order = [statuses.get("written"), statuses.get("published"), statuses.get("proposed")];
     const books = Book.inOrderOf("status", order);
 
-    expect((await books).map((book: any) => statuses[book.status])).toEqual(order);
+    expect((await books).map((book: any) => statuses.get(book.status))).toEqual(order);
   });
 
   it("in order of expression", async () => {

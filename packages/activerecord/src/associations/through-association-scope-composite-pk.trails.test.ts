@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
 import { CpkOrder, CpkOrderTag, CpkTag } from "../test-helpers/models/cpk.js";
@@ -14,7 +14,7 @@ CpkOrder.hasMany(
     return this.where("cpk_order_tags.order_id > 0 AND cpk_tags.name = 'Digital product'");
   },
   {
-    className: "CpkTag",
+    className: "Cpk::Tag",
     through: "orderTags",
     source: "tag",
   },

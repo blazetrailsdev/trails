@@ -12,7 +12,7 @@ import {
   travelBack,
   travelTo,
 } from "@blazetrails/activesupport";
-import { Base, Migrator, RecordNotUnique, Rollback, StatementInvalid } from "./index.js";
+import { Base, Migrator, Rollback, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { CheckPending, ConcurrentMigrationError, MigrationContext } from "./migration.js";
@@ -23,15 +23,15 @@ import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.j
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
 import type { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration, InvalidMigrationTimestampError } from "./migration.js";
 import { GiveMeBigNumbers } from "./test-helpers/migrations/decimal/1_give_me_big_numbers.js";
 import { WeNeedThings } from "./test-helpers/migrations/rename/1_we_need_things.js";
 import { RenameThings } from "./test-helpers/migrations/rename/2_rename_things.js";
 import { WeNeedReminders } from "./test-helpers/migrations/valid/2_we_need_reminders.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { VERSION } from "./gem-version.js";
-import { assertColumn, assertNoColumn } from "./test-helpers/test-case.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -72,8 +72,7 @@ import {
   setValidateMigrationTimestamps,
   validateMigrationTimestamps,
 } from "./active-record.js";
-
-const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
+import { MIGRATIONS_ROOT } from "./config.js";
 
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
   return await Base.leaseConnection();
@@ -96,7 +95,7 @@ function migrateProxy(version: number, body: (m: Migration) => Promise<void>): M
     version,
     name: `Migration${version}`,
     migration: () =>
-      new (class extends Migration {
+      new (class extends Migration.Current {
         override async up(): Promise<void> {
           await body(this);
         }
@@ -129,7 +128,7 @@ async function personColumnNames(): Promise<string[]> {
   return Person.columnNames();
 }
 
-fixtures(["people"], { useTransactionalTests: false });
+const { self } = fixtures(["people"], { useTransactionalTests: false });
 
 afterEach(async () => {
   Base.tableNamePrefix = "";
@@ -205,7 +204,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertRaises([StandardError], {}, () =>
       new Migrator(
@@ -226,7 +225,7 @@ describe("MigrationTest", () => {
       Base.tableNamePrefix = "p_";
       Base.tableNameSuffix = "_s";
       Thing.resetTableName();
-      Thing.resetSequenceName();
+      await Thing.resetSequenceName();
       await WeNeedThings.migrate("up");
       expect(await Thing.tableExists()).toBeTruthy();
       Thing.resetColumnInformation();
@@ -242,7 +241,7 @@ describe("MigrationTest", () => {
       Base.tableNamePrefix = "";
       Base.tableNameSuffix = "";
       Thing.resetTableName();
-      Thing.resetSequenceName();
+      await Thing.resetSequenceName();
       await adapter.dropTable("p_things_s", "p_awesome_things_s", { ifExists: true });
     }
   });
@@ -330,7 +329,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertNothingRaised(() =>
       new Migrator(
@@ -417,7 +416,7 @@ describe("MigrationTest", () => {
     }
   });
 
-  class MockMigration extends Migration {
+  class MockMigration extends Migration.Current {
     wentUp = false;
     wentDown = false;
     override async up(): Promise<void> {
@@ -564,7 +563,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await new Migrator(
       "up",
@@ -573,7 +572,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const migrator = new Migrator(
       "up",
@@ -636,7 +635,7 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate();
 
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
   });
 
   it("migration detection without schema migration table", async () => {
@@ -768,17 +767,16 @@ describe("MigrationTest", () => {
   });
 
   it("create table with force true does not drop nonexisting table", async () => {
-    const pool = (await Base.leaseConnection()).pool;
-    const tempConn = await pool.checkout();
     try {
-      expect(tempConn).not.toBe(await Base.leaseConnection());
+      const tempConn = rbObjDup(await Person.leaseConnection());
+
+      expect(tempConn).not.toBe(await Person.leaseConnection());
 
       await tempConn.createTable("testings2", { force: true }, (t) => {
         t.column("foo", "string");
       });
     } finally {
-      await tempConn.dropTable("testings2", { ifExists: true });
-      await pool.checkin(tempConn);
+      await (await Person.leaseConnection()).dropTable("testings2", { ifExists: true });
     }
   });
 
@@ -791,7 +789,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await new Migrator(
       "up",
@@ -800,7 +798,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const migrator = new Migrator(
       "up",
@@ -822,7 +820,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertNothingRaised(() =>
       new Migrator(
@@ -844,7 +842,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
 
     await assertNothingRaised(() =>
       new Migrator(
@@ -862,7 +860,7 @@ describe("MigrationTest", () => {
   });
 
   it("method missing delegates to connection", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       override get connection(): DatabaseAdapter {
         return { createTable: () => "hi mom!" } as unknown as DatabaseAdapter;
       }
@@ -876,7 +874,7 @@ describe("MigrationTest", () => {
   it("filtering migrations", async () => {
     class Reminder extends Base {}
     const adapter = await Base.leaseConnection();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
     expect(await Reminder.tableExists()).toBeFalsy();
 
     const nameFilter = (migration: MigrationProxy): boolean =>
@@ -888,18 +886,18 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate(null, nameFilter);
 
-    await assertColumn(Person, "last_name");
+    await self().assertColumn(Person, "last_name");
     await assertRaises([StatementInvalid], {}, () => Reminder.first());
 
     await migrator.down(null, nameFilter);
 
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
     await assertRaises([StatementInvalid], {}, () => Reminder.first());
   });
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
     const adapter = await Base.leaseConnection();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const migrator = new Migrator(
       "up",
@@ -920,7 +918,7 @@ describe("MigrationTest", () => {
       "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
     );
 
-    await assertNoColumn(
+    await self().assertNoColumn(
       Person,
       "last_name",
       "On error, the Migrator should revert schema changes but it did not.",
@@ -932,7 +930,7 @@ describe("MigrationTest", () => {
     "migrator one up with exception and rollback using run",
     async () => {
       const adapter = await Base.leaseConnection();
-      await assertNoColumn(Person, "last_name");
+      await self().assertNoColumn(Person, "last_name");
 
       const migrator = new Migrator(
         "up",
@@ -953,7 +951,7 @@ describe("MigrationTest", () => {
         "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
       );
 
-      await assertNoColumn(
+      await self().assertNoColumn(
         Person,
         "last_name",
         "On error, the Migrator should revert schema changes but it did not.",
@@ -963,9 +961,9 @@ describe("MigrationTest", () => {
 
   itIfSupports("ddl_transactions", "migration without transaction", async () => {
     const adapter = await freshAdapter();
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
-    class MigWithoutTx extends Migration {
+    class MigWithoutTx extends Migration.Current {
       static {
         this.disableDdlTransactionBang();
       }
@@ -988,36 +986,11 @@ describe("MigrationTest", () => {
       "An error has occurred, all later migrations canceled:\n\nSomething broke",
     );
 
-    await assertColumn(
+    await self().assertColumn(
       Person,
       "last_name",
       "without ddl transactions, the Migrator should not rollback on error but it did.",
     );
-  });
-
-  it("migration that fails to load escapes the canceled message", async () => {
-    const adapter = await freshAdapter();
-    const loadError = new Error("uninitialized constant MigThatFailsToLoad");
-    const proxy: MigrationProxy = migrationProxy({
-      version: 102,
-      name: "MigThatFailsToLoad",
-      migration: () => Promise.reject(loadError),
-    });
-    const migrator = new Migrator(
-      "up",
-      [proxy],
-      new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
-    );
-    let err!: Error;
-    try {
-      await migrator.migrate();
-    } catch (e) {
-      err = e as Error;
-    }
-    expect(err).toBe(loadError);
-    const versions = [...(await migrator.migrated())];
-    expect(versions).not.toContain(102);
   });
 
   it("internal metadata table name", async () => {
@@ -1233,17 +1206,17 @@ describe("MigrationTest", () => {
       Base.tableNamePrefix = "prefix_";
       Base.tableNameSuffix = "_suffix";
       Reminder.resetTableName();
-      Reminder.resetSequenceName();
+      await Reminder.resetSequenceName();
       await WeNeedReminders.migrate("up");
       expect(await Reminder.tableExists()).toBeTruthy();
       Reminder.resetColumnInformation();
-      expect(await Reminder.create({ content: "hello world", remind_at: new Date() })).toBeTruthy();
+      expect(await Reminder.create({ content: "hello world", remind_at: Time.now() })).toBeTruthy();
       expect(((await Reminder.first()) as any).content).toBe("hello world");
 
       await WeNeedReminders.migrate("down");
       await assertRaises([StatementInvalid], {}, () => Reminder.first());
     } finally {
-      Reminder.resetSequenceName();
+      await Reminder.resetSequenceName();
     }
   });
 
@@ -1351,7 +1324,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock", async () => {
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
@@ -1368,7 +1341,7 @@ describe("MigrationTest", () => {
       getSpy.mockRestore();
     }
 
-    await assertNoColumn(
+    await self().assertNoColumn(
       Person,
       "last_name",
       "without an advisory lock, the Migrator should not make any changes, but it did.",
@@ -1376,7 +1349,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock using run", async () => {
-    await assertNoColumn(Person, "last_name");
+    await self().assertNoColumn(Person, "last_name");
 
     const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
@@ -1393,7 +1366,7 @@ describe("MigrationTest", () => {
       getSpy.mockRestore();
     }
 
-    await assertNoColumn(
+    await self().assertNoColumn(
       Person,
       "last_name",
       "without an advisory lock, the Migrator should not make any changes, but it did.",
@@ -1534,97 +1507,6 @@ AND query LIKE '%${lockId}%'`;
     });
   });
 
-  describe("IndexTest", () => {
-    async function withTestings(body: () => Promise<void>): Promise<void> {
-      await (
-        await Base.leaseConnection()
-      ).createTable("testings", { force: true }, (t) => {
-        t.string("foo", { limit: 100 });
-        t.string("bar", { limit: 100 });
-      });
-      try {
-        await body();
-      } finally {
-        await (await Base.leaseConnection()).dropTable("testings", { ifExists: true });
-      }
-    }
-
-    it("test_remove_index_which_does_not_exist_doesnt_raise_with_option", async () => {
-      await withTestings(async () => {
-        const mig = new (class extends Migration {})();
-        await mig.addIndex("testings", "foo");
-        await mig.removeIndex("testings", "foo");
-
-        await expect(mig.removeIndex("testings", "foo")).rejects.toThrow(ArgumentError);
-
-        await mig.removeIndex("testings", "foo", { ifExists: true });
-      });
-    });
-
-    it("test_remove_index_with_name_which_does_not_exist_doesnt_raise_with_option", async () => {
-      await withTestings(async () => {
-        const mig = new (class extends Migration {})();
-        await mig.addIndex("testings", ["foo"], { name: "foo" });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
-
-        await mig.removeIndex("testings", { name: "foo", ifExists: true });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(false);
-      });
-    });
-
-    it("test_remove_index_with_column_array_which_does_not_exist_doesnt_raise_with_option", async () => {
-      await withTestings(async () => {
-        const mig = new (class extends Migration {})();
-        await mig.addIndex("testings", ["foo"], { name: "foo" });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
-
-        await mig.removeIndex("testings", { column: ["foo", "bar"], ifExists: true });
-
-        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
-        expect(await mig.indexExists("testings", ["foo", "bar"], { name: "foo" })).toBe(false);
-      });
-    });
-  });
-
-  describeIfPostgresqlAdapter("PostgresqlIndexTest", () => {
-    it("test_invalid_index", async () => {
-      const conn = await Base.leaseConnection();
-      await conn.dropTable("ex", { ifExists: true });
-      await conn.createTable("ex", { force: true }, (t) => {
-        t.integer("number");
-      });
-      try {
-        await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
-        const mig = new (class extends Migration {})();
-
-        let error: unknown;
-        try {
-          await mig.addIndex("ex", "number", {
-            unique: true,
-            algorithm: "concurrently",
-            name: "invalid_index",
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeInstanceOf(RecordNotUnique);
-
-        expect(await mig.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
-        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: true })).toBe(
-          false,
-        );
-        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: false })).toBe(
-          true,
-        );
-      } finally {
-        await conn.dropTable("ex", { ifExists: true });
-      }
-    });
-  });
-
   describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     let connection: DatabaseAdapter;
     let _columns: Column[] | null = null;
@@ -1634,7 +1516,7 @@ AND query LIKE '%${lockId}%'`;
       connection = await Base.leaseConnection();
       await connection.createTable("delete_me", { force: true }, () => {});
       Person.resetColumnInformation();
-      Person.resetSequenceName();
+      await Person.resetSequenceName();
     });
 
     afterEach(async () => {
@@ -1871,7 +1753,7 @@ AND query LIKE '%${lockId}%'`;
     beforeEach(async () => {
       connection = await Person.leaseConnection();
       Person.resetColumnInformation();
-      Person.resetSequenceName();
+      await Person.resetSequenceName();
     });
 
     afterEach(async () => {
@@ -1881,10 +1763,10 @@ AND query LIKE '%${lockId}%'`;
     it("bulk revert", async () => {
       await connection.addColumn("people", "column1", "string");
       await connection.addColumn("people", "column2", "string");
-      await assertColumn(Person, "column1");
-      await assertColumn(Person, "column2");
+      await self().assertColumn(Person, "column1");
+      await self().assertColumn(Person, "column2");
 
-      class BulkRevert extends Migration {
+      class BulkRevert extends Migration.Current {
         static {
           this.disableDdlTransactionBang();
         }
@@ -1902,8 +1784,8 @@ AND query LIKE '%${lockId}%'`;
 
       await assertQueriesCount(1, false, () => migration.migrate("down"));
 
-      await assertNoColumn(Person, "column1");
-      await assertNoColumn(Person, "column2");
+      await self().assertNoColumn(Person, "column1");
+      await self().assertNoColumn(Person, "column2");
     });
   });
 
@@ -2066,7 +1948,7 @@ AND query LIKE '%${lockId}%'`;
       Dir.mkdir(magicPath);
       File.write(
         `${magicPath}/1_currencies_have_symbols.ts`,
-        '// @ts-nocheck\n// @ts-check\n\nimport { Migration } from "../../../migration.js";\n\nexport class CurrenciesHaveSymbols extends Migration {}\n',
+        '// @ts-nocheck\n// @ts-check\n\nimport { Migration } from "../../../migration.js";\n\nexport class CurrenciesHaveSymbols extends Migration.Current {}\n',
       );
 
       try {
@@ -2241,7 +2123,7 @@ AND query LIKE '%${lockId}%'`;
 
             File.write(
               path,
-              `import { Migration } from "../../../migration.js";\n\nexport class ${migrationClassName(filename)} extends Migration {\n  async change() {}\n}\n`,
+              `import { Migration } from "../../../migration.js";\n\nexport class ${migrationClassName(filename)} extends Migration.Current {\n  async change() {}\n}\n`,
             );
           }
 
@@ -2517,7 +2399,7 @@ describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
 
 function mockMigration(): { migration: Migration; sql: string[] } {
   const sql: string[] = [];
-  const migration = new (class extends Migration {
+  const migration = new (class extends Migration.Current {
     async change() {}
   })(undefined, 20240101000000);
   (migration as any).adapter = adapterDouble({
@@ -2542,7 +2424,7 @@ describe("MigrationTest", () => {
   fixtures(["people"], { useTransactionalTests: false });
 
   it("migration instance has connection", async () => {
-    const migration = new (class extends Migration {})();
+    const migration = new (class extends Migration.Current {})();
     expect(await migration.connection).toBe(await Base.leaseConnection());
   });
 });

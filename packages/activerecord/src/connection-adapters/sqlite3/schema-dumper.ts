@@ -1,25 +1,32 @@
 import type { IO, StringIO } from "@blazetrails/ruby-compat";
 import type { Column } from "./column.js";
+import type { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
+  declare protected connection: SQLite3Adapter;
+
   /** @internal */
-  protected override async virtualTables(stream: IO | StringIO): Promise<void> {
-    const connection = this._adapter();
-    if (!connection || typeof connection.virtualTables !== "function") return;
-    const virtualTables: Array<[string, [string, string]]> = await connection.virtualTables();
-    if (virtualTables.length === 0) return;
-    stream.puts("");
-    stream.puts("  // Virtual tables defined in this database.");
-    stream.puts(
-      "  // Note that virtual tables may not work with other database engines. Be careful if changing database.",
-    );
-    for (const [tableName, options] of [...virtualTables].sort()) {
-      const [moduleName, argumentsStr] = options;
+  protected override async virtualTables(
+    stream: IO | StringIO,
+  ): Promise<Array<[string, [string, string]]> | undefined> {
+    const virtualTables: Array<[string, [string, string]]> = await this.connection.virtualTables();
+    if (virtualTables.length > 0) {
+      stream.puts("");
+      stream.puts("  // Virtual tables defined in this database.");
       stream.puts(
-        `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(argumentsStr.split(", "))});`,
+        "  // Note that virtual tables may not work with other database engines. Be careful if changing database.",
       );
+      const sorted = [...virtualTables].sort();
+      for (const [tableName, options] of sorted) {
+        const [moduleName, argumentsStr] = options;
+        stream.puts(
+          `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(argumentsStr.split(", "))});`,
+        );
+      }
+      return sorted;
     }
+    return undefined;
   }
 
   /** @internal */
@@ -46,5 +53,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected extractExpressionForVirtualColumn(column: Column): string {
     return JSON.stringify(column.defaultFunction ?? null);
+  }
+
+  protected override adapterType(): [name: string, path: string] {
+    return ["SQLite3Adapter", "sqlite3-adapter"];
   }
 }

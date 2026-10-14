@@ -1,5 +1,6 @@
 import type { Time } from "@blazetrails/date";
-import { actsLike, TimeWithZone, isBlank, registerConstant } from "@blazetrails/activesupport";
+import { actsLike, TimeWithZone, isBlank } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { DateTime } from "./date-time.js";
 
 export class TimestampWithTimeZone extends DateTime {

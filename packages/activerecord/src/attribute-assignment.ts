@@ -1,11 +1,18 @@
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  eachPair,
+  eachValue,
+  isEmpty,
+  rbInspect,
+  rbStrToF,
+  rbStrToI,
+} from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void;
+  _assignAttribute(k: string, v: unknown): unknown;
   readAttribute(name: string): unknown;
   /** @internal */
   assignNestedParameterAttributes(pairs: Record<string, unknown>): Promise<void> | void;
@@ -16,30 +23,36 @@ interface AttributeAssignmentHost {
 function isNestedParameterHash(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+  return proto === Object.prototype || proto === null || value instanceof Map;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE assign-attributes-pending-promise-chain-arms
+ */
 export function _assignAttributes(
   this: AttributeAssignmentHost,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): Promise<void> | void {
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
   let pending: Promise<void> | undefined;
 
-  for (const [k, v] of Object.entries(attributes)) {
+  eachPair(attributes, (k, v) => {
     const key = String(k);
     if (key.includes("(")) {
       (multiParameterAttributes ??= {})[key] = v;
     } else if (isNestedParameterHash(v)) {
       (nestedParameterAttributes ??= {})[key] = v;
     } else if (pending) {
-      pending = pending.then(() => this._assignAttribute(key, v));
+      pending = pending.then(async () => {
+        await this._assignAttribute(key, v);
+      });
     } else {
-      pending = this._assignAttribute(key, v) as Promise<void> | undefined;
+      const assigned = this._assignAttribute(key, v);
+      if (assigned instanceof Promise) pending = assigned;
     }
-  }
+  });
 
   const assignDeferred = (): Promise<void> | void => {
     const nested = (
@@ -56,16 +69,24 @@ export function _assignAttributes(
   return pending ? pending.then(assignDeferred) : assignDeferred();
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE assign-attributes-pending-promise-chain-arms
+ */
 export function assignNestedParameterAttributes(
   this: AttributeAssignmentHost,
   pairs: Record<string, unknown>,
 ): Promise<void> | void {
   let pending: Promise<void> | undefined;
   for (const [k, v] of Object.entries(pairs)) {
-    pending = (
-      pending ? pending.then(() => this._assignAttribute(k, v)) : this._assignAttribute(k, v)
-    ) as Promise<void> | undefined;
+    if (pending) {
+      pending = pending.then(async () => {
+        await this._assignAttribute(k, v);
+      });
+    } else {
+      const assigned = this._assignAttribute(k, v);
+      if (assigned instanceof Promise) pending = assigned;
+    }
   }
   return pending;
 }
@@ -88,7 +109,7 @@ export function executeCallstackForMultiparameterAttributes(
   for (const [name, valuesWithEmptyParameters] of Object.entries(callstack)) {
     let values: Record<number, unknown> | null;
     try {
-      if (Object.values(valuesWithEmptyParameters).every((v) => v == null)) {
+      if (eachValue(valuesWithEmptyParameters).isAll((v) => v == null)) {
         values = null;
       } else {
         values = valuesWithEmptyParameters;
@@ -134,24 +155,13 @@ export function extractCallstackForMultiparameterAttributes(
 
 /** @internal */
 export function typeCastAttributeValue(multiparameterName: string, value: string): unknown {
-  const match = multiparameterName.match(/\(\d*([if])\)/);
-  if (!match) return value;
-  const flag = match[1];
-  if (flag === "i") {
-    const n = parseInt(value, 10);
-    return isNaN(n) ? 0 : n;
-  }
-  if (flag === "f") {
-    const n = parseFloat(value);
-    return isNaN(n) ? 0.0 : n;
-  }
-  return value;
+  const md = /\([0-9]*([if])\)/.exec(multiparameterName);
+  return md ? { i: rbStrToI, f: rbStrToF }[md[1] as "i" | "f"](value) : value;
 }
 
 /** @internal */
 export function findParameterPosition(multiparameterName: string): number {
-  const match = multiparameterName.match(/\((\d+)/);
-  return match ? parseInt(match[1], 10) : 0;
+  return rbStrToI([...multiparameterName.matchAll(/\(([0-9]*).*\)/g)][0][1]) as number;
 }
 
 export const AttributeAssignment = {

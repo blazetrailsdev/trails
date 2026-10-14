@@ -8,7 +8,7 @@ import type { Human } from "./human.js";
 import type { Post } from "./post.js";
 import type { SpecialCategorization } from "./categorization.js";
 import { Base } from "../../base.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 export class Category extends Base {
   declare posts: AssociationProxy<Post>;
@@ -106,7 +106,8 @@ export class Category extends Base {
     return "a category...";
   }
 }
+registerModel(Category);
 
 export class SpecialCategory extends Category {}
 
-registerSubclass(SpecialCategory);
+registerModel(SpecialCategory);

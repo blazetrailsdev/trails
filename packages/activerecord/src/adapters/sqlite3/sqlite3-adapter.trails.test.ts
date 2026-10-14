@@ -3,10 +3,9 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
-import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
-import { fixtures } from "../../test-fixtures.js";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { BusyException } from "../../sqlite/errors.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
+import { Errno, File, FileUtils } from "@blazetrails/ruby-compat";
+import { BusyException, CantOpenException } from "../../sqlite/errors.js";
 import {
   ActiveRecordError,
   NoDatabaseError,
@@ -84,30 +83,6 @@ describe("SqliteAdapter", () => {
   });
 });
 
-describe("isInMemoryDatabase", () => {
-  const isMemoryFilename = isInMemoryDatabase;
-
-  it("treats :memory: as in-memory", () => {
-    expect(isMemoryFilename(":memory:")).toBe(true);
-  });
-
-  it("treats file::memory: URI as in-memory", () => {
-    expect(isMemoryFilename("file::memory:?cache=shared")).toBe(true);
-  });
-
-  it("treats file:?mode=memory URI as in-memory", () => {
-    expect(isMemoryFilename("file:memdb1?mode=memory&cache=shared")).toBe(true);
-  });
-
-  it("does NOT treat a path containing mode=memory text as in-memory", () => {
-    expect(isMemoryFilename("file:/tmp/mode=memory.db")).toBe(false);
-  });
-
-  it("treats a regular file path as on-disk", () => {
-    expect(isMemoryFilename("/tmp/test.db")).toBe(false);
-  });
-});
-
 describe("SQLite3Adapter pragmas option", () => {
   let adapter: SQLite3Adapter | undefined;
 
@@ -143,12 +118,37 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(result[0]?.foreign_keys).toBe(1);
   });
 
-  it("raises NoDatabaseError opening a missing database file readonly", async () => {
+  it("raises SQLite3::CantOpenException opening a missing database file readonly", async () => {
     const missing = new BetterSQLite3Adapter({
       database: "tmp/missing-readonly-database.sqlite3",
       readonly: true,
     });
-    await expect(missing.connectBang()).rejects.toThrow(NoDatabaseError);
+    const error = await missing.connectBang().then(
+      () => null,
+      (e: Error) => e,
+    );
+    expect(error instanceof NoDatabaseError).toBe(false);
+    expect(error instanceof StatementInvalid).toBe(true);
+    expect(error!.message).toBe("SQLite3::CantOpenException: unable to open database file");
+    expect(error!.cause instanceof CantOpenException).toBe(true);
+  });
+
+  it("new_client raises NoDatabaseError for Errno::ENOENT and re-raises anything else", async () => {
+    const newClient = (error: Error) =>
+      Promise.resolve().then(() =>
+        BetterSQLite3Adapter.newClient({
+          database: ":memory:",
+          driver: {
+            name: "raising",
+            open: async () => {
+              throw error;
+            },
+          },
+        } as never),
+      );
+    await expect(newClient(new Errno.ENOENT("tmp/nope.sqlite3"))).rejects.toThrow(NoDatabaseError);
+    const cantOpen = new CantOpenException("unable to open database file");
+    await expect(newClient(cantOpen)).rejects.toBe(cantOpen);
   });
 
   it("raises NoDatabaseError with the pool when the database directory cannot be created", () => {
@@ -299,5 +299,45 @@ describe("SQLite3 translateException", () => {
     const translated = translate(tooLong);
     expect(translated).toBeInstanceOf(StatementInvalid);
     expect(translated).not.toBeInstanceOf(ValueTooLong);
+  });
+});
+
+describe("SQLite3AdapterTest", () => {
+  let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
+
+  beforeEach(async () => {
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await adapter.execute(`DROP TABLE IF EXISTS json_defs`);
+    await pool.disconnect();
+  });
+
+  it("change column default serializes a structured json default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
+    await adapter.changeColumnDefault("json_defs", "options", {});
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual("{}");
+  });
+
+  it("change column default treats a bare to object as a literal default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
+    await adapter.changeColumnDefault("json_defs", "options", { to: 1 });
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual('{"to":1}');
+  });
+
+  it("change column serializes a structured json default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" TEXT)`);
+    await adapter.changeColumn("json_defs", "options", "json", { default: {} });
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual("{}");
+  });
+
+  it("quote default expression serializes a structured json default once", async () => {
+    expect(await adapter.quoteDefaultExpression({}, { sqlType: "json" })).toEqual("'{}'");
   });
 });

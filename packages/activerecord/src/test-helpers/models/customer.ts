@@ -1,4 +1,6 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Address {
   street: string;
@@ -22,6 +24,7 @@ export class Address {
     );
   }
 }
+registerConstant("Address", Address);
 
 export class Money {
   amount: number;
@@ -41,6 +44,7 @@ export class Money {
     );
   }
 }
+registerConstant("Money", Money);
 
 export class GpsLocation {
   gpsLocation: string;
@@ -61,6 +65,7 @@ export class GpsLocation {
     return this.latitude === other.latitude && this.longitude === other.longitude;
   }
 }
+registerConstant("GpsLocation", GpsLocation);
 
 export class Fullname {
   first: string;
@@ -89,6 +94,7 @@ export class Fullname {
     return this.toS;
   }
 }
+registerConstant("Fullname", Fullname);
 
 export class Customer extends Base {
   declare address: Address | null;
@@ -96,7 +102,7 @@ export class Customer extends Base {
 
   static {
     this.composedOf("address", {
-      className: Address,
+      className: "Address",
       mapping: [
         ["address_street", "street"],
         ["address_city", "city"],
@@ -105,7 +111,7 @@ export class Customer extends Base {
       allowNil: true,
     });
     this.composedOf("addressHashMapping", {
-      className: Address,
+      className: "Address",
       mapping: [
         ["address_street", "street"],
         ["address_city", "city"],
@@ -114,17 +120,17 @@ export class Customer extends Base {
       allowNil: true,
     });
     this.composedOf("balance", {
-      className: Money,
+      className: "Money",
       mapping: [["balance", "amount"]],
       allowNil: false,
     });
     this.composedOf("gpsLocation", {
-      className: GpsLocation,
+      className: "GpsLocation",
       mapping: [["gps_location", "gpsLocation"]],
       allowNil: true,
     });
     this.composedOf("nonBlankGpsLocation", {
-      className: GpsLocation,
+      className: "GpsLocation",
       mapping: [["gps_location", "gpsLocation"]],
       allowNil: true,
       converter: (gps: unknown) => {
@@ -134,14 +140,15 @@ export class Customer extends Base {
       },
     });
     this.composedOf("fullname", {
-      className: Fullname,
+      className: "Fullname",
       mapping: [["name", "toS"]],
       constructorFn: (name: unknown) => Fullname.parse(name),
       converter: (v: unknown) => Fullname.parse(v),
     });
     this.composedOf("fullnameNoConverter", {
-      className: Fullname,
+      className: "Fullname",
       mapping: [["name", "toString"]],
     });
   }
 }
+registerModel(Customer);

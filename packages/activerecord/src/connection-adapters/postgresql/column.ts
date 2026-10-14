@@ -2,7 +2,7 @@ import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { rbHash } from "@blazetrails/ruby-compat";
+import { rbHash, rbStrSend, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _serial: boolean;
@@ -17,28 +17,29 @@ export class Column extends BaseColumn {
     return (this.sqlTypeMetadata as TypeMetadata | null)?.fmod ?? null;
   }
 
+  /** @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
   constructor(
     name: string,
-    defaultValue: unknown,
+    defaultValue: string | Uint8Array | null,
     sqlTypeMetadata: TypeMetadata | null = null,
     null_: boolean = true,
+    defaultFunction: string | null = null,
     options: {
       collation?: string | null;
-      defaultFunction?: string | null;
       comment?: string | null;
       serial?: boolean;
       identity?: string | null;
       generated?: string | null;
     } = {},
   ) {
-    super(name, defaultValue, sqlTypeMetadata, null_, {
+    super(name, defaultValue, sqlTypeMetadata, null_, defaultFunction, {
       collation: options.collation,
-      defaultFunction: options.defaultFunction,
       comment: options.comment,
     });
     this._serial = options.serial ?? false;
     this._identity = options.identity ?? null;
     this._generated = options.generated ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   isIdentity(): boolean {
@@ -73,9 +74,8 @@ export class Column extends BaseColumn {
     return this.sqlTypeMetadata?.type === "enum";
   }
 
-  override get sqlType(): string | null {
-    const raw = super.sqlType;
-    return raw?.endsWith("[]") ? raw.slice(0, -2) : (raw ?? null);
+  override get sqlType(): string {
+    return rbStrSend(super.sqlType!, "deleteSuffix", "[]")[0] as string;
   }
 
   override equals(other: unknown): boolean {
@@ -85,6 +85,10 @@ export class Column extends BaseColumn {
       this.isIdentity() === other.isIdentity() &&
       this.isSerial() === other.isSerial()
     );
+  }
+
+  override eql(other: unknown): boolean {
+    return this.equals(other);
   }
 
   override hash(): number {
@@ -107,3 +111,5 @@ export class Column extends BaseColumn {
     super.encodeWith(coder);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::Column", Column);

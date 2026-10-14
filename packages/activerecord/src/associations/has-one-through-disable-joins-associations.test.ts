@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
-import { Notifications } from "@blazetrails/activesupport";
-import { registerModel, registerSubclass } from "../index.js";
+import { registerModel } from "../index.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Organization } from "../test-helpers/models/organization.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
@@ -26,7 +25,7 @@ import {
   TenantMembership,
 } from "../test-helpers/models/membership.js";
 import { Contract } from "../test-helpers/models/contract.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 
 registerModel(Member);
@@ -52,31 +51,15 @@ registerModel(Project);
 registerModel(Developer);
 registerModel(AuditLog);
 Company.inheritanceColumn = "type";
-registerSubclass(Firm);
-registerSubclass(DependentFirm);
-registerSubclass(ExclusivelyDependentFirm);
-registerSubclass(RestrictedWithExceptionFirm);
-registerSubclass(RestrictedWithErrorFirm);
-registerSubclass(Client);
-
-async function captureSql(block: () => Promise<unknown>): Promise<string[]> {
-  const observed: string[] = [];
-  const sub = Notifications.subscribe("sql.active_record", (event: any) => {
-    if (event?.payload?.name === "SCHEMA") return;
-    if (event?.payload?.cached) return;
-    const sql = event?.payload?.sql;
-    if (typeof sql === "string") observed.push(sql);
-  });
-  try {
-    await block();
-  } finally {
-    Notifications.unsubscribe(sub);
-  }
-  return observed;
-}
+registerModel(Firm);
+registerModel(DependentFirm);
+registerModel(ExclusivelyDependentFirm);
+registerModel(RestrictedWithExceptionFirm);
+registerModel(RestrictedWithErrorFirm);
+registerModel(Client);
 
 describe("HasOneThroughDisableJoinsAssociationsTest", () => {
-  const { members, organizations } = fixtures([
+  const { self, members, organizations } = fixtures([
     "members",
     "organizations",
     "memberDetails",
@@ -103,10 +86,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   it("counting on disable joins through", async () => {
     let withoutJoins: unknown;
     let withJoins: unknown;
-    const noJoins = await captureSql(async () => {
+    const noJoins = await self().captureSql({}, async () => {
       withoutJoins = await member.organizationWithoutJoins;
     });
-    const joins = await captureSql(async () => {
+    const joins = await self().captureSql({}, async () => {
       withJoins = await member.organization;
     });
 
@@ -150,10 +133,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
 
     let leadDeveloper: unknown;
     let leadDeveloperDisableJoins: unknown;
-    const joins = await captureSql(async () => {
+    const joins = await self().captureSql({}, async () => {
       leadDeveloper = await project.leadDeveloper;
     });
-    const noJoins = await captureSql(async () => {
+    const noJoins = await self().captureSql({}, async () => {
       leadDeveloperDisableJoins = await project.leadDeveloperDisableJoins;
     });
 
@@ -167,10 +150,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("disable joins through with enum type", async () => {
-    const joins = await captureSql(async () => {
+    const joins = await self().captureSql({}, async () => {
       await member.club;
     });
-    const noJoins = await captureSql(async () => {
+    const noJoins = await self().captureSql({}, async () => {
       await member.clubWithoutJoins;
     });
 

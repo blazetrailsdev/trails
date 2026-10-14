@@ -1,4 +1,5 @@
 import { extend, include, included, initializeIncludedModules } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 import {
   assignAttributes,
   setAttributes,
@@ -10,22 +11,29 @@ import { ForbiddenAttributesProtection } from "./forbidden-attributes-protection
 import { Validations, type ValidationContext } from "./validations.js";
 import type { AttrNameArg } from "./validations/helper-methods.js";
 import type { validatesWith as withValidatesWith } from "./validations/with.js";
-import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
+import { Conversion } from "./conversion.js";
 import { Naming } from "./naming.js";
 import { Translation } from "./translation.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
 type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
-export function initialize(this: APIHost, attributes: Record<string, unknown> = {}): void {
+export function initialize(
+  this: APIHost,
+  attributes: Record<string, unknown> | Map<string, unknown> = {},
+): void {
   if (attributes != null) this.assignAttributes(attributes);
 
   initializeIncludedModules(this);
 }
 
+const SuperMethods = new Module((mod) => mod.defineMethod("initialize", initialize));
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export class API {
   static [included](base: IncludingClass): void {
+    include(base, SuperMethods);
+
     include(base, {
       assignAttributes,
       setAttributes,
@@ -39,7 +47,6 @@ export class API {
     include(base, Validations);
 
     include(base, Conversion);
-    extend(base, ConversionClassMethods);
 
     extend(base, Naming);
     extend(base, Translation);
@@ -52,17 +59,25 @@ export class API {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export interface API extends Conversion {
+  /** @internal */
+  initialize(attributes?: Record<string, unknown> | Map<string, unknown>): void;
   assignAttributes(newAttributes: unknown): void;
   setAttributes(newAttributes: unknown): Promise<void> | void;
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
-  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  _assignAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Promise<void> | void;
   /** @internal */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void;
+  _assignAttribute(k: string, v: unknown): unknown;
   /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForMassAssignment(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
   /** @internal */
-  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForbiddenAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
 
   /** @internal */
   contextForValidation(): ValidationContext;
@@ -70,15 +85,15 @@ export interface API extends Conversion {
   runValidationsBang(): Promise<boolean>;
   raiseValidationError(): never;
   readAttributeForValidation(attribute: string): unknown;
-  isValid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  validate(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  validateBang(context?: string | string[] | ValidationContext | null): Promise<true>;
+  isValid(context?: string | string[] | null): Promise<boolean>;
+  validate(context?: string | string[] | null): Promise<boolean>;
+  isInvalid(context?: string | string[] | null): Promise<boolean>;
+  validateBang(context?: string | string[] | null): Promise<true>;
   readonly validationContext: string | string[] | null;
   /** @internal */
   _validationContext: string | string[] | null;
   /** @internal */
-  _runValidateCallbacks(): Promise<void>;
+  _runValidateCallbacks(block?: () => unknown): unknown;
   freeze(): this;
 
   validatesWith: typeof withValidatesWith;

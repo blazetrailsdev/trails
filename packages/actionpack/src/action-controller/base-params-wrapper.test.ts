@@ -1,6 +1,7 @@
+import { type HashWithIndifferentAccess, assertEqual } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { Options as ParamsWrapperOptions } from "./metal/params-wrapper.js";
+import { Options as ParamsWrapperOptions, inheritedParamsWrapper } from "./metal/params-wrapper.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 
@@ -16,7 +17,7 @@ describe("Base ParamsWrapper wiring", () => {
     expect(UsersController._wrapperOptions.name).toBe("person");
     expect(UsersController._wrapperOptions.include).toEqual(["name"]);
     expect(UsersController._wrapperOptions.klass).toBe(UsersController);
-    expect(Base._wrapperOptions.name).toBeNull();
+    expect(Base._wrapperOptions.toH().name).toBeNull();
   });
 
   it("wrapParameters with hash merges format from current", () => {
@@ -55,7 +56,7 @@ describe("Base ParamsWrapper wiring", () => {
     class Parent extends Base {}
     Parent.wrapParameters({ format: [":json"], name: "parent" });
     class Child extends Parent {}
-    Child.inheritedParamsWrapper();
+    inheritedParamsWrapper.call(Child);
     expect(Child._wrapperOptions.klass).toBe(Child);
     expect(Child._wrapperOptions.name).toBe("parent");
     expect(Child._wrapperOptions.format).toEqual([":json"]);
@@ -65,10 +66,8 @@ describe("Base ParamsWrapper wiring", () => {
   it("inheritedParamsWrapper re-derives auto-derived name from subclass klass", () => {
     class UsersController extends Base {}
     UsersController.wrapParameters({ format: [":json"] });
-    expect(UsersController._wrapperOptions.name).toBe("user");
-    expect(UsersController._wrapperOptions.nameSet).toBe(false);
     class AdminsController extends UsersController {}
-    AdminsController.inheritedParamsWrapper();
+    inheritedParamsWrapper.call(AdminsController);
     expect(AdminsController._wrapperOptions.name).toBe("admin");
     expect(AdminsController._wrapperOptions.klass).toBe(AdminsController);
   });
@@ -76,7 +75,7 @@ describe("Base ParamsWrapper wiring", () => {
   it("inheritedParamsWrapper is a no-op when format is empty", () => {
     class E extends Base {}
     const before = E._wrapperOptions;
-    E.inheritedParamsWrapper();
+    inheritedParamsWrapper.call(E);
     expect(E._wrapperOptions).toBe(before);
   });
 
@@ -88,7 +87,7 @@ describe("Base ParamsWrapper wiring", () => {
   });
 
   it("processAction wraps request params and exposes them via this.params", async () => {
-    let seen: Record<string, unknown> | null = null;
+    let seen: HashWithIndifferentAccess | null = null;
     class WidgetsController extends Base {
       static actions = ["create"];
       create(): void {
@@ -107,15 +106,12 @@ describe("Base ParamsWrapper wiring", () => {
     const controller = new WidgetsController();
     await controller.dispatch("create", request, new Response());
     expect(seen).not.toBeNull();
-    expect((seen as unknown as Record<string, unknown>).widget).toEqual({
-      name: "alpha",
-      color: "blue",
-    });
-    expect((seen as unknown as Record<string, unknown>).name).toBe("alpha");
+    assertEqual({ name: "alpha", color: "blue" }, seen!.get("widget"));
+    expect(seen!.get("name")).toBe("alpha");
   });
 
   it("processAction does not wrap when format does not match request content-type", async () => {
-    let seen: Record<string, unknown> | null = null;
+    let seen: HashWithIndifferentAccess | null = null;
     class ThingsController extends Base {
       static actions = ["create"];
       create(): void {
@@ -134,7 +130,7 @@ describe("Base ParamsWrapper wiring", () => {
     const controller = new ThingsController();
     await controller.dispatch("create", request, new Response());
     expect(seen).not.toBeNull();
-    expect((seen as unknown as Record<string, unknown>).thing).toBeUndefined();
-    expect((seen as unknown as Record<string, unknown>).name).toBe("beta");
+    expect(seen!.get("thing")).toBeUndefined();
+    expect(seen!.get("name")).toBe("beta");
   });
 });

@@ -16,7 +16,7 @@ describe("PostgreSQLAdapter#connect", () => {
     } as never);
     const pool = {};
     adapter.pool = pool as never;
-    vi.spyOn(adapter as never, "_acquireFreshClient" as never).mockRejectedValue(error as never);
+    vi.spyOn(PostgreSQLAdapter, "newClient").mockRejectedValue(error);
 
     await expect(adapter.connect()).rejects.toBe(error);
     expect(error.connectionPool).toBe(pool);

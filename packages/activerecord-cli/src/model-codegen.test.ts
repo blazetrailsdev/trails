@@ -56,7 +56,7 @@ describe("generateModels", () => {
     expect(out).toContain("export class Book extends Base {");
     expect(out).toContain("static {}");
     expect(out).not.toMatch(/_tableName/);
-    expect(out).not.toMatch(/_primaryKey/);
+    expect(out).not.toMatch(/primaryKey = /);
   });
 
   it("emits this._primaryKey for non-default single-column PK", () => {
@@ -64,7 +64,7 @@ describe("generateModels", () => {
       noHeader: true,
       now: NOW,
     });
-    expect(out).toContain('this._primaryKey = "uuid";');
+    expect(out).toContain('this.primaryKey = "uuid";');
   });
 
   it("emits belongs_to and has_many without options for convention-matching FK", () => {
@@ -116,7 +116,7 @@ describe("generateModels", () => {
       noHeader: true,
       now: NOW,
     });
-    expect(out).toContain('this._primaryKey = ["tenant_id","id"];');
+    expect(out).toContain('this.primaryKey = ["tenant_id","id"];');
   });
 
   it("skips tables with an empty-array primary key (introspection's no-PK shape)", () => {

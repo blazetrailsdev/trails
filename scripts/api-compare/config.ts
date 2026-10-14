@@ -43,6 +43,8 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   abstractcontroller: "actionpack",
   actionpackversion: "actionpack",
   "activerecord-test-support": "activerecord",
+  mysql2: "activerecord",
+  pg: "activerecord",
   sqlite3: "activerecord",
   thor: "trailties",
 };
@@ -107,6 +109,8 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   abstractcontroller: "abstract-controller",
   actionpackversion: "action-pack",
   "activerecord-test-support": "support",
+  mysql2: "mysql2",
+  pg: "pg",
   sqlite3: "sqlite",
   thor: "thor",
 };
@@ -189,6 +193,7 @@ export const MANIFEST_PACKAGES = [
   "abstractcontroller",
   "actionpackversion",
   "actionview",
+  "activejob",
   "trailties",
   "rack",
   "rack-session",
@@ -196,6 +201,10 @@ export const MANIFEST_PACKAGES = [
   "globalid",
   "i18n",
   "did-you-mean",
+  "bcrypt",
+  "msgpack",
+  "mysql2",
+  "pg",
   "sqlite3",
   "thor",
 ] as const;

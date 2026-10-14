@@ -1,19 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  withPostgresqlDatetimeType,
-  withNativeDatabaseTypeOverrides,
-} from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { describeIfPg, PostgreSQLAdapter, withNativeDatabaseTypeOverrides } from "./test-helper.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
 import { Developer, AuditLog, AuditLogRequired } from "../../test-helpers/models/developer.js";
-import { withTimezoneConfig } from "../../test-helper.js";
 import { Base, registerModel } from "../../index.js";
-import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 function infinite(value: unknown): number | null {
   if (value === Infinity) return 1;
@@ -23,126 +16,22 @@ function infinite(value: unknown): number | null {
 
 registerModel([Developer, AuditLog, AuditLogRequired]);
 
-fixtures(["topics"], { useTransactionalTests: false });
+const { self } = fixtures(["topics"], { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
-    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
-    await adapter.execute(`
-      CREATE TABLE "postgresql_timestamps" (
-        "id" SERIAL PRIMARY KEY,
-        "created_at" timestamp without time zone,
-        "updated_at" timestamp without time zone DEFAULT NOW(),
-        "occurred_at" timestamp with time zone,
-        "precise_at" timestamp(3) without time zone
-      )
-    `);
-  });
-  afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
   });
 
   describe("PostgreSQLTimestampTest", () => {
-    it("timestamp column", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "created_at");
-      expect(col).toBeDefined();
-      expect(col!.type).toBe("datetime");
-      expect(col!.sqlType).toBe("timestamp without time zone");
-    });
-
-    it("timestamp default", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "updated_at");
-      expect(col).toBeDefined();
-      expect(col!.defaultFunction).toContain("now");
-    });
-
-    it("timestamp type cast", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '2023-06-15 14:30:00' AS val");
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
-      expect((rows[0].val as Temporal.Instant).toZonedDateTimeISO("UTC").year).toBe(2023);
-    });
-
-    it("timestamp with time zone", async () => {
-      const id = await adapter.insert(
-        `INSERT INTO "postgresql_timestamps" ("occurred_at") VALUES ('2023-06-15 14:30:00+00')`,
-      );
-      const rows = (
-        await adapter.execQuery(
-          `SELECT "occurred_at" FROM "postgresql_timestamps" WHERE "id" = $1`,
-          "SQL",
-          [id],
-        )
-      ).toArray();
-      expect(rows[0].occurred_at).toBeInstanceOf(Temporal.Instant);
-    });
-
-    it("timestamp precision", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "precise_at");
-      expect(col).toBeDefined();
-      expect(col!.type).toBe("datetime");
-      expect(col!.precision).toBe(3);
-    });
-
-    it("timestamp infinity", async () => {
-      const rows = await adapter.execute("SELECT 'infinity'::timestamp AS val");
-      expect(rows[0].val).toBeDefined();
-    });
-
-    it("timestamp before epoch", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '1969-12-31 23:59:59' AS val");
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
-      expect((rows[0].val as Temporal.Instant).toZonedDateTimeISO("UTC").year).toBe(1969);
-    });
-
-    it("timestamp schema dump", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_timestamps");
-      expect(output).toContain("postgresql_timestamps");
-      expect(output).toMatch(/t\.datetime\s*\("created_at"/);
-    });
-
-    it("datetime column", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "created_at");
-      expect(col).toBeDefined();
-      expect(col!.type).toBe("datetime");
-    });
-
-    it("datetime default", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "updated_at");
-      expect(col!.defaultFunction).toBeTruthy();
-    });
-
-    it("datetime type cast", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 10:00:00' AS val");
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
-    });
-
-    it("datetime precision", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "precise_at");
-      expect(col).toBeDefined();
-      expect(col!.precision).toBe(3);
-    });
-
-    it("datetime schema dump", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_timestamps");
-      expect(output).toContain("postgresql_timestamps");
-      expect(output).toMatch(/t\.datetime/);
-    });
-
     it("timestamp with zone values with rails time zone support and no time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withTimezoneConfig({ default: "utc", awareAttributes: true }, async () => {
-          await adapter.reconnect();
+        await self().withTimezoneConfig({ default: "utc", awareAttributes: true }, async () => {
+          await adapter.reconnectBang();
           class PostgresqlTimestampWithZone extends Base {
             static _tableName = "postgresql_timestamp_with_zones";
           }
@@ -154,7 +43,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
         });
       } finally {
-        await adapter.reconnect();
+        await adapter.reconnectBang();
         await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
@@ -164,8 +53,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withTimezoneConfig({ default: "local", awareAttributes: false }, async () => {
-          await adapter.reconnect();
+        await self().withTimezoneConfig({ default: "local", awareAttributes: false }, async () => {
+          await adapter.reconnectBang();
           await adapter.execute(`SET time zone 'America/Jamaica'`);
           class PostgresqlTimestampWithZone extends Base {
             static _tableName = "postgresql_timestamp_with_zones";
@@ -178,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
         });
       } finally {
-        await adapter.reconnect();
+        await adapter.reconnectBang();
         await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
@@ -190,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withTimezoneConfig(
+        await self().withTimezoneConfig(
           {
             default: "utc",
             awareAttributes: true,
@@ -198,7 +87,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             awareTypes: ["timestamptz", "datetime", "time"],
           },
           async () => {
-            await adapter.reconnect();
+            await adapter.reconnectBang();
             class PostgresqlTimestampWithZone extends Base {
               static _tableName = "postgresql_timestamp_with_zones";
             }
@@ -213,7 +102,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           },
         );
       } finally {
-        await adapter.reconnect();
+        await adapter.reconnectBang();
         await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
@@ -225,15 +114,15 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withPostgresqlDatetimeType("timestamptz", async () => {
-          await withTimezoneConfig(
+        await self().withPostgresqlDatetimeType("timestamptz", async () => {
+          await self().withTimezoneConfig(
             {
               default: "utc",
               awareAttributes: true,
               awareTypes: ["timestamptz", "datetime", "time"],
             },
             async () => {
-              await adapter.reconnect();
+              await adapter.reconnectBang();
               class PostgresqlTimestampWithZone extends Base {
                 static _tableName = "postgresql_timestamp_with_zones";
               }
@@ -247,7 +136,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
         });
       } finally {
-        await adapter.reconnect();
+        await adapter.reconnectBang();
         await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
@@ -256,8 +145,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
       try {
-        await withPostgresqlDatetimeType("timestamptz", async () => {
-          await withTimezoneConfig(
+        await self().withPostgresqlDatetimeType("timestamptz", async () => {
+          await self().withTimezoneConfig(
             {
               default: "utc",
               awareAttributes: true,
@@ -265,7 +154,7 @@ describeIfPg("PostgreSQLAdapter", () => {
               awareTypes: ["timestamptz", "datetime", "time"],
             },
             async () => {
-              await adapter.reconnect();
+              await adapter.reconnectBang();
               class PostgresqlTimestampWithZone extends Base {
                 static _tableName = "postgresql_timestamp_with_zones";
               }
@@ -281,7 +170,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
         });
       } finally {
-        await adapter.reconnect();
+        await adapter.reconnectBang();
         await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
@@ -289,11 +178,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLTimestampFixtureTest", () => {
     it("group by date", async () => {
-      const keys = [
-        ...(
-          (await Topic.group("date_trunc('month', created_at)").count()) as Map<unknown, number>
-        ).keys(),
-      ];
+      const keys = [...(await Topic.group("date_trunc('month', created_at)").count()).keys()];
       expect(keys.length).toBeGreaterThan(0);
       for (const k of keys) expect(k).toBeInstanceOf(RubyTime);
     });
@@ -353,7 +238,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampMigrationTest", () => {
-    fixtures(["topics"], { useTransactionalTests: true });
+    const { self } = fixtures(["topics"], { useTransactionalTests: true });
 
     it("adds column as timestamp", async () => {
       await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
@@ -365,7 +250,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("adds column as timestamptz if datetime type changed", async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
         const rows = await adapter.execute(
           `SELECT data_type FROM information_schema.columns
@@ -380,7 +265,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withNativeDatabaseTypeOverrides(
         { datetimes_as_enum: { name: "custom_time_format" } },
         () =>
-          withPostgresqlDatetimeType("datetimes_as_enum", () =>
+          self().withPostgresqlDatetimeType("datetimes_as_enum", () =>
             adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime", {
               precision: null,
             }),

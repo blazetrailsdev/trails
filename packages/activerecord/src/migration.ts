@@ -1,6 +1,7 @@
 import {
   getEnv,
   camelize,
+  constantize,
   groupBy,
   underscore,
   humanize,
@@ -8,16 +9,43 @@ import {
   extractOptionsBang,
   FileUpdateChecker,
   Monitor,
-  NameError,
   symbolizeKeys,
+  TopLevel,
   Autoload,
+  Benchmark,
   extend,
   type Extended,
+  wrap,
+  filterMap,
 } from "@blazetrails/activesupport";
-import { stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
+import {
+  format,
+  max,
+  stdout,
+  puts,
+  excToS,
+  rbFLoad,
+  rbFPublicSend,
+  rbInspect,
+  rbModRemoveConst,
+  rbObjRespondTo,
+  block as rbBlock,
+  rbBlockGivenP,
+  rbStrSend,
+  toI,
+  aryDelete,
+} from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  excBacktraceLocations,
+  excSetBacktrace,
+  excSetupMessage,
+  File,
+  FileUtils,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Zlib } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbFSend, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
 import { Temporal, Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -45,7 +73,6 @@ import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { ActiveRecord } from "./namespaces.js";
 import type * as CompatibilityModule from "./migration/compatibility.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
-import { _DatabaseTasks } from "./tasks/database-tasks-slot.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
 import { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
@@ -164,14 +191,15 @@ export class PendingMigrationError extends MigrationError {
 
   /** @internal */
   detailedMigrationMessage(pendingMigrations: Array<{ filename?: string }>): string {
-    const env = Migration.env();
     let message =
-      "Migrations are pending. To resolve this issue, run:\n\n        bin/rails db:migrate";
-    if (env !== "development" && env !== "test") message += ` RAILS_ENV=${env}`;
+      "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db migrate";
+    if (TopLevel.Trails !== undefined && !TopLevel.Trails.env["local?"]()) {
+      message += ` TRAILS_ENV=${TopLevel.Trails.env}`;
+    }
     message += "\n\n";
     message += `You have ${pendingMigrations.length} pending ${pendingMigrations.length > 1 ? "migrations:" : "migration:"}\n\n`;
-    for (const m of pendingMigrations) {
-      if (m.filename) message += `${m.filename}\n`;
+    for (const pendingMigration of pendingMigrations) {
+      message += `${pendingMigration.filename}\n`;
     }
     return message;
   }
@@ -187,46 +215,56 @@ export class ConcurrentMigrationError extends MigrationError {
 }
 
 export class NoEnvironmentInSchemaError extends MigrationError {
-  constructor(message = "Environment data not found in the schema.") {
-    super(message);
+  constructor() {
+    const msg =
+      "Environment data not found in the schema. To resolve this issue, run: \n\n        bin/trails db environment:set";
+    if (TopLevel.Trails !== undefined) {
+      super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}`);
+    } else {
+      super(msg);
+    }
     this.name = "ActiveRecord::NoEnvironmentInSchemaError";
   }
 }
 
-export class ProtectedEnvironmentError extends MigrationError {
-  constructor(env: string) {
-    super(`You are attempting to run a destructive action against your '${env}' database.`);
+export class ProtectedEnvironmentError extends ActiveRecordError {
+  constructor(env = "production") {
+    let msg = `You are attempting to run a destructive action against your '${env}' database.\n`;
+    msg +=
+      "If you are sure you want to continue, run the same command with the environment variable:\n";
+    msg += "DISABLE_DATABASE_ENVIRONMENT_CHECK=1";
+    super(msg);
     this.name = "ActiveRecord::ProtectedEnvironmentError";
   }
 }
 
-export class EnvironmentMismatchError extends MigrationError {
+export class EnvironmentMismatchError extends ActiveRecordError {
   constructor({ current, stored }: { current?: string; stored?: string } = {}) {
     let msg = `You are attempting to modify a database that was last run in \`${stored ?? ""}\` environment.\n`;
     msg += `You are running in \`${current ?? ""}\` environment. `;
     msg += `If you are sure you want to continue, first set the environment using:\n\n`;
-    msg += `        trails db environment:set`;
-    super(`${msg}\n\n`);
+    msg += `        bin/trails db environment:set`;
+    if (TopLevel.Trails !== undefined) {
+      super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}\n\n`);
+    } else {
+      super(`${msg}\n\n`);
+    }
     this.name = "ActiveRecord::EnvironmentMismatchError";
   }
 }
 
-export class EnvironmentStorageError extends MigrationError {
-  constructor(message = "Cannot store environment data.") {
-    super(message);
+export class EnvironmentStorageError extends ActiveRecordError {
+  constructor() {
+    let msg =
+      "You are attempting to store the environment in a database where metadata is disabled.\n";
+    msg += "Check your database configuration to see if this is intended.";
+    super(msg);
     this.name = "ActiveRecord::EnvironmentStorageError";
   }
 }
 
 /** @internal */
-let migrationVerbose = true;
-
-/** @internal */
-function writeMigrationMessage(text = ""): void {
-  if (migrationVerbose) {
-    stdout.write(`${text}\n`);
-  }
-}
+let migrationVerbose: boolean | undefined = true;
 
 /** @internal */
 function announceMigrationText(header: string, message: string): string {
@@ -235,21 +273,15 @@ function announceMigrationText(header: string, message: string): string {
   return `== ${text} ${"=".repeat(pad)}`;
 }
 
-/** @internal */
-const toRun = Symbol("toRun");
+export class ReversibleBlockHelper extends Struct.new("reverting") {
+  declare reverting: boolean;
 
-export class ReversibleBlockHelper {
-  /** @noRailsEquivalent PERMANENT */
-  [toRun]: Array<() => Promise<void>> = [];
-
-  constructor(public reverting: boolean) {}
-
-  up(fn: () => Promise<void>): void {
-    if (!this.reverting) this[toRun].push(fn);
+  up<T>(block: () => T): T | undefined {
+    if (!this.reverting) return block();
   }
 
-  down(fn: () => Promise<void>): void {
-    if (this.reverting) this[toRun].push(fn);
+  down<T>(block: () => T): T | undefined {
+    if (this.reverting) return block();
   }
 }
 
@@ -271,24 +303,35 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   static delegate: Migration | null = null;
   private _version?: number;
 
-  static get verbose(): boolean {
+  static get verbose(): boolean | undefined {
     return migrationVerbose;
   }
 
-  static set verbose(value: boolean) {
+  static set verbose(value: boolean | undefined) {
     migrationVerbose = value;
   }
 
-  get verbose(): boolean {
+  get verbose(): boolean | undefined {
     return migrationVerbose;
   }
 
-  set verbose(value: boolean) {
+  set verbose(value: boolean | undefined) {
     migrationVerbose = value;
   }
   private static _disableDdlTransaction = false;
 
   constructor(name: string | null = new.target.name || null, version?: number) {
+    const subclass = new.target;
+    if (subclass !== Current && Object.getPrototypeOf(subclass) === Migration) {
+      const major = VERSION.MAJOR;
+      const minor = VERSION.MINOR;
+      throw new StandardError(
+        "Directly inheriting from ActiveRecord::Migration is not supported. " +
+          "Please specify the Active Record release the migration was written for:\n" +
+          "\n" +
+          `  class ${rbInspect(subclass)} < ActiveRecord::Migration[${major}.${minor}]`,
+      );
+    }
     this._name = name;
     this._version = version;
   }
@@ -322,7 +365,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       tableName: string,
       options?:
         | {
-            id?: boolean | ColumnType | IdHashOptions;
+            id?: false | ColumnType | IdHashOptions;
             primaryKey?: string | string[] | false;
             force?: boolean | "cascade";
             ifNotExists?: boolean;
@@ -402,8 +445,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async addIndex(
     ...args: [tableName: string, columns: string | string[], options?: AddIndexOptions]
-  ): Promise<void> {
-    await this.methodMissing("addIndex", ...args);
+  ): Promise<unknown> {
+    return await this.methodMissing("addIndex", ...args);
   }
 
   async removeIndex(
@@ -415,8 +458,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         | { column?: string | string[]; name?: string; ifExists?: boolean },
       options?: { column?: string | string[]; name?: string; ifExists?: boolean },
     ]
-  ): Promise<void> {
-    await this.methodMissing("removeIndex", ...args);
+  ): Promise<unknown> {
+    return await this.methodMissing("removeIndex", ...args);
   }
 
   async changeColumn(
@@ -532,15 +575,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?:
-      | string
-      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
-    options?: { column?: string; name?: string; ifExists?: boolean },
+    toTable?: string | null,
+    options?: { column?: string; name?: string; toTable?: string; ifExists?: boolean },
   ): Promise<void> {
     if (options !== undefined) {
-      await this.methodMissing("removeForeignKey", fromTable, toTableOrOptions, options);
-    } else if (toTableOrOptions !== undefined) {
-      await this.methodMissing("removeForeignKey", fromTable, toTableOrOptions);
+      await this.methodMissing("removeForeignKey", fromTable, toTable, options);
+    } else if (toTable !== undefined) {
+      await this.methodMissing("removeForeignKey", fromTable, toTable);
     } else {
       await this.methodMissing("removeForeignKey", fromTable);
     }
@@ -563,13 +604,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    expression?: string | null,
     options?: { name?: string; ifExists?: boolean },
   ): Promise<void> {
     if (options !== undefined) {
-      await this.methodMissing("removeCheckConstraint", tableName, expressionOrOptions, options);
-    } else if (expressionOrOptions !== undefined) {
-      await this.methodMissing("removeCheckConstraint", tableName, expressionOrOptions);
+      await this.methodMissing("removeCheckConstraint", tableName, expression, options);
+    } else if (expression !== undefined) {
+      await this.methodMissing("removeCheckConstraint", tableName, expression);
     } else {
       await this.methodMissing("removeCheckConstraint", tableName);
     }
@@ -577,20 +618,18 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string },
+    options: { name?: string; expression?: string | null; validate?: boolean } = {},
   ): Promise<void> {
-    await this.methodMissing("validateCheckConstraint", tableName, nameOrOptions);
+    await this.methodMissing("validateCheckConstraint", tableName, options);
   }
 
   async validateForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | Omit<ForeignKeyLookupOptions, "toTable">,
+    toTable?: string | null,
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void> {
-    const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
-    const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : options;
-    if (opts !== undefined) {
-      await this.methodMissing("validateForeignKey", fromTable, toTable, opts);
+    if (options !== undefined) {
+      await this.methodMissing("validateForeignKey", fromTable, toTable, options);
     } else if (toTable !== undefined) {
       await this.methodMissing("validateForeignKey", fromTable, toTable);
     } else {
@@ -608,6 +647,14 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     await this.methodMissing("changeTableComment", tableName, commentOrChanges);
+  }
+
+  async createSchema(schemaName: string): Promise<void> {
+    await this.methodMissing("createSchema", schemaName);
+  }
+
+  async createVirtualTable(tableName: string, moduleName: string, values: string[]): Promise<void> {
+    await this.methodMissing("createVirtualTable", tableName, moduleName, values);
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
@@ -700,8 +747,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addTimestamps", ...args);
   }
 
-  async removeTimestamps(tableName: string): Promise<void> {
-    await this.methodMissing("removeTimestamps", tableName);
+  async removeTimestamps(...args: [tableName: string, options?: ColumnOptions]): Promise<void> {
+    await this.methodMissing("removeTimestamps", ...args);
   }
 
   async createJoinTable(
@@ -728,13 +775,15 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   async changeTable(
-    ...args: [
-      tableName: string,
-      options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
-      fn?: (t: TableOf<A>) => void | Promise<void>,
-    ]
+    tableName: string,
+    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
-    await this.methodMissing("changeTable", ...args);
+    if (typeof options === "function") {
+      await this.methodMissing("changeTable", tableName, {}, options);
+    } else {
+      await this.methodMissing("changeTable", tableName, options ?? {}, fn);
+    }
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -798,32 +847,46 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("views")) as string[];
   }
 
+  async transaction<T>(
+    ...args: Parameters<DatabaseAdapter["transaction"]>
+  ): Promise<T | undefined> {
+    return (await this.methodMissing("transaction", ...args)) as T | undefined;
+  }
+
+  async execute(...args: [sql: string, name?: string | null]): Promise<unknown> {
+    return await this.methodMissing("execute", ...args);
+  }
+
   get name(): string | null {
     return this._name;
   }
 
-  async revert(...migrationClasses: Array<MigrationClass | (() => Promise<void>)>): Promise<void> {
-    const last = migrationClasses[migrationClasses.length - 1];
-    const fn =
-      typeof last === "function" && last !== Migration && !(last.prototype instanceof Migration)
-        ? (last as () => Promise<void>)
-        : undefined;
-    const klasses = (fn ? migrationClasses.slice(0, -1) : migrationClasses) as MigrationClass[];
-    if (klasses.length > 0) {
-      await this.run(...[...klasses].reverse(), { revert: true });
+  async revert(
+    ...migrationClasses: Array<MigrationClass | ((...args: never[]) => Promise<void>)>
+  ): Promise<void> {
+    const block = (
+      rbBlockGivenP(migrationClasses[migrationClasses.length - 1])
+        ? migrationClasses.pop()
+        : undefined
+    ) as (() => Promise<void>) | undefined;
+    if (migrationClasses.length !== 0) {
+      await this.run(...([...migrationClasses].reverse() as MigrationClass[]), { revert: true });
     }
-    if (fn === undefined) return;
-    if (isCommandRecorder(this.connection)) {
-      await this.connection.revert(fn);
-      return;
+    if (block !== undefined) {
+      if (rbObjRespondTo(this.connection, "revert")) {
+        await (this.connection as unknown as CommandRecorder).revert(block);
+      } else {
+        const recorder = await this.commandRecorder();
+        this._connectionOverride = recorder;
+        await this.suppressMessages(async () => {
+          await recorder.revert(block);
+        });
+        this._connectionOverride = recorder.delegate as DatabaseAdapter;
+        await recorder.replay(
+          this as unknown as Record<string, (...a: unknown[]) => Promise<void>>,
+        );
+      }
     }
-    const recorder = await this.commandRecorder();
-    this._connectionOverride = recorder;
-    await this.suppressMessages(async () => {
-      await recorder.revert(fn);
-    });
-    this._connectionOverride = recorder.delegate as DatabaseAdapter;
-    await recorder.replay(this as unknown as Record<string, (...a: unknown[]) => Promise<void>>);
   }
 
   async run(...migrationClasses: Array<MigrationClass | MigrationRunOptions>): Promise<void> {
@@ -832,9 +895,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     let dir = opts.direction ?? "up";
     if (opts.revert) dir = dir === "down" ? "up" : "down";
     if (this.isReverting()) {
-      await this.revert(async () => {
-        await this.run(...klasses, { direction: dir, revert: true });
-      });
+      await this.revert(
+        rbBlock(async () => {
+          await this.run(...klasses, { direction: dir, revert: true });
+        }),
+      );
     } else {
       for (const migrationClass of klasses) {
         await new migrationClass().execMigration(await this.connection, dir);
@@ -842,34 +907,44 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  async reversible(fn?: (dir: ReversibleBlockHelper) => void | Promise<void>): Promise<void> {
-    if (!fn) return;
+  async reversible(fn: (dir: ReversibleBlockHelper) => void | Promise<void>): Promise<void> {
     const helper = new ReversibleBlockHelper(this.isReverting());
-    await this.executeBlock(async () => {
-      await fn(helper);
-      for (const f of helper[toRun]) await f();
-    });
+    await this.executeBlock(async () => fn(helper));
   }
 
-  async upOnly(fn?: () => Promise<void>): Promise<void> {
-    if (!this.isReverting() && fn) {
-      await this.executeBlock(fn);
-    }
+  async upOnly(block: () => Promise<void>): Promise<void> {
+    if (!this.isReverting()) await this.executeBlock(block);
   }
 
   async migrate(direction: "up" | "down"): Promise<void> {
-    if (typeof this[direction] !== "function") return;
-    this.announce(direction === "up" ? "migrating" : "reverting");
-    let timeElapsed = 0;
-    const pool = (await _DatabaseTasks!.migrationConnection()).pool as ConnectionPool;
+    if (!rbObjRespondTo(this, direction)) return;
+
+    switch (direction) {
+      case "up":
+        this.announce("migrating");
+        break;
+      case "down":
+        this.announce("reverting");
+        break;
+    }
+
+    let timeElapsed: number | null = null;
+    const pool = (await ActiveRecord.Tasks.DatabaseTasks.migrationConnection())
+      .pool as ConnectionPool;
     await pool.withConnection(async (conn) => {
-      const start = Date.now();
-      await this.execMigration(conn, direction);
-      timeElapsed = (Date.now() - start) / 1000;
+      timeElapsed = await Benchmark.realtime(() => this.execMigration(conn, direction));
     });
-    const elapsed = timeElapsed.toFixed(4);
-    this.announce(`${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
-    this.write();
+
+    switch (direction) {
+      case "up":
+        this.announce(format("migrated (%.4fs)", timeElapsed));
+        this.write();
+        break;
+      case "down":
+        this.announce(format("reverted (%.4fs)", timeElapsed));
+        this.write();
+        break;
+    }
   }
 
   isReverting(): boolean {
@@ -906,8 +981,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   write(text = ""): void {
     if (Migration.verbose) {
-      stdout.write(`${text}\n`);
+      this.puts(text);
     }
+  }
+
+  /** @internal */
+  protected puts(...args: unknown[]): null {
+    return puts.call(stdout, ...args);
   }
 
   announce(message: string): void {
@@ -920,14 +1000,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async sayWithTime<T>(message: string, fn: () => Promise<T>): Promise<T> {
     this.say(message);
-    const start = Date.now();
-    const result = await fn();
-    const elapsed = ((Date.now() - start) / 1000).toFixed(4);
-    this.say(`${elapsed}s`, true);
-    if (typeof result === "number") {
-      this.say(`${result} rows`, true);
-    }
-    return result;
+    let result: T | null = null;
+    const timeElapsed = await Benchmark.realtime(async () => {
+      result = await fn();
+    });
+    this.say(format("%.4fs", timeElapsed), true);
+    if (Number.isInteger(result)) this.say(`${result} rows`, true);
+    return result as T;
   }
 
   async suppressMessages(fn: () => Promise<void>): Promise<void> {
@@ -943,7 +1022,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   get connection(): A | Promise<A> {
     return (
       (this._connectionOverride as A | undefined) ??
-      (_DatabaseTasks!.migrationConnection() as Promise<A>)
+      (ActiveRecord.Tasks.DatabaseTasks.migrationConnection() as Promise<A>)
     );
   }
 
@@ -952,7 +1031,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   get connectionPool(): ConnectionPool {
-    return this._poolOverride ?? _DatabaseTasks!.migrationConnectionPool();
+    return this._poolOverride ?? ActiveRecord.Tasks.DatabaseTasks.migrationConnectionPool();
   }
 
   async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
@@ -961,7 +1040,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       const self = this as unknown as { change?: () => Promise<void> };
       if (rbObjRespondTo(this, "change")) {
         if (direction === "down") {
-          await this.revert(() => self.change!());
+          await this.revert(rbBlock(() => self.change!()));
         } else {
           await self.change!();
         }
@@ -989,7 +1068,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._disableDdlTransaction = true;
   }
 
-  static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/;
+  static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)\.(?:ts|js)$/;
 
   static isValidVersionFormat(versionString: string): boolean {
     return [Migration.MigrationFilenameRegexp, /^\d(_?\d)*$/].some((pattern) =>
@@ -997,18 +1076,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     );
   }
 
-  static nextMigrationNumber(number?: number | bigint | string): string {
-    const raw =
-      number == null
-        ? 0n
-        : typeof number === "bigint"
-          ? number
-          : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
-    const n = raw < 0n ? 0n : raw;
-    if (!timestampedMigrations()) return n.toString().padStart(3, "0");
-    const stamp = Time.now().utc().strftime("%Y%m%d%H%M%S");
-    if (number == null) return stamp;
-    return n > BigInt(stamp) ? n.toString().padStart(14, "0") : stamp;
+  static nextMigrationNumber(number: number | bigint | string): string {
+    if (timestampedMigrations()) {
+      return max([Time.now().utc().strftime("%Y%m%d%H%M%S"), format("%.14d", number)])!;
+    } else {
+      return format("%.3d", toI(number));
+    }
   }
 
   static properTableName(
@@ -1034,7 +1107,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     };
   }
 
-  /** @missingRailsCall call — PERMANENT */
   static async copy(
     destination: string,
     sources: Record<string, string>,
@@ -1043,9 +1115,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       onCopy?: (scope: string, migration: MigrationProxy, oldPath: string) => void;
     } = {},
   ): Promise<MigrationProxy[]> {
-    if (!File.isExist(destination)) {
-      FileUtils.mkdirP(destination);
-    }
+    const copied: MigrationProxy[] = [];
+
+    if (!File.isExist(destination)) FileUtils.mkdirP(destination);
 
     const schemaMigration = new NullSchemaMigration();
     const internalMetadata = new NullInternalMetadata();
@@ -1057,47 +1129,59 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     ).migrations;
     let last: MigrationProxy | undefined = destinationMigrations[destinationMigrations.length - 1];
 
-    const copied: MigrationProxy[] = [];
-    for (const [scope, sourcePath] of Object.entries(sources)) {
-      if (!/^[a-z0-9_]+$/.test(scope)) {
-        throw new ArgumentError(
-          `Invalid migration scope '${scope}': must match /^[a-z0-9_]+$/ to be discoverable by MigrationContext#migrations.`,
-        );
-      }
-      if (!File.isExist(sourcePath)) continue;
-      const sourceMigrations = new MigrationContext([sourcePath], schemaMigration, internalMetadata)
+    for (const [scope, path] of Object.entries(sources)) {
+      const sourceMigrations = new MigrationContext([path], schemaMigration, internalMetadata)
         .migrations;
 
-      for (const source of sourceMigrations) {
-        const body = File.binread(source.filename);
-        const inserted = `// This migration comes from ${scope} (originally ${source.version})\n`;
+      for (const migration of sourceMigrations) {
+        let source = File.binread(migration.filename);
+        const insertedComment = `// This migration comes from ${scope} (originally ${migration.version})\n`;
+        let magicComments = "";
+        let substituted: unknown;
+        for (;;) {
+          [substituted, source] = rbStrSend(
+            source,
+            "subBang",
+            /^\/\/ @ts-(?:no)?check.*\n/,
+            rbBlock((magicComment: string) => {
+              magicComments += magicComment;
+              return "";
+            }),
+          );
+          if (substituted === null) break;
+        }
 
-        const duplicate = destinationMigrations.find((m) => m.name === source.name);
+        if (magicComments.length !== 0 && source.startsWith("\n")) {
+          magicComments += "\n";
+          source = source.slice(1);
+        }
+
+        source = `${magicComments}${insertedComment}${source}`;
+
+        const duplicate = destinationMigrations.find((m) => m.name === migration.name);
         if (duplicate) {
           if (options.onSkip && duplicate.scope !== scope) {
-            options.onSkip(scope, source);
+            options.onSkip(scope, migration);
           }
           continue;
         }
 
-        const nextNumber = last ? last.version + 1 : 0;
-        source.version = toInteger(Migration.nextMigrationNumber(nextNumber));
-        const fileBase = underscore(source.name);
-        const ext = File.extname(source.filename) || ".ts";
-        const newPath = File.join(destination, `${source.version}_${fileBase}.${scope}${ext}`);
-        const oldPath = source.filename;
-        source.filename = newPath;
-        last = source;
+        migration.version = toInteger(Migration.nextMigrationNumber(last ? last.version + 1 : 0));
+        const newPath = File.join(
+          destination,
+          `${migration.version}_${underscore(migration.name)}.${scope}${File.extname(migration.filename)}`,
+        );
+        const oldPath = migration.filename;
+        migration.filename = newPath;
+        last = migration;
 
-        const magicMatch = /^((?:\/\/ @ts-(?:no)?check[^\n]*\n)+\n?)/.exec(body);
-        const magic = magicMatch ? magicMatch[1] : "";
-        const rest = magic.length > 0 ? body.slice(magic.length) : body;
-        File.binwrite(source.filename, `${magic}${inserted}${rest}`);
-        copied.push(source);
-        options.onCopy?.(scope, source, oldPath);
-        destinationMigrations.push(source);
+        File.binwrite(migration.filename, source);
+        copied.push(migration);
+        if (options.onCopy) options.onCopy(scope, migration, oldPath);
+        destinationMigrations.push(migration);
       }
     }
+
     return copied;
   }
 
@@ -1112,10 +1196,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   static async checkAllPendingBang(): Promise<void> {
     const pendingMigrations: MigrationProxy[][] = [];
 
-    await _DatabaseTasks!.withTemporaryPoolForEach({ env: this.env() }, async (pool) => {
-      const pending = await pool.migrationContext.open().pendingMigrations();
-      if (pending != null) pendingMigrations.push(pending);
-    });
+    await ActiveRecord.Tasks.DatabaseTasks.withTemporaryPoolForEach(
+      { env: this.env() },
+      async (pool) => {
+        const pending = await pool.migrationContext.open().pendingMigrations();
+        if (pending != null) pendingMigrations.push(pending);
+      },
+    );
 
     const migrations = pendingMigrations.flat();
 
@@ -1147,11 +1234,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   static methodMissing(name: string, ...args: unknown[]): unknown {
-    const delegate = this.nearestDelegate as unknown as Record<string, unknown> | null;
-    if (delegate !== null && typeof delegate[name] === "function") {
-      return (delegate[name] as (...a: unknown[]) => unknown).apply(delegate, args);
-    }
-    throw new TypeError(`undefined method '${name}' for ${this.name}`);
+    return rbFSend(this.nearestDelegate, name, ...args);
   }
 
   async methodMissing(name: string, ...args: unknown[]): Promise<unknown> {
@@ -1163,7 +1246,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         if (args.length > 0 && !["execute", "enableExtension", "disableExtension"].includes(name)) {
           const options = Migration.tableNameOptions();
           args[0] = Migration.properTableName(args[0] as string | { tableName?: unknown }, options);
-          if (name === "renameTable" || (name === "removeForeignKey" && !isPlainObject(args[1]))) {
+          if (
+            name === "renameTable" ||
+            (name === "removeForeignKey" && !isPlainObject(args[1] ?? args[2]))
+          ) {
             args[1] = Migration.properTableName(
               args[1] as string | { tableName?: unknown },
               options,
@@ -1176,7 +1262,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         methodMissing?: (name: string, ...args: unknown[]) => unknown;
       };
       if ((await strategy.respondToMissing?.(name)) !== true) {
-        throw new TypeError(`undefined method '${name}' for ${conn.constructor.name}`);
+        throw new NoMethodError(
+          `undefined method '${name}' for an instance of ${rbObjClassname(this)}`,
+          name,
+          args,
+          false,
+          { receiver: this },
+        );
       }
       if (block !== undefined) args.push(block);
       return await strategy.methodMissing?.(name, ...args);
@@ -1220,7 +1312,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async anySchemaNeedsUpdate(): Promise<boolean> {
-    const databaseTasks = _DatabaseTasks!;
+    const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
       if (!(await databaseTasks.schemaUpToDate(dbConfig, _schemaFormat()))) return true;
@@ -1247,17 +1339,14 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return ActiveRecord.Base.configurations().configsFor({ envName: this.env() });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall call — PERMANENT
-   */
+  /** @internal */
   static env(): string {
     return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
 
   /** @internal */
   private static async loadSchemaBang(): Promise<void> {
-    const databaseTasks = _DatabaseTasks!;
+    const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
 
@@ -1280,12 +1369,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 export declare namespace Migration {
   let CommandRecorder:
     | typeof import("./migration/command-recorder.js").CommandRecorder
-    | import("@blazetrails/ruby-compat").PrependModule;
+    | import("@blazetrails/ruby-compat").Module;
   let Compatibility: typeof CompatibilityModule;
   let JoinTable: typeof JoinTableModule;
   let ExecutionStrategy: typeof import("./migration/execution-strategy.js").ExecutionStrategy;
   let DefaultStrategy: typeof import("./migration/default-strategy.js").DefaultStrategy;
   let CheckPending: typeof import("./migration.js").CheckPending;
+  let Current: typeof import("./migration.js").Current;
   const autoload: Extended<typeof Autoload>["autoload"];
 }
 Object.assign(Migration, {
@@ -1307,8 +1397,6 @@ Migration.CommandRecorder = CommandRecorder;
 Migration.JoinTable = JoinTableModule;
 Migration.ExecutionStrategy = ExecutionStrategy;
 Migration.DefaultStrategy = DefaultStrategy;
-
-let loadMigrationSeq = 0;
 
 export class MigrationProxy {
   name: string;
@@ -1352,20 +1440,16 @@ export class MigrationProxy {
     return this._migration;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall load — PERMANENT
-   */
+  /** @internal */
   async loadMigration(): Promise<Migration> {
-    const { pathToFileURL } = await import("node:url");
-    const url = pathToFileURL(this.filename);
-    url.search = `?${(loadMigrationSeq += 1)}`;
-    const mod = (await import(url.href)) as Record<string, unknown>;
-    const klass = mod[this.name];
-    if (typeof klass !== "function") {
-      throw new NameError(`uninitialized constant ${this.name}`, this.name);
+    try {
+      rbModRemoveConst(Object, this.name);
+    } catch (e) {
+      if (!(e instanceof StandardError)) throw e;
     }
-    return new (klass as new (name?: string, version?: number) => Migration)(
+
+    await rbFLoad(File.expandPath(this.filename));
+    return new (constantize(this.name) as new (name?: string, version?: number) => Migration)(
       this.name,
       this.version,
     );
@@ -1395,11 +1479,11 @@ export class MigrationContext<
   S extends SchemaMigration | NullSchemaMigration = SchemaMigration,
   I extends InternalMetadata | NullInternalMetadata = InternalMetadata,
 > {
-  readonly migrationsPaths: string[];
+  readonly migrationsPaths: string | string[];
   readonly schemaMigration: S;
   readonly internalMetadata: I;
 
-  constructor(migrationsPaths: string[], ...seated: SeatedCollaborators<S, I>) {
+  constructor(migrationsPaths: string | string[], ...seated: SeatedCollaborators<S, I>) {
     const [schemaMigration, internalMetadata] = seated;
     this.migrationsPaths = migrationsPaths;
     this.schemaMigration = schemaMigration ?? (new SchemaMigration(this.connectionPool()) as S);
@@ -1407,7 +1491,7 @@ export class MigrationContext<
   }
 
   private connectionPool(): ConnectionPool {
-    return _DatabaseTasks!.migrationConnectionPool();
+    return ActiveRecord.Tasks.DatabaseTasks.migrationConnectionPool();
   }
 
   async migrate(
@@ -1479,12 +1563,11 @@ export class MigrationContext<
     return new Migrator("up", this.migrations, this.schemaMigration, this.internalMetadata);
   }
 
-  async migrationsStatus(
-    this: MigrationContext,
-  ): Promise<Array<{ status: "up" | "down"; version: string; name: string }>> {
-    const dbList = new Set(await this.schemaMigration.normalizedVersions());
+  async migrationsStatus(this: MigrationContext): Promise<Array<[string, string, string]>> {
+    let dbList: Array<string | [string, string, string]> =
+      await this.schemaMigration.normalizedVersions();
 
-    const fileList = this.migrationFiles().map((file) => {
+    const fileList = filterMap(this.migrationFiles(), (file): [string, string, string] => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);
       let version = parsed[0];
@@ -1493,25 +1576,18 @@ export class MigrationContext<
       if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
         throw new InvalidMigrationTimestampError(version, name);
       }
-      version = SchemaMigration.normalizeMigrationNumber(version);
-      const status = dbList.delete(version) ? ("up" as const) : ("down" as const);
-      return { status, version, name: humanize(name + scope) };
+      version = this.schemaMigration.normalizeMigrationNumber(version);
+      const status = aryDelete(dbList, version) != null ? "up" : "down";
+      return [status, version, humanize(name + scope)];
     });
 
-    const noFileList = [...dbList].map((version) => ({
-      status: "up" as const,
-      version,
-      name: "********** NO FILE **********",
-    }));
+    dbList = dbList.map((version) => ["up", version as string, "********** NO FILE **********"]);
 
-    return [...noFileList, ...fileList].sort((a, b) => {
-      const va = toInteger(a.version);
-      const vb = toInteger(b.version);
-      return va < vb ? -1 : va > vb ? 1 : 0;
-    });
+    return ([...dbList, ...fileList] as Array<[string, string, string]>).sort(
+      ([, a], [, b]) => Number(toI(a)) - Number(toI(b)),
+    );
   }
 
-  /** @missingRailsCall call — PERMANENT */
   get currentEnvironment(): string {
     return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
@@ -1525,14 +1601,12 @@ export class MigrationContext<
     const internalMetadata = this.internalMetadata;
     if (!internalMetadata.enabled) return null;
     if ((await this.currentVersion()) === 0) return null;
-    const noEnvMsg =
-      "Environment data not found in the schema. To resolve this issue, run: bin/rails db:environment:set";
     if (!(await internalMetadata.tableExists())) {
-      throw new NoEnvironmentInSchemaError(noEnvMsg);
+      throw new NoEnvironmentInSchemaError();
     }
     const environment = await internalMetadata.get("environment");
     if (!environment) {
-      throw new NoEnvironmentInSchemaError(noEnvMsg);
+      throw new NoEnvironmentInSchemaError();
     }
     return environment;
   }
@@ -1554,7 +1628,6 @@ export class MigrationContext<
     }
   }
 
-  /** @missingRailsCall size — PERMANENT */
   async needsMigration(this: MigrationContext): Promise<boolean> {
     return (await this.pendingMigrationVersions()).length > 0;
   }
@@ -1584,29 +1657,19 @@ export class MigrationContext<
 
   /** @internal */
   protected migrationFiles(): string[] {
-    const paths = this.migrationsPaths;
-    const files = paths.flatMap((path) => Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`));
-
-    const isTs = (file: string): boolean => file.endsWith(".ts");
-    const byBasename = new Map<string, string>();
-    for (const file of files.sort()) {
-      const parsed = this.parseMigrationFilename(file);
-      if (!parsed) continue;
-      const key = `${parsed[0]}_${parsed[1]}`;
-      const kept = byBasename.get(key);
-      if (kept === undefined || (isTs(file) && !isTs(kept))) {
-        byBasename.set(key, file);
-      }
-    }
-    return [...byBasename.values()].sort();
+    const paths = wrap(this.migrationsPaths);
+    return paths.flatMap((path) => Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`));
   }
 
   /** @internal */
-  protected parseMigrationFilename(filename: string): [string, string, string] | null {
-    const base = filename.replace(/.*[/\\]/, "");
-    const m = base.match(/^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/);
-    if (!m) return null;
-    return [m[1], m[2], m[3] ?? ""];
+  protected parseMigrationFilename(filename: string): [string, string, string] | undefined {
+    return (
+      rbFSend(File.basename(filename), "scan", Migration.MigrationFilenameRegexp) as [
+        string,
+        string,
+        string,
+      ][]
+    )[0];
   }
 
   /** @internal */
@@ -1635,19 +1698,18 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
     );
-    const currentVersion = (await this.currentVersion()) ?? 0;
-    const currentMigration = await migrator.currentMigration();
-    if (currentVersion !== 0 && !currentMigration) {
-      throw new UnknownMigrationVersionError(currentVersion);
+    if ((await this.currentVersion()) !== 0 && !(await migrator.currentMigration())) {
+      throw new UnknownMigrationVersionError((await this.currentVersion())!);
     }
-    const migrations = migrator.migrations;
+
     const startIndex =
-      currentVersion === 0
+      (await this.currentVersion()) === 0
         ? 0
-        : migrations.findIndex((m) => m.version === currentMigration!.version);
-    const finish = migrations[startIndex + steps];
-    const version = finish ? Number(finish.version) : 0;
-    return direction === "up" ? this.up(version) : this.down(version);
+        : migrator.migrations.indexOf((await migrator.currentMigration())!);
+
+    const finish = migrator.migrations[startIndex + steps];
+    const version = finish ? finish.version : 0;
+    return rbFPublicSend(this, direction, version) as Promise<MigrationProxy[]>;
   }
 }
 
@@ -1684,33 +1746,23 @@ export class Migrator {
 
   /** @internal */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
-    const lockId = await this.generateMigratorAdvisoryLockId();
-    const gotLock = await (await this.connection).getAdvisoryLock(lockId);
-    if (!gotLock) {
-      throw new ConcurrentMigrationError();
-    }
-    await this._ensureSchemaTable();
-    await this.loadMigrated();
-    const _sentinel = Symbol();
-    let fnResult: T | typeof _sentinel = _sentinel;
-    let fnError: unknown = _sentinel;
+    let lockId!: bigint;
+    let gotLock: boolean | undefined;
     try {
-      fnResult = await fn();
-    } catch (e) {
-      fnError = e;
+      lockId = await this.generateMigratorAdvisoryLockId();
+
+      gotLock = await (await this.connection).getAdvisoryLock(lockId);
+      if (!gotLock) {
+        throw new ConcurrentMigrationError();
+      }
+      await this.loadMigrated();
+      return await fn();
+    } finally {
+      if (gotLock && !(await (await this.connection).releaseAdvisoryLock(lockId))) {
+        // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` raises over the block's exception (migration.rb:1608-1612).
+        throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
+      }
     }
-    let released: boolean | undefined;
-    try {
-      released = await (await this.connection).releaseAdvisoryLock(lockId);
-    } catch (releaseErr) {
-      if (fnError !== _sentinel) throw fnError;
-      throw releaseErr;
-    }
-    if (fnError !== _sentinel) throw fnError;
-    if (released !== true) {
-      throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
-    }
-    return fnResult as T;
   }
 
   async run(): Promise<string | number | undefined> {
@@ -1728,7 +1780,7 @@ export class Migrator {
   /** @internal */
   async runWithoutLock(): Promise<string | number | undefined> {
     await this._ensureSchemaTable();
-    const migration = this._migrations.find((m) => m.version === this._targetVersion);
+    const migration = this.migrations.find((m) => m.version === this._targetVersion);
     if (!migration) throw new UnknownMigrationVersionError(this._targetVersion ?? "");
     await this.recordEnvironment();
     return this.executeMigrationInTransaction(migration);
@@ -1761,17 +1813,16 @@ export class Migrator {
   /** @internal */
   async recordEnvironment(): Promise<void> {
     if (this.isDown()) return;
-    if (this._internalMetadata.enabled) {
-      await this._internalMetadata.set(
-        "environment",
-        (await this.connection).pool.dbConfig.envName as string,
-      );
-    }
+
+    await this._internalMetadata.set(
+      "environment",
+      (await this.connection).pool.dbConfig.envName as string,
+    );
   }
 
   /** @internal */
   private get connection(): Promise<DatabaseAdapter> {
-    return _DatabaseTasks!.migrationConnection();
+    return ActiveRecord.Tasks.DatabaseTasks.migrationConnection();
   }
 
   /** @internal */
@@ -1805,31 +1856,30 @@ export class Migrator {
         return this.recordVersionStateAfterMigrating(migration.version);
       });
     } catch (e) {
-      const useTx = await this.isUseTransaction(migration);
-      const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
-      throw Object.assign(new StandardError(msg), { cause: e });
+      let msg = "An error has occurred, ";
+      if (await this.isUseTransaction(migration)) msg += "this and ";
+      msg += `all later migrations canceled:\n\n${excToS(e)}`;
+      const error = new StandardError(msg);
+      excSetBacktrace(error, (excBacktraceLocations(e as Error) ?? []).map(String));
+      throw excSetupMessage(error, e);
     }
   }
 
   /** @internal */
   private target(): MigrationProxy | undefined {
-    if (this._targetVersion === null) return undefined;
     return this.migrations.find((m) => m.version === this._targetVersion);
   }
 
   /** @internal */
   private finish(): number {
-    const migrations = this.migrations;
-    const target = this.target();
-    const index = target ? migrations.findIndex((m) => m.version === target.version) : -1;
-    return index === -1 ? migrations.length - 1 : index;
+    const index = this.migrations.indexOf(this.target()!);
+    return index === -1 ? this.migrations.length - 1 : index;
   }
 
   /** @internal */
   private async start(): Promise<number> {
     if (this.isUp()) return 0;
-    const current = await this.current();
-    const index = current ? this.migrations.findIndex((m) => m.version === current.version) : -1;
+    const index = this.migrations.indexOf((await this.current())!);
     return index === -1 ? 0 : index;
   }
 
@@ -1870,7 +1920,7 @@ export class Migrator {
   }
 
   /** @internal */
-  private validate(migrations: MigrationProxy[]): void {
+  private validate(migrations: MigrationProxy[]): undefined {
     const [name] = [...groupBy(migrations, (m) => m.name)].find(([, v]) => v.length > 1) ?? [];
     if (name != null) throw new DuplicateMigrationNameError(name);
 
@@ -1903,8 +1953,9 @@ export class Migrator {
 
   /** @internal */
   async isUseTransaction(migration: MigrationProxy): Promise<boolean> {
-    if (await migration.disableDdlTransaction) return false;
-    return (await this.connection).supportsDdlTransactions?.() ?? false;
+    return (
+      !(await migration.disableDdlTransaction) && (await this.connection).supportsDdlTransactions()
+    );
   }
 
   async currentMigration(): Promise<MigrationProxy | null> {
@@ -1923,11 +1974,11 @@ export class Migrator {
       for (const m of runnable) {
         if (!(await this.isRan(m))) kept.push(m);
       }
-      return kept;
-    }
-    if (this.target()) runnable.pop();
-    for (const m of runnable) {
-      if (await this.isRan(m)) kept.push(m);
+    } else {
+      if (this.target()) runnable.pop();
+      for (const m of runnable) {
+        if (await this.isRan(m)) kept.push(m);
+      }
     }
     return kept;
   }
@@ -1951,26 +2002,29 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   static readonly VERSION = `${VERSION.MAJOR}.${VERSION.MINOR}`;
 
   override async createTable(
-    tableName: string,
-    options?:
-      | {
-          id?: boolean | ColumnType | IdHashOptions;
-          primaryKey?: string | string[] | false;
-          force?: boolean | "cascade";
-          ifNotExists?: boolean;
-          default?: unknown;
-          options?: string;
-          comment?: string;
-          charset?: string;
-          collation?: string;
-          as?: string;
-        }
-      | ((t: TableDefinitionOf<A>) => void),
-    fn?: (t: TableDefinitionOf<A>) => void,
+    ...args: [
+      tableName: string,
+      options?:
+        | {
+            id?: false | ColumnType | IdHashOptions;
+            primaryKey?: string | string[] | false;
+            force?: boolean | "cascade";
+            ifNotExists?: boolean;
+            default?: unknown;
+            options?: string;
+            comment?: string;
+            charset?: string;
+            collation?: string;
+            as?: string;
+          }
+        | ((t: TableDefinitionOf<A>) => void),
+      fn?: (t: TableDefinitionOf<A>) => void,
+    ]
   ): Promise<void> {
+    const [tableName, options, fn] = args;
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      await super.createTable(tableName, options);
+      await super.createTable(...args);
     } else if (options === block) {
       await super.createTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -1979,13 +2033,16 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   }
 
   override async changeTable(
-    tableName: string,
-    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: TableOf<A>) => void | Promise<void>,
+    ...args: [
+      tableName: string,
+      options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+      fn?: (t: TableOf<A>) => void | Promise<void>,
+    ]
   ): Promise<void> {
+    const [tableName, options, fn] = args;
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      await super.changeTable(tableName, options);
+      await super.changeTable(...args);
     } else if (options === block) {
       await super.changeTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -1994,14 +2051,17 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   }
 
   override async createJoinTable(
-    table1: string,
-    table2: string,
-    options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
-    fn?: (t: TableDefinitionOf<A>) => void,
+    ...args: [
+      table1: string,
+      table2: string,
+      options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
+      fn?: (t: TableDefinitionOf<A>) => void,
+    ]
   ): Promise<void> {
+    const [table1, table2, options, fn] = args;
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      await super.createJoinTable(table1, table2, options);
+      await super.createJoinTable(...args);
     } else if (options === block) {
       await super.createJoinTable(table1, table2, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -2071,7 +2131,6 @@ export class CheckPending {
     return this.app(env);
   }
 
-  /** @missingRailsCall call — PERMANENT */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
     const currentEnvironment = ActiveRecord.ConnectionHandling.DEFAULT_ENV();
     const allConfigs = ActiveRecord.Base.configurations().configsFor({
@@ -2094,6 +2153,7 @@ export class CheckPending {
   }
 }
 
+Migration.Current = Current;
 Migration.CheckPending = CheckPending;
 Migration.delegate = new Migration();
 ActiveRecord.Migration = Migration;

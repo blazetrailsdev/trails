@@ -10,6 +10,7 @@ import type { Tyre } from "./tyre.js";
 import type { Wheel } from "./wheel.js";
 import { Base } from "../../base.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Car extends Base {
@@ -108,9 +109,10 @@ export class Car extends Base {
       return this.order("name asc");
     });
 
-    this.attribute("wheels_owned_at", "datetime", { default: () => Temporal.Now.instant() });
+    this.attribute("wheels_owned_at", "datetime", { default: () => RubyTime.now() });
   }
 }
+registerModel(Car);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Car {
   get person(): Person | null | Promise<Person | null>;
@@ -126,6 +128,7 @@ export class CoolCar extends Car {
     });
   }
 }
+registerModel(CoolCar);
 
 export class FastCar extends Car {
   static {
@@ -134,3 +137,4 @@ export class FastCar extends Car {
     });
   }
 }
+registerModel(FastCar);

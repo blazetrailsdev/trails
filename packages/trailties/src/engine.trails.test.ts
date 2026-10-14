@@ -49,17 +49,38 @@ describe("Railtie class-level method_missing", () => {
     );
     const blog = BlogEngine as unknown as typeof BlogEngine & Pick<Engine, "routes">;
     expect(blog.routes()).toBe(BlogEngine.instance().routes());
-    blog.routes().draw((r) => {
-      r.get("/cart", { to: "cart#show" });
+    blog.routes().draw(function () {
+      this.get("/cart", { to: "cart#show" });
     });
 
     const set = new RouteSet();
-    set.draw((r) => {
-      r.mount(BlogEngine as never, { at: "/blog", as: "blog" });
+    set.draw(function () {
+      this.mount(BlogEngine as never, { at: "/blog", as: "blog" });
     });
     const output = new RoutesInspector(set.routes.routes).format(new ConsoleFormatter.Sheet());
 
     expect(output).toContain("Routes for Blog::Engine:");
     expect(output).toContain("cart GET  /cart(.:format) cart#show");
+  });
+});
+
+describe("Engine.isolate_namespace", () => {
+  it("names the engine after the module, scopes its routes and defines the module's railtie readers", () => {
+    class IsolatedEngine extends Engine {}
+    Engine.register(
+      IsolatedEngine,
+      new URL("./__fixtures__/initializer-engine", import.meta.url).pathname,
+    );
+    const mod: Parameters<typeof Engine.isolateNamespace>[0] = { name: "Blog::Admin" };
+    IsolatedEngine.isolateNamespace(mod);
+    const routes = IsolatedEngine.instance().routes();
+
+    expect(IsolatedEngine.engineName()).toBe("blog_admin");
+    expect(IsolatedEngine.isolated()).toBe(true);
+    expect(routes.defaultScope).toEqual({ module: "blog/admin" });
+    expect(mod.trailtieNamespace!()).toBe(IsolatedEngine);
+    expect(mod.tableNamePrefix).toBe("blog_admin_");
+    expect(mod.isUseRelativeModelNaming!()).toBe(true);
+    expect(mod.trailtieRoutesUrlHelpers!()).toBe(routes.urlHelpers());
   });
 });

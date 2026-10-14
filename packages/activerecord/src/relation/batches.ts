@@ -1,367 +1,375 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { kernelArray as Array } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/ruby-compat";
-import { WhereClause } from "./where-clause.js";
-import { stripThenable } from "./thenable.js";
+import { defineModule, eachSlice, kernelArray as Array, pluck } from "@blazetrails/activesupport";
+import { cmp, isEmpty, rbCmpint, rbInspect, rtest, slice } from "@blazetrails/ruby-compat";
+import { stripThenable } from "@blazetrails/activesupport";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
 import type { FindEachOptions, InBatchesOptions, LoadedRelation, Relation } from "../relation.js";
 import { errorOnIgnoredOrder } from "../active-record.js";
 
-export class Batches {
-  static readonly ORDER_IGNORE_MESSAGE =
-    "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
+export const ORDER_IGNORE_MESSAGE =
+  "Scoped order is ignored, use :cursor with :order to configure custom order.";
+export const DEFAULT_ORDER = ":asc" as const;
 
-  findEach<T extends Base>(
-    this: any,
-    opts: FindEachOptions,
-    block: (record: T) => void | Promise<void>,
-  ): Promise<null>;
-  findEach<T extends Base>(
-    this: any,
-    opts?: FindEachOptions,
-  ): AsyncGenerator<T> & { size(): Promise<number> };
-  findEach<T extends Base>(
-    this: any,
-    {
-      start,
-      finish,
-      batchSize = 1000,
-      errorOnIgnore,
-      cursor = this.primaryKey,
-      order,
-    }: FindEachOptions = {},
-    block?: (record: T) => void | Promise<void>,
-  ): (AsyncGenerator<T> & { size(): Promise<number> }) | Promise<null> {
-    if (block) {
-      return this.findInBatches(
-        { start, finish, batchSize, errorOnIgnore, cursor, order },
-        async (records: T[]) => {
-          for (const record of records) await block(record);
-        },
-      );
-    } else {
-      const relation = this;
-      const enumerator = (async function* () {
-        for await (const records of relation.findInBatches({
-          start,
-          finish,
-          batchSize,
-          errorOnIgnore,
-          cursor,
-          order,
-        })) {
-          yield* records as T[];
-        }
-      })() as AsyncGenerator<T> & { size(): Promise<number> };
-      enumerator.size = async (): Promise<number> => {
-        cursor = Array(cursor);
-        return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
-      };
-      return enumerator;
-    }
-  }
-
-  findInBatches<T extends Base>(
-    this: any,
-    opts: FindEachOptions,
-    block: (batch: T[]) => void | Promise<void>,
-  ): Promise<null>;
-  findInBatches<T extends Base>(
-    this: any,
-    opts?: FindEachOptions,
-  ): AsyncGenerator<T[]> & { size(): Promise<number> };
-  findInBatches<T extends Base>(
-    this: any,
-    {
-      start,
-      finish,
-      batchSize = 1000,
-      errorOnIgnore,
-      cursor = this.primaryKey,
-      order,
-    }: FindEachOptions = {},
-    block?: (batch: T[]) => void | Promise<void>,
-  ): (AsyncGenerator<T[]> & { size(): Promise<number> }) | Promise<null> {
-    const relation = this;
-    if (!block) {
-      const size = async (): Promise<number> => {
-        cursor = Array(cursor);
-        const total = await applyLimits(
-          relation,
-          cursor,
-          start,
-          finish,
-          buildBatchOrders(cursor, order),
-        ).size();
-        return Math.floor((total - 1) / batchSize) + 1;
-      };
-      const enumerator = (async function* () {
-        for await (const batch of relation
-          .inBatches({ of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order })
-          ._generator()) {
-          yield (await batch.toArray()) as T[];
-        }
-      })() as AsyncGenerator<T[]> & { size(): Promise<number> };
-      enumerator.size = size;
-      return enumerator;
-    }
-
-    return relation.inBatches(
-      { of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order },
-      async (batch: LoadedRelation<Relation<T>>) => {
-        await block(await batch.toArray());
+export function findEach<T extends Base>(
+  this: any,
+  opts: FindEachOptions,
+  block: (record: T) => void | Promise<void>,
+): Promise<null>;
+export function findEach<T extends Base>(
+  this: any,
+  opts?: FindEachOptions,
+): AsyncGenerator<T> & { size(): Promise<number> };
+/** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+export function findEach<T extends Base>(
+  this: any,
+  {
+    start,
+    finish,
+    batchSize = 1000,
+    errorOnIgnore,
+    cursor = this.primaryKey,
+    order = DEFAULT_ORDER,
+  }: FindEachOptions = {},
+  block?: (record: T) => void | Promise<void>,
+): (AsyncGenerator<T> & { size(): Promise<number> }) | Promise<null> {
+  if (block) {
+    return this.findInBatches(
+      { start, finish, batchSize, errorOnIgnore, cursor, order },
+      async (records: T[]) => {
+        for (const record of records) await block(record);
       },
     );
-  }
-
-  inBatches<T extends Base>(
-    this: any,
-    opts: InBatchesOptions,
-    block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
-  ): Promise<null>;
-  inBatches<T extends Base>(
-    this: any,
-    opts?: InBatchesOptions,
-  ): BatchEnumerator<LoadedRelation<Relation<T>>>;
-  inBatches<T extends Base>(
-    this: any,
-    {
-      of = 1000,
-      start,
-      finish,
-      order,
-      cursor: cursorOption,
-      errorOnIgnore,
-      load = false,
-      useRanges,
-    }: InBatchesOptions = {},
-    block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
-  ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<null> {
-    const self = this;
-    const cursor = Array(cursorOption ?? this.primaryKey).map(String);
-    const ensureValidOptions = () =>
-      ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
-
-    if (this.arel().orders.length > 0) {
-      this.actOnIgnoredOrder(errorOnIgnore);
-    }
-
-    const batchOrders = buildBatchOrders(cursor, order as any);
-
-    const enumerator = block
-      ? null
-      : new BatchEnumerator<LoadedRelation<Relation<T>>>({
-          of,
-          start,
-          finish,
-          relation: self,
-          cursor,
-          order,
-          useRanges,
-        });
-
-    let remaining: number | null = null;
-    let batchLimit = of;
-    if (this.limitValue !== null) {
-      const limitValue = this.limitValue;
-      if (typeof limitValue !== "number") {
-        throw new ArgumentError(`comparison of String with ${batchLimit} failed`);
+  } else {
+    const relation = this;
+    const enumerator = (async function* () {
+      for await (const records of relation.findInBatches({
+        start,
+        finish,
+        batchSize,
+        errorOnIgnore,
+        cursor,
+        order,
+      })) {
+        yield* records as T[];
       }
-      remaining = limitValue;
-      if (remaining < batchLimit) batchLimit = remaining;
-    }
-
-    let generator: () => AsyncGenerator<LoadedRelation<Relation<T>>>;
-    if (remaining === 0) {
-      generator = async function* () {};
-    } else if (this.loaded) {
-      generator = async function* () {
-        await ensureValidOptions();
-        const loadedBatches = await batchOnLoadedRelation({
-          relation: self,
-          start,
-          finish,
-          cursor,
-          order: (order ?? "asc") as any,
-          batchLimit,
-        });
-        for (const batchRows of loadedBatches) {
-          const batchRel = self.clone();
-          batchRel.orderValues = batchOrders.map(([col, dir]) =>
-            dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
-          );
-          batchRel._records = batchRows;
-          batchRel._loaded = true;
-          yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
-        }
-      };
-    } else {
-      generator = async function* () {
-        await ensureValidOptions();
-        for await (const { rows: batchRows, useRanges: batchUseRanges } of batchOnUnloadedRelation({
-          relation: self,
-          start,
-          finish,
-          cursor,
-          order: (order ?? "asc") as any,
-          batchLimit,
-          load,
-          remaining,
-          useRanges,
-        })) {
-          const batchRel = self.clone();
-          batchRel.orderValues = batchOrders.map(([col, dir]) =>
-            dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
-          );
-          const tuples = batchRows.map((r) => cursor.map((c) => r.readAttribute(c)));
-          if (batchUseRanges && !load && cursor.length === 1 && tuples.length > 0) {
-            const col = cursor[0];
-            const dir = batchOrders[0][1];
-            const first = tuples[0][0];
-            const last = tuples[tuples.length - 1][0];
-            const attr = self.table.get(col);
-            const lo = dir === "desc" ? last : first;
-            const hi = dir === "desc" ? first : last;
-            batchRel.whereClause = batchRel.whereClause.plus(
-              new WhereClause([attr.gteq(lo).and(attr.lteq(hi))]),
-            );
-          } else if (cursor.length === 1) {
-            const ids = tuples.map((t: unknown[]) => t[0]);
-            batchRel.whereClause = batchRel.whereClause.plus(
-              new WhereClause([...self.predicateBuilder.buildFromHash({ [cursor[0]]: ids })]),
-            );
-          } else {
-            batchRel.whereClause = batchRel.whereClause.plus(
-              new WhereClause([
-                ...self.predicateBuilder.buildFromHash(new Map([[cursor, tuples]])),
-              ]),
-            );
-          }
-          if (load) {
-            batchRel._records = batchRows;
-            batchRel._loaded = true;
-          }
-          yield stripThenable(batchRel);
-        }
-      } as () => AsyncGenerator<LoadedRelation<Relation<T>>>;
-    }
-
-    if (block) {
-      return (async () => {
-        for await (const batchRelation of generator()) {
-          await block(batchRelation);
-        }
-        return null;
-      })();
-    }
-
-    enumerator!._generator = generator;
-    return enumerator!;
-  }
-
-  /** @internal */
-  actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
-    const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder();
-    if (raise) {
-      throw new ArgumentError(Batches.ORDER_IGNORE_MESSAGE);
-    } else if (this.model.logger) {
-      this.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
-    }
+    })() as AsyncGenerator<T> & { size(): Promise<number> };
+    enumerator.size = async (): Promise<number> => {
+      cursor = Array(cursor);
+      return applyLimits
+        .call(this, relation, cursor, start, finish, buildBatchOrders.call(this, cursor, order))
+        .size();
+    };
+    return enumerator;
   }
 }
 
+export function findInBatches<T extends Base>(
+  this: any,
+  opts: FindEachOptions,
+  block: (batch: T[]) => void | Promise<void>,
+): Promise<null>;
+export function findInBatches<T extends Base>(
+  this: any,
+  opts?: FindEachOptions,
+): AsyncGenerator<T[]> & { size(): Promise<number> };
+/** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+export function findInBatches<T extends Base>(
+  this: any,
+  {
+    start,
+    finish,
+    batchSize = 1000,
+    errorOnIgnore,
+    cursor = this.primaryKey,
+    order = DEFAULT_ORDER,
+  }: FindEachOptions = {},
+  block?: (batch: T[]) => void | Promise<void>,
+): (AsyncGenerator<T[]> & { size(): Promise<number> }) | Promise<null> {
+  const relation = this;
+  if (!block) {
+    const size = async (): Promise<number> => {
+      cursor = Array(cursor);
+      const total = await applyLimits
+        .call(this, relation, cursor, start, finish, buildBatchOrders.call(this, cursor, order))
+        .size();
+      return Math.floor((total - 1) / batchSize) + 1;
+    };
+    const enumerator = (async function* () {
+      for await (const batch of relation
+        .inBatches({ of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order })
+        ._generator()) {
+        yield (await batch.toArray()) as T[];
+      }
+    })() as AsyncGenerator<T[]> & { size(): Promise<number> };
+    enumerator.size = size;
+    return enumerator;
+  }
+
+  return relation.inBatches(
+    { of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order },
+    async (batch: LoadedRelation<Relation<T>>) => {
+      await block(await batch.toArray());
+    },
+  );
+}
+
+export function inBatches<T extends Base>(
+  this: any,
+  opts: InBatchesOptions,
+  block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+): Promise<null>;
+export function inBatches<T extends Base>(
+  this: any,
+  opts?: InBatchesOptions,
+): BatchEnumerator<LoadedRelation<Relation<T>>>;
+/**
+ * @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator
+ * @inventedArm indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
+ */
+export function inBatches<T extends Base>(
+  this: any,
+  {
+    of = 1000,
+    start,
+    finish,
+    order = DEFAULT_ORDER,
+    cursor: cursorOption,
+    errorOnIgnore,
+    load = false,
+    useRanges,
+  }: InBatchesOptions = {},
+  block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<null> {
+  const self = this;
+  const cursor = Array(cursorOption ?? this.primaryKey).map(String);
+  ensureValidOptionsForBatchingBang.call(this, cursor, start, finish, order);
+
+  if (this.arel().orders.length > 0) {
+    actOnIgnoredOrder.call(this, errorOnIgnore);
+  }
+
+  const run = async (block: (relation: any) => unknown): Promise<null> => {
+    await self.model.schemaCache().indexes(self.tableName);
+    ensureValidOptionsForBatchingBang.call(self, cursor, start, finish, order);
+
+    let batchLimit = of;
+    let remaining: number | null = null;
+
+    if (self.limitValue !== null) {
+      remaining = self.limitValue as number;
+      if (rbCmpint(cmp(remaining, batchLimit), remaining, batchLimit) < 0) batchLimit = remaining;
+    }
+
+    if (self.loaded) {
+      return batchOnLoadedRelation.call(
+        this,
+        {
+          relation: self,
+          start,
+          finish,
+          cursor,
+          order,
+          batchLimit,
+        },
+        block,
+      );
+    } else {
+      return batchOnUnloadedRelation.call(
+        self,
+        {
+          relation: self,
+          start,
+          finish,
+          load,
+          cursor,
+          order,
+          useRanges,
+          remaining,
+          batchLimit,
+        },
+        block,
+      );
+    }
+  };
+
+  const generator = async function* (): AsyncGenerator<LoadedRelation<Relation<T>>> {
+    type Batch = { relation: any; resume: () => void; stop: (reason: unknown) => void };
+    const stopped = {};
+    const state: { pending: Batch | null; finished: boolean; failure: unknown[] } = {
+      pending: null,
+      finished: false,
+      failure: [],
+    };
+    let wake = (): void => {};
+    let batch: Batch | null = null;
+    void run(
+      (relation) =>
+        new Promise<void>((resume, stop) => {
+          state.pending = { relation, resume, stop };
+          wake();
+        }),
+    )
+      .catch((error: unknown) => {
+        if (error !== stopped) state.failure.push(error);
+      })
+      .then(() => {
+        state.finished = true;
+        wake();
+      });
+    try {
+      while (true) {
+        if (!state.pending && !state.finished) {
+          await new Promise<void>((resolve) => (wake = resolve));
+        }
+        batch = state.pending;
+        if (!batch) break;
+        state.pending = null;
+        yield batch.relation;
+        batch.resume();
+        batch = null;
+      }
+    } finally {
+      batch?.stop(stopped);
+    }
+    if (state.failure.length > 0) throw state.failure[0];
+  };
+
+  if (!block) {
+    const enumerator = new BatchEnumerator<LoadedRelation<Relation<T>>>({
+      of,
+      start,
+      finish,
+      relation: self,
+      cursor,
+      order,
+      useRanges,
+    });
+    enumerator._generator = generator;
+    return enumerator;
+  }
+
+  return run(block);
+}
+
+/** @internal */
+export const BatchesPublicInstanceMethods = {
+  findEach,
+  findInBatches,
+  inBatches,
+} as const;
+
+/** @internal */
+export const BatchesPrivateInstanceMethods = {
+  ensureValidOptionsForBatchingBang,
+  applyLimits,
+  applyStartLimit,
+  applyFinishLimit,
+  batchCondition,
+  buildBatchOrders,
+  actOnIgnoredOrder,
+  batchOnLoadedRelation,
+  recordCursorValues,
+  compareValuesForOrder,
+  batchOnUnloadedRelation,
+} as const;
+
+export const Batches = defineModule(
+  BatchesPublicInstanceMethods,
+  undefined,
+  BatchesPrivateInstanceMethods,
+);
+
 /**
  * @internal
- * @missingRailsCall size — PERMANENT
+ * @missingRailsCall indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
+ * @inventedArm if — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
  */
-export async function ensureValidOptionsForBatchingBang(
-  relation: any,
+export function ensureValidOptionsForBatchingBang(
+  this: any,
   cursor: string[],
   start: unknown,
   finish: unknown,
-  order: "asc" | "desc" | ("asc" | "desc")[],
-): Promise<void> {
-  if (start !== undefined && start !== null) {
-    if (Array(start).length !== cursor.length) {
-      throw new ArgumentError(":start must contain one value per cursor column");
-    }
+  order: ":asc" | ":desc" | (":asc" | ":desc")[],
+): void {
+  if (rtest(start) && Array(start).length !== cursor.length) {
+    throw new ArgumentError(":start must contain one value per cursor column");
   }
-  if (finish !== undefined && finish !== null) {
-    if (Array(finish).length !== cursor.length) {
-      throw new ArgumentError(":finish must contain one value per cursor column");
+
+  if (rtest(finish) && Array(finish).length !== cursor.length) {
+    throw new ArgumentError(":finish must contain one value per cursor column");
+  }
+
+  if (Array<string>(this.primaryKey).some((key) => !cursor.includes(key))) {
+    const indexes = this.model.schemaCache().getCachedIndexes(this.tableName) as
+      | { unique: boolean; where?: string | null; columns: string[] }[]
+      | undefined;
+    if (indexes !== undefined) {
+      const uniqueIndex = indexes.find(
+        (index) =>
+          index.unique &&
+          !index.where &&
+          isEmpty(Array(index.columns).filter((c) => !cursor.includes(c))),
+      );
+
+      if (!uniqueIndex) {
+        throw new ArgumentError(":cursor must include a primary key or other unique column(s)");
+      }
     }
   }
 
-  if (Array<string>(relation.primaryKey).some((key) => !cursor.includes(key))) {
-    const model = relation.model;
-    const indexes = (await model.schemaCache().indexes(relation.tableName)) as {
-      unique: boolean;
-      where?: string | null;
-      columns: string[];
-    }[];
-    const uniqueIndex = indexes.find(
-      (index) =>
-        index.unique &&
-        !index.where &&
-        isEmpty(Array(index.columns).filter((c) => !cursor.includes(c))),
-    );
-    if (!uniqueIndex) {
-      throw new ArgumentError(":cursor must include a primary key or other unique column(s)");
-    }
-  }
-
-  if (Array(order).filter((o) => !["asc", "desc"].includes(o)).length > 0) {
-    const inspected = globalThis.Array.isArray(order)
-      ? `[${order.map((o) => `:${o}`).join(", ")}]`
-      : `:${order}`;
+  if (Array(order).filter((o) => ![":asc", ":desc"].includes(o)).length > 0) {
     throw new ArgumentError(
-      `:order must be :asc or :desc or an array consisting of :asc or :desc, got ${inspected}`,
+      `:order must be :asc or :desc or an array consisting of :asc or :desc, got ${rbInspect(order)}`,
     );
   }
 }
 
 /** @internal */
 export function applyLimits(
+  this: any,
   relation: any,
   cursor: string[],
   start: unknown,
   finish: unknown,
-  batchOrders: [string, "asc" | "desc"][],
+  batchOrders: [string, ":asc" | ":desc"][],
 ): any {
   if (start !== undefined && start !== null) {
-    relation = applyStartLimit(relation, cursor, start, batchOrders);
+    relation = applyStartLimit.call(this, relation, cursor, start, batchOrders);
   }
   if (finish !== undefined && finish !== null) {
-    relation = applyFinishLimit(relation, cursor, finish, batchOrders);
+    relation = applyFinishLimit.call(this, relation, cursor, finish, batchOrders);
   }
   return relation;
 }
 
 /** @internal */
 export function applyStartLimit(
+  this: any,
   relation: any,
   cursor: string[],
   start: unknown,
-  batchOrders: [string, "asc" | "desc"][],
+  batchOrders: [string, ":asc" | ":desc"][],
 ): any {
-  const operators = batchOrders.map(([, order]) => (order === "desc" ? "lteq" : "gteq"));
-  return batchCondition(relation, cursor, start, operators);
+  const operators = batchOrders.map(([, order]) => (order === ":desc" ? "lteq" : "gteq"));
+  return batchCondition.call(this, relation, cursor, start, operators);
 }
 
 /** @internal */
 export function applyFinishLimit(
+  this: any,
   relation: any,
   cursor: string[],
   finish: unknown,
-  batchOrders: [string, "asc" | "desc"][],
+  batchOrders: [string, ":asc" | ":desc"][],
 ): any {
-  const operators = batchOrders.map(([, order]) => (order === "desc" ? "gteq" : "lteq"));
-  return batchCondition(relation, cursor, finish, operators);
+  const operators = batchOrders.map(([, order]) => (order === ":desc" ? "gteq" : "lteq"));
+  return batchCondition.call(this, relation, cursor, finish, operators);
 }
 
 /** @internal */
 export function batchCondition(
+  this: any,
   relation: any,
   cursor: string[],
   values: unknown,
@@ -384,123 +392,176 @@ export function batchCondition(
 
 /** @internal */
 export function buildBatchOrders(
+  this: any,
   cursor: string[],
-  order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
-): [string, "asc" | "desc"][] {
-  return cursor.map((column, i) => [column, Array(order)[i] ?? "asc"]);
+  order: ":asc" | ":desc" | (":asc" | ":desc")[],
+): [string, ":asc" | ":desc"][] {
+  return cursor.map((column, i) => [column, Array(order)[i] ?? DEFAULT_ORDER]);
 }
 
 /** @internal */
-export async function batchOnLoadedRelation(opts: {
-  relation: any;
-  start: unknown;
-  finish: unknown;
-  cursor: string[];
-  order: "asc" | "desc" | ("asc" | "desc")[];
-  batchLimit: number;
-}): Promise<any[]> {
-  const { relation, cursor, batchLimit } = opts;
-  const loaded = await relation.records();
-  let records: any[] = globalThis.Array.isArray(loaded) ? loaded : [];
-  const order = buildBatchOrders(cursor, opts.order as any).map(([, second]) => second);
+export function actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
+  const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder();
+  if (raise) {
+    throw new ArgumentError(ORDER_IGNORE_MESSAGE);
+  } else if (this.model.logger) {
+    this.model.logger.warn(ORDER_IGNORE_MESSAGE);
+  }
+}
 
-  if (opts.start != null || opts.finish != null) {
+/** @internal */
+export async function batchOnLoadedRelation(
+  this: any,
+  {
+    relation,
+    start,
+    finish,
+    cursor,
+    order,
+    batchLimit,
+  }: {
+    relation: any;
+    start: unknown;
+    finish: unknown;
+    cursor: string[];
+    order: ":asc" | ":desc" | (":asc" | ":desc")[];
+    batchLimit: number;
+  },
+  block: (subrelation: any) => unknown,
+): Promise<null> {
+  let records: any[] = await relation.toArray();
+  order = buildBatchOrders.call(this, cursor, order).map(([, second]) => second);
+
+  if (rtest(start) || rtest(finish)) {
     records = records.filter((record) => {
-      const values = recordCursorValues(record, cursor);
+      const values = recordCursorValues.call(this, record, cursor);
+
       return (
-        (opts.start == null || compareValuesForOrder(values, Array(opts.start), order) >= 0) &&
-        (opts.finish == null || compareValuesForOrder(values, Array(opts.finish), order) <= 0)
+        (start == null || compareValuesForOrder.call(this, values, Array(start), order) >= 0) &&
+        (finish == null || compareValuesForOrder.call(this, values, Array(finish), order) <= 0)
       );
     });
   }
 
-  const sorted = [...records].sort((record1, record2) => {
-    const values1 = recordCursorValues(record1, cursor);
-    const values2 = recordCursorValues(record2, cursor);
-    return compareValuesForOrder(values1, values2, order);
+  records.sort((record1, record2) => {
+    const values1 = recordCursorValues.call(this, record1, cursor);
+    const values2 = recordCursorValues.call(this, record2, cursor);
+    return compareValuesForOrder.call(this, values1, values2, order);
   });
-  const result: any[][] = [];
-  for (let i = 0; i < sorted.length; i += batchLimit) {
-    result.push(sorted.slice(i, i + batchLimit));
+
+  for (const subrecords of eachSlice(records, batchLimit)) {
+    const subrelation = relation.spawn();
+    subrelation.loadRecords(subrecords);
+
+    await block(stripThenable(subrelation));
   }
-  return result;
+
+  return null;
 }
 
-/**
- * @internal
- * @missingRailsCall slice — PERMANENT
- */
-export function recordCursorValues(record: any, cursor: string[]): unknown[] {
-  const attributes = record.attributes;
-  return cursor.filter((column) => column in attributes).map((column) => attributes[column]);
+/** @internal */
+export function recordCursorValues(this: any, record: any, cursor: string[]): unknown[] {
+  return Object.values(slice(record.attributes, ...cursor));
 }
 
 /** @internal */
 export function compareValuesForOrder(
+  this: any,
   values1: unknown[],
   values2: unknown[],
-  order: ("asc" | "desc")[],
+  order: (":asc" | ":desc")[],
 ): number {
-  for (let i = 0; i < values1.length; i++) {
-    const a = values1[i] as any;
-    const b = values2[i] as any;
-    const dir = order[i] ?? "asc";
-    if (a < b) return dir === "asc" ? -1 : 1;
-    if (a > b) return dir === "asc" ? 1 : -1;
+  for (const [index, element1] of values1.entries()) {
+    const element2 = values2[index];
+    const direction = order[index];
+    let comparison = cmp(element1, element2) as number;
+    if (direction === ":desc") comparison = -comparison;
+    if (comparison !== 0) return comparison;
   }
+
   return 0;
 }
 
 /** @internal */
-export async function* batchOnUnloadedRelation(opts: {
-  relation: any;
-  start: unknown;
-  finish: unknown;
-  cursor: string[];
-  order: "asc" | "desc" | ("asc" | "desc")[];
-  batchLimit: number;
-  load?: boolean;
-  remaining?: number | null;
-  useRanges?: boolean | null;
-}): AsyncGenerator<{ rows: any[]; useRanges: boolean }> {
-  const { cursor } = opts;
-  let { batchLimit } = opts;
-  let remaining: number | null | undefined = opts.remaining;
-  const batchOrders = buildBatchOrders(cursor, opts.order as any);
-  let relation = opts.relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
-  relation = applyLimits(relation, cursor, opts.start, opts.finish, batchOrders);
-  const emptyScope = opts.relation.toSql() === opts.relation.model.unscoped().all().toSql();
-  const useRanges = (emptyScope && opts.useRanges !== false) || opts.useRanges === true;
+export async function batchOnUnloadedRelation(
+  this: any,
+  opts: {
+    relation: any;
+    start: unknown;
+    finish: unknown;
+    load: boolean;
+    cursor: string[];
+    order: ":asc" | ":desc" | (":asc" | ":desc")[];
+    useRanges: boolean | null | undefined;
+    remaining: number | null;
+    batchLimit: number;
+  },
+  block: (yieldedRelation: any) => unknown,
+): Promise<null> {
+  const { start, load, cursor, order, useRanges, batchLimit } = opts;
+  let { relation, finish, remaining } = opts;
+  const batchOrders = buildBatchOrders.call(this, cursor, order);
+  relation = relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
+  relation = applyLimits.call(this, relation, cursor, start, finish, batchOrders);
+  relation.skipQueryCacheBang();
   let batchRelation = relation;
-  while (true) {
-    const rows = await (opts.load ? batchRelation : batchRelation.select(...cursor)).toArray();
-    if (rows.length === 0) break;
+  const emptyScope = this.toSql() === this.model.unscoped().all().toSql();
 
-    if (rows.some((record: any) => cursor.some((column) => record.attributes[column] == null))) {
+  while (true) {
+    let values: unknown[];
+    let yieldedRelation: any;
+    if (load) {
+      const records = await batchRelation.records();
+      values = pluck<any, any>(records, ...cursor);
+      yieldedRelation = this.where(new Map([[cursor, values]]));
+      yieldedRelation.loadRecords(records);
+    } else if ((emptyScope && useRanges !== false) || useRanges) {
+      values = await batchRelation.pluck(...cursor);
+
+      finish = values[values.length - 1];
+      if (rtest(finish)) {
+        yieldedRelation = applyFinishLimit.call(this, batchRelation, cursor, finish, batchOrders);
+        yieldedRelation = yieldedRelation.except("limit", "order");
+        yieldedRelation.skipQueryCacheBang(false);
+      }
+    } else {
+      values = await batchRelation.pluck(...cursor);
+      yieldedRelation = this.where(new Map([[cursor, values]]));
+    }
+
+    if (values.length === 0) break;
+
+    if (values.flat(Infinity).some((value) => value == null)) {
       throw new ArgumentError(
         "Not all of the batch cursor columns were included in the custom select clause " +
           "or some columns contain nil.",
       );
     }
 
-    yield { rows, useRanges };
-    if (rows.length < batchLimit) break;
-    if (remaining != null) {
-      remaining -= rows.length;
-      if (remaining === 0) break;
-      if (remaining < batchLimit) {
-        batchLimit = remaining;
-        relation = relation.limit(batchLimit);
+    await block(stripThenable(yieldedRelation));
+
+    if (values.length < batchLimit) break;
+
+    if (this.limitValue != null) {
+      remaining! -= values.length;
+
+      if (remaining === 0) {
+        break;
+      } else if (remaining! < batchLimit) {
+        relation = relation.limit(remaining);
       }
     }
-    const batchOrdersCopy = [...batchOrders];
-    const [, lastOrder] = batchOrdersCopy.pop() as [string, "asc" | "desc"];
-    const operators: string[] = batchOrdersCopy.map(([, order]) =>
-      order === "desc" ? "lteq" : "gteq",
-    );
-    operators.push(lastOrder === "desc" ? "lt" : "gt");
 
-    const cursorValue = recordCursorValues(rows[rows.length - 1], cursor);
-    batchRelation = batchCondition(relation, cursor, cursorValue, operators);
+    const batchOrdersCopy = [...batchOrders];
+    const [, lastOrder] = batchOrdersCopy.pop()!;
+    const operators: string[] = batchOrdersCopy.map(([, order]) =>
+      order === ":desc" ? "lteq" : "gteq",
+    );
+    operators.push(lastOrder === ":desc" ? "lt" : "gt");
+
+    const cursorValue = values[values.length - 1];
+    batchRelation = batchCondition.call(this, relation, cursor, cursorValue, operators);
   }
+
+  return null;
 }

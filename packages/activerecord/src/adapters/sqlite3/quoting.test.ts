@@ -1,10 +1,11 @@
 import { it, expect, beforeEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { toF } from "@blazetrails/ruby-compat";
 import { base36, BigDecimal, TimeWithZone, TimeZone, toFs } from "@blazetrails/activesupport";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import * as Type from "../../type.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { defaultTimezone, setDefaultTimezone } from "../../active-record.js";
@@ -44,16 +45,16 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("type cast true", () => {
-    expect(conn.typeCast(true)).toBe(1n);
+    expect(conn.typeCast(true)).toBe(1);
   });
 
   it("type cast false", () => {
-    expect(conn.typeCast(false)).toBe(0n);
+    expect(conn.typeCast(false)).toBe(0);
   });
 
   it("type cast bigdecimal", () => {
     const bd = new BigDecimal("10.0");
-    expect(conn.typeCast(bd)).toBe(Number(bd.toString("F")));
+    expect(conn.typeCast(bd)).toEqual(toF(bd));
   });
 
   it("quoting binary strings", () => {
@@ -64,14 +65,14 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("quoted time returns date qualified time", () => {
-    const value = Temporal.ZonedDateTime.from("2000-01-01T12:30:00.999999+00:00[UTC]").toInstant();
+    const value = RubyTime.utc(2000, 1, 1, 12, 30, 0, 999999);
     const type = new Type.Time();
 
     expect(conn.quote(type.serialize(value))).toBe("'2000-01-01 12:30:00.999999'");
   });
 
   it("quoted time normalizes date qualified time", () => {
-    const value = Temporal.ZonedDateTime.from("2018-03-11T12:30:00.999999+00:00[UTC]").toInstant();
+    const value = RubyTime.utc(2018, 3, 11, 12, 30, 0, 999999);
     const type = new Type.Time();
 
     expect(conn.quote(type.serialize(value))).toBe("'2000-01-01 12:30:00.999999'");

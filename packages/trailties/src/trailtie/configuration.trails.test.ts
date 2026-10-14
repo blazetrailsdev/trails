@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
+import { EngineConfiguration } from "../engine/configuration.js";
 
 describe("Railtie::Configuration (trails)", () => {
   it("respondTo answers true for a real method as well as a stored option", () => {
@@ -10,6 +11,10 @@ describe("Railtie::Configuration (trails)", () => {
     expect(config.isRespondTo("toPrepare")).toBe(true);
     expect(config.isRespondTo("eagerLoadNamespaces")).toBe(true);
     expect(config.isRespondTo("neverSet")).toBe(false);
+  });
+
+  it("respond_to? answers an attr_accessor held as an instance field", () => {
+    expect(new EngineConfiguration().isRespondTo("defaultScope")).toBe(true);
   });
 
   it("stores a key naming TS-only implementation surface, as Ruby has no such method", () => {

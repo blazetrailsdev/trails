@@ -1,5 +1,6 @@
 import { EachValidator } from "@blazetrails/activemodel";
-import { kernelArray } from "@blazetrails/activesupport";
+import { any, kernelArray } from "@blazetrails/activesupport";
+import { aryReject as reject, merge } from "@blazetrails/ruby-compat";
 
 export function validatesAssociated(
   this: {
@@ -12,21 +13,13 @@ export function validatesAssociated(
 }
 
 export class AssociatedValidator extends EachValidator {
-  /**
-   * @missingRailsCall any? — PERMANENT
-   * @missingRailsCall merge — PERMANENT
-   * @missingRailsCall reject — PERMANENT
-   */
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     const context = recordValidationContextForAssociation(record);
-    const values = kernelArray(value);
 
-    let anyInvalid = false;
-    for (const association of values) {
-      if (!(await isValidObject(association, context))) anyInvalid = true;
-    }
-    if (anyInvalid) {
-      record.errors.add(attribute, ":invalid", { ...this.options, value });
+    if (
+      any(await reject(kernelArray(value), (association) => isValidObject(association, context)))
+    ) {
+      record.errors.add(attribute, ":invalid", merge(this.options, { value }));
     }
   }
 }
@@ -47,3 +40,5 @@ function recordValidationContextForAssociation(record: any): string | undefined 
   }
   return undefined;
 }
+
+export const ClassMethods = { validatesAssociated };

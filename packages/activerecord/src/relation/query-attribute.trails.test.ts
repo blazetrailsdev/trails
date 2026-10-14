@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { BigIntegerType, IntegerType } from "@blazetrails/activemodel";
+import { BigIntegerType, IntegerType, ValueType } from "@blazetrails/activemodel";
 import { QueryAttribute } from "./query-attribute.js";
 
 class StringType {
@@ -24,9 +24,32 @@ const stringType = new StringType();
 const intType = new IntType();
 
 describe("QueryAttribute", () => {
+  it("value for database is computed once even when the type reports an in-place change", () => {
+    let callCount = 0;
+    class MutableType extends ValueType<unknown> {
+      readonly name = "mutable";
+      cast(v: unknown) {
+        return v;
+      }
+      override serialize(v: unknown) {
+        callCount++;
+        return JSON.stringify(v);
+      }
+      override isChangedInPlace() {
+        return true;
+      }
+    }
+    const value = { a: 1 };
+    const attr = new QueryAttribute("n", value, new MutableType());
+    expect(attr.valueForDatabase).toBe('{"a":1}');
+    value.a = 2;
+    expect(attr.valueForDatabase).toBe('{"a":1}');
+    expect(callCount).toBe(1);
+  });
+
   it("does not cast value via type", () => {
     const attr = new QueryAttribute("age", "25", intType);
-    expect(attr.value).toBe("25");
+    expect(attr.value()).toBe("25");
     expect(attr.typeCast("25")).toBe("25");
   });
 
@@ -40,9 +63,9 @@ describe("QueryAttribute", () => {
       serialize: (v: unknown) => v,
     };
     const attr = new QueryAttribute("n", "42", countingType);
-    void attr.value;
-    void attr.value;
-    void attr.value;
+    void attr.value();
+    void attr.value();
+    void attr.value();
     expect(callCount).toBe(0);
   });
 
@@ -71,7 +94,7 @@ describe("QueryAttribute", () => {
       serialize: (v: unknown) => v,
     };
     const attr = new QueryAttribute("name", "raw", trackingType).withCastValue("already-cast");
-    expect(attr.value).toBe("already-cast");
+    expect(attr.value()).toBe("already-cast");
     expect(castCalled).toBe(false);
   });
 
@@ -85,7 +108,7 @@ describe("QueryAttribute", () => {
   it("isInfinite returns the sign for Infinity/-Infinity", () => {
     expect(new QueryAttribute("x", Infinity, intType).isInfinite()).toBe(1);
     expect(new QueryAttribute("x", -Infinity, intType).isInfinite()).toBe(-1);
-    expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(false);
+    expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(null);
   });
 
   it("isInfinite checks valueForDatabase for serializable types", () => {
@@ -121,40 +144,40 @@ describe("QueryAttribute", () => {
   it("valueBeforeTypeCast preserves original value", () => {
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.valueBeforeTypeCast).toBe("25");
-    expect(attr.value).toBe("25");
+    expect(attr.value()).toBe("25");
   });
 
   it("isUnboundable reports the sign of `value <=> 0` for an out-of-range bound", () => {
     const int4 = new IntegerType({ limit: 4 });
     expect(new QueryAttribute("id", 2 ** 40, int4).isUnboundable()).toBe(1);
     expect(new QueryAttribute("id", -(2 ** 40), int4).isUnboundable()).toBe(-1);
-    expect(new QueryAttribute("id", 5, int4).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", 5, int4).isUnboundable()).toBeNull();
 
     const int8 = new IntegerType({ limit: 8 });
     expect(new QueryAttribute("id", 2n ** 63n, int8).isUnboundable()).toBe(1);
     expect(new QueryAttribute("id", -(2n ** 63n) - 1n, int8).isUnboundable()).toBe(-1);
-    expect(new QueryAttribute("id", 2n ** 63n - 1n, int8).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", 2n ** 63n - 1n, int8).isUnboundable()).toBeNull();
   });
 
   it("isUnboundable signs a STRING bound by its cast value", () => {
     const int4 = new IntegerType({ limit: 4 });
     expect(new QueryAttribute("id", "1099511627776", int4).isUnboundable()).toBe(1);
     expect(new QueryAttribute("id", "-1099511627776", int4).isUnboundable()).toBe(-1);
-    expect(new QueryAttribute("id", "5", int4).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", "5", int4).isUnboundable()).toBeNull();
   });
 
   it("isUnboundable is never true for :big_integer, whose max_value is INFINITY", () => {
     const big = new BigIntegerType();
-    expect(new QueryAttribute("id", 2n ** 63n, big).isUnboundable()).toBe(false);
-    expect(new QueryAttribute("id", -(2n ** 100n), big).isUnboundable()).toBe(false);
-    expect(new QueryAttribute("id", Infinity, big).isUnboundable()).toBe(false);
-    expect(new QueryAttribute("id", -Infinity, big).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", 2n ** 63n, big).isUnboundable()).toBeNull();
+    expect(new QueryAttribute("id", -(2n ** 100n), big).isUnboundable()).toBeNull();
+    expect(new QueryAttribute("id", Infinity, big).isUnboundable()).toBeNull();
+    expect(new QueryAttribute("id", -Infinity, big).isUnboundable()).toBeNull();
   });
 
   it("isUnboundable is false for ±Infinity — Rails casts it to nil, which is in range", () => {
     const int4 = new IntegerType({ limit: 4 });
-    expect(new QueryAttribute("id", Infinity, int4).isUnboundable()).toBe(false);
-    expect(new QueryAttribute("id", -Infinity, int4).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", Infinity, int4).isUnboundable()).toBeNull();
+    expect(new QueryAttribute("id", -Infinity, int4).isUnboundable()).toBeNull();
     expect(new QueryAttribute("id", Infinity, int4).isInfinite()).toBe(1);
     expect(new QueryAttribute("id", -Infinity, int4).isInfinite()).toBe(-1);
   });
@@ -172,9 +195,9 @@ describe("QueryAttribute", () => {
     const spy = vi.spyOn(int4, "isSerializable");
 
     const inRange = new QueryAttribute("id", 5, int4);
-    expect(inRange.isUnboundable()).toBe(false);
-    expect(inRange.isUnboundable()).toBe(false);
-    expect(inRange.isUnboundable()).toBe(false);
+    expect(inRange.isUnboundable()).toBeNull();
+    expect(inRange.isUnboundable()).toBeNull();
+    expect(inRange.isUnboundable()).toBeNull();
     expect(spy).toHaveBeenCalledTimes(1);
 
     spy.mockClear();

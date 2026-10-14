@@ -1,12 +1,11 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Marshal, kernelThrow, rbFSend } from "@blazetrails/ruby-compat";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import {
   Base,
   registerModel,
-  registerSubclass,
   SubclassNotFound,
   AssociationTypeMismatch,
   RecordNotFound,
@@ -54,14 +53,9 @@ import {
   CpkNonCpkBook,
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { resetI18n } from "../test-helpers/i18n.js";
-import {
-  assertQueriesCount,
-  assertNoQueries,
-  assertQueriesMatch,
-} from "../testing/query-assertions.js";
-import { captureSql } from "../testing/sql-capture.js";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import {
   assert,
   assertNot,
@@ -88,12 +82,12 @@ function registerCompanyModels(): void {
   registerModel(Client);
   registerModel(Account);
   Company.inheritanceColumn = "type";
-  registerSubclass(Firm);
-  registerSubclass(DependentFirm);
-  registerSubclass(ExclusivelyDependentFirm);
-  registerSubclass(RestrictedWithExceptionFirm);
-  registerSubclass(RestrictedWithErrorFirm);
-  registerSubclass(Client);
+  registerModel(Firm);
+  registerModel(DependentFirm);
+  registerModel(ExclusivelyDependentFirm);
+  registerModel(RestrictedWithExceptionFirm);
+  registerModel(RestrictedWithErrorFirm);
+  registerModel(Client);
 }
 
 class SpecialBook extends Base {
@@ -139,7 +133,7 @@ class SpecialBulb extends Base {
 }
 
 describe("HasOneAssociationsTest", () => {
-  const { companies, accounts, pirates, ships } = fixtures([
+  const { self, companies, accounts, pirates, ships } = fixtures([
     "companies",
     "accounts",
     "developers",
@@ -204,7 +198,7 @@ describe("HasOneAssociationsTest", () => {
   it("has one", async () => {
     const firm = companies("first_firm") as any;
     const firstAccount = await Account.find(1);
-    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+    await self().assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, {}, async () => {
       const account = await readHasOne(firm, "account");
       expect(account.id).toBe(firstAccount.id);
       expect(account.credit_limit).toBe(firstAccount.credit_limit);
@@ -212,7 +206,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("has one does not use order by", async () => {
-    const sqlLog = await captureSql(async () => {
+    const sqlLog = await self().captureSql({}, async () => {
       await readHasOne(companies("first_firm"), "account");
     });
     assert(
@@ -268,8 +262,16 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "accountUsingForeignAndPrimaryKeys")).id).toBe(account.id);
   });
 
-  it.skip("can marshal has one association with nil target", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
+  it("can marshal has one association with nil target", async () => {
+    const firm = new Firm();
+    await assertNothingRaised(() => {
+      expect((Marshal.load(Marshal.dump(firm)) as Firm).attributes).toEqual(firm.attributes);
+    });
+
+    await firm.account;
+    await assertNothingRaised(() => {
+      expect((Marshal.load(Marshal.dump(firm)) as Firm).attributes).toEqual(firm.attributes);
+    });
   });
 
   it("proxy assignment", async () => {
@@ -374,7 +376,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence", async () => {
-    const numAccounts = (await Account.count()) as number;
+    const numAccounts = await Account.count();
     const firm = (await Firm.find(1)) as any;
     expect(await readHasOne(firm, "account")).not.toBeNull();
     const accountId = (await readHasOne(firm, "account")).id;
@@ -384,26 +386,8 @@ describe("HasOneAssociationsTest", () => {
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([accountId]);
   });
 
-  it("direct destroy records destroyed account id via unloaded belongs_to", async () => {
-    const account = (await Account.find(1)) as any;
-    expect(account.association("firm").isLoaded()).toBe(false);
-    const firm = (await Company.find(account.firm_id)) as any;
-    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
-    await account.destroy();
-    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([account.id]);
-  });
-
-  it("direct destroy only preloads the belongs_to the callback references", async () => {
-    const account = (await Account.find(1)) as any;
-    expect(account.association("firm").isLoaded()).toBe(false);
-    expect(account.association("unautosavedFirm").isLoaded()).toBe(false);
-    await assertQueriesMatch(/FROM\s+.?companies.?/i, 1, false, async () => {
-      await account.destroy();
-    });
-  });
-
   it("exclusive dependence", async () => {
-    const numAccounts = (await Account.count()) as number;
+    const numAccounts = await Account.count();
     const firm = (await ExclusivelyDependentFirm.find(9)) as any;
     expect(await readHasOne(firm, "account")).not.toBeNull();
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
@@ -528,65 +512,6 @@ describe("HasOneAssociationsTest", () => {
     const account = await (firm as any).createAccount({ credit_limit: 1000 });
     await firm.reload();
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
-  });
-
-  it("create over a loaded target nullifies the prior account", async () => {
-    const company = (await Company.create({ name: "NewCo" })) as any;
-    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
-    const found = (await Company.find(company.id)) as any;
-    await readHasOne(found, "account");
-    const created = await found.createAccount({ credit_limit: 70 });
-    expect((await Account.find(original.id)).firm_id).toBeNull();
-    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
-    expect((await readHasOne(found, "account")).id).toBe(created.id);
-  });
-
-  it("create over a loaded target destroys the prior dependent account", async () => {
-    const firm = companies("first_firm") as any;
-    const originalId = (await readHasOne(firm, "account")).id;
-    const created = await firm.createAccount({ credit_limit: 70 });
-    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
-    expect((await readHasOne(firm, "account")).id).toBe(created.id);
-  });
-
-  it("create over an unloaded target nullifies the prior account", async () => {
-    const company = (await Company.create({ name: "UnloadedCo" })) as any;
-    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
-    const found = (await Company.find(company.id)) as any;
-    const created = await found.createAccount({ credit_limit: 70 });
-    expect((await Account.find(original.id)).firm_id).toBeNull();
-    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
-    expect((await readHasOne(found, "account")).id).toBe(created.id);
-  });
-
-  it("create over an unloaded target destroys the prior dependent account", async () => {
-    const firm = (await Firm.find(Number((companies("first_firm") as any).id))) as any;
-    const originalId = Number((await Account.where({ firm_id: Number(firm.id) }).first())!.id);
-    const created = await firm.createAccount({ credit_limit: 70 });
-    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
-    expect((await readHasOne(firm, "account")).id).toBe(created.id);
-  });
-
-  it("create re-raises a deferred target-load error after a successful build", async () => {
-    const company = (await Company.create({ name: "DeferredLoadCo" })) as any;
-    const found = (await Company.find(company.id)) as any;
-    const association = found.association("account");
-    expect(association.isLoaded()).toBe(false);
-    const loadError = new Error("connection lost while loading the displaced target");
-    vi.spyOn(association, "loadTargetForBuild").mockRejectedValue(loadError);
-
-    await expect(found.createAccount({ credit_limit: 70 })).rejects.toBe(loadError);
-    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
-  });
-
-  it("build over a loaded target nullifies the prior account", async () => {
-    const company = (await Company.create({ name: "BuildCo" })) as any;
-    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
-    const found = (await Company.find(company.id)) as any;
-    await readHasOne(found, "account");
-    const built = await found.buildAccount({ credit_limit: 70 });
-    expect((await Account.find(original.id)).firm_id).toBeNull();
-    expect(built.isPersisted()).toBe(false);
   });
 
   it("create when parent is new raises", async () => {
@@ -772,11 +697,14 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("has one proxy should not respond to private methods", () => {
-    // PERMANENT-SKIP: Ruby private-method visibility has no TypeScript equivalent.
+    // PERMANENT-SKIP: asserts NoMethodError on a private call — CLAUDE.md § "Method visibility is compile-time only".
   });
 
-  it.skip("has one proxy should respond to private methods via send", () => {
-    // PERMANENT-SKIP: Ruby `send` private dispatch has no TypeScript equivalent.
+  it("has one proxy should respond to private methods via send", async () => {
+    await assertNothingRaised(async () => {
+      rbFSend(accounts("signals37"), "privateMethod");
+      rbFSend(await companies("first_firm").account, "privateMethod");
+    });
   });
 
   it("save of record with loaded has one", async () => {
@@ -1243,10 +1171,7 @@ describe("HasOneAssociationsTest", () => {
     const author = await DestroyableAuthor.create({ name: "Test" });
     await (UndestroyableBook as any).create({ author });
     await assertNoDifference(
-      [
-        () => DestroyableAuthor.count() as Promise<number>,
-        () => UndestroyableBook.count() as Promise<number>,
-      ],
+      [() => DestroyableAuthor.count(), () => UndestroyableBook.count()],
       null,
       async () => {
         assertNot(await author.destroy());

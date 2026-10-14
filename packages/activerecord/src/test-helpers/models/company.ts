@@ -1,4 +1,10 @@
-import { Hash, kernelThrow } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  kernelThrow,
+  rbModConstSet,
+  Module,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -10,7 +16,6 @@ import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
 import { registerModel } from "../../associations.js";
-import { registerSubclass } from "../../inheritance.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -20,6 +25,7 @@ export class AbstractCompany extends Base {
     this.abstractClass = true;
   }
 }
+registerModel(AbstractCompany);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Company extends AbstractCompany {
@@ -81,6 +87,7 @@ export class Company extends AbstractCompany {
     return "I am Jack's innermost fears and aspirations";
   }
 }
+registerModel(Company);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Company {
   get account(): Account | null | Promise<Account | null>;
@@ -90,17 +97,23 @@ export interface Company {
 }
 
 export class SpecialCo extends Company {}
+registerModel(SpecialCo);
+
+export const Namespaced = new Module();
+registerConstant("Namespaced", Namespaced);
 
 export class NamespacedCompany extends Company {
-  static moduleName = "Namespaced";
-  static _demodulizedName = "Company";
+  static {
+    registerModel(rbModConstSet(Namespaced, "Company", this));
+  }
 }
 
 export class NamespacedFirm extends Company {
   declare clients: AssociationProxy<NamespacedClient>;
 
-  static moduleName = "Namespaced";
-  static _demodulizedName = "Firm";
+  static {
+    registerModel(rbModConstSet(Namespaced, "Firm", this));
+  }
 
   static {
     this.hasMany("clients", { className: "Namespaced::Client", foreignKey: "firm_id" });
@@ -108,8 +121,9 @@ export class NamespacedFirm extends Company {
 }
 
 export class NamespacedClient extends Company {
-  static moduleName = "Namespaced";
-  static _demodulizedName = "Client";
+  static {
+    registerModel(rbModConstSet(Namespaced, "Client", this));
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -204,7 +218,7 @@ export class Firm extends Company {
       {
         foreignKey: "client_of",
         className: "Client",
-        dependent: "delete",
+        dependent: "deleteAll",
       },
     );
     this.hasMany(
@@ -247,7 +261,7 @@ export class Firm extends Company {
       className: "Client",
       primaryKey: "name",
       foreignKey: "firm_name",
-      dependent: "delete",
+      dependent: "deleteAll",
     });
     this.hasMany(
       "clientsGroupedByFirmId",
@@ -380,6 +394,7 @@ export class Firm extends Company {
     this.log.push(`after_remove${record.id}`);
   }
 }
+registerModel(Firm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Firm {
   get account(): Account | null | Promise<Account | null>;
@@ -427,6 +442,7 @@ export class DependentFirm extends Company {
     this.hasOne("company", { foreignKey: "client_of", dependent: "nullify" });
   }
 }
+registerModel(DependentFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DependentFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -462,6 +478,7 @@ export class RestrictedWithExceptionFirm extends Company {
     );
   }
 }
+registerModel(RestrictedWithExceptionFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithExceptionFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -495,6 +512,7 @@ export class RestrictedWithErrorFirm extends Company {
     );
   }
 }
+registerModel(RestrictedWithErrorFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithErrorFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -507,6 +525,7 @@ export class Agency extends Firm {
     this.acceptsNestedAttributesFor("projects");
   }
 }
+registerModel(Agency);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Client extends Company {
   declare accounts: AssociationProxy<Account>;
@@ -627,6 +646,7 @@ export class Client extends Company {
 
   overwriteToRaise(): void {}
 }
+registerModel(Client);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Client {
   get firm(): Firm | null | Promise<Firm | null>;
@@ -664,24 +684,25 @@ export class ExclusivelyDependentFirm extends Company {
       function (this: any) {
         return this.order("id").where("name = 'BigShot Inc.'");
       },
-      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+      { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
     this.hasMany(
       "dependentHashConditionalClientsOfFirm",
       function (this: any) {
         return this.order("id").where({ name: "BigShot Inc." });
       },
-      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+      { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
     this.hasMany(
       "dependentConditionalClientsOfFirm",
       function (this: any) {
         return this.order("id").where("name = ?", "BigShot Inc.");
       },
-      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+      { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
   }
 }
+registerModel(ExclusivelyDependentFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ExclusivelyDependentFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -702,10 +723,13 @@ export class LargeClient extends Client {
     (this as any)["extraSize"] = 50;
   }
 }
+registerModel(LargeClient);
 
 export class SpecialClient extends Client {}
+registerModel(SpecialClient);
 
 export class VerySpecialClient extends SpecialClient {}
+registerModel(VerySpecialClient);
 
 export class NewlyContractedCompany extends Company {
   declare newContracts: AssociationProxy<NewContract>;
@@ -719,48 +743,6 @@ export class NewlyContractedCompany extends Company {
     });
   }
 }
-
-for (const klass of [
-  Company,
-  AbstractCompany,
-  SpecialCo,
-  Firm,
-  DependentFirm,
-  RestrictedWithExceptionFirm,
-  RestrictedWithErrorFirm,
-  Agency,
-  Client,
-  ExclusivelyDependentFirm,
-  LargeClient,
-  SpecialClient,
-  VerySpecialClient,
-  NewlyContractedCompany,
-]) {
-  registerModel(klass);
-}
-
-for (const klass of [NamespacedCompany, NamespacedFirm, NamespacedClient]) {
-  registerModel(klass);
-}
+registerModel(NewlyContractedCompany);
 
 Company.inheritanceColumn = "type";
-
-for (const klass of [
-  SpecialCo,
-  NamespacedCompany,
-  NamespacedFirm,
-  NamespacedClient,
-  Firm,
-  DependentFirm,
-  RestrictedWithExceptionFirm,
-  RestrictedWithErrorFirm,
-  Agency,
-  Client,
-  ExclusivelyDependentFirm,
-  LargeClient,
-  SpecialClient,
-  VerySpecialClient,
-  NewlyContractedCompany,
-]) {
-  registerSubclass(klass);
-}

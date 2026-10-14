@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { Base } from "./base.js";
+import { Relation } from "./relation.js";
+import { RelationMethods } from "./token-for.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class TokenUser extends User {
   static {
@@ -38,12 +40,26 @@ describe("token-for relation finders", () => {
     expect(await TokenUser.findByTokenFor("token_snapshot", token)).toBeNull();
   });
 
+  it("raises for an id past Number.MAX_SAFE_INTEGER instead of signing a rounded one", () => {
+    const user = new TokenUser();
+    user.id = 2n ** 60n + 1n;
+    expect(user.id).toBe(2n ** 60n + 1n);
+    expect(() => user.generateTokenFor("lookup")).toThrow(TypeError);
+  });
+
   it("raises Ruby's Hash#fetch KeyError when a relation looks up an unknown purpose", async () => {
     await expect(TokenUser.where("1=1").findByTokenFor("bad", "token")).rejects.toThrow(
       /key not found: "bad"/,
     );
     await expect(TokenUser.where("1=1").findByTokenForBang("bad", "token")).rejects.toThrow(
       /key not found: "bad"/,
+    );
+  });
+
+  it("Relation includes TokenFor::RelationMethods", () => {
+    expect(Relation.prototype.findByTokenFor).toBe(RelationMethods.prototype.findByTokenFor);
+    expect(Relation.prototype.findByTokenForBang).toBe(
+      RelationMethods.prototype.findByTokenForBang,
     );
   });
 });

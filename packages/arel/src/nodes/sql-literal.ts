@@ -1,62 +1,46 @@
 import { Nodes } from "../namespaces.js";
-import { ArgumentError, isBlank, rbHash } from "@blazetrails/activesupport";
+import { ArgumentError, include } from "@blazetrails/activesupport";
+import { stringSuperclass, rbModConstSet } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
-import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
+import { Expressions, type ExpressionsModule } from "../expressions.js";
+import { Predications, type PredicationsModule } from "../predications.js";
+import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
+import { OrderPredications, type OrderPredicationsModule } from "../order-predications.js";
+import type { Attribute } from "../attributes/attribute.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class SqlLiteral extends Node {
-  readonly value: string;
+export class SqlLiteral extends stringSuperclass("eql", "hash", "isBlank", "isEmpty") {
   readonly retryable: boolean;
 
-  constructor(string: string | SqlLiteral, options?: { retryable?: boolean }) {
-    super();
-    this.value = string instanceof SqlLiteral ? string.value : string;
-    this.retryable = options?.retryable ?? false;
+  constructor(string: string | SqlLiteral, { retryable = false }: { retryable?: boolean } = {}) {
+    super(string);
+    this.retryable = retryable;
   }
 
-  fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {
+  fetchAttribute(_block?: (attr: Attribute) => boolean): boolean | undefined {
     return undefined;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  eql(other: unknown): boolean {
-    if (typeof other === "string") return this.value === other;
-    return other instanceof SqlLiteral && this.value === other.value;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  hash(): number {
-    return rbHash(this.value);
   }
 
   encodeWith(coder: { scalar: string }): void {
     coder.scalar = this.toString();
   }
 
-  toString(): string {
-    return this.value;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  isBlank(): boolean {
-    return isBlank(this.value);
-  }
-
   plus(other: unknown): Fragments {
     if (!arelNode(other)) {
       throw new ArgumentError("Expected Arel node");
     }
-    return new Fragments([this, other as Node]);
+    return new Fragments([this, other]);
   }
 }
 
-type _Predications = import("../predications.js").PredicationsModule;
-type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
-type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
-type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SqlLiteral
-  extends _Predications, _Expressions, _AliasPredication, _OrderPredications {}
+  extends PredicationsModule, ExpressionsModule, AliasPredicationModule, OrderPredicationsModule {}
 
-Nodes.SqlLiteral = SqlLiteral;
+include(SqlLiteral, Expressions);
+include(SqlLiteral, Predications);
+include(SqlLiteral, AliasPredication);
+include(SqlLiteral, OrderPredications);
+
+rbModConstSet(Nodes, "SqlLiteral", SqlLiteral);

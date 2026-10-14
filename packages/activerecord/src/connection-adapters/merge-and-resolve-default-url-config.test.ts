@@ -48,7 +48,7 @@ function resolveConfig(
 
 function resolveDbConfig(spec: string, config: RawConfigurations) {
   const configs = new DatabaseConfigurations(config);
-  return configs.resolve(spec);
+  return configs.resolve(spec)!;
 }
 
 describe("MergeAndResolveDefaultUrlConfigTest", () => {

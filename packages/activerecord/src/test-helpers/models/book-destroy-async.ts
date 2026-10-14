@@ -5,6 +5,7 @@ import type { EssayDestroyAsync } from "./essay-destroy-async.js";
 import type { Tag } from "./tag.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BookDestroyAsync extends Base {
@@ -38,6 +39,7 @@ export class BookDestroyAsync extends Base {
     this.enum("status", ["proposed", "written", "published"]);
   }
 }
+registerModel(BookDestroyAsync);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface BookDestroyAsync {
   get content(): Content | null | Promise<Content | null>;
@@ -55,3 +57,4 @@ export class BookDestroyAsyncWithScopedTags extends Base {
     this.hasMany("tags", { through: "taggings", dependent: "destroy" });
   }
 }
+registerModel(BookDestroyAsyncWithScopedTags);

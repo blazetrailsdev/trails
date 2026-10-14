@@ -109,8 +109,8 @@ describe("CookieJarTest", () => {
 
   it("key methods", () => {
     const jar = CookieJar.build(cookieRequest(), { foo: "bar" });
-    expect(jar.has("foo")).toBe(true);
-    expect(jar.has("baz")).toBe(false);
+    expect(jar.isKey("foo")).toBe(true);
+    expect(jar.isKey("baz")).toBe(false);
     expect(jar.keys).toEqual(["foo"]);
     expect(jar.values).toEqual(["bar"]);
   });
@@ -274,7 +274,7 @@ describe("CookiesTest", () => {
   it("delete unexisting cookie", () => {
     const jar = new CookieJar(cookieRequest());
     jar.delete("nonexistent");
-    expect(jar.has("nonexistent")).toBe(false);
+    expect(jar.isKey("nonexistent")).toBe(false);
   });
 
   it("deleted cookie predicate", () => {

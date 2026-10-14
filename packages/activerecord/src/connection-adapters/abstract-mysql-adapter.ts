@@ -11,9 +11,16 @@ import {
   explain as mysqlExplain,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { fetch, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  first,
+  isEmpty,
+  rbInspect,
+  rbObjAsString as toS,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { Concurrent, rtest } from "@blazetrails/ruby-compat";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -39,7 +46,7 @@ import {
   ValueTooLong,
 } from "../errors.js";
 import type * as Arel from "@blazetrails/arel";
-import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
+import { sql as arelSql, Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
@@ -86,7 +93,9 @@ import {
   SchemaStatements,
 } from "./mysql/schema-statements.js";
 import {
+  classAttribute,
   compactBlank,
+  extractOptionsBang,
   groupBy,
   include,
   isPresent,
@@ -156,16 +165,15 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
   protected abstract getFullVersion(): Promise<string | null>;
 
-  get emulateBooleans(): boolean {
-    return this._emulateBooleans;
+  declare static emulateBooleans: boolean;
+  declare static isEmulateBooleans: boolean;
+  declare emulateBooleans: boolean;
+
+  static {
+    classAttribute.call(this, "emulateBooleans", { default: true });
   }
 
-  set emulateBooleans(value: boolean) {
-    this._emulateBooleans = value;
-  }
-
-  /** @missingRailsCall empty? — PERMANENT */
-  static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): string[] {
+  static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): never {
     const mysqlConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
 
@@ -180,14 +188,14 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       sslcapath: "--ssl-capath",
       sslcipher: "--ssl-cipher",
       sslkey: "--ssl-key",
-      ssl_mode: "--ssl-mode",
+      sslMode: "--ssl-mode",
     }).flatMap(([opt, arg]) =>
       rtest(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
     );
 
     if (rtest(mysqlConfig.password) && options.includePassword) {
       args.push(`--password=${String(mysqlConfig.password)}`);
-    } else if (rtest(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
+    } else if (rtest(mysqlConfig.password) && !isEmpty(toS(mysqlConfig.password))) {
       args.push("-p");
     }
 
@@ -217,8 +225,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsExpressionIndex(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("8.0.13") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.13") >= 0;
   }
 
   supportsTransactionIsolation(): boolean {
@@ -265,8 +272,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsOptimizerHints(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("5.7.7") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("5.7.7") >= 0;
   }
 
   async supportsCommonTableExpressions(): Promise<boolean> {
@@ -286,13 +292,18 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  async supportsInsertReturning(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.0") >= 0;
-    return false;
+  /** @inventedArm test — CONVERGEABLE mysql-mariadb-predicate-reads-version-memo-synchronously */
+  supportsInsertReturning(): boolean {
+    const databaseVersion = this.databaseVersion as Version;
+    return (
+      /mariadb/i.test(databaseVersion.fullVersionString ?? "") &&
+      databaseVersion.compare("10.5.0") >= 0
+    );
   }
 
   async returnValueAfterInsert(column: Column): Promise<boolean> {
-    return (await this.supportsInsertReturning())
+    await this.databaseVersion;
+    return this.supportsInsertReturning()
       ? column.isAutoPopulated()
       : column.isAutoIncrementedByDb();
   }
@@ -396,23 +407,24 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return "VALUES ()";
   }
 
-  async recreateDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
+  async recreateDatabase(name: string, options: Record<string, unknown> = {}): Promise<unknown> {
     await this.dropDatabase(name);
-    await this.createDatabase(name, options);
+    const sql = await this.createDatabase(name, options);
     await this.reconnectBang();
+    return sql;
   }
 
-  async createDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
+  async createDatabase(name: string, options: Record<string, unknown> = {}): Promise<unknown> {
     if (options.collation) {
-      await this.execute(
+      return this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT COLLATE ${this.quoteTableName(String(options.collation))}`,
       );
     } else if (options.charset) {
-      await this.execute(
+      return this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET ${this.quoteTableName(String(options.charset))}`,
       );
     } else if (await isRowFormatDynamicByDefault.call(this)) {
-      await this.execute(
+      return this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
       );
     } else {
@@ -426,9 +438,8 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
-  async currentDatabase(): Promise<string> {
-    const value = await this.queryValue("SELECT database()", "SCHEMA");
-    return value == null ? "" : String(value);
+  async currentDatabase(): Promise<string | null> {
+    return (await this.queryValue("SELECT database()", "SCHEMA")) as string | null;
   }
 
   async charset(): Promise<string | null> {
@@ -489,31 +500,21 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
           { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
           ((t: MysqlTableDefinition) => void) | undefined,
         ]
-  ): Promise<void> {
-    const rest = [...args] as unknown[];
-    while (
-      rest.length > 0 &&
-      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
-    ) {
-      rest.pop();
-    }
-    args = rest as typeof args;
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as {
+  ): Promise<unknown> {
+    const tableNames = args.filter(
+      (arg, index) => index < args.length - 2 || (arg !== undefined && typeof arg !== "function"),
+    ) as string[];
+    const options = extractOptionsBang(tableNames) as {
       ifExists?: boolean;
       force?: boolean | "cascade";
       temporary?: boolean;
     };
     for (const tableName of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(tableName);
+      await this.schemaCache.clearDataSourceCacheBang(toS(tableName));
     }
-    const temporary = options.temporary ? " TEMPORARY" : "";
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    const names = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
-    await this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
+    return this.execute(
+      `DROP${options.temporary ? " TEMPORARY" : ""} TABLE${options.ifExists ? " IF EXISTS" : ""} ${tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ")}${options.force === "cascade" ? " CASCADE" : ""}`,
+    );
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -547,8 +548,10 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
-  ): Promise<ChangeColumnDefaultDefinition> {
+  ): Promise<ChangeColumnDefaultDefinition | undefined> {
     const column = await this.columnFor(tableName, columnName);
+    if (!column) return;
+
     const default_ = this.extractNewDefaultValue(defaultOrChanges);
     return new ChangeColumnDefaultDefinition(column, default_);
   }
@@ -634,10 +637,10 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     columnName: string | string[],
     options: Record<string, unknown> = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const createIndex = await this.buildCreateIndexDefinition(tableName, columnName, options);
     if (!createIndex) return;
-    await this.execute(await this.schemaCreation.accept(createIndex));
+    return this.execute(await this.schemaCreation.accept(createIndex));
   }
 
   async buildCreateIndexDefinition(
@@ -662,7 +665,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
+    if (!isPresent(tableName)) throw new ArgumentError();
 
     const scope = quotedScope.call(this, tableName);
 
@@ -719,7 +722,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     if (!(await this.supportsCheckConstraints())) {
       // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:545
-      throw new NotImplementedError("check constraints are not supported by this database");
+      throw new NotImplementedError();
     }
     const scope = quotedScope.call(this, tableName);
 
@@ -735,28 +738,54 @@ WHERE fk.referenced_column_name IS NOT NULL
 
     const chkInfo = await this.internalExecQuery(sql, "SCHEMA");
 
-    const checkConstraints: CheckConstraintDefinition[] = [];
-    for (const row of chkInfo.toArray()) {
-      const options = { name: row["name"] as string };
-      let expression = row["expression"] as string;
-      if (expression.startsWith("(") && expression.endsWith(")")) {
-        expression = expression.slice(1, -1);
-      }
-      expression = this.stripWhitespaceCharacters(expression);
-      if (!(await this.isMariadb())) {
-        expression = expression.replace(/\\'/g, "'");
-      }
-      checkConstraints.push(new CheckConstraintDefinition(tableName, expression, options));
-    }
-    return checkConstraints;
+    return Promise.all(
+      chkInfo.toArray().map(async (row) => {
+        const options = { name: row["name"] as string };
+        let expression = row["expression"] as string;
+        if (expression.startsWith("(") && expression.endsWith(")")) {
+          expression = expression.slice(1, -1);
+        }
+        expression = this.stripWhitespaceCharacters(expression);
+        if (!(await this.isMariadb())) {
+          expression = expression.replace(/\\'/g, "'");
+        }
+        return new CheckConstraintDefinition(tableName, expression, options);
+      }),
+    );
   }
 
-  async tableOptions(tableName: string): Promise<Record<string, string>> {
-    const createInfo = await this.createTableInfo(tableName);
-    if (!createInfo) return {};
-    const tail = createInfo.replace(/[\s\S]*\n\) ?/, "");
-    const comment = /COMMENT='/.test(tail) ? await this.tableComment(tableName) : null;
-    return parseTableOptions(createInfo, comment);
+  async tableOptions(tableName: string): Promise<Record<string, string | null> | null> {
+    const createTableInfo = (await this.createTableInfo(tableName))!;
+
+    let rawTableOptions = createTableInfo
+      .replace(/^.*\n\) ?/s, "")
+      .replace(/\n\/\*!.*\*\/\n$/s, "")
+      .trim();
+
+    if (rawTableOptions === "") return null;
+
+    const tableOptions: Record<string, string | null> = {};
+
+    const match = / DEFAULT CHARSET=(?<charset>\w+)(?: COLLATE=(?<collation>\w+))?/.exec(
+      rawTableOptions,
+    );
+    if (match) {
+      rawTableOptions =
+        rawTableOptions.slice(0, match.index) +
+        rawTableOptions.slice(match.index + match[0].length);
+      tableOptions.charset = match.groups!.charset;
+      if (match.groups!.collation) tableOptions.collation = match.groups!.collation;
+    }
+
+    rawTableOptions = rawTableOptions.replace(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, "$1");
+
+    if (/ COMMENT='.+'/.test(rawTableOptions)) {
+      rawTableOptions = rawTableOptions.replace(/ COMMENT='.+'/, "");
+      tableOptions.comment = await this.tableComment(tableName);
+    }
+
+    if (rawTableOptions !== "ENGINE=InnoDB") tableOptions.options = rawTableOptions;
+    return tableOptions;
   }
 
   async showVariable(name: string): Promise<unknown> {
@@ -772,7 +801,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
+    if (!isPresent(tableName)) throw new ArgumentError();
 
     const scope = quotedScope.call(this, tableName);
 
@@ -803,15 +832,16 @@ WHERE fk.referenced_column_name IS NOT NULL
     return column.isCaseSensitive();
   }
 
-  columnsForDistinct(columns: string, orders?: (string | Nodes.Node)[]): string {
+  columnsForDistinct(columns: string, orders: (string | ArelNode)[]): string {
     const visitor = this.arelVisitor();
     const orderColumns = compactBlank(
-      compactBlank(orders ?? []).map((s) =>
-        (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, "").trim(),
-      ),
+      compactBlank(orders).map((s) => {
+        if (typeof s !== "string") s = visitor.compile(s);
+        return s.replace(/\s+(?:ASC|DESC)\b/gi, "");
+      }),
     ).map((column, i) => `${column} AS alias_${i}`);
-    if (orderColumns.length === 0) return columns;
-    return [...orderColumns, columns].join(", ");
+
+    return [...orderColumns, super.columnsForDistinct(columns, orders as string[])].join(", ");
   }
 
   /** @missingRailsName config — PERMANENT */
@@ -829,10 +859,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     return index.using === "btree" || super.defaultIndexType(index);
   }
 
-  /** @missingRailsCall first — PERMANENT */
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
-    const [first] = insert.keys;
-    const noOpColumn = first !== undefined ? this.quoteColumnName(first) : undefined;
+    const noOpColumn =
+      first(insert.keys) != null ? this.quoteColumnName(first(insert.keys)!) : undefined;
 
     let sql: string;
     if (await this.supportsInsertRawAliasSyntax()) {
@@ -847,7 +876,7 @@ WHERE fk.referenced_column_name IS NOT NULL
       } else if (insert.updateDuplicates()) {
         const raw = insert.rawUpdateSql();
         if (raw) {
-          sql = `INSERT ${insert.into()} ${await insert.valuesList()} ON DUPLICATE KEY UPDATE ${raw.value}`;
+          sql = `INSERT ${insert.into()} ${await insert.valuesList()} ON DUPLICATE KEY UPDATE ${raw.toString()}`;
         } else {
           sql += " ON DUPLICATE KEY UPDATE ";
           sql += insert.touchModelTimestampsUnless(
@@ -870,7 +899,7 @@ WHERE fk.referenced_column_name IS NOT NULL
         sql += " ON DUPLICATE KEY UPDATE ";
         const raw = insert.rawUpdateSql();
         if (raw) {
-          sql += raw.value;
+          sql += raw.toString();
         } else {
           sql += insert.touchModelTimestampsUnless((column) => `${column}<=>VALUES(${column})`);
           sql += insert
@@ -895,7 +924,10 @@ WHERE fk.referenced_column_name IS NOT NULL
     }
   }
 
-  /** @missingRailsCall with_raw_connection — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection */
+  /**
+   * @missingRailsCall with_raw_connection — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   override quoteString(string: string): string {
     if (this._escapeState.noBackslashEscapes) {
       return string.replace(/'/g, "''");
@@ -970,55 +1002,53 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
-  declare _maxAllowedPacket?: number | null;
-
-  /** @internal */
   override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
     if (this._defaultTimezone != null) {
-      return { defaultTimezone: this._defaultTimezone, emulateBooleans: this._emulateBooleans };
+      return { defaultTimezone: this._defaultTimezone, emulateBooleans: this.emulateBooleans };
     }
-    if (this._emulateBooleans) return { emulateBooleans: true };
+    if (this.emulateBooleans) return { emulateBooleans: true };
     return null;
   }
 
   /** @internal */
   async handleWarnings(sql: string): Promise<void> {
-    const rawConnection = this._connection as {
-      warningCount?: unknown;
-      query(sql: string): Promise<[unknown, unknown]>;
-    } | null;
-    const action = dbWarningsAction();
-    if (action == null || rawConnection == null) return;
-    const warningCount = await this.warningCount(rawConnection);
-    if (warningCount === 0) return;
+    const rawConnection = this._rawConnection as WarningsConnection;
+    if (dbWarningsAction() == null || rawConnection.warningCount === 0) return;
 
-    const [rawRows] = await rawConnection.query("SHOW WARNINGS");
-    let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
+    const warningCount = rawConnection.warningCount;
+
+    let result = (await rawConnection.query("SHOW WARNINGS"))!.toA() as [
+      string | null,
+      number | string | null,
+      string,
+    ][];
     if (result.length === 0) {
       result = [
-        {
-          Level: "Warning",
-          Code: undefined,
-          Message: `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
-        },
+        [
+          "Warning",
+          null,
+          `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
+        ],
       ];
     }
-    for (const row of result) {
-      const level = row.Level ?? null;
-      const code = row.Code == null ? null : String(row.Code);
-      const message = row.Message ?? "";
-      const warning = new SQLWarning(message, code, level, sql, this.pool);
+    for (const [level, code, message] of result) {
+      const warning = new SQLWarning(
+        message,
+        code == null ? null : String(code),
+        level,
+        sql,
+        this.pool,
+      );
       if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
         continue;
 
-      action.call(this, warning);
+      dbWarningsAction()!.call(this, warning);
     }
   }
 
   /** @internal */
   override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
-    if (warning.level === "Note") return true;
-    return super.isWarningIgnored(warning);
+    return warning.level === "Note" || super.isWarningIgnored(warning);
   }
 
   /** @internal */
@@ -1026,10 +1056,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     exception: unknown,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
-    const exceptionMessage = exception instanceof Error ? exception.message : String(exception);
     switch (this.errorNumber(exception as Error & { errno?: number })) {
       case null:
-        if (/MySQL client is not connected/i.test(exceptionMessage)) {
+        if (/MySQL client is not connected/i.test((exception as Error).message)) {
           return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
         } else {
           return super.translateException(exception, { message, sql, binds });
@@ -1141,8 +1170,7 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   async supportsInsertRawAliasSyntax(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("8.0.19") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.19") >= 0;
   }
 
   /** @internal */
@@ -1212,8 +1240,6 @@ WHERE fk.referenced_column_name IS NOT NULL
     await this.rawExecute(`SET ${encoding} ${sqlModeAssignment} ${variableAssignments}`, "SCHEMA");
   }
 
-  private _emulateBooleans = true;
-
   /** @internal */
   async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
     const result = await this.internalExecQuery(
@@ -1223,7 +1249,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     return result.toArray();
   }
 
-  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+  static override readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
 
   /** @internal */
   async createTableInfo(tableName: string): Promise<string | null> {
@@ -1272,7 +1300,8 @@ WHERE fk.referenced_column_name IS NOT NULL
     message: string;
     sql: string;
   }): Promise<Partial<MismatchedForeignKeyOptions>> {
-    const foreignKeyPat = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1] ?? "\\w+";
+    const referencing = /Referencing column '(\w+)' and referenced/i.exec(message);
+    const foreignKeyPat = referencing ? referencing[1] : "\\w+";
 
     const match = new RegExp(
       String.raw`(?:CREATE|ALTER)\s+TABLE\s*(?:\`?\w+\`?\.)?\`?(?<table>\w+)\`?.+?` +
@@ -1297,7 +1326,10 @@ WHERE fk.referenced_column_name IS NOT NULL
     return options;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
   protected mismatchedForeignKey(
     message: string,
     {
@@ -1332,20 +1364,6 @@ WHERE fk.referenced_column_name IS NOT NULL
         `Unable to parse MySQL version from ${rbInspect(fullVersionString)}`,
       );
     }
-  }
-
-  override async removeForeignKey(
-    fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
-    options: RemoveForeignKeyOptions = {},
-  ): Promise<void> {
-    const optionsForm = typeof toTable === "object" && toTable !== null;
-    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTable : options) };
-    if (opts.onUpdate === "restrict") delete opts.onUpdate;
-    if (opts.onDelete === "restrict") delete opts.onDelete;
-    return optionsForm
-      ? super.removeForeignKey(fromTable, opts)
-      : super.removeForeignKey(fromTable, toTable, opts);
   }
 
   /** @internal */
@@ -1386,21 +1404,6 @@ WHERE fk.referenced_column_name IS NOT NULL
       "unsignedFloat",
       "unsignedDecimal",
     ];
-  }
-
-  /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    nameOrOptions?: string | null | { type?: string },
-    options: { type?: string } = {},
-  ): string {
-    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
-    const name = kwargsOnly ? null : nameOrOptions;
-    const opts = kwargsOnly ? nameOrOptions : options;
-    return mysqlDataSourceSql.call(this, name, opts);
   }
 
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
@@ -1455,69 +1458,22 @@ WHERE fk.referenced_column_name IS NOT NULL
   buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     return mysqlBuildExplainClause.call(this, options);
   }
-
-  /** @internal */
-  protected async warningCount(rawConnection: {
-    warningCount?: unknown;
-    query(sql: string): Promise<[unknown, unknown]>;
-  }): Promise<number> {
-    if (typeof rawConnection.warningCount === "number") return rawConnection.warningCount;
-    const [rows] = await rawConnection.query("SHOW COUNT(*) WARNINGS");
-    const row = (rows as Record<string, unknown>[])[0];
-    if (!row) return 0;
-    const value = Object.values(row)[0];
-    return typeof value === "number" ? value : Number(value) || 0;
-  }
 }
 
-/**
- * Parse the trailing table-options string from `SHOW CREATE TABLE` output.
- * Exported for unit testing. Mirrors Rails AbstractMysqlAdapter#table_options.
- *
- * @param createInfo - Raw output of `SHOW CREATE TABLE`
- * @param tableComment - Pre-fetched table comment (pass null if no COMMENT= in createInfo)
- * @internal
- * @noRailsEquivalent CONVERGEABLE the SHOW CREATE TABLE parsing of AbstractMysqlAdapter#table_options (abstract_mysql_adapter.rb:549), extracted for unit testing.
- */
-export function parseTableOptions(
-  createInfo: string,
-  tableComment: string | null,
-): Record<string, string> {
-  let raw = createInfo
-    .replace(/[\s\S]*\n\) ?/, "")
-    .replace(/\n\/\*![\s\S]*\*\/\n$/, "")
-    .trim();
-  if (!raw) return {};
-
-  const opts: Record<string, string> = {};
-
-  const charsetMatch = / DEFAULT CHARSET=(?<charset>\w+)(?: COLLATE=(?<collation>\w+))?/.exec(raw);
-  if (charsetMatch) {
-    raw = raw.slice(0, charsetMatch.index) + raw.slice(charsetMatch.index + charsetMatch[0].length);
-    opts["charset"] = charsetMatch.groups!["charset"]!;
-    if (charsetMatch.groups!["collation"]) opts["collation"] = charsetMatch.groups!["collation"]!;
-  }
-
-  raw = raw.replace(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, "$1");
-
-  if (/ COMMENT='/.test(raw)) {
-    raw = raw.replace(/ COMMENT='.+'/, "");
-    if (tableComment != null) opts["comment"] = tableComment;
-  }
-
-  if (raw !== "ENGINE=InnoDB") opts["options"] = raw;
-  return opts;
+/** @internal */
+interface WarningsConnection {
+  warningCount: number;
+  query(sql: string): Promise<{ toA(): unknown[][] } | null>;
 }
 
 export interface MysqlPreparedStatement {
-  sql: string;
-  close(): void | Promise<void>;
+  close(): void;
 }
 
 export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
   /** @internal */
-  protected override dealloc(stmt: MysqlPreparedStatement): void | Promise<void> {
-    return stmt.close();
+  protected override dealloc(stmt: MysqlPreparedStatement): void {
+    stmt.close();
   }
 }
 
@@ -1528,6 +1484,9 @@ export interface AbstractMysqlAdapter {
 }
 
 export interface AbstractMysqlAdapter {
+  /** @internal */
+  _maxAllowedPacket?: number | null;
+
   readonly schemaCreation: MysqlSchemaCreation;
 
   updateTableDefinition(tableName: string, base?: unknown): MysqlTable;
@@ -1536,14 +1495,20 @@ export interface AbstractMysqlAdapter {
     tableName: string,
     columnName: string | string[],
     options?: AddIndexOptions,
-  ): Promise<void>;
+  ): Promise<unknown>;
 
   createTable(
     tableName: string,
     options?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void>;
+  ): Promise<unknown>;
 
+  removeForeignKey(
+    fromTable: string,
+    toTable?: string | null,
+    options?: RemoveForeignKeyOptions,
+  ): Promise<void>;
+  internalStringOptionsForPrimaryKey(): Promise<Record<string, unknown>>;
   removeColumn(
     tableName: string,
     columnName: string,
@@ -1559,11 +1524,15 @@ export interface AbstractMysqlAdapter {
 
   /** @internal */
   defaultInsertValue: typeof mysqlDefaultInsertValue;
+
+  /** @internal */
+  dataSourceSql: typeof mysqlDataSourceSql;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 include(AbstractMysqlAdapter as unknown as new (...args: unknown[]) => unknown, SchemaStatements);
 AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
+AbstractMysqlAdapter.prototype.dataSourceSql = mysqlDataSourceSql;
 AbstractMysqlAdapter.prototype.newColumnFromField = newColumnFromField;
 AbstractMysqlAdapter.prototype.explain = mysqlExplain;
 AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;

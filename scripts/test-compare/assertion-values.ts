@@ -110,7 +110,7 @@ function collectSide(
     const value = values?.[i];
     if (value != null) {
       if (LOOSE_RAILS_KINDS.has(kinds[i])) entry.loose.add(entry.captured.length);
-      const token = foldSymbolToken(value);
+      const token = foldIvarToken(foldSymbolToken(value));
       entry.captured.push(
         foldRenamedExtensionToken(
           foldNameToken(side === "trails" ? foldDumpStatementToken(token) : token),
@@ -132,6 +132,21 @@ function collectSide(
  */
 function foldSymbolToken(token: string): string {
   return token.startsWith("s::") ? `s:${token.slice(3)}` : token;
+}
+
+/**
+ * Fold a Ruby instance variable onto its trails spelling: `@object` is
+ * `this.object`. `assert_difference` renders the expression it was given into
+ * its failure message (`activesupport/lib/active_support/testing/assertions.rb:122`),
+ * so `-> { @object.num }` reads `` `@object.num` `` where the ported
+ * `() => this.object.num` reads `` `this.object.num` ``
+ * (`activesupport/test/test_case_test.rb:51-58`). An `@` after a word
+ * character or another `@` is not an ivar. Applied to BOTH sides.
+ */
+const IVAR_RE = /(?<![\w@])@(?=[a-z_])/g;
+
+function foldIvarToken(token: string): string {
+  return token.startsWith("s:") ? `s:${token.slice(2).replace(IVAR_RE, "this.")}` : token;
 }
 
 /**

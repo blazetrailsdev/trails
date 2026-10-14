@@ -1,5 +1,7 @@
 import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
+import { DeepMergeable } from "./deep-mergeable.js";
+import { ActiveSupport } from "./namespaces.js";
 import {
   ArgumentError,
   type DefaultProc,
@@ -7,8 +9,10 @@ import {
   KeyError,
   TypeError,
   eachPair,
+  include,
   isSymbol,
-  rbObjClass,
+  rbModConstSet,
+  rbObjClassname,
   rbObjRespondTo,
   symbolToS,
   toEnum,
@@ -63,7 +67,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       for (const [i, pair] of (args[0] as unknown[][]).entries()) {
         if (!Array.isArray(pair)) {
           throw new ArgumentError(
-            `wrong element type ${rbObjClass(pair)} at ${i} (expected array)`,
+            `wrong element type ${rbObjClassname(pair)} at ${i} (expected array)`,
           );
         }
         if (pair.length < 1 || pair.length > 2) {
@@ -115,14 +119,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this;
   }
 
-  override delete(key: string): ReturnType<Hash<string, V>["delete"]> {
-    const convertedKey = this.convertKey(key);
-    const value = super.get(convertedKey);
-    super.delete(convertedKey);
-    return value;
+  override delete(key: string, block?: (key: string) => V): ReturnType<Hash<string, V>["delete"]> {
+    return super.delete(this.convertKey(key), block);
   }
 
-  key(key: string): boolean {
+  isKey(key: string): boolean {
     return this.has(key);
   }
 
@@ -131,15 +132,15 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   include(key: string): boolean {
-    return this.key(key);
+    return this.isKey(key);
   }
 
   hasKey(key: string): boolean {
-    return this.key(key);
+    return this.isKey(key);
   }
 
   member(key: string): boolean {
-    return this.key(key);
+    return this.isKey(key);
   }
 
   fetch(key: string, ...extras: (V | DefaultBlock<V>)[]): V {
@@ -203,7 +204,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
           ? otherHash
           : (otherHash as unknown as ToHash).toHash();
       const eachPairBlock = (key: string, value: V) => {
-        if (block && this.key(key)) {
+        if (block && this.isKey(key)) {
           value = block(this.convertKey(key), this.get(key)!, value);
         }
         this.regularWriter(this.convertKey(key), this.convertValue(value));
@@ -238,7 +239,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.reverseMergeBang(otherHash);
   }
 
-  replace(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
+  override replace(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
     super.clear();
     return this.update(new HashWithIndifferentAccess<V>(otherHash));
   }
@@ -505,13 +506,18 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * anything else is `no_dig_method`'s TypeError (`object.c:3897-3900`).
    */
   dig(key: string, ...identifiers: (string | number)[]): unknown {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
+    }
     let obj: unknown = this.get(key);
     for (let i = 0; i < identifiers.length; i++) {
       const identifier = identifiers[i];
       if (obj == null) return undefined;
       if (Array.isArray(obj)) {
         if (typeof identifier !== "number") {
-          throw new TypeError(`no implicit conversion of ${rbObjClass(identifier)} into Integer`);
+          throw new TypeError(
+            `no implicit conversion of ${rbObjClassname(identifier)} into Integer`,
+          );
         }
         obj = obj[identifier < 0 ? obj.length + identifier : identifier];
         continue;
@@ -521,7 +527,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
         return (dig as (...args: (string | number)[]) => unknown).apply(obj, identifiers.slice(i));
       }
 
-      throw new TypeError(`${rbObjClass(obj)} does not have #dig method`);
+      throw new TypeError(`${rbObjClassname(obj)} does not have #dig method`);
     }
     return obj;
   }
@@ -663,3 +669,6 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     }
   }
 }
+
+include(HashWithIndifferentAccess, DeepMergeable);
+rbModConstSet(ActiveSupport, "HashWithIndifferentAccess", HashWithIndifferentAccess);

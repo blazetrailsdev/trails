@@ -44,3 +44,47 @@ describe("Request ENV_METHODS readers", () => {
     expect(req.rawHostWithPort).toBe("example.com:8080");
   });
 });
+
+describe("Request include MimeNegotiation", () => {
+  it("keeps its own format / formats / variant readers beside the module's writers", () => {
+    for (const name of ["format", "formats", "variant"]) {
+      const descriptor = Object.getOwnPropertyDescriptor(Request.prototype, name);
+      expect(typeof descriptor?.get).toBe("function");
+      expect(typeof descriptor?.set).toBe("function");
+    }
+    const req = new Request({ HTTP_ACCEPT: "application/json" });
+    expect(String(req.format)).toBe("application/json");
+  });
+
+  it("seats ignore_accept_header on the includer", () => {
+    expect(Object.hasOwn(Request, "ignoreAcceptHeader")).toBe(true);
+    expect(Request.ignoreAcceptHeader).toBe(false);
+    expect(new Request({}).ignoreAcceptHeader).toBe(false);
+  });
+});
+
+describe("Request module initialize bodies", () => {
+  it("starts the FilterParameters memos nil", () => {
+    const request = new Request({});
+    expect(request._filteredParameters).toBeNull();
+    expect(request._filteredEnv).toBeNull();
+    expect(request._filteredPath).toBeNull();
+    expect(request._parameterFilter).toBeNull();
+  });
+
+  it("memoizes protocol and port", () => {
+    const request = new Request({ HTTP_HOST: "example.com:8080" });
+    expect(request.protocol).toBe("http://");
+    expect(request.port).toBe(8080);
+    request.env["HTTPS"] = "on";
+    request.env["HTTP_HOST"] = "example.com:9090";
+    expect(request.protocol).toBe("http://");
+    expect(request.port).toBe(8080);
+  });
+
+  it("fills a nil memo on first read", () => {
+    const request = new Request({ PATH_INFO: "/a", QUERY_STRING: "" });
+    expect(request.filteredPath()).toBe("/a");
+    expect(request._filteredPath).toBe("/a");
+  });
+});

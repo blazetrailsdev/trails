@@ -5,8 +5,8 @@ import {
   type CodeGenerator,
   type Included,
   included,
-  prepend,
 } from "@blazetrails/activesupport";
+import { type Hash, Module, keys, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -14,7 +14,6 @@ import {
   AttributeMethods,
   AttrNames,
   ClassMethods as AttributeMethodsClassMethods,
-  InstanceMethods as AttributeMethodsInstanceMethods,
   defineMethodAttribute,
   completeHalfAccessor,
   type AttributeMethodHost,
@@ -28,19 +27,15 @@ import {
 
 export function constructor(
   this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
-  super_: () => void,
+  ...args: unknown[]
 ): void {
   this._attributes = this.constructor._defaultAttributes().deepDup();
-  super_();
+  SuperMethods.superMethod(this, "initialize")!(...args);
 }
 
-export function initializeDup(
-  this: AttributeInstanceHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
+export function initializeDup(this: AttributeInstanceHost, other: unknown): void {
   this._attributes = this._attributes.deepDup();
-  super_(other);
+  SuperMethods.superMethod(this, "initializeDup")!(other);
 }
 
 export type AttributeInstanceHost = { _attributes: AttributeSet };
@@ -57,11 +52,27 @@ export interface AttributeOptions {
   scale?: number | null;
   array?: boolean;
   range?: boolean;
+  [option: string]: unknown;
 }
 
-export function attributeNames(this: { attributeTypes(): Record<string, ValueType> }): string[] {
-  return Object.keys(this.attributeTypes());
+export function attributeNames(this: {
+  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
+}): string[] {
+  return keys(this.attributeTypes());
 }
+
+export function freeze<T extends AttributeInstanceHost>(this: T): T {
+  if (!Object.isFrozen(this)) {
+    this._attributes = rbObjClone(this._attributes).freeze();
+  }
+  return SuperMethods.superMethod(this, "freeze")!() as T;
+}
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initialize", constructor);
+  mod.defineMethod("initializeDup", initializeDup);
+  mod.defineMethod("freeze", freeze);
+});
 
 /** @internal */
 export function _writeAttribute(
@@ -88,10 +99,6 @@ export function setDefineMethodAttribute(
   canonicalName: string,
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
-    writer: true,
-  });
-  const tempMethodName = AttributeMethodsClassMethods.buildMangledName(methodName);
   completeHalfAccessor(
     this,
     as,
@@ -100,32 +107,35 @@ export function setDefineMethodAttribute(
       this._writeAttribute(canonicalName, value);
     },
   );
-  owner.defineCachedMethod(tempMethodName, { namespace: "active_model", as: `${as}=` }, (batch) => {
-    batch.push((mod) => {
-      Object.defineProperty(mod, tempMethodName, {
-        value: function (this: { _writeAttribute(n: string, v: unknown): void }, value: unknown) {
-          this._writeAttribute(canonicalName, value);
+  AttrNames.defineAttributeAccessorMethod(
+    owner,
+    canonicalName,
+    { writer: true },
+    (tempMethodName) => {
+      owner.defineCachedMethod(
+        tempMethodName,
+        { namespace: "active_model", as: `${as}=` },
+        (batch) => {
+          batch.push((mod) => {
+            Object.defineProperty(mod, tempMethodName, {
+              value: function (
+                this: { _writeAttribute(n: string, v: unknown): void },
+                value: unknown,
+              ) {
+                this._writeAttribute(canonicalName, value);
+              },
+              writable: true,
+              configurable: true,
+            });
+          });
         },
-        writable: true,
-        configurable: true,
-      });
-    });
-  });
-}
-
-export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {
-  if (!Object.isFrozen(this)) {
-    const attributes = this._attributes;
-    const cloned = Object.create(Object.getPrototypeOf(attributes) as object) as AttributeSet;
-    Object.assign(cloned, attributes);
-    cloned.initializeClone(attributes);
-    this._attributes = cloned.freeze();
-  }
-  return super_();
+      );
+    },
+  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export interface Attributes extends Included<typeof AttributeMethodsInstanceMethods> {
+export interface Attributes extends Included<typeof AttributeMethods> {
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
 
   /** @internal */
@@ -153,9 +163,8 @@ export class Attributes {
     extend(base, ClassMethods);
     extend(base, { defineMethodAttribute });
 
-    prepend(base.prototype, { initInternals: constructor });
-    prepend(base.prototype, { initializeDup });
-    prepend(base.prototype, { freeze });
+    include(base, SuperMethods);
+    rbDeclareIvar(base, "@attributes", "_attributes");
 
     base.attributeMethodSuffix("=", { parameters: "value" });
   }
@@ -176,7 +185,7 @@ export class Attributes {
   }
 }
 
-include(Attributes, { attributeMissing: AttributeMethodsInstanceMethods.attributeMissing });
+include(Attributes, { attributeMissing: AttributeMethods.attributeMissing });
 
 export const ClassMethods = {
   attribute,
@@ -184,7 +193,6 @@ export const ClassMethods = {
   setDefineMethodAttribute,
 };
 
-/** @noRailsEquivalent PERMANENT */
 export type AttributesClassHalf = AttributeRegistrationClassHalf &
   AttributeMethodsClassHalf &
   Extended<typeof ClassMethods> & {
@@ -193,11 +201,9 @@ export type AttributesClassHalf = AttributeRegistrationClassHalf &
     attributeMethodPatterns: AttributeMethodPattern[];
     isAttributeMethodPatterns: boolean;
     /** @internal */
-    _aliasesByAttributeName: Map<string, string[]>;
+    _aliasesByAttributeName: Hash<string, string[]>;
   };
 
-/** @noRailsEquivalent PERMANENT */
 export type AttributeRegistrationClassHalf = Extended<typeof AttributeRegistrationClassMethods>;
 
-/** @noRailsEquivalent PERMANENT */
 export type AttributeMethodsClassHalf = Extended<typeof AttributeMethodsClassMethods>;

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../index.js";
 import type { Node } from "./node.js";
 import { assertNotSame } from "../test-helpers/assertions.js";
@@ -13,7 +14,7 @@ describe("Arel::Nodes::InsertStatement", () => {
       statement.columns = words("a", "b", "c");
       statement.values = words("x", "y", "z") as unknown as Node;
 
-      const dolly = statement.clone();
+      const dolly = rbObjClone(statement);
       expect(dolly.columns).toEqual(statement.columns);
       expect(dolly.values).toEqual(statement.values);
 

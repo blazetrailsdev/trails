@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import {
   Base,
@@ -7,7 +8,7 @@ import {
   TooManyRecords,
 } from "./index.js";
 import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
@@ -158,11 +159,11 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if method without arguments", async () => {
-    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: "isNewRecord" });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Black Pearl" });
     await assertNoDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       null,
       () => pirate.saveBang(),
     );
@@ -170,25 +171,19 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if method with arguments", async () => {
-    Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (attrs, rec) => {
-        const v = attrs["_reject_me_if_new"];
-        delete attrs["_reject_me_if_new"];
-        return v != null && v !== "" && v !== false && !rec.isPersisted();
-      },
-    });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: "rejectEmptyShipsOnCreate" });
 
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
     await assertNoDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       null,
       () => pirate.saveBang(),
     );
 
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
     await assertDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       1,
       null,
       () => pirate.saveBang(),
@@ -228,11 +223,11 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if with indifferent keys", async () => {
-    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (a) => !a["name"] });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (a) => !hashAref(a, "name") });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Hello Pearl" });
     await assertDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       1,
       null,
       () => pirate.saveBang(),
@@ -288,7 +283,7 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if is not short circuited if allow destroy is false", async () => {
     Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (a) => a["name"] === "The Golden Hind",
+      rejectIf: (a) => hashAref(a, "name") === "The Golden Hind",
       allowDestroy: false,
     });
     const pirate = await Pirate.createBang({
@@ -321,7 +316,7 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if with blank nested attributes id", async () => {
     Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (a) => a["id"] == null || a["id"] === "",
+      rejectIf: (a) => hashAref(a, "id") == null || hashAref(a, "id") === "",
     });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ id: "" });
@@ -343,7 +338,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("should not create duplicates with create with", async () => {
     Human.acceptsNestedAttributesFor("interests");
     await assertDifference(
-      () => Interest.count() as Promise<number>,
+      () => Interest.count(),
       1,
       null,
       async () => {
@@ -1205,12 +1200,12 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
     await repairValidations(Interest, async () => {
       (Interest as any).validates("human", { presence: true });
       await assertDifference(
-        () => Human.count() as Promise<number>,
+        () => Human.count(),
         1,
         null,
         async () => {
           await assertDifference(
-            () => Interest.count() as Promise<number>,
+            () => Interest.count(),
             2,
             null,
             async () => {
@@ -1259,7 +1254,7 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
     const pirate = await makePirate();
     await (pirate as any).setAttributes({ parrotsAttributes: { foo: { name: "Big Big Love" } } });
     await assertDifference(
-      () => Parrot.count() as Promise<number>,
+      () => Parrot.count(),
       1,
       null,
       () => pirate.saveBang(),
@@ -1275,7 +1270,7 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
       },
     });
     await assertDifference(
-      () => Parrot.count() as Promise<number>,
+      () => Parrot.count(),
       2,
       null,
       () => pirate.saveBang(),
@@ -1555,7 +1550,7 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
         indexErrors: "nestedAttributesOrder",
       });
       this.acceptsNestedAttributesFor("tuningPegs", {
-        rejectIf: (a) => Number(a["pitch"]) % 2 === 1,
+        rejectIf: (a) => Number(hashAref(a, "pitch")) % 2 === 1,
       });
     }
   }
@@ -1567,14 +1562,14 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
     expect(await guitar.isValid()).toBeTruthy();
     await guitar.update({ tuningPegsAttributes: [{ id: peg2.id, pitch: null }] });
     expect(await guitar.isValid()).toBeFalsy();
-    expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuning_pegs[0].pitch"]);
+    expect([...(guitar as any).errors.messages.keys()]).toEqual([":tuning_pegs[0].pitch"]);
   });
 
   it("index unaffected by reject_if", async () => {
     const guitar = await IndexedGuitar.createBang({});
     await guitar.update({ tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }] });
     expect(await guitar.isValid()).toBeFalsy();
-    expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuning_pegs[1].pitch"]);
+    expect([...(guitar as any).errors.messages.keys()]).toEqual([":tuning_pegs[1].pitch"]);
   });
 });
 

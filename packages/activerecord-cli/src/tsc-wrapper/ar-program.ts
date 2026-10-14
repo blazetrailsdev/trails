@@ -7,8 +7,8 @@ import {
 import { createFileSystemLayer } from "typescript/unstable/fs";
 import { computeLineStarts } from "typescript/unstable/ast/scanner";
 import type { Diagnostic, DiagnosticCategory, Program } from "typescript/unstable/sync";
-import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
-import { collectBaseDescendants } from "@blazetrails/activerecord/type-virtualization/transitive-extends-walker.js";
+import { tsApi } from "../type-virtualization/ts-api.js";
+import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
 import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
 
 export interface CreateArTrailsProgramOptions {
@@ -18,6 +18,13 @@ export interface CreateArTrailsProgramOptions {
 export interface ArRemapHost {
   getDeltasForFile(fileName: string): readonly LineDelta[] | undefined;
   getOriginalText(fileName: string): string | undefined;
+  getTseSourceMap?(fileName: string): TseSourceMap | undefined;
+}
+
+export interface TseSourceMap {
+  source: string;
+  sourceContent: string;
+  lines: ReadonlyMap<number, readonly { line: number; genCol: number; srcCol: number }[]>;
 }
 
 export interface ArTrailsProgram {
@@ -135,6 +142,9 @@ function remapOneDiagnostic(
   const unmoved = relatedInformation ? { ...d, relatedInformation } : d;
   if (!d.fileName || !d.startPosition) return unmoved;
 
+  const tse = host.getTseSourceMap?.(d.fileName);
+  if (tse) return remapTseDiagnostic(d, unmoved, tse);
+
   const deltas = host.getDeltasForFile(d.fileName);
   if (!deltas || deltas.length === 0) return unmoved;
 
@@ -166,6 +176,58 @@ function remapOneDiagnostic(
       if (line === null) return [];
       return [{ line, text: originalText.slice(lineStarts[line], lineStarts[line + 1]) }];
     }),
+  };
+}
+
+function tsePosition(
+  tse: TseSourceMap,
+  position: { line: number; character: number },
+): { line: number; character: number } | undefined {
+  const segments = tse.lines.get(position.line);
+  if (segments === undefined || segments.length === 0) return undefined;
+  let i = 0;
+  while (i + 1 < segments.length && segments[i + 1].genCol <= position.character) i++;
+  const { line, genCol, srcCol } = segments[i];
+  const next = segments[i + 1];
+  const character = srcCol + Math.max(0, position.character - genCol);
+  if (next?.line === line) return { line, character: Math.min(character, next.srcCol) };
+  return { line, character: i > 0 ? srcCol : character };
+}
+
+function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMap): Diagnostic {
+  const startPosition = tsePosition(tse, d.startPosition!);
+  if (startPosition === undefined) return unmoved;
+  const { line, character } = startPosition;
+  const lineStarts = computeLineStarts(tse.sourceContent);
+  const pos = lineStarts[line] + character;
+  const mappedEnd = d.endPosition && tsePosition(tse, d.endPosition);
+  const endPosition =
+    mappedEnd && lineStarts[mappedEnd.line] + mappedEnd.character >= pos
+      ? mappedEnd
+      : startPosition;
+  const open = tse.sourceContent.lastIndexOf("<%", pos);
+  const close = tse.sourceContent.indexOf("%>", pos);
+  const enclosed =
+    open !== -1 && close !== -1 && tse.sourceContent.slice(open, pos).indexOf("%>") === -1;
+  const [first, ...rest] = enclosed ? tse.sourceContent.slice(open, close + 2).split("\n") : [];
+  const tag = rest.length > 0 ? `${first.trimEnd()} … %>` : first;
+  return {
+    ...unmoved,
+    messageChain: tag
+      ? [
+          ...(unmoved.messageChain ?? []),
+          { pos: 0, end: 0, code: d.code, category: d.category, text: `in ${tag}` },
+        ]
+      : unmoved.messageChain,
+    fileName: tse.source,
+    pos,
+    end: lineStarts[endPosition.line] + endPosition.character,
+    startPosition,
+    endPosition,
+    sourceLines: lineStarts.slice(line, endPosition.line + 1).map((start, i) => ({
+      line: line + i,
+      text: tse.sourceContent.slice(start, lineStarts[line + i + 1]),
+    })),
   };
 }
 

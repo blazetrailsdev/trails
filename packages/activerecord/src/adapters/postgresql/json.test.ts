@@ -3,7 +3,7 @@ import "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { jsonSharedTestCases, JsonDataType as klass } from "../../cases/json-shared-test-cases.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import type { TableDefinition } from "../../connection-adapters/abstract/schema-definitions.js";
@@ -46,7 +46,7 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
   });
 
   it("deserialize with array", async () => {
-    const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
+    const x = new klass({ objects: [{ foo: "bar" }] }) as any;
     expect(x.objects).toEqual([{ foo: "bar" }]);
     await x.saveBang();
     expect(x.objects).toEqual([{ foo: "bar" }]);

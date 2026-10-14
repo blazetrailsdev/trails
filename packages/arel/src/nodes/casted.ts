@@ -1,20 +1,28 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
+import { isNil, rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { Arel, Attributes, Nodes } from "../namespaces.js";
 import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import type { ArelNode } from "../arel.js";
+import type { SelectManager } from "../select-manager.js";
+import type { Table } from "../table.js";
 
-export function buildQuoted(other: unknown, attribute?: unknown): Node {
+export function buildQuoted(
+  other: unknown,
+  attribute?: unknown,
+): ArelNode | Table | SelectManager | ModelAttribute {
   if (
     other instanceof Node ||
     other instanceof Attributes.Attribute ||
     other instanceof Arel.Table ||
     other instanceof Arel.SelectManager ||
+    other instanceof Nodes.SqlLiteral ||
     other instanceof ModelAttribute
   )
-    return other as Node;
+    return other;
   if (attribute instanceof Attributes.Attribute) return new Casted(other, attribute);
   return new Quoted(other);
 }
@@ -37,7 +45,7 @@ export class Casted extends NodeExpression {
   }
 
   isNil(): boolean {
-    return this.value === null || this.value === undefined;
+    return isNil(this.value);
   }
 
   valueForDatabase(): unknown {
@@ -75,14 +83,14 @@ export class Quoted extends Unary {
   }
 
   isNil(): boolean {
-    return this.value === null || this.value === undefined;
+    return isNil(this.value);
   }
 
-  isInfinite(): 1 | -1 | false {
-    if (this.value === Infinity) return 1;
-    if (this.value === -Infinity) return -1;
-    const v = this.value as { isInfinite?: () => 1 | -1 | false } | null | undefined;
-    return typeof v?.isInfinite === "function" ? v.isInfinite() : false;
+  isInfinite(): 1 | -1 | null | false {
+    return (
+      rbObjRespondTo(this.value, "isInfinite") &&
+      (rbFSend(this.value, "isInfinite") as 1 | -1 | null)
+    );
   }
 
   get value(): unknown {
@@ -94,5 +102,5 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Casted extends _AliasPredication {}
 
-Nodes.Quoted = Quoted;
-Nodes.Casted = Casted;
+rbModConstSet(Nodes, "Quoted", Quoted);
+rbModConstSet(Nodes, "Casted", Casted);

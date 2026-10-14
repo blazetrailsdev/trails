@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { formatter, setFormatter } from "@blazetrails/did-you-mean";
 import {
   AssociationNotFoundError,
   CompositePrimaryKeyMismatchError,
@@ -18,6 +19,20 @@ describe("AssociationErrors", () => {
     expect(err.message).not.toMatch(/Did you mean/);
     expect(err.corrections).toEqual(["tagging"]);
     expect(err.detailedMessage()).toContain("Did you mean?  tagging");
+  });
+
+  it("AssociationNotFoundError.detailedMessage takes its suggestion from DidYouMean.formatter", () => {
+    const formatterWas = formatter();
+    setFormatter({ messageFor: (corrections) => ` [${corrections.join(", ")}]` });
+    try {
+      const err = new AssociationNotFoundError(
+        { constructor: { name: "Post", reflections: () => ({ tagging: {}, comments: {} }) } },
+        "taggingz",
+      );
+      expect(err.detailedMessage()).toBe(`${err.message} [tagging]`);
+    } finally {
+      setFormatter(formatterWas);
+    }
   });
 
   it("AssociationNotFoundError.detailedMessage equals message when there are no corrections", () => {

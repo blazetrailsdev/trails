@@ -1,114 +1,6 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
-import { rbEqual, rbObjAsString } from "@blazetrails/ruby-compat";
-
-const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
-const NULL_LITERAL = /^null$/i;
-
-function encodeArrayElement(text: string | null, delimiter: string): string {
-  if (text === null) return "NULL";
-  if (
-    text === "" ||
-    NULL_LITERAL.test(text) ||
-    text.includes(delimiter) ||
-    STRUCTURAL_CHARS.test(text)
-  ) {
-    return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
-  return text;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export class PgTextEncoderArray {
-  /** @noRailsEquivalent PERMANENT */
-  readonly name: string;
-  readonly delimiter: string;
-
-  constructor({ name, delimiter }: { name: string; delimiter: string }) {
-    this.name = name;
-    this.delimiter = delimiter;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  encode(values: readonly unknown[]): string {
-    const items = values.map((value) => {
-      if (value == null) return encodeArrayElement(null, this.delimiter);
-      if (globalThis.Array.isArray(value)) return this.encode(value);
-      return encodeArrayElement(String(value), this.delimiter);
-    });
-    return `{${items.join(this.delimiter)}}`;
-  }
-}
-
-/** @noRailsEquivalent PERMANENT */
-export class PgTextDecoderArray {
-  /** @noRailsEquivalent PERMANENT */
-  readonly name: string;
-  readonly delimiter: string;
-
-  constructor({ name, delimiter }: { name: string; delimiter: string }) {
-    this.name = name;
-    this.delimiter = delimiter;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  decode(str: string): unknown[] {
-    const trimmed = str.trim();
-    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-      // eslint-disable-next-line blazetrails/rails-error-parity
-      throw new TypeError(`malformed array literal: "${str}"`);
-    }
-    const inner = trimmed.slice(1, -1);
-    if (inner === "") return [];
-
-    const elements: unknown[] = [];
-    let i = 0;
-
-    while (i < inner.length) {
-      if (inner[i] === '"') {
-        i++;
-        let val = "";
-        while (i < inner.length && inner[i] !== '"') {
-          if (inner[i] === "\\" && i + 1 < inner.length) {
-            i++;
-            val += inner[i];
-          } else {
-            val += inner[i];
-          }
-          i++;
-        }
-        i++;
-        elements.push(val);
-      } else if (
-        inner.substring(i, i + 4).toUpperCase() === "NULL" &&
-        (i + 4 >= inner.length || inner[i + 4] === this.delimiter || inner[i + 4] === "}")
-      ) {
-        elements.push(null);
-        i += 4;
-      } else if (inner[i] === "{") {
-        let depth = 1;
-        const start = i;
-        i++;
-        while (i < inner.length && depth > 0) {
-          if (inner[i] === "{") depth++;
-          if (inner[i] === "}") depth--;
-          i++;
-        }
-        elements.push(this.decode(inner.substring(start, i)));
-      } else {
-        let val = "";
-        while (i < inner.length && inner[i] !== this.delimiter) {
-          val += inner[i];
-          i++;
-        }
-        elements.push(val);
-      }
-      if (i < inner.length && inner[i] === this.delimiter) i++;
-    }
-
-    return elements;
-  }
-}
+import { PG } from "../../../pg/pg.js";
+import { rbEqual, rbFPublicSend, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
 
 export interface ArraySubtype {
   readonly type?: string | (() => string | undefined);
@@ -126,8 +18,8 @@ export interface ArraySubtype {
 export class Array extends ValueType<unknown> {
   readonly subtype: ArraySubtype;
   readonly delimiter: string;
-  private readonly pgEncoder: PgTextEncoderArray;
-  private readonly pgDecoder: PgTextDecoderArray;
+  private readonly pgEncoder: PG.TextEncoder.Array;
+  private readonly pgDecoder: PG.TextDecoder.Array;
 
   override type(): string | undefined {
     const subtypeType = this.subtype.type;
@@ -156,11 +48,11 @@ export class Array extends ValueType<unknown> {
     this.subtype = subtype;
     this.delimiter = delimiter;
 
-    this.pgEncoder = new PgTextEncoderArray({
+    this.pgEncoder = new PG.TextEncoder.Array(null, {
       name: `${this.type() ?? ""}[]`,
       delimiter: delimiter,
     });
-    this.pgDecoder = new PgTextDecoderArray({
+    this.pgDecoder = new PG.TextDecoder.Array(null, {
       name: `${this.type() ?? ""}[]`,
       delimiter: delimiter,
     });
@@ -171,7 +63,6 @@ export class Array extends ValueType<unknown> {
       return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
     }
     if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
-    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
     return super.deserialize(value);
   }
 
@@ -228,10 +119,7 @@ export class Array extends ValueType<unknown> {
       return value.map((item) => this.typeCastArray(item, method));
     }
 
-    if (method === "deserialize")
-      return this.subtype.deserialize?.(value) ?? this.subtype.cast(value);
-    if (method === "cast") return this.subtype.cast(value);
-    return this.subtype.serialize(value);
+    return rbFPublicSend(this.subtype, method, value);
   }
 
   override isMutable(): boolean {
@@ -240,10 +128,10 @@ export class Array extends ValueType<unknown> {
 }
 
 export class Data {
-  readonly encoder: PgTextEncoderArray;
+  readonly encoder: PG.TextEncoder.Array;
   readonly values: unknown[];
 
-  constructor(encoder: PgTextEncoderArray, values: unknown[]) {
+  constructor(encoder: PG.TextEncoder.Array, values: unknown[]) {
     this.encoder = encoder;
     this.values = values;
   }

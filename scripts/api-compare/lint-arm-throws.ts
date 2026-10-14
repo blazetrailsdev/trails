@@ -6,13 +6,12 @@
  *     committed mark, in the package total or in any one TS file. The fix is to
  *     raise what Rails raises, where Rails raises it, never to raise the mark;
  *   - UNMEASURED — a gated package the run never reported, which would
- *     otherwise disarm the gate silently.
- *
- * A mark left ABOVE the measurement is reported, not failed: narrow it in the
- * same PR that restored the raise with `pnpm parity:api:arms:throws:tighten`,
- * which writes each dimension DOWN and never up. There is no reseed — the same
- * rule the call baselines carry, for the same reason: a whole-file rewrite
- * buries the one row you meant to retire.
+ *     otherwise disarm the gate silently;
+ *   - STALE — a mark left ABOVE the measurement. Narrow it in the same PR that
+ *     restored the raise with `pnpm parity:api:arms:throws:tighten`, which
+ *     writes each dimension DOWN and never up. There is no reseed — the same
+ *     rule the call baselines carry, for the same reason: a whole-file rewrite
+ *     buries the one row you meant to retire.
  *
  * The other four arm tokens — `if`, `loop`, `try`, `rescue` — are report-only
  * and stay that way: `if` alone is 1,891 of the 2,141 rows and measured 70%
@@ -32,7 +31,10 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
-import { compareArms, type SkeletonArtifact } from "./report-arms.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
+import { compareArms, staleArmReceipts, type SkeletonArtifact } from "./report-arms.js";
+import { TAG as INVENTED_ARM_TAG } from "./invented-arm-tags.js";
+import { staleMarkFailure } from "./param-name-mark.js";
 import {
   MARK_PATH,
   exceedances,
@@ -50,10 +52,17 @@ async function readArtifact(): Promise<SkeletonArtifact> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as SkeletonArtifact;
 }
 
-async function main(tighten: boolean): Promise<number> {
+async function main(tighten: boolean, scope: string | null): Promise<number> {
   const artifact = await readArtifact();
 
-  const absent = unmeasuredPackages(artifact.packages);
+  if (scope !== null) {
+    const mismatch = scopeMismatch("arm-throw gate", artifact.packages, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent = scope === null ? unmeasuredPackages(artifact.packages) : [];
   if (absent.length > 0) {
     console.error(
       `\narm-throw gate: gated package(s) not measured: ${absent.join(", ")}.\n` +
@@ -63,8 +72,25 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  const marks = await loadMarks();
-  const unmarked = unmarkedPackages(marks);
+  const staleReceipts = [
+    ...artifact.skeletons.flatMap((s) =>
+      staleArmReceipts(s).map((token) => `${s.package}/${s.tsFile} ${s.tsName}: ${token}`),
+    ),
+    ...(artifact.uncomparedArmTags ?? []).map(
+      (t) => `${t.package}/${t.tsFile} ${t.tsName}: ${t.call} (declaration not compared)`,
+    ),
+  ];
+  if (!tighten && staleReceipts.length > 0) {
+    console.error(
+      `\narm-throw gate: ${staleReceipts.length} STALE ${INVENTED_ARM_TAG} receipt(s).\n` +
+        "Each names an arm or call the body no longer adds to Rails'. Delete the tag:\n",
+    );
+    for (const line of staleReceipts) console.error(`  - ${line}`);
+    return 1;
+  }
+
+  const committed = await loadMarks();
+  const unmarked = unmarkedPackages(committed);
   if (unmarked.length > 0) {
     console.error(
       `\narm-throw gate: gated package(s) carry no committed mark: ${unmarked.join(", ")}.\n` +
@@ -74,6 +100,7 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
+  const marks = scopedMarks(committed, scope);
   const current = measure(artifact.skeletons.flatMap((s) => compareArms(s) ?? []));
   const grew = exceedances(marks, current);
   const stale = staleMarks(marks, current);
@@ -107,11 +134,10 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  for (const v of stale) {
-    console.log(
-      `arm-throw gate: ${v.package} ${v.dimension} mark ${v.mark} is above the ` +
-        `current ${v.current} — narrow it with \`pnpm parity:api:arms:throws:tighten\`.`,
-    );
+  const staleFailure = staleMarkFailure("arm-throw gate", "parity:api:arms:throws:tighten", stale);
+  if (staleFailure !== null) {
+    console.error(staleFailure);
+    return 1;
   }
   const summary = Object.entries(current)
     .filter(([, m]) => m.total > 0)
@@ -125,7 +151,8 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  const code = await main(process.argv.slice(2).includes("--tighten"));
+  const argv = process.argv.slice(2);
+  const code = await main(argv.includes("--tighten"), scopeOf(argv));
   process.exit(code);
 }
 

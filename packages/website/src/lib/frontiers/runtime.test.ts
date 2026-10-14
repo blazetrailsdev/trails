@@ -64,7 +64,7 @@ describe("exec: generate model", () => {
       .list()
       .filter((f) => f.path.startsWith("db/migrate/") && f.path.includes("create_users"));
     expect(migFiles.length).toBe(1);
-    expect(migFiles[0].content).toContain("class CreateUsers extends Migration");
+    expect(migFiles[0].content).toContain("class CreateUsers extends Migration.get(8.0)");
     expect(migFiles[0].content).toContain('t.string("name")');
     expect(migFiles[0].content).toContain('t.string("email")');
     expect(migFiles[0].content).toContain("t.timestamps()");

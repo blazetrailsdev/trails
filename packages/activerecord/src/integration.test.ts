@@ -7,8 +7,7 @@ import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 import { registerModel } from "./associations.js";
-import { fixtures } from "./test-fixtures.js";
-import { withTimezoneConfig } from "./test-helper.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 registerModel(Owner);
 registerModel(Pet);
@@ -39,7 +38,7 @@ async function withCacheVersioning(fn: () => Promise<void> | void): Promise<void
 }
 
 describe("IntegrationTest", () => {
-  const { owners, pets } = fixtures(["companies", "developers", "owners", "pets"]);
+  const { self, owners, pets } = fixtures(["companies", "developers", "owners", "pets"]);
 
   it("to param should return string", async () => {
     expect(Object((await Client.first())!.toParam())).toBeInstanceOf(String);
@@ -156,7 +155,7 @@ describe("IntegrationTest", () => {
 
   it("cache key for existing record is not timezone dependent", async () => {
     const utcKey = (await Developer.first())!.cacheKey();
-    await withTimezoneConfig({ zone: "America/New_York" }, async () => {
+    await self().withTimezoneConfig({ zone: "America/New_York" }, async () => {
       const estKey = (await Developer.first())!.cacheKey();
       expect(estKey).toBe(utcKey);
     });

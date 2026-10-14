@@ -7,7 +7,9 @@ import { KeyError } from "./key-error.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import { RangeError } from "./range-error.js";
+import { RuntimeError } from "./runtime-error.js";
 import { StandardError } from "./standard-error.js";
+import { Timeout } from "./timeout.js";
 
 describe("KeyError", () => {
   it("is an IndexError", () => {
@@ -62,5 +64,14 @@ describe("FloatDomainError", () => {
     expect(error).toBeInstanceOf(RangeError);
     expect(error).toBeInstanceOf(StandardError);
     expect(new RangeError("x").name).toBe("RangeError");
+  });
+});
+
+describe("Timeout::Error", () => {
+  it("is a RuntimeError", () => {
+    const error = new Timeout.Error("execution expired");
+    expect(error).toBeInstanceOf(RuntimeError);
+    expect(error.name).toBe("Timeout::Error");
+    expect(error.message).toBe("execution expired");
   });
 });

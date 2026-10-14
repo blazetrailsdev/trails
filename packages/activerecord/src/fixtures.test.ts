@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFile } from "fs/promises";
-import { include } from "@blazetrails/ruby-compat";
+import {
+  env,
+  File as RubyFile,
+  include,
+  rbObjRespondTo,
+  RuntimeError,
+  setEnv,
+  toI,
+} from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import {
@@ -14,15 +22,18 @@ import {
   Notifications,
   Duration,
   Logger,
+  Minitest,
   assertInDelta,
 } from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
+import { TestCase } from "./cases/test-case.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
-import { fixtures, TestFixtures } from "./test-fixtures.js";
+import { TestFixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Organization } from "./test-helpers/models/organization.js";
 import { ClassNameThatDoesNotFollowCONVENTIONS } from "./test-helpers/models/randomly-named-c1.js";
 import {
@@ -30,20 +41,47 @@ import {
   AdminClassNameThatDoesNotFollowCONVENTIONS2,
 } from "./test-helpers/models/admin/randomly-named-c1.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
+import { Dog } from "./test-helpers/models/dog.js";
+import { OtherDog } from "./test-helpers/models/other-dog.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
-import { Movie } from "./test-helpers/models/movie.js";
-import { Computer } from "./test-helpers/models/computer.js";
-import { ActiveRecordError, NotNullViolation } from "./errors.js";
+import "./test-helpers/models/movie.js";
+import "./test-helpers/models/computer.js";
+import { ActiveRecordError, NotNullViolation, StatementInvalid } from "./errors.js";
+import type { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
+import { runWithoutConnection } from "./support/connection-helper.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
+import { allDevelopersFixtureData } from "./test-helpers/fixtures/all/developers.js";
+import { allPeopleFixtureData } from "./test-helpers/fixtures/all/people.js";
+import { allTasksFixtureData } from "./test-helpers/fixtures/all/tasks.js";
+import { toBeLinkedAccountsFixtureData } from "./test-helpers/fixtures/to-be-linked/accounts.js";
+import { toBeLinkedUsersFixtureData } from "./test-helpers/fixtures/to-be-linked/users.js";
+import { categoriesSpecialCategoriesFixtureData } from "./test-helpers/fixtures/categories/special-categories.js";
+import { categoriesSubsubdirArbitraryFilenameFixtureData } from "./test-helpers/fixtures/categories/subsubdir/arbitrary-filename.js";
 
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/parrots.ts`, nakedYmlParrotsFixtureData);
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/trees.ts`, nakedYmlTreesFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/developers.ts`, allDevelopersFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/people.ts`, allPeopleFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/tasks.ts`, allTasksFixtureData);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/all/admin/accounts.ts`,
+  toBeLinkedAccountsFixtureData,
+);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/admin/users.ts`, toBeLinkedUsersFixtureData);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/categories/special_categories.ts`,
+  categoriesSpecialCategoriesFixtureData,
+);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/categories/subsubdir/arbitrary_filename.ts`,
+  categoriesSubsubdirArbitraryFilenameFixtureData,
+);
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Reply } from "./test-helpers/models/reply.js";
@@ -54,6 +92,7 @@ import { Book } from "./test-helpers/models/book.js";
 import { Course } from "./test-helpers/models/course.js";
 import { College } from "./test-helpers/models/college.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Developer } from "./test-helpers/models/developer.js";
@@ -69,7 +108,7 @@ import {
 import "./relation.js";
 import { setVerifyForeignKeysForFixtures, verifyForeignKeysForFixtures } from "./active-record.js";
 
-for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot]) {
+for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot, Account, Company, Course, Post]) {
   registerModel(model);
 }
 
@@ -93,9 +132,11 @@ describe("PrimaryKeyErrorTest", () => {
       connectionPool: () => pool,
       tableName: "authors",
       primaryKey: "id",
+      isCompositePrimaryKey: () => false,
       loadSchema: async () => {},
       columns: () => Object.values(doubleColumnsHash("authors")),
       typeForAttribute: () => ({ type: () => "integer" }),
+      definedEnums: {},
       _reflections: {
         ownedEssay: {
           name: "ownedEssay",
@@ -153,7 +194,7 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
         const error = await load().catch((e: Error) => e);
         expect(() => {
           throw error;
-        }).toThrow();
+        }).toThrow(RuntimeError);
         expect((error as Error).message).toContain(
           "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
         );
@@ -212,7 +253,7 @@ describe("FixturesTest", () => {
     { useInstantiatedFixtures: true, useTransactionalTests: false },
   );
 
-  const FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+  const YAML_FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
 
   it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
     "bulk insert",
@@ -222,7 +263,7 @@ describe("FixturesTest", () => {
         subscriber.call(e as never),
       );
       try {
-        await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "bulbs", { bulbs: Bulb });
+        await self().createFixtures("bulbs");
         expect(subscriber.events.length, "It takes one INSERT query to insert two fixtures").toBe(
           1,
         );
@@ -240,11 +281,7 @@ describe("FixturesTest", () => {
         subscriber.call(e as never),
       );
       try {
-        await FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["bulbs", "movies", "computers"], {
-          bulbs: Bulb,
-          movies: Movie,
-          computers: Computer,
-        });
+        await self().createFixtures("bulbs", "movies", "computers");
         const conn = await Base.leaseConnection();
         const expectedSql = [
           `INSERT INTO ${conn.quoteTableName("bulbs")} .*`,
@@ -271,7 +308,7 @@ describe("FixturesTest", () => {
       };
 
       await assertNoDifference(
-        async () => (await Aircraft.count()) as number,
+        async () => await Aircraft.count(),
         null,
         async () => {
           await expect((await Base.leaseConnection()).insertFixturesSet(fixtures)).rejects.toThrow(
@@ -290,7 +327,7 @@ describe("FixturesTest", () => {
       };
 
       await assertDifference(
-        async () => (await TrafficLight.count()) as number,
+        async () => await TrafficLight.count(),
         1,
         null,
         async () => {
@@ -302,6 +339,88 @@ describe("FixturesTest", () => {
           });
         },
       );
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "bulk insert with multi statements enabled",
+    async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: ["MULTI_STATEMENTS"] });
+
+        const fixtures = {
+          traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a"] }],
+        };
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).resolves.not.toThrow();
+
+        await assertDifference(
+          async () => await TrafficLight.count(),
+          1,
+          null,
+          async () => {
+            await Base.transaction(async () => {
+              const conn = await Base.leaseConnection();
+              expect(conn.openTransactions()).toBe(1);
+              await conn.insertFixturesSet(fixtures);
+              expect(conn.openTransactions()).toBe(1);
+            });
+          },
+        );
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).resolves.not.toThrow();
+      });
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "bulk insert with multi statements disabled",
+    async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: [] });
+
+        const fixtures = {
+          traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a"] }],
+        };
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).rejects.toThrow(StatementInvalid);
+
+        await assertDifference(
+          async () => await TrafficLight.count(),
+          1,
+          null,
+          async () => {
+            const conn = await Base.leaseConnection();
+            await conn.insertFixturesSet(fixtures);
+          },
+        );
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).rejects.toThrow(StatementInvalid);
+      });
     },
   );
 
@@ -346,7 +465,7 @@ describe("FixturesTest", () => {
       const stub = stubMaxAllowedPacket(conn, packetSize);
       try {
         await assertDifference(
-          async () => (await TrafficLight.count()) as number,
+          async () => await TrafficLight.count(),
           1,
           null,
           async () => {
@@ -404,10 +523,7 @@ describe("FixturesTest", () => {
       const stub = stubMaxAllowedPacket(conn, packetSize);
       try {
         await assertDifference(
-          [
-            async () => (await TrafficLight.count()) as number,
-            async () => (await Comment.count()) as number,
-          ],
+          [async () => await TrafficLight.count(), async () => await Comment.count()],
           +1,
           null,
           async () => {
@@ -436,9 +552,7 @@ describe("FixturesTest", () => {
   });
 
   it("attributes", async () => {
-    const [topics] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", {
-      topics: Topic,
-    });
+    const [topics] = await self().createFixtures("topics");
     expect(topics.get("first")!.get("title")).toBe("The First Topic");
     expect(topics.get("second")!.get("author_email_address")).toBeNull();
   });
@@ -462,7 +576,7 @@ describe("FixturesTest", () => {
   });
 
   it("inserts", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", { topics: Topic });
+    await self().createFixtures("topics");
     const firstRow = await (
       await Base.leaseConnection()
     ).selectOne("SELECT * FROM topics WHERE author_name = 'David'");
@@ -475,23 +589,19 @@ describe("FixturesTest", () => {
   });
 
   it("insert with datetime", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "tasks", { tasks: Task });
+    await self().createFixtures("tasks");
     const first = await Task.find(1);
     expect(first).toBeTruthy();
   });
 
   it("insert with default function", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "aircrafts", {
-      aircrafts: Aircraft,
-    });
+    await self().createFixtures("aircrafts");
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-manufactured-at" });
     assertInDelta(Time.now().toF(), (aircraft!.manufactured_at as Time).toF(), 1.1);
   });
 
   it("insert with default value", async () => {
-    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "aircrafts", {
-      aircrafts: Aircraft,
-    });
+    await self().createFixtures("aircrafts");
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
     expect(aircraft?.wheels_count).toBe(0);
   });
@@ -502,7 +612,7 @@ describe("FixturesTest", () => {
       Base.logger = new Logger(null);
 
       const level = (Base.logger as Logger).level;
-      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", { topics: Topic });
+      await self().createFixtures("topics");
       expect((Base.logger as Logger).level).toBe(level);
     } finally {
       Base.logger = previousLogger;
@@ -510,9 +620,7 @@ describe("FixturesTest", () => {
   });
 
   it("instantiation", async () => {
-    const [topics] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", {
-      topics: Topic,
-    });
+    const [topics] = await self().createFixtures("topics");
     expect(await topics.get("first")!.find()).toBeInstanceOf(Topic);
   });
 
@@ -546,13 +654,13 @@ describe("FixturesTest", () => {
 
   it("empty yaml fixture", () => {
     expect(
-      new FixtureSet(null, "accounts", Account, FIXTURES_ROOT + "/naked/yml/accounts"),
+      new FixtureSet(null, "accounts", Account, YAML_FIXTURES_ROOT + "/naked/yml/accounts"),
     ).not.toBeNull();
   });
 
   it("empty yaml fixture with a comment in it", () => {
     expect(
-      new FixtureSet(null, "companies", Company, FIXTURES_ROOT + "/naked/yml/companies"),
+      new FixtureSet(null, "companies", Company, YAML_FIXTURES_ROOT + "/naked/yml/companies"),
     ).not.toBeNull();
   });
 
@@ -567,6 +675,67 @@ describe("FixturesTest", () => {
   it("serialized fixtures", () => {
     expect(trafficLights("uk").state).toEqual(["Green", "Red", "Orange"]);
   });
+
+  it("fixtures are set up with database env variable", async () => {
+    const dbUrlTmp = env["DATABASE_URL"];
+    setEnv("DATABASE_URL", "sqlite3::memory:");
+    const configurations = vi.spyOn(Base, "configurations").mockReturnValue({} as never);
+    try {
+      const testCase = class extends TestCase {
+        declare accounts: (name: string) => Promise<Account>;
+
+        static {
+          this.fixtures("accounts");
+        }
+
+        async testFixtures() {
+          expect(await this.accounts("signals37")).toBeTruthy();
+        }
+      };
+
+      const result = await new testCase("testFixtures").run();
+
+      expect(
+        result.isPassed(),
+        `Expected ${result.name} to pass:\n${result.failure?.message}`,
+      ).toBeTruthy();
+    } finally {
+      configurations.mockRestore();
+      setEnv("DATABASE_URL", dbUrlTmp);
+    }
+  });
+
+  it("fixture method and private alias", () => {
+    expect(topics("first").title).toBe("The First Topic");
+    expect((self().fixture("topics", "first") as Topic).title).toBe("The First Topic");
+    expect((self().activeRecordFixture("topics", "first") as Topic).title).toBe("The First Topic");
+  });
+
+  it("fixture method does not clash with a test case method", async () => {
+    // @ts-expect-error -- fixtures_test.rb:638-641 defines a private #fixture over TestFixtures#fixture
+    const testCase = class extends TestCase {
+      declare accounts: (name: string) => Promise<Account>;
+
+      static {
+        this.fixtures("accounts");
+      }
+
+      async testFixtures() {
+        expect(await this.accounts("signals37")).toBeTruthy();
+      }
+
+      private fixture() {
+        return new Account();
+      }
+    };
+
+    const result = await new testCase("testFixtures").run();
+
+    expect(
+      result.isPassed(),
+      `Expected ${result.name} to pass:\n${result.failure?.message}`,
+    ).toBeTruthy();
+  });
 });
 
 describe("FixturesWithoutInstantiationTest", () => {
@@ -575,14 +744,19 @@ describe("FixturesWithoutInstantiationTest", () => {
   });
 
   it("without complete instantiation", () => {
-    expect("@first" in self()).toBe(false);
-    expect("@topics" in self()).toBe(false);
-    expect("@developers" in self()).toBe(false);
-    expect("@accounts" in self()).toBe(false);
+    expect("@first" in self()).toBeFalsy();
+    expect("@topics" in self()).toBeFalsy();
+    expect("@developers" in self()).toBeFalsy();
+    expect("@accounts" in self()).toBeFalsy();
   });
 
   it("fixtures from root yml without instantiation", () => {
-    expect("@unknown" in self(), "@unknown is not defined").toBe(false);
+    expect("@unknown" in self(), "@unknown is not defined").toBeFalsy();
+  });
+
+  it("visibility of accessor method", () => {
+    expect(rbObjRespondTo(self(), "topics", false), "should be private method").toBe(false);
+    expect(rbObjRespondTo(self(), "topics", true), "confirm to respond surely").toBe(true);
   });
 
   it("accessor methods", () => {
@@ -610,7 +784,7 @@ describe("FixturesWithoutInstanceInstantiationTest", () => {
   });
 
   it("without instance instantiation", () => {
-    expect("@first" in self(), "@first is not defined").toBe(false);
+    expect("@first" in self(), "@first is not defined").toBeFalsy();
   });
 });
 
@@ -666,6 +840,8 @@ describe("SetupSubclassTest", () => {
   beforeEach(() => {
     state.second = true;
   });
+
+  it("nothing", () => {});
 
   it("subclassing should preserve setups", () => {
     expect(state.first).toBeTruthy();
@@ -738,7 +914,7 @@ describe("SetFixtureClassPrevailsTest", () => {
 });
 
 describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTest", () => {
-  fixtures(["accounts", "companies"], { useTransactionalTests: false });
+  const { self } = fixtures(["accounts", "companies"], { useTransactionalTests: false });
   withSecondPool();
 
   let instances: Base[];
@@ -750,6 +926,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
       new Company({ name: "RoR Consulting" }),
       new Course({ name: "Test" }),
     ];
+    FixtureSet.resetCache();
   });
 
   it("resets to min pk with specified pk and sequence", async () => {
@@ -766,7 +943,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
       await connection.resetPkSequenceBang(
         model.tableName!,
         model.primaryKey as string,
-        model.sequenceName,
+        await model.sequenceName,
       );
 
       await instance.saveBang();
@@ -785,6 +962,21 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
       await instance.saveBang();
       expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
+  });
+
+  it("create fixtures resets sequences when not cached", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor as typeof Base;
+      const maxId = Object.entries(
+        (await self().createFixtures(model.tableName!))[0].fixtures,
+      ).reduce((_maxId, [, fixture]) => {
+        const fixtureId = Number(toI(fixture.get("id")));
+        return fixtureId > _maxId ? fixtureId : _maxId;
+      }, 0);
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(maxId + 1);
     }
   });
 });
@@ -877,6 +1069,88 @@ describe("ManyToManyFixturesWithClassDefined", () => {
 });
 
 const TIMESTAMP_COLUMNS = ["created_at", "created_on", "updated_at", "updated_on"] as const;
+
+describe("LoadAllFixturesTest", () => {
+  const { self } = fixtures([]);
+
+  it("all there", () => {
+    try {
+      (self().constructor as typeof TestCase).fixturePaths = [TS_FIXTURES_ROOT + "/all"];
+      (self().constructor as typeof TestCase).fixtures(":all");
+
+      if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
+        expect([...self().fixtureTableNames].sort()).toEqual([
+          "admin/accounts",
+          "admin/users",
+          "developers",
+          "namespaced/accounts",
+          "people",
+          "tasks",
+        ]);
+      }
+    } finally {
+      FixtureSet.resetCache();
+    }
+  });
+});
+
+describe("LoadAllFixturesWithArrayTest", () => {
+  const { self } = fixtures([]);
+
+  it("all there", () => {
+    try {
+      (self().constructor as typeof TestCase).fixturePaths = [
+        TS_FIXTURES_ROOT + "/all",
+        TS_FIXTURES_ROOT + "/categories",
+      ];
+      (self().constructor as typeof TestCase).fixtures(":all");
+
+      if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
+        expect([...self().fixtureTableNames].sort()).toEqual([
+          "admin/accounts",
+          "admin/users",
+          "developers",
+          "namespaced/accounts",
+          "people",
+          "special_categories",
+          "subsubdir/arbitrary_filename",
+          "tasks",
+        ]);
+      }
+    } finally {
+      FixtureSet.resetCache();
+    }
+  });
+});
+
+describe("FasterFixturesTest", () => {
+  const { self } = fixtures(["categories", "authors", "authorAddresses"], {
+    useTransactionalTests: false,
+  });
+
+  async function loadExtraFixture(name: string) {
+    const fixture = (await self().createFixtures(name))[0];
+    expect(fixture instanceof FixtureSet).toBeTruthy();
+    self()._loadedFixtures[fixture.tableName] = fixture;
+  }
+
+  it("cache", async () => {
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "categories")).toBeTruthy();
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "authors")).toBeTruthy();
+
+    await assertNoQueries(false, async () => {
+      await self().createFixtures("categories");
+      await self().createFixtures("authors");
+    });
+
+    await loadExtraFixture("posts");
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "posts")).toBeTruthy();
+    (self().constructor as typeof TestCase).setupFixtureAccessors("posts");
+    expect(
+      (await (self() as unknown as { posts(name: string): Promise<Post> }).posts("welcome")).title,
+    ).toBe("Welcome to the weblog");
+  });
+});
 
 describe("FoxyFixturesTest", () => {
   const {
@@ -1186,7 +1460,7 @@ describe("FixtureClassNamesTest", () => {
   let savedCache: Record<string, unknown>;
 
   beforeEach(() => {
-    klass = class {} as typeof klass;
+    klass = class extends Minitest.Test {} as unknown as typeof klass;
     include(klass, TestFixtures);
     savedCache = { ...klass.fixtureClassNames };
   });
@@ -1197,6 +1471,18 @@ describe("FixtureClassNamesTest", () => {
 
   it("fixture_class_names returns nil for unregistered identifier", () => {
     expect(klass.fixtureClassNames["unregistered_identifier"]).toBeUndefined();
+  });
+});
+
+describe("SameNameDifferentDatabaseFixturesTest", () => {
+  const { self, dogs, otherDogs } = fixtures(["dogs", "otherDogs"]);
+
+  it("fixtures are properly loaded", async () => {
+    FixtureSet.resetCache();
+    await self().createFixtures("dogs", "other_dogs");
+
+    expect(dogs("sophie")).toBeInstanceOf(Dog);
+    expect(otherDogs("lassie")).toBeInstanceOf(OtherDog);
   });
 });
 
@@ -1305,7 +1591,7 @@ describe("MultipleFixtureConnectionsTest", () => {
 describe("HasManyThroughFixture", () => {
   fixtures([]);
 
-  const FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+  const YAML_FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
 
   function makeModel(name: string): typeof Base {
     const klass = class extends Base {};
@@ -1313,11 +1599,11 @@ describe("HasManyThroughFixture", () => {
     return klass;
   }
 
-  function loadHasAndBelongsToMany(): Record<string, Record<string, unknown>[]> {
+  function loadHasAndBelongsToMany(): Map<string, Record<string, unknown>[]> {
     const parrot = makeModel("Parrot");
     parrot.hasAndBelongsToMany("treasures");
 
-    const parrots = `${FIXTURES_ROOT}/parrots`;
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     return fs.tableRows();
@@ -1335,11 +1621,13 @@ describe("HasManyThroughFixture", () => {
     parrot.hasMany("parrot_treasures", { anonymousClass: pt });
     parrot.hasMany("treasures", { through: "parrot_treasures" });
 
-    const parrots = `${FIXTURES_ROOT}/parrots`;
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     const rows = fs.tableRows();
-    expect(rows["parrots_treasures"]).toEqual(loadHasAndBelongsToMany()["parrots_treasures"]);
+    expect(rows.get("parrots_treasures")).toEqual(
+      loadHasAndBelongsToMany().get("parrots_treasures"),
+    );
   });
 
   it("has many through with default table name on join table", () => {
@@ -1353,14 +1641,16 @@ describe("HasManyThroughFixture", () => {
     parrot.hasMany("parrot_treasures", { anonymousClass: pt });
     parrot.hasMany("treasures", { through: "parrot_treasures" });
 
-    const parrots = `${FIXTURES_ROOT}/parrots`;
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     const rows = fs.tableRows();
-    expect(rows["parrot_treasures"]).toEqual(loadHasAndBelongsToMany()["parrots_treasures"]);
+    expect(rows.get("parrot_treasures")).toEqual(
+      loadHasAndBelongsToMany().get("parrots_treasures"),
+    );
   });
 
   it("has and belongs to many order", () => {
-    expect(Object.keys(loadHasAndBelongsToMany())).toEqual(["parrots", "parrots_treasures"]);
+    expect([...loadHasAndBelongsToMany().keys()]).toEqual(["parrots", "parrots_treasures"]);
   });
 });

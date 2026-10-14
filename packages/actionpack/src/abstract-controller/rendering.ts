@@ -1,4 +1,7 @@
-import { ArgumentError, Module } from "@blazetrails/ruby-compat";
+import { ViewPaths } from "@blazetrails/actionview";
+import { Concern, extend, include, isPlainObject } from "@blazetrails/activesupport";
+import { ArgumentError, Hash, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Mime } from "../action-dispatch/http/mime-type.js";
 import { AbstractControllerError } from "./error.js";
 
 const DEFAULT_DOUBLE_RENDER_MESSAGE =
@@ -31,12 +34,12 @@ export interface RenderingHost {
   responseBody: unknown;
   renderToBody(options: RenderOptions): unknown;
   /** @internal */
-  _setHtmlContentType?(): void;
+  _setHtmlContentType(): void;
   /** @internal */
-  _setRenderedContentType?(format: unknown): void;
+  _setRenderedContentType(format: unknown): void;
   /** @internal */
-  _setVaryHeader?(): void;
-  renderedFormat?(): unknown;
+  _setVaryHeader(): void;
+  renderedFormat(): unknown;
   /** @internal */
   _normalizeRender(...args: unknown[]): RenderOptions;
   /** @internal */
@@ -47,27 +50,33 @@ export interface RenderingHost {
   _normalizeOptions(options: RenderOptions): RenderOptions;
 }
 
-export function render<T extends RenderingHost>(this: T, ...args: unknown[]): void | Promise<void> {
+export function render<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {
   const options = this._normalizeRender(...args);
   const renderedBody = this.renderToBody(options);
-  const set = (renderedBody: unknown): void => {
+  const set = (renderedBody: unknown): unknown => {
     if (options.html != null && options.html !== false) {
-      this._setHtmlContentType?.();
+      this._setHtmlContentType();
     } else {
-      this._setRenderedContentType?.(this.renderedFormat?.());
+      this._setRenderedContentType(this.renderedFormat());
     }
-    this._setVaryHeader?.();
-    this.responseBody = renderedBody;
+    this._setVaryHeader();
+    return (this.responseBody = renderedBody);
   };
   if (typeof (renderedBody as PromiseLike<unknown> | null)?.then === "function") {
     return Promise.resolve(renderedBody).then(set);
   }
-  set(renderedBody);
+  return set(renderedBody);
 }
 
 export function renderToString<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {
   const options = this._normalizeRender(...args);
   return this.renderToBody(options);
+}
+
+export function renderToBody(options: RenderOptions = {}): void {}
+
+export function renderedFormat(): unknown {
+  return Mime.get("text");
 }
 
 export function viewAssigns<T extends object>(this: T): Record<string, unknown> {
@@ -81,13 +90,13 @@ export function viewAssigns<T extends object>(this: T): Record<string, unknown> 
 }
 
 export function _normalizeArgs(action?: unknown, options: RenderOptions = {}): RenderOptions {
-  if (action != null && typeof (action as { permitted?: () => boolean }).permitted === "function") {
-    if ((action as { permitted: () => boolean }).permitted()) {
+  if (rbObjRespondTo(action, "isPermitted")) {
+    if ((action as { isPermitted(): boolean }).isPermitted()) {
       return action as RenderOptions;
     }
     throw new ArgumentError("render parameters are not permitted");
   }
-  if (action != null && typeof action === "object" && !Array.isArray(action)) {
+  if (isPlainObject(action) || action instanceof Hash) {
     return action as RenderOptions;
   }
   return options;
@@ -119,19 +128,36 @@ export function _processVariant(_options: RenderOptions): void {}
 export function _processFormat(_format: unknown): void {}
 
 /** @internal */
+export function _setHtmlContentType(): void {}
+
+/** @internal */
+export function _setVaryHeader(): void {}
+
+/** @internal */
+export function _setRenderedContentType(_format: unknown): void {}
+
+/** @internal */
 export function _protectedIvars(): readonly string[] {
   return DEFAULT_PROTECTED_INSTANCE_VARIABLES;
 }
 
 export const Rendering = new Module((mod) => {
+  extend(mod, Concern);
+  include(mod, ViewPaths);
+
   mod.defineMethod("render", render);
   mod.defineMethod("renderToString", renderToString);
+  mod.defineMethod("renderToBody", renderToBody);
+  mod.defineMethod("renderedFormat", renderedFormat);
   mod.defineMethod("viewAssigns", viewAssigns);
   mod.defineMethod("_normalizeArgs", _normalizeArgs);
   mod.defineMethod("_normalizeOptions", _normalizeOptions);
   mod.defineMethod("_processOptions", _processOptions);
   mod.defineMethod("_processFormat", _processFormat);
   mod.defineMethod("_processVariant", _processVariant);
+  mod.defineMethod("_setHtmlContentType", _setHtmlContentType);
+  mod.defineMethod("_setVaryHeader", _setVaryHeader);
+  mod.defineMethod("_setRenderedContentType", _setRenderedContentType);
   mod.defineMethod("_normalizeRender", _normalizeRender);
   mod.defineMethod("_protectedIvars", _protectedIvars);
 });

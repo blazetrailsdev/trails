@@ -1,0 +1,444 @@
+import * as ts from "typescript/unstable/ast";
+import { camelize, pluralize, underscore } from "@blazetrails/activesupport";
+import { resolveAssociationTarget, stripQuotes } from "./resolve-target.js";
+import type {
+  ClassInfo,
+  RuntimeCall,
+  AssociationCall,
+  AttributeCall,
+  ScopeCall,
+  EnumCall,
+} from "./walker.js";
+import { tsTypeFor } from "./type-registry.js";
+
+const INDENT = "  ";
+
+const AR_IMPORT = `import("@blazetrails/activerecord")`;
+
+export type SchemaColumnValue =
+  | string
+  | {
+      type: string;
+      null?: boolean;
+      arrayElementType?: string;
+    };
+
+export interface SynthesizeOptions {
+  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, SchemaColumnValue>>>>;
+  classNameAliases?: ReadonlyMap<string, string>;
+  attributesNullable?: boolean;
+  associationTargets?: ReadonlyMap<string, string>;
+  ancestors?: readonly ClassInfo[];
+  superNameOf?: ReadonlyMap<string, string>;
+  composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
+  isKnownTarget?: (name: string, host: ClassInfo) => boolean;
+  mergeAttributeInterface?: boolean;
+}
+
+export interface SynthesizedDeclares {
+  classLines: string[];
+  interfaceLines: string[];
+  relationScopeLines: string[];
+}
+
+export function synthesizeDeclares(
+  info: ClassInfo,
+  opts: SynthesizeOptions = {},
+): SynthesizedDeclares {
+  const out: string[] = [];
+  const interfaceLines: string[] = [];
+  const relationScopeLines: string[] = [];
+  const mergeAttributeInterface = opts.mergeAttributeInterface ?? true;
+  const enumKeys = enumKeyUnions(info);
+  const emit = (l: RenderedLine): void => {
+    const keys = l.attribute && enumKeys.get(l.declaredName);
+    if (keys) l = enumAttributeLine(l, keys);
+    if (l.relationScope) relationScopeLines.push(l.relationScope);
+    if (mergeAttributeInterface && l.attribute) {
+      interfaceLines.push(
+        `${INDENT}get ${l.attribute.memberName}(): ${l.attribute.readerType};`,
+        `${INDENT}set ${l.attribute.memberName}(value: ${l.attribute.writerType ?? "unknown"});`,
+      );
+    } else {
+      out.push(l.text);
+    }
+  };
+  const aliases = opts.classNameAliases;
+  const targets = opts.associationTargets;
+  const isKnownTarget = boundKnownTarget(info, opts);
+  const conflictingSingulars = collectConflictingSingulars(info, opts);
+  const conflictingCollections = collectConflictingCollections(info, opts);
+  const synthesizedInstanceNames = new Set<string>();
+  for (const call of info.calls) {
+    if (
+      (call.kind === "belongsTo" || call.kind === "hasOne") &&
+      conflictingSingulars.has(call.name)
+    ) {
+      continue;
+    }
+    if (
+      (call.kind === "hasMany" || call.kind === "hasAndBelongsToMany") &&
+      conflictingCollections.has(call.name)
+    ) {
+      continue;
+    }
+    for (const line of renderCall(
+      info,
+      call,
+      aliases,
+      targets,
+      opts.attributesNullable ?? false,
+      isKnownTarget,
+    )) {
+      if (!line.skipIfPresent || !memberPresent(info, line)) {
+        emit(line);
+        if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
+      }
+    }
+  }
+  for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
+    emit(line);
+  }
+  return { classLines: out, interfaceLines, relationScopeLines };
+}
+
+function enumKeyUnions(info: ClassInfo): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const call of info.calls) {
+    if (call.kind === "enum" && call.values.length > 0) {
+      out.set(call.attr, call.values.map((v) => JSON.stringify(v)).join(" | "));
+    }
+  }
+  return out;
+}
+
+function enumAttributeLine(l: RenderedLine, keys: string): RenderedLine {
+  const nullable = / \| null$/.test(l.attribute!.readerType);
+  return attributeLine(l.attribute!.memberName, nullable ? `${keys} | null` : keys, l.declaredName);
+}
+
+function boundKnownTarget(
+  host: ClassInfo,
+  opts: SynthesizeOptions,
+): ((name: string) => boolean) | undefined {
+  const predicate = opts.isKnownTarget;
+  if (!predicate) return undefined;
+  return (name: string) => predicate(name, host);
+}
+
+function renderSchemaColumnDeclares(
+  info: ClassInfo,
+  synthesizedInstanceNames: Set<string>,
+  opts: SynthesizeOptions,
+): RenderedLine[] {
+  const map = opts.schemaColumnsByTable;
+  if (!map) return [];
+  const table = info.tableName ?? pluralize(underscore(info.name));
+  const cols = map[table];
+  if (!cols) return [];
+  const out: RenderedLine[] = [];
+  const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
+  const composedCols = opts.composedOfColumns?.get(info.name);
+  for (const [col, value] of entries) {
+    if (synthesizedInstanceNames.has(col)) continue;
+    if (info.existingMembers.has(col)) continue;
+    if (col === "id") continue;
+    if (composedCols?.has(col)) continue;
+    if (info.skipSchemaColumns.has(col)) continue;
+    const tsType = isForeignKeyColumn(col, value)
+      ? `${AR_IMPORT}.PrimaryKeyValue`
+      : renderSchemaValueType(value);
+    out.push(attributeLine(renderDeclaredMemberName(col), tsType, col));
+  }
+  return out;
+}
+
+function isForeignKeyColumn(col: string, value: SchemaColumnValue): boolean {
+  if (col === "id" || !col.endsWith("_id")) return false;
+  const type = typeof value === "string" ? value : value.type;
+  return type === "integer" || type === "big_integer" || type === "bigint";
+}
+
+function renderSchemaValueType(value: SchemaColumnValue): string {
+  if (typeof value === "string") return tsTypeFor(value);
+  let tsT = tsTypeFor(value.type);
+  if (value.type === "array" && value.arrayElementType) {
+    const elType = tsTypeFor(value.arrayElementType);
+    tsT = elType.includes("|") ? `(${elType})[]` : `${elType}[]`;
+  }
+  if (value.null !== false) tsT = tsT.includes("|") ? `(${tsT}) | null` : `${tsT} | null`;
+  return tsT;
+}
+
+function renderDeclaredMemberName(name: string): string {
+  return isValidIdentifier(name) ? name : JSON.stringify(name);
+}
+
+const identifierScanner = ts.createScanner(true);
+function isValidIdentifier(name: string): boolean {
+  if (name.length === 0) return false;
+  identifierScanner.setText(name);
+  const token = identifierScanner.scan();
+  return token === ts.SyntaxKind.Identifier && identifierScanner.getTokenEnd() === name.length;
+}
+
+function collectConflictingCollections(info: ClassInfo, opts: SynthesizeOptions): Set<string> {
+  const out = new Set<string>();
+  const ancestors = opts.ancestors;
+  if (!ancestors || ancestors.length === 0) return out;
+  const inheritedCollections = new Set<string>();
+  for (const anc of ancestors) {
+    for (const call of anc.calls) {
+      if (call.kind === "hasMany" || call.kind === "hasAndBelongsToMany") {
+        inheritedCollections.add(call.name);
+      }
+    }
+  }
+  for (const call of info.calls) {
+    if (call.kind !== "hasMany" && call.kind !== "hasAndBelongsToMany") continue;
+    if (inheritedCollections.has(call.name)) out.add(call.name);
+  }
+  return out;
+}
+
+function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): Set<string> {
+  const out = new Set<string>();
+  const ancestors = opts.ancestors;
+  if (!ancestors || ancestors.length === 0) return out;
+  const aliases = opts.classNameAliases;
+  const targets = opts.associationTargets;
+  const superNameOf = opts.superNameOf;
+
+  const isKnownTarget = boundKnownTarget(info, opts);
+  const target = (host: ClassInfo, call: AssociationCall): string =>
+    call.options["polymorphic"] === "true"
+      ? "Base"
+      : resolveTarget(host, call, aliases, targets, isKnownTarget);
+  const inherited = new Map<string, string>();
+  for (const anc of [...ancestors].reverse()) {
+    for (const call of anc.calls) {
+      if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
+      const prev = inherited.get(call.name);
+      const t = target(anc, call);
+      if (prev === undefined || t === prev || classExtends(t, prev, superNameOf)) {
+        inherited.set(call.name, t);
+      }
+    }
+  }
+  for (const call of info.calls) {
+    if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
+    const base = inherited.get(call.name);
+    if (base === undefined) continue;
+    const ownTarget = target(info, call);
+    if (ownTarget === base || base === "Base" || classExtends(ownTarget, base, superNameOf))
+      continue;
+    out.add(call.name);
+  }
+  return out;
+}
+
+function classExtends(
+  sub: string,
+  sup: string,
+  superNameOf: ReadonlyMap<string, string> | undefined,
+): boolean {
+  if (!superNameOf) return false;
+  const seen = new Set<string>();
+  let current: string | undefined = superNameOf.get(sub);
+  while (current && !seen.has(current)) {
+    if (current === sup) return true;
+    seen.add(current);
+    current = superNameOf.get(current);
+  }
+  return false;
+}
+
+interface RenderedLine {
+  text: string;
+  declaredName: string;
+  isStatic: boolean;
+  skipIfPresent: boolean;
+  attribute?: { memberName: string; readerType: string; writerType?: string };
+  relationScope?: string;
+}
+
+function renderCall(
+  info: ClassInfo,
+  call: RuntimeCall,
+  aliases: ReadonlyMap<string, string> | undefined,
+  targets: ReadonlyMap<string, string> | undefined,
+  attributesNullable: boolean,
+  isKnownTarget: ((name: string) => boolean) | undefined,
+): RenderedLine[] {
+  switch (call.kind) {
+    case "attribute":
+      return renderAttribute(call, attributesNullable);
+    case "hasMany":
+    case "hasAndBelongsToMany":
+      return renderCollectionAssoc(info, call, aliases, targets, isKnownTarget);
+    case "belongsTo":
+    case "hasOne":
+      return renderSingularAssoc(info, call, aliases, targets, isKnownTarget);
+    case "scope":
+      return renderScope(info, call);
+    case "enum":
+      return renderEnum(info, call);
+  }
+}
+
+function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[] {
+  if (call.name === "id") return [];
+  const memberName = renderDeclaredMemberName(call.name);
+  if (isForeignKeyColumn(call.name, call.railsType)) {
+    return [attributeLine(memberName, `${AR_IMPORT}.PrimaryKeyValue`, call.name)];
+  }
+  const tsType = tsTypeFor(call.railsType);
+  const rendered = nullable
+    ? tsType.includes("|")
+      ? `(${tsType}) | null`
+      : `${tsType} | null`
+    : tsType;
+  return [attributeLine(memberName, rendered, call.name)];
+}
+
+function renderCollectionAssoc(
+  info: ClassInfo,
+  call: AssociationCall,
+  aliases?: ReadonlyMap<string, string>,
+  targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
+): RenderedLine[] {
+  const target = resolveTarget(info, call, aliases, targets, isKnownTarget);
+  const memberName = renderDeclaredMemberName(call.name);
+  return [
+    line(`declare ${memberName}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
+  ];
+}
+
+function renderSingularAssoc(
+  info: ClassInfo,
+  call: AssociationCall,
+  aliases?: ReadonlyMap<string, string>,
+  targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
+): RenderedLine[] {
+  const target =
+    call.options["polymorphic"] === "true"
+      ? "Base"
+      : resolveTarget(info, call, aliases, targets, isKnownTarget);
+  const memberName = renderDeclaredMemberName(call.name);
+  const readerType = `${target} | null | Promise<${target} | null>`;
+  return [
+    {
+      ...line(`declare ${memberName}: ${readerType};`, call.name, false),
+      attribute: { memberName, readerType, writerType: `${target} | null` },
+    },
+  ];
+}
+
+function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
+  return [scopeLine(info, call.name, call.paramsAfterThis)];
+}
+
+function scopeLine(info: ClassInfo, name: string, params: readonly string[]): RenderedLine {
+  const argList = params.join(", ");
+  const relation = `${AR_IMPORT}.Relation<${info.name}>`;
+  const memberName = renderDeclaredMemberName(name);
+  return {
+    ...line(`declare static ${memberName}: (${argList}) => ${relation};`, name, true),
+    relationScope: `${memberName}(${[`this: ${relation}`, ...params].join(", ")}): ${relation};`,
+  };
+}
+
+function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
+  const out: RenderedLine[] = [];
+  const { prefix, suffix } = readPrefixSuffix(call.options, call.attr);
+  const valueMethodNames: string[] = [];
+  for (const label of call.values) {
+    const valueMethodName = `${prefix}${label}${suffix}`;
+    valueMethodNames.push(valueMethodName);
+    out.push(...renderEnumMethods(info, valueMethodName));
+
+    const methodFriendlyLabel = label.replace(/[^\w\x80-\uffff]+/g, "_");
+    const valueMethodAlias = `${prefix}${methodFriendlyLabel}${suffix}`;
+
+    if (valueMethodAlias !== valueMethodName && !valueMethodNames.includes(valueMethodAlias)) {
+      valueMethodNames.push(valueMethodAlias);
+      out.push(...renderEnumMethods(info, valueMethodAlias));
+    }
+  }
+  return out;
+}
+
+function renderEnumMethods(info: ClassInfo, valueMethodName: string): RenderedLine[] {
+  const scopeName = camelize(valueMethodName, false);
+  const predicate = `is${pascal(valueMethodName)}`;
+  const bang = `${scopeName}Bang`;
+  const notScope = `not${pascal(valueMethodName)}`;
+  return [
+    line(`declare ${renderDeclaredMemberName(predicate)}: () => boolean;`, predicate, false),
+    line(
+      `declare ${renderDeclaredMemberName(bang)}: () => Promise<true | undefined>;`,
+      bang,
+      false,
+    ),
+    scopeLine(info, scopeName, []),
+    scopeLine(info, notScope, []),
+  ];
+}
+
+function readPrefixSuffix(
+  options: Record<string, string>,
+  attr: string,
+): { prefix: string; suffix: string } {
+  return {
+    prefix: readAffix(options["prefix"], attr, "prefix"),
+    suffix: readAffix(options["suffix"], attr, "suffix"),
+  };
+}
+
+function readAffix(raw: string | undefined, attr: string, side: "prefix" | "suffix"): string {
+  if (!raw || raw === "false") return "";
+  const value = raw === "true" ? attr : stripQuotes(raw);
+  return side === "prefix" ? `${value}_` : `_${value}`;
+}
+
+function resolveTarget(
+  info: ClassInfo,
+  call: AssociationCall,
+  aliases?: ReadonlyMap<string, string>,
+  targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
+): string {
+  const override = targets?.get(`${info.name}#${call.name}`);
+  if (override) return override;
+  const target = resolveAssociationTarget(call);
+  const resolved = aliases?.get(target) ?? target;
+  if (isKnownTarget && !isKnownTarget(resolved)) return "Base";
+  return resolved;
+}
+
+function pascal(s: string): string {
+  return camelize(s);
+}
+
+function line(body: string, declaredName: string, isStatic: boolean): RenderedLine {
+  return {
+    text: `${INDENT}${body}`,
+    declaredName,
+    isStatic,
+    skipIfPresent: true,
+  };
+}
+
+function attributeLine(memberName: string, readerType: string, declaredName: string): RenderedLine {
+  return {
+    ...line(`declare ${memberName}: ${readerType};`, declaredName, false),
+    attribute: { memberName, readerType },
+  };
+}
+
+function memberPresent(info: ClassInfo, l: RenderedLine): boolean {
+  const set = l.isStatic ? info.existingStaticMembers : info.existingMembers;
+  return set.has(l.declaredName);
+}

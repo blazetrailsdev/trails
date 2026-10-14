@@ -1,30 +1,18 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
+import type { Hash } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP, rbFSend, rbObjMethod } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { ArgumentError, NameError } from "../attribute-assignment.js";
 
 export class WithValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attr: string, _val: unknown): void {
-    const methodName = this.options.with as string;
-    const method = (record as unknown as Record<string, unknown>)[
-      methodName.startsWith(":") ? methodName.slice(1) : methodName
-    ];
-    if (typeof method !== "function") {
-      throw new NameError(`undefined method '${methodName}' for ${String(record)}`);
-    }
-    if (method.length === 0) {
-      method.call(record);
-    } else {
-      method.call(record, attr);
-    }
-  }
-
-  override checkValidityBang(): void {
-    super.checkValidityBang();
     const methodName = this.options.with;
-    if (typeof methodName !== "string" || methodName.trim().length === 0) {
-      throw new ArgumentError("WithValidator requires the :with option to be a non-blank string");
+
+    if (rbObjMethod(record, methodName).arity() === 0) {
+      rbFSend(record, methodName);
+    } else {
+      rbFSend(record, methodName, attr);
     }
   }
 }
@@ -39,51 +27,47 @@ type ValidatorClass = new (
 ) => ValidatorLike;
 
 export interface ValidatesWithClassHost {
-  _validators: Map<string | null, ValidatorLike[]>;
+  _validators: Hash<string | null, ValidatorLike[]>;
   validate(
     filter: ValidatorLike | ((record: ValidatableRecord) => unknown),
     options?: Record<string, unknown>,
   ): void;
 }
 
-export async function validatesWith(this: ValidatableRecord, ...args: unknown[]): Promise<void> {
+export async function validatesWith(
+  this: ValidatableRecord,
+  ...args: Array<ValidatorClass | Record<string, unknown> | ValidatorBlock>
+): Promise<void> {
+  const block = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as ValidatorBlock) : undefined;
   const options = extractOptionsBang(args);
-  const klasses = args;
   options.class = this.constructor;
 
-  for (const klass of klasses as ValidatorClass[]) {
-    const validator = new klass({ ...options });
+  for (const klass of args as ValidatorClass[]) {
+    const validator = new klass({ ...options }, block);
     await validator.validate(this);
   }
 }
 
 export const ClassMethods = {
-  validatesWith(this: ValidatesWithClassHost, ...args: unknown[]): void {
-    const last = args[args.length - 1];
-    const block =
-      args.length > 1 &&
-      typeof last === "function" &&
-      !/^class[\s{]/.test(Function.prototype.toString.call(last))
-        ? (args.pop() as ValidatorBlock)
-        : undefined;
+  validatesWith(
+    this: ValidatesWithClassHost,
+    ...args: Array<ValidatorClass | Record<string, unknown> | ValidatorBlock>
+  ): void {
+    const block = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as ValidatorBlock) : undefined;
     const options = extractOptionsBang(args);
-    const klasses = args;
     options.class = this;
 
-    for (const klass of klasses as ValidatorClass[]) {
+    for (const klass of args as ValidatorClass[]) {
       const validator = new klass({ ...options }, block);
 
-      const _validators = new Map(this._validators);
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
       if (Array.isArray(attributes) && attributes.length > 0) {
         for (const attribute of attributes) {
-          const key = String(attribute);
-          _validators.set(key, [...(_validators.get(key) ?? []), validator]);
+          this._validators.get(String(attribute))!.push(validator);
         }
       } else {
-        _validators.set(null, [...(_validators.get(null) ?? []), validator]);
+        this._validators.get(null)!.push(validator);
       }
-      this._validators = _validators;
 
       this.validate(validator, options);
     }

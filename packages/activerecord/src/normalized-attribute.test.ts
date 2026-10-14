@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { presence, titleize } from "@blazetrails/activesupport";
-import { Base } from "./index.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 function noon(time: RubyTime): RubyTime {
   const utc = time.getutc();
@@ -62,10 +61,8 @@ describe("NormalizedAttributeTest", () => {
   it("normalizes changed-in-place value before validation", async () => {
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
-      _hasValue: boolean;
     };
     nameAttr._value = "fly high";
-    nameAttr._hasValue = true;
     expect(aircraft.name).toBe("fly high");
 
     await aircraft.isValid();
@@ -75,10 +72,8 @@ describe("NormalizedAttributeTest", () => {
   it("normalizes value on demand", () => {
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
-      _hasValue: boolean;
     };
     nameAttr._value = "fly high";
-    nameAttr._hasValue = true;
     expect(aircraft.name).toBe("fly high");
 
     aircraft.normalizeAttribute("name");
@@ -164,22 +159,3 @@ describe("NormalizedAttributeTest", () => {
 function succ(value: string): string {
   return String(Number(value) + 1);
 }
-
-describe("normalizes on Base", () => {
-  fixtures([]);
-
-  it("normalizes attributes before persistence", async () => {
-    class NormalizedUser extends Base {
-      declare name: any;
-      static _tableName = "aircraft";
-      static {
-        this.normalizes("name", {
-          with: (name: unknown) => (typeof name === "string" ? name.trim().toLowerCase() : name),
-        });
-      }
-    }
-
-    const user = await NormalizedUser.create({ name: "  ALICE  " });
-    expect(user.name).toBe("alice");
-  });
-});

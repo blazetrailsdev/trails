@@ -29,6 +29,13 @@ const FIXTURES: Record<string, { input: string; recited: string }> = {
   },
 };
 
+const TAG = "@inlinedFrom ActiveModel::API#initialize";
+
+FIXTURES["packages/activerecord/src/tagged.ts"] = {
+  input: `/**\n * ${TAG} rails/v7.1.0/activemodel/lib/active_model/api.rb:80-84\n */\n`,
+  recited: `/**\n * ${TAG} rails/${rails}/activemodel/lib/active_model/api.rb:80-84\n */\n`,
+};
+
 const REGEX_BEARING = "eslint/ruby-compat-needs-mri-citation.mjs";
 const REGEX_SOURCE =
   "const CITATION = /vendor\\/ruby\\/([A-Za-z0-9_./+-]+):(\\d+)/g;\n// vendor/ruby/rational.c:1\n";
@@ -47,11 +54,22 @@ async function fixtureTree(): Promise<string> {
 const PATHS = [...Object.keys(FIXTURES), REGEX_BEARING];
 
 describe("vendor:recite", () => {
+  it("rewrites an @inlinedFrom citation's version on a ref bump, without adding vendor/", () => {
+    const cited = (version: string) =>
+      ` * ${TAG} rails/${version}/activemodel/lib/active_model/api.rb:80-84`;
+    expect(reciteText(cited("v8.0.2"), { rails: "v8.1.0" })).toBe(cited("v8.1.0"));
+    expect(reciteText(cited("v8.1.0"), { rails: "v8.1.0" })).toBe(cited("v8.1.0"));
+  });
+
   it("rewrites unversioned and stale citations and leaves versioned ones alone", async () => {
     const root = await fixtureTree();
     try {
       const changed = await recite(root, PATHS);
-      expect(changed.sort()).toEqual(["docs/stale.md", "packages/ruby-compat/src/unversioned.ts"]);
+      expect(changed.sort()).toEqual([
+        "docs/stale.md",
+        "packages/activerecord/src/tagged.ts",
+        "packages/ruby-compat/src/unversioned.ts",
+      ]);
       for (const [path, { recited }] of Object.entries(FIXTURES)) {
         expect(await readFile(join(root, path), "utf8")).toBe(recited);
       }
@@ -73,7 +91,7 @@ describe("vendor:recite", () => {
   it("--check reports without writing", async () => {
     const root = await fixtureTree();
     try {
-      expect((await recite(root, PATHS, { check: true })).length).toBe(2);
+      expect((await recite(root, PATHS, { check: true })).length).toBe(3);
       for (const [path, { input }] of Object.entries(FIXTURES)) {
         expect(await readFile(join(root, path), "utf8")).toBe(input);
       }

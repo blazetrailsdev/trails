@@ -8,10 +8,16 @@ import {
 import {
   Enumerable,
   FrozenError,
-  Hash,
+  groupBy,
+  type Hash,
   isEmpty,
   rbEqual,
   rbInspect,
+  rbDeclareIvar,
+  rbModConstSet,
+  rbModName,
+  rbObjDup,
+  toSym,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
@@ -86,9 +92,10 @@ export class Errors<TBase extends object = object> {
     error: ActiveModelError,
     overrideOptions: { attribute?: string; type?: string } = {},
   ): void {
-    const type = overrideOptions.type;
-    if (type !== undefined) {
-      overrideOptions.type = type.startsWith(":") ? type : `:${type}`;
+    for (const key of ["attribute", "type"] as const) {
+      if (Object.hasOwn(overrideOptions, key)) {
+        overrideOptions[key] = toSym(overrideOptions[key]);
+      }
     }
     this._errors.push(new NestedError(this._base, error, overrideOptions));
   }
@@ -112,16 +119,16 @@ export class Errors<TBase extends object = object> {
     return this._errors.filter((e) => e.match(normAttr, normType, normOpts));
   }
 
-  include(attribute: string): boolean {
-    return this._errors.some((e) => e.match(attribute));
+  isInclude(attribute: string): boolean {
+    return this._errors.some((e) => e.match(toSym(attribute)));
   }
 
   hasKey(attribute: string): boolean {
-    return this.include(attribute);
+    return this.isInclude(attribute);
   }
 
   isKey(attribute: string): boolean {
-    return this.include(attribute);
+    return this.isInclude(attribute);
   }
 
   delete(
@@ -141,18 +148,12 @@ export class Errors<TBase extends object = object> {
     return this.messagesFor(attribute);
   }
 
-  get attributeNames(): string[] {
-    return [...new Set(this._errors.map((e) => e.attribute))];
+  get attributeNames(): readonly string[] {
+    return Object.freeze([...new Set(this._errors.map((e) => e.attribute))]);
   }
 
-  asJson(options?: Record<string, unknown> | null): Record<string, (string | null)[]> {
-    const result: Record<string, (string | null)[]> = {};
-    for (const [attr, msgs] of this.toHash(
-      options != null && (options["fullMessages"] as boolean | undefined),
-    )) {
-      result[attr] = msgs;
-    }
-    return result;
+  asJson(options: Record<string, unknown> | null = null): Hash<string, (string | null)[]> {
+    return this.toHash((options && options["fullMessages"]) as boolean);
   }
 
   get messages(): Map<string, readonly (string | null)[]> {
@@ -163,27 +164,17 @@ export class Errors<TBase extends object = object> {
   }
 
   get details(): Map<string, ReadonlyArray<ErrorDetailHash>> {
-    const hash = new Hash<string, ReadonlyArray<ErrorDetailHash>>(EMPTY_ARRAY);
-    for (const [attr, details] of Object.entries(
-      transformValues(this.groupByAttribute(), (errors) =>
-        errors.map((e) => e.details as ErrorDetailHash),
-      ),
-    )) {
-      hash.set(attr, details);
-    }
+    const hash: Hash<string, ReadonlyArray<ErrorDetailHash>> = transformValues(
+      this.groupByAttribute(),
+      (errors) => errors.map((error) => error.details as ErrorDetailHash),
+    );
+    hash.setDefault(EMPTY_ARRAY);
     hash.freeze();
     return hash;
   }
 
-  groupByAttribute(): Record<string, ActiveModelError[]> {
-    const result: Record<string, ActiveModelError[]> = {};
-    for (const error of this._errors) {
-      if (!result[error.attribute]) {
-        result[error.attribute] = [];
-      }
-      result[error.attribute].push(error);
-    }
-    return result;
+  groupByAttribute(): Hash<string, ActiveModelError[]> {
+    return groupBy(this._errors, (error) => error.attribute);
   }
 
   add(
@@ -242,8 +233,8 @@ export class Errors<TBase extends object = object> {
     return this._errors.map((e) => e.fullMessage);
   }
 
-  fullMessagesFor(attribute: string): (string | null)[] {
-    return this.where(attribute).map((e) => e.fullMessage);
+  fullMessagesFor(attribute: string): readonly (string | null)[] {
+    return Object.freeze(this.where(attribute).map((e) => e.fullMessage));
   }
 
   messagesFor(attribute: string): (string | null)[] {
@@ -259,7 +250,7 @@ export class Errors<TBase extends object = object> {
   generateMessage(
     attribute: string,
     type: string = ":invalid",
-    options?: Record<string, unknown>,
+    options: Record<string, unknown> = {},
   ): string {
     return ActiveModelError.generateMessage(attribute, type, this._base, options);
   }
@@ -290,18 +281,11 @@ export class Errors<TBase extends object = object> {
   ): [string, string | null | undefined, Record<string, unknown>] {
     const opts = { ...(options ?? {}) };
     const resolvedType = typeof type === "function" ? type(this._base, opts) : type;
-    return [attribute, resolvedType, opts];
+    return [toSym(attribute), resolvedType, opts];
   }
 
   dup(): this {
-    const duped = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
-    duped.initializeDup(this);
-    return duped;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.iterator](): IterableIterator<ActiveModelError> {
-    return this._errors[Symbol.iterator]();
+    return rbObjDup(this);
   }
 
   get count(): number {
@@ -310,15 +294,9 @@ export class Errors<TBase extends object = object> {
 
   toHash(fullMessages = false): Hash<string, (string | null)[]> {
     const messageMethod = fullMessages ? "fullMessage" : "message";
-    const hash = new Hash<string, (string | null)[]>();
-    for (const [attribute, errors] of Object.entries(
-      transformValues(this.groupByAttribute(), (errors) =>
-        errors.map((error) => error[messageMethod]),
-      ),
-    )) {
-      hash.set(attribute, errors);
-    }
-    return hash;
+    return transformValues(this.groupByAttribute(), (errors) =>
+      errors.map((error) => error[messageMethod]),
+    );
   }
 
   toArray(): (string | null)[] {
@@ -326,8 +304,9 @@ export class Errors<TBase extends object = object> {
   }
 
   inspect(): string {
-    const details = this._errors.map((e) => e.inspect());
-    return `#<ActiveModel::Errors [${details.join(", ")}]>`;
+    const inspection = rbInspect(this._errors);
+
+    return `#<${rbModName(this.constructor as typeof Errors) ?? ""} ${inspection}>`;
   }
 }
 
@@ -336,6 +315,7 @@ export interface Errors<TBase extends object = object> {
   first(): ActiveModelError | null;
   first(n: number): ActiveModelError[];
   isAny(block?: (error: ActiveModelError) => unknown): boolean;
+  [Symbol.iterator](): IterableIterator<ActiveModelError>;
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
 
@@ -369,7 +349,9 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
   }
 }
 
-ActiveModel.Errors = Errors;
+rbModConstSet(ActiveModel, "Errors", Errors);
+rbDeclareIvar(Errors, "@errors", "_errors");
+rbDeclareIvar(Errors, "@base", "_base");
 ActiveModel.RangeError = RangeError;
 ActiveModel.StrictValidationFailed = StrictValidationFailed;
 ActiveModel.UnknownAttributeError = UnknownAttributeError;

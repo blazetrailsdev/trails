@@ -59,6 +59,8 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
 
     DatabaseTasks.databaseConfiguration = null;
+
+    Base.configurations({});
     const { connect } = await import(pathToFileURL(join(tmpDir, "db.ts")).href);
     await connect();
     expect(await Base.withConnection((c) => c.tableExists("users"))).toBe(true);
@@ -96,7 +98,6 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     const origNodeEnv = process.env.NODE_ENV;
     delete process.env.TRAILS_ENV;
     delete process.env.NODE_ENV;
-    DatabaseTasks.env = null;
     try {
       expect(await run(["init", "--driver", "better-sqlite3"], tmpDir)).toBe(0);
       const createCode = await run(["db:create"], tmpDir);
@@ -107,20 +108,18 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
 
       delete process.env.TRAILS_ENV;
       delete process.env.NODE_ENV;
-      DatabaseTasks.env = null;
       DatabaseTasks.databaseConfiguration = null;
+      Base.configurations({});
       const { connect } = await import(pathToFileURL(join(tmpDir, "db.ts")).href);
       await connect();
       expect(Base.connectionDbConfig().envName).toBe("development");
 
       process.env.TRAILS_ENV = "staging";
-      DatabaseTasks.env = null;
       const stale = await import(`${pathToFileURL(join(tmpDir, "db.ts")).href}?staging`);
       await expect(stale.connect()).rejects.toThrow(/`staging` database is not configured/);
       delete process.env.TRAILS_ENV;
     } finally {
       process.env.NODE_ENV = origNodeEnv;
-      DatabaseTasks.env = null;
     }
   });
 

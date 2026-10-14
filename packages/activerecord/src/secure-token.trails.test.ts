@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
 import { Base } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { setGenerateSecureTokenOn } from "./active-record.js";
 
 describe("SecureTokenTest", () => {

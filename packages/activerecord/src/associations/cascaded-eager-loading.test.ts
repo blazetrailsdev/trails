@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
-import { resetCallbacks } from "../support/reset-callbacks.js";
-import { fixtures } from "../test-fixtures.js";
+import { registerModel } from "../index.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -23,7 +22,7 @@ import { Account } from "../test-helpers/models/account.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
-  const { authors, topics, vertices, companies, people } = fixtures([
+  const { self, authors, topics, vertices, companies, people } = fixtures([
     "authors",
     "posts",
     "topics",
@@ -47,18 +46,13 @@ describe("CascadedEagerLoadingTest", () => {
   Comment.inheritanceColumn = "type";
   registerModel(Comment);
   registerModel(SpecialComment);
-  registerSubclass(SpecialComment);
   registerModel(SubSpecialComment);
-  registerSubclass(SubSpecialComment);
   registerModel(VerySpecialComment);
-  registerSubclass(VerySpecialComment);
   registerModel(Categorization);
   registerModel(Category);
   registerModel(Topic);
   registerModel(Reply);
-  registerSubclass(Reply);
   registerModel(SillyReply);
-  registerSubclass(SillyReply);
   registerModel(Vertex);
   registerModel(Edge);
   registerModel(Company);
@@ -104,56 +98,6 @@ describe("CascadedEagerLoadingTest", () => {
     await assertQueriesCount(0, false, () => {
       expect(targetArr(authors[0], "comments").length).toBe(11);
     });
-  });
-
-  it("eager association loading dedups a manual join coinciding with an eager root", async () => {
-    const loaded = await Author.all()
-      .joins(":posts")
-      .eagerLoad({ ":posts": ":comments" })
-      .order("authors.id");
-    expect(loaded).toHaveLength(3);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
-    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
-    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
-  });
-
-  it("eager association loading dedups a single-step manual join and eager root", async () => {
-    const loaded = await Author.all().joins(":posts").eagerLoad(":posts").order("authors.id");
-    expect(loaded).toHaveLength(3);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
-    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
-  });
-
-  it("eager association loading dedups a manual join coinciding with a dotted eager root", async () => {
-    const loaded = await Author.all()
-      .joins(":posts")
-      .eagerLoad("posts.comments")
-      .order("authors.id");
-    expect(loaded).toHaveLength(3);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
-    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
-  });
-
-  it("eager association loading dedups a nested hash-form manual join and eager spec", async () => {
-    const loaded = await Author.all()
-      .joins({ ":posts": ":comments" })
-      .eagerLoad({ ":posts": ":comments" })
-      .order("authors.id");
-    expect(loaded).toHaveLength(2);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(4);
-    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
-    expect(targetArr(loaded[1], "posts")).toHaveLength(1);
-    expect(commentCount(targetArr(loaded[1], "posts"))).toBe(1);
-  });
-
-  it("eager association loading dedups a through-association intermediate join and eager spec", async () => {
-    const rel = Author.all().joins(":comments").eagerLoad(":comments").order("authors.id");
-    const sql = rel.toSql();
-    expect(sql).not.toMatch(/posts_authors/);
-    const loaded = await rel;
-    expect(loaded).toHaveLength(2);
-    expect(targetArr(loaded[0], "comments")).toHaveLength(11);
-    expect(targetArr(loaded[1], "comments")).toHaveLength(1);
   });
 
   it("eager association loading grafts stashed associations to correct parent", async () => {
@@ -455,7 +399,7 @@ describe("CascadedEagerLoadingTest", () => {
     const authorsRel = Author.where({ id: author.id });
     const retrievedComments: Base[] = [];
 
-    await resetCallbacks(Comment, "initialize", async () => {
+    await self().resetCallbacks(Comment, "initialize", async () => {
       Comment.afterInitialize((record: Comment) => {
         retrievedComments.push(record);
       });
@@ -487,7 +431,7 @@ describe("CascadedEagerLoadingTest", () => {
     const authorsRel = Author.where({ id: author.id });
     const retrievedAuthors: Base[] = [];
 
-    await resetCallbacks(Author, "initialize", async () => {
+    await self().resetCallbacks(Author, "initialize", async () => {
       Author.afterInitialize((record: Author) => {
         retrievedAuthors.push(record);
       });

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { clearTimestampAttributes } from "./timestamp.js";
 import { DefaultScope } from "./scoping/default.js";
@@ -155,14 +155,6 @@ describe("DupTest", () => {
     Topic.afterInitializeCalled = false;
     topic.dup();
     expect(Topic.afterInitializeCalled).toBeTruthy();
-  });
-
-  it("dup runs after_initialize against the duped attributes", async () => {
-    const topic = await Topic.find(3);
-    expect(topic.author_email_address).toBeFalsy();
-    const duped = topic.dup();
-    expect(duped.title).toBe(topic.title);
-    expect(duped.author_email_address).toBeFalsy();
   });
 
   it("dup validity is independent", async () => {

@@ -2,8 +2,7 @@ import { Collector as AbstractCollector } from "../../abstract-controller/collec
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { NullType } from "../../action-dispatch/http/mime-type.js";
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
-import { _setRenderedContentType } from "./rendering.js";
-import { ArgumentError, fetch, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, fetch, include, rbEqual, rbFSend } from "@blazetrails/ruby-compat";
 
 export type FormatHandler = () => unknown;
 type VariantBlock = (variant: VariantCollector) => unknown;
@@ -11,17 +10,16 @@ type Response = FormatHandler | VariantBlock | VariantCollector;
 type Format = MimeType | NullType;
 type MimeMethod = (block?: FormatHandler | VariantBlock) => Response;
 
-export class Collector extends AbstractCollector {
+export class Collector {
   format: Format | null = null;
-  #responses: Map<Format | null | undefined, Response | null>;
-  #variant: readonly string[] | null;
+  private _responses: Map<Format | null | undefined, Response | null>;
+  private _variant: readonly string[] | null;
 
   constructor(mimes: string[] = [], variant: readonly string[] | null = null) {
-    super();
-    this.#responses = new Map();
-    this.#variant = variant;
+    this._responses = new Map();
+    this._variant = variant;
 
-    for (const mime of mimes) this.#responses.set(Mime.get(mime), null);
+    for (const mime of mimes) this._responses.set(Mime.get(mime), null);
   }
 
   any(...args: (string | FormatHandler | VariantBlock)[]): Response | string[] {
@@ -29,9 +27,7 @@ export class Collector extends AbstractCollector {
     const block =
       typeof last === "function" ? (args.pop() as FormatHandler | VariantBlock) : undefined;
     if (args.length > 0) {
-      for (const type of args as string[]) {
-        (this as unknown as Record<string, (block?: unknown) => Response>)[type](block);
-      }
+      (args as string[]).forEach((type) => rbFSend(this, type, block));
       return args as string[];
     } else {
       return this.custom(MimeType.ALL, block);
@@ -44,36 +40,38 @@ export class Collector extends AbstractCollector {
 
   custom(mimeType: MimeType | string, block?: FormatHandler | VariantBlock): Response {
     if (!(mimeType instanceof MimeType)) mimeType = MimeType.lookup(String(mimeType));
-    let response = this.#responses.get(mimeType);
+    let response = this._responses.get(mimeType);
     if (response == null) {
-      response = block ?? new VariantCollector(this.#variant);
-      this.#responses.set(mimeType, response);
+      response = block ?? new VariantCollector(this._variant);
+      this._responses.set(mimeType, response);
     }
     return response;
   }
 
   isAnyResponse(): boolean {
-    const own = fetch(this.#responses, this.format, false);
-    return !(own != null && own !== false) && this.#responses.get(MimeType.ALL) != null;
+    const own = fetch(this._responses, this.format, false);
+    return !(own != null && own !== false) && this._responses.get(MimeType.ALL) != null;
   }
 
   get response(): FormatHandler | null | undefined {
-    const response = fetch(this.#responses, this.format, this.#responses.get(MimeType.ALL));
+    const response = fetch(this._responses, this.format, this._responses.get(MimeType.ALL));
     if (response instanceof VariantCollector) {
       return response.variant;
     } else if (response == null || response.length === 0) {
       return response as FormatHandler | null | undefined;
     } else {
-      const variantCollector = new VariantCollector(this.#variant);
+      const variantCollector = new VariantCollector(this._variant);
       response.call(null, variantCollector);
       return variantCollector.variant;
     }
   }
 
   negotiateFormat(request: { negotiateMime(order: MimeType[]): Format | null }): Format | null {
-    return (this.format = request.negotiateMime([...this.#responses.keys()] as MimeType[]));
+    return (this.format = request.negotiateMime([...this._responses.keys()] as MimeType[]));
   }
 }
+
+include(Collector, AbstractCollector);
 
 export function respondTo(
   this: {
@@ -83,8 +81,9 @@ export function respondTo(
     };
     mediaType?: string | null;
     contentType: string | null;
-    response: { contentType?: string; mediaType?: string | null };
+    response: { contentType?: string | null; mediaType?: string | null };
     _processFormat(format: Format): void;
+    _setRenderedContentType(format: Format): void;
   },
   ...mimes: Array<string | ((collector: Collector & Record<string, MimeMethod>) => void)>
 ): unknown {
@@ -106,7 +105,7 @@ export function respondTo(
       throw new RespondToMismatchError();
     }
     this._processFormat(format);
-    if (!collector.isAnyResponse()) _setRenderedContentType.call(this, format);
+    if (!collector.isAnyResponse()) this._setRenderedContentType(format);
     const response = collector.response;
     if (response) return response();
   } else {

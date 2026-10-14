@@ -1,7 +1,7 @@
 import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
+import { Hash, block as rbBlock, fetch, hashAref, rbObjAsString } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
-import { defaultValue } from "./type.js";
-import { typeRegistry } from "./type/registry.js";
+import * as Type from "./type.js";
 import { AttributeSet } from "./attribute-set.js";
 import type { AttributeOptions } from "./attributes.js";
 
@@ -13,20 +13,20 @@ export interface AttributeRegistrationClassMethods {
   ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: AttributeDecorator): void;
-  attributeTypes(): Record<string, ValueType | null>;
+  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
   typeForAttribute(name: string, block?: () => ValueType): ValueType | null;
 }
 
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
-  _cachedAttributeTypes?: Record<string, ValueType | null> | null;
+  _cachedAttributeTypes?: Record<string, ValueType | null> | Hash<string, ValueType | null> | null;
   _attributesBuilder?: unknown;
   _pendingAttributeModifications?: PendingModification[];
   attributeAliases?: Record<string, string>;
   /** @internal */
   resolveAttributeName(name: string): string;
 
-  attributeTypes(): Record<string, ValueType | null>;
+  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
   /** @internal */
   pendingAttributeModifications(): PendingModification[];
   /** @internal */
@@ -109,38 +109,23 @@ export const ClassMethods = {
   attribute(
     this: AttributeRegistrationHost,
     name: string,
-    type?: string | ValueType | AttributeOptions,
-    options?: AttributeOptions,
+    type: string | ValueType | AttributeOptions | null = null,
+    options: AttributeOptions = {},
   ): void {
-    name = this.resolveAttributeName(name);
-    if (type !== undefined && typeof type !== "string" && !(type instanceof ValueType)) {
+    if (type != null && typeof type !== "string" && !(type instanceof ValueType)) {
       options = type;
-      type = undefined;
+      type = null;
     }
-    const typeProvided = type !== undefined;
-    const { default: _default, ...typeOptions } = options ?? {};
-    if (typeProvided) {
-      type =
-        type instanceof ValueType
-          ? type
-          : this.resolveTypeName(
-              type as string,
-              Object.keys(typeOptions).length > 0
-                ? (typeOptions as Record<string, unknown>)
-                : undefined,
-            );
-      type = this.hookAttributeType(name, type as ValueType);
-    }
+    const { default: default_, ...opts } = options;
+    const noDefault = default_ === undefined;
+    name = this.resolveAttributeName(name);
+    if (typeof type === "string") type = this.resolveTypeName(type, opts);
+    if (type != null) type = this.hookAttributeType(name, type);
 
-    const noDefault = options?.default === undefined;
     if (type != null || noDefault) {
-      this.pendingAttributeModifications().push(
-        new PendingType(name, typeProvided ? (type as ValueType) : null),
-      );
+      this.pendingAttributeModifications().push(new PendingType(name, type));
     }
-    if (!noDefault) {
-      this.pendingAttributeModifications().push(new PendingDefault(name, options?.default));
-    }
+    if (!noDefault) this.pendingAttributeModifications().push(new PendingDefault(name, default_));
 
     this.resetDefaultAttributes();
   },
@@ -157,32 +142,29 @@ export const ClassMethods = {
     this.resetDefaultAttributes();
   },
 
+  /** @inventedArm registerSubclass — PERMANENT */
   _defaultAttributes(this: AttributeHostInternals): AttributeSet {
-    if (!this._cachedDefaultAttributes) {
-      registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
+    return (this._cachedDefaultAttributes ||= (() => {
       const attributeSet = new AttributeSet({});
+      registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
       this.applyPendingAttributeModifications(attributeSet);
-      this._cachedDefaultAttributes = attributeSet;
-    }
-    return this._cachedDefaultAttributes;
+      return attributeSet;
+    })());
   },
 
-  attributeTypes(this: AttributeHostInternals): Record<string, ValueType | null> {
+  /** @inventedArm if — PERMANENT */
+  attributeTypes(
+    this: AttributeHostInternals,
+  ): Record<string, ValueType | null> | Hash<string, ValueType | null> {
     if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
       return this._cachedAttributeTypes;
     }
     const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
-    const cast = host._defaultAttributes().castTypes();
-    const proxy = new Proxy(cast, {
-      get(target, prop, receiver) {
-        if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
-          return defaultValue();
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-    });
-    this._cachedAttributeTypes = proxy;
-    return proxy;
+    let hash = host._defaultAttributes().castTypes();
+    if (!(hash instanceof Hash)) hash = new Hash<string, ValueType | null>().replace(hash);
+    hash.setDefault(Type.defaultValue());
+    this._cachedAttributeTypes = hash;
+    return hash;
   },
 
   typeForAttribute(
@@ -192,14 +174,17 @@ export const ClassMethods = {
   ): ValueType | null {
     attributeName = this.resolveAttributeName(attributeName);
 
-    const types = this.attributeTypes();
     if (block) {
-      return Object.hasOwn(types, attributeName) ? types[attributeName] : block();
+      return fetch(this.attributeTypes(), attributeName, rbBlock(block));
+    } else {
+      return hashAref(this.attributeTypes(), attributeName) as ValueType | null;
     }
-    return types[attributeName];
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   pendingAttributeModifications(this: AttributeHostInternals): PendingModification[] {
     if (!Object.hasOwn(this, "_pendingAttributeModifications")) {
       this._pendingAttributeModifications = [];
@@ -240,8 +225,8 @@ export const ClassMethods = {
   },
 
   /** @internal */
-  resolveAttributeName(this: AttributeHostInternals, name: string): string {
-    return name;
+  resolveAttributeName(name: string): string {
+    return rbObjAsString(name);
   },
 
   /** @internal */
@@ -250,7 +235,7 @@ export const ClassMethods = {
     name: string,
     options?: Record<string, unknown>,
   ): ValueType {
-    return typeRegistry.lookup(name, options);
+    return Type.lookup(name, options);
   },
 
   /** @internal */

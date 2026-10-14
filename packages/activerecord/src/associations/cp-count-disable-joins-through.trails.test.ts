@@ -1,8 +1,9 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, collectionProxyFor as association, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("CollectionProxy#count — disable_joins through", () => {
   fixtures([]);
@@ -100,7 +101,9 @@ describe("CollectionProxy#count — disable_joins through", () => {
     });
     let n: number;
     try {
-      n = (await association(author, "noJoinsCdComments").count()) as number;
+      n = (await (
+        author.association("noJoinsCdComments") as CollectionAssociation
+      ).reader.count()) as number;
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -148,7 +151,9 @@ describe("CollectionProxy#count — disable_joins through", () => {
       if (typeof sql === "string") observed.push(sql);
     });
     try {
-      expect(await association(author, "noJoinsCdRatings").count()).toBe(3);
+      expect(
+        await (author.association("noJoinsCdRatings") as CollectionAssociation).reader.count(),
+      ).toBe(3);
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -159,7 +164,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
   });
 
   it("unsaved owner returns 0 without firing any SQL", async () => {
-    const unsaved = CdAuthor.new({ name: "unsaved" });
+    const unsaved = new CdAuthor({ name: "unsaved" });
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
@@ -167,7 +172,9 @@ describe("CollectionProxy#count — disable_joins through", () => {
       if (typeof sql === "string") observed.push(sql);
     });
     try {
-      expect(await association(unsaved, "noJoinsCdComments").count()).toBe(0);
+      expect(
+        await (unsaved.association("noJoinsCdComments") as CollectionAssociation).reader.count(),
+      ).toBe(0);
     } finally {
       Notifications.unsubscribe(sub);
     }

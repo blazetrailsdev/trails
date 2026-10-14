@@ -1,8 +1,7 @@
-import { fetch, File, hasKey } from "@blazetrails/ruby-compat";
+import { fetch, File, merge, rtest } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 import { schemaFormat } from "../active-record.js";
-import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 import type { SchemaFormat } from "../tasks/database-tasks.js";
 
 export class HashConfig extends DatabaseConfig {
@@ -37,12 +36,9 @@ export class HashConfig extends DatabaseConfig {
     return this.configurationHash.database;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   override set _database(database: string) {
-    this._configurationHash = Object.freeze({ ...this._configurationHash, database });
+    this._configurationHash = Object.freeze(merge(this.configurationHash, { database }));
   }
 
   override get pool(): number {
@@ -118,17 +114,17 @@ export class HashConfig extends DatabaseConfig {
   }
 
   schemaDump(format: SchemaFormat = schemaFormat()): string | null {
-    if (
-      hasKey(this.configurationHash, "schemaDump") &&
-      this.configurationHash.schemaDump !== undefined
-    ) {
-      const val = this.configurationHash.schemaDump;
-      if (val === false || val === null) return null;
-      return val;
+    if ("schemaDump" in this.configurationHash) {
+      const config = this.configurationHash.schemaDump;
+      if (rtest(config)) {
+        return config;
+      }
+      return null;
+    } else if (this.isPrimary()) {
+      return this.schemaFileType(format);
+    } else {
+      return `${this.name}_${this.schemaFileType(format)}`;
     }
-    const typeFile = this.schemaFileType(format);
-    if (!typeFile) return null;
-    return this.isPrimary() ? typeFile : `${this.name}_${typeFile}`;
   }
 
   databaseTasks(): boolean {
@@ -148,8 +144,9 @@ export class HashConfig extends DatabaseConfig {
 
   private schemaFileType(format: string): string | null {
     switch (format) {
-      case "ruby":
-        return `schema.${SchemaDumper.language}`;
+      case "ts":
+      case "js":
+        return `schema.${format}`;
       case "sql":
         return "structure.sql";
       default:

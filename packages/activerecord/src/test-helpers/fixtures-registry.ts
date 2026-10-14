@@ -1,10 +1,9 @@
 import type { Base } from "../base.js";
 
 import { underscore } from "@blazetrails/activesupport";
+import { FIXTURES_ROOT } from "../config.js";
 import { File } from "../fixture-set/file.js";
 import * as FixtureData from "./fixtures/index.js";
-
-export const FIXTURES_ROOT = new URL("./fixtures", import.meta.url).pathname;
 
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
@@ -367,6 +366,10 @@ export const fixtureRegistry = {
     model: () => import("./models/minivan.js").then((m) => m.Minivan),
     data: FixtureData.minivanFixtureData,
   },
+  mixins: {
+    joinTable: "mixins",
+    data: FixtureData.mixinFixtureData,
+  },
   mixedCaseMonkeys: {
     model: () => import("./models/mixed-case-monkey.js").then((m) => m.MixedCaseMonkey),
     data: FixtureData.mixedCaseMonkeyFixtureData,
@@ -492,23 +495,23 @@ export const fixtureRegistry = {
     data: FixtureData.referenceFixtureData,
   },
   shardedBlogPosts: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedBlogPost),
+    model: () => import("./models/sharded/blog-post.js").then((m) => m.ShardedBlogPost),
     data: FixtureData.shardedBlogPostFixtureData,
   },
   shardedBlogPostsTags: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedBlogPostTag),
+    model: () => import("./models/sharded/blog-post-tag.js").then((m) => m.ShardedBlogPostTag),
     data: FixtureData.shardedBlogPostTagFixtureData,
   },
   shardedBlogs: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedBlog),
+    model: () => import("./models/sharded/blog.js").then((m) => m.ShardedBlog),
     data: FixtureData.shardedBlogFixtureData,
   },
   shardedComments: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedComment),
+    model: () => import("./models/sharded/comment.js").then((m) => m.ShardedComment),
     data: FixtureData.shardedCommentFixtureData,
   },
   shardedTags: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedTag),
+    model: () => import("./models/sharded/tag.js").then((m) => m.ShardedTag),
     data: FixtureData.shardedTagFixtureData,
   },
   ships: {

@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Unary } from "./unary.js";
 
 export class UnqualifiedColumn extends Unary {
@@ -19,4 +20,4 @@ export class UnqualifiedColumn extends Unary {
   }
 }
 
-Nodes.UnqualifiedColumn = UnqualifiedColumn;
+rbModConstSet(Nodes, "UnqualifiedColumn", UnqualifiedColumn);

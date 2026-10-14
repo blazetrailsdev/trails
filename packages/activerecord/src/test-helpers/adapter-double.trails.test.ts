@@ -18,8 +18,8 @@ describe("adapterDouble", () => {
 
   it("lets an override shadow a getter-only member", () => {
     const cache = { isCached: () => true };
-    const double = adapterDouble({ internalSchemaCache: cache });
+    const double = adapterDouble({ schemaCache: cache });
 
-    expect(double.internalSchemaCache).toBe(cache);
+    expect(double.schemaCache).toBe(cache);
   });
 });

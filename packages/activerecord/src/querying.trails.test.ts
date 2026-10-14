@@ -1,10 +1,12 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { block, type Module } from "@blazetrails/ruby-compat";
 import { Base, Relation } from "./index.js";
 import { _queryBySql, _loadFromSql } from "./querying.js";
 import { Result } from "./result.js";
+import { TableNotSpecified } from "./errors.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
 
 fixtures({ topics: [Topic, {}] });
@@ -28,6 +30,31 @@ describe("QueryingTest — static forwarders on Base", () => {
 
   it("extending() returns a Relation", () => {
     expect(Topic.extending()).toBeInstanceOf(Relation);
+  });
+
+  it("extending() builds a Module from its block, after the modules it is given", () => {
+    const all = Topic.all() as unknown as {
+      extending(...modules: unknown[]): {
+        first(): string;
+        only(): string;
+        extendingValues: object[];
+      };
+    };
+    const relation = all.extending(
+      { first: () => "module", only: () => "module" },
+      block((mod: Module) => mod.defineMethod("first", () => "block")),
+    );
+
+    expect(relation.extendingValues).toHaveLength(2);
+    expect(relation.first()).toBe("module");
+    expect(relation.only()).toBe("module");
+    expect(
+      (
+        Topic.extending(block((mod: Module) => mod.defineMethod("page", () => 1))) as unknown as {
+          page(): number;
+        }
+      ).page(),
+    ).toBe(1);
   });
 
   it("unscope() static forwarder returns a Relation", () => {
@@ -239,5 +266,49 @@ describe("_loadFromSql — STI detection (Story J gap 2)", () => {
 
   it("returns empty array for empty result set", () => {
     expect(_loadFromSql.call(Topic as typeof Base, resultFromRowHashes([]))).toEqual([]);
+  });
+
+  it("instantiates STI rows from indexedRows without materializing a hash per row", () => {
+    const resultSet = new Result(["id", "type", "title"], [[1, Reply.name, "Rex"]]);
+    const toArray = vi.spyOn(resultSet, "toArray");
+    const records = _loadFromSql.call(Topic as typeof Base, resultSet);
+    expect(toArray).not.toHaveBeenCalled();
+    expect(records[0]).toBeInstanceOf(Reply);
+    expect(records[0].readAttribute("title")).toBe("Rex");
+    expect(records[0].hasAttribute("author_name")).toBe(false);
+    expect(Object.keys(records[0].attributes)).toEqual(["id", "type", "title"]);
+  });
+
+  it("instantiates non-STI rows from indexedRows without materializing a hash per row", () => {
+    const resultSet = new Result(["id", "title"], [[1, "Rex"]]);
+    const toArray = vi.spyOn(resultSet, "toArray");
+    const records = _loadFromSql.call(Topic as typeof Base, resultSet);
+    expect(toArray).not.toHaveBeenCalled();
+    expect(records[0]).toBeInstanceOf(Topic);
+    expect(records[0].readAttribute("title")).toBe("Rex");
+    expect(records[0].isPersisted()).toBe(true);
+  });
+});
+
+describe("QueryingTest — update_all / delete_all delegate to all on an abstract class", () => {
+  class AbstractThing extends Base {
+    static {
+      this.abstractClass = true;
+    }
+  }
+
+  it("updateAll reaches the relation and raises TableNotSpecified", async () => {
+    await expect(AbstractThing.updateAll({ title: "x" })).rejects.toThrow(TableNotSpecified);
+  });
+
+  it("deleteAll delegates to the relation", async () => {
+    const deleteAll = vi.spyOn(Relation.prototype, "deleteAll").mockResolvedValue(3);
+    try {
+      expect(await AbstractThing.deleteAll()).toBe(3);
+      expect(deleteAll).toHaveBeenCalledTimes(1);
+      expect((deleteAll.mock.contexts[0] as Relation<Base>).model).toBe(AbstractThing);
+    } finally {
+      deleteAll.mockRestore();
+    }
   });
 });

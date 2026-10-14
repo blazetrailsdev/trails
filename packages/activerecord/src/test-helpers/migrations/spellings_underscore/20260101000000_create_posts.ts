@@ -1,3 +1,3 @@
 import { Migration } from "../../../migration.js";
 
-export class CreatePosts extends Migration {}
+export class CreatePosts extends Migration.Current {}

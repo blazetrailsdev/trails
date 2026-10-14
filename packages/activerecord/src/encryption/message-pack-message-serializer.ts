@@ -1,29 +1,27 @@
-import { MessagePack, MessagePackError } from "@blazetrails/activesupport/message-pack";
+import { MessagePack } from "@blazetrails/activesupport/message-pack";
+import { isPlainObject } from "@blazetrails/activesupport";
+import { RuntimeError, transformValues, type Bytes, type Hash } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, ForbiddenClass } from "./errors.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 
 export class MessagePackMessageSerializer implements MessageSerializerLike {
-  dump(message: Message): string {
+  dump(message: Message): Bytes {
     if (!(message instanceof Message)) {
-      throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
+      throw new ForbiddenClass();
     }
-    return MessagePack.dump(this.messageToHash(message)).toString("latin1");
+    return MessagePack.dump(this.messageToHash(message));
   }
 
-  load(serializedContent: string): Message {
-    if (typeof serializedContent !== "string") {
-      throw new TypeError(`Expected string, got ${typeof serializedContent}`);
-    }
-    let data: unknown;
+  load(serializedContent: string | Bytes): Message {
     try {
-      data = MessagePack.load(serializedContent);
+      const data = MessagePack.load(serializedContent);
+      return this.hashToMessage(data, 1);
     } catch (e) {
-      if (e instanceof MessagePackError) throw new Decryption("Failed to load MessagePack message");
+      if (e instanceof RuntimeError) throw new Decryption();
       throw e;
     }
-    return this.hashToMessage(data, 1);
   }
 
   isBinary(): boolean {
@@ -32,51 +30,39 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
 
   /** @internal */
   private messageToHash(message: Message): Record<string, unknown> {
-    return Object.assign(Object.create(null) as Record<string, unknown>, {
+    return {
       p: message.payload,
       h: this.headersToHash(message.headers),
-    });
+    };
   }
 
   /** @internal */
-  private headersToHash(headers: Properties): Record<string, unknown> {
-    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    headers.each((key, value) => {
-      result[key] = value instanceof Message ? this.messageToHash(value) : value;
-    });
-    return result;
+  private headersToHash(headers: Properties): Hash<string, unknown> {
+    return transformValues(headers.toH(), (value) =>
+      value instanceof Message ? this.messageToHash(value) : value,
+    );
   }
 
   /** @internal */
   private hashToMessage(data: unknown, level: number): Message {
     this.validateMessageDataFormat(data, level);
-    const d = data as Record<string, unknown>;
-    const payload = d["p"];
     return new Message({
-      payload: typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
-      headers: this.parseProperties(d["h"] as Record<string, unknown> | null, level),
+      payload: data["p"] as string,
+      headers: this.parseProperties(data["h"] as Record<string, unknown> | null, level),
     });
   }
 
   /** @internal */
-  private validateMessageDataFormat(data: unknown, level: number): void {
+  private validateMessageDataFormat(
+    data: unknown,
+    level: number,
+  ): asserts data is Record<string, unknown> {
     if (level > 2) {
       throw new Decryption("More than one level of hash nesting in headers is not supported");
     }
-    if (typeof data !== "object" || data === null || Array.isArray(data) || Buffer.isBuffer(data)) {
+
+    if (!(isPlainObject(data) && "p" in data)) {
       throw new Decryption("Invalid data format: hash without payload");
-    }
-    const d = data as Record<string, unknown>;
-    if (!("p" in d)) {
-      throw new Decryption("Invalid data format: hash without payload");
-    }
-    if (
-      "h" in d &&
-      d["h"] !== null &&
-      d["h"] !== undefined &&
-      (typeof d["h"] !== "object" || Array.isArray(d["h"]) || Buffer.isBuffer(d["h"]))
-    ) {
-      throw new Decryption("Invalid data format: headers must be an object");
     }
   }
 
@@ -86,17 +72,8 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     level: number,
   ): Properties {
     const properties = new Properties();
-    if (headers) {
-      for (const [key, value] of Object.entries(headers)) {
-        const decoded =
-          typeof value === "object" &&
-          value !== null &&
-          !Array.isArray(value) &&
-          !Buffer.isBuffer(value)
-            ? this.hashToMessage(value, level + 1)
-            : value;
-        properties.set(key, decoded);
-      }
+    for (const [key, value] of Object.entries(headers ?? {})) {
+      properties.set(key, isPlainObject(value) ? this.hashToMessage(value, level + 1) : value);
     }
     return properties;
   }

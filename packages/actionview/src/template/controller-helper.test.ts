@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { FormBuilder } from "../helpers/form-helper.js";
 import { LookupContext } from "../lookup-context.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assert, assertNil, assertNot } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 describe("ControllerHelperTest", () => {
   class SpecializedFormBuilder extends FormBuilder {}
@@ -22,5 +23,17 @@ describe("ControllerHelperTest", () => {
     view.assignController(controller);
 
     assertNil(view.defaultFormBuilder);
+  });
+
+  it("respond to", () => {
+    const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
+    const controller: Record<string, unknown> = {};
+    view.assignController(controller);
+    assertNot(rbObjRespondTo(view, "params"));
+    assert(rbObjRespondTo(view, "assignController"));
+
+    controller.params = () => ({});
+    assert(rbObjRespondTo(view, "params"));
+    assert(rbObjRespondTo(view, "assignController"));
   });
 });

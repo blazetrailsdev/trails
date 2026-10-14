@@ -1,5 +1,6 @@
 import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Matey extends Base {
@@ -12,6 +13,7 @@ export class Matey extends Base {
     this.belongsTo("target", { className: "Pirate" });
   }
 }
+registerModel(Matey);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Matey {
   get pirate(): Pirate | null | Promise<Pirate | null>;

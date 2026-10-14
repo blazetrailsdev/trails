@@ -1,14 +1,12 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { stub } from "@blazetrails/activesupport";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
+import { StringIO, Thread } from "@blazetrails/ruby-compat";
 import pg from "pg";
+import { Socket } from "net";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-  withPostgresqlDatetimeType,
-} from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
   ConnectionNotEstablished,
   Deadlocked,
@@ -21,9 +19,10 @@ import {
   SerializationFailure,
   ValueTooLong,
 } from "../../errors.js";
+import { PG } from "../../pg/pg.js";
+import { Connection, type PGConnection } from "../../pg/connection.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
-import { captureSql } from "../../testing/sql-capture.js";
 import { itIfSupports } from "../../support/supports.js";
 import {
   dbWarningsAction,
@@ -74,9 +73,11 @@ async function expectedNullsNotDistinctValue(
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
+  const { self } = fixtures([], { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     try {
@@ -133,7 +134,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE UNIQUE INDEX "ex_idx_both_i" ON "ex_idx_both" ("n") INCLUDE ("d") NULLS NOT DISTINCT`,
       );
       const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "ex_idx_both");
+      await adapter.createSchemaDumper({}).table("ex_idx_both", lines);
       const indexLine = lines
         .string()
         .split("\n")
@@ -319,7 +320,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("rollback does not cancel a query issued by another chain", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.beginDbTransaction();
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
@@ -332,7 +333,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("transaction status follows the driver's in-flight query, not adapter bookkeeping", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.execute("BEGIN");
         const client = other._rawConnection as unknown as Record<string, unknown>;
@@ -355,7 +356,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("reset with no raw connection reconnects instead of running super", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.execute("SELECT 1 AS n");
         await other.disconnectBang();
@@ -373,10 +374,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("reset rolls back a transaction the adapter did not pin", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.execute("BEGIN");
-        expect((other as unknown as { _client: unknown })._client).toBeNull();
         expect(other._rawConnection!.transactionStatus()).not.toBe(0);
 
         const resetting = other.resetBang();
@@ -390,7 +390,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("reset does not cancel a query issued by another chain", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.beginDbTransaction();
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
@@ -404,7 +404,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("a query holding the lock does not wait on a reset queued behind it", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       let resetting: Promise<void> | undefined;
       try {
         await other.execute("SELECT 1 AS n");
@@ -423,7 +423,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("cancelAnyRunningQuery does not leak its cancel onto a later query", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.beginDbTransaction();
         let sleepError: unknown;
@@ -432,8 +432,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
         await new Promise<void>((r) => setTimeout(r, 200));
         await (
-          other as unknown as { _cancelAnyRunningQuery(): Promise<void> }
-        )._cancelAnyRunningQuery();
+          other as unknown as { cancelAnyRunningQuery(): Promise<void> }
+        ).cancelAnyRunningQuery();
         await sleep;
         expect(sleepError).toBeInstanceOf(QueryCanceled);
         await other.rollbackDbTransaction();
@@ -445,27 +445,25 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("cancelAnyRunningQuery waits for the cancelled command to come back", async () => {
       const PQTRANS_ACTIVE = 1;
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.beginDbTransaction();
         const sleep = other.execute("SELECT pg_sleep(2)").catch(() => {});
         await new Promise<void>((r) => setTimeout(r, 200));
         expect(other._rawConnection!.transactionStatus()).toBe(PQTRANS_ACTIVE);
 
-        const internals = other as unknown as {
-          _cancelAnyRunningQuery(): Promise<void>;
-          _blockUntilCommandSettles(client: unknown): Promise<void>;
-        };
-        const blockUntilCommandSettles = internals._blockUntilCommandSettles.bind(other);
+        const internals = other as unknown as { cancelAnyRunningQuery(): Promise<void> };
+        const rawConnection = other._rawConnection!;
+        const block = rawConnection.block.bind(rawConnection);
         let releaseBlock!: () => void;
         const blocked = new Promise<void>((r) => (releaseBlock = r));
-        internals._blockUntilCommandSettles = async (client: unknown): Promise<void> => {
+        rawConnection.block = async (): Promise<boolean> => {
           await blocked;
-          await blockUntilCommandSettles(client);
+          return block();
         };
 
         let cancelReturned = false;
-        const cancel = internals._cancelAnyRunningQuery().then(() => {
+        const cancel = internals.cancelAnyRunningQuery().then(() => {
           cancelReturned = true;
         });
         await new Promise<void>((r) => setTimeout(r, 50));
@@ -483,7 +481,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("clearCacheBang deallocates under the connection lock", async () => {
       const PQTRANS_INTRANS = 2;
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         other.preparedStatements = true;
         await other.execQuery("SELECT $1::integer AS n", "SQL", [1]);
@@ -587,7 +585,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("default prepared statements", async () => {
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         expect(a.preparedStatements).toBe(true);
       } finally {
@@ -782,12 +780,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("date time decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
+      expect(rows[0].val).toBeInstanceOf(RubyTime);
     });
 
     it("date decoding", async () => {
       const rows = await adapter.execute(`SELECT DATE '2023-06-15' AS val`);
-      expect(rows[0].val).toBeInstanceOf(Temporal.PlainDate);
+      expect(rows[0].val).toBe("2023-06-15");
     });
 
     it("time decoding", async () => {
@@ -798,16 +796,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("timestamp decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
-      const d = rows[0].val as Temporal.Instant;
-      expect(d).toBeInstanceOf(Temporal.Instant);
-      expect(d.toZonedDateTimeISO("UTC").year).toBe(2023);
+      const d = rows[0].val as RubyTime;
+      expect(d).toBeInstanceOf(RubyTime);
+      expect(d.getutc().year).toBe(2023);
     });
 
     it("timestamp with time zone decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`);
-      const d = rows[0].val as Temporal.Instant;
-      expect(d).toBeInstanceOf(Temporal.Instant);
-      expect(d.toZonedDateTimeISO("UTC").year).toBe(2023);
+      const d = rows[0].val as RubyTime;
+      expect(d).toBeInstanceOf(RubyTime);
+      expect(d.getutc().year).toBe(2023);
     });
 
     it("interval decoding", async () => {
@@ -1068,7 +1066,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("highPrecisionCurrentTimestamp returns CURRENT_TIMESTAMP literal", () => {
       const ts = adapter.highPrecisionCurrentTimestamp();
 
-      expect(ts.toSql({ withConnection: (block) => block(adapter) })).toBe("CURRENT_TIMESTAMP");
+      expect(adapter.visitor.compile(ts)).toBe("CURRENT_TIMESTAMP");
     });
 
     it("setConstraints ALL DEFERRED executes without error", async () => {
@@ -1113,7 +1111,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("nativeDatabaseTypes datetime resolves from datetimeType", async () => {
-      await withPostgresqlDatetimeType("timestamptz", () => {
+      await self().withPostgresqlDatetimeType("timestamptz", () => {
         const types = PostgreSQLAdapter.nativeDatabaseTypes();
         expect(types.datetime).toEqual({ name: "timestamptz" });
       });
@@ -1197,7 +1195,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const client = await PostgreSQLAdapter.newClient({
         connectionString: PG_TEST_URL,
       });
-      expect(client).toBeInstanceOf(pg.Client);
+      expect(client).toBeInstanceOf(Connection);
       await client.end();
     });
 
@@ -1229,70 +1227,90 @@ describeIfPg("PostgreSQLAdapter", () => {
       if (spy.mock.calls.length < n) throw new Error(`newClient not called ${n} time(s)`);
     };
 
-    it("disconnectBang orphans an in-flight acquire so it is not adopted by a racing reconnect", async () => {
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
-      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const endSpy = vi.spyOn(orphan, "end");
+    it("disconnectBang waits behind a connect holding the adapter lock and closes the client it seats", async () => {
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      const client = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const endSpy = vi.spyOn(client, "end");
       const first = defer();
-      const second = defer();
       const spy = vi
         .spyOn(PostgreSQLAdapter, "newClient")
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => second.promise);
+        .mockImplementationOnce(() => first.promise);
       try {
-        const firstAcquire = a.connect();
+        const connecting = new Thread(() => a.lock.synchronize(() => a.connect())).value();
         await waitForNewClientCalls(spy, 1);
 
-        await a.disconnectBang();
-
-        const reconnect = a.reconnect();
-        await waitForNewClientCalls(spy, 2);
-
-        first.resolve(orphan);
-        await expect(firstAcquire).rejects.toBeTruthy();
+        const disconnecting = new Thread(() => a.disconnectBang()).value();
+        first.resolve(client);
+        await connecting;
+        await disconnecting;
 
         expect(endSpy).toHaveBeenCalled();
         expect(a._rawConnectionForTest()).toBeNull();
-
-        second.resolve(reconnected);
-        await reconnect;
-        expect(a._rawConnectionForTest()).toBe(reconnected);
       } finally {
         spy.mockRestore();
-        await a.disconnectBang();
-        await orphan.end().catch(() => {});
+        await client.end().catch(() => {});
       }
     });
 
-    it("orphaned acquire still fails when the racing reconnect publishes first", async () => {
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
-      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const endSpy = vi.spyOn(orphan, "end");
-      const first = defer();
-      const spy = vi
-        .spyOn(PostgreSQLAdapter, "newClient")
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => Promise.resolve(reconnected));
+    it("reconnect resets the raw connection in place onto a new backend", async () => {
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
-        const firstAcquire = a.connect();
-        await waitForNewClientCalls(spy, 1);
-
-        await a.disconnectBang();
+        await a.connect();
+        const raw = a._rawConnectionForTest() as PGConnection & Connection;
+        const client = raw.client;
+        const pid = (await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+        await raw.query("BEGIN");
 
         await a.reconnect();
-        expect(a._rawConnectionForTest()).toBe(reconnected);
 
-        first.resolve(orphan);
-        await expect(firstAcquire).rejects.toBeTruthy();
-
-        expect(endSpy).toHaveBeenCalled();
-        expect(a._rawConnectionForTest()).toBe(reconnected);
+        expect(a._rawConnectionForTest()).toBe(raw);
+        expect(raw.client).not.toBe(client);
+        expect(raw.transactionStatus()).toBe(0);
+        expect((await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid).not.toBe(pid);
       } finally {
-        spy.mockRestore();
         await a.disconnectBang();
-        await orphan.end().catch(() => {});
+      }
+    });
+
+    it("reconnect resets onto a stream from the configured factory", async () => {
+      const stream = vi.fn(() => new Socket());
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, stream });
+      try {
+        await a.connect();
+        const raw = a._rawConnectionForTest()!;
+        expect(stream).toHaveBeenCalledTimes(1);
+
+        await a.reconnect();
+
+        expect(a._rawConnectionForTest()).toBe(raw);
+        expect(stream).toHaveBeenCalledTimes(2);
+        expect((await raw.query("SELECT 1 AS one")).rows[0].one).toBe(1);
+      } finally {
+        await a.disconnectBang();
+      }
+    });
+
+    it("reconnect connects afresh when reset raises PG::ConnectionBad", async () => {
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      try {
+        await a.connect();
+        const raw = a._rawConnectionForTest() as PGConnection;
+        const connect = vi.spyOn(pg.Client.prototype, "connect");
+        try {
+          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
+          await expect(raw.reset()).rejects.toBeInstanceOf(PG.ConnectionBad);
+          expect(raw.status()).toBe(1);
+
+          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
+          await a.reconnect();
+        } finally {
+          connect.mockRestore();
+        }
+
+        expect(a._rawConnectionForTest()).not.toBe(raw);
+        expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).rows[0].one).toBe(1);
+      } finally {
+        await a.disconnectBang();
       }
     });
   });
@@ -1527,15 +1545,20 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("createDatabase option string", () => {
     it("emits the remaining option arms in merged-hash order", async () => {
-      const sqls = await captureSql(
-        () =>
-          adapter.createDatabase("db", {
+      const sqls: string[] = [];
+      await stub(
+        adapter,
+        "execute",
+        (sql: string) => sqls.push(sql),
+        [],
+        async () => {
+          await adapter.createDatabase("db", {
             owner: "alice",
             template: "template0",
             tablespace: "fast",
             connectionLimit: -1,
-          }),
-        { stub: adapter },
+          });
+        },
       );
       expect(sqls[0]).toBe(
         `CREATE DATABASE "db" ENCODING = 'utf8' OWNER = "alice" TEMPLATE = "template0"` +
@@ -1544,9 +1567,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("ignores keys it has no arm for instead of rejecting them", async () => {
-      const sqls = await captureSql(
-        () => adapter.createDatabase("db", { adapter: "postgresql", host: "localhost" }),
-        { stub: adapter },
+      const sqls: string[] = [];
+      await stub(
+        adapter,
+        "execute",
+        (sql: string) => sqls.push(sql),
+        [],
+        async () => {
+          await adapter.createDatabase("db", { adapter: "postgresql", host: "localhost" });
+        },
       );
       expect(sqls[0]).toBe(`CREATE DATABASE "db" ENCODING = 'utf8'`);
     });
@@ -1604,7 +1633,7 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     expect(await adapter.supportsJson()).toBe(true);
     expect(adapter.supportsComments()).toBe(true);
     expect(adapter.supportsSavepoints()).toBe(true);
-    expect(await adapter.supportsInsertReturning()).toBe(true);
+    expect(adapter.supportsInsertReturning()).toBe(true);
     expect(adapter.supportsDdlTransactions()).toBe(true);
     expect(adapter.supportsAdvisoryLocks()).toBe(true);
     expect(adapter.supportsExplain()).toBe(true);
@@ -1709,7 +1738,7 @@ describe("PostgreSQLAdapter advisory lock id guard (unit)", () => {
 
 describeIfPg("PostgreSQLAdapter#active", () => {
   it("returns false once the backend behind a live client is terminated", async () => {
-    const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       const pidRows = await adapter.execute("SELECT pg_backend_pid() AS pid");
       const pid = (pidRows[0] as { pid: number }).pid;
@@ -1725,7 +1754,7 @@ describeIfPg("PostgreSQLAdapter#active", () => {
     }
   });
   it("loadAdditionalTypes runs uncast, so it cannot re-enter getOidType", async () => {
-    const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       await adapter.execute("SELECT 1");
       const internals = adapter as unknown as {

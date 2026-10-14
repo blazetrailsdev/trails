@@ -1,6 +1,21 @@
 import { Nodes } from "@blazetrails/arel";
-import { NoMethodError, rbObjClass, rbInspect, compact, uniq } from "@blazetrails/ruby-compat";
-import { inOrderOf, wrap } from "@blazetrails/activesupport";
+import {
+  Enumerable,
+  type Each,
+  rbObjAsString,
+  rtest,
+  compact,
+  first as aryFirst,
+  isEmpty,
+  last as aryLast,
+  take as aryTake,
+  uniq,
+  arySlice,
+  cmp,
+  numericMinus,
+  rbCmpint,
+} from "@blazetrails/ruby-compat";
+import { inOrderOf, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   ArgumentError,
@@ -8,8 +23,9 @@ import {
 } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
-import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { ActiveRecord } from "../namespaces.js";
+import type { JoinDependency } from "../associations/join-dependency.js";
+import { defineModule, stripThenable } from "@blazetrails/activesupport";
 
 export const ONE_AS_ONE = "1 AS one";
 
@@ -20,9 +36,11 @@ interface FinderRelation {
   _model: {
     name: string;
     primaryKey: string | string[];
-    compositePrimaryKey: boolean;
+    isCompositePrimaryKey(): boolean;
     implicitOrderColumn?: string | null;
+    queryConstraintsList(): string[] | null;
     createBang(attrs: any): Promise<any>;
+    withConnection<R>(block: (c: DatabaseAdapter) => R | Promise<R>): Promise<R>;
     transaction<R>(
       fn: (tx: any) => Promise<R>,
       options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
@@ -33,6 +51,10 @@ interface FinderRelation {
   isNullRelation(): boolean;
   limitValue: number | string | null;
   offsetValue: number | string | null;
+  distinctValue: unknown;
+  limitBang(value: unknown): FinderRelation;
+  /** @internal */
+  _selectBang(...fields: unknown[]): FinderRelation;
   orderValues: unknown[];
   createWithValue: Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
@@ -71,10 +93,26 @@ interface FinderRelation {
   /** @internal */
   readonly isEagerLoading: boolean;
   /** @internal */
+  applyJoinDependency(options?: { eagerLoading?: boolean }): any;
+  /** @internal */
   applyJoinDependency<R>(
     options: { eagerLoading?: boolean },
     block: (relation: any) => R | Promise<R>,
-  ): Promise<R>;
+  ): R | Promise<R>;
+  /** @internal */
+  usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
+  readonly hasLimitOrOffset: boolean;
+  groupValues: unknown[];
+  eagerLoadValues: unknown[];
+  includesValues: unknown[];
+  joinsValues: unknown[];
+  leftOuterJoinsValues: unknown[];
+  except(...skips: string[]): FinderRelation;
+  joinsBang(...args: unknown[]): FinderRelation;
+  /** @internal */
+  constructJoinDependency(associations: unknown[], joinType: unknown): JoinDependency;
+  /** @internal */
+  selectAssociationList(associations: unknown[]): unknown[];
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void>;
   arel(): { ast: unknown };
@@ -93,25 +131,8 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
 export function find(this: FinderRelation, block: (record: any) => unknown): Promise<any>;
 export function find(this: FinderRelation, ...args: unknown[]): Promise<any>;
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
-  const block = args[args.length - 1];
-  if (typeof block === "function") {
-    const ifnoneArgs = args.slice(0, -1);
-    if (ifnoneArgs.length > 1) {
-      throw new ArgumentError(
-        `wrong number of arguments (given ${ifnoneArgs.length}, expected 0..1)`,
-      );
-    }
-    const ifnone = ifnoneArgs[0];
-    for (const record of await this.toArray()) {
-      if (await (block as (record: unknown) => unknown)(record)) return record;
-    }
-    if (ifnone == null) return null;
-    if (typeof ifnone !== "function") {
-      const desc =
-        typeof ifnone === "boolean" ? String(ifnone) : `an instance of ${rbObjClass(ifnone)}`;
-      throw new NoMethodError(`undefined method \`call' for ${desc}`);
-    }
-    return await ifnone();
+  if (typeof args[args.length - 1] === "function") {
+    return Enumerable.find.call(this as unknown as Each<unknown, Promise<unknown>>, ...args);
   }
   return findWithIds.call(this, ...args);
 }
@@ -148,11 +169,7 @@ export async function first(this: FinderRelation, limit?: number): Promise<any> 
 }
 
 export async function firstBang(this: FinderRelation): Promise<any> {
-  const record = await first.call(this);
-  if (!record) {
-    raiseRecordNotFoundExceptionBang.call(this);
-  }
-  return record;
+  return (await first.call(this)) || raiseRecordNotFoundExceptionBang.call(this);
 }
 
 export async function last(this: FinderRelation, limit?: number): Promise<any> {
@@ -166,11 +183,7 @@ export async function last(this: FinderRelation, limit?: number): Promise<any> {
 }
 
 export async function lastBang(this: FinderRelation): Promise<any> {
-  const record = await last.call(this);
-  if (!record) {
-    raiseRecordNotFoundExceptionBang.call(this);
-  }
-  return record;
+  return (await last.call(this)) || raiseRecordNotFoundExceptionBang.call(this);
 }
 
 export async function sole(this: FinderRelation): Promise<any> {
@@ -190,11 +203,7 @@ export async function take(this: FinderRelation, limit?: number): Promise<any> {
 }
 
 export async function takeBang(this: FinderRelation): Promise<any> {
-  const record = await take.call(this);
-  if (!record) {
-    raiseRecordNotFoundExceptionBang.call(this);
-  }
-  return record;
+  return (await take.call(this)) || raiseRecordNotFoundExceptionBang.call(this);
 }
 
 /** @internal */
@@ -209,10 +218,7 @@ export async function findNthWithLimit(
   let relation: any = orderedRelation.call(this);
   const limitValue = (this as any).limitValue;
   if (limitValue != null) {
-    if (typeof limitValue !== "number") {
-      throw new NoMethodError("undefined method `-' for an instance of String");
-    }
-    limit = Math.min(limitValue - index, limit);
+    limit = Math.min(numericMinus(limitValue, index) as number, limit);
   }
   if (limit <= 0) return [];
   if (index > 0) {
@@ -221,21 +227,14 @@ export async function findNthWithLimit(
   return relation.limit(limit).toArray();
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export async function findNthFromLast(this: FinderRelation, index: number): Promise<any | null> {
   if (this.isLoaded) {
     const records: any[] = await this.records();
     return records[records.length - index] ?? null;
   }
   const relation: any = orderedRelation.call(this);
-  if (
-    relation.orderValues.length === 0 ||
-    relation.limitValue != null ||
-    relation.offsetValue != null
-  ) {
+  if (isEmpty(relation.orderValues) || relation.hasLimitOrOffset) {
     const records = await relation.records();
     return records[records.length - index] ?? null;
   }
@@ -291,10 +290,9 @@ export const fortyTwoBang = bangFinder(fortyTwo);
 export const secondToLastBang = bangFinder(secondToLast);
 export const thirdToLastBang = bangFinder(thirdToLast);
 
-/** @missingRailsCall size — PERMANENT */
 export async function isExists(
   this: FinderRelation,
-  conditions?: Record<string, unknown> | unknown,
+  conditions: Record<string, unknown> | unknown = ":none",
 ): Promise<boolean> {
   if (this.isNullRelation()) return false;
   if (conditions instanceof ActiveRecord.Base) {
@@ -305,9 +303,8 @@ export async function isExists(
   }
   if (conditions === false || conditions === null || this.limitValue === 0) return false;
   if (this.isEagerLoading) {
-    return this.applyJoinDependency({ eagerLoading: false }, (relation) =>
-      relation.isExists(conditions),
-    );
+    const relation = await this.applyJoinDependency({ eagerLoading: false });
+    return relation.isExists(conditions);
   }
   const relation = this.constructRelationForExists(conditions);
   await relation._materializeDeferredDistinctPkPredicates();
@@ -331,7 +328,7 @@ export async function isInclude(this: FinderRelation, record: any): Promise<bool
     return records.some((r) => r.equals(record));
   }
   const recordClass = record.constructor;
-  const id = recordClass.compositePrimaryKey
+  const id = recordClass.isCompositePrimaryKey()
     ? Object.fromEntries(
         (recordClass.primaryKey as string[]).map((column, index) => [column, record.id[index]]),
       )
@@ -342,10 +339,7 @@ export async function isInclude(this: FinderRelation, record: any): Promise<bool
 
 export const isMember = isInclude;
 
-/**
- * @missingRailsCall size — PERMANENT
- * @missingRailsName size — PERMANENT
- */
+/** @missingRailsName size — PERMANENT */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
   ids?: unknown,
@@ -358,46 +352,44 @@ export function raiseRecordNotFoundExceptionBang(
   const conditions = this.whereClause.isEmpty()
     ? ""
     : ` [${
-        this.arel().whereSql({
-          withConnection: <T>(block: (connection: DatabaseAdapter) => T): T =>
-            (model as any).connectionPool().withConnectionSync(block),
-        })?.value ?? ""
+        this.arel()
+          .whereSql({
+            withConnection: <T>(block: (connection: DatabaseAdapter) => T): T =>
+              (model as any).connectionPool().withConnectionSync(block),
+          })
+          ?.toString() ?? ""
       }]`;
 
   const name = this.model.name;
   key ??= this.model.primaryKey;
-  const keyToS = Array.isArray(key) ? rbInspect(key) : key;
-  const idsToS = Array.isArray(ids) ? rbInspect(ids) : ids;
 
   if (ids === undefined || ids === null) {
-    throw new RecordNotFound(
-      `Couldn't find ${name}${conditions ? ` with${conditions}` : ""}`,
-      name,
-      key,
-    );
+    let error = `Couldn't find ${name}`;
+    if (conditions) error += ` with${conditions}`;
+    throw new RecordNotFound(error, name, key);
   }
 
-  const wrapped = wrap(ids);
-  if (wrapped.length === 1) {
+  if (wrap(ids).length === 1) {
     throw new RecordNotFound(
-      `Couldn't find ${name} with '${keyToS}'=${idsToS}${conditions}`,
+      `Couldn't find ${name} with '${rbObjAsString(key)}'=${rbObjAsString(ids)}${conditions}`,
       name,
       key,
       ids,
     );
   }
 
-  let error = `Couldn't find all ${pluralize(name)} with '${keyToS}': `;
+  let error = `Couldn't find all ${pluralize(name)} with '${rbObjAsString(key)}': `;
   error += `(${(ids as unknown[]).flat(Infinity).join(", ")})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
   if (notFoundIds) {
     error +=
       ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
-      ` with ${pluralize(keyToS, notFoundIds.length)} ${notFoundIds.flat(Infinity).join(", ")}.`;
+      ` with ${pluralize(rbObjAsString(key), notFoundIds.length)} ${notFoundIds.flat(Infinity).join(", ")}.`;
   }
   throw new RecordNotFound(error, name, key, ids);
 }
 
-export const FinderMethods = {
+/** @internal */
+export const FinderMethodsPublicInstanceMethods = {
   find,
   findBy,
   findByBang,
@@ -427,7 +419,12 @@ export const FinderMethods = {
   isInclude,
   isMember,
   raiseRecordNotFoundExceptionBang,
+} as const;
+
+/** @internal */
+export const FinderMethodsPrivateInstanceMethods = {
   constructRelationForExists,
+  applyJoinDependency,
   usingLimitableReflections,
   findWithIds,
   findOne,
@@ -443,39 +440,82 @@ export const FinderMethods = {
   _orderColumns,
 } as const;
 
+export const FinderMethods = defineModule(
+  FinderMethodsPublicInstanceMethods,
+  undefined,
+  FinderMethodsPrivateInstanceMethods,
+);
+
 /** @internal */
 export function constructRelationForExists(this: FinderRelation, conditions: unknown): any {
-  if (conditions !== undefined) {
-    conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
-  }
+  conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
+
   let relation: any;
-  if ((this as any).distinctValue && (this as any).offsetValue != null) {
-    relation = (this as any).except("order").limitBang(1);
+  if (rtest(this.distinctValue) && this.offsetValue != null) {
+    relation = this.except("order").limitBang(1);
   } else {
-    relation = (this as any)
-      .except("select", "distinct", "order")
+    relation = this.except("select", "distinct", "order")
       ._selectBang(new Nodes.SqlLiteral(ONE_AS_ONE))
       .limitBang(1);
   }
-  if (conditions === undefined) {
-    return relation;
-  }
-  if (Array.isArray(conditions)) {
-    const [sql, ...binds] = conditions as unknown[];
-    if (sql !== undefined) relation = relation.where(sql, ...binds);
-  } else if (conditions instanceof Nodes.Node) {
-    relation = relation.where(conditions);
-  } else if (conditions !== null && typeof conditions === "object") {
-    if (Object.keys(conditions).length > 0) relation = relation.where(conditions);
+
+  if (Array.isArray(conditions) || isPlainObject(conditions) || conditions instanceof Map) {
+    if (!isEmpty(conditions)) relation.whereBang(conditions);
   } else {
-    const pk = this.primaryKey;
-    if (Array.isArray(pk)) {
-      relation = relation.where(buildPkWhere(pk, conditions as unknown[]));
-    } else {
-      relation = relation.where({ [pk]: conditions });
-    }
+    if (conditions !== ":none") relation.whereBang(new Map([[this.primaryKey, conditions]]));
   }
+
   return relation;
+}
+
+/** @internal */
+export function applyJoinDependency<R>(
+  this: FinderRelation,
+  { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean } = {},
+  block?: (relation: any, joinDependency: JoinDependency) => R | Promise<R>,
+): unknown {
+  const yieldRelation = (): unknown => {
+    if (block) {
+      return block(relation, joinDependency);
+    } else {
+      return stripThenable(relation);
+    }
+  };
+  const joinDependency = this.constructJoinDependency(
+    [...new Set([...this.eagerLoadValues, ...this.includesValues])],
+    Nodes.OuterJoin,
+  );
+  const relation = this.except("includes", "eagerLoad", "preload").joinsBang(joinDependency);
+
+  if (
+    eagerLoading &&
+    this.hasLimitOrOffset &&
+    !(
+      this.usingLimitableReflections(joinDependency.reflections as never) &&
+      this.usingLimitableReflections(
+        this.constructJoinDependency(
+          this.selectAssociationList(this.joinsValues).concat(
+            this.selectAssociationList(this.leftOuterJoinsValues),
+          ),
+          null,
+        ).reflections as never,
+      )
+    )
+  ) {
+    return Promise.resolve(
+      this.skipQueryCacheIfNecessary(() =>
+        this.model.withConnection((c: DatabaseAdapter) =>
+          (
+            c as unknown as {
+              distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
+            }
+          ).distinctRelationForPrimaryKey(relation),
+        ),
+      ),
+    ).then(yieldRelation);
+  }
+
+  return yieldRelation();
 }
 
 /** @internal */
@@ -486,28 +526,17 @@ export function usingLimitableReflections(
   return reflections.every((r) => !r.isCollection());
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- * @missingRailsArgs uniq — PERMANENT
- */
+/** @internal */
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
 
-  if (this.model.compositePrimaryKey && !Array.isArray(ids[0])) {
-    throw new NoMethodError(
-      ids[0] == null
-        ? "undefined method 'first' for nil"
-        : `undefined method 'first' for an instance of ${rbObjClass(ids[0])}`,
-    );
-  }
-  const expectsArray = this.model.compositePrimaryKey
-    ? Array.isArray((ids[0] as unknown[])[0])
-    : Array.isArray(ids[0]);
+  const expectsArray = this.model.isCompositePrimaryKey()
+    ? Array.isArray(aryFirst(aryFirst(ids) as unknown[]))
+    : Array.isArray(aryFirst(ids));
 
-  if (expectsArray && (ids[0] as unknown[]).length === 0) return [];
+  if (expectsArray && isEmpty(aryFirst(ids) as unknown[])) return [];
 
-  if (expectsArray) ids = ids[0] as unknown[];
+  if (expectsArray) ids = aryFirst(ids) as unknown[];
 
   ids = uniq(compact(ids));
 
@@ -519,7 +548,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
       throw new RecordNotFound(errorMessage, modelName, this.primaryKey);
     }
     case 1: {
-      const result = await findOne.call(this, ids[0]);
+      const result = await findOne.call(this, aryFirst(ids));
       return expectsArray ? [result] : result;
     }
     default:
@@ -559,25 +588,29 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   if ((this as any).selectValues.length > 0) {
     relation = relation.select(this.table.get(pk as string));
   }
-  const records = await relation.toArray();
+  const result = await relation.toArray();
 
-  let expectedSize = ids.length;
-  const limitValue: number | string | null = (this as any).limitValue ?? null;
-  const offsetValue: number | string | null = (this as any).offsetValue ?? null;
-  if (limitValue !== null && typeof limitValue !== "number") {
-    throw new ArgumentError("comparison of Integer with String failed");
+  const limitValue = this.limitValue;
+  const offsetValue = this.offsetValue;
+  let expectedSize: unknown;
+  if (limitValue != null && rbCmpint(cmp(ids.length, limitValue), ids.length, limitValue) > 0) {
+    expectedSize = limitValue;
+  } else {
+    expectedSize = ids.length;
   }
-  if (offsetValue !== null && typeof offsetValue !== "number") {
-    throw new TypeError("String can't be coerced into Integer");
-  }
-  if (limitValue !== null && ids.length > limitValue) expectedSize = limitValue;
-  if (offsetValue !== null && ids.length - offsetValue < expectedSize)
-    expectedSize = ids.length - offsetValue;
 
-  if (records.length !== expectedSize) {
-    this.raiseRecordNotFoundExceptionBang(ids, records.length, expectedSize);
+  if (
+    offsetValue != null &&
+    rbCmpint(cmp(numericMinus(ids.length, offsetValue), expectedSize), ids.length, expectedSize) < 0
+  ) {
+    expectedSize = numericMinus(ids.length, offsetValue);
   }
-  return records;
+
+  if (result.length === expectedSize) {
+    return result;
+  } else {
+    this.raiseRecordNotFoundExceptionBang(ids, result.length, expectedSize as number);
+  }
 }
 
 /**
@@ -585,12 +618,8 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
  * @missingRailsName size — PERMANENT
  */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
-  const offsetValue: number | string = (this as any).offsetValue ?? 0;
-  const limitValue: number | string | null = (this as any).limitValue ?? null;
-  if (typeof offsetValue !== "number" || (limitValue !== null && typeof limitValue !== "number")) {
-    throw new TypeError("no implicit conversion of String into Integer");
-  }
-  ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
+  ids =
+    (arySlice(ids, this.offsetValue ?? 0, this.limitValue ?? ids.length) as unknown[] | null) ?? [];
 
   let relation = (this as any).except("limit", "offset");
   const pk = this.model.primaryKey;
@@ -601,94 +630,68 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   const result: any[] = await relation.records();
 
   if (result.length === ids.length) {
-    const composite = Array.isArray(pk);
-    const keyOf = (id: unknown): unknown => (composite ? String(id) : id);
     return inOrderOf(
       result,
-      (record: any) => keyOf(record.id),
-      ids.map((id) => keyOf((this.model as any).typeForAttribute(String(pk)).cast(id))),
+      (record: any) => record.id,
+      ids.map((id) => (this.model as any).typeForAttribute(String(pk)).cast(id)),
     );
   } else {
     this.raiseRecordNotFoundExceptionBang(ids, result.length, ids.length);
   }
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export async function findTake(this: FinderRelation): Promise<any | null> {
-  if (this.isLoaded) return (await this.records())[0] ?? null;
-  (this as any)._take ??= (await (this as any).limit(1).records())[0] ?? null;
+  if (this.isLoaded) return aryFirst(await this.records()) ?? null;
+  (this as any)._take ??= aryFirst(await (this as any).limit(1).records()) ?? null;
   return (this as any)._take;
 }
 
-/**
- * @internal
- * @missingRailsCall take — PERMANENT
- */
+/** @internal */
 export async function findTakeWithLimit(this: FinderRelation, limit: number): Promise<any[]> {
-  if (this.isLoaded) return (await this.records()).slice(0, limit);
+  if (this.isLoaded) return aryTake(await this.records(), limit);
   return (this as any).limit(limit).toArray();
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export async function findNth(this: FinderRelation, index: number): Promise<any | null> {
-  const offsets = ((this as any)._offsets ??= new Map<number, any>());
-  let record = offsets.get(index) ?? null;
-  if (record == null) {
-    record = (await this.findNthWithLimit(index, 1))[0] ?? null;
-    offsets.set(index, record);
-  }
-  return record;
+  (this as any)._offsets ||= {};
+  return ((this as any)._offsets[index] ||=
+    aryFirst(await this.findNthWithLimit(index, 1)) ?? null);
 }
 
-/**
- * @internal
- * @missingRailsCall last — PERMANENT
- */
+/** @internal */
 export async function findLast(this: FinderRelation, limit?: number): Promise<any> {
   const records: any[] = await this.records();
-  if (limit === undefined) return records[records.length - 1] ?? null;
-  return limit === 0 ? [] : records.slice(-limit);
+  return limit != null ? aryLast(records, limit) : (aryLast(records) ?? null);
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function orderedRelation(this: FinderRelation): any {
-  const mc = this.model as any;
-  const pk = this.primaryKey;
-  const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
-  const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
-  if (this.orderValues.length === 0 && (implicitOrder || constraintsList != null || pk)) {
-    const cols = _orderColumns.call(this);
-    if (cols.length > 0) {
-      return (this as any).order(
-        cols.map((column: string) => (this as any).table.get(column).asc()),
-      );
-    }
+  if (
+    isEmpty(this.orderValues) &&
+    (rtest(this.model.implicitOrderColumn) ||
+      this.model.queryConstraintsList() != null ||
+      rtest(this.primaryKey))
+  ) {
+    return this.order(
+      _orderColumns.call(this).map((column) => (this as any).table.get(column).asc()),
+    );
+  } else {
+    return this;
   }
-  return this;
 }
 
 /** @internal */
 export function _orderColumns(this: FinderRelation): string[] {
-  const mc = this.model as any;
-  const pk = mc?.primaryKey;
-  const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
-  const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
+  const oc: (string | string[] | null | undefined)[] = [];
 
-  const oc: string[] = [];
-  if (implicitOrder) oc.push(implicitOrder);
-  if (constraintsList) oc.push(...constraintsList);
-  if (pk && constraintsList == null) {
-    const pkCols = Array.isArray(pk) ? pk : [pk];
-    oc.push(...pkCols);
+  if (rtest(this.model.implicitOrderColumn)) oc.push(this.model.implicitOrderColumn);
+  if (rtest(this.model.queryConstraintsList())) oc.push(this.model.queryConstraintsList());
+
+  if (rtest(this.model.primaryKey) && this.model.queryConstraintsList() == null) {
+    oc.push(this.model.primaryKey);
   }
-  return [...new Set(oc.filter(Boolean))];
+
+  return compact(uniq(oc.flat()));
 }

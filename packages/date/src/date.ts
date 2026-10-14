@@ -1,4 +1,9 @@
-import { FloatDomainError, FrozenError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  FloatDomainError,
+  FrozenError,
+  NoMethodError,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   ArgumentError,
@@ -10,7 +15,12 @@ import {
   lessThan,
   lessThanOrEqual,
   Rational,
+  rational,
+  rbCDate,
+  rbDbl2num,
+  rbDefineAllocFunc,
   rubyClass,
+  TEMPORAL_METHOD_TABLE,
 } from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
 
@@ -4404,14 +4414,18 @@ function minusDd(self: Date, other: Date): Rational {
 }
 
 /** @internal */
-function checkNumeric(obj: unknown, field: string): void {
+function checkNumeric(obj: unknown, field: string): asserts obj is number | bigint | Rational {
   if (!kNumericP(obj)) throw new TypeError(`invalid ${field} (not numeric)`);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE plain-date-seat-equals-date-is-not-symmetric
+ */
 function cmpGen(self: Date, other: unknown): number | null {
   if (kNumericP(other)) return self.ajd.cmp(other);
   else if (other instanceof Date) return self.ajd.cmp(other.ajd);
+  else if (other instanceof Temporal.PlainDate) return self.ajd.cmp(new Date(other).ajd);
   return null;
 }
 
@@ -4498,7 +4512,7 @@ function deconstructKeys(
   return h;
 }
 
-export class Date {
+export class Date extends rbCDate {
   static _railsClassName = "Date";
 
   static Error = DateError;
@@ -4552,14 +4566,15 @@ export class Date {
     of?: number,
   );
   constructor(
-    year: number | bigint | typeof SEAT | Temporal.PlainDate = -4712,
+    year?: number | bigint | typeof SEAT | Temporal.PlainDate,
     month?: number | bigint,
-    day: number | Rational = 1,
+    day?: number | Rational,
     start = DEFAULT_SG,
     df?: number,
     sf?: Rational,
     of?: number,
   ) {
+    super();
     if (year instanceof Temporal.PlainDate) {
       const sg = val2sg((month as number | undefined) ?? DEFAULT_SG);
       const [nth, ry] = decodeYear(year.year, -1);
@@ -4582,7 +4597,9 @@ export class Date {
         `wrong number of arguments (given ${arguments.length}, expected 0..4)`,
       );
     }
-    month ??= 1;
+    if (arguments.length < 3) day = 1;
+    if (arguments.length < 2) month = 1;
+    if (arguments.length < 1) year = -4712;
     checkNumeric(day, "day");
     checkNumeric(month, "month");
     checkNumeric(year, "year");
@@ -5708,8 +5725,18 @@ export class Date {
     return deconstructKeys(this, keys, false);
   }
 
-  marshalDump(): [bigint, number, number, Rational, number, number] {
-    return [this.nth, this.mJd(), this.mDf(), this.mSf(), this.mOf(), this.sg];
+  marshalDump(): [bigint, number, number, number | bigint | Rational, number, number] {
+    const sf = this.mSf();
+    const a: [bigint, number, number, number | bigint | Rational, number, number] = [
+      this.nth,
+      this.mJd(),
+      this.mDf(),
+      wholenumP(sf) ? bigNorm(sf.numerator) : sf,
+      this.mOf(),
+      rbDbl2num(this.sg),
+    ];
+
+    return a;
   }
 
   marshalLoad(a: unknown[]): this {
@@ -5749,10 +5776,10 @@ export class Date {
         break;
       case 6:
         {
-          nth = a[0] as bigint;
+          nth = BigInt(a[0] as number | bigint);
           jd = Number(a[1]);
           df = Number(a[2]);
-          sf = a[3] as Rational;
+          sf = rational(a[3] as number | bigint | Rational);
           of = Number(a[4]);
           sg = Number(a[5]);
         }
@@ -6588,10 +6615,10 @@ export class DateTime extends DateWithoutParseStatics {
         break;
       case 6:
         {
-          nth = a[0] as bigint;
+          nth = BigInt(a[0] as number | bigint);
           jd = Number(a[1]);
           df = Number(a[2]);
-          sf = a[3] as Rational;
+          sf = rational(a[3] as number | bigint | Rational);
           of = Number(a[4]);
           sg = Number(a[5]);
         }
@@ -6664,13 +6691,14 @@ export class DateTime extends DateWithoutParseStatics {
       nanosecond: ns % 1000,
     });
     if (this.#of === 0) return plain;
-    if (this.#of % 60 !== 0) {
-      return new SubMinuteOffsetZonedDateTime(
-        plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: this.#of }),
-        this.#of,
-      );
-    }
-    return plain.toZonedDateTime(of2str(this.#of));
+    const zoned =
+      this.#of % 60 !== 0
+        ? new SubMinuteOffsetZonedDateTime(
+            plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: this.#of }),
+            this.#of,
+          )
+        : plain.toZonedDateTime(of2str(this.#of));
+    return Object.defineProperty(zoned, rubyClass, { value: "DateTime" });
   }
 
   get hour(): number {
@@ -6753,3 +6781,15 @@ export class DateTime extends DateWithoutParseStatics {
     );
   }
 }
+
+rbDefineAllocFunc(Date, (klass) => new klass(SEAT, 0n, 0, DEFAULT_SG));
+rbDefineAllocFunc(
+  DateTime,
+  (klass) => new klass(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG),
+);
+
+TEMPORAL_METHOD_TABLE["Temporal.PlainDate"].marshalDump = (self: Temporal.PlainDate) =>
+  new Date(self).marshalDump();
+
+registerConstant("Date", Date);
+registerConstant("DateTime", DateTime);

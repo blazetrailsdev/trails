@@ -1,3 +1,5 @@
+import { Time } from "@blazetrails/date";
+import { rbCNumeric, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { coder } from "./coder.js";
@@ -36,7 +38,7 @@ export class Entry {
     } else if (options.expiresIn != null) {
       const expiresIn =
         typeof options.expiresIn === "number" ? options.expiresIn : options.expiresIn.toF();
-      this._expiresIn = expiresIn * 1000 + Date.now();
+      this._expiresIn = expiresIn * 1000 + Time.now().toF() * 1000;
     } else {
       this._expiresIn = null;
     }
@@ -57,7 +59,7 @@ export class Entry {
   }
 
   isExpired(): boolean {
-    return this._expiresIn != null && this._createdAt + this._expiresIn <= Date.now();
+    return this._expiresIn != null && this._createdAt + this._expiresIn <= Time.now().toF() * 1000;
   }
 
   isMismatched(version: string | null | undefined): boolean {
@@ -89,7 +91,7 @@ export class Entry {
     if (
       this._value != null &&
       !this.isCompressed() &&
-      !(typeof this._value === "number" || typeof this._value === "boolean")
+      !(rbObjIsKindOf(this._value, rbCNumeric) || typeof this._value === "boolean")
     ) {
       if (typeof this._value !== "string") {
         this._value = coder.load(coder.dump(this._value));
@@ -113,7 +115,7 @@ export class Entry {
     if (
       this._value == null ||
       typeof this._value === "boolean" ||
-      typeof this._value === "number"
+      rbObjIsKindOf(this._value, rbCNumeric)
     ) {
       uncompressedSize = 0;
     } else if (typeof this._value === "string") {

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("blank eager spec with a zero-node join dependency", () => {
   fixtures(["posts", "comments", "topics"]);

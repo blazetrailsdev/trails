@@ -4,8 +4,10 @@ import {
   arityMatches,
   matchArityAgainst,
   shouldSkipArity,
+  arityParams,
   isForwardingRubyEntry,
   renderSig,
+  threadsSuper,
 } from "./arity.js";
 import type { MethodInfo, ParamInfo } from "@blazetrails/parity/types";
 
@@ -251,6 +253,29 @@ describe("arityMatches", () => {
   });
 });
 
+describe("threadsSuper", () => {
+  const superThis: ParamInfo = req("this");
+
+  it("is true for a leading `super_`, with or without a `this:` receiver", () => {
+    expect(threadsSuper([req("super_"), req("other")])).toBe(true);
+    expect(threadsSuper([superThis, req("super_")])).toBe(true);
+  });
+
+  it("is false for any other leading parameter", () => {
+    expect(threadsSuper([])).toBe(false);
+    expect(threadsSuper([superThis, req("other")])).toBe(false);
+    expect(threadsSuper([req("other"), req("super_")])).toBe(false);
+  });
+
+  it("never matches, even where Ruby's optionals would absorb the extra slot", () => {
+    expect(arityMatches([opt("options")], [superThis, req("super_"), opt("options")]).ok).toBe(
+      false,
+    );
+    expect(arityMatches([rest("args")], [superThis, req("super_")]).ok).toBe(false);
+    expect(arityMatches([req("other")], [req("super_"), req("other")]).ok).toBe(false);
+  });
+});
+
 describe("matchArityAgainst", () => {
   it("matches when ANY candidate overlaps — real impl wins over a 0-arg binding", () => {
     // base.ts exposes `_writeAttribute: ReadonlyAttributes._writeAttribute` as a
@@ -343,5 +368,26 @@ describe("renderSig", () => {
       "(a, b = …, *c, **o, &blk)",
     );
     expect(renderSig([req("this"), req("a")], "ts")).toBe("(a)");
+  });
+});
+
+describe("arityParams", () => {
+  const rubyAlias = { notes: "alias", aliasResolved: true, params: [req("name"), opt("options")] };
+  const staticDeclare = {
+    params: [],
+    aliasParams: [req("this", "ThorClass"), req("name"), opt("options")],
+  };
+
+  it("reads the target's signature for a static declare alias against a resolved Ruby alias", () => {
+    expect(isForwardingRubyEntry(rubyAlias)).toBe(false);
+    expect(matchArityAgainst(rubyAlias.params, [staticDeclare.params]).matched).toBe(false);
+    expect(matchArityAgainst(rubyAlias.params, [arityParams(staticDeclare)]).matched).toBe(true);
+  });
+
+  it("keeps a member's own signature when it has one, or no alias target", () => {
+    expect(arityParams({ params: [req("a")], aliasParams: [req("b"), req("c")] })).toEqual([
+      req("a"),
+    ]);
+    expect(arityParams({ params: [] })).toEqual([]);
   });
 });

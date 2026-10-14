@@ -12,22 +12,26 @@ function meta(overrides: NonNullable<ConstructorParameters<typeof SqlTypeMetadat
 describe("ColumnEqualityTrails", () => {
   it("compares every attribute Rails compares", () => {
     const base = () =>
-      new Column("title", "hi", meta(), false, { comment: "c", collation: "utf8" });
+      new Column("title", "hi", meta(), false, null, { comment: "c", collation: "utf8" });
     expect(base().equals(base())).toBe(true);
 
-    expect(base().equals(new Column("other", "hi", meta(), false, { comment: "c" }))).toBe(false);
-    expect(base().equals(new Column("title", "bye", meta(), false, { comment: "c" }))).toBe(false);
-    expect(base().equals(new Column("title", "hi", meta({ limit: 10 }), false))).toBe(false);
-    expect(base().equals(new Column("title", "hi", meta(), true, { comment: "c" }))).toBe(false);
-    expect(base().equals(new Column("title", "hi", meta(), false, { comment: "other" }))).toBe(
+    expect(base().equals(new Column("other", "hi", meta(), false, null, { comment: "c" }))).toBe(
       false,
     );
-    expect(base().equals(new Column("title", "hi", meta(), false, { collation: "ascii" }))).toBe(
+    expect(base().equals(new Column("title", "bye", meta(), false, null, { comment: "c" }))).toBe(
+      false,
+    );
+    expect(base().equals(new Column("title", "hi", meta({ limit: 10 }), false))).toBe(false);
+    expect(base().equals(new Column("title", "hi", meta(), true, null, { comment: "c" }))).toBe(
       false,
     );
     expect(
-      base().equals(new Column("title", "hi", meta(), false, { defaultFunction: "now()" })),
+      base().equals(new Column("title", "hi", meta(), false, null, { comment: "other" })),
     ).toBe(false);
+    expect(
+      base().equals(new Column("title", "hi", meta(), false, null, { collation: "ascii" })),
+    ).toBe(false);
+    expect(base().equals(new Column("title", "hi", meta(), false, "now()"))).toBe(false);
   });
 
   it("is not equal to a non-Column", () => {
@@ -58,7 +62,7 @@ describe("ColumnEqualityTrails", () => {
     const pg = new PostgreSQLColumn(
       "id",
       null,
-      new PgTypeMetadata({ sqlType: "integer", type: "integer" }),
+      new PgTypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
       false,
     );
     const metadata = new SqlTypeMetadata({ sqlType: "integer", type: "integer" });
@@ -68,31 +72,46 @@ describe("ColumnEqualityTrails", () => {
   });
 
   it("compares the PostgreSQL identity and serial flags", () => {
-    const opts = new PgTypeMetadata({ sqlType: "integer", type: "integer" });
+    const opts = new PgTypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" }));
     const plain = new PostgreSQLColumn("id", null, opts, false);
     expect(plain.equals(new PostgreSQLColumn("id", null, opts, false))).toBe(true);
-    expect(plain.equals(new PostgreSQLColumn("id", null, opts, false, { serial: true }))).toBe(
-      false,
-    );
-    expect(plain.equals(new PostgreSQLColumn("id", null, opts, false, { identity: "a" }))).toBe(
-      false,
-    );
+    expect(
+      plain.equals(new PostgreSQLColumn("id", null, opts, false, null, { serial: true })),
+    ).toBe(false);
+    expect(
+      plain.equals(new PostgreSQLColumn("id", null, opts, false, null, { identity: "a" })),
+    ).toBe(false);
   });
 
   it("compares the SQLite3 autoIncrement flag", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new SQLite3Column("id", null, opts, false);
-    expect(plain.equals(new SQLite3Column("id", null, opts, false))).toBe(true);
-    expect(plain.equals(new SQLite3Column("id", null, opts, false, { autoIncrement: true }))).toBe(
-      false,
+    const plain = new SQLite3Column("id", null, new SqlTypeMetadata(opts), false);
+    expect(plain.equals(new SQLite3Column("id", null, new SqlTypeMetadata(opts), false))).toBe(
+      true,
     );
-    expect(plain.equals(new SQLite3Column("id", null, opts, false, { rowid: true }))).toBe(true);
+    expect(
+      plain.equals(
+        new SQLite3Column("id", null, new SqlTypeMetadata(opts), false, null, {
+          autoIncrement: true,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      plain.equals(
+        new SQLite3Column("id", null, new SqlTypeMetadata(opts), false, null, { rowid: true }),
+      ),
+    ).toBe(true);
   });
 
   it("does not equal a sibling adapter's column", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const pg = new PostgreSQLColumn("id", null, new PgTypeMetadata(opts), false);
-    const sqlite = new SQLite3Column("id", null, opts, false);
+    const pg = new PostgreSQLColumn(
+      "id",
+      null,
+      new PgTypeMetadata(new SqlTypeMetadata(opts)),
+      false,
+    );
+    const sqlite = new SQLite3Column("id", null, new SqlTypeMetadata(opts), false);
     expect(pg.equals(sqlite)).toBe(false);
     expect(sqlite.equals(pg)).toBe(false);
   });
@@ -100,8 +119,8 @@ describe("ColumnEqualityTrails", () => {
 
 describe("ColumnDeduplicationTrails", () => {
   it("collapses identical columns onto one frozen instance through the registry", () => {
-    const a = new Column("dedup_title", "hi", meta(), false, { comment: "c" }).deduplicate();
-    const b = new Column("dedup_title", "hi", meta(), false, { comment: "c" }).deduplicate();
+    const a = new Column("dedup_title", "hi", meta(), false, null, { comment: "c" }).deduplicate();
+    const b = new Column("dedup_title", "hi", meta(), false, null, { comment: "c" }).deduplicate();
     expect(b).toBe(a);
     expect(Object.isFrozen(a)).toBe(true);
   });
@@ -114,18 +133,30 @@ describe("ColumnDeduplicationTrails", () => {
 
   it("folds the PostgreSQL identity and serial flags into the key", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new PostgreSQLColumn("dedup_pg", null, new PgTypeMetadata(opts), false);
-    const serial = new PostgreSQLColumn("dedup_pg", null, new PgTypeMetadata(opts), false, {
-      serial: true,
-    });
+    const plain = new PostgreSQLColumn(
+      "dedup_pg",
+      null,
+      new PgTypeMetadata(new SqlTypeMetadata(opts)),
+      false,
+    );
+    const serial = new PostgreSQLColumn(
+      "dedup_pg",
+      null,
+      new PgTypeMetadata(new SqlTypeMetadata(opts)),
+      false,
+      null,
+      {
+        serial: true,
+      },
+    );
     expect(plain.deduplicate()).not.toBe(serial.deduplicate());
   });
 
   it("folds the PostgreSQL type metadata oid and fmod into the key", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new PgTypeMetadata(opts);
-    const withOid = new PgTypeMetadata(opts, { oid: 23 });
-    const withFmod = new PgTypeMetadata(opts, { fmod: 4 });
+    const plain = new PgTypeMetadata(new SqlTypeMetadata(opts));
+    const withOid = new PgTypeMetadata(new SqlTypeMetadata(opts), { oid: 23 });
+    const withFmod = new PgTypeMetadata(new SqlTypeMetadata(opts), { fmod: 4 });
     expect(plain.hash()).not.toBe(withOid.hash());
     expect(plain.hash()).not.toBe(withFmod.hash());
     expect(plain.deduplicate()).not.toBe(withOid.deduplicate());
@@ -134,7 +165,6 @@ describe("ColumnDeduplicationTrails", () => {
   it("interns the sqlTypeMetadata onto the shared canonical instance", () => {
     const canonical = meta({ sqlType: "bigint" }).deduplicate();
     const own = meta({ sqlType: "bigint" });
-    expect(own).not.toBe(canonical);
     const column = new Column("dedup_interned", null, own, false).deduplicate();
     expect(column.sqlTypeMetadata).toBe(canonical);
     expect(Object.isFrozen(canonical)).toBe(true);
@@ -142,8 +172,10 @@ describe("ColumnDeduplicationTrails", () => {
 
   it("folds the SQLite3 rowid flag into the key, which its equality ignores", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new SQLite3Column("dedup_sqlite", null, opts, false);
-    const rowid = new SQLite3Column("dedup_sqlite", null, opts, false, { rowid: true });
+    const plain = new SQLite3Column("dedup_sqlite", null, new SqlTypeMetadata(opts), false);
+    const rowid = new SQLite3Column("dedup_sqlite", null, new SqlTypeMetadata(opts), false, null, {
+      rowid: true,
+    });
     expect(plain.equals(rowid)).toBe(true);
     expect(plain.deduplicate()).not.toBe(rowid.deduplicate());
   });

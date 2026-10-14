@@ -1,9 +1,11 @@
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { describe, it, expect, vi } from "vitest";
-import { SchemaStatements, canRemoveIndexByName } from "./schema-statements.js";
+import { SchemaStatements } from "./schema-statements.js";
+import { indexNameLength, maxIdentifierLength, tableNameLength } from "./database-limits.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
+  Table as SchemaTable,
   TableDefinition,
   type ColumnType,
 } from "./schema-definitions.js";
@@ -53,6 +55,9 @@ function makeStatements(
   adapter["supportsExclusionConstraints"] ??= () => false;
   adapter["supportsUniqueConstraints"] ??= () => false;
   adapter["useForeignKeys"] ??= () => true;
+  adapter["maxIdentifierLength"] ??= maxIdentifierLength;
+  adapter["tableNameLength"] ??= tableNameLength;
+  adapter["indexNameLength"] ??= indexNameLength;
   adapter["nativeDatabaseTypes"] ??= () => SQLite3Adapter.NATIVE_DATABASE_TYPES;
   adapter["dataSourceSql"] ??= (name?: string | null) =>
     name == null
@@ -176,6 +181,30 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(await ss.indexNameForRemove("users", longExpr, {})).toBe(expected);
   });
 
+  it("indexNameForRemove tests :name by key presence, and compares options[:name].to_s", async () => {
+    const indexes = vi.fn().mockResolvedValue([
+      { name: "index_users_on_email", columns: ["email"], unique: false },
+      { name: "", columns: ["email"], unique: false },
+    ]);
+    const ss = makeStatements({ indexes });
+    expect(await ss.indexNameForRemove("users", "email", { name: undefined })).toBe("");
+    expect(await ss.indexNameForRemove("users", "email", { name: "" })).toBe("");
+    expect(await ss.indexNameForRemove("users", "lower(email)", { name: undefined })).toBe("");
+    expect(indexes).toHaveBeenCalledTimes(3);
+    await expect(ss.indexNameForRemove("users", "email", {})).rejects.toThrow(
+      /Multiple indexes found on users columns/,
+    );
+  });
+
+  it("Table#removeIndex does not forward an absent name as a present key", async () => {
+    const removeIndex = vi.fn().mockResolvedValue(undefined);
+    const table = new SchemaTable("users", { removeIndex } as never);
+    await table.removeIndex("email");
+    expect(removeIndex).toHaveBeenCalledWith("users", "email");
+    await table.removeIndex({ column: "email" });
+    expect("name" in removeIndex.mock.calls[1][2]).toBe(false);
+  });
+
   it("stripTableNamePrefixAndSuffix strips prefix/suffix", () => {
     const ss = makeStatements({ tableNamePrefix: "app_", tableNameSuffix: "_v2" });
     expect(ss.stripTableNamePrefixAndSuffix("app_users_v2")).toBe("users");
@@ -218,12 +247,45 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(() => ss.foreignKeyName("astronauts", {})).toThrow("key not found: :column");
   });
 
-  it("foreignKeyName returns an explicitly supplied nullish name instead of deriving", () => {
+  it("foreignKeyName derives the name for a name forwarded as undefined", () => {
     const ss = makeStatements();
-    expect(ss.foreignKeyName("astronauts", { name: undefined, column: "rocket_id" })).toBe(
-      undefined,
-    );
+    const derived = ss.foreignKeyName("astronauts", { column: "rocket_id" });
+    expect(ss.foreignKeyName("astronauts", { name: undefined, column: "rocket_id" })).toBe(derived);
     expect(ss.foreignKeyName("astronauts", { name: "", column: "rocket_id" })).toBe("");
+  });
+
+  it("addForeignKey and addCheckConstraint derive the name for a name forwarded as undefined", async () => {
+    const ss = makeStatements();
+    await ss.addForeignKey("astronauts", "rockets", { name: undefined });
+    await ss.addCheckConstraint("users", "age > 0", { name: undefined });
+    const sql = ((ss as any).execute as ReturnType<typeof vi.fn>).mock.calls.map(([s]) => s);
+    expect(sql[0]).toContain(ss.foreignKeyName("astronauts", { column: "rocket_id" }));
+    expect(sql[1]).toContain(ss.checkConstraintName("users", { expression: "age > 0" }));
+  });
+
+  it("foreignKeyFor ignores a name forwarded as undefined", async () => {
+    const ss = makeStatements();
+    const fk = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: "rocket_id",
+      name: "fk_rails_78146ddd2e",
+    });
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
+    expect(await ss.foreignKeyFor("astronauts", { name: undefined, column: "rocket_id" })).toBe(fk);
+  });
+
+  it("the ForBang messages take Ruby truthiness for the || operand", async () => {
+    const ss = makeStatements();
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([]);
+    vi.spyOn(ss, "checkConstraints").mockResolvedValue([]);
+    await expect(
+      ss.foreignKeyForBang("astronauts", { toTable: false as never, column: "rocket_id" }),
+    ).rejects.toThrow("Table 'astronauts' has no foreign key for {:column=>\"rocket_id\"}");
+    await expect(
+      ss.checkConstraintForBang("users", { expression: false as never, name: "chk" }),
+    ).rejects.toThrow("Table 'users' has no check constraint for {:name=>\"chk\"}");
+    await expect(
+      ss.checkConstraintForBang("users", { expression: "", name: "chk" }),
+    ).rejects.toThrow("Table 'users' has no check constraint for ");
   });
 
   it("checkConstraintName", () => {
@@ -236,18 +298,18 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(() => ss.checkConstraintName("users", {})).toThrow("key not found: :expression");
   });
 
-  it("checkConstraintName returns an explicitly supplied nullish name instead of deriving", () => {
+  it("checkConstraintName derives the name for a name forwarded as undefined", () => {
     const ss = makeStatements();
+    const derived = ss.checkConstraintName("users", { expression: "age > 0" });
+    expect(derived).toMatch(/^chk_rails_[0-9a-f]{10}$/);
     expect(ss.checkConstraintName("users", { name: undefined, expression: "age > 0" })).toBe(
-      undefined,
+      derived,
     );
     expect(ss.checkConstraintName("users", { name: "", expression: "age > 0" })).toBe("");
-    expect(ss.checkConstraintName("users", { expression: "age > 0" })).toMatch(
-      /^chk_rails_[0-9a-f]{10}$/,
-    );
-    expect(ss.checkConstraintName("users", { expression: undefined })).toBe(
+    expect(ss.checkConstraintName("users", { expression: null })).toBe(
       ss.checkConstraintName("users", { expression: "" }),
     );
+    expect(() => ss.checkConstraintName("users", { expression: undefined })).toThrow(KeyError);
     expect(() => ss.checkConstraintName("users", {})).toThrow(KeyError);
     expect(() => ss.checkConstraintName("users", {})).toThrow("key not found: :expression");
   });
@@ -257,9 +319,17 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.checkConstraintOptions("users", "age > 0", {})).toEqual({
       name: ss.checkConstraintName("users", { expression: "age > 0" }),
     });
-    expect(ss.checkConstraintOptions("users", "age > 0", { name: undefined })).toEqual({
-      name: undefined,
+  });
+
+  it("checkConstraintFor derives the name for a name forwarded as undefined", async () => {
+    const ss = makeStatements();
+    const chk = new CheckConstraintDefinition("users", "age > 0", {
+      name: ss.checkConstraintName("users", { expression: "age > 0" }),
     });
+    vi.spyOn(ss, "checkConstraints").mockResolvedValue([chk]);
+    expect(await ss.checkConstraintFor("users", { name: undefined, expression: "age > 0" })).toBe(
+      chk,
+    );
   });
 
   it("checkConstraintExists guards on key presence, not truthiness", async () => {
@@ -306,7 +376,7 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect((ss as any).execute).toHaveBeenCalled();
   });
 
-  it("checkConstraintExists returns false when an explicit undefined name is supplied", async () => {
+  it("checkConstraintExists derives the name for a name forwarded as undefined", async () => {
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" })!;
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
@@ -314,7 +384,18 @@ describe("SchemaStatements privates (PR 8)", () => {
     ]);
     expect(
       await ss.checkConstraintExists("users", { name: undefined, expression: "age > 0" }),
-    ).toBe(false);
+    ).toBe(true);
+    await expect(ss.checkConstraintExists("users", { name: undefined })).rejects.toThrow(
+      "At least one of :name or :expression must be supplied",
+    );
+  });
+
+  it("addColumns raises ArgumentError without the type keyword", async () => {
+    const ss = makeStatements() as unknown as {
+      addColumns(tableName: string, ...columnNames: string[]): Promise<void>;
+    };
+    await expect(ss.addColumns("people", "name")).rejects.toThrow("missing keyword: :type");
+    await expect(ss.addColumns("people")).rejects.toThrow("missing keyword: :type");
   });
 
   it("validateIndexLengthBang throws when name too long", () => {
@@ -465,10 +546,10 @@ describe("SchemaStatements privates (PR 8)", () => {
 
     expect(await ss.foreignKeyExists("users", "orgs")).toBe(true);
     expect(await ss.foreignKeyExists("users", "teams")).toBe(false);
-    expect(await ss.foreignKeyExists("users", { column: "org_id" })).toBe(true);
-    expect(await ss.foreignKeyExists("users", { column: "other_id" })).toBe(false);
-    expect(await ss.foreignKeyExists("users", { name: "fk_rails_abc" })).toBe(true);
-    expect(await ss.foreignKeyExists("users", { name: "nope" })).toBe(false);
+    expect(await ss.foreignKeyExists("users", undefined, { column: "org_id" })).toBe(true);
+    expect(await ss.foreignKeyExists("users", undefined, { column: "other_id" })).toBe(false);
+    expect(await ss.foreignKeyExists("users", undefined, { name: "fk_rails_abc" })).toBe(true);
+    expect(await ss.foreignKeyExists("users", undefined, { name: "nope" })).toBe(false);
     expect(await ss.foreignKeyExists("users")).toBe(true);
   });
 
@@ -552,24 +633,6 @@ describe("SchemaStatements#quotedColumnsForIndex", () => {
     expect(await ss.quotedColumnsForIndex(["id", "name"], { order: { id: "desc" } })).toBe(
       '"id", "name"',
     );
-  });
-});
-
-describe("canRemoveIndexByName (module-level)", () => {
-  it("is true for a bare name", () => {
-    expect(canRemoveIndexByName(null, { name: "idx" })).toBe(true);
-  });
-
-  it("tolerates an algorithm key", () => {
-    expect(canRemoveIndexByName(null, { name: "idx", algorithm: "concurrently" })).toBe(true);
-  });
-
-  it("rejects extra keys other than name/algorithm", () => {
-    expect(canRemoveIndexByName(null, { name: "idx", unique: true })).toBe(false);
-  });
-
-  it("rejects a given column name", () => {
-    expect(canRemoveIndexByName("email", { name: "idx" })).toBe(false);
   });
 });
 

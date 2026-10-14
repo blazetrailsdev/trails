@@ -51,9 +51,9 @@ the Arel errors.
 `Arel::Visitors::Visitor` derives the method to call from the visited object's
 class at runtime, `:"visit_#{klass.name.gsub('::', '_')}"`
 (`vendor/rails/v8.0.2/activerecord/lib/arel/visitors/visitor.rb:17-21`), and caches it
-per visitor class. trails does the same. It reads `ctor.name`, plus the
-class's branded Ruby nesting, since a JS constructor name carries no namespace,
-in `packages/arel/src/visitors/ruby-class.ts`.
+per visitor class. trails does the same through ruby-compat's `rbObjClass` and `rbModName`, which
+read the path `rbSetClassPathString` gave the class where it is seated on its
+namespace, since a JS constructor name carries no namespace.
 
 That makes the class names load-bearing at runtime. The published `dist/` is
 unminified ESM, but a consumer bundling arel with **name mangling enabled** will

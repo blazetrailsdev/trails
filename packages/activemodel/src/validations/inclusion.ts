@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { include, mergeBang } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 import {
@@ -17,13 +17,12 @@ export interface InclusionValidator extends Clusivity {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InclusionValidator extends EachValidator {
-  /** @missingRailsArgs merge! — PERMANENT */
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!this.isInclude(record, value)) {
       record.errors.add(
         attribute,
         ":inclusion",
-        mergeBang(except(this.options, "in", "within"), { value }),
+        Object.assign(except(this.options, "in", "within"), { value }),
       );
     }
   }

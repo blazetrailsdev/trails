@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import "./index.js";
 import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { registerModel } from "./associations.js";
 import { Relation } from "./relation.js";
 import { DeferredIdsNotIn } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
@@ -14,7 +14,7 @@ describe("excluding deferred arm (trails)", () => {
   fixtures(["posts"]);
 
   it("reads the primary key off the predicate builder's table for an unloaded relation", () => {
-    const aliased = new Relation(Post, Post.arelTable.alias("p"));
+    const aliased = new Relation(Post, { table: Post.arelTable.alias("p") });
     const relation = aliased.excluding(Post.where({ title: "Welcome to the weblog" }));
 
     const predicate = relation.whereClause.predicates.at(-1) as Nodes.NotIn;

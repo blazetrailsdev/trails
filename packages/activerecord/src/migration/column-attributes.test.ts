@@ -1,3 +1,4 @@
+import { fixtures } from "../test-helpers/use-fixtures.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    The test class spells `include ActiveRecord::Migration::TestHelper` (migration/helper.rb:10); the
    empty class/interface merge carries the mixed-in methods onto its type. */
@@ -7,7 +8,6 @@ import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/ruby-compat";
 import { TestHelper, TestModel } from "../test-helpers/migration-helper.js";
-import { assertColumn, assertNoColumn } from "../test-helpers/test-case.js";
 import { adapterType } from "../test-adapter.js";
 
 class ColumnAttributesTest {}
@@ -15,6 +15,8 @@ interface ColumnAttributesTest extends TestHelper {}
 include(ColumnAttributesTest, TestHelper);
 
 describe("Migration", () => {
+  const { self: testCase } = fixtures([], { useTransactionalTests: false });
+
   describe("ColumnAttributesTest", () => {
     const self = new ColumnAttributesTest();
 
@@ -27,27 +29,27 @@ describe("Migration", () => {
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
-      expect(TestModel.new().command).toBe(string);
+      expect(new TestModel().command).toBe(string);
     });
 
     it("add remove single field using string arguments", async () => {
-      await assertNoColumn(TestModel, "last_name");
+      await testCase().assertNoColumn(TestModel, "last_name");
 
       await self.addColumn("test_models", "last_name", "string");
-      await assertColumn(TestModel, "last_name");
+      await testCase().assertColumn(TestModel, "last_name");
 
       await self.removeColumn("test_models", "last_name");
-      await assertNoColumn(TestModel, "last_name");
+      await testCase().assertNoColumn(TestModel, "last_name");
     });
 
     it("add remove single field using symbol arguments", async () => {
-      await assertNoColumn(TestModel, "last_name");
+      await testCase().assertNoColumn(TestModel, "last_name");
 
       await self.addColumn("test_models", "last_name", "string");
-      await assertColumn(TestModel, "last_name");
+      await testCase().assertColumn(TestModel, "last_name");
 
       await self.removeColumn("test_models", "last_name");
-      await assertNoColumn(TestModel, "last_name");
+      await testCase().assertNoColumn(TestModel, "last_name");
     });
 
     it.skipIf(adapterType === "mysql")("add column without limit", async () => {

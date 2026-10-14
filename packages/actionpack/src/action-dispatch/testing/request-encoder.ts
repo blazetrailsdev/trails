@@ -1,4 +1,8 @@
-import { ArgumentError, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbFSend, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  ToJsonWithActiveSupportEncoder,
+  type ToJsonWithActiveSupportEncoderHost,
+} from "@blazetrails/activesupport";
 import { Mime, MimeType } from "../http/mime-type.js";
 
 export type ResponseParser = (body: string) => unknown;
@@ -43,7 +47,16 @@ export class RequestEncoder {
     }
     this._mime = mime;
     this.responseParser = responseParser ?? ((body) => body);
-    this._paramEncoder = paramEncoder ?? ((params) => params);
+    const mid = `to_${symbolToS(this._mime.symbol!)}`;
+    this._paramEncoder =
+      paramEncoder ??
+      ((params) =>
+        mid === "to_json"
+          ? ToJsonWithActiveSupportEncoder.toJSON.call(
+              params as ToJsonWithActiveSupportEncoderHost,
+              null,
+            )
+          : rbFSend(params, mid));
   }
 
   get contentType(): string {
@@ -59,7 +72,7 @@ export class RequestEncoder {
     return this._paramEncoder(params);
   }
 
-  static parser(contentType: string | undefined): ResponseParser {
+  static parser(contentType: string | null | undefined): ResponseParser {
     const symbol = contentType ? MimeType.lookup(contentType).symbol : null;
     const type = symbol != null ? symbolToS(symbol) : undefined;
     return RequestEncoder.encoder(type).responseParser;

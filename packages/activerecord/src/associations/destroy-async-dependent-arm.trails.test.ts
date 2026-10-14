@@ -1,16 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { rbModConstSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
-class DestroyAsyncTestJob {}
+class DestroyAsyncTestJob {
+  static performLater(_jobArguments: Record<string, unknown>): void {}
+}
 registerConstant("DestroyAsyncTestJob", DestroyAsyncTestJob);
 
 class AsyncBook extends Base {
   static _tableName = "books";
   static {
-    this.destroyAssociationAsyncJob("DestroyAsyncTestJob");
+    this.destroyAssociationAsyncJob = "DestroyAsyncTestJob";
     this.hasMany("essays", {
       dependent: "destroyAsync",
       className: "AsyncEssay",
@@ -27,20 +29,29 @@ class AsyncBook extends Base {
 class AsyncEssay extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob("DestroyAsyncTestJob");
+    this.destroyAssociationAsyncJob = "DestroyAsyncTestJob";
     this.belongsTo("book", { dependent: "destroyAsync", className: "AsyncBook" });
   }
 }
+
+const AsyncShelf = { name: "AsyncShelf" };
+
+class Essay extends Base {
+  static _tableName = "essays";
+  static {
+    this.destroyAssociationAsyncJob = "DestroyAsyncTestJob";
+    this.belongsTo("book", { dependent: "destroyAsync", className: "AsyncBook" });
+  }
+}
+rbModConstSet(AsyncShelf, "Essay", Essay);
 
 class AsyncContent extends Base {
   static _tableName = "content";
 }
 
 function jobsFor(record: Base): Array<[unknown, Record<string, unknown>]> {
-  return (
-    (record as unknown as { _afterCommitJobs?: Array<[unknown, Record<string, unknown>]> })
-      ._afterCommitJobs ?? []
-  );
+  return (record as unknown as { _afterCommitJobs: Array<[unknown, Record<string, unknown>]> })
+    ._afterCommitJobs;
 }
 
 describe("destroy_async dependent arm", () => {
@@ -67,6 +78,16 @@ describe("destroy_async dependent arm", () => {
       associationPrimaryKeyColumn: "id",
       ensuringOwnerWasMethod: null,
     });
+  });
+
+  it("belongs_to enqueues a namespaced owner's qualified name", async () => {
+    const book = await AsyncBook.create({ name: "Der be gold" });
+    const essay = await Essay.create({ name: "essay", book_id: book.id });
+
+    await essay.destroy();
+
+    expect(jobsFor(essay)[0][1].ownerModelName).toBe("AsyncShelf::Essay");
+    expect(jobsFor(essay)[0][1].associationClass).toBe("AsyncBook");
   });
 
   it("has_many enqueues every target id in one batch", async () => {

@@ -1,7 +1,7 @@
 import { assertRaise, assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
 import { ArgumentError, Range, kernelThrow } from "@blazetrails/ruby-compat";
 

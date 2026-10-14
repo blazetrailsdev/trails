@@ -18,19 +18,12 @@ import {
 import { ArgumentError, ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { currentAdapter } from "./support/adapter-helper.js";
-import { quoteTableName } from "./support/quote-regex.js";
 import { StatementInvalid } from "./errors.js";
 import { deprecator } from "./deprecator.js";
-import { captureSql } from "./testing/sql-capture.js";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { assertAsyncEqual } from "./support/async-helper.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
-import { withTimezoneConfig } from "./test-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Company, DependentFirm, Client } from "./test-helpers/models/company.js";
@@ -84,7 +77,7 @@ function byRecord(result: unknown, record: { id: unknown }): unknown {
 }
 
 describe("CalculationsTest", () => {
-  const { companies, topics, cpkBooks, minivans } = fixtures([
+  const { self, companies, topics, cpkBooks, minivans } = fixtures([
     "companies",
     "accounts",
     "authors",
@@ -96,9 +89,7 @@ describe("CalculationsTest", () => {
     "posts",
     "comments",
     "cpkBooks",
-    "cpkAuthors",
-    "oneNeedQuoting",
-  ] as const);
+  ]);
 
   it("should sum field", async () => {
     expect(await Account.sum("credit_limit")).toEqual(318);
@@ -242,7 +233,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by field", async () => {
-    const c = (await Account.group("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").sum("credit_limit");
     for (const firmId of [1, 6, 2]) {
       expect([...c.keys()], `Group ${String(c)} does not contain firm_id ${firmId}`).toContain(
         firmId,
@@ -252,9 +243,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by arel attribute", async () => {
-    const c = (await Account.group(Account.arelTable.get("firm_id")).sum(
-      "credit_limit",
-    )) as Grouped;
+    const c = await Account.group(Account.arelTable.get("firm_id")).sum("credit_limit");
     for (const firmId of [1, 6, 2]) {
       expect([...c.keys()], `Group ${String(c)} does not contain firm_id ${firmId}`).toContain(
         firmId,
@@ -290,7 +279,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by multiple fields having functions", async () => {
-    const c = (await Topic.group("author_name", "COALESCE(type, title)").count(":all")) as Grouped;
+    const c = await Topic.group("author_name", "COALESCE(type, title)").count(":all");
     const get = (key: unknown[]): unknown =>
       [...c.entries()].find(([k]) => JSON.stringify(k) === JSON.stringify(key))?.[1];
     expect(get(["Carl", "The Third Topic of the day"])).toEqual(1);
@@ -357,7 +346,7 @@ describe("CalculationsTest", () => {
     await developer.auditLogs.create({ message: "first log" });
     await developer.auditLogs.create({ message: "second log" });
 
-    const c = (await developer.auditLogs.joins(":developer").group("id").count()) as Grouped;
+    const c = await developer.auditLogs.joins(":developer").group("id").count();
 
     expect(c.size).toEqual(await developer.auditLogs.count());
     for (const log of await developer.auditLogs) {
@@ -366,51 +355,50 @@ describe("CalculationsTest", () => {
   });
 
   it("should not use alias for grouped field", async () => {
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(
-        `GROUP BY ${quoteTableName("accounts.firm_id").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+        `GROUP BY ${self()
+          .quoteTableName("accounts.firm_id")
+          .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
         "i",
       ),
-      undefined,
-      false,
+      {},
       async () => {
-        const c = (await Account.group("firm_id")
-          .order("accounts_firm_id")
-          .sum("credit_limit")) as Grouped;
+        const c = await Account.group("firm_id").order("accounts_firm_id").sum("credit_limit");
         expect([...c.keys()].filter((k) => k != null)).toEqual([1, 2, 6, 9]);
       },
     );
   });
 
   it("should order by grouped field", async () => {
-    const c = (await Account.group("firm_id").order("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").order("firm_id").sum("credit_limit");
     expect([...c.keys()].filter((k) => k != null)).toEqual([1, 2, 6, 9]);
   });
 
   it("should order by calculation", async () => {
-    const c = (await Account.group("firm_id")
+    const c = await Account.group("firm_id")
       .order("sum_credit_limit desc, firm_id")
-      .sum("credit_limit")) as Grouped;
+      .sum("credit_limit");
     expect([...c.keys()].map((k) => c.get(k))).toEqual([105, 60, 53, 50, 50]);
     expect([...c.keys()].filter((k) => k != null)).toEqual([6, 2, 9, 1]);
   });
 
   it("should limit calculation", async () => {
-    const c = (await Account.where("firm_id IS NOT NULL")
+    const c = await Account.where("firm_id IS NOT NULL")
       .group("firm_id")
       .order("firm_id")
       .limit(2)
-      .sum("credit_limit")) as Grouped;
+      .sum("credit_limit");
     expect([...c.keys()].filter((k) => k != null)).toEqual([1, 2]);
   });
 
   it("should limit calculation with offset", async () => {
-    const c = (await Account.where("firm_id IS NOT NULL")
+    const c = await Account.where("firm_id IS NOT NULL")
       .group("firm_id")
       .order("firm_id")
       .limit(2)
       .offset(1)
-      .sum("credit_limit")) as Grouped;
+      .sum("credit_limit");
     expect([...c.keys()].filter((k) => k != null)).toEqual([2, 6]);
   });
 
@@ -445,7 +433,7 @@ describe("CalculationsTest", () => {
   });
 
   it("limit is kept", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.limit(1).count();
     });
     expect(queries.length).toEqual(1);
@@ -453,7 +441,7 @@ describe("CalculationsTest", () => {
   });
 
   it("offset is kept", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.offset(1).count();
     });
     expect(queries.length).toEqual(1);
@@ -461,7 +449,7 @@ describe("CalculationsTest", () => {
   });
 
   it("limit with offset is kept", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.limit(1).offset(1).count();
     });
     expect(queries.length).toEqual(1);
@@ -470,7 +458,7 @@ describe("CalculationsTest", () => {
   });
 
   it("no limit no offset", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.count();
     });
     expect(queries.length).toEqual(1);
@@ -479,7 +467,7 @@ describe("CalculationsTest", () => {
   });
 
   it("no order by when counting all", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.order({ id: "desc" }).limit(10).count();
     });
     expect(queries.length).toBe(1);
@@ -496,7 +484,7 @@ describe("CalculationsTest", () => {
   });
 
   it("apply distinct in count", async () => {
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.distinct().count();
       await Account.group("firm_id").distinct().count();
     });
@@ -630,7 +618,7 @@ describe("CalculationsTest", () => {
   it("group by count for a composite primary key model", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
     const expected = new Map([
-      [book.author_id, (await CpkBook.where({ author_id: book.author_id }).count()) as number],
+      [book.author_id, await CpkBook.where({ author_id: book.author_id }).count()],
     ]);
     expect(await CpkBook.where({ author_id: book.author_id }).group("author_id").count()).toEqual(
       expected,
@@ -644,9 +632,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by summed field having condition", async () => {
-    const c = (await Account.group("firm_id")
-      .having("sum(credit_limit) > 50")
-      .sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").having("sum(credit_limit) > 50").sum("credit_limit");
     expect(c.get(1)).toBeUndefined();
     expect(c.get(6)).toEqual(105);
     expect(c.get(2)).toEqual(60);
@@ -655,10 +641,10 @@ describe("CalculationsTest", () => {
   it.skipIf(adapterType === "postgres")(
     "should group by summed field having condition from select",
     async () => {
-      const c = (await Account.select("MIN(credit_limit) AS min_credit_limit")
+      const c = await Account.select("MIN(credit_limit) AS min_credit_limit")
         .group("firm_id")
         .having("min_credit_limit > 50")
-        .sum("credit_limit")) as Grouped;
+        .sum("credit_limit");
       expect(c.get(1)).toBeUndefined();
       expect(c.get(2)).toBe(60);
       expect(c.get(9)).toBe(53);
@@ -688,13 +674,13 @@ describe("CalculationsTest", () => {
   });
 
   it("should return type casted values with group and expression", async () => {
-    expect(
-      ((await Account.group("firm_name").sum("0.01 * credit_limit")) as Grouped).get("37signals"),
-    ).toEqual(0.5);
+    expect((await Account.group("firm_name").sum("0.01 * credit_limit")).get("37signals")).toEqual(
+      0.5,
+    );
   });
 
   it("should group by summed field with conditions", async () => {
-    const c = (await Account.where("firm_id > 1").group("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.where("firm_id > 1").group("firm_id").sum("credit_limit");
     expect(c.get(1)).toBeUndefined();
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
@@ -702,7 +688,7 @@ describe("CalculationsTest", () => {
 
   it("should group by summed field with conditions and having", async () => {
     const relation = Account.where("firm_id > 1").group("firm_id").having("sum(credit_limit) > 60");
-    const c = (await relation.sum("credit_limit")) as Grouped;
+    const c = await relation.sum("credit_limit");
     expect(c.get(1)).toBeUndefined();
     expect(c.get(6)).toEqual(105);
     expect(c.get(2)).toBeUndefined();
@@ -711,14 +697,14 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by fields with table alias", async () => {
-    const c = (await Account.group("accounts.firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("accounts.firm_id").sum("credit_limit");
     expect(c.get(1)).toBe(50);
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
   });
 
   it("should calculate grouped with longer field", async () => {
-    const c = (await Account.group("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").sum("credit_limit");
     expect(c.get(1)).toBe(50);
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
@@ -730,7 +716,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped with invalid field", async () => {
-    const c = (await Account.group("accounts.firm_id").count(":all")) as Grouped;
+    const c = await Account.group("accounts.firm_id").count(":all");
     expect(c.get(1)).toBe(1);
     expect(c.get(6)).toBe(2);
     expect(c.get(2)).toBe(1);
@@ -747,7 +733,7 @@ describe("CalculationsTest", () => {
     await Speedometer.createBang({ speedometer_id: "ABC" });
     await Minivan.createBang({ minivan_id: "OMG", speedometer_id: "ABC" });
 
-    const c = (await Minivan.group("speedometer").count(":all")) as Grouped;
+    const c = await Minivan.group("speedometer").count(":all");
     const firstKey = [...c.keys()][0] as Speedometer;
     expect(firstKey.constructor).toEqual(Speedometer);
     expect(c.get(firstKey)).toEqual(1);
@@ -766,7 +752,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped by function", async () => {
-    const c = (await Company.group(`UPPER(${quoteTableName("type")})`).count(":all")) as Grouped;
+    const c = await Company.group(`UPPER(${self().quoteTableName("type")})`).count(":all");
     expect(c.get(null)).toBe(2);
     expect(c.get("DEPENDENTFIRM")).toBe(1);
     expect(c.get("CLIENT")).toBe(5);
@@ -774,9 +760,9 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped by function with table alias", async () => {
-    const c = (await Company.group(`UPPER(companies.${quoteTableName("type")})`).count(
+    const c = await Company.group(`UPPER(companies.${self().quoteTableName("type")})`).count(
       ":all",
-    )) as Grouped;
+    );
     expect(c.get(null)).toBe(2);
     expect(c.get("DEPENDENTFIRM")).toBe(1);
     expect(c.get("CLIENT")).toBe(5);
@@ -814,14 +800,14 @@ describe("CalculationsTest", () => {
 
   it("should group by scoped field", async () => {
     const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
-    const c = (await railsCore.companies.group("name").sum("id")) as Grouped;
+    const c = await railsCore.companies.group("name").sum("id");
     expect(c.get("Leetsoft")).toBe(7);
     expect(c.get("Jadedpixel")).toBe(8);
   });
 
   it("should group by summed field through association and having", async () => {
     const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
-    const c = (await railsCore.companies.group("name").having("sum(id) > 7").sum("id")) as Grouped;
+    const c = await railsCore.companies.group("name").having("sum(id) > 7").sum("id");
     expect(c.get("Leetsoft")).toBeUndefined();
     expect(c.get("Jadedpixel")).toBe(8);
   });
@@ -835,7 +821,7 @@ describe("CalculationsTest", () => {
 
   it("should not perform joined include by default", async () => {
     expect(await Account.includes(":firm").count()).toEqual(await Account.count());
-    const queries = await captureSql(async () => {
+    const queries = await self().captureSql({}, async () => {
       await Account.includes(":firm").count();
     });
     expect(queries[queries.length - 1]).not.toMatch(/join/i);
@@ -948,9 +934,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field in joined table with group by", async () => {
-    const c = (await Account.group("accounts.firm_id")
-      .joins(":firm")
-      .count("companies.id")) as Grouped;
+    const c = await Account.group("accounts.firm_id").joins(":firm").count("companies.id");
 
     for (const firmId of [1, 6, 2, 9]) expect([...c.keys()]).toContain(firmId);
   });
@@ -1111,19 +1095,19 @@ describe("CalculationsTest", () => {
   });
 
   it("maximum with not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
 
     expect(await Company.includes(":contracts").maximum("developer_id")).toBe(7);
   });
 
   it("minimum with not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
 
     expect(await Company.includes(":contracts").minimum("developer_id")).toBe(7);
   });
 
   it("sum with not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
 
     expect(await Company.includes(":contracts").sum("developer_id")).toBe(7);
   });
@@ -1151,12 +1135,10 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct is honored when used with count operation after group", async () => {
-    const approvedTopicsCount = (
-      (await Topic.group("approved").count("author_name")) as Grouped
-    ).get(true);
+    const approvedTopicsCount = (await Topic.group("approved").count("author_name")).get(true);
     expect(approvedTopicsCount).toBe(4);
     const distinctAuthorsForApprovedCount = (
-      (await Topic.group("approved").distinct().count("author_name")) as Grouped
+      await Topic.group("approved").distinct().count("author_name")
     ).get(true);
     expect(distinctAuthorsForApprovedCount).toBe(3);
   });
@@ -1275,14 +1257,14 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck auto table name prefix", async () => {
-    const c = await Company.createBang({ name: "test", contracts: [Contract.new()] });
+    const c = await Company.createBang({ name: "test", contracts: [new Contract()] });
     expect(await Company.joins(":contracts").pluck("id")).toEqual([c.id]);
   });
 
   it("pluck if table included", async () => {
     const c = await Company.createBang({
       name: "test",
-      contracts: [Contract.new({ developer_id: 7 })],
+      contracts: [new Contract({ developer_id: 7 })],
     });
     expect(
       await Company.includes(":contracts")
@@ -1294,7 +1276,7 @@ describe("CalculationsTest", () => {
   it("pluck not auto table name prefix if column joined", async () => {
     const company = await Company.createBang({
       name: "test",
-      contracts: [Contract.new({ developer_id: 7 })],
+      contracts: [new Contract({ developer_id: 7 })],
     });
     const metadata = (await company.contracts.first())!.metadata;
     expect(await Company.joins(":contracts").pluck("metadata")).toEqual([metadata]);
@@ -1641,12 +1623,12 @@ describe("CalculationsTest", () => {
     ]);
     const actual = await Post.group("type")
       .order("count_posts_id")
-      .count(quoteTableName("posts.id"));
+      .count(self().quoteTableName("posts.id"));
     expect(actual).toEqual(expected);
   });
 
   it("pluck not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
     const ids = await Company.includes(":contracts").pluck("developer_id");
     expect(ids.length).toEqual(await Company.count());
     expect(ids.filter((id) => id != null)).toEqual([7]);
@@ -1692,7 +1674,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with multiple columns and includes", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
     const companiesAndDevelopers = await Company.order("companies.id")
       .includes(":contracts")
       .pluck("name", "developer_id");
@@ -2052,7 +2034,7 @@ describe("CalculationsTest", () => {
 
   it("minimum and maximum on tz aware attributes", async () => {
     try {
-      await withTimezoneConfig(
+      await self().withTimezoneConfig(
         { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           await Topic.resetColumnInformation();

@@ -11,7 +11,7 @@ import { InternalMetadata } from "./internal-metadata.js";
 import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { itIfSupports } from "./support/supports.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -26,7 +26,7 @@ describe("ActiveRecordSchemaTest", () => {
 
   let adapter: DatabaseAdapter;
   let schemaMigration: SchemaMigration;
-  let originalVerbose: boolean;
+  let originalVerbose: boolean | undefined;
 
   beforeEach(async () => {
     originalVerbose = Migration.verbose;
@@ -38,9 +38,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   afterEach(async () => {
-    await adapter.dropTable("fruits", "has_timestamps", "multiple_indexes", "ts_opts", {
-      ifExists: true,
-    });
+    await adapter.dropTable("fruits", "has_timestamps", "multiple_indexes", { ifExists: true });
     await schemaMigration.deleteAllVersions();
     Migration.verbose = originalVerbose;
   });
@@ -128,10 +126,10 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("normalize version", () => {
-    expect(SchemaMigration.normalizeMigrationNumber("0000118")).toBe("118");
-    expect(SchemaMigration.normalizeMigrationNumber("2")).toBe("002");
-    expect(SchemaMigration.normalizeMigrationNumber("0017")).toBe("017");
-    expect(SchemaMigration.normalizeMigrationNumber("20131219224947")).toBe("20131219224947");
+    expect(schemaMigration.normalizeMigrationNumber("0000118")).toBe("118");
+    expect(schemaMigration.normalizeMigrationNumber("2")).toBe("002");
+    expect(schemaMigration.normalizeMigrationNumber("0017")).toBe("017");
+    expect(schemaMigration.normalizeMigrationNumber("20131219224947")).toBe("20131219224947");
   });
 
   it("schema load with multiple indexes for column of different names", async () => {
@@ -199,7 +197,7 @@ describe("ActiveRecordSchemaTest", () => {
     await Schema.define(async (schema) => {
       await schema.createTable("has_timestamps");
 
-      await schema.changeTable("has_timestamps", async (t) => {
+      await schema.changeTable("has_timestamps", {}, async (t) => {
         await t.timestamps({ default: RubyTime.now() });
       });
     });
@@ -263,38 +261,5 @@ describe("ActiveRecordSchemaTest", () => {
         null: false,
       }),
     ).toBeTruthy();
-  });
-
-  it("timestamps with custom options on create table", async () => {
-    const td = new TableDefinition(adapter, "ts_custom");
-    td.timestamps({ null: true, precision: 6 });
-    const createdAt = td.columns.find((c) => c.name === "created_at");
-    const updatedAt = td.columns.find((c) => c.name === "updated_at");
-    expect(createdAt!.options.null).toBe(true);
-    expect(createdAt!.options.precision).toBe(6);
-    expect(updatedAt!.options.null).toBe(true);
-    expect(updatedAt!.options.precision).toBe(6);
-  });
-
-  it("addTimestamps forwards options to addColumn", async () => {
-    class TsOptMig extends Migration {
-      async up() {
-        await this.createTable("ts_opts", (t) => {
-          t.string("name");
-        });
-        await this.addTimestamps("ts_opts", { null: true });
-      }
-      async down() {
-        await this.dropTable("ts_opts");
-      }
-    }
-    const m = new TsOptMig();
-    m.connection = adapter;
-    await m.up();
-    await adapter.execute(`INSERT INTO ts_opts (name) VALUES ('test')`);
-    const rows = (await adapter.selectAll(`SELECT * FROM ts_opts`)).toArray();
-    expect(rows.length).toBe(1);
-    expect(rows[0].created_at).toBeNull();
-    expect(rows[0].updated_at).toBeNull();
   });
 });

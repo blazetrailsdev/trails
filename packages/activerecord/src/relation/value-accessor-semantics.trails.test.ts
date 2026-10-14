@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { Relation } from "../relation.js";
 import { EXCEPT_ONLY_KEYS } from "./query-methods.js";
@@ -18,7 +18,7 @@ function relation(): Relation<Post> {
   return Post.all();
 }
 
-function internals(rel: Relation<Post>): JoinInternals {
+function internals(rel: Relation<Post, boolean>): JoinInternals {
   return rel as unknown as JoinInternals;
 }
 
@@ -91,7 +91,7 @@ describe("Relation value accessor Rails semantics", () => {
     const rel = relation().order([new Nodes.SqlLiteral("id = ?"), 1]);
     expect(rel.orderValues).toBe(internals(rel).orderValues);
     expect(rel.orderValues[0]).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((rel.orderValues[0] as Nodes.SqlLiteral).value).toMatch(/^id = '?1'?$/);
+    expect((rel.orderValues[0] as Nodes.SqlLiteral).toString()).toMatch(/^id = '?1'?$/);
   });
 
   it("select_values returns the shared frozen empty array when unset", () => {

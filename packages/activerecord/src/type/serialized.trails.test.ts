@@ -105,3 +105,10 @@ describe("Serialized#type", () => {
     expect(new Serialized(new BinaryType(), jsonCoder).type()).toBe("binary");
   });
 });
+
+describe("Serialized#inspect", () => {
+  it("is Kernel#inspect, not the delegated subtype's", () => {
+    const type = new Serialized(new StringType(), jsonCoder);
+    expect(type.inspect()).toMatch(/^#<(ActiveRecord::Type::)?Serialized:0x[0-9a-f]+ .*@coder=/);
+  });
+});

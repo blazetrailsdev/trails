@@ -8,7 +8,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Process, StandardError } from "@blazetrails/ruby-compat";
+import { Process, StandardError, Thread } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
@@ -24,7 +24,7 @@ import {
   Rollback,
 } from "./index.js";
 import { Result } from "./result.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { itIfSupports } from "./support/supports.js";
@@ -552,7 +552,7 @@ describe("AdapterTestWithoutTransaction", () => {
     connection.enableQueryCacheBang();
     try {
       posts("welcome");
-      const count = (await Post.count()) as number;
+      const count = await Post.count();
 
       await connection.create("INSERT INTO posts(title, body) VALUES ('', '')");
 
@@ -673,8 +673,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   });
 
   const remoteSupported = adapterType !== "sqlite";
-
-  const itBlocked = it.skip;
 
   let connection: DatabaseAdapter;
 
@@ -926,7 +924,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await activePredicate(connection)).toBeFalsy();
   });
 
-  itBlocked("transaction restores after remote disconnection", async () => {
+  it.skipIf(!remoteSupported)("transaction restores after remote disconnection", async () => {
     await remoteDisconnect(connection);
     await Post.transaction(async () => {
       await Post.count();
@@ -937,7 +935,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   it.skipIf(!remoteSupported)(
     "active transaction is restored after remote disconnection",
     async () => {
-      expect((await Post.count()) as number).toBeGreaterThan(0);
+      expect(await Post.count()).toBeGreaterThan(0);
       await Post.transaction(async () => {
         await connection.materializeTransactions();
         await remoteDisconnect(connection);
@@ -950,7 +948,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
         throw new Rollback();
       });
 
-      expect((await Post.count()) as number).toBeGreaterThan(0);
+      expect(await Post.count()).toBeGreaterThan(0);
     },
   );
 
@@ -970,7 +968,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       expect(invocations).toBe(1);
 
       expect(await activePredicate(connection)).toBeFalsy();
-      expect((await Post.count()) as number).toBeGreaterThan(0);
+      expect(await Post.count()).toBeGreaterThan(0);
     },
   );
 
@@ -1056,6 +1054,59 @@ function twoWeeksAgo(): string {
     .replace("T", " ")
     .slice(0, 19);
 }
+
+describe("AdapterThreadSafetyTest", () => {
+  fixtures({});
+
+  let threadList: Thread<Promise<void>>[];
+  let connection: DatabaseAdapter;
+
+  beforeEach(async () => {
+    threadList = [];
+    connection = await Base.connectionPool().checkout();
+  });
+
+  afterEach(() => {
+    for (const thread of threadList) thread.kill();
+  });
+
+  it.skipIf(inMemoryDb())("#active? is synchronized", async () => {
+    threads(2, 25, () => connection.selectAll("SELECT 1"));
+    threads(2, 25, () => connection.verifyBang());
+    threads(2, 25, () => connection.disconnectBang());
+
+    await join();
+  });
+
+  it.skipIf(inMemoryDb())("#verify! is synchronized", async () => {
+    threads(2, 25, () => connection.verifyBang());
+    threads(2, 25, () => connection.disconnectBang());
+
+    await join();
+  });
+
+  async function join(): Promise<void> {
+    const shuffled = [...threadList];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    for (const thread of shuffled) await thread.join();
+  }
+
+  function threads(count: number, times: number, block: () => unknown): void {
+    for (let i = 0; i < count; i++) {
+      threadList.push(
+        new Thread(async () => {
+          for (let n = 0; n < times; n++) {
+            await block();
+            await Thread.pass();
+          }
+        }),
+      );
+    }
+  }
+});
 
 describe("InvalidateTransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });

@@ -3,16 +3,15 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { assertNothingRaised, assertRaises, isPlainObject } from "@blazetrails/activesupport";
 import { Base, Range, PreparedStatementInvalid, UnknownAttributeReference } from "./index.js";
 import type { Relation } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Post } from "./test-helpers/models/post.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { replaceBindVariables, replaceNamedBindVariables } from "./sanitization.js";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
 
-fixtures({});
+const { self } = fixtures({});
 
 function bind(statement: string, ...vars: unknown[]): string {
   if (isPlainObject(vars[0])) {
@@ -147,11 +146,11 @@ describe("SanitizeTest", () => {
         : /title LIKE \?/
       : /LIKE '20!% !_reduction!_!!'/;
 
-    await assertQueriesMatch(query, undefined, false, async () => {
+    await self().assertQueriesMatch(query, {}, async () => {
       await searchablePost.searchAsMethod("20% _reduction_!");
     });
 
-    await assertQueriesMatch(query, undefined, false, async () => {
+    await self().assertQueriesMatch(query, {}, async () => {
       await searchablePost.searchAsScope("20% _reduction_!");
     });
   });

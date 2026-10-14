@@ -1,10 +1,7 @@
 import { Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import type { BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
-import { NoMethodError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
-import { EnvironmentStorageError } from "./migration.js";
 import { ActiveRecordError } from "./errors.js";
 import { first } from "@blazetrails/ruby-compat";
 import {
@@ -58,15 +55,16 @@ export class InternalMetadata {
     return this._pool.dbConfig.useMetadataTable;
   }
 
-  async createTable(): Promise<void> {
+  async createTable(): Promise<unknown> {
     if (!this.enabled) return;
-    await this._pool.withConnection(async (connection) => {
-      if (await connection.tableExists(this.tableName)) return;
-      await connection.createTable(this.tableName, { id: false }, (t) => {
-        t.string("key", connection.internalStringOptionsForPrimaryKey());
-        t.string("value");
-        t.timestamps();
-      });
+    return await this._pool.withConnection(async (connection) => {
+      if (!(await connection.tableExists(this.tableName))) {
+        return await connection.createTable(this.tableName, { id: false }, async (t) => {
+          t.string("key", await connection.internalStringOptionsForPrimaryKey());
+          t.string("value");
+          t.timestamps();
+        });
+      }
     });
   }
 
@@ -81,9 +79,9 @@ export class InternalMetadata {
     });
   }
 
-  async dropTable(): Promise<void> {
+  async dropTable(): Promise<unknown> {
     if (!this.enabled) return;
-    await this._pool.withConnection((connection) =>
+    return await this._pool.withConnection((connection) =>
       connection.dropTable(this.tableName, { ifExists: true }),
     );
   }
@@ -91,18 +89,16 @@ export class InternalMetadata {
   async get(key: string): Promise<string | null> {
     if (!this.enabled) return null;
     return await this._pool.withConnection(async (connection) => {
-      const entry = await this.selectEntry(connection, key);
-      if (!entry) return null;
-      const value = entry[this.valueKey];
-      if (value == null) return null;
-      return String(value);
+      let entry: Record<string, unknown> | null;
+      if ((entry = await this.selectEntry(connection, key)) != null) {
+        return entry[this.valueKey] as string | null;
+      }
+      return null;
     });
   }
 
-  async set(key: string, value: string): Promise<void> {
-    if (!this.enabled) {
-      throw new EnvironmentStorageError();
-    }
+  async set(key: string, value: string | null): Promise<void> {
+    if (!this.enabled) return;
     await this._pool.withConnection((connection) =>
       this.updateOrCreateEntry(connection, key, value),
     );
@@ -112,7 +108,7 @@ export class InternalMetadata {
   private async updateOrCreateEntry(
     connection: DatabaseAdapter,
     key: string,
-    value: string,
+    value: string | null,
   ): Promise<void> {
     const entry = await this.selectEntry(connection, key);
     if (entry) {
@@ -141,11 +137,7 @@ export class InternalMetadata {
   }
 
   async tableExists(): Promise<boolean> {
-    const schemaCache: BoundSchemaReflection | null = this._pool.schemaCache;
-    if (schemaCache === null) {
-      throw new NoMethodError("undefined method 'data_source_exists?' for nil");
-    }
-    return (await schemaCache.dataSourceExists(this.tableName)) ?? false;
+    return (await this._pool.schemaCache!.dataSourceExists(this.tableName)) ?? false;
   }
 
   private currentTime(connection: DatabaseAdapter): string {
@@ -158,10 +150,10 @@ export class InternalMetadata {
     key: string,
   ): Promise<Record<string, unknown> | null> {
     const sm = new SelectManager(this.arelTable);
-    sm.project(star());
+    sm.project(new Nodes.SqlLiteral("*", { retryable: true }));
     sm.where(this.arelTable.get(this.primaryKey).eq(new Nodes.BindParam(key)));
     sm.order(this.arelTable.get(this.primaryKey).asc());
-    sm.take(1);
+    sm.limit = 1;
     const result = await connection.selectAll(sm, `${this.constructor.name} Load`);
     return result.first() ?? null;
   }
@@ -169,7 +161,7 @@ export class InternalMetadata {
   private async createEntry(
     connection: DatabaseAdapter,
     key: string,
-    value: string,
+    value: string | null,
   ): Promise<void> {
     const im = new InsertManager(this.arelTable);
     im.insert([
@@ -184,7 +176,7 @@ export class InternalMetadata {
   private async updateEntry(
     connection: DatabaseAdapter,
     key: string,
-    newValue: string,
+    newValue: string | null,
   ): Promise<void> {
     const um = new UpdateManager(this.arelTable);
     um.set([

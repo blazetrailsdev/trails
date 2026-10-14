@@ -1,14 +1,20 @@
+import {
+  Module,
+  rbModConstSet,
+  registerConstant,
+  registeredConstant,
+} from "@blazetrails/ruby-compat";
+import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 
-export class ShardedBlog extends Base {
-  static _tableName = "sharded_blogs";
+const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
+registerConstant("Sharded", Sharded);
 
+export class ShardedBlog extends Base {
+  declare name: string;
+
+  static _tableName = "sharded_blogs";
   static {
-    this.hasMany("blogPosts", { className: "ShardedBlogPost", foreignKey: "blog_id" });
-    this.hasMany("commentsViaPosts", {
-      through: "blogPosts",
-      source: "commentsWithCompositePk",
-      className: "ShardedComment",
-    });
+    registerModel(rbModConstSet(Sharded, "Blog", this));
   }
 }

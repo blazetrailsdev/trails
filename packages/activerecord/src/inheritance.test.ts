@@ -6,18 +6,30 @@ import {
   assertNothingRaised,
   assertPredicate,
   assertNotPredicate,
+  assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  include,
+  rbModConstSet,
+  regexpEscape,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
-import { fixtures } from "./test-fixtures.js";
-import { stiName, isBaseClass, baseClass, registerSubclass } from "./inheritance.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { Inheritance, stiName, isBaseClass, baseClass } from "./inheritance.js";
 import { registerModel } from "./associations.js";
-import { SubclassNotFound, RecordNotFound, NotImplementedError, NameError } from "./errors.js";
+import {
+  ActiveRecordError,
+  SubclassNotFound,
+  RecordNotFound,
+  NotImplementedError,
+  NameError,
+} from "./errors.js";
 import {
   AbstractCompany,
   Company,
@@ -58,7 +70,7 @@ import { Author } from "./test-helpers/models/author.js";
 import { ShopProduct, ShopProductType } from "./test-helpers/models/shop.js";
 
 describe("InheritanceTest", () => {
-  const { companies } = fixtures([
+  const { self, companies } = fixtures([
     "companies",
     "projects",
     "subscribers",
@@ -120,13 +132,13 @@ describe("InheritanceTest", () => {
 
   it("should store demodulized class name with store full sti class option disabled", () => {
     Base.storeFullStiClass = false;
-    const item = NamespacedCompany.new();
+    const item = new NamespacedCompany();
     expect((item as any)._readAttribute("type")).toBe("Company");
   });
 
   it("should store full class name with store full sti class option enabled", () => {
     Base.storeFullStiClass = true;
-    const item = NamespacedCompany.new();
+    const item = new NamespacedCompany();
     expect((item as any)._readAttribute("type")).toBe("Namespaced::Company");
   });
 
@@ -201,8 +213,10 @@ describe("InheritanceTest", () => {
     assertNotPredicate(TightDescendant, (k) => isBaseClass(k));
   });
 
-  it.skip("base class activerecord error", () => {
-    // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  it("base class activerecord error", async () => {
+    await assertRaise([ActiveRecordError], {}, () => {
+      include(class {}, Inheritance);
+    });
   });
 
   it("a bad type column", async () => {
@@ -272,7 +286,7 @@ describe("InheritanceTest", () => {
   });
 
   it("inheritance save", async () => {
-    const firm = Firm.new();
+    const firm = new Firm();
     (firm as any).name = "Next Angle";
     await firm.save();
 
@@ -281,7 +295,7 @@ describe("InheritanceTest", () => {
   });
 
   it("alt inheritance save", async () => {
-    const cabbage = Cabbage.new({ name: "Savoy" });
+    const cabbage = new Cabbage({ name: "Savoy" });
     await cabbage.save();
 
     const savoy = await Vegetable.find(cabbage.id);
@@ -289,17 +303,17 @@ describe("InheritanceTest", () => {
   });
 
   it("inheritance new with default class", () => {
-    const company = Company.new();
+    const company = new Company();
     expect(company.constructor).toBe(Company);
   });
 
   it("inheritance new with base class", () => {
-    const company = Company.new({ type: "Company" });
+    const company = new Company({ type: "Company" });
     expect(company.constructor).toBe(Company);
   });
 
   it("inheritance new with subclass", () => {
-    const firm = Company.new({ type: "Firm" });
+    const firm = new Company({ type: "Firm" });
     expect(firm.constructor).toBe(Firm);
   });
 
@@ -320,24 +334,24 @@ describe("InheritanceTest", () => {
 
   it("new with abstract class", async () => {
     const e = await assertRaises([NotImplementedError], {}, () => {
-      AbstractCompany.new();
+      new AbstractCompany();
     });
     expect(e.message).toBe("AbstractCompany is an abstract class and cannot be instantiated.");
   });
 
   it("new with ar base", async () => {
     const e = await assertRaises([NotImplementedError], {}, () => {
-      Base.new();
+      new Base();
     });
     expect(e.message).toBe("ActiveRecord::Base is an abstract class and cannot be instantiated.");
   });
 
   it("new with invalid type", () => {
-    expect(() => Company.new({ type: "InvalidType" })).toThrow(SubclassNotFound);
+    expect(() => new Company({ type: "InvalidType" })).toThrow(SubclassNotFound);
   });
 
   it("new with unrelated type", () => {
-    expect(() => Company.new({ type: "Account" })).toThrow(SubclassNotFound);
+    expect(() => new Company({ type: "Account" })).toThrow(SubclassNotFound);
   });
 
   it("where new with invalid type", () => {
@@ -369,7 +383,7 @@ describe("InheritanceTest", () => {
   it("new with unrelated namespaced type", async () => {
     Base.storeFullStiClass = false;
     const e = await assertRaises([SubclassNotFound], {}, () => {
-      NamespacedCompany.new({ type: "Firm" });
+      new NamespacedCompany({ type: "Firm" });
     });
 
     expect(e.message).toBe(
@@ -379,13 +393,13 @@ describe("InheritanceTest", () => {
 
   it("new with complex inheritance", async () => {
     await assertNothingRaised(() => {
-      Client.new({ type: "VerySpecialClient" });
+      new Client({ type: "VerySpecialClient" });
     });
   });
 
   it("new without storing full sti class", () => {
     Base.storeFullStiClass = false;
-    const item = Company.new({ type: "SpecialCo" });
+    const item = new Company({ type: "SpecialCo" });
     expect(item).toBeInstanceOf(SpecialCo);
   });
 
@@ -500,13 +514,12 @@ describe("InheritanceTest", () => {
 
   it("eager load belongs to primary key quoting", async () => {
     const bindParam = new Nodes.BindParam(null);
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(
         `${regexpEscape((await Base.leaseConnection()).quoteTableName("companies.id"))} = (?:${regexpEscape(bindParam.toSql())}|1)`,
         "i",
       ),
-      undefined,
-      false,
+      {},
       async () => {
         await Account.includes(":firm").find(1);
       },
@@ -520,7 +533,7 @@ describe("InheritanceTest", () => {
   it("inheritance without mapping", async () => {
     expect(await SpecialSubscriber.find("webster132")).toBeInstanceOf(SpecialSubscriber);
     await assertNothingRaised(async () => {
-      const s = SpecialSubscriber.new({ name: "And breaaaaathe!" });
+      const s = new SpecialSubscriber({ name: "And breaaaaathe!" });
       (s as any).id = "roger";
       await s.save();
     });
@@ -548,8 +561,8 @@ describe("InheritanceComputeTypeTest", () => {
   });
 
   it("sti type from attributes disabled in non sti class", async () => {
-    const phone = ShopProductType.new({ name: "Phone" });
-    const product = ShopProduct.new({ type: phone } as Record<string, unknown>);
+    const phone = new ShopProductType({ name: "Phone" });
+    const product = new ShopProduct({ type: phone } as Record<string, unknown>);
     assert(await product.save());
   });
 
@@ -561,19 +574,19 @@ describe("InheritanceComputeTypeTest", () => {
       void (Company as any).resetColumnInformation();
       await Company.loadSchema();
 
-      let firm = Company.new();
+      let firm = new Company();
       expect((firm as any).type).toBe("Firm");
       expect(firm).toBeInstanceOf(Firm);
 
-      firm = Company.new({ firm_name: "Shri Hans Plastic" });
+      firm = new Company({ firm_name: "Shri Hans Plastic" });
       expect((firm as any).type).toBe("Firm");
       expect(firm).toBeInstanceOf(Firm);
 
-      const client = Client.new();
+      const client = new Client();
       expect((client as any).type).toBe("Client");
       expect(client).toBeInstanceOf(Client);
 
-      firm = Company.new({ type: "Client" });
+      firm = new Company({ type: "Client" });
       expect((firm as any).type).toBe("Client");
       expect(firm).toBeInstanceOf(Client);
     } finally {
@@ -585,41 +598,48 @@ describe("InheritanceComputeTypeTest", () => {
 });
 
 describe("InheritanceAttributeTest", () => {
+  const InheritanceAttributeTest = new Module();
+  registerConstant("InheritanceAttributeTest", InheritanceAttributeTest);
   fixtures(["companies"]);
 
   class AttrTestCompany extends Base {
-    static moduleName = "InheritanceAttributeTest";
-    static _demodulizedName = "Company";
+    static {
+      rbModConstSet(InheritanceAttributeTest, "Company", this);
+    }
     static {
       this.tableName = "companies";
       this.attribute("type", "string", { default: "InheritanceAttributeTest::Startup" });
     }
   }
   class AttrTestStartup extends AttrTestCompany {
-    static moduleName = "InheritanceAttributeTest";
-    static _demodulizedName = "Startup";
+    static {
+      rbModConstSet(InheritanceAttributeTest, "Startup", this);
+    }
   }
   class AttrTestEmpire extends AttrTestCompany {
-    static moduleName = "InheritanceAttributeTest";
-    static _demodulizedName = "Empire";
+    static {
+      rbModConstSet(InheritanceAttributeTest, "Empire", this);
+    }
   }
 
   registerModel([AttrTestCompany, AttrTestStartup, AttrTestEmpire]);
-  registerSubclass(AttrTestStartup);
-  registerSubclass(AttrTestEmpire);
+  registerModel(AttrTestStartup);
+  registerModel(AttrTestEmpire);
 
   it("inheritance new with subclass as default", () => {
-    const startup = AttrTestCompany.new();
+    const startup = new AttrTestCompany();
     expect((startup as any).type).toBe("InheritanceAttributeTest::Startup");
     expect(startup).toBeInstanceOf(AttrTestStartup);
 
-    const empire = AttrTestCompany.new({ type: "InheritanceAttributeTest::Empire" });
+    const empire = new AttrTestCompany({ type: "InheritanceAttributeTest::Empire" });
     expect((empire as any).type).toBe("InheritanceAttributeTest::Empire");
     expect(empire).toBeInstanceOf(AttrTestEmpire);
   });
 });
 
 describe("InheritanceAttributeMappingTest", () => {
+  const InheritanceAttributeMappingTest = new Module();
+  registerConstant("InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
   fixtures(["companies", "sponsors"]);
 
   class OmgStiType extends StringType {
@@ -641,25 +661,28 @@ describe("InheritanceAttributeMappingTest", () => {
   Type.register("omg_sti", OmgStiType);
 
   class IamtCompany extends Base {
-    static moduleName = "InheritanceAttributeMappingTest";
-    static _demodulizedName = "Company";
+    static {
+      rbModConstSet(InheritanceAttributeMappingTest, "Company", this);
+    }
     static {
       this.tableName = "companies";
       this.attribute("type", "omg_sti");
     }
   }
   class IamtStartup extends IamtCompany {
-    static moduleName = "InheritanceAttributeMappingTest";
-    static _demodulizedName = "Startup";
+    static {
+      rbModConstSet(InheritanceAttributeMappingTest, "Startup", this);
+    }
   }
   class IamtEmpire extends IamtCompany {
-    static moduleName = "InheritanceAttributeMappingTest";
-    static _demodulizedName = "Empire";
+    static {
+      rbModConstSet(InheritanceAttributeMappingTest, "Empire", this);
+    }
   }
 
   registerModel([IamtCompany, IamtStartup, IamtEmpire]);
-  registerSubclass(IamtStartup);
-  registerSubclass(IamtEmpire);
+  registerModel(IamtStartup);
+  registerModel(IamtEmpire);
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class IamtSponsor extends Base {

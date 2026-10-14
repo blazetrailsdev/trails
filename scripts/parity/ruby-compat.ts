@@ -7,6 +7,13 @@
  * flagged, and converges by importing the export, not by baselining. It lives in
  * `scripts/parity/` because two tools read it (RFC 0092's shared-home rule).
  *
+ * A Hash row is also satisfied by its marked native form (RFC 0190):
+ * `"k" in h`, `delete h.k`, `Object.assign(h, other)`, `{ ...h, ...other }` and
+ * a `for…of` over `Object.entries(h)` credit `key?`, `delete`, `merge!`,
+ * `merge` and `each_pair` through `NATIVE_FORM_ANALOGUES`
+ * (`scripts/api-compare/enumerable-idioms.ts`), so the reverse reading does not
+ * send such a body to the helper. `Hash#fetch` has no native form.
+ *
  * ── Keyed by the MRI SPELLING, and why that is not enough on its own ────────
  * Rows are keyed `Receiver#method` / `Receiver.method`, because the bare name is
  * ambiguous across receivers: `fetch` is `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`),
@@ -55,10 +62,15 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#Integer", "kernelInteger"],
   ["Kernel#catch", "kernelCatch"],
   ["Kernel#inspect", "rbInspect"],
+  ["Kernel#object_id", "rbObjId"],
+  ["Kernel#send", "rbFSend"],
   ["Kernel#throw", "kernelThrow"],
   ["Kernel#Rational", "rational"],
+  ["Module#define_method", "rbModDefineMethod"],
   ["Range#cover?", "cover"],
   ["Regexp.escape", "regexpEscape"],
+  ["Regexp.union", "rbRegSUnion"],
+  ["Regexp#match?", "rbRegMatchP"],
 ]);
 
 /** The receiver kinds `extract-ruby-api.rb`'s `receiver_kind` records, in the
@@ -96,6 +108,13 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   string,
   { tsExport: string; receiver: ReceiverKind }
 >([
+  ["Array#compact", { tsExport: "compact", receiver: "array" }],
+  ["Array#count", { tsExport: "aryCount", receiver: "array" }],
+  ["Array#delete", { tsExport: "aryDelete", receiver: "array" }],
+  ["Array#include?", { tsExport: "aryIncludes", receiver: "array" }],
+  ["Array#join", { tsExport: "aryJoin", receiver: "array" }],
+  ["Array#reduce", { tsExport: "reduce", receiver: "array" }],
+  ["Array#sort", { tsExport: "sort", receiver: "array" }],
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],
@@ -105,10 +124,13 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Hash#merge", { tsExport: "merge", receiver: "hash" }],
   ["Hash#merge!", { tsExport: "mergeBang", receiver: "hash" }],
   ["Hash#reject", { tsExport: "reject", receiver: "hash" }],
+  ["Hash#replace", { tsExport: "hashReplace", receiver: "hash" }],
   ["Hash#slice", { tsExport: "slice", receiver: "hash" }],
   ["Hash#update", { tsExport: "update", receiver: "hash" }],
   ["String#delete", { tsExport: "stringDelete", receiver: "string" }],
   ["String#dump", { tsExport: "rbStrDump", receiver: "string" }],
+  ["String.new", { tsExport: "rbStrSNew", receiver: "string" }],
+  ["String#split", { tsExport: "stringSplit", receiver: "string" }],
   ["String#succ", { tsExport: "succ", receiver: "string" }],
   ["Symbol#to_s", { tsExport: "symbolToS", receiver: "symbol" }],
 ]);
@@ -148,6 +170,12 @@ type Claim = { tsExport: string; receiver?: ReceiverKind };
 
 const BY_BARE_NAME = byBareName();
 
+/** `string-new` is `core_new_kind`'s record of a `String.new(x)` site
+ *  (extract-ruby-api.rb), whose receiver is proven to be the String class. */
+function provenClass(kind: string): string {
+  return kind === "string-new" ? "string" : kind;
+}
+
 /** The ruby-compat export that ports Ruby call `rubyCall` on a receiver whose
  *  recorded kinds are `receiverKinds` (the Ruby body's `callReceivers` entry
  *  for the name, absent when every occurrence was an unqualified call), or
@@ -173,7 +201,8 @@ export function rubyCompatExport(
   if (receiverKinds === undefined || receiverKinds.length === 0) return undefined;
   const admitted = [...claims].filter(
     (claim) =>
-      claim.receiver !== undefined && receiverKinds.every((kind) => kind === claim.receiver),
+      claim.receiver !== undefined &&
+      receiverKinds.every((kind) => provenClass(kind) === claim.receiver),
   );
   return admitted.length === 1 ? admitted[0].tsExport : undefined;
 }
@@ -210,7 +239,9 @@ export function rubyCompatAliases(rubyCall: string, receiverKinds?: readonly str
       (claim) =>
         claim.receiver !== undefined &&
         PORTED_NAMES_BY_EXPORT.get(claim.tsExport)!.size === 1 &&
-        receiverKinds.every((kind) => kind === claim.receiver || UNPROVEN_RECEIVER_KINDS.has(kind)),
+        receiverKinds.every(
+          (kind) => provenClass(kind) === claim.receiver || UNPROVEN_RECEIVER_KINDS.has(kind),
+        ),
     )
     .map((claim) => claim.tsExport);
 }

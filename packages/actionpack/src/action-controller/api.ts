@@ -1,59 +1,148 @@
 import { Metal } from "./metal.js";
-import { statusCode } from "@blazetrails/rack";
-import { DoubleRenderError, type RenderOptions } from "./base.js";
-import { renderForApi } from "./api/api-rendering.js";
-import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
-import { logAt } from "./metal/logging.js";
-import { include } from "@blazetrails/activesupport";
+import { ApiRendering } from "./api/api-rendering.js";
+import {
+  RateLimiting,
+  type ClassMethods as RateLimitingClassMethods,
+} from "./metal/rate-limiting.js";
+import { Logging, type logAt } from "./metal/logging.js";
+import { include, type Included } from "@blazetrails/activesupport";
+import { Caching } from "../abstract-controller/caching.js";
+import { ConditionalGet } from "./metal/conditional-get.js";
+import { BasicImplicitRender } from "./metal/basic-implicit-render.js";
+import { DataStreaming } from "./metal/data-streaming.js";
+import { Redirecting } from "./metal/redirecting.js";
+import { Renderers } from "./metal/renderers.js";
+import { DefaultHeaders } from "./metal/default-headers.js";
+import {
+  Callbacks,
+  type ActionCallbackHost,
+  type beforeAction,
+  type prependBeforeAction,
+  type skipBeforeAction,
+  type appendBeforeAction,
+  type afterAction,
+  type prependAfterAction,
+  type skipAfterAction,
+  type appendAfterAction,
+  type aroundAction,
+  type prependAroundAction,
+  type skipAroundAction,
+  type appendAroundAction,
+} from "../abstract-controller/callbacks.js";
+import {
+  Rendering as AbstractControllerRendering,
+  type render,
+} from "../abstract-controller/rendering.js";
+import type { Renderer } from "./renderer.js";
+import { UrlFor } from "./metal/url-for.js";
+import { Rescue } from "./metal/rescue.js";
+import { Instrumentation } from "./metal/instrumentation.js";
+import {
+  Options as ParamsWrapperOptions,
+  ParamsWrapper,
+  type _setWrapperOptions,
+  type wrapParameters,
+} from "./metal/params-wrapper.js";
 import { StrongParameters, type Parameters as Params } from "./metal/strong-parameters.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface API {
+export interface API
+  extends
+    Included<typeof UrlFor>,
+    Included<typeof Redirecting>,
+    Included<typeof ConditionalGet>,
+    Included<typeof DataStreaming> {
+  render: OmitThisParameter<typeof render>;
   get params(): Params;
   set params(value: Params | Record<string, unknown>);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class API extends Metal {
+  static {
+    this.abstractBang();
+  }
+
+  declare static render: Renderer["render"];
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
     return this;
   }
 
-  static rateLimit = rateLimit;
+  static MODULES: Array<Parameters<typeof include>[1]> = [
+    AbstractControllerRendering,
 
-  static logAt = logAt;
+    UrlFor,
+    Redirecting,
+    ApiRendering,
+    Renderers.All,
+    ConditionalGet,
+    BasicImplicitRender,
+    StrongParameters,
+    RateLimiting,
+    Caching,
+
+    DataStreaming,
+    DefaultHeaders,
+    Logging,
+
+    Callbacks,
+
+    Rescue,
+
+    Instrumentation,
+
+    ParamsWrapper,
+  ];
+
+  declare static raiseOnOpenRedirects: boolean;
+
+  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
+  declare static setCallback: ActionCallbackHost["setCallback"];
+  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static raiseOnMissingCallbackActions: boolean;
+  declare static beforeAction: OmitThisParameter<typeof beforeAction>;
+  declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
+  declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
+  declare static appendBeforeAction: OmitThisParameter<typeof appendBeforeAction>;
+  declare static afterAction: OmitThisParameter<typeof afterAction>;
+  declare static prependAfterAction: OmitThisParameter<typeof prependAfterAction>;
+  declare static skipAfterAction: OmitThisParameter<typeof skipAfterAction>;
+  declare static appendAfterAction: OmitThisParameter<typeof appendAfterAction>;
+  declare static aroundAction: OmitThisParameter<typeof aroundAction>;
+  declare static prependAroundAction: OmitThisParameter<typeof prependAroundAction>;
+  declare static skipAroundAction: OmitThisParameter<typeof skipAroundAction>;
+  declare static appendAroundAction: OmitThisParameter<typeof appendAroundAction>;
+
+  declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
+
+  declare static logAt: OmitThisParameter<typeof logAt>;
+
+  declare static _wrapperOptions: ParamsWrapperOptions;
+  declare _wrapperOptions: ParamsWrapperOptions;
+  /** @internal */
+  declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
+  declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
 
   /** @internal */
-  async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
-    return rateLimiting.call(this, args);
-  }
+  declare _urlOptions: Readonly<Record<string, unknown>> | null;
+  /** @internal */
+  declare _routes: unknown;
+  declare viewRuntime: number | null;
 
-  render(options: RenderOptions = {}): void {
-    if (this.performed) {
-      throw new DoubleRenderError();
-    }
-
-    if (options.status !== undefined && options.status !== null) {
-      this.status = options.status;
-    }
-
-    const result = renderForApi(options as Record<string, unknown>);
-    this.contentType = result.contentType;
-    this.responseBody = result.body;
-    this.markPerformed();
-  }
-
-  redirectTo(url: string, options: { status?: number | string } = {}): void {
-    if (this.performed) {
-      throw new DoubleRenderError();
-    }
-
-    const status = options.status ? statusCode(options.status) : 302;
-    this.status = status;
-    this.headers.set("location", url);
-    this.responseBody = "";
-    this.markPerformed();
+  /**
+   * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
+   * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
+   * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114
+   * @inventedArm if — CONVERGEABLE url-for-routes-ivar-shares-the-routes-reader-property
+   */
+  constructor() {
+    super();
+    if ("_routes" in this) this._routes = null;
+    this._urlOptions = null;
+    this.viewRuntime = null;
   }
 }
 
-include(API, StrongParameters);
+for (const mod of API.MODULES) {
+  include(API, mod);
+}

@@ -1,5 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isPlainObject } from "@blazetrails/activesupport";
+import { defineModule, rbModDefineMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 
 import { Relation } from "../relation.js";
@@ -42,23 +43,21 @@ export function scope<T extends typeof Base>(
     );
   }
 
-  const extension = block;
+  const extension = block != null ? defineModule(block) : undefined;
 
-  let method: (this: any, ...args: any[]) => any;
   if (typeof body === "function") {
-    method = function (this: any, ...args: any[]) {
+    rbModDefineMethod({ prototype: modelClass }, name, function (this: any, ...args: any[]) {
       let scope = this.all()._execScope(...args, body);
       if (extension) scope = scope.extending(extension);
       return scope;
-    };
+    });
   } else {
-    method = function (this: any, ...args: any[]) {
+    rbModDefineMethod({ prototype: modelClass }, name, function (this: any, ...args: any[]) {
       let scope = (body as { call(...args: any[]): any }).call(...args) || this.all();
       if (extension) scope = scope.extending(extension);
       return scope;
-    };
+    });
   }
-  Object.defineProperty(modelClass, name, { value: method, writable: true, configurable: true });
 
   modelClass.generateRelationMethod(name);
 }
@@ -85,19 +84,23 @@ export function defaultScoped(
 ): any;
 export function defaultScoped(
   this: NamedHost,
-  scopeOrOptions?: any,
-  options?: { allQueries?: boolean | null },
+  scope: any = this.relation!(),
+  options: { allQueries?: boolean | null } = {},
 ): any {
-  const kwargsOnly =
-    scopeOrOptions != null && Object.getPrototypeOf(scopeOrOptions) === Object.prototype;
-  const scope = (kwargsOnly ? undefined : scopeOrOptions) ?? this.relation?.();
-  const opts = kwargsOnly ? (scopeOrOptions as { allQueries?: boolean | null }) : options;
-  return Default.buildDefaultScope.call(this, scope, { allQueries: opts?.allQueries }) ?? scope;
+  if (isPlainObject(scope)) {
+    options = scope;
+    scope = this.relation!();
+  }
+  return Default.buildDefaultScope.call(this, scope, { allQueries: options.allQueries }) || scope;
 }
 
 export function defaultExtensions(this: NamedHost): any[] {
-  const scope = scopeForAssociation.call(this) ?? defaultScoped.call(this);
-  return scope?.extensions ?? [];
+  const scope = scopeForAssociation.call(this) || Default.buildDefaultScope.call(this);
+  if (scope != null && scope !== false) {
+    return scope.extensions;
+  } else {
+    return [];
+  }
 }
 
 export const ClassMethods = {

@@ -8,7 +8,7 @@ import {
   isPlainObject,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, Module } from "@blazetrails/ruby-compat";
 import { OutputBuffer } from "../buffers.js";
 
 export function raw(stringish: unknown): SafeBuffer {
@@ -90,3 +90,9 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
     }
   }
 }
+
+export const OutputSafetyHelper = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { raw, safeJoin, toSentence });
+  });
+});

@@ -3,14 +3,15 @@ import { Column } from "./column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 function makeColumn(options: {
-  defaultValue?: unknown;
+  defaultValue?: string | null;
   generatedType?: "stored" | "virtual" | null;
 }): Column {
   return new Column(
-    "col",
+    `col_${options.generatedType ?? "plain"}_${options.defaultValue ?? "none"}`,
     options.defaultValue ?? null,
     new SqlTypeMetadata({ sqlType: "text" }),
     true,
+    null,
     {
       generatedType: options.generatedType,
     },
@@ -43,11 +44,18 @@ describe("SQLite3::Column#hasDefault", () => {
 
 describe("SQLite3::Column JSON round-trip", () => {
   it("preserves the subclass and its state through the schema-cache dump", () => {
-    const col = new Column("id", null, { sqlType: "INTEGER", type: "integer" }, false, {
-      autoIncrement: true,
-      rowid: true,
-      generatedType: "stored",
-    });
+    const col = new Column(
+      "id",
+      null,
+      new SqlTypeMetadata({ sqlType: "INTEGER", type: "integer" }),
+      false,
+      null,
+      {
+        autoIncrement: true,
+        rowid: true,
+        generatedType: "stored",
+      },
+    );
 
     const coder: Record<string, unknown> = {};
     col.encodeWith(coder);

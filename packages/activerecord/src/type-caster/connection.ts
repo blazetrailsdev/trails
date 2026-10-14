@@ -1,5 +1,6 @@
 import type { ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbModConstSet, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { TypeCaster } from "../namespaces.js";
 import { defaultValue } from "../type.js";
 
 export class Connection {
@@ -18,15 +19,17 @@ export class Connection {
 
   typeForAttribute(attrName: unknown): ValueType {
     const schemaCache = this._klass?.connectionPool?.()?.poolConfig?.schemaReflection.loadedCache;
-    const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
-    const column = columnsHash?.[toS(attrName)];
-    const type = column
-      ? (this._klass
+
+    let type: ValueType | undefined;
+    if (schemaCache?.getCachedDataSourceExists?.(tableName(this))) {
+      const column = schemaCache.getCachedColumnsHash?.(tableName(this))?.[toS(attrName)];
+      if (column) {
+        type = this._klass
           .connectionPool()
-          .withConnectionSync((connection: any) => connection.lookupCastTypeFromColumn(column)) as
-          | ValueType
-          | undefined)
-      : undefined;
+          .withConnectionSync((connection: any) => connection.lookupCastTypeFromColumn(column));
+      }
+    }
+
     return type ?? defaultValue();
   }
 }
@@ -35,3 +38,4 @@ export class Connection {
 export function tableName(connection: Connection): string {
   return (connection as any)._tableName as string;
 }
+rbModConstSet(TypeCaster, "Connection", Connection);

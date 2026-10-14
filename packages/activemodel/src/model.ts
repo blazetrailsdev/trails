@@ -1,21 +1,15 @@
 import type { Errors } from "./errors.js";
-import {
-  ValidationContext,
-  ClassMethods as ValidationsClassMethods,
-  initInternals as validationsInitInternals,
-  initializeDup as validationsInitializeDup,
-} from "./validations.js";
+import { ValidationContext, ClassMethods as ValidationsClassMethods } from "./validations.js";
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
   Callbacks as ASCallbacks,
-  runCallbacks,
   include,
-  prepend,
   runLoadHooks,
   ToJsonWithActiveSupportEncoder,
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
+import { rbObjDup, type Hash } from "@blazetrails/ruby-compat";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
@@ -27,7 +21,7 @@ import { ClassMethods as WithClassMethods } from "./validations/with.js";
 import type { ClassMethods as ConversionClassMethods } from "./conversion.js";
 import { Access } from "./access.js";
 import { Naming } from "./naming.js";
-import { API, initialize as apiInitialize } from "./api.js";
+import { API } from "./api.js";
 
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
@@ -36,8 +30,6 @@ export interface Model extends API, Access, Naming {
   freeze(): this;
 
   /** @internal */
-  initInternals(): void;
-  /** @internal */
   initializeDup(other: unknown): void;
 }
 
@@ -45,7 +37,7 @@ export interface Model extends API, Access, Naming {
 export class Model {
   declare static paramDelimiter: string;
   declare private static _modelName: ModelName | null;
-  declare static _validators: Map<string | null, Array<ValidatorLike>>;
+  declare static _validators: Hash<string | null, Array<ValidatorLike>>;
   declare static is_validators: boolean;
 
   declare static _toPartialPath: Extended<typeof ConversionClassMethods>["_toPartialPath"];
@@ -106,9 +98,6 @@ export class Model {
     modelName: ModelName;
   }>;
 
-  /** @noRailsEquivalent PERMANENT */
-  declare static moduleName?: string;
-
   declare static modelName: ModelName;
 
   /** @internal */
@@ -130,8 +119,8 @@ export class Model {
   /** @internal */
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
-  /** @missingRailsCall assign_attributes — PERMANENT */
-  constructor(attributes: Record<string, unknown> = {}) {
+  /** @missingRailsCall assign_attributes — CONVERGEABLE activemodel-api-initialize-concern-constructor */
+  constructor(attributes: Record<string, unknown> | Map<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
 
     Object.defineProperty(this, "_initializingAttributes", {
@@ -141,18 +130,11 @@ export class Model {
       enumerable: false,
     });
 
-    this.initInternals();
-
     this._initializingAttributes = true;
     try {
-      apiInitialize.call(this, attributes);
+      this.initialize(attributes);
     } finally {
       this._initializingAttributes = false;
-    }
-
-    const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
-    if (callbackSuppressor._suppressInitializeCallback !== true) {
-      void runCallbacks(this, "initialize", undefined, { strict: "sync" });
     }
   }
 
@@ -160,19 +142,10 @@ export class Model {
   _contextForValidation?: ValidationContext;
 
   dup(): this {
-    const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
-    const descriptors = Object.getOwnPropertyDescriptors(this);
-    for (const key of Reflect.ownKeys(descriptors)) {
-      const descriptor = descriptors[key as string];
-      descriptor.configurable = true;
-      if (!descriptor.get && !descriptor.set) descriptor.writable = true;
-    }
-    Object.defineProperties(duped, descriptors);
-    duped.initializeDup(this);
-    return duped;
+    return rbObjDup(this);
   }
 
-  declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
+  declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 }
 
 include(Model, API);
@@ -180,10 +153,5 @@ include(Model, API);
 include(Model, ToJsonWithActiveSupportEncoder);
 
 include(Model, Access);
-
-prepend(Model.prototype, {
-  initInternals: validationsInitInternals,
-  initializeDup: validationsInitializeDup,
-});
 
 runLoadHooks("active_model", Model);

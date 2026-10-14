@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { arConsole } from "./console.js";
 
 function makeReplStub() {
@@ -34,7 +34,7 @@ describe("ArConsoleTest", () => {
     vi.restoreAllMocks();
     delete process.env["TRAILS_ENV"];
     DatabaseTasks.databaseConfiguration = null;
-    DatabaseTasks.env = null;
+    Base.configurations({});
   });
 
   it("launches REPL, puts Base in context, resolves 0 on exit", async () => {

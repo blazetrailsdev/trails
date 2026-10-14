@@ -20,12 +20,13 @@ function strEnsureBytePos(b: number[], pos: number): void {
 }
 
 /**
- * `String#getbyte` (`vendor/ruby/v3.3.11/string.c:6141` `rb_str_getbyte`).
+ * `String#getbyte` (`vendor/ruby/v3.3.11/string.c:6141` `rb_str_getbyte`). A
+ * `Uint8Array`, the binary String seat, is read as its own bytes.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbStrGetbyte(str: string, index: unknown): number | null {
-  const b = bytes(str);
+export function rbStrGetbyte(str: string | Uint8Array, index: unknown): number | null {
+  const b = typeof str === "string" ? bytes(str) : str;
   let pos = num2long(index);
   if (pos < 0) pos += b.length;
   if (pos < 0 || b.length <= pos) return null;
@@ -33,17 +34,22 @@ export function rbStrGetbyte(str: string, index: unknown): number | null {
 }
 
 /**
- * `String#setbyte` (`vendor/ruby/v3.3.11/string.c:6166` `rb_str_setbyte`).
+ * `String#setbyte` (`vendor/ruby/v3.3.11/string.c:6166` `rb_str_setbyte`). A
+ * `Uint8Array`, the binary String seat, is written in place.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbStrSetbyte(self: StringReceiver, index: unknown, value: unknown): unknown {
-  const b = bytes(self.string);
+export function rbStrSetbyte(
+  self: StringReceiver | Uint8Array,
+  index: unknown,
+  value: unknown,
+): unknown {
+  const b = self instanceof Uint8Array ? self : bytes(self.string);
   const pos = num2long(index);
   const len = b.length;
   if (pos < -len || len <= pos) throw new IndexError(`index ${pos} out of string`);
   b[pos < 0 ? pos + len : pos] = num2long(value) & 0xff;
-  self.string = strNew(b);
+  if (!(self instanceof Uint8Array)) self.string = strNew(b as number[]);
   return value;
 }
 

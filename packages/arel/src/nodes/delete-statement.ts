@@ -1,20 +1,21 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 export class DeleteStatement extends Node {
-  relation: Node | Table | null;
-  wheres: Node[];
-  orders: Node[];
-  groups: Node[];
-  havings: Node[];
+  relation: ArelNode | Table | null;
+  wheres: ArelNode[];
+  orders: ArelNode[];
+  groups: ArelNode[];
+  havings: ArelNode[];
   limit: Node | null;
   offset: Node | null;
-  key: Node | Node[] | null;
+  key: ArelNode | ArelNode[] | null;
 
-  constructor(relation: Node | Table | null = null, wheres: Node[] = []) {
+  constructor(relation: ArelNode | Table | null = null, wheres: ArelNode[] = []) {
     super();
     this.relation = relation;
     this.wheres = wheres;
@@ -53,12 +54,10 @@ export class DeleteStatement extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.relation) copy.relation = cloneSlot(this.relation);
-    if (this.wheres) copy.wheres = [...this.wheres];
-    return copy;
+  initializeCopy(_other: DeleteStatement): void {
+    if (this.relation != null) this.relation = rbObjClone(this.relation);
+    if (this.wheres != null) this.wheres = rbObjClone(this.wheres);
   }
 }
 
-Nodes.DeleteStatement = DeleteStatement;
+rbModConstSet(Nodes, "DeleteStatement", DeleteStatement);

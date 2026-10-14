@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NameError } from "./name-error.js";
-import { constantize, registerConstant, unregisterConstant } from "../inflector.js";
+import { constantize } from "../inflector.js";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { assert, assertNot, assertRaise, assertNil } from "../testing/assertions.js";
 
 describe("NameErrorTest", () => {

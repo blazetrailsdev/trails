@@ -303,7 +303,13 @@ export class AppGenerator extends AppBase {
             outDir: "dist",
             plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" }],
           },
-          include: ["app", "config", "db", ".trails/template-registry-augmentation.d.ts"],
+          include: [
+            "app",
+            "config",
+            "db",
+            ".trails/template-registry-augmentation.d.ts",
+            ".trails/views",
+          ],
         },
         null,
         2,
@@ -572,20 +578,20 @@ export default await Trails.initialize();
 
     this.createFile(
       "config/routes.ts",
-      `import type { Mapper } from "@blazetrails/actionpack";
+      `import { Trails } from "@blazetrails/trailties";
 
-export function drawRoutes(mapper: Mapper): void {
+Trails.application!.routes().draw(function () {
   // Define your application routes here.
   // Example:
-  //   mapper.get("/posts", { to: "posts#index" });
+  //   this.get("/posts", { to: "posts#index" });
 
   // Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   // Can be used by load balancers and uptime monitors to verify that the app is live.
-  mapper.get("up", { to: "rails/health#show", as: "rails_health_check" });
+  this.get("up", { to: "rails/health#show", as: "rails_health_check" });
 
   // Defines the root path route ("/")
-  // mapper.root("posts#index");
-}
+  // this.root("posts#index");
+});
 `,
     );
 
@@ -1168,7 +1174,7 @@ await import("../config/environment.js");
 await import("@blazetrails/trailties/test-help");
 
 // Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
-(TestCase as typeof TestCase & { fixtures(...names: string[]): void }).fixtures(":all");
+TestCase.fixtures(":all");
 
 // Add more helper methods to be used by all tests here...
 `,

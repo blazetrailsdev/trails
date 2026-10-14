@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BooleanType } from "@blazetrails/activemodel";
 import { Boolean } from "./test-helpers/models/boolean.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 fixtures({ booleans: [Boolean, {}] });
 

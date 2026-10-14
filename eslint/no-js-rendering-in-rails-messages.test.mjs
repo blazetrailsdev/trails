@@ -19,7 +19,7 @@ tester.run("no-js-rendering-in-rails-messages", rule, {
     "function castValue(value: unknown) { return String(value); }",
     "const key = `${x.constructor.name}:${JSON.stringify(y)}`;",
     "throw new ArgumentError(`missing values for ${rbInspect(missing)}`);",
-    "throw new TypeError(`can't quote ${rbObjClass(value)}`);",
+    "throw new TypeError(`can't quote ${rbObjClassname(value)}`);",
     "throw new (errors[String(kind)])('m');",
     "const msg = JSON.stringify(x); throw new ArgumentError(msg);",
     "const e = new ArgumentError(JSON.stringify(x));",

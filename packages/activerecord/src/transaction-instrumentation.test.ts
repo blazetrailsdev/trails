@@ -2,12 +2,13 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, Transaction } from "./index.js";
 import type { DatabaseStatementsHost } from "./connection-adapters/abstract/database-statements.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import "./test-helpers/models/reply.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
 import { assertEmpty, assertNot, assertSame } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 

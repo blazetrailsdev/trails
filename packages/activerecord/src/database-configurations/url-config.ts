@@ -1,3 +1,4 @@
+import { merge } from "@blazetrails/ruby-compat";
 import { HashConfig } from "./hash-config.js";
 import { type DatabaseConfigOptions } from "./database-config.js";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
@@ -5,10 +6,7 @@ import { ConnectionUrlResolver } from "./connection-url-resolver.js";
 export class UrlConfig extends HashConfig {
   readonly url: string;
 
-  /**
-   * @missingRailsCall merge — PERMANENT
-   * @missingRailsName configurationHash — PERMANENT
-   */
+  /** @missingRailsName configurationHash — PERMANENT */
   constructor(
     envName: string,
     name: string,
@@ -18,8 +16,7 @@ export class UrlConfig extends HashConfig {
     super(envName, name, configurationHash);
 
     this.url = url;
-    this._configurationHash = { ...this._configurationHash, ...this.buildUrlHash() };
-    camelizeUrlKeys(this._configurationHash as Record<string, unknown>);
+    this._configurationHash = merge(this._configurationHash, this.buildUrlHash());
 
     if (this._configurationHash.schemaDump === "false") {
       this._configurationHash.schemaDump = false;
@@ -53,19 +50,6 @@ export class UrlConfig extends HashConfig {
 Object.defineProperty(UrlConfig, "name", {
   value: "ActiveRecord::DatabaseConfigurations::UrlConfig",
 });
-
-function camelizeUrlKeys(hash: Record<string, unknown>): void {
-  for (const [snake, camel] of [
-    ["schema_dump", "schemaDump"],
-    ["query_cache", "queryCache"],
-    ["database_tasks", "databaseTasks"],
-  ] as const) {
-    if (snake in hash) {
-      hash[camel] = hash[snake];
-      delete hash[snake];
-    }
-  }
-}
 
 /** @internal */
 export function toBooleanBang(configurationHash: Record<string, unknown>, key: string): void {

@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import "../../../test-helpers/abstract-unit.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { controllerConstants } from "../../http/request.js";
 import type { DispatchableControllerClass } from "../../routing/dispatcher.js";
@@ -14,12 +15,12 @@ import {
 
 function buildHost(): RoutingAssertionsHost {
   const routes = new RouteSet();
-  routes.draw((m) => {
-    m.get("/items", { to: "items#index" });
-    m.post("/items", { to: "items#create" });
-    m.get("/items/list/:id", { to: "items#list" });
-    m.get("/items/show/:id", { to: "items#show" });
-    m.match("/all", { to: "x#a", via: ":all" });
+  routes.draw(function () {
+    this.get("/items", { to: "items#index" });
+    this.post("/items", { to: "items#create" });
+    this.get("/items/list/:id", { to: "items#list" });
+    this.get("/items/show/:id", { to: "items#show" });
+    this.match("/all", { to: "x#a", via: ":all" });
   });
   return { routes };
 }
@@ -112,7 +113,9 @@ describe("assertGenerates", () => {
 
   it("accepts use_route: Symbol via Symbol#description (Rails parity)", () => {
     const host: RoutingAssertionsHost = { routes: new RouteSet() };
-    host.routes!.draw((m) => m.get("/items", { to: "items#index", as: "items" }));
+    host.routes!.draw(function () {
+      this.get("/items", { to: "items#index", as: "items" });
+    });
     ok(() =>
       assertGenerates.call(host, "/items", {
         controller: "items",
@@ -140,7 +143,9 @@ describe("withRouting", () => {
     const original = buildHost();
     const before = original.routes;
     withRouting.call(original, (routes: RouteSet) => {
-      routes.draw((m) => m.get("/temp", { to: "tmp#i" }));
+      routes.draw(function () {
+        this.get("/temp", { to: "tmp#i" });
+      });
       expect(original.routes).toBe(routes);
       ok(() => assertRecognizes.call(original, { controller: "tmp", action: "i" }, "/temp"));
     });

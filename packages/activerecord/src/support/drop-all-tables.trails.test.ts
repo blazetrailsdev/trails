@@ -5,8 +5,13 @@ import { provisionSecondDatabase } from "./setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { typeRegistryKeyFor } from "./type-registry-key.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
+import { ConnectionFailed, ConnectionNotEstablished } from "../errors.js";
+import { PG } from "../pg/pg.js";
 
 let adapter: DatabaseAdapter;
+
+fixtures({}, { useTransactionalTests: false });
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
   if (typeRegistryKeyFor(a) === "sqlite3") {
@@ -48,8 +53,8 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("retries exactly once when execute throws a connection error and succeeds on retry", async () => {
-    const connErr = Object.assign(new Error("Connection terminated unexpectedly"), {
-      code: "08006",
+    const connErr = new ConnectionFailed("Connection terminated unexpectedly", {
+      cause: new PG.ConnectionBad("Connection terminated unexpectedly\n"),
     });
 
     let executeCallCount = 0;
@@ -82,8 +87,8 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
   });
 
   it("retries when a DROP throws a connection error mid-loop", async () => {
-    const connErr = Object.assign(new Error("invalid frontend message type 0"), {
-      code: "08P01",
+    const connErr = new ConnectionNotEstablished("client has already ended", {
+      cause: new PG.ConnectionBad("connection is closed"),
     });
 
     let mutationCallCount = 0;

@@ -17,6 +17,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest, TestCaseInfo } from "./types.js";
+import { PKG_SRC_DIRS } from "./compare.js";
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -30,15 +31,20 @@ const PKG_DIRS: Record<string, string> = {
   rack: "packages/rack/src/",
   "rack-session": "packages/rack-session/src/",
   "rack-test": "packages/rack-test/src/",
+  bcrypt: "packages/bcrypt/src/",
+  msgpack: "packages/msgpack/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
+  activejob: "packages/activejob/src/",
+  thor: PKG_SRC_DIRS.thor,
 };
 
 interface ConventionFile {
   rubyFile: string;
   conventionTsFile: string;
+  conventionTsPackage?: string;
   tsFileExists: boolean;
   missing: number;
   missingTests?: string[];
@@ -191,7 +197,11 @@ function main() {
 
       const rubyFile = convFile.rubyFile;
       const conventionTsFile = convFile.conventionTsFile;
-      const tsFullPath = path.join(ROOT_DIR, pkgDir, conventionTsFile);
+      const tsFullPath = path.join(
+        ROOT_DIR,
+        convFile.conventionTsPackage ? PKG_SRC_DIRS[convFile.conventionTsPackage] : pkgDir,
+        conventionTsFile,
+      );
 
       // Find the Ruby file in the manifest
       const rubyFileInfo = pkgInfo.files.find((f) => f.file === rubyFile);

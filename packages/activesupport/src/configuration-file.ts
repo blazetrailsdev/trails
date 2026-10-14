@@ -1,13 +1,10 @@
-import { File } from "@blazetrails/ruby-compat";
-import { parse as yamlParse } from "yaml";
+import { File, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
+import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
 
-export class FormatError extends Error {
-  constructor(message: string, cause?: unknown) {
-    super(message, cause !== undefined ? { cause } : undefined);
-    this.name = "FormatError";
-  }
-}
+export class FormatError extends StandardError {}
+
+FormatError.prototype.name = "ActiveSupport::ConfigurationFile::FormatError";
 
 export class ConfigurationFile {
   private content: string;
@@ -21,30 +18,23 @@ export class ConfigurationFile {
   /** @missingRailsCall load — PERMANENT */
   static parse(
     contentPath: string,
-    options: { context?: Record<string, unknown>; [option: string]: unknown } = {},
+    options: { context?: object; [option: string]: unknown } = {},
   ): unknown {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
-  /**
-   * @missingRailsCall load — PERMANENT
-   * @missingRailsCall unsafe_load — CONVERGEABLE configuration-file-parse-through-psych-unsafe-load
-   */
-  parse({
-    context,
-    ...options
-  }: { context?: Record<string, unknown>; [option: string]: unknown } = {}): unknown {
+  /** @missingRailsCall load — PERMANENT */
+  parse({ context, ...options }: { context?: object; [option: string]: unknown } = {}): unknown {
     const source = this.content.includes("<%") ? this.render(context) : this.content;
     try {
       const parsed: unknown = yamlParse(source, options);
       return parsed != null && parsed !== false ? parsed : {};
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new FormatError(
+      if (!(error instanceof Error && error.name === "YAMLParseError")) throw error;
+      throw new RuntimeError(
         `YAML syntax error occurred while parsing ${this.contentPath}. ` +
           `Please note that YAML must be consistently indented using spaces. Tabs are not allowed. ` +
-          `Error: ${errorMessage}`,
-        error,
+          `Error: ${error.message}`,
       );
     }
   }
@@ -59,7 +49,7 @@ export class ConfigurationFile {
     return content;
   }
 
-  private render(context?: Record<string, unknown>): string {
+  private render(context?: object): string {
     const { nodes } = tseParse(this.content);
     let body = 'let __out = "";\n';
     for (const node of nodes) {
@@ -78,9 +68,10 @@ export class ConfigurationFile {
       }
     }
     body += `return __out;\n//# sourceURL=${this.contentPath}\n`;
-    const names = context ? Object.keys(context) : [];
-    const template = new Function(...names, body) as (...args: unknown[]) => string;
-    return context ? template(...names.map((n) => context[n])) : template();
+    const template = new Function("__binding", `with (__binding) {\n${body}}`) as (
+      binding: object,
+    ) => string;
+    return context ? template(context) : template({});
   }
 
   static FormatError = FormatError;

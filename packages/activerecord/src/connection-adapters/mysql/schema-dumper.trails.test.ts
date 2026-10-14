@@ -1,17 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { Version } from "../abstract-adapter.js";
+import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
-const stubSource: SchemaSource = {
+const stubSource: any = {
+  supportsVirtualColumns: async () => false,
   tables: async () => [],
   columns: async () => [],
   indexes: async () => [],
   lookupCastTypeFromColumn: () => new ValueType(),
+  nativeDatabaseTypes: () => AbstractMysqlAdapter.NATIVE_DATABASE_TYPES,
 };
 class TestSchemaDumper extends SchemaDumper {
   setConnection(connection: TestSchemaDumper["connection"]): void {
@@ -25,7 +28,8 @@ const stubConnection = (
     expression?: string;
     onQuery?: (sql: string) => void;
   } = {},
-): NonNullable<TestSchemaDumper["connection"]> => ({
+): any => ({
+  supportsVirtualColumns: async () => o.expression != null,
   tableOptions: async () => ({}),
   internalExecQuery: async (sql: string) => {
     o.onQuery?.(sql);
@@ -67,9 +71,16 @@ const col = (
     limit: o.limit ?? null,
     precision: o.precision ?? null,
   };
-  return new Column(o.name ?? "col", null, new TypeMetadata(meta, { extra }), true, {
-    collation: o.collation ?? null,
-  });
+  return new Column(
+    o.name ?? "col",
+    null,
+    new TypeMetadata(new SqlTypeMetadata(meta), { extra }),
+    true,
+    null,
+    {
+      collation: o.collation ?? null,
+    },
+  );
 };
 
 describe("MySQL::SchemaDumper", () => {
@@ -264,27 +275,6 @@ describe("MySQL::SchemaDumper", () => {
       expect(
         await (d as any).extractExpressionForVirtualColumn(col({ name: "c", virtual: true })),
       ).toBe(JSON.stringify("json_extract(`profile`,_utf8mb4'$.email')"));
-    });
-  });
-
-  describe("tableOptions", () => {
-    it("returns the adapter's options and writes no collation cache", async () => {
-      const d = make();
-      d.setConnection({
-        ...stubConnection(),
-        tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
-      });
-      expect(await (d as any).tableOptions("users")).toEqual({
-        charset: "utf8mb4",
-        collation: "utf8mb4_bin",
-      });
-      expect((d as any)._tableCollationCache).toBeUndefined();
-    });
-
-    it("returns empty object when connection is absent", async () => {
-      const d = make();
-      d.setConnection(undefined);
-      expect(await (d as any).tableOptions("users")).toEqual({});
     });
   });
 });

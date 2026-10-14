@@ -4,11 +4,8 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNot, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
-import { captureSql } from "../testing/sql-capture.js";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
-import { quoteTableName } from "../support/quote-regex.js";
 import { ActiveRecordError } from "../errors.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Developer } from "../test-helpers/models/developer.js";
@@ -59,6 +56,7 @@ describe("UpdateAllTest", () => {
   });
 
   const {
+    self,
     authors,
     tags,
     posts,
@@ -126,18 +124,18 @@ describe("UpdateAllTest", () => {
     const petsScope = Pet.joins(":toys").where({ toys: { name: "Bone" } });
 
     expect(await petsScope.isExists()).toBe(true);
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       const count = await petsScope.count();
       expect(await petsScope.updateAll({ name: "Bob" })).toBe(count);
     });
 
     if (adapterType === "mysql") {
       expect(sqls[sqls.length - 1]).not.toMatch(
-        new RegExp(`SELECT DISTINCT ${regexpEscape(quoteTableName("pets.pet_id"))}`),
+        new RegExp(`SELECT DISTINCT ${regexpEscape(self().quoteTableName("pets.pet_id"))}`),
       );
     } else {
       expect(sqls[sqls.length - 1]).toMatch(
-        new RegExp(`SELECT ${regexpEscape(quoteTableName("pets.pet_id"))}`),
+        new RegExp(`SELECT ${regexpEscape(self().quoteTableName("pets.pet_id"))}`),
       );
     }
   });
@@ -276,7 +274,7 @@ describe("UpdateAllTest", () => {
           if (!(this as any).author_name) (this as any).author_name = "David";
         });
         this.afterUpdate(async function () {
-          TopicWithCallbacks.topicCount = (await TopicWithCallbacks.count()) as number;
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
         });
       }
     }
@@ -309,7 +307,7 @@ describe("UpdateAllTest", () => {
           if (!(this as any).author_name) (this as any).author_name = "David";
         });
         this.afterUpdate(async function () {
-          TopicWithCallbacks.topicCount = (await TopicWithCallbacks.count()) as number;
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
         });
       }
     }
@@ -351,7 +349,7 @@ describe("UpdateAllTest", () => {
           if (!(this as any).author_name) (this as any).author_name = "David";
         });
         this.afterUpdate(async function () {
-          TopicWithCallbacks.topicCount = (await TopicWithCallbacks.count()) as number;
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
         });
       }
     }
@@ -499,10 +497,9 @@ describe("UpdateAllTest", () => {
     if (await testUpdateWithOrderSucceeds("id DESC")) {
       assertNot(await testUpdateWithOrderSucceeds("id ASC"));
     } else {
-      await assertQueriesMatch(
+      await self().assertQueriesMatch(
         /^UPDATE .+ \(SELECT .* ORDER BY id DESC\)$/i,
-        undefined,
-        false,
+        {},
         async () => {
           await testUpdateWithOrderSucceeds("id DESC");
         },

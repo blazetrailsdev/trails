@@ -17,9 +17,10 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { rbInspect, rbObjClass, rbObjRespondTo } from "./object.js";
+import { rbInspect, rbObjClassname, rbObjRespondTo } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
+import { rbStrCmp } from "./string/support.js";
 
 /**
  * The Ruby class name `rb_obj_class` reports in `rb_cmperr`'s message — Ruby's
@@ -61,7 +62,7 @@ interface CmpSpelling {
  * @boundary: a Temporal value carrying an instant is trails' seat for a Ruby
  * `Time`, whose `<=>` (`vendor/ruby/v3.3.11/time.c:3951` `time_cmp`) orders by that
  * instant, so it is ordered on `epochNanoseconds` — reached through
- * {@link rbObjClass}'s `Time` arm, which seats that reading, rather than
+ * {@link rbObjClassname}'s `Time` arm, which seats that reading, rather than
  * through `@blazetrails/date`, which this package does not depend on. The receiver's
  * own `<=>` still wins, as it does in Ruby. A Temporal value carrying no
  * instant still reaches `rb_obj_cmp`;
@@ -87,13 +88,13 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (b instanceof Number) b = b.valueOf();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
-  if (rbObjClass(a) === "Time" && rbObjClass(b) === "Time") {
+  if (rbObjClassname(a) === "Time" && rbObjClassname(b) === "Time") {
     if (typeof (a as { compare?: unknown }).compare === "function") {
       return (a as { compare(o: unknown): number | null }).compare(b) ?? null;
     }
-    const x = (a as { epochNanoseconds: bigint }).epochNanoseconds;
-    const y = (b as { epochNanoseconds: bigint }).epochNanoseconds;
-    return x < y ? -1 : x > y ? 1 : 0;
+    const x = (a as { epochNanoseconds?: bigint }).epochNanoseconds;
+    const y = (b as { epochNanoseconds?: bigint }).epochNanoseconds;
+    if (x !== undefined && y !== undefined) return x < y ? -1 : x > y ? 1 : 0;
   }
   if (kDateP(a) && (typeof b === "number" || typeof b === "bigint")) {
     const ajd = mAjd(a);
@@ -129,6 +130,17 @@ export function cmp(a: unknown, b: unknown): number | null {
           return a > 0 ? 1 : -1;
         }
       }
+      /* `rb_num_coerce_cmp` (`vendor/ruby/v3.3.11/numeric.c:484`) over
+         `do_coerce` (`:455`): an operand answering `coerce` is sent it, and
+         the pair it returns is compared. */
+      if (rbObjRespondTo(b, "coerce")) {
+        const ary = (b as { coerce(x: unknown): unknown }).coerce(a);
+        if (ary === null || ary === undefined) return null;
+        if (!Array.isArray(ary) || ary.length !== 2) {
+          throw new TypeError("coerce must return [x, y]");
+        }
+        return cmp(ary[0], ary[1]);
+      }
       return null;
     }
     if (Number.isNaN(b as number)) return null;
@@ -148,7 +160,7 @@ export function cmp(a: unknown, b: unknown): number | null {
       const inv = cmp(b, a);
       return inv === null ? null : -inv;
     }
-    return a < s ? -1 : a > s ? 1 : 0;
+    return rbStrCmp(a, s);
   }
   if (Array.isArray(a)) {
     /* `rb_ary_cmp` (`vendor/ruby/v3.3.11/array.c:5303`) and its `recursive_cmp`
@@ -217,8 +229,8 @@ function isCmpSpelling(value: unknown): value is CmpSpelling {
  * Ruby's `rb_cmperr` (`vendor/ruby/v3.3.11/compar.c:28`), which names the operand by
  * `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
 function rbCmperr(x: unknown, y: unknown): never {
-  const classname = specialConstP(y) ? rbInspect(y) : rbObjClass(y);
-  throw new ArgumentError(`comparison of ${rbObjClass(x)} with ${classname} failed`);
+  const classname = specialConstP(y) ? rbInspect(y) : rbObjClassname(y);
+  throw new ArgumentError(`comparison of ${rbObjClassname(x)} with ${classname} failed`);
 }
 
 /**
@@ -313,12 +325,14 @@ export function isBetween(this: Comparable, min: unknown, max: unknown): boolean
 }
 
 /**
- * Ruby `Array#max` (`vendor/ruby/v3.3.11/array.c:5848` `rb_ary_max`), the no-argument,
- * no-block arm: `nil` for an empty array, and otherwise the first element
- * carried through `ary_max_generic` (`vendor/ruby/v3.3.11/array.c:5719`). MRI's
- * `CMP_OPTIMIZABLE` fast paths for a Fixnum / String / Float first element are
- * omitted — each one falls back to `ary_max_generic` the moment an element is
- * not of that type, so they change speed, not the answer.
+ * Ruby `Array#max` (`vendor/ruby/v3.3.11/array.c:5848` `rb_ary_max`), the
+ * no-argument arms. Without a block: `nil` for an empty array, and otherwise
+ * the first element carried through `ary_max_generic`
+ * (`vendor/ruby/v3.3.11/array.c:5719`). MRI's `CMP_OPTIMIZABLE` fast paths for a
+ * Fixnum / String / Float first element are omitted — each one falls back to
+ * `ary_max_generic` the moment an element is not of that type, so they change
+ * speed, not the answer. With a block: the element the block's `<=>` answer
+ * ranks highest, the first of any tie (`vendor/ruby/v3.3.11/array.c:5859-5866`).
  *
  * It lives beside {@link rbCmpint} rather than in an `array.ts` because that is
  * the whole of it: `ary_max_generic` is `rb_cmpint(rb_cmp(vmax, v), vmax, v)`,
@@ -327,8 +341,18 @@ export function isBetween(this: Comparable, min: unknown, max: unknown): boolean
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Array#max` (`vendor/ruby/v3.3.11/array.c:5848`).
  */
-export function max<T>(ary: readonly T[]): T | null {
+export function max<T>(ary: readonly T[], block?: (a: T, b: T) => number | null): T | null {
   const n = ary.length;
+  if (block) {
+    let result: T | null = null;
+    for (let i = 0; i < ary.length; i++) {
+      const v = ary[i];
+      if (i === 0 || rbCmpint(block(v, result as T), v, result) > 0) {
+        result = v;
+      }
+    }
+    return result;
+  }
   if (n === 0) return null;
   const result = ary[0];
   if (n > 1) return aryMaxGeneric(ary, 1, result);

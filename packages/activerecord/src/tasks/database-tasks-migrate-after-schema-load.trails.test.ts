@@ -1,19 +1,20 @@
 import { StringIO } from "@blazetrails/ruby-compat";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { Base } from "../base.js";
-
-const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
+import { schemaFormat, setSchemaFormat } from "../active-record.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
+    vi.restoreAllMocks();
+    Base.configurations({});
     try {
       await Base.removeConnection();
     } catch {
@@ -23,8 +24,10 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   });
 
   async function connectTo(database: string): Promise<void> {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: {
+    vi.spyOn(DatabaseTasks, "env", "get").mockReturnValue(DEFAULT_ENV());
+    vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue("db");
+    Base.configurations({
+      [DEFAULT_ENV()]: {
         primary: {
           adapter: "sqlite3",
           database,
@@ -49,25 +52,25 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     await DatabaseTasks.migrateAll();
 
     const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-    const languageWas = SchemaDumper.language;
-    SchemaDumper.language = "js";
+    const schemaFormatWas = schemaFormat();
+    setSchemaFormat("js");
     let dumped: string;
     try {
       dumped = (
         await SchemaDumper.dump(DatabaseTasks.migrationConnectionPool(), new StringIO())
       ).string();
     } finally {
-      SchemaDumper.language = languageWas;
+      setSchemaFormat(schemaFormatWas);
     }
-    expect(dumped).toMatch(/export const defineParams = \{ version: /);
+    expect(dumped).toMatch(/await Schema\.get\([0-9.]+\)\.define\(\{ version: /);
 
     const schemaFile = join(dir, "schema.js");
     await writeFile(schemaFile, dumped);
 
     await Base.removeConnection();
     await connectTo(join(dir, "fresh.sqlite3"));
-    const [fresh] = DatabaseTasks.configsFor({ envName: DatabaseTasks.env });
-    await DatabaseTasks.loadSchema(fresh, "ruby", schemaFile);
+    const [fresh] = DatabaseTasks.configsFor({ envName: DEFAULT_ENV() });
+    await DatabaseTasks.loadSchema(fresh, "js", schemaFile);
 
     const pending =
       await DatabaseTasks.migrationConnectionPool().migrationContext.pendingMigrationVersions();

@@ -1,8 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
-import { FixtureSet } from "./fixtures.js";
-import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
+import { Fixture, FixtureError, FixtureSet, FormatError } from "./fixtures.js";
+import { StandardError } from "@blazetrails/ruby-compat";
+import {
+  HashWithIndifferentAccess,
+  OID_NAMESPACE,
+  onLoad,
+  uuidV5,
+} from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import {
+  defaultInsertValue,
+  insertFixturesSet,
+} from "./connection-adapters/abstract/database-statements.js";
+import { Visitors } from "@blazetrails/arel";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import "./relation.js";
 
@@ -26,10 +37,16 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
     schemaCache: {
       columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
     },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    supportsVirtualColumns: async () => false,
+    defaultInsertValue,
+    get visitor() {
+      return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+    },
     quoteString: (v: string) => v.replace(/'/g, "''"),
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
@@ -73,7 +90,10 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   return {
     tableName,
     primaryKey: pk,
+    isCompositePrimaryKey: () => false,
     loadSchema: async () => {},
+    definedEnums: {},
+    _reflections: {},
     columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
     typeForAttribute: () => ({ type: () => "integer" }),
     findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
@@ -114,6 +134,21 @@ describe("createFixtures", () => {
     expect(deleteSql).toContain('"users"');
   });
 
+  it("resolve_enums leaves an Integer row value alone when a label is spelled like it", async () => {
+    const Book = makeModel("books", new Map());
+    Book.definedEnums = { status: new HashWithIndifferentAccess({ "5": 0, published: 1 }) };
+
+    const books = await createFixtures(makeAdapter(), Book, {
+      integer: { status: 5 },
+      label: { status: "published" },
+      digits: { status: "5" },
+    });
+
+    expect(books.integer.status).toBe(5);
+    expect(books.label.status).toBe(1);
+    expect(books.digits.status).toBe(0);
+  });
+
   it("deterministic IDs are stable across multiple createFixtures calls", async () => {
     const davidId = FixtureSet.identify("david");
     const rows = new Map([[davidId, { id: davidId }]]);
@@ -132,8 +167,10 @@ describe("createFixtures", () => {
     const Model = {
       tableName: "orders",
       primaryKey: ["shop_id", "id"],
-      compositePrimaryKey: true,
+      isCompositePrimaryKey: () => true,
       loadSchema: async () => {},
+      definedEnums: {},
+      _reflections: {},
       columns: () => Object.values(doubleColumnsHash("orders", { orders: ["shop_id"] })),
       typeForAttribute: () => ({ type: () => "integer" }),
       findBy: vi.fn(async () => ({ shop_id: 1, id: 1 })),
@@ -257,6 +294,26 @@ describe("FixtureSet (trails)", () => {
 
   it("default_fixture_model_name singularizes and camelizes when table names are pluralized", () => {
     expect(FixtureSet.defaultFixtureModelName("users")).toBe("User");
+  });
+
+  it("all_loaded_fixtures is readable and writable on the instance as well as the class", () => {
+    const instance = Object.create(FixtureSet.prototype) as FixtureSet;
+    expect(instance.allLoadedFixtures).toBe(FixtureSet.allLoadedFixtures);
+
+    const original = FixtureSet.allLoadedFixtures;
+    try {
+      const replaced = {};
+      instance.allLoadedFixtures = replaced;
+      expect(FixtureSet.allLoadedFixtures).toBe(replaced);
+    } finally {
+      FixtureSet.allLoadedFixtures = original;
+    }
+  });
+
+  it("Fixture::FormatError < Fixture::FixtureError < StandardError", () => {
+    expect(new FormatError("bad")).toBeInstanceOf(FixtureError);
+    expect(new FixtureError("bad")).toBeInstanceOf(StandardError);
+    expect(Fixture.FormatError).toBe(FormatError);
   });
 
   it("runs the active_record_fixture_set load hook with FixtureSet", () => {

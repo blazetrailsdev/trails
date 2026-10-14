@@ -1,6 +1,6 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { buildQuoted } from "./casted.js";
@@ -9,11 +9,11 @@ import { Unary } from "./unary.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Case extends NodeExpression {
-  case: Node | null;
+  case: NodeOrValue;
   conditions: When[];
-  default: Node | null;
+  default: NodeOrValue;
 
-  constructor(expression?: Node, defaultValue?: Node) {
+  constructor(expression?: NodeOrValue, defaultValue?: NodeOrValue) {
     super();
     this.case = expression ?? null;
     this.conditions = [];
@@ -25,10 +25,16 @@ export class Case extends NodeExpression {
     return this;
   }
 
-  else(expression: Node | unknown): this {
-    this.default = new Else(buildQuoted(expression === undefined ? null : expression));
+  then(expression: Node | unknown): this {
+    this.conditions[this.conditions.length - 1].right = buildQuoted(expression);
     return this;
   }
+
+  else(expression: Node | unknown): this {
+    this.default = new Else(buildQuoted(expression));
+    return this;
+  }
+
   hash(): number {
     return rbHash([this.case, this.conditions, this.default]);
   }
@@ -43,28 +49,10 @@ export class Case extends NodeExpression {
     );
   }
 
-  then(onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown): void;
-  then(expression: Node | unknown): this;
-
-  then(expression: Node | unknown, onRejected?: unknown): this | void {
-    if (typeof expression === "function" && typeof onRejected === "function") {
-      (onRejected as (e: Error) => unknown)(
-        new TypeError("Arel::Nodes::Case is not awaitable; use #toSql() to render"),
-      );
-      return;
-    }
-    this.conditions[this.conditions.length - 1].right = buildQuoted(
-      expression === undefined ? null : expression,
-    );
-    return this;
-  }
-
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.case) copy.case = cloneSlot(this.case);
-    copy.conditions = this.conditions.map((x) => x.clone());
-    if (this.default) copy.default = cloneSlot(this.default);
-    return copy;
+  initializeCopy(_other: Case): void {
+    if (this.case != null) this.case = rbObjClone(this.case);
+    this.conditions = this.conditions.map((x) => rbObjClone(x));
+    if (this.default != null) this.default = rbObjClone(this.default);
   }
 }
 
@@ -75,6 +63,6 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Case extends _AliasPredication {}
 
-Nodes.Case = Case;
-Nodes.When = When;
-Nodes.Else = Else;
+rbModConstSet(Nodes, "Case", Case);
+rbModConstSet(Nodes, "When", When);
+rbModConstSet(Nodes, "Else", Else);

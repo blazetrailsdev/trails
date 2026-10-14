@@ -8,7 +8,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { RouteSet, ActionController, controllerConstants } from "@blazetrails/actionpack";
-import type { DispatchableControllerClass } from "@blazetrails/actionpack";
+import type { DispatchableControllerClass, DrawCallback } from "@blazetrails/actionpack";
 
 export interface AppServerDeps {
   executeCode: (code: string) => Promise<unknown>;
@@ -18,7 +18,7 @@ export interface AppServer {
   call: (env: RackEnv) => Promise<RackResponse>;
   routes: RouteSet;
   registerController: (name: string, controllerClass: ControllerClass) => void;
-  drawRoutes: (fn: (r: any) => void) => void;
+  drawRoutes: (fn: DrawCallback) => void;
 }
 
 type ControllerClass = DispatchableControllerClass &
@@ -46,7 +46,7 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
       controllerConstants.set(name, controllerClass);
     },
 
-    drawRoutes(fn: (r: any) => void) {
+    drawRoutes(fn: DrawCallback) {
       routeSet.draw(fn);
     },
   };

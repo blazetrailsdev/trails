@@ -1,76 +1,73 @@
 import type { DatabaseConfigOptions } from "../database-configurations/database-config.js";
-import {
-  DatabaseConfigurations,
-  configurationsStore,
-  setConfigurationsStore,
-} from "../database-configurations.js";
+import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
-import { DEFAULT_ENV } from "../connection-handling.js";
-import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { BoundSchemaReflection } from "../connection-adapters/schema-cache.js";
-import { getEnv, isBlank, TopLevel, trailsRoot } from "@blazetrails/activesupport";
 import {
+  type EnvironmentInquirer,
+  getEnv,
+  isBlank,
+  isPresent,
+  TopLevel,
+  toSentence,
+  trailsRoot,
+} from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  excToS,
+  isEmpty,
+  StandardError,
+  rbFSend,
+  rbStrToI,
+  sort,
+  union,
   getCryptoAsync,
-  getOs,
   stdout,
   stderr,
-  abort,
+  puts,
+  Kernel,
   File,
   FileUtils,
-  getPath,
+  rbEqual,
+  rbFLoad,
+  rbModConstSet,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
-import { NoMethodError } from "@blazetrails/activemodel";
 import type { Base } from "../base.js";
 import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
 import { ActiveRecord } from "../namespaces.js";
 
-export class DatabaseNotSupported extends Error {
-  /** @noRailsEquivalent PERMANENT */
-  constructor(message: string) {
-    super(message);
-    this.name = "ActiveRecord::Tasks::DatabaseNotSupported";
-  }
-}
+export class DatabaseNotSupported extends StandardError {}
 
-export type SchemaFormat = "ruby" | "sql";
+DatabaseNotSupported.prototype.name = "ActiveRecord::Tasks::DatabaseNotSupported";
+
+export type SchemaFormat = "ts" | "js" | "sql";
 
 export class DatabaseTasks {
   static readonly LOCAL_HOSTS: readonly string[] = ["127.0.0.1", "localhost"];
 
-  private static _env: string | null = null;
+  private static _env: string | EnvironmentInquirer | null = null;
 
-  static get env(): string {
-    return (this._env ??= TopLevel.Trails ? TopLevel.Trails.env.toString() : DEFAULT_ENV());
+  static get env(): string | EnvironmentInquirer {
+    return (this._env ??= TopLevel.Trails!.env);
   }
 
-  static set env(value: string | null) {
+  static set env(value: string | EnvironmentInquirer | null) {
     this._env = value;
   }
 
   static get name(): string {
     return "primary";
   }
-  static get databaseConfiguration(): DatabaseConfigurations | null {
-    return configurationsStore();
-  }
-
-  static set databaseConfiguration(value: DatabaseConfigurations | null) {
-    setConfigurationsStore(value ?? new DatabaseConfigurations({}));
-  }
+  static databaseConfiguration: DatabaseConfigurations | null = null;
 
   private static _dbDir: string | null = null;
 
-  /** @missingRailsCall first — PERMANENT */
+  /** @missingRailsCall first — CONVERGEABLE paths-path-expanded-is-async-over-a-sync-dir-glob */
   static get dbDir(): string {
-    if (this._dbDir !== null) return this._dbDir;
-    const application = TopLevel.Trails?.application;
-    const root = application?.config.root;
-    if (!application || root == null) return "db";
-    return (this._dbDir = File.expandPath(application.config.paths().get("db")!.toAry()[0], root));
+    return (this._dbDir ??= TopLevel.Trails!.application!.config.paths().get("db")!.firstSync()!);
   }
 
   static set dbDir(value: string) {
@@ -90,16 +87,7 @@ export class DatabaseTasks {
   private static _root: string | null = null;
 
   static get root(): string {
-    if (this._root !== null) return this._root;
-    const root = TopLevel.Trails?.application?.config.root;
-    if (root != null) return (this._root = root);
-    return DatabaseTasks._resolveCwd();
-  }
-
-  private static _resolveCwd(): string {
-    const proc = (globalThis as { process?: { cwd?: () => string } }).process;
-    if (proc && typeof proc.cwd === "function") return proc.cwd();
-    return getOs().cwd();
+    return (this._root ??= TopLevel.Trails!.root()!);
   }
 
   static set root(value: string) {
@@ -110,28 +98,23 @@ export class DatabaseTasks {
   static structureDumpFlags: string | string[] | Record<string, string | string[]> | null = null;
   static structureLoadFlags: string | string[] | Record<string, string | string[]> | null = null;
 
-  private static _registeredTasks: Array<{
-    pattern: RegExp | string;
-    handler: DatabaseTaskHandler;
-  }> = [];
+  private static tasks: Map<RegExp | string, DatabaseTaskHandler>;
 
   static registerTask(pattern: RegExp | string, task: DatabaseTaskHandler): void {
-    this._registeredTasks.push({ pattern, handler: task });
+    this.tasks ??= new Map();
+    this.tasks.set(pattern, task);
   }
 
   /** @internal */
   private static classForAdapter(adapter: string | undefined): DatabaseTaskHandler {
-    const task =
+    const [_key, task] =
       adapter === undefined
-        ? undefined
-        : this._registeredTasks
-            .slice()
-            .reverse()
-            .find(({ pattern }) => {
-              if (typeof pattern === "string") return adapter.includes(pattern);
-              pattern.lastIndex = 0;
-              return pattern.test(adapter);
-            })?.handler;
+        ? []
+        : ([...this.tasks].reverse().find(([pattern, _task]) => {
+            if (typeof pattern === "string") return adapter.includes(pattern);
+            pattern.lastIndex = 0;
+            return pattern.test(adapter);
+          }) ?? []);
     if (!task) {
       throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
     }
@@ -156,25 +139,26 @@ export class DatabaseTasks {
     return new ctor(config, ...args);
   }
 
-  static async create(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+  static async create(
+    configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
+  ): Promise<void> {
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const { DatabaseAlreadyExists } = await import("../errors.js");
     try {
-      const handler = this.databaseAdapterFor(dbConfig);
-      if (handler.create) {
-        await handler.create();
-      }
-      if (isVerbose()) stdout.write(`Created database '${dbConfig.database}'\n`);
+      await rbFSend(this.databaseAdapterFor(dbConfig, ...args), "create");
+      if (isVerbose()) puts.call(stdout, `Created database '${dbConfig.database}'`);
     } catch (error) {
       if (error instanceof DatabaseAlreadyExists) {
-        if (isVerbose()) stderr.write(`Database '${dbConfig.database}' already exists\n`);
-        return;
+        if (isVerbose()) puts.call(stderr, `Database '${dbConfig.database}' already exists`);
+      } else {
+        puts.call(stderr, excToS(error));
+        puts.call(
+          stderr,
+          `Couldn't create '${dbConfig.database}' database. Please check your configuration.`,
+        );
+        throw error;
       }
-      stderr.write(_errorToS(error) + "\n");
-      stderr.write(
-        `Couldn't create '${dbConfig.database}' database. Please check your configuration.\n`,
-      );
-      throw error;
     }
   }
 
@@ -188,31 +172,33 @@ export class DatabaseTasks {
     await this.migrationClass().establishConnection(dbConfig);
   }
 
-  static async createCurrent(environment?: string, name?: string): Promise<void> {
-    environment = this._normalizeEnv(environment);
+  static async createCurrent(
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    name?: string,
+  ): Promise<void> {
     await this.eachCurrentConfiguration(environment, name, async (dbConfig) => {
       await this.create(dbConfig);
     });
     await this.migrationClass().establishConnection(`:${environment}`);
   }
 
-  static async drop(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+  static async drop(
+    configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
+  ): Promise<void> {
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const { NoDatabaseError } = await import("../errors.js");
     try {
-      const handler = this.databaseAdapterFor(dbConfig);
-      if (handler.drop) {
-        await handler.drop();
-      }
-      if (isVerbose()) stdout.write(`Dropped database '${dbConfig.database}'\n`);
+      await rbFSend(this.databaseAdapterFor(dbConfig, ...args), "drop");
+      if (isVerbose()) puts.call(stdout, `Dropped database '${dbConfig.database}'`);
     } catch (error) {
       if (error instanceof NoDatabaseError) {
-        stderr.write(`Database '${dbConfig.database}' does not exist\n`);
-        return;
+        puts.call(stderr, `Database '${dbConfig.database}' does not exist`);
+      } else {
+        puts.call(stderr, excToS(error));
+        puts.call(stderr, `Couldn't drop database '${dbConfig.database}'`);
+        throw error;
       }
-      stderr.write(_errorToS(error) + "\n");
-      stderr.write(`Couldn't drop database '${dbConfig.database}'\n`);
-      throw error;
     }
   }
 
@@ -222,76 +208,64 @@ export class DatabaseTasks {
     });
   }
 
-  static async dropCurrent(environment?: string): Promise<void> {
-    await this.eachCurrentConfiguration(this._normalizeEnv(environment), async (dbConfig) => {
+  static async dropCurrent(
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+  ): Promise<void> {
+    await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.drop(dbConfig);
     });
   }
 
-  static async migrate(options?: { skipInitialize?: boolean }): Promise<void>;
+  static async migrate(options?: { skipInitialize?: boolean }): Promise<undefined>;
   static async migrate(
-    version: number | string | null,
+    version: number | null,
     options?: { skipInitialize?: boolean },
-  ): Promise<void>;
+  ): Promise<undefined>;
   static async migrate(
-    version: number | string | null | { skipInitialize?: boolean } = null,
+    version: number | null | { skipInitialize?: boolean } = null,
     options: { skipInitialize?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<undefined> {
     if (version !== null && typeof version === "object") {
       options = version;
       version = null;
     }
     const { skipInitialize = false } = options;
-    this.checkTargetVersion();
-    const effectiveVersion = this.targetVersion();
-
-    const { Migration } = await import("../migration.js");
     const scope = getEnv("SCOPE");
     const verboseWas = Migration.verbose;
     Migration.verbose = isVerbose();
-
-    const runMigration = async (pool: ConnectionPool) => {
-      const explicitVersion =
-        version == null ? null : typeof version === "string" ? version.trim() || null : version;
-      let filter: ((m: import("../migration.js").MigrationProxy) => boolean) | undefined;
-      if (explicitVersion !== null) {
-        const versionKey = String(BigInt(explicitVersion));
-        filter = (m) => String(BigInt(m.version)) === versionKey;
-      } else if (scope !== undefined && scope.trim() !== "") {
-        filter = (m) => m.scope === scope;
-      }
-      const ran = await pool.migrationContext.migrate(effectiveVersion ?? null, filter);
-      if (scope && scope.trim() !== "" && ran.length === 0 && Migration.verbose) {
-        stdout.write(`No migrations ran. (using ${scope} scope)\n`);
-      }
-      (await pool.leaseConnection()).schemaCache.clearBang();
-    };
-
     try {
-      const pool = this.migrationConnectionPool();
-      if (!skipInitialize) await initializeDatabase(pool.dbConfig);
-      await runMigration(pool);
+      this.checkTargetVersion();
+
+      if (!skipInitialize) await initializeDatabase(this.migrationConnectionPool().dbConfig);
+
+      const migrationsRan = await this.migrationConnectionPool().migrationContext.migrate(
+        this.targetVersion(),
+        (migration) => {
+          if (isBlank(version)) {
+            return isBlank(scope) || scope === migration.scope;
+          } else {
+            return migration.version === version;
+          }
+        },
+      );
+      if (isPresent(scope) && migrationsRan.length === 0) {
+        rbFSend(Migration, "write", `No migrations ran. (using ${scope} scope)`);
+      }
+
+      this.migrationConnectionPool().schemaCache.clearBang();
     } finally {
       Migration.verbose = verboseWas;
     }
   }
 
-  private static async _migrationAdapter(): Promise<
-    import("../connection-adapters/abstract-adapter.js").AbstractAdapter
-  > {
-    return this.migrationClass().connectionPool().leaseConnection();
-  }
-
   static async purge(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
-    const handler = this.databaseAdapterFor(dbConfig);
-    if (handler.purge) {
-      await handler.purge();
-    }
+    const dbConfig = this.resolveConfiguration(configuration)!;
+    await rbFSend(this.databaseAdapterFor(dbConfig), "purge");
   }
 
-  static async purgeCurrent(environment?: string): Promise<void> {
-    environment = this._normalizeEnv(environment);
+  static async purgeCurrent(
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+  ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.purge(dbConfig);
     });
@@ -304,7 +278,9 @@ export class DatabaseTasks {
     });
   }
 
-  static async truncateAll(environment: string = DatabaseTasks.env): Promise<void> {
+  static async truncateAll(
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+  ): Promise<void> {
     for (const dbConfig of this.configsFor({ envName: environment })) {
       await this.truncateTables(dbConfig);
     }
@@ -312,54 +288,42 @@ export class DatabaseTasks {
 
   static async charset(
     configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
   ): Promise<string | null> {
-    const dbConfig = this.resolveConfiguration(configuration);
-    const handler = this.databaseAdapterFor(dbConfig);
-    if (!handler.charset) {
-      throw new NoMethodError(
-        `undefined method 'charset' for an instance of ${handler.constructor.name}`,
-      );
-    }
-    return handler.charset();
+    const dbConfig = this.resolveConfiguration(configuration)!;
+    return rbFSend(this.databaseAdapterFor(dbConfig, ...args), "charset") as Promise<string | null>;
   }
 
   static async charsetCurrent(
-    envName: string = DatabaseTasks.env,
+    envName: string | EnvironmentInquirer = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
-    if (!dbConfig) return null;
-    return this.charset(dbConfig);
+    return this.charset(dbConfig!);
   }
 
   static async collation(
     configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
   ): Promise<string | null> {
-    const dbConfig = this.resolveConfiguration(configuration);
-    const handler = this.databaseAdapterFor(dbConfig);
-    if (!handler.collation) {
-      throw new NoMethodError(
-        `undefined method 'collation' for an instance of ${handler.constructor.name}`,
-      );
-    }
-    return handler.collation();
+    const dbConfig = this.resolveConfiguration(configuration)!;
+    return rbFSend(this.databaseAdapterFor(dbConfig, ...args), "collation") as Promise<
+      string | null
+    >;
   }
 
   static async collationCurrent(
-    envName: string = DatabaseTasks.env,
+    envName: string | EnvironmentInquirer = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
-    if (!dbConfig) return null;
-    return this.collation(dbConfig);
+    return this.collation(dbConfig!);
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   static targetVersion(): number | null {
     const version = getEnv("VERSION");
-    if (version === undefined || version === "") return null;
-    const match = version.match(/^\s*(-?\d+(?:_\d+)*)/);
-    return match ? Number(match[1].replace(/_/g, "")) : 0;
+    if (version !== undefined && !isEmpty(version)) return Number(rbStrToI(version));
+    return null;
   }
 
   static checkTargetVersion(): void {
@@ -371,17 +335,17 @@ export class DatabaseTasks {
 
   static checkSchemaFile(filename: string): void {
     if (!File.isExist(filename)) {
-      let message = `${filename} doesn't exist yet. Run \`bin/rails db:migrate\` to create it, then try again.`;
+      let message = `${filename} doesn't exist yet. Run \`bin/trails db migrate\` to create it, then try again.`;
       const root = trailsRoot();
       if (root != null) {
         message += ` If you do not intend to use a database, you should instead alter ${root}/config/application.rb to limit the frameworks that will be loaded.`;
       }
-      abort(message);
+      Kernel.abort(message);
     }
   }
 
   static async checkProtectedEnvironmentsBang(
-    environment: string = DatabaseTasks.env,
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
   ): Promise<void> {
     if (getEnv("DISABLE_DATABASE_ENVIRONMENT_CHECK") !== undefined) return;
 
@@ -392,59 +356,59 @@ export class DatabaseTasks {
 
   /** @internal */
   static configsFor(options: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name: string;
     includeHidden?: boolean;
   }): HashConfig | undefined;
   /** @internal */
   static configsFor(options?: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name?: undefined;
     includeHidden?: boolean;
   }): HashConfig[];
   /** @internal */
   static configsFor(
-    options: { envName?: string; name?: string; includeHidden?: boolean } = {},
+    options: {
+      envName?: string | EnvironmentInquirer;
+      name?: string;
+      includeHidden?: boolean;
+    } = {},
   ): HashConfig[] | HashConfig | undefined {
     return ActiveRecord.Base.configurations().configsFor(options as { name: string });
   }
 
   /** @internal */
-  private static resolveConfiguration(configuration: unknown): HashConfig {
+  private static resolveConfiguration(configuration: unknown): HashConfig | null {
     return ActiveRecord.Base.configurations().resolve(configuration);
   }
 
   /** @internal */
   private static async eachCurrentConfiguration(
-    environment: string,
-    name: string | undefined | ((dbConfig: HashConfig) => unknown),
+    environment: string | EnvironmentInquirer,
+    name?: string | null | ((dbConfig: HashConfig) => unknown),
     block?: (dbConfig: HashConfig) => unknown,
   ): Promise<void> {
-    if (typeof name === "function") [name, block] = [undefined, name];
+    if (block === undefined) [name, block] = [null, name as (dbConfig: HashConfig) => unknown];
     await eachCurrentEnvironment(environment, async (env) => {
       for (const dbConfig of this.configsFor({ envName: env })) {
         if (name != null && name !== dbConfig.name) continue;
 
-        await block!(dbConfig);
+        await block(dbConfig);
       }
     });
   }
 
-  private static _normalizeEnv(environment?: string): string {
-    const trimmed = environment?.trim();
-    return trimmed || this.env;
-  }
-
   /** @internal */
   static async eachLocalConfiguration(block: (dbConfig: HashConfig) => unknown): Promise<void> {
-    for (const dbConfig of configurationsStore().configsFor()) {
+    for (const dbConfig of ActiveRecord.Base.configurations().configsFor()) {
       if (!dbConfig.database) continue;
 
       if (this.isLocalDatabase(dbConfig)) {
         await block(dbConfig);
       } else {
-        stderr.write(
-          `This task only modifies local databases. ${dbConfig.database} is on a remote host.\n`,
+        puts.call(
+          stderr,
+          `This task only modifies local databases. ${dbConfig.database} is on a remote host.`,
         );
       }
     }
@@ -479,28 +443,20 @@ export class DatabaseTasks {
     configuration: HashConfig | string | Record<string, unknown>,
     ...args: unknown[]
   ): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const filename = args.shift() as string;
     const flags = this.structureDumpFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig, ...args);
-    if (!handler.structureDump) {
-      throw new Error(`Adapter '${dbConfig.adapter}' does not support structureDump`);
-    }
-    await handler.structureDump(filename, flags);
+    await rbFSend(this.databaseAdapterFor(dbConfig, ...args), "structureDump", filename, flags);
   }
 
   static async structureLoad(
     configuration: HashConfig | string | Record<string, unknown>,
     ...args: unknown[]
   ): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const filename = args.shift() as string;
     const flags = this.structureLoadFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig, ...args);
-    if (!handler.structureLoad) {
-      throw new Error(`Adapter '${dbConfig.adapter}' does not support structureLoad`);
-    }
-    await handler.structureLoad(filename, flags);
+    await rbFSend(this.databaseAdapterFor(dbConfig, ...args), "structureLoad", filename, flags);
   }
 
   /** @internal */
@@ -543,105 +499,84 @@ export class DatabaseTasks {
     return File.join(this.dbDir, filename);
   }
 
-  /** @internal */
-  static _resolveSchemaPath(filename: string): string {
-    return File.isAbsolutePath(filename) ? filename : File.expandPath(filename, this.root);
-  }
-
+  /** @missingRailsArgs dump — PERMANENT */
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
   ): Promise<void> {
+    if (dbConfig.schemaDump() == null) return;
+
     const filename = this.schemaDumpPath(dbConfig, format);
     if (filename == null) return;
 
     FileUtils.mkdirP(this.dbDir);
-    if (format === "ruby") {
-      const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-      const migrationConnectionPool = this.migrationConnectionPool();
-      await File.open(filename, "w:utf-8", async (file) => {
-        await SchemaDumper.dump(migrationConnectionPool, file);
-      });
-    } else if (format === "sql") {
-      await this.structureDump(dbConfig, filename);
-      if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
-        await File.open(filename, "a", async (f) => {
-          f.puts(await (await this.migrationConnection()).dumpSchemaInformation!());
-          f.print("\n");
+    switch (format) {
+      case "ts":
+      case "js": {
+        const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
+        const migrationConnectionPool = this.migrationConnectionPool();
+        await File.open(filename, "w:utf-8", async (file) => {
+          await SchemaDumper.dump(migrationConnectionPool, file, {
+            tableNamePrefix: ActiveRecord.Base.tableNamePrefix,
+            tableNameSuffix: ActiveRecord.Base.tableNameSuffix,
+            schemaFormat: format,
+          });
         });
+        break;
       }
+      case "sql":
+        await this.structureDump(dbConfig, filename);
+        if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
+          await File.open(filename, "a", async (f) => {
+            f.puts(await (await this.migrationConnection()).dumpSchemaInformation!());
+            f.print("\n");
+          });
+        }
+        break;
     }
   }
 
-  /** @missingRailsCall load — PERMANENT */
   static async loadSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
     file?: string,
   ): Promise<void> {
-    file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
-    if (file == null) return;
-
-    const { Migration } = await import("../migration.js");
-    const verboseWas = Migration.verbose;
-    Migration.verbose = isVerbose() && getEnv("VERBOSE") !== undefined;
+    let verboseWas: boolean | undefined;
     try {
+      file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
+      if (file == null) return;
+
+      verboseWas = Migration.verbose;
+      Migration.verbose = isVerbose() && getEnv("VERBOSE") !== undefined;
       this.checkSchemaFile(file);
 
-      if (format === "sql") {
-        await this.structureLoad(dbConfig, file);
-        await this._stampSchemaSha1(dbConfig, file);
-        return;
+      switch (format) {
+        case "ts":
+        case "js":
+          await rbFLoad(file);
+          break;
+        case "sql":
+          await this.structureLoad(dbConfig, file);
+          break;
+        default:
+          throw new ArgumentError(`unknown format :${format as string}`);
       }
 
-      const path = getPath();
-      if (!path.pathToFileURL) {
-        throw new Error(
-          "DatabaseTasks.loadSchema requires PathAdapter.pathToFileURL. " +
-            "The configured PathAdapter does not provide it.",
-        );
-      }
-      const absolute = this._resolveSchemaPath(file);
-      const href = path.pathToFileURL(absolute).href;
-      const mod = (await import(href)) as {
-        default?: (ctx: unknown) => Promise<void> | void;
-        defineParams?: { version?: string | number };
-      };
-      const defineSchema =
-        mod.default ?? (mod as unknown as (ctx: unknown) => Promise<void> | void);
-      if (typeof defineSchema !== "function") {
-        throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
-      }
-      const { Schema } = await import("../schema.js");
-      await Schema.define(mod.defineParams ?? {}, (schema) => defineSchema(schema.connection));
-      await this._stampSchemaSha1(dbConfig, absolute);
+      await this.migrationConnectionPool().internalMetadata.createTableAndSetFlags(
+        dbConfig.envName,
+        await this.schemaSha1(file),
+      );
     } finally {
       Migration.verbose = verboseWas;
-    }
-  }
-
-  private static async _stampSchemaSha1(dbConfig: HashConfig, filename: string): Promise<void> {
-    if (!dbConfig.useMetadataTable) return;
-    try {
-      const adapter = await this._migrationAdapter();
-      const { InternalMetadata } = await import("../internal-metadata.js");
-      const metadata = new InternalMetadata(adapter.pool);
-      const sha1 = await this.schemaSha1(filename);
-      await metadata.createTableAndSetFlags(dbConfig.envName, sha1);
-    } catch (error) {
-      console.debug?.(
-        `[trails] _stampSchemaSha1 failed for ${dbConfig.envName} (${filename})`,
-        error,
-      );
     }
   }
 
   static async loadSchemaCurrent(
     format: SchemaFormat = schemaFormat(),
     file?: string,
-    environment?: string,
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
   ): Promise<void> {
-    await this.eachCurrentConfiguration(this._normalizeEnv(environment), async (dbConfig) => {
+    await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.withTemporaryConnection(dbConfig, async () => {
         await this.loadSchema(dbConfig, format, file);
       });
@@ -649,18 +584,20 @@ export class DatabaseTasks {
   }
 
   static async loadSeed(): Promise<void> {
-    if (!this.seedLoader) {
-      throw new Error(
-        "You tried to load seed data, but no seed loader is specified. " +
-          "Set DatabaseTasks.seedLoader = { loadSeed() { ... } }",
+    if (this.seedLoader) {
+      await this.seedLoader.loadSeed();
+    } else {
+      throw new RuntimeError(
+        "You tried to load seed data, but no seed loader is specified. Please specify seed " +
+          "loader with ActiveRecord::Tasks::DatabaseTasks.seed_loader = your_seed_loader\n" +
+          "Seed loader should respond to load_seed method",
       );
     }
-    await this.seedLoader.loadSeed();
   }
 
   static async migrateStatus(): Promise<void> {
     if (!(await this.migrationConnectionPool().schemaMigration.tableExists())) {
-      abort("Schema migrations table does not exist yet.");
+      Kernel.abort("Schema migrations table does not exist yet.");
     }
     const rows = await this.migrationConnectionPool().migrationContext.migrationsStatus();
     const center = (s: string, w: number) => {
@@ -668,19 +605,18 @@ export class DatabaseTasks {
       const left = Math.floor(pad / 2);
       return " ".repeat(left) + s + " ".repeat(pad - left);
     };
-    const puts = (s = "") => stdout.write(s + "\n");
-    puts(`\ndatabase: ${this.migrationConnectionPool().dbConfig.database}\n`);
-    puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
-    puts("-".repeat(50));
-    for (const row of rows) {
-      puts(`${center(row.status, 8)}  ${row.version.padEnd(14)}  ${row.name}`);
+    puts.call(stdout, `\ndatabase: ${this.migrationConnectionPool().dbConfig.database}\n\n`);
+    puts.call(stdout, `${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
+    puts.call(stdout, "-".repeat(50));
+    for (const [status, version, name] of rows) {
+      puts.call(stdout, `${center(status, 8)}  ${version.padEnd(14)}  ${name}`);
     }
-    puts();
+    puts.call(stdout);
   }
 
   static async migrateAll(): Promise<void> {
     const configs = ActiveRecord.Base.configurations().configsFor({
-      envName: this._normalizeEnv(),
+      envName: DatabaseTasks.env,
     });
 
     for (const dbConfig of configs) {
@@ -693,10 +629,7 @@ export class DatabaseTasks {
     }
 
     const mappedVersions = await this.dbConfigsWithVersions();
-    const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
-      BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
-    );
-    for (const [version, dbConfigs] of sorted) {
+    for (const [version, dbConfigs] of sort(Array.from(mappedVersions))) {
       for (const dbConfig of dbConfigs) {
         await this.withTemporaryConnection(dbConfig, async () => {
           await this.migrate(version, { skipInitialize: true });
@@ -706,23 +639,20 @@ export class DatabaseTasks {
   }
 
   static async prepareAll(): Promise<void> {
-    const env = this._normalizeEnv();
     let seed = false;
-    const dumpDbConfigs: HashConfig[] = [];
+    let dumpDbConfigs: HashConfig[] = [];
 
-    await this.eachCurrentConfiguration(env, async (dbConfig) => {
+    await this.eachCurrentConfiguration(this.env, async (dbConfig) => {
       const databaseInitialized = await initializeDatabase(dbConfig);
       if (databaseInitialized && dbConfig.seeds) seed = true;
     });
 
-    await eachCurrentEnvironment(env, async (environment) => {
+    await eachCurrentEnvironment(this.env, async (environment) => {
       const mappedVersions = await this.dbConfigsWithVersions(environment);
-      const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
-        BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
-      );
-      for (const [version, dbConfigs] of sorted) {
+      for (const [version, dbConfigs] of sort(Array.from(mappedVersions))) {
+        dumpDbConfigs = union(dumpDbConfigs, dbConfigs);
+
         for (const dbConfig of dbConfigs) {
-          if (!dumpDbConfigs.includes(dbConfig)) dumpDbConfigs.push(dbConfig);
           await this.withTemporaryPool(dbConfig, async (pool) => {
             await pool.migrationContext.migrate(version ?? null);
           });
@@ -742,10 +672,9 @@ export class DatabaseTasks {
   }
 
   static async dbConfigsWithVersions(
-    environment?: string,
-  ): Promise<Map<string | number, HashConfig[]>> {
-    const dbConfigsWithVersions = new Map<string | number, HashConfig[]>();
-    environment = this._normalizeEnv(environment);
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+  ): Promise<Map<number, HashConfig[]>> {
+    const dbConfigsWithVersions = new Map<number, HashConfig[]>();
     await this.withTemporaryPoolForEach({ env: environment }, async (pool) => {
       const dbConfig = pool.dbConfig;
       const versionsToRun = await pool.migrationContext.pendingMigrationVersions();
@@ -793,13 +722,16 @@ export class DatabaseTasks {
   }
 
   static async withTemporaryPoolForEach(
-    { env, name, clobber = false }: { env?: string; name?: string; clobber?: boolean } = {},
+    {
+      env = DatabaseTasks.env,
+      name,
+      clobber = false,
+    }: { env?: string | EnvironmentInquirer; name?: string; clobber?: boolean } = {},
     block: (pool: ConnectionPool) => Promise<void>,
   ): Promise<void> {
-    env = this._normalizeEnv(env);
     if (name != null) {
       const dbConfig = this.migrationClass().configurations().configsFor({ envName: env, name });
-      if (dbConfig) await this.withTemporaryPool(dbConfig, block, { clobber });
+      await this.withTemporaryPool(dbConfig!, block, { clobber });
     } else {
       for (const dbConfig of this.migrationClass()
         .configurations()
@@ -829,10 +761,9 @@ export class DatabaseTasks {
     file?: string,
   ): Promise<boolean> {
     void format;
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     file ??= this.schemaDumpPath(dbConfig) ?? undefined;
-    if (!file) return true;
-    if (!File.isExist(file)) return true;
+    if (!(file != null && File.isExist(file))) return true;
 
     return await this.withTemporaryPool(dbConfig, async (pool) => {
       const internalMetadata = pool.internalMetadata;
@@ -870,14 +801,23 @@ export class DatabaseTasks {
     }
   }
 
-  static raiseForMultiDb(environment: string | undefined, opts: { command: string }): void {
+  static raiseForMultiDb(
+    environment: string | EnvironmentInquirer | undefined,
+    opts: { command: string },
+  ): void {
     environment ??= DatabaseTasks.env;
-    const configs = this.configsFor({ envName: environment });
-    if (configs.length > 1) {
-      const list = configs.map((c) => `${opts.command}:${c.name}`).join(", ");
-      throw new Error(
+    const dbConfigs = this.configsFor({ envName: environment });
+
+    if (dbConfigs.length > 1) {
+      const dbsList: string[] = [];
+
+      for (const db of dbConfigs) {
+        dbsList.push(`${opts.command}:${db.name}`);
+      }
+
+      throw new RuntimeError(
         `You're using a multiple database application. To use \`${opts.command}\` you must ` +
-          `run the namespaced task with a VERSION. Available tasks are ${list}.`,
+          `run the namespaced task with a VERSION. Available tasks are ${toSentence(dbsList)}.`,
       );
     }
   }
@@ -921,10 +861,10 @@ export class DatabaseTasks {
   }
 }
 
-_setDatabaseTasks(DatabaseTasks);
+rbModConstSet(ActiveRecord.Tasks, "DatabaseTasks", DatabaseTasks);
 
 export interface DatabaseTaskInstance {
-  create?(): Promise<void>;
+  create?(): Promise<unknown>;
   drop?(): Promise<void>;
   purge?(): Promise<void>;
   charset?(): Promise<string | null>;
@@ -938,10 +878,6 @@ export interface DatabaseTaskHandler {
   usingDatabaseConfigurations?(): boolean;
 }
 
-function _errorToS(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 /** @internal */
 export function isVerbose(): boolean {
   const v = getEnv("VERBOSE");
@@ -950,12 +886,12 @@ export function isVerbose(): boolean {
 
 /** @internal */
 export async function eachCurrentEnvironment(
-  environment: string,
-  block: (env: string) => unknown,
-): Promise<string[]> {
+  environment: string | EnvironmentInquirer,
+  block: (env: string | EnvironmentInquirer) => unknown,
+): Promise<(string | EnvironmentInquirer)[]> {
   const environments = [environment];
   if (
-    environment === "development" &&
+    rbEqual(environment, "development") &&
     getEnv("SKIP_TEST_DATABASE") === undefined &&
     getEnv("DATABASE_URL") === undefined
   ) {

@@ -7,11 +7,9 @@
  *   so the dispatcher branches on runtime shape.
  *
  *   Rails' `when Date, Time then "'#{quoted_date(value)}'"` (quoting.rb:85)
- *   accepts Ruby's native time objects; trails' analogue is Temporal, not JS
- *   `Date` — #939 ("close the dual-typed window") made Temporal the sole
- *   date/time representation, so `quote` and `typeCast` both reject a JS `Date`
- *   with guidance rather than formatting it. rb:85 is ported onto the Temporal
- *   branches via the `quoted_date` self-send.
+ *   accepts Ruby's native time objects; trails' analogues are the Temporal
+ *   types, `Time`, `TimeWithZone`, and a JS `Date`, which ruby-compat classes
+ *   as `Time` (`rbClassOf`).
  *
  *   Rails' `when nil, Numeric, String then value` (quoting.rb:102) hands a
  *   Float to the driver unchanged. trails' whole-valued Float is a boxed
@@ -20,20 +18,27 @@
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
+import { actsLike, BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
+import {
+  rbFSend,
+  rbObjAsString,
+  rbObjClassname,
+  rbObjRespondTo,
+  Rational,
+  sprintf,
+  TypeError,
+} from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
-import { formatPlainDateTimeForSql, formatPlainDateForSql } from "./sql-datetime.js";
 import { Value as TimeValue } from "../../type/time.js";
-import { defaultTimezone } from "../../active-record.js";
 
 export interface QuotingClassMethods {
   quoteColumnName(columnName: unknown): string;
 }
 
 export interface QuotingDispatchHost {
+  readonly defaultTimezone: string;
   quote(value: unknown): string;
   quotedDate(value: TemporalDateLike): string;
   quotedTime(value: QuotedTimeValue): string;
@@ -47,36 +52,41 @@ export interface QuotingDispatchHost {
   unquotedFalse(): boolean | number;
 }
 
+export const ClassMethods = {
+  quoteColumnName(_columnName: unknown): string {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
+    throw new NotImplementedError();
+  },
+};
+
 export type QuotedTimeValue = TimeValue | TimeWithZone | RubyTime;
 
 export type TemporalDateLike =
   | TimeWithZone
   | RubyTime
+  | Date
   | Temporal.Instant
   | Temporal.ZonedDateTime
   | Temporal.PlainDateTime
   | Temporal.PlainDate;
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "string") {
-    return `'${this.quoteString(value)}'`;
+  if (typeof value === "string" || value instanceof Chars) {
+    return `'${this.quoteString(rbObjAsString(value))}'`;
   }
-  if (typeof value === "symbol") {
-    const desc = value.description;
-    if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
-    return `'${this.quoteString(desc)}'`;
-  }
-  if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
+  if (value === true) return this.quotedTrue();
+  if (value === false) return this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
   if (value instanceof BigDecimal) return value.toString("F");
-  if (typeof value === "number" || typeof value === "bigint" || value instanceof Number) {
+  if (
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    value instanceof Number ||
+    value instanceof Rational
+  ) {
     return rbObjAsString(value);
   }
   if (value instanceof BinaryData) return this.quotedBinary(value);
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return this.quotedBinary(new BinaryData(bytes));
-  }
   if (value instanceof TimeValue) return `'${this.quotedTime(value)}'`;
   if (
     value instanceof TimeWithZone ||
@@ -84,29 +94,33 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.ZonedDateTime
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Date
   ) {
     return `'${this.quotedDate(value)}'`;
   }
-  if (value instanceof Date)
-    throw new TypeError(
-      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
   if (typeof value === "function" && value.name) {
     return `'${value.name}'`;
   }
-  throw new TypeError(`can't quote ${rbObjClass(value)}`);
+  throw new TypeError(`can't quote ${rbObjClassname(value)}`);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (typeof value === "symbol") return value.description ?? String(value);
-  if (value instanceof BinaryData) return value.bytes;
-  if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
-  if (value === null || value === undefined) return value;
+  if (value instanceof Chars || value instanceof BinaryData) return rbObjAsString(value);
+  if (value === true) return this.unquotedTrue();
+  if (value === false) return this.unquotedFalse();
   if (value instanceof BigDecimal) return value.toString("F");
-  if (typeof value === "number" || typeof value === "bigint") return value;
-  if (value instanceof Number) return value.valueOf();
-  if (typeof value === "string") return value;
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "number" ||
+    value instanceof Number ||
+    typeof value === "bigint" ||
+    value instanceof Rational ||
+    typeof value === "string"
+  ) {
+    return value;
+  }
   if (value instanceof TimeValue) return this.quotedTime(value);
   if (
     value instanceof TimeWithZone ||
@@ -114,15 +128,12 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.ZonedDateTime
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Date
   ) {
     return this.quotedDate(value);
   }
-  if (value instanceof Date)
-    throw new TypeError(
-      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
-  throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
+  throw new TypeError(`can't cast ${rbObjClassname(value)}`);
 }
 
 export function castBoundValue(value: unknown): unknown {
@@ -145,9 +156,8 @@ export interface QuotingHost {
   lookupCastType(sqlType: string | null): ValueType;
 }
 
-export function quoteColumnName(_columnName: unknown): string {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
-  throw new NotImplementedError();
+export function quoteColumnName(this: object, columnName: unknown): string {
+  return (this.constructor as unknown as QuotingClassMethods).quoteColumnName(columnName);
 }
 
 export function quoteTableName(this: QuotingClassMethods, tableName: unknown): string {
@@ -190,16 +200,21 @@ export function unquotedFalse(): boolean {
   return false;
 }
 
-export function quotedDate(value: TemporalDateLike): string {
-  if (actsLikeTime(value)) {
-    if (defaultTimezone() === "utc") {
-      if (!isUtc(value)) value = getutc(value);
+export function quotedDate(this: { defaultTimezone: string }, value: TemporalDateLike): string {
+  if (actsLike.call(value, "time")) {
+    if (this.defaultTimezone === "utc") {
+      if (!rbFSend(value, "isUtc")) value = rbFSend(value, "getutc") as TemporalDateLike;
     } else {
-      value = getlocal(value);
+      value = rbFSend(value, "getlocal") as TemporalDateLike;
     }
   }
 
-  return toFsDb(value);
+  const result = rbFSend(value, "toFs", "db") as string;
+  if (rbObjRespondTo(value, "usec") && (rbFSend(value, "usec") as number) > 0) {
+    return result + "." + sprintf("%06d", rbFSend(value, "usec"));
+  } else {
+    return result;
+  }
 }
 
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
@@ -208,7 +223,7 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
 }
 
 export function quotedBinary(value: BinaryData): string {
-  return `'${quoteString(Buffer.from(value.bytes).toString("latin1"))}'`;
+  return `'${quoteString(Buffer.from(value.toString()).toString("latin1"))}'`;
 }
 
 export function sanitizeAsSqlComment(value: unknown): string {
@@ -232,8 +247,6 @@ export function typeCastedBinds(
   });
 }
 
-type TimeLike = TimeWithZone | RubyTime | Temporal.Instant | Temporal.ZonedDateTime;
-
 /** @internal */
 export function lookupCastType(
   this: { typeMap: TypeMap },
@@ -248,57 +261,6 @@ export function columnNameMatcher(): RegExp {
 
 export function columnNameWithOrderMatcher(): RegExp {
   return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
-}
-
-function actsLikeTime(value: unknown): value is TimeLike {
-  return (
-    value instanceof TimeWithZone ||
-    value instanceof RubyTime ||
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.ZonedDateTime
-  );
-}
-
-function instantOf(value: TimeLike): Temporal.Instant {
-  if (value instanceof TimeWithZone) value = value.utc();
-  if (value instanceof RubyTime) return value.toZonedDateTime().toInstant();
-  if (value instanceof Temporal.ZonedDateTime) return value.toInstant();
-  return value;
-}
-
-/** Ruby's `Time#utc?` (`vendor/ruby/v3.3.11/time.c:4340`). */
-function isUtc(value: TimeLike): boolean {
-  if (value instanceof TimeWithZone || value instanceof RubyTime) return value.isUtc();
-  if (value instanceof Temporal.ZonedDateTime) return value.timeZoneId === "UTC";
-  return true;
-}
-
-/** Ruby's `Time#getutc` (`vendor/ruby/v3.3.11/time.c:4425`). */
-function getutc(value: TimeLike): Temporal.ZonedDateTime {
-  return instantOf(value).toZonedDateTimeISO("UTC");
-}
-
-/** Ruby's `Time#getlocal` (`vendor/ruby/v3.3.11/time.c:4374`). */
-function getlocal(value: TimeLike): Temporal.ZonedDateTime {
-  return instantOf(value).toZonedDateTimeISO(Temporal.Now.timeZoneId());
-}
-
-function toFsDb(value: TemporalDateLike): string {
-  if (
-    value instanceof TimeWithZone ||
-    value instanceof RubyTime ||
-    value instanceof Temporal.Instant
-  ) {
-    value = getutc(value);
-  }
-
-  if (value instanceof Temporal.ZonedDateTime)
-    return formatPlainDateTimeForSql(value.toPlainDateTime());
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  throw new TypeError(
-    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
-  );
 }
 
 /** @internal */

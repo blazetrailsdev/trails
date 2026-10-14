@@ -1,19 +1,22 @@
-import { File } from "@blazetrails/ruby-compat";
+import { Concern, Module, extend } from "@blazetrails/activesupport";
+import { ArgumentError, File, merge, slice } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
+import type { Base, RenderOptions } from "../base.js";
+import { MissingFile } from "./exceptions.js";
 
 export const DEFAULT_SEND_FILE_TYPE = "application/octet-stream";
 export const DEFAULT_SEND_FILE_DISPOSITION = "attachment";
 
 /** @internal */
 export interface SendFileHeadersHost {
-  contentType: string | null;
+  contentType: string | MimeType | null | undefined;
   response: { sendingFile: boolean };
   headers: { set(name: string, value: string): unknown };
 }
 
 export interface SendDataOptions extends SendFileHeadersOptions {
-  status?: number | string;
+  status?: RenderOptions["status"];
   contentType?: string;
 }
 
@@ -22,9 +25,46 @@ export interface SendFileOptions extends SendDataOptions {
 }
 
 export interface SendFileHeadersOptions {
-  type?: string | null;
+  type?: string | MimeType | null;
   filename?: string | null;
   disposition?: string | false | null;
+}
+
+/** @internal */
+export type DataStreamingHost = SendFileHeadersHost &
+  Pick<Base, "render" | "sendFileHeadersBang"> & {
+    status: number | string;
+    response: { sendingFile: boolean; sendFile(path: string): void };
+  };
+
+/** @internal */
+export function sendFile(
+  this: DataStreamingHost,
+  path: string,
+  options: SendFileOptions = {},
+): void {
+  if (!(File.isFile(path) && File.isReadable(path))) {
+    throw new MissingFile(`Cannot read file ${path}`);
+  }
+
+  if (!options.urlBasedFilename) options.filename ??= File.basename(path);
+  this.sendFileHeadersBang(options);
+
+  this.status = options.status ?? 200;
+  if (Object.hasOwn(options, "contentType")) this.contentType = options.contentType!;
+  this.response.sendFile(path);
+}
+
+/** @internal */
+export function sendData(
+  this: DataStreamingHost,
+  data: string | Buffer,
+  options: SendDataOptions = {},
+): unknown {
+  this.sendFileHeadersBang(options);
+  return this.render(
+    merge(slice(options as Record<string, unknown>, "status", "contentType"), { body: data }),
+  );
 }
 
 /** @internal */
@@ -34,26 +74,27 @@ export function sendFileHeadersBang(
 ): void {
   const typeProvided = Object.hasOwn(options, "type");
 
-  let contentType: string | null = typeProvided
-    ? (options.type as string | null)
+  let contentType: string | MimeType | null | undefined = typeProvided
+    ? options.type
     : DEFAULT_SEND_FILE_TYPE;
   this.contentType = contentType;
   this.response.sendingFile = true;
 
-  if (contentType === null || contentType === undefined) {
-    throw new TypeError(":type option required");
-  }
+  if (contentType == null) throw new ArgumentError(":type option required");
 
-  if (typeProvided && !contentType.includes("/")) {
-    const extension = Mime.get(contentType);
-    if (!extension) throw new TypeError(`Unknown MIME type ${String(options.type)}`);
-    contentType = extension.toString();
-  } else if (!typeProvided && options.filename) {
-    const ext = File.extname(options.filename).toLowerCase().replace(/^\./, "");
-    const guessed = MimeType.lookupByExtension(ext);
-    if (guessed) contentType = guessed.toString();
+  if (typeof contentType === "string" && contentType.startsWith(":")) {
+    const extension = Mime.get(contentType.slice(1));
+    if (!extension) throw new ArgumentError(`Unknown MIME type ${contentType.slice(1)}`);
+    this.contentType = extension;
+  } else {
+    if (!typeProvided && options.filename != null) {
+      contentType =
+        MimeType.lookupByExtension(
+          File.extname(options.filename).toLowerCase().replaceAll(".", ""),
+        ) || contentType;
+    }
+    this.contentType = contentType;
   }
-  this.contentType = contentType;
 
   const disposition: string | false | null | undefined = Object.hasOwn(options, "disposition")
     ? (options.disposition ?? false)
@@ -71,3 +112,15 @@ export function sendFileHeadersBang(
 
   this.headers.set("Content-Transfer-Encoding", "binary");
 }
+
+export const DataStreaming: Module<{
+  sendFile: OmitThisParameter<typeof sendFile>;
+  sendData: OmitThisParameter<typeof sendData>;
+  sendFileHeadersBang: OmitThisParameter<typeof sendFileHeadersBang>;
+}> = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.defineMethod("sendFile", sendFile);
+  mod.defineMethod("sendData", sendData);
+  mod.defineMethod("sendFileHeadersBang", sendFileHeadersBang);
+});

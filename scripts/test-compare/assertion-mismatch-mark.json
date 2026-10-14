@@ -6,19 +6,24 @@
       "value": 0
     },
     "actioncontroller": {
-      "assertionCount": 283,
-      "kind": 463,
-      "value": 76
+      "assertionCount": 91,
+      "kind": 158,
+      "value": 25
     },
     "actiondispatch": {
-      "assertionCount": 357,
-      "kind": 513,
-      "value": 72
+      "assertionCount": 312,
+      "kind": 468,
+      "value": 70
     },
     "actionview": {
       "assertionCount": 41,
       "kind": 93,
       "value": 2
+    },
+    "activejob": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
     },
     "activemodel": {
       "assertionCount": 0,
@@ -33,9 +38,14 @@
     "activesupport": {
       "assertionCount": 1,
       "kind": 3,
-      "value": 10
+      "value": 0
     },
     "arel": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "bcrypt": {
       "assertionCount": 0,
       "kind": 0,
       "value": 0
@@ -60,10 +70,15 @@
       "kind": 0,
       "value": 0
     },
+    "msgpack": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
     "rack": {
-      "assertionCount": 332,
+      "assertionCount": 331,
       "kind": 433,
-      "value": 50
+      "value": 49
     },
     "rack-session": {
       "assertionCount": 0,
@@ -76,6 +91,11 @@
       "value": 0
     },
     "ruby-compat": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "thor": {
       "assertionCount": 0,
       "kind": 0,
       "value": 0

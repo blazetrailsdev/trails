@@ -1,5 +1,5 @@
 import { chomp, classAttribute } from "@blazetrails/activesupport";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
@@ -25,18 +25,22 @@ export interface TseTemplate {
 export type TseImplementation = (source: string, options?: EmitJsOptions) => EmitResult;
 
 export class Tse implements TemplateHandler {
-  static trimMode: string = "-";
-
+  declare static tseTrimMode: string;
+  declare static isTseTrimMode: boolean;
+  declare static tseImplementation: TseImplementation;
+  declare static isTseImplementation: boolean;
   declare static escapeIgnoreList: string[];
   declare static isEscapeIgnoreList: boolean;
+  declare static stripTrailingNewlines: boolean;
+  declare static isStripTrailingNewlines: boolean;
+  declare stripTrailingNewlines: boolean;
 
   static {
+    classAttribute.call(this, "tseTrimMode", { default: "-" });
+    classAttribute.call(this, "tseImplementation", { default: compileJs });
     classAttribute.call(this, "escapeIgnoreList", { default: ["text/plain"] });
+    classAttribute.call(this, "stripTrailingNewlines", { default: false });
   }
-
-  static stripTrailingNewlines: boolean = false;
-
-  static implementation: TseImplementation = compileJs;
 
   static call(template: TseTemplate, source: string): string {
     return new this().call(template, source);
@@ -57,9 +61,10 @@ export class Tse implements TemplateHandler {
   /** @missingRailsCall include? — PERMANENT */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof Tse;
-    const prepared = ctor.stripTrailingNewlines ? chomp(source) : source;
+    const prepared = this.stripTrailingNewlines ? chomp(source) : source;
     const options: EmitJsOptions = {
       escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
+      trim: ctor.tseTrimMode === "-",
       async: template._streaming === true,
     };
     if (
@@ -71,7 +76,7 @@ export class Tse implements TemplateHandler {
       options.preamble = `_ob.safeAppend(${JSON.stringify(`<!-- BEGIN ${id} -->`)});`;
       options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
     }
-    const result = ctor.implementation(prepared, options);
+    const result = ctor.tseImplementation(prepared, options);
     return result.code
       .replace(
         /^\s*export\s+default\s+(?:async\s+)?function\s+render\(context, locals\)\s*\{/u,
@@ -80,3 +85,5 @@ export class Tse implements TemplateHandler {
       .replace(/\}\n$/u, "");
   }
 }
+
+registerConstant("ActionView::Template::Handlers::TSE", Tse);

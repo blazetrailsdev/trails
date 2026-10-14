@@ -37,6 +37,8 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "to_f",
   "to_s",
   "to_sym",
+  "strip",
+  "rstrip",
 
   // ActiveSupport inflections — String core-exts, exported by
   // @blazetrails/activesupport as free functions of the string.
@@ -68,6 +70,9 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "html_safe",
   "to_query",
   "to_sentence",
+  // active_support/core_ext/array/extract_options.rb — `args.extract_options!`,
+  // exported by @blazetrails/activesupport as `extractOptionsBang(args)`.
+  "extract_options!",
   // active_support/core_ext/hash/keys.rb — `hash.assert_valid_keys(*valid)`,
   // exported by @blazetrails/activesupport as `assertValidKeys(obj, validKeys)`.
   "assert_valid_keys",
@@ -81,6 +86,13 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // Ruby core `Hash#except` — `hash.except(*keys)`, exported by ruby-compat
   // as `except(hash, ...keys)`.
   "except",
+  "merge!",
+  "reverse_merge!",
+  // Ruby core `Hash#update` (`vendor/ruby/v3.3.11/hash.c:4028`), the
+  // `rb_hash_update` body `merge!` above is an alias of, exported by
+  // ruby-compat as `update(hash, ...others)`.
+  "update",
+  "intersect?",
   // active_support/core_ext/hash/indifferent_access.rb — `hash.with_indifferent_access`,
   // exported by @blazetrails/activesupport as `withIndifferentAccess(obj)`.
   "with_indifferent_access",
@@ -94,14 +106,33 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // the same reason `group_by` is: the Hash is keyed by VALUE, not by string
   // coercion, so no `Array.prototype` analogue exists.
   "index_by",
+  // active_support/core_ext/enumerable.rb:75-87 — `methods.flatten.index_with { … }`
+  // (activemodel/lib/active_model/access.rb:9), exported by
+  // @blazetrails/activesupport as `indexWith(collection, block)`, as `index_by`
+  // above is.
+  "index_with",
   // active_support/core_ext/enumerable.rb:184-186 — `values.compact_blank`,
   // exported by @blazetrails/activesupport as `compactBlank(collection)`.
   "compact_blank",
+  // active_support/core_ext/array/extract.rb:10-17 — `nodes.children.extract! { … }`
+  // (activerecord/lib/active_record/associations/join_dependency/join_association.rb:60),
+  // exported by @blazetrails/activesupport as `extractBang(array, block)`.
+  "extract!",
+  // Ruby core `Enumerable#filter_map` — `schemes.filter_map { … }`
+  // (activerecord/lib/active_record/encryption/encryptable_record.rb:79). No
+  // JS method both filters and maps, so @blazetrails/activesupport exports it
+  // as `filterMap(collection, block)` and the receiver is TS argument 1.
+  "filter_map",
   // Ruby core `Array#empty?` / `Hash#empty?` / `String#empty?` — a language
   // built-in on the same receivers as `blank?` above, and the same shape: no
   // prototype to hang it on, so activerecord's `ruby-empty.ts` exports it as
   // `isEmpty(collection)` and the Ruby receiver is TS argument 1.
   "empty?",
+  // Ruby core `Array#select!` — `@pools[frequency].select! { … }`
+  // (activerecord/lib/active_record/connection_adapters/abstract/connection_pool/reaper.rb:49).
+  // No JS method filters an array in place, so @blazetrails/activesupport
+  // exports it as `selectBang(array, block)` and the receiver is TS argument 1.
+  "select!",
   // Ruby core `Integer#anybits?` (`vendor/ruby/v3.3.11/numeric.c:3647`) — a bit test on
   // a Number, which TS cannot hang on `Number.prototype` any more than it can
   // on `String.prototype`, so @blazetrails/ruby-compat exports it as
@@ -112,6 +143,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // DescendantsTracker exports it as `subclasses(cls)` and the Ruby receiver is
   // TS argument 1.
   "subclasses",
+  // active_support/core_ext/module/anonymous.rb:27-29 — `klass.anonymous?`,
+  // a core-ext on Module, which TS cannot hang on a class any more than
+  // `subclasses` above. @blazetrails/activesupport exports it as
+  // `isAnonymous(mod)` and the Ruby receiver is TS argument 1.
+  "anonymous?",
   // active_support/core_ext/time/conversions.rb:55 and
   // core_ext/date/conversions.rb:49 — `timestamp.to_fs(format)`, defined on the
   // Ruby core classes Time/Date, which TS cannot monkey-patch any more than it
@@ -123,6 +159,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // call, so @blazetrails/ruby-compat exports it as `first(collection)`
   // and the Ruby receiver is TS argument 1.
   "first",
+  "last",
   // Ruby core `Array#drop` — the same shape as `first` above: `chain.slice(1)`
   // names a JS method Ruby never calls, so @blazetrails/ruby-compat
   // exports it as `drop(collection, n)` and the Ruby receiver is TS argument 1.
@@ -137,4 +174,34 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // values as ARGUMENTS and is numbers-only, so @blazetrails/activesupport
   // exports `min(collection)` and the Ruby receiver is TS argument 1.
   "min",
+  "max",
+  // Ruby core `Enumerable#partition` (`vendor/ruby/v3.3.11/enum.c:1102`) —
+  // `Array(send(method, table, *arguments)).partition { … }`
+  // (connection_adapters/abstract/schema_statements.rb:1564). JS has no
+  // `Array.prototype` analogue, so @blazetrails/ruby-compat exports it as
+  // `partition(ary, block)` and the Ruby receiver is TS argument 1.
+  "partition",
+  // Ruby core `Array#zip` (`vendor/ruby/v3.3.11/array.c:4422`) —
+  // `Array(target.id).zip(Array(inverse.foreign_key))`
+  // (associations/through_association.rb:120). JS has no `Array.prototype`
+  // analogue, so @blazetrails/ruby-compat exports it as `zip(ary, ...argv)` and
+  // the Ruby receiver is TS argument 1.
+  "zip",
+  // Ruby core `Array#uniq` (`vendor/ruby/v3.3.11/array.c:6177`) —
+  // `loaders.flat_map(&:future_classes).uniq` (associations/preloader/branch.rb:33).
+  // It keys on `hash`/`eql?`, which no JS `Set` round-trip does, so
+  // @blazetrails/ruby-compat exports it as `uniq(ary)` and the Ruby receiver is
+  // TS argument 1.
+  "uniq",
+  // Ruby core `Array#values_at` (`vendor/ruby/v3.3.11/array.c:3769`) —
+  // `name.to_s.split(".").values_at(-2, -1)`
+  // (connection_adapters/postgresql_adapter.rb:474,487). JS's `at` takes one
+  // index, so @blazetrails/ruby-compat exports it as `valuesAt(ary, ...indexes)`
+  // and the Ruby receiver is TS argument 1.
+  "values_at",
+  // Ruby core `Array#flatten` (`vendor/ruby/v3.3.11/array.c:6476`) —
+  // `methods.flatten` (activemodel/lib/active_model/access.rb:9,13). JS's
+  // `flat` never sends `to_ary`, so @blazetrails/ruby-compat exports it as
+  // `flatten(ary)` and the Ruby receiver is TS argument 1.
+  "flatten",
 ]);

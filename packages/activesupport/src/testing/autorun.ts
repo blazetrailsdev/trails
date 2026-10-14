@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
+import { getFn, setFn } from "vitest/suite";
 import { Time } from "@blazetrails/date";
+import {
+  RuntimeError,
+  iseqLocationSetup,
+  rbModMethodDefined,
+  rbModToS,
+} from "@blazetrails/ruby-compat";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
-import { _takeAssertions } from "./assertions.js";
-import type { RunningTest } from "./tests-without-assertions.js";
+import { Assertion, Skip, UnexpectedError, _takeAssertions } from "./assertions.js";
 
 declare module "vitest" {
   interface TestContext {
@@ -12,48 +18,75 @@ declare module "vitest" {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
+export const describedClasses = new WeakMap<object, typeof TestCase>();
+/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
+export const topLevel = {};
+
+const capturing = new WeakSet<object>();
+const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
+
 beforeEach(async (context: TestContext) => {
   _takeAssertions();
   let klass = TestCase;
   for (let suite = context.task.suite; suite != null && klass === TestCase; suite = suite.suite) {
-    const constant = safeConstantize(suite.name);
+    const constant = describedClasses.get(suite) ?? safeConstantize(suite.name);
     if (typeof constant === "function" && constant.prototype instanceof TestCase) {
       klass = constant as typeof TestCase;
     }
   }
-  const testCase = (context.testCase = new klass(context.task.name));
-  await testCase.beforeSetup?.();
-  TestCase.beforeSetup();
+  if (klass === TestCase) klass = describedClasses.get(topLevel) ?? TestCase;
+  const testName = `test_${context.task.name.replace(/\s+/g, "_")}`;
+  const defined = rbModMethodDefined(klass, testName);
+  if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);
+  const testCase = (context.testCase = new klass(testName));
+  captured.set(testCase, { from: context.task.result?.errors?.length ?? 0, at: -1, count: 0 });
+  const run = getFn(context.task);
+  if (!capturing.has(run)) {
+    const captureExceptions = async (): Promise<void> => {
+      try {
+        await run();
+      } catch (e) {
+        if ((e as { code?: unknown } | null)?.code !== "VITEST_PENDING") {
+          const body = captured.get(context.testCase)!;
+          body.at = context.task.result?.errors?.length ?? 0;
+          body.count = Array.isArray(e) ? e.length : 1;
+          context.testCase.failures.push(
+            e instanceof Assertion ? e : new UnexpectedError(e as Error),
+          );
+        }
+        throw e;
+      }
+    };
+    capturing.add(captureExceptions);
+    setFn(context.task, captureExceptions);
+  }
+  const test = getFn(context.task);
+  iseqLocationSetup(test, context.task.file.filepath, context.task.location?.line ?? 0);
+  Object.defineProperty(testCase, testName, { value: test, configurable: true });
+  await testCase.beforeSetup();
 });
 
 afterEach(async (context: TestContext) => {
-  const test = _runningTest(context);
-  try {
-    TestCase.afterTeardown(test);
-  } finally {
-    await context.testCase?.afterTeardown?.(test);
-  }
-  if (test.failures.length > 0) throw test.failures[0];
-});
-
-/** @noRailsEquivalent PERMANENT */
-function _runningTest(context: TestContext): RunningTest {
+  const testCase = context.testCase;
+  if (testCase === undefined) return;
   const task = context.task as {
-    name: string;
     mode?: string;
-    location?: { line?: number };
-    file?: { filepath?: string };
     result?: { state?: string; errors?: unknown[] };
   };
-  return {
-    assertions: (expect.getState().assertionCalls ?? 0) + _takeAssertions(),
-    skipped: task.mode === "skip" || task.mode === "todo",
-    error: task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0,
-    name: task.name,
-    sourceLocation: [task.file?.filepath ?? "", task.location?.line ?? 0],
-    failures: [],
-  };
-}
+  testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
+  const { from, at, count } = captured.get(testCase) ?? { from: 0, at: -1, count: 0 };
+  (task.result?.errors ?? []).forEach((e, i) => {
+    if (i < from || (i >= at && i < at + count)) return;
+    testCase.failures.push(new UnexpectedError(e as Error));
+  });
+  if (task.mode === "skip" || task.mode === "todo" || task.result?.state === "skip") {
+    testCase.failures.push(new Skip());
+  }
+  const failures = testCase.failures.length;
+  await testCase.afterTeardown();
+  if (testCase.failures.length > failures) throw testCase.failures[failures];
+});
 
 expect.addEqualityTesters([
   function timeEquals(a: unknown, b: unknown): boolean | undefined {

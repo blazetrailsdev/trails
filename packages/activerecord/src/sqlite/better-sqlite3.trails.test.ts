@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { type ColumnInfo, type SqliteConnection, SQLite3Constants } from "../sqlite-adapter.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
+import { CantOpenException } from "./errors.js";
 
 describe("SqliteDriver — better-sqlite3 round-trip", () => {
   let driver: SqliteConnection;
@@ -26,6 +27,17 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     const row = (await select.get(["sprocket"])) as Record<string, unknown>;
     expect(row["name"]).toBe("sprocket");
     expect(row["qty"]).toBe(42);
+  });
+
+  it("rollback() rolls the open transaction back and answers true, as the gem's Database#rollback does", async () => {
+    const before = await driver.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear");
+    await driver.exec("BEGIN");
+    await driver.execute("UPDATE widgets SET qty = qty + 1 WHERE name = ?", ["gear"]);
+    expect(await driver.rollback()).toBe(true);
+    expect(await driver.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear")).toBe(
+      before,
+    );
+    await expect((async () => driver.rollback())()).rejects.toThrow();
   });
 
   it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
@@ -62,6 +74,12 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     select.bindParams(["sprocket"]);
     expect(await select.toA()).toEqual([["sprocket", 42]]);
     expect(await select.get(["sprocket"])).toMatchObject({ name: 42 });
+  });
+
+  it("bindParams binds an integer-valued number as SQLITE_INTEGER and a boxed Float as REAL", async () => {
+    const select = await driver.prepare("SELECT typeof(?), typeof(?), typeof(?)");
+    select.bindParams([42, new Number(42) as number, 4.2]);
+    expect(await select.toA()).toEqual([["integer", "real", "real"]]);
   });
 
   it("returns all rows", async () => {
@@ -298,5 +316,25 @@ describe("SqliteDriver — better-sqlite3 strict", () => {
     } finally {
       await conn.close();
     }
+  });
+});
+
+describe("SqliteDriver — better-sqlite3 open under a missing directory", () => {
+  const database = "/nonexistent-trails-dir/a.sqlite3";
+  const expectCantOpen = (error: unknown) => {
+    expect(error).toBeInstanceOf(CantOpenException);
+    expect((error as CantOpenException).code).toBe(14);
+    expect((error as Error).message).toBe("unable to open database file");
+    expect((error as Error).cause).toBeInstanceOf(TypeError);
+  };
+
+  it("open raises SQLite3::CantOpenException", async () => {
+    const error = await Promise.resolve()
+      .then(() => betterSqlite3Driver.open({ database }))
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expectCantOpen(error);
   });
 });

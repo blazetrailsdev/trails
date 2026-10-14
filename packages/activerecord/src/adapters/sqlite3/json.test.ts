@@ -2,7 +2,7 @@ import { it, expect, beforeEach } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { jsonSharedTestCases, JsonDataType as klass } from "../../cases/json-shared-test-cases.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
@@ -24,7 +24,7 @@ describeIfSqlite("SQLite3JSONTest", () => {
 
   jsonSharedTestCases({ columnType });
 
-  it("test_default", async () => {
+  it("default", async () => {
     const defaultVal = { users: "read", posts: ["read", "write"] };
     await connection.addColumn("json_data_type", "permissions", columnType, {
       default: defaultVal,

@@ -1,25 +1,57 @@
 import type * as Arel from "@blazetrails/arel";
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, type ArelNode } from "@blazetrails/arel";
+import type { Relation } from "../../relation.js";
+import type { Base } from "../../base.js";
 
 type DeferredIds = { ids(): Promise<unknown[]> };
 
 /** @noRailsEquivalent PERMANENT */
-export class DeferredIdsIn extends Nodes.In {
+export class DeferredPluck implements PromiseLike<unknown[]> {
+  private plucked?: Promise<unknown[]>;
+
   /** @noRailsEquivalent PERMANENT */
   constructor(
-    attribute: Arel.Attribute,
-    inlineSubquery: Nodes.Node,
+    private readonly relation: Relation<Base, boolean>,
+    private readonly columnNames: string[],
+  ) {}
+
+  /** @noRailsEquivalent PERMANENT */
+  ids(): Promise<unknown[]> {
+    return (this.plucked ??= this.relation.pluck(...this.columnNames).catch((error) => {
+      this.plucked = undefined;
+      throw error;
+    }));
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  then<A = unknown[], B = never>(
+    onfulfilled?: ((value: unknown[]) => A | PromiseLike<A>) | null,
+    onrejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
+  ): Promise<A | B> {
+    return this.ids().then(onfulfilled, onrejected);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  in(left: Arel.Attribute | Nodes.Grouping): DeferredIdsIn {
+    return new DeferredIdsIn(left, this.relation.select(...this.columnNames).arel().ast, [this]);
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+export class DeferredIdsIn extends Nodes.In {
+  constructor(
+    attribute: Arel.Attribute | Nodes.Grouping,
+    inlineSubquery: ArelNode,
     /** @noRailsEquivalent PERMANENT */
     readonly innerRelations: DeferredIds[],
   ) {
     super(attribute, inlineSubquery);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   invert(): DeferredIdsNotIn {
     return new DeferredIdsNotIn(
       this.left as Arel.Attribute,
-      this.right as Nodes.Node,
+      this.right as ArelNode,
       this.innerRelations,
     );
   }
@@ -27,21 +59,19 @@ export class DeferredIdsIn extends Nodes.In {
 
 /** @noRailsEquivalent PERMANENT */
 export class DeferredIdsNotIn extends Nodes.NotIn {
-  /** @noRailsEquivalent PERMANENT */
   constructor(
     attribute: Arel.Attribute,
-    inlineSubquery: Nodes.Node,
+    inlineSubquery: ArelNode,
     /** @noRailsEquivalent PERMANENT */
     readonly innerRelations: DeferredIds[],
   ) {
     super(attribute, inlineSubquery);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   invert(): DeferredIdsIn {
     return new DeferredIdsIn(
       this.left as Arel.Attribute,
-      this.right as Nodes.Node,
+      this.right as ArelNode,
       this.innerRelations,
     );
   }

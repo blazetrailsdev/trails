@@ -21,7 +21,7 @@ describe("Controller JSON rendering integration", () => {
 
     const c = new PostsController();
     await c.dispatch("index", new Request(), new Response());
-    const [status, headers, body] = c.toRackResponse();
+    const [status, headers, body] = c.toA();
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
@@ -53,7 +53,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody!)).toEqual({ id: "42" });
+    expect(JSON.parse(c.responseBody as string)).toEqual({ id: "42" });
   });
 
   it("accesses query parameters via params", async () => {
@@ -75,7 +75,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody!)).toEqual({ page: "3" });
+    expect(JSON.parse(c.responseBody as string)).toEqual({ page: "3" });
   });
 
   it("parses JSON request body into params", async () => {
@@ -93,13 +93,14 @@ describe("Controller JSON rendering integration", () => {
         REQUEST_METHOD: "POST",
         PATH_INFO: "/posts",
         CONTENT_TYPE: "application/json",
+        CONTENT_LENGTH: "20",
         "rack.input": JSON.stringify({ title: "New Post" }),
       }),
       new Response(),
     );
 
     expect(c.status).toBe(201);
-    expect(JSON.parse(c.responseBody!)).toEqual({ title: "New Post" });
+    expect(JSON.parse(c.responseBody as string)).toEqual({ title: "New Post" });
   });
 
   it("works end-to-end with RouteSet dispatch", async () => {
@@ -111,8 +112,8 @@ describe("Controller JSON rendering integration", () => {
     }
 
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
     controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
 
@@ -128,8 +129,8 @@ describe("Controller JSON rendering integration", () => {
 
   it("returns 404 for unmatched routes", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
 
     const [status, , body] = await routes.call({
@@ -152,7 +153,7 @@ describe("Controller JSON rendering integration", () => {
     await c.dispatch("index", new Request(), new Response());
 
     expect(c.status).toBe(200);
-    expect(JSON.parse(c.responseBody!)).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(JSON.parse(c.responseBody as string)).toEqual([{ id: 1 }, { id: 2 }]);
   });
 
   it("renders with custom status codes", async () => {
@@ -196,6 +197,7 @@ describe("Controller JSON rendering integration", () => {
         PATH_INFO: "/posts/5",
         QUERY_STRING: "page=2",
         CONTENT_TYPE: "application/json",
+        CONTENT_LENGTH: "19",
         "rack.input": JSON.stringify({ title: "Updated" }),
         "action_dispatch.request.path_parameters": {
           controller: "posts",
@@ -206,7 +208,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody!)).toEqual({
+    expect(JSON.parse(c.responseBody as string)).toEqual({
       id: "5",
       title: "Updated",
       page: "2",
@@ -236,7 +238,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody!)).toEqual({ id: "5" });
+    expect(JSON.parse(c.responseBody as string)).toEqual({ id: "5" });
   });
 
   it("parses nested query parameters", async () => {
@@ -258,7 +260,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody!)).toEqual({
+    expect(JSON.parse(c.responseBody as string)).toEqual({
       user: { name: "dean", role: "admin" },
     });
   });

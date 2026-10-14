@@ -1,5 +1,6 @@
-import type pg from "pg";
-import { PGResult } from "./pg-result.js";
+import type { PGTypeMapByOid } from "./pg-text-decoder.js";
+import { PG } from "../../pg/pg.js";
+import type { PGConnection } from "../../pg/connection.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
@@ -12,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { b, fetch, isEmpty } from "@blazetrails/ruby-compat";
+import { aryJoin, b, fetch, first, isEmpty } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -52,17 +53,6 @@ export async function explain(
   return new ExplainPrettyPrinter().pp(result);
 }
 
-function query(
-  rawConnection: pg.Client,
-  config: string | Record<string, unknown> | null,
-): Promise<pg.QueryResult | pg.QueryResult[]> {
-  return (
-    rawConnection.query as unknown as (
-      c: string | Record<string, unknown> | null,
-    ) => Promise<pg.QueryResult | pg.QueryResult[]>
-  )(config);
-}
-
 /** @internal */
 interface ExecuteHost extends PerformQueryHost {
   preprocessQuery(sql: string | null): string | null;
@@ -81,7 +71,23 @@ interface ExecuteHost extends PerformQueryHost {
   /** @internal */
   performQuery: typeof performQuery;
   /** @internal */
-  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown;
+  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): Promise<unknown>;
+}
+
+/** @internal */
+interface QueryHost {
+  internalExecute(sql: string, name?: string | null): Promise<unknown>;
+  /** @internal */
+  _typeMapForResults: PGTypeMapByOid;
+}
+
+export async function query(
+  this: QueryHost,
+  sql: string,
+  name: string | null = null,
+): Promise<unknown[][]> {
+  const result = (await this.internalExecute(sql, name)) as PG.Result;
+  return result.mapTypesBang(this._typeMapForResults).values();
 }
 
 export function isWriteQuery(sql: string | null): boolean {
@@ -98,7 +104,7 @@ interface ExecInsertHost extends LastInsertIdResultHost {
   isUseInsertReturning(): boolean;
   lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
   primaryKey(tableName: string): unknown;
-  defaultSequenceName(tableRef: string, pk: string): Promise<string | null> | string | null;
+  defaultSequenceName(tableRef: string, pk: string | null): Promise<string | null> | string | null;
   /** @internal */
   lastInsertIdResult(sequenceName: string): Promise<Result>;
 }
@@ -108,11 +114,11 @@ export async function execute(
   sql: string | null,
   name: string | null = null,
   { allowRetry = false }: { allowRetry?: boolean } = {},
-): Promise<PGResult> {
+): Promise<PG.Result> {
   try {
     return (await AbstractAdapter.prototype.execute.call(this, sql, name, {
       allowRetry,
-    })) as PGResult;
+    })) as PG.Result;
   } finally {
     this._noticeReceiverSqlWarnings = [];
   }
@@ -127,14 +133,7 @@ interface TransactionHost {
     options?: { allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<unknown>;
   /** @internal */
-  _client: pg.Client | null;
-  /** @internal */
-  _acquireFreshClient(): Promise<pg.Client>;
-  /** @internal */
-  _discardRawConnection(): void;
-  /** @internal */
-  _cancelAnyRunningQuery(): Promise<void>;
-  constructor: { _isConnectionError(err: unknown): boolean };
+  cancelAnyRunningQuery(): Promise<void>;
 }
 
 export async function execInsert(
@@ -147,7 +146,7 @@ export async function execInsert(
   returning?: string[] | null,
 ): Promise<Result> {
   if (this.isUseInsertReturning() || pk === false) {
-    return DatabaseStatements.execInsert.call(
+    return DatabaseStatements.instanceMethod("execInsert")!.value.call(
       this as never,
       sql,
       name,
@@ -163,8 +162,8 @@ export async function execInsert(
       const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
       if (tableRef) {
         if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-        pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
-        sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
+        pk = suppressCompositePrimaryKey(pk as string | string[] | null);
+        sequenceName = await this.defaultSequenceName(tableRef, pk);
       }
       if (!sequenceName) return result;
     }
@@ -172,66 +171,42 @@ export async function execInsert(
   });
 }
 
-export async function beginDbTransaction(this: TransactionHost): Promise<void> {
-  try {
-    await this.internalExecute("BEGIN", "TRANSACTION", [], {
-      materializeTransactions: false,
-      allowRetry: true,
-    });
-    this._client = await this._acquireFreshClient();
-  } catch (error) {
-    this._client = null;
-    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
-    throw error;
-  }
+export async function beginDbTransaction(this: TransactionHost): Promise<unknown> {
+  return this.internalExecute("BEGIN", "TRANSACTION", [], {
+    allowRetry: true,
+    materializeTransactions: false,
+  });
 }
 
 export async function beginIsolatedDbTransaction(
   this: TransactionHost,
   isolation: string,
 ): Promise<void> {
-  const level = fetch<string>(transactionIsolationLevels(), isolation);
-  try {
-    await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
-      materializeTransactions: false,
-      allowRetry: true,
-    });
-    this._client = await this._acquireFreshClient();
-  } catch (error) {
-    this._client = null;
-    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
-    throw error;
-  }
+  await this.internalExecute(
+    `BEGIN ISOLATION LEVEL ${fetch<string>(transactionIsolationLevels(), isolation)}`,
+    "TRANSACTION",
+    [],
+    { allowRetry: true, materializeTransactions: false },
+  );
 }
 
-export async function commitDbTransaction(this: TransactionHost): Promise<void> {
-  try {
-    await this.internalExecute("COMMIT", "TRANSACTION", [], {
-      allowRetry: false,
-      materializeTransactions: true,
-    });
-  } catch (error) {
-    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
-    throw error;
-  } finally {
-    this._client = null;
-  }
+export async function commitDbTransaction(this: TransactionHost): Promise<unknown> {
+  return this.internalExecute("COMMIT", "TRANSACTION", [], {
+    allowRetry: false,
+    materializeTransactions: true,
+  });
 }
 
 export async function execRollbackDbTransaction(this: TransactionHost): Promise<void> {
-  await this._cancelAnyRunningQuery();
-  try {
-    await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
-      allowRetry: false,
-      materializeTransactions: true,
-    });
-  } finally {
-    this._client = null;
-  }
+  await this.cancelAnyRunningQuery();
+  await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
+    allowRetry: false,
+    materializeTransactions: true,
+  });
 }
 
 export async function execRestartDbTransaction(this: TransactionHost): Promise<void> {
-  await this._cancelAnyRunningQuery();
+  await this.cancelAnyRunningQuery();
   await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
     allowRetry: false,
     materializeTransactions: true,
@@ -250,16 +225,17 @@ interface SetConstraintsHost {
 
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
-  return `EXPLAIN (${options
-    .map((option) => (option.startsWith(":") ? option.slice(1) : option))
-    .join(", ")
-    .toUpperCase()})`;
+  return `EXPLAIN (${aryJoin(options, ", ").toUpperCase()})`;
 }
 
 /** @internal */
 interface CancelAnyRunningQueryHost {
   /** @internal */
-  _cancelAnyRunningQuery(): void;
+  _rawConnection: {
+    transactionStatus(): number;
+    cancel(): Promise<string | null>;
+    block(): Promise<boolean>;
+  } | null;
 }
 
 export async function setConstraints(
@@ -275,16 +251,40 @@ export async function setConstraints(
   await this.execute(`SET CONSTRAINTS ${list} ${deferred.toUpperCase()}`);
 }
 
+const PQTRANS_IDLE = 0;
+const PQTRANS_INTRANS = 2;
+const PQTRANS_INERROR = 3;
+
+const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
+
 /** @internal */
-export function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): void {
-  this._cancelAnyRunningQuery();
+export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Promise<void> {
+  try {
+    if (
+      this._rawConnection == null ||
+      IDLE_TRANSACTION_STATUSES.includes(this._rawConnection.transactionStatus())
+    ) {
+      return;
+    }
+
+    await this._rawConnection.cancel();
+    await this._rawConnection.block();
+  } catch (error) {
+    if (!(error instanceof PG.Error)) throw error;
+  }
 }
 
 /** @internal */
 export interface PerformQueryHost extends HandleWarningsHost {
-  updateTypemapForDefaultTimezone(): Promise<void>;
-  prepareStatement(sql: string | null, binds: unknown[], rawConnection: pg.Client): Promise<string>;
-  isCachedPlanFailure(pgerror: unknown): boolean;
+  updateTypemapForDefaultTimezone(): Promise<true | undefined>;
+  prepareStatement(
+    sql: string | null,
+    binds: unknown[],
+    rawConnection: PGConnection,
+  ): Promise<string>;
+  isCachedPlanFailure(pgerror: {
+    result: { resultErrorField(fieldcode: number): string | null } | null;
+  }): boolean;
   isInTransaction(): boolean;
   sqlKey(sql: string | null): string;
   _statements: StatementPool;
@@ -296,7 +296,7 @@ export interface PerformQueryHost extends HandleWarningsHost {
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
-  rawConnection: pg.Client,
+  rawConnection: PGConnection,
   sql: string | null,
   binds: unknown[],
   typeCastedBinds: unknown[],
@@ -309,31 +309,25 @@ export async function performQuery(
     notificationPayload: Record<string, unknown>;
     batch?: boolean;
   },
-): Promise<PGResult> {
-  const rowMode = "array";
+): Promise<PG.Result> {
   await this.updateTypemapForDefaultTimezone();
-  let raw: pg.QueryResult | pg.QueryResult[];
+  let result: PG.Result;
   if (prepare) {
     for (;;) {
       try {
         const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
         notificationPayload.statement_name = stmtKey;
-        raw = await query(rawConnection, {
-          name: stmtKey,
-          text: sql as string,
-          values: typeCastedBinds,
-          rowMode,
-        });
+        result = await rawConnection.execPrepared(stmtKey, typeCastedBinds);
         break;
       } catch (error) {
-        if (this.isCachedPlanFailure(error)) {
+        if (this.isCachedPlanFailure(error as Parameters<typeof this.isCachedPlanFailure>[0])) {
           if (this.isInTransaction()) {
             throw new PreparedStatementCacheExpired(
               (error as { message?: string })?.message ?? "cached plan expired",
               { sql: sql as string, binds, cause: error },
             );
           } else {
-            await this._statements.delete(this.sqlKey(sql));
+            this._statements.delete(this.sqlKey(sql));
             continue;
           }
         }
@@ -341,12 +335,11 @@ export async function performQuery(
       }
     }
   } else if (binds == null || binds.length === 0) {
-    raw = await query(rawConnection, sql != null ? { text: sql, rowMode } : sql);
+    result = await rawConnection.asyncExec(sql);
   } else {
-    raw = await query(rawConnection, { text: sql, values: typeCastedBinds, rowMode });
+    result = await rawConnection.execParams(sql, typeCastedBinds);
   }
 
-  const result = new PGResult(Array.isArray(raw) ? raw[raw.length - 1] : raw);
   this.verifiedBang();
   this.handleWarnings(result);
   notificationPayload.row_count = result.length;
@@ -354,14 +347,14 @@ export async function performQuery(
 }
 
 /** @internal */
-export async function castResult(this: CastResultHost, result: PGResult): Promise<Result> {
-  if (isEmpty(result.fields)) {
+export async function castResult(this: CastResultHost, result: PG.Result): Promise<Result> {
+  if (isEmpty(result.fields())) {
     result.clear();
     return Result.empty();
   }
 
   const types: Record<string | number, ValueType> = {};
-  const fields = result.fields;
+  const fields = result.fields();
   for (let i = 0; i < fields.length; i++) {
     const fname = fields[i];
     const ftype = result.ftype(i);
@@ -378,7 +371,7 @@ export async function castResult(this: CastResultHost, result: PGResult): Promis
 }
 
 /** @internal */
-export function affectedRows(result: PGResult): number {
+export function affectedRows(result: PG.Result): number {
   const affectedRows = result.cmdTuples();
   result.clear();
   return affectedRows;
@@ -449,17 +442,14 @@ export async function lastInsertIdResult(
   return this.internalExecQuery(`SELECT currval(${this.quote(sequenceName)})`, "SQL");
 }
 
-/**
- * @missingRailsCall first — PERMANENT
- * @internal
- */
+/** @internal */
 export function returningColumnValues(result: Result): unknown[] | undefined {
-  return result.rows[0];
+  return first(result.rows);
 }
 
 /** @internal */
-export function suppressCompositePrimaryKey(pk: string | string[] | undefined): string | undefined {
-  return Array.isArray(pk) ? undefined : pk;
+export function suppressCompositePrimaryKey(pk: string | string[] | null): string | null {
+  return Array.isArray(pk) ? null : pk;
 }
 
 const ACTIONABLE_LEVELS = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);

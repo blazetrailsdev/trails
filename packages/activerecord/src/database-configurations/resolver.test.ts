@@ -1,6 +1,7 @@
 import { assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import { TypeError } from "@blazetrails/ruby-compat";
+import { DatabaseConfigurations, InvalidConfigurationError } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { AdapterNotFound } from "../errors.js";
 import "../connection-handling.js";
@@ -8,7 +9,7 @@ import { ConnectionHandler } from "../connection-adapters/abstract/connection-ha
 
 function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
   const configs = new DatabaseConfigurations(config);
-  return configs.resolve(poolConfig);
+  return configs.resolve(poolConfig)!;
 }
 
 describe("PoolConfig", () => {
@@ -21,7 +22,7 @@ describe("PoolConfig", () => {
       );
 
       expect(error.message).toMatch(
-        /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter package to your package\.json if it's not in the list of available adapters\.$/,
+        "Database configuration specifies nonexistent 'ridiculous' adapter. Available adapters are: abstract, expo-sqlite, fake, libsql, libsql-remote, libsql-replica, mysql2, node-sqlite, postgresql, sqlite3. Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary adapter gem to your Gemfile if it's not in the list of available adapters.",
       );
     });
 
@@ -83,7 +84,11 @@ describe("PoolConfig", () => {
       });
     });
 
-    it.skip("url missing scheme", () => {});
+    it("url missing scheme", async () => {
+      await assertRaises([InvalidConfigurationError], {}, () => {
+        resolveDbConfig("foo");
+      });
+    });
 
     it("url host db", () => {
       const poolConfig = resolveDbConfig("abstract://foo/bar?encoding=utf8");

@@ -2,12 +2,9 @@ export { NotImplementedError } from "@blazetrails/ruby-compat";
 import { StandardError } from "@blazetrails/ruby-compat";
 import type { Column } from "./connection-adapters/column.js";
 
-export class ActiveRecordError extends StandardError {
-  constructor(message?: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "ActiveRecord::ActiveRecordError";
-  }
-}
+export class ActiveRecordError extends StandardError {}
+
+ActiveRecordError.prototype.name = "ActiveRecord::ActiveRecordError";
 
 export class SubclassNotFound extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
@@ -17,8 +14,8 @@ export class SubclassNotFound extends ActiveRecordError {
 }
 
 export class AssociationTypeMismatch extends ActiveRecordError {
-  constructor(expected: string, actual: string) {
-    super(`${expected} expected, got ${actual}`);
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "ActiveRecord::AssociationTypeMismatch";
   }
 }
@@ -69,8 +66,7 @@ export class ConnectionNotEstablished extends AdapterError {
   private _poolSet: boolean;
 
   constructor(message?: string | Error, options?: { connectionPool?: unknown; cause?: unknown }) {
-    const cause = options?.cause ?? (message instanceof Error ? message : undefined);
-    super(message instanceof Error ? message.message : message, { ...options, cause });
+    super(message instanceof Error ? message.message : message, options);
     this.name = "ActiveRecord::ConnectionNotEstablished";
     this._poolSet = options?.connectionPool !== undefined;
   }
@@ -237,8 +233,7 @@ export class ConnectionFailed extends QueryAborted {
     message?: string | Error,
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
-    const cause = options?.cause ?? (message instanceof Error ? message : undefined);
-    super(message instanceof Error ? message.message : message, { ...options, cause });
+    super(message instanceof Error ? message.message : message, options);
     this.name = "ActiveRecord::ConnectionFailed";
   }
 }

@@ -1,10 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { Encoding } from "../encoding.js";
 import { MatchData } from "../match-data.js";
+import { NoMethodError } from "../no-method-error.js";
 import { Range } from "../range.js";
 import { TypeError } from "../type-error.js";
 import { bytes } from "./bytes.js";
-import { rbStrSend } from "./method-table.js";
+import { rbObjClone } from "../include.js";
+import { rbHash } from "../rb-hash.js";
+import {
+  center,
+  lastMatchGetter,
+  matchOperator,
+  rbObjNotMatch,
+  rbStrSend,
+  rstrip,
+  stringSuperclass,
+  strip,
+  type StringInstance,
+} from "./method-table.js";
 
 type Row = [string, string, unknown[], unknown];
 
@@ -1050,5 +1063,87 @@ describe("STRING_METHOD_TABLE blocks and enumerators", () => {
   it("answers upto's enumerator before walking the range", () => {
     const [enumerator] = rbStrSend("a", "upto", "zzzzzzzzzz") as [Iterator<string>, string];
     expect([enumerator.next().value, enumerator.next().value]).toEqual(["a", "b"]);
+  });
+});
+
+describe("stringSuperclass", () => {
+  class Literal extends stringSuperclass("eql", "hash") {}
+  const literal = (value: string) => new Literal(value);
+
+  it("is eql? to a String or String subclass instance with the same contents", () => {
+    expect(literal("a").eql("a")).toBe(true);
+    expect(literal("a").eql(new Literal("a"))).toBe(true);
+    expect(literal("a").eql(new Literal("b"))).toBe(false);
+    expect(literal("a").eql({ toString: () => "a" })).toBe(false);
+    expect(rbStrSend("a", "eql", new Literal("a"))[0]).toBe(true);
+  });
+
+  it("raises NoMethodError for a String method nothing defined", () => {
+    const klass = stringSuperclass("undefinedStringMethod" as keyof StringInstance);
+    const str = new klass("a") as unknown as { undefinedStringMethod(): unknown };
+    expect(() => str.undefinedStringMethod()).toThrow(NoMethodError);
+  });
+
+  it("holds the contents String#initialize is given, and answers them from to_s", () => {
+    expect(literal("a").toString()).toBe("a");
+    expect(`${new Literal(new Literal("a"))}`).toBe("a");
+    expect(rbObjClone(literal("a")).toString()).toBe("a");
+    expect(() => new Literal(1)).toThrow(TypeError);
+  });
+
+  it("is empty until String#initialize runs, as String.allocate is", () => {
+    const allocated = Object.create(Literal.prototype) as Literal;
+    expect(allocated.toString()).toBe("");
+    expect(allocated.eql("")).toBe(true);
+  });
+
+  it("hashes as its String contents", () => {
+    expect(literal("a").hash()).toBe(rbHash("a"));
+  });
+});
+
+describe("strip and matchOperator", () => {
+  it("strip removes NUL and ASCII whitespace only, as MRI does", () => {
+    expect(strip("\0 \t\n\v\f\r yes \r\n\0")).toBe("yes");
+    expect(strip("\u00a0a\u00a0")).toBe("\u00a0a\u00a0");
+    expect(strip("\ufeffa\u2003")).toBe("\ufeffa\u2003");
+    expect(strip(" \n")).toBe("");
+  });
+
+  it("rstrip removes trailing NUL and ASCII whitespace only, as MRI does", () => {
+    expect(rstrip("\0 yes \r\n\0")).toBe("\0 yes");
+    expect(rstrip("a\u00a0")).toBe("a\u00a0");
+  });
+
+  it("center pads both sides, the odd character on the right, as MRI does", () => {
+    expect(center("ab", 5)).toBe(" ab  ");
+    expect(center("x", 4, "12")).toBe("1x12");
+    expect(center("abc", 2)).toBe("abc");
+  });
+
+  it("matchOperator dispatches =~ on nil, a String and a receiver's own method", () => {
+    expect(matchOperator(null, /a/)).toBeNull();
+    expect(matchOperator(undefined, /a/)).toBeNull();
+    expect(matchOperator("😀yes", /yes/)).toBe(1);
+    expect(matchOperator("no", /yes/)).toBeNull();
+    expect(matchOperator({ matchOperator: (pattern: unknown) => [pattern] }, "p")).toEqual(["p"]);
+    expect(() => matchOperator([1], /a/)).toThrow(
+      new NoMethodError("undefined method '=~' for an instance of Array", "=~"),
+    );
+    expect(() => matchOperator(true, /a/)).toThrow(NoMethodError);
+  });
+
+  it("lastMatchGetter reads $& off the last String#=~", () => {
+    matchOperator("a12.5b", /\d+\.\d+/);
+    expect(lastMatchGetter()).toBe("12.5");
+    matchOperator("no", /yes/);
+    expect(lastMatchGetter()).toBeNull();
+  });
+
+  it("rbObjNotMatch negates the receiver's =~", () => {
+    expect(rbObjNotMatch("no", /yes/)).toBe(true);
+    expect(rbObjNotMatch("yes", /yes/)).toBe(false);
+    expect(rbObjNotMatch(null, /a/)).toBe(true);
+    expect(rbObjNotMatch({ matchOperator: () => 0 }, /a/)).toBe(false);
   });
 });

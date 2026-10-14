@@ -112,7 +112,7 @@ describe("Migration", () => {
 
     it("invert change table", async () => {
       await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
+        await recorder.changeTable("fruits", {}, async (t) => {
           await t.string("name");
           await t.rename("kind", "cultivar");
         });
@@ -125,7 +125,7 @@ describe("Migration", () => {
 
       await expect(
         recorder.revert(async () => {
-          await recorder.changeTable("fruits", async (t) => {
+          await recorder.changeTable("fruits", {}, async (t) => {
             await t.remove("kind");
           });
         }),

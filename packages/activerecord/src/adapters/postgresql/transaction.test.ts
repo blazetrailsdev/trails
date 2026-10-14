@@ -7,7 +7,7 @@ const SAMPLES = suiteTable("samples", "transaction");
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     await adapter.disconnectBang();
@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises SerializationFailure when a serialization failure occurs", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await adapter.beginIsolatedDbTransaction(":serializable");
         await other.beginIsolatedDbTransaction(":serializable");
@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises Interrupt when canceling statement via interrupt", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         const rows = await adapter.execute("SELECT pg_backend_pid() AS pid");
         const pid = (rows[0] as { pid: number }).pid;
@@ -68,7 +68,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises Deadlocked when a deadlock is encountered", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await adapter.beginDbTransaction();
         await other.beginDbTransaction();
@@ -94,7 +94,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises LockWaitTimeout when lock wait timeout exceeded", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await adapter.beginDbTransaction();
         await adapter.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
@@ -109,14 +109,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises QueryCanceled when canceling statement due to user request", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await adapter.beginDbTransaction();
         await adapter.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
         const otherRows = await other.execute("SELECT pg_backend_pid() AS pid");
         const otherPid = (otherRows[0] as { pid: number }).pid;
         const blocked = other.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
-        const canceler = new PostgreSQLAdapter(PG_TEST_URL);
+        const canceler = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
         try {
           const deadline = Date.now() + 3000;
           while (Date.now() < deadline) {

@@ -1,6 +1,9 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
-import { RouteSet, StaticDispatcher } from "./route-set.js";
+import { RouteSet, StaticDispatcher, type DrawCallback } from "./route-set.js";
+import type { RoutesProxyInstance } from "./routes-proxy.js";
+import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import { Constraints } from "./mapper.js";
 import { X_CASCADE } from "../constants.js";
 import type { Request } from "../http/request.js";
@@ -8,8 +11,8 @@ import type { Request } from "../http/request.js";
 describe("ActionDispatch::Routing::RouteSet generation", () => {
   it("trims a trailing part that restates the route default", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts(/:page)", { to: "posts#index", as: "posts", defaults: { page: "1" } });
+    routes.draw(function () {
+      this.get("/posts(/:page)", { to: "posts#index", as: "posts", defaults: { page: "1" } });
     });
     expect(routes.generate("posts", { page: "1" }).path(null)).toBe("/posts");
     expect(routes.generate("posts", { page: "2" }).path(null)).toBe("/posts/2");
@@ -17,17 +20,17 @@ describe("ActionDispatch::Routing::RouteSet generation", () => {
 
   it("never trims a required part that restates the route default", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:page", { to: "posts#index", as: "posts", defaults: { page: "1" } });
+    routes.draw(function () {
+      this.get("/posts/:page", { to: "posts#index", as: "posts", defaults: { page: "1" } });
     });
     expect(routes.generate("posts", { page: "1" }).path(null)).toBe("/posts/1");
   });
 
   it("keeps a trailing part named only by the enclosing scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope({ page: "1" }, (m) => {
-        m.get("/posts(/:page)", { to: "posts#index", as: "posts" });
+    routes.draw(function () {
+      this.scope({ page: "1" }, () => {
+        this.get("/posts(/:page)", { to: "posts#index", as: "posts" });
       });
     });
     expect(routes.generate("posts", {}, { page: "3" }).path(null)).toBe("/posts/3");
@@ -38,11 +41,11 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
   it("wraps the dispatcher in Constraints(SERVE) for a route under a constraints block", () => {
     const routes = new RouteSet();
     const constraint = (req: Request) => req.path === "/posts";
-    routes.draw((r) => {
-      r.constraints(constraint, () => {
-        r.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.constraints(constraint, () => {
+        this.get("/posts", { to: "posts#index" });
       });
-      r.get("/comments", { to: "comments#index" });
+      this.get("/comments", { to: "comments#index" });
     });
     const [posts, comments] = routes.routes.routes;
     expect(posts.app).toBeInstanceOf(Constraints);
@@ -53,11 +56,11 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
 
   it("cascades when the constraints block rejects the request", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.constraints(
+    routes.draw(function () {
+      this.constraints(
         () => false,
         () => {
-          r.get("/posts", { to: "posts#index" });
+          this.get("/posts", { to: "posts#index" });
         },
       );
     });
@@ -74,9 +77,9 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
   it("wraps resource routes in Constraints(SERVE) under a constraints block", () => {
     const routes = new RouteSet();
     const constraint = () => true;
-    routes.draw((r) => {
-      r.constraints(constraint, () => {
-        r.resources("posts", { only: ["index", "show"] });
+    routes.draw(function () {
+      this.constraints(constraint, () => {
+        this.resources("posts", { only: ["index", "show"] });
       });
     });
     const apps = routes.routes.routes.map((route) => route.app);
@@ -90,18 +93,18 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
   it("dispatches a mounted app answering action through StaticDispatcher", () => {
     const routes = new RouteSet();
     const app = { action: () => app, call: () => [200, {}, []] };
-    routes.draw((r) => {
-      r.mount(app as never, { at: "/static" });
+    routes.draw(function () {
+      this.mount(app as never, { at: "/static" });
     });
     expect(routes.routes.routes[0].app).toBeInstanceOf(StaticDispatcher);
   });
 
   it("merges nested Hash scope constraints onto a matched route", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope({ constraints: { subdomain: "api" } }, () => {
-        r.scope({ constraints: { id: /\d+/ } }, () => {
-          r.get("/posts/:id", { to: "posts#show", constraints: { format: "json" } });
+    routes.draw(function () {
+      this.scope({ constraints: { subdomain: "api" } }, () => {
+        this.scope({ constraints: { id: /\d+/ } }, () => {
+          this.get("/posts/:id", { to: "posts#show", constraints: { format: "json" } });
         });
       });
     });
@@ -113,18 +116,15 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
   it("raises for a constraint answering neither call nor matches?", () => {
     const routes = new RouteSet();
     expect(() =>
-      routes.draw((r) => {
-        r.get("/posts", { to: "posts#index", constraints: 1 as never });
+      routes.draw(function () {
+        this.get("/posts", { to: "posts#index", constraints: 1 as never });
       }),
     ).toThrow("Invalid constraint: 1 must respond to :call or :matches?");
   });
 });
 
 describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection::UrlHelper.optimize_helper?", () => {
-  function helperGoesThroughUrlFor(
-    draw: (r: Parameters<Parameters<RouteSet["draw"]>[0]>[0]) => void,
-    ...args: unknown[]
-  ): boolean {
+  function helperGoesThroughUrlFor(draw: DrawCallback, ...args: unknown[]): boolean {
     const routes = new RouteSet();
     routes.draw(draw);
     const spy = vi.spyOn(routes, "urlFor");
@@ -136,25 +136,25 @@ describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection::UrlHelper.opt
 
   it("optimizes a route whose path carries no requirements", () => {
     expect(
-      helperGoesThroughUrlFor((r) => r.get("/foo/:id", { to: "foo#show", as: "foo" }), 1),
+      helperGoesThroughUrlFor(function () {
+        this.get("/foo/:id", { to: "foo#show", as: "foo" });
+      }, 1),
     ).toBe(false);
   });
 
   it("uses the generic helper for a format: true route", () => {
     expect(
-      helperGoesThroughUrlFor(
-        (r) => r.get("/foo", { to: "foo#index", as: "foo", format: true }),
-        "json",
-      ),
+      helperGoesThroughUrlFor(function () {
+        this.get("/foo", { to: "foo#index", as: "foo", format: true });
+      }, "json"),
     ).toBe(true);
   });
 
   it("uses the generic helper when a :controller requirement is not a path segment", () => {
     expect(
-      helperGoesThroughUrlFor(
-        (r) => r.get("/foo/:id", { to: "foo#show", as: "foo", constraints: { controller: /foo/ } }),
-        1,
-      ),
+      helperGoesThroughUrlFor(function () {
+        this.get("/foo/:id", { to: "foo#show", as: "foo", constraints: { controller: /foo/ } });
+      }, 1),
     ).toBe(true);
   });
 });
@@ -256,5 +256,88 @@ describe("ActionDispatch::Routing::RouteSet#generate_url_helpers", () => {
     }
     include(Host, new RouteSet().urlHelpers());
     expect(Host.defaultUrlOptions).toEqual({});
+  });
+});
+
+describe("ActionDispatch::Routing::RouteSet#define_mounted_helper", () => {
+  it("defines the helper under its camelCase name, once", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", as: "posts" });
+    });
+    routes.defineMountedHelper("trails_test_app");
+    const mod = routes.mountedHelpers();
+    expect(mod.isMethodDefined("trailsTestApp")).toBe(true);
+    expect(mod.isMethodDefined("_trailsTestApp")).toBe(true);
+    expect(mod.isMethodDefined("trails_test_app")).toBe(false);
+
+    const other = new RouteSet();
+    other.defineMountedHelper("trailsTestApp");
+    class Host {}
+    include(Host, mod);
+    const host = new Host() as { trailsTestApp: RoutesProxyInstance };
+    expect(host.trailsTestApp.routes).toBe(routes);
+    expect(host.trailsTestApp.postsPath()).toBe("/posts");
+  });
+
+  it("reaches a class that included MountedHelpers before the helper was defined", () => {
+    const routes = new RouteSet();
+    class Host {}
+    include(Host, routes.mountedHelpers());
+    routes.defineMountedHelper("trails_late_app");
+    const host = new Host() as { trailsLateApp: RoutesProxyInstance };
+    expect(host.trailsLateApp.scope).toBe(host);
+  });
+});
+
+describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection#define_url_helper", () => {
+  it("takes a trailing ActionController::Parameters as the options", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
+    });
+    const helpers = routes.urlHelpers() as unknown as { postPath(...args: unknown[]): string };
+    const params = new Parameters({ id: "7", page: "2" }).permit("id", "page");
+    expect(helpers.postPath(params)).toBe("/posts/7?page=2");
+  });
+
+  it("carries a nested hash of the Parameters into the query string", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
+    });
+    const helpers = routes.urlHelpers() as unknown as {
+      postPath(...args: unknown[]): string;
+      urlFor(options: unknown): string;
+    };
+    const params = new Parameters({ id: "7", filter: { a: "1", tags: ["x", "y"] } });
+    params.permitBang();
+    const query = "filter%5Ba%5D=1&filter%5Btags%5D%5B%5D=x&filter%5Btags%5D%5B%5D=y";
+    expect(helpers.postPath(params)).toBe(`/posts/7?${query}`);
+
+    const options = new Parameters({
+      controller: "posts",
+      action: "show",
+      id: "7",
+      filter: { a: "1", tags: ["x", "y"] },
+    });
+    options.set("onlyPath", true);
+    options.permitBang();
+    expect(helpers.urlFor(options)).toBe(`/posts/7?${query}`);
+  });
+
+  it("routes a HashWithIndifferentAccess straight through url_for", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
+    });
+    const options = new HashWithIndifferentAccess({
+      controller: "posts",
+      action: "show",
+      id: "7",
+      page: "2",
+      onlyPath: true,
+    });
+    expect(routes.urlFor(options)).toBe("/posts/7?page=2");
   });
 });

@@ -6,6 +6,12 @@ import { describe, it, expect } from "vitest";
 import { Model, ValueType } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
+import {
+  FrozenError,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  hashAref,
+} from "@blazetrails/ruby-compat";
 
 describe("Attributes#attribute_names", () => {
   class User extends Model {
@@ -23,6 +29,12 @@ describe("Attributes#attribute_names", () => {
 
   it("is the instance's @attributes keys, virtual attributes included", () => {
     expect(new User().attributeNames()).toEqual(["name", "token"]);
+  });
+
+  it("holds the set in the @attributes ivar (attributes.rb:107)", () => {
+    const user = new User();
+    expect(rbObjIvarGet(user, "@attributes")).toBe(user._attributes);
+    expect(rbObjInstanceVariables(user)).toContain("@attributes");
   });
 
   it("the class-level reader is attribute_types.keys, virtual attributes included", () => {
@@ -160,8 +172,8 @@ describe("attributesBeforeTypeCast", () => {
 
     const u = new User({ name: "Alice", age: "25" });
     const raw = u._attributes.valuesBeforeTypeCast();
-    expect(raw.name).toBe("Alice");
-    expect(raw.age).toBe("25");
+    expect(hashAref(raw, "name")).toBe("Alice");
+    expect(hashAref(raw, "age")).toBe("25");
     expect(u._readAttribute("age")).toBe(25);
   });
 });
@@ -295,5 +307,40 @@ describe("Attributes", () => {
     expect(admin._readAttribute("role")).toBe("admin");
     expect(Admin.attributeNames()).toContain("name");
     expect(Admin.attributeNames()).toContain("role");
+  });
+});
+
+describe("Attributes#freeze", () => {
+  class User extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      this.attribute("name", "string");
+    }
+  }
+  interface User extends Attributes {
+    name: string | null;
+  }
+
+  it("swaps in a frozen clone of the attribute set and leaves the original writable", () => {
+    const user = new User();
+    const original = user._attributes;
+
+    expect(user.freeze()).toBe(user);
+
+    expect(Object.isFrozen(user)).toBe(true);
+    expect(user._attributes).not.toBe(original);
+    expect(Object.isFrozen(user._attributes)).toBe(true);
+    expect(Object.isFrozen(original)).toBe(false);
+    expect(() => original.writeFromUser("name", "x")).not.toThrow();
+    expect(() => user._attributes.writeFromUser("name", "y")).toThrow(FrozenError);
+    expect(user.name).toBeNull();
+  });
+
+  it("materializes errors before freezing, so a frozen model still answers them", () => {
+    const user = new User().freeze();
+
+    expect(user.errors.isEmpty()).toBe(true);
   });
 });

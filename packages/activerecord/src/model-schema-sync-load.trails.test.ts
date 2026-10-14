@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { registerSubclass } from "./inheritance.js";
+import { registerModel } from "./associations.js";
 import { resetColumnInformation } from "./model-schema.js";
 import { defaultValue } from "./type.js";
 
@@ -14,7 +14,7 @@ class UuidType extends ValueType {
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
   return adapterDouble({
-    internalSchemaCache: {
+    schemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => columns,
       dataSourceExists: async () => true,
@@ -193,7 +193,7 @@ describe("sync loadSchema / columnsHash", () => {
     Circle.columnsHash();
     expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
 
-    registerSubclass(Circle);
+    registerModel(Circle);
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
@@ -227,7 +227,7 @@ describe("sync loadSchema / columnsHash", () => {
     }
     class Circle extends Shape {
       static {
-        registerSubclass(this);
+        registerModel(this);
       }
     }
 
@@ -261,7 +261,7 @@ describe("sync loadSchema / columnsHash", () => {
     class SpecialPost extends Post {
       static override tableName = "special_posts";
       static {
-        registerSubclass(this);
+        registerModel(this);
       }
     }
 
@@ -323,7 +323,7 @@ describe("sync loadSchema / columnsHash", () => {
       calls,
       isWarm: () => warm,
       adapter: adapterDouble({
-        internalSchemaCache: {
+        schemaCache: {
           isCached: () => warm,
           getCachedColumnsHash: () => (warm ? cols : undefined),
           dataSourceExists: async () => true,
@@ -345,8 +345,6 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { id: { sqlType: "integer", name: "id", default: null } };
     const built = makeResettableAdapter(cols);
     await establishConnectionTo(Post, built.adapter as never);
-    Post.connectionPool().poolConfig.schemaReflection.loadedCache = built.adapter
-      .internalSchemaCache as never;
     Post.columnsHash();
 
     built.calls.clear = 0;
@@ -354,5 +352,50 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(built.calls.clear).toBe(1);
     expect(built.isWarm()).toBe(false);
+  });
+});
+
+describe("sync loadSchema on a reflection that has not loaded its cache", () => {
+  it("reads a synchronous adapter's columns without seating a cache", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const cols = [{ sqlType: "integer", name: "id", default: null }];
+    await establishConnectionTo(
+      Post,
+      adapterDouble({
+        columns: () => cols,
+        lookupCastTypeFromColumn: () => defaultValue(),
+      }) as never,
+    );
+    await Post.leaseConnection();
+
+    expect(Post.columnsHash().id).toBe(cols[0]);
+    expect(Post.connectionPool().schemaReflection.loadedCache).toBeNull();
+  });
+
+  it("reads a table once per reflection and again after its data source cache is cleared", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    let reads = 0;
+    const adapter = adapterDouble({
+      columns: () => {
+        reads++;
+        return [{ sqlType: "integer", name: "id", default: null }];
+      },
+      lookupCastTypeFromColumn: () => defaultValue(),
+    });
+    await establishConnectionTo(Post, adapter as never);
+    await Post.leaseConnection();
+    const schemaCache = Post.connectionPool().schemaCache;
+
+    schemaCache.getCachedColumnsHash("posts");
+    schemaCache.getCachedColumnsHash("posts");
+    expect(reads).toBe(1);
+
+    await schemaCache.clearDataSourceCacheBang("posts");
+    schemaCache.getCachedColumnsHash("posts");
+    expect(reads).toBe(2);
   });
 });

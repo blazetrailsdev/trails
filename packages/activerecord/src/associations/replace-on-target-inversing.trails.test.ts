@@ -1,25 +1,15 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
-import { Base, collectionProxyFor as association } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { Base } from "../index.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { Interest } from "../test-helpers/models/interest.js";
 
-async function withHasManyInversing(model: typeof Base, fn: () => Promise<void>): Promise<void> {
-  const flags = model as unknown as { hasManyInversing: boolean };
-  const prev = flags.hasManyInversing;
-  flags.hasManyInversing = true;
-  try {
-    await fn();
-  } finally {
-    flags.hasManyInversing = prev;
-  }
-}
-
 describe("replace_on_target inversing (trails)", () => {
-  const { interests } = fixtures(["humans", "interests"]);
+  const { self, interests } = fixtures(["humans", "interests"]);
 
   it("tracks a persisted record added through the inversing path so a later add replaces in place", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting") as Base & { id: number };
       const human = (await loadSingularTarget(interest, "human")) as Base;
       const interestIds = (): unknown[] =>
@@ -29,7 +19,7 @@ describe("replace_on_target inversing (trails)", () => {
 
       expect(interestIds()).toEqual([interest.id]);
 
-      await association(human, "interests").push(interest);
+      await (human.association("interests") as CollectionAssociation).reader.push(interest);
 
       expect(interestIds()).toEqual([interest.id]);
     });
@@ -37,12 +27,12 @@ describe("replace_on_target inversing (trails)", () => {
 });
 
 describe("CollectionAssociation#target= (trails)", () => {
-  const { humans, interests } = fixtures(["humans", "interests"]);
+  const { self, humans, interests } = fixtures(["humans", "interests"]);
 
   it("folds a lone record into the loaded target under has_many_inversing", async () => {
-    await withHasManyInversing(Interest, async () => {
+    await self().withHasManyInversing(Interest, async () => {
       const human = humans("gordon") as Base;
-      await association(human, "interests");
+      await (human.association("interests") as CollectionAssociation).reader;
       const assoc = (
         human as unknown as { association(name: string): { target: Base[] } }
       ).association("interests");

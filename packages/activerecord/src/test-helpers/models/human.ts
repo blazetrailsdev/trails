@@ -3,6 +3,7 @@ import type { Face } from "./face.js";
 import type { Interest } from "./interest.js";
 import type { MixedCaseMonkey } from "./mixed-case-monkey.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Human extends Base {
@@ -59,6 +60,7 @@ export class Human extends Base {
     this.addCallbackCalled = true;
   }
 }
+registerModel(Human);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Human {
   get face(): Face | null | Promise<Face | null>;
@@ -76,3 +78,4 @@ export interface Human {
 }
 
 export class SuperHuman extends Human {}
+registerModel(SuperHuman);

@@ -1,6 +1,5 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbModName } from "@blazetrails/ruby-compat";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
-import { registeredConstantName } from "../inflector.js";
 
 declare module "@blazetrails/ruby-compat/name-error" {
   interface NameError {
@@ -43,8 +42,8 @@ export function isMissingName(this: NameError, name: string): boolean {
 }
 
 /** @internal */
-function realModName(mod: unknown): string | undefined {
-  return registeredConstantName(mod) ?? (mod as { name?: string }).name;
+function realModName(mod: unknown): string | null {
+  return rbModName(mod as new () => unknown);
 }
 
 NameError.prototype.missingName = missingName;

@@ -15,7 +15,7 @@ function clearAggregationCache(this: Base): void {
 }
 
 interface ComposedOfOptions {
-  className?: (new (...args: any[]) => any) | string;
+  className?: string;
   mapping?: [string, string][] | [string, string];
   constructorFn?: ((...args: any[]) => any) | string;
   converter?: (value: unknown) => unknown;
@@ -48,9 +48,7 @@ export function composedOf(this: typeof Base, partId: string, options: ComposedO
     "composedOf",
     partId,
     null,
-    typeof options.className === "function"
-      ? { ...options, className: options.className.name, anonymousClass: options.className }
-      : { ...options },
+    options as unknown as Record<string, unknown>,
     this,
   );
   addAggregateReflection(this, partId, reflection);
@@ -61,19 +59,10 @@ export const ClassMethods = {
 };
 
 /** @internal */
-function resolveClass(
-  className: (new (...args: any[]) => any) | string,
-): new (...args: any[]) => any {
-  return typeof className === "string"
-    ? (constantize(className) as new (...args: any[]) => any)
-    : className;
-}
-
-/** @internal */
 function readerMethod(
   this: typeof Base,
   name: string,
-  className: (new (...args: any[]) => any) | string,
+  className: string,
   mapping: [string, string][],
   allowNil: boolean,
   constructor: ((...args: any[]) => any) | string,
@@ -92,8 +81,8 @@ function readerMethod(
           typeof constructor === "function"
             ? constructor(...attrs)
             : constructor === "new"
-              ? new (resolveClass(className))(...attrs)
-              : (resolveClass(className) as any)[constructor](...attrs);
+              ? new (constantize(className) as new (...args: any[]) => any)(...attrs)
+              : (constantize(className) as any)[constructor](...attrs);
         cache.set(name, object == null ? object : Object.freeze(object));
       }
       return cache.get(name) ?? null;
@@ -106,7 +95,7 @@ function readerMethod(
 function writerMethod(
   this: typeof Base,
   name: string,
-  className: (new (...args: any[]) => any) | string,
+  className: string,
   mapping: [string, string][],
   allowNil: boolean,
   converter?: (value: unknown) => unknown,
@@ -116,7 +105,7 @@ function writerMethod(
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
     set(this: Base, part: unknown): void {
-      const klass = resolveClass(className);
+      const klass = constantize(className) as new (...args: any[]) => any;
       const cache: Map<string, unknown> = (this as any)._aggregationCache;
 
       if (!(part instanceof klass || converter == null || part == null)) {
@@ -127,7 +116,7 @@ function writerMethod(
         isPlainObject(part) && Object.keys(part).every((key) => /^\d+$/.test(key));
       if (hashFromMultiparameterAssignment) {
         const keys = Object.keys(part as object).map(Number);
-        if (keys.length !== Math.max(...keys)) throw new ArgumentError("ArgumentError");
+        if (keys.length !== Math.max(...keys)) throw new ArgumentError();
         part = new klass(
           ...keys.sort((a, b) => a - b).map((key) => (part as Record<number, unknown>)[key]),
         );

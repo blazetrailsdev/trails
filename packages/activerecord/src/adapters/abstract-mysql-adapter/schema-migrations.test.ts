@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
-import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
+import type { Mysql2Result } from "../../mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -23,7 +23,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
         expect(idxNames).toEqual(["idx_renamed"]);
       } finally {
-        await adapter.removeForeignKey("engines", { name: "fk_engines_cars", ifExists: true });
+        await adapter.removeForeignKey("engines", undefined, {
+          name: "fk_engines_cars",
+          ifExists: true,
+        });
         await adapter.removeIndex("engines", { name: "idx_renamed", ifExists: true });
         await adapter.removeIndex("engines", { name: "index_engines_on_car_id", ifExists: true });
       }
@@ -56,8 +59,8 @@ async function withEncodingUtf8mb4(adapter: Mysql2Adapter, fn: () => Promise<voi
   const result = (await adapter.execute(
     "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
       "FROM information_schema.schemata WHERE schema_name = DATABASE()",
-  )) as Mysql2RawResult;
-  const row = result.rows?.[0];
+  )) as Mysql2Result;
+  const row = result.toA()[0];
   if (!row) throw new Error("Could not read database charset from information_schema.schemata");
   const originalCharset = row[0] as string;
   const originalCollation = row[1] as string;

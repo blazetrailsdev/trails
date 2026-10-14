@@ -122,7 +122,7 @@ describe("Mapper public DSL additions", () => {
     const dir = await mkdtemp(join(tmpdir(), "trails-draw-"));
     await writeFile(
       join(dir, "external.ts"),
-      'export function drawRoutes(mapper) { mapper.get("/external", { to: "external#index" }); }\n',
+      'export function drawRoutes() { this.get("/external", { to: "external#index" }); }\n',
     );
     const set = new RouteSet();
     const m = new Mapper(set);

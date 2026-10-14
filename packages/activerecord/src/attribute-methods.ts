@@ -1,6 +1,26 @@
-import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
+import { CodeGenerator, include, indexWith, Module } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
-import { isEmpty, rbInspect as inspect } from "@blazetrails/ruby-compat";
+import {
+  rbFSend,
+  type Concurrent,
+  type Hash,
+  hasKey,
+  isEmpty,
+  keys as hashKeys,
+  objRespondToMissing,
+  rbClassSuperclass,
+  rbFCaller,
+  rbInspect as inspect,
+  rbModConstSet,
+  rbModMethodDefined,
+  rbModPublicInstanceMethod,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rbObjMethod,
+  rbObjRespondTo,
+  NameError,
+  type UnboundMethod,
+} from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   AttributeMethods,
@@ -10,15 +30,13 @@ import {
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
-import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
-  InspectionMask,
+  type InspectionMask,
   initializeGeneratedModules as _coreInitializeGeneratedModules,
   inspectionFilter as _coreInspectionFilter,
 } from "./core.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
-import { reload as _reload } from "./persistence.js";
 import { cachedTableExists, isSchemaLoaded, loadSchema } from "./model-schema.js";
 import { attributeNamesForSerialization as _attrNamesForSerialization } from "./serialization.js";
 import { AttributeMethods as AttributeMethodsNamespace } from "./namespaces.js";
@@ -33,6 +51,7 @@ interface AttributeRecord {
   _attributes: {
     isKey(name: string): boolean;
     keys(): Iterable<string>;
+    toHash(): Record<string, unknown>;
     fetchValue(name: string): unknown;
     accessed(): string[];
   };
@@ -53,8 +72,54 @@ export interface InstanceMethodHost {
   id?: unknown;
   readAttribute(name: string, block?: (name: string) => unknown): unknown;
   writeAttribute(name: string, value: unknown): void;
+  columnForAttribute(name: string): { isVirtual(): boolean };
   /** @internal */
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
+}
+
+export function respondToMissing(
+  this: AttributeRecord & InstanceMethodHost,
+  name: string,
+  includePrivate: boolean = false,
+): boolean {
+  const klass = this.constructor as unknown as {
+    prototype: object;
+    defineAttributeMethods(): boolean;
+  };
+  if (klass.defineAttributeMethods()) {
+    if (rbModMethodDefined(klass, name)) return true;
+  }
+
+  return objRespondToMissing(this, name, includePrivate);
+}
+
+export function methodMissing(
+  this: AttributeRecord & InstanceMethodHost,
+  name: string,
+  ...args: unknown[]
+): unknown {
+  const klass = this.constructor as unknown as {
+    prototype: object;
+    defineAttributeMethods(): boolean;
+  };
+  klass.defineAttributeMethods();
+
+  let method: UnboundMethod | null;
+  try {
+    method = rbModPublicInstanceMethod(klass, name);
+  } catch (e) {
+    if (!(e instanceof NameError)) throw e;
+    method = null;
+  }
+
+  while (method && !(method.owner instanceof GeneratedAttributeMethods)) {
+    method = method.superMethod();
+  }
+  if (method) {
+    return method.bindCall(this, ...args);
+  } else {
+    return AMAttributeMethods.AttributeMethods.methodMissing.call(this as never, name, ...args);
+  }
 }
 
 export function isRespondTo(
@@ -62,12 +127,12 @@ export function isRespondTo(
   name: string,
   includePrivate: boolean = false,
 ): boolean {
-  if (!AMAttributeMethods.InstanceMethods.isRespondTo.call(this as never, name, includePrivate))
+  if (!AMAttributeMethods.AttributeMethods.isRespondTo.call(this as never, name, includePrivate))
     return false;
 
   if (this._attributes) {
     const column = (
-      this.constructor as unknown as { symbolColumnToString(name: string): string | undefined }
+      this.constructor as unknown as { symbolColumnToString(name: string): string | null }
     ).symbolColumnToString(name);
     if (column != null) {
       return _hasAttribute.call(this, column);
@@ -109,11 +174,7 @@ export function attributeNames(this: AttributeRecord): string[] {
 }
 
 export function attributes(this: AttributeRecord): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const key of this._attributes.keys()) {
-    result[key] = this.readAttribute(key);
-  }
-  return result;
+  return this._attributes.toHash();
 }
 
 export function accessedFields(this: AttributeRecord): string[] {
@@ -121,19 +182,15 @@ export function accessedFields(this: AttributeRecord): string[] {
 }
 
 export class GeneratedAttributeMethods extends Module {
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE generated-attribute-methods-name-comes-from-const-set
-   */
-  ownerName?: string;
-
-  /** @noRailsEquivalent CONVERGEABLE generated-attribute-methods-name-comes-from-const-set */
-  inspect(): string {
-    return `${this.ownerName}::GeneratedAttributeMethods`;
-  }
+  static LOCK = {
+    synchronize<T>(block: () => T): T {
+      return block();
+    },
+  };
 }
 
 export interface AttributeMethodsHost {
+  new (...args: never[]): unknown;
   name: string;
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
@@ -142,7 +199,7 @@ export interface AttributeMethodsHost {
   _dangerousAttributeMethods?: Set<string>;
   _ignoredColumns?: string[];
   prototype: any;
-  isBaseClass?(): boolean;
+  isBaseClass(): boolean;
   attributeNames(): string[];
   abstractClass?: boolean;
   aliasAttribute(newName: string, oldName: string): void;
@@ -150,7 +207,7 @@ export interface AttributeMethodsHost {
   _hasAttribute(attrName: string): boolean;
   attributeMethodPatterns: AttributeMethodPattern[];
   /** @internal */
-  attributeMethodPatternsCache(): Map<string, unknown>;
+  attributeMethodPatternsCache(): InstanceType<typeof Concurrent.Map<string, unknown>>;
   /** @internal */
   generatedAttributeMethods(): Module;
   defineAttributeMethodPattern(
@@ -180,14 +237,11 @@ const RESTRICTED_CLASS_METHODS = new Set([
   "superclass",
 ]);
 
-const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
-
 let _dangerousMethodsCache: Set<string> | null = null;
 
-/** @missingRailsCall map — PERMANENT */
+/** @missingRailsCall map — CONVERGEABLE dangerous-attribute-methods-computed-not-curated */
 export function dangerousAttributeMethods(): Set<string> {
-  if (_dangerousMethodsCache) return _dangerousMethodsCache;
-  _dangerousMethodsCache = new Set([
+  return (_dangerousMethodsCache ||= new Set([
     "save",
     "saveBang",
     "destroy",
@@ -224,32 +278,34 @@ export function dangerousAttributeMethods(): Set<string> {
     "ciphertextFor",
     "attributes",
     "logger",
-  ]);
-  return _dangerousMethodsCache;
+  ]));
 }
 
 /** @missingRailsName generatedAttributeMethods — PERMANENT */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  const previous = Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")
-    ? this._generatedAttributeMethods
-    : undefined;
-  if (previous instanceof Module) {
-    previous.removeMethod(...previous.instanceMethods());
-  }
-  this._generatedAttributeMethods = new GeneratedAttributeMethods();
-  this._generatedAttributeMethods.ownerName = this.name;
+  this._generatedAttributeMethods = rbModConstSet(
+    this,
+    "GeneratedAttributeMethods",
+    new GeneratedAttributeMethods(),
+  );
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
-  include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
+  include(this, this._generatedAttributeMethods);
+
   _coreInitializeGeneratedModules.call(
     this as unknown as ThisParameterType<typeof _coreInitializeGeneratedModules>,
   );
 }
 
-export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
+/** @internal */
+export function generatedAttributeMethods(this: AttributeMethodsHost): Module {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
+  return this._generatedAttributeMethods!;
+}
+
+export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
   AttributeMethods.ClassMethods.aliasAttribute.call(this as never, newName, oldName);
 
   if (
@@ -312,45 +368,41 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
 }
 
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
-  }
   if (
     Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
     this._attributeMethodsGenerated
   ) {
     return false;
   }
-  if (typeof this.isBaseClass === "function" && !this.isBaseClass()) {
-    const superclass = Object.getPrototypeOf(this) as AttributeMethodsHost | null;
-    if (superclass && typeof superclass.defineAttributeMethods === "function") {
-      superclass.defineAttributeMethods();
+  return GeneratedAttributeMethods.LOCK.synchronize(() => {
+    if (
+      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+      this._attributeMethodsGenerated
+    ) {
+      return false;
     }
-  }
-  if (this.abstractClass !== true) {
-    loadSchema.call(this as never);
-    AttributeMethods.ClassMethods.defineAttributeMethods.call(
-      this as never,
-      ...this.attributeNames(),
-    );
-    if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
-  }
-  generateAliasAttributes.call(this);
-  this._attributeMethodsGenerated = true;
-  return true;
+
+    if (!this.isBaseClass()) rbClassSuperclass(this)!.defineAttributeMethods!();
+
+    if (!this.abstractClass) {
+      loadSchema.call(this as never);
+      AttributeMethods.ClassMethods.defineAttributeMethods.call(
+        this as never,
+        ...this.attributeNames(),
+      );
+      if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
+    }
+
+    generateAliasAttributes.call(this);
+
+    this._attributeMethodsGenerated = true;
+    return true;
+  });
 }
 
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
-  }
-  const superclass = Object.getPrototypeOf(this) as AttributeMethodsHost | null;
-  if (
-    superclass &&
-    !Object.prototype.hasOwnProperty.call(superclass, "_isActiveRecordBase") &&
-    typeof superclass.generateAliasAttributes === "function"
-  ) {
-    superclass.generateAliasAttributes();
+  if (rbClassSuperclass(this) !== ActiveRecord.Base) {
+    rbClassSuperclass(this)!.generateAliasAttributes!();
   }
   if (
     Object.prototype.hasOwnProperty.call(this, "_aliasAttributesMassGenerated") &&
@@ -371,14 +423,16 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
 }
 
 export function undefineAttributeMethods(this: AttributeMethodsHost): void {
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-    this._attributeMethodsGenerated
-  ) {
-    AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
-  }
-  this._attributeMethodsGenerated = false;
-  this._aliasAttributesMassGenerated = false;
+  GeneratedAttributeMethods.LOCK.synchronize(() => {
+    if (
+      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+      this._attributeMethodsGenerated
+    ) {
+      AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
+    }
+    this._attributeMethodsGenerated = false;
+    this._aliasAttributesMassGenerated = false;
+  });
 }
 
 function isOwnedByGeneratedAttributeMethods(klass: any, name: string): boolean {
@@ -407,41 +461,27 @@ export function isInstanceMethodAlreadyImplemented(
   this: AttributeMethodsHost,
   methodName: string,
 ): boolean {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
-  }
   if (isDangerousAttributeMethod.call(this, methodName)) {
     throw new DangerousAttributeError(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
     );
   }
 
-  const superclass = Object.getPrototypeOf(this);
-  if (Object.prototype.hasOwnProperty.call(superclass ?? {}, "_isActiveRecordBase")) {
+  const superclass = rbClassSuperclass(this);
+  if (superclass === ActiveRecord.Base) {
     return AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(
       this as any,
       methodName,
     );
   } else {
-    const base = frameworkBase(this);
     const defined =
-      base != null &&
-      isMethodDefinedWithin.call(this, methodName, superclass, base) &&
+      isMethodDefinedWithin.call(this, methodName, superclass, ActiveRecord.Base) &&
       !isOwnedByGeneratedAttributeMethods(superclass, methodName);
     return (
       defined ||
       AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(this as any, methodName)
     );
   }
-}
-
-function frameworkBase(klass: unknown): any {
-  let c: unknown = klass;
-  while (typeof c === "function" && c !== Function.prototype) {
-    if (Object.prototype.hasOwnProperty.call(c, "_isActiveRecordBase")) return c;
-    c = Object.getPrototypeOf(c);
-  }
-  return null;
 }
 
 export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: string): boolean {
@@ -452,12 +492,10 @@ export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,
   klass: any,
-  superklass: any = Object.getPrototypeOf(klass) === Function.prototype
-    ? Object
-    : Object.getPrototypeOf(klass),
+  superklass: any = rbClassSuperclass(klass) ?? Object,
 ): boolean {
-  if (name in klass.prototype) {
-    if (superklass?.prototype != null && name in superklass.prototype) {
+  if (rbModMethodDefined(klass, name)) {
+    if (rbModMethodDefined(superklass, name)) {
       return instanceMethodOwner(klass, name) !== instanceMethodOwner(superklass, name);
     } else {
       return true;
@@ -469,21 +507,26 @@ export function isMethodDefinedWithin(
 
 export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(methodName)) return true;
-  if (INTRINSIC_FUNCTION_PROPS.has(methodName)) return false;
 
-  let klass: any = ActiveRecord.Base;
-  while (klass && klass !== Function.prototype && klass !== Object.prototype) {
-    if (Object.prototype.hasOwnProperty.call(klass, methodName)) return true;
-    klass = Object.getPrototypeOf(klass);
+  if (rbObjRespondTo(ActiveRecord.Base, methodName, true)) {
+    if (rbObjRespondTo(Object, methodName, true)) {
+      return (
+        rbObjMethod(ActiveRecord.Base, methodName).owner() !==
+        rbObjMethod(Object, methodName).owner()
+      );
+    } else {
+      return true;
+    }
+  } else {
+    return false;
   }
-  return false;
 }
 
 export function isAttributeMethod(
   this: { _attributes?: { isKey(name: string): boolean } },
   attrName: string,
-): boolean {
-  return this._attributes?.isKey(attrName) ?? false;
+): boolean | undefined {
+  return this._attributes?.isKey(attrName);
 }
 
 /** @internal */
@@ -499,97 +542,58 @@ function attributeMethod(this: InstanceMethodHost, attrName: string): boolean {
 export function attributesWithValues(
   this: InstanceMethodHost,
   attributeNames: string[],
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const attributes = this._attributes;
-  if (attributes == null) return result;
-  for (const name of attributeNames) {
-    if (attributes.isKey(name)) result[name] = attributes.getAttribute?.(name);
-  }
-  return result;
+): Hash<string, unknown> {
+  return indexWith(attributeNames, (name) => this._attributes!.getAttribute!(name));
 }
 
 /** @internal */
 export function attributesForUpdate(this: InstanceMethodHost, attributeNames: string[]): string[] {
-  const mc = this.constructor as any;
-  const colNames = new Set<string>(mc.columnNames?.() ?? []);
-  return attributeNames.filter((name) => {
-    if (!colNames.has(name)) return false;
-    if (mc.isReadonlyAttribute?.(name)) return false;
-    if (mc.isCounterCacheColumn?.(name)) return false;
-    const col = mc.columnForAttribute?.(name);
-    if (col?.virtual || col?.isVirtual?.()) return false;
-    return true;
-  });
+  const klass = this.constructor as any;
+  attributeNames = attributeNames.filter((name) => klass.columnNames().includes(name));
+  return attributeNames.filter(
+    (name) =>
+      !(
+        klass.isReadonlyAttribute(name) ||
+        klass.isCounterCacheColumn(name) ||
+        this.columnForAttribute(name).isVirtual()
+      ),
+  );
 }
 
 /** @internal */
 export function attributesForCreate(this: InstanceMethodHost, attributeNames: string[]): string[] {
-  const mc = this.constructor as any;
-  const colNames = new Set<string>(mc.columnNames?.() ?? []);
-
-  return attributeNames.filter((name) => {
-    if (!colNames.has(name)) return false;
-    if (pkAttribute.call(this, name) && this.id == null) return false;
-    const col = mc.columnForAttribute?.(name);
-    if (col?.virtual || col?.isVirtual?.()) return false;
-    return true;
-  });
-}
-
-const bigintReplacer = (_k: string, v: unknown) => (typeof v === "bigint" ? v.toString() : v);
-
-function inspectArray(arr: unknown[]): string {
-  return `[${arr
-    .map((v) => {
-      if (v == null) return "nil";
-      if (globalThis.Array.isArray(v)) return inspectArray(v as unknown[]);
-      if (typeof v === "bigint") return String(v);
-      try {
-        return JSON.stringify(v, bigintReplacer) ?? String(v);
-      } catch {
-        return String(v);
-      }
-    })
-    .join(", ")}]`;
+  const klass = this.constructor as any;
+  attributeNames = attributeNames.filter((name) => klass.columnNames().includes(name));
+  return attributeNames.filter(
+    (name) =>
+      !(
+        (pkAttribute.call(this, name) && this.id == null) ||
+        this.columnForAttribute(name).isVirtual()
+      ),
+  );
 }
 
 /** @internal */
-export function formatForInspect(this: InstanceMethodHost, name: string, value: unknown): string {
-  if (value === null || value === undefined) {
-    return "nil";
+export function formatForInspect(
+  this: InstanceMethodHost,
+  name: string,
+  value: unknown,
+): string | InspectionMask {
+  if (value == null) {
+    return inspect(value);
   } else {
     let inspectedValue: string;
     if (typeof value === "string" && value.length > 50) {
-      inspectedValue = inspect(`${value.substring(0, 50)}...`);
-    } else if (value instanceof Temporal.PlainDate) {
-      inspectedValue = `"${dateToFs(value, "inspect")}"`;
-    } else if (value instanceof TimeWithZone) {
-      inspectedValue = `"${value.toFs("inspect")}"`;
-    } else if (value instanceof Temporal.Instant || value instanceof RubyTime) {
-      inspectedValue = `"${toFs(value, "inspect")}"`;
-      // boundary: legacy custom-typed attributes may still be JS Date.
-    } else if (value instanceof Date) {
-      inspectedValue = Number.isNaN(value.getTime())
-        ? `"${String(value)}"`
-        : `"${value.toISOString()}"`;
-    } else if (typeof value === "string") {
-      inspectedValue = inspect(value);
-    } else if (globalThis.Array.isArray(value)) {
-      inspectedValue = inspectArray(value as unknown[]);
+      inspectedValue = inspect(`${value.slice(0, 50)}...`);
+    } else if (value instanceof Temporal.PlainDate || value instanceof RubyTime) {
+      inspectedValue = `"${rbFSend(value, "toFs", "inspect")}"`;
     } else {
-      try {
-        const stringified = JSON.stringify(value);
-        inspectedValue = stringified === undefined ? String(value) : stringified;
-      } catch {
-        inspectedValue = String(value);
-      }
+      inspectedValue = inspect(value);
     }
 
-    const filtered = _coreInspectionFilter
-      .call(this.constructor as never)
-      .filterParam(name, inspectedValue);
-    return filtered instanceof InspectionMask ? String(filtered.__getobj__()) : String(filtered);
+    return _coreInspectionFilter.call(this as never).filterParam(name, inspectedValue) as
+      | string
+      | InspectionMask;
   }
 }
 
@@ -600,37 +604,16 @@ export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
 }
 
 interface AttributeNamesHost {
-  attributeTypes(): Record<string, unknown>;
+  attributeTypes(): Record<string, unknown> | Hash<string, unknown>;
   abstractClass?: boolean;
-  _attributeNamesMemo?: { names: readonly string[] };
-}
-
-function classAttributeNames(this: AttributeNamesHost): string[] {
-  const memo = Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")
-    ? this._attributeNamesMemo
-    : undefined;
-  if (memo) return memo.names as string[];
-  const exists = cachedTableExists.call(this as never);
-  if (this.abstractClass || exists === false) {
-    const frozen = Object.freeze([] as string[]);
-    this._attributeNamesMemo = { names: frozen };
-    return frozen as string[];
-  }
-  const names = Object.keys(this.attributeTypes());
-  if (exists !== undefined) {
-    const frozen = Object.freeze(names);
-    this._attributeNamesMemo = { names: frozen };
-    return frozen as string[];
-  }
-  return names;
 }
 
 /** @internal */
 function classHasAttribute(
-  this: { attributeTypes(): Record<string, unknown> },
+  this: { attributeTypes(): Record<string, unknown> | Hash<string, unknown> },
   attrName: string,
 ): boolean {
-  return Object.prototype.hasOwnProperty.call(this.attributeTypes(), attrName);
+  return hasKey(this.attributeTypes(), attrName);
 }
 
 export const ClassMethods = {
@@ -642,12 +625,31 @@ export const ClassMethods = {
         this.columnNames().includes(String(attribute).replace(/=$/, "")))
     );
   },
-  /** @missingRailsCall table_exists? — PERMANENT */
-  attributeNames: classAttributeNames,
+  /**
+   * @missingRailsCall table_exists? — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
+  attributeNames(this: AttributeNamesHost): string[] {
+    return (rbObjIvarGet(this, "@attribute_names") ??
+      (!this.abstractClass && cachedTableExists.call(this as never) === undefined
+        ? hashKeys(this.attributeTypes())
+        : rbObjIvarSet(
+            this,
+            "@attribute_names",
+            Object.freeze(
+              !this.abstractClass && cachedTableExists.call(this as never)
+                ? hashKeys(this.attributeTypes())
+                : [],
+            ),
+          ))) as string[];
+  },
   _hasAttribute: classHasAttribute,
 };
 
-export function attributeForInspect(this: InstanceMethodHost, attrName: string): string {
+export function attributeForInspect(
+  this: InstanceMethodHost,
+  attrName: string,
+): string | InspectionMask {
   attrName = String(attrName);
   attrName =
     (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
@@ -659,9 +661,10 @@ export function attributeForInspect(this: InstanceMethodHost, attrName: string):
 
 export function get(this: InstanceMethodHost, attrName: string): unknown {
   return this.readAttribute(attrName, (n) =>
-    AttributeMethods.InstanceMethods.missingAttribute.call(
+    AttributeMethods.AttributeMethods.missingAttribute.call(
       this as unknown as AttributeMethodsInstanceHost,
       n,
+      rbFCaller(),
     ),
   );
 }
@@ -672,10 +675,6 @@ export function set(this: InstanceMethodHost, attrName: string, value: unknown):
 
 export function queryAttribute(this: InstanceMethodHost, attrName: string): boolean {
   return _queryAttribute.call(this as any, attrName);
-}
-
-export async function reload<T>(this: T): Promise<T> {
-  return _reload.call(this as any) as unknown as Promise<T>;
 }
 
 /** @internal */
@@ -711,10 +710,14 @@ export function readAttributeBeforeTypeCast(this: InstanceMethodHost, attrName: 
 export function readAttributeForDatabase(this: InstanceMethodHost, attrName: string): unknown {
   return _readAttributeForDatabase(this as any, attrName);
 }
-export function attributesBeforeTypeCast(this: InstanceMethodHost): Record<string, unknown> {
+export function attributesBeforeTypeCast(
+  this: InstanceMethodHost,
+): Record<string, unknown> | Hash<string, unknown> {
   return _attributesBeforeTypeCast.call(this as any);
 }
-export function attributesForDatabase(this: InstanceMethodHost): Record<string, unknown> {
+export function attributesForDatabase(
+  this: InstanceMethodHost,
+): Record<string, unknown> | Hash<string, unknown> {
   return _attributesForDatabase(this as any);
 }
 export function attributeBeforeTypeCast(this: InstanceMethodHost, attrName: string): unknown {
@@ -735,9 +738,9 @@ export function queryCastAttribute(
 }
 export function isSavedChangeToAttribute(
   this: InstanceMethodHost,
-  attrName: string,
+  attrName: string | string[],
   options?: DirtyOptions,
-): boolean {
+): boolean | undefined {
   return _isSavedChangeToAttribute(this as any, attrName, options);
 }
 export function savedChangeToAttribute(
@@ -756,7 +759,7 @@ export function isWillSaveChangeToAttribute(
   this: InstanceMethodHost,
   attrName: string,
   options?: DirtyOptions,
-): boolean {
+): boolean | undefined {
   return _isWillSaveChangeToAttribute(this as any, attrName, options);
 }
 export function attributeChangeToBeSaved(

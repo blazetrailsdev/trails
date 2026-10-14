@@ -1,24 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { Relation } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
-import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
 
 registerModel(Post);
 registerModel(Comment);
 
-const aliasQ = quoteTableName("omg_posts");
-const baseQ = quoteTableName("posts");
-const idQ = quoteTableName("id");
+let aliasQ: string;
+let baseQ: string;
+let idQ: string;
 
 describe("Relation on an aliased table", () => {
-  fixtures(["posts", "comments"]);
+  const { self } = fixtures(["posts", "comments"]);
 
-  const aliased = () => new Relation(Post, Post.arelTable.alias("omg_posts"));
+  beforeEach(() => {
+    aliasQ = self().quoteTableName("omg_posts");
+    baseQ = self().quoteTableName("posts");
+    idQ = self().quoteTableName("id");
+  });
+
+  const aliased = () => new Relation(Post, { table: Post.arelTable.alias("omg_posts") });
 
   it("qualifies the star projection against the alias", () => {
     expect(aliased().toSql()).toContain(`${aliasQ}.*`);
@@ -47,14 +51,9 @@ describe("Relation on an aliased table", () => {
   });
 
   it("qualifies plucked columns against the alias", async () => {
-    await assertQueriesMatch(
-      new RegExp(regexpEscape(`${aliasQ}.${idQ}`)),
-      undefined,
-      false,
-      async () => {
-        await aliased().pluck("id");
-      },
-    );
+    await self().assertQueriesMatch(new RegExp(regexpEscape(`${aliasQ}.${idQ}`)), {}, async () => {
+      await aliased().pluck("id");
+    });
   });
 
   it("roots the limited-id subquery on the alias", () => {
@@ -64,10 +63,9 @@ describe("Relation on an aliased table", () => {
   });
 
   it("roots the materialized limited-id query on the alias", async () => {
-    await assertQueriesMatch(
+    await self().assertQueriesMatch(
       new RegExp(`SELECT DISTINCT ${regexpEscape(`${aliasQ}.${idQ}`)}`),
-      undefined,
-      false,
+      {},
       async () => {
         await aliased().eagerLoad(":comments").limit(1);
       },

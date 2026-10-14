@@ -1,12 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNotRespondTo, assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNotRespondTo, assertNothingRaised, extend } from "@blazetrails/activesupport";
+import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Errors } from "./errors.js";
 import { I18n } from "./i18n.js";
-import { ModelName, type ModelLike } from "./naming.js";
+import { Naming, type ModelName, type ModelLike } from "./naming.js";
 import { Error as ModelError } from "./error.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
+const ErrorTest = new Module();
+registerConstant("ErrorTest", ErrorTest);
+
 class Person {
+  static {
+    rbModConstSet(ErrorTest, "Person", this);
+  }
+  declare static modelName: ModelName;
+  declare modelName: ModelName;
   errors: Errors;
   name: string | null = null;
   age: number | null = null;
@@ -27,16 +36,20 @@ class Person {
     return [this];
   }
 }
+extend(Person, Naming);
 
 class Manager extends Person {
-  static moduleName = "ErrorTest";
-  static modelName: ModelName = new ModelName(Manager);
+  static {
+    rbModConstSet(ErrorTest, "Manager", this);
+  }
 
   override readAttributeForValidation(attr: string): unknown {
     return (this as unknown as Record<string, unknown>)[attr];
   }
 
-  static i18nScope = "activemodel";
+  static get i18nScope(): string {
+    return "activemodel";
+  }
 
   static override lookupAncestors(): Array<ModelLike & { modelName: ModelName }> {
     return [this];
@@ -59,58 +72,58 @@ describe("ErrorTest", () => {
 
   it("initialize", () => {
     const base = new Person();
-    const error = new ModelError(base, "name", ":too_long", { foo: ":bar" });
+    const error = new ModelError(base, ":name", ":too_long", { foo: ":bar" });
     expect(error.base).toBe(base);
-    expect(error.attribute).toBe("name");
+    expect(error.attribute).toBe(":name");
     expect(error.type).toBe(":too_long");
     expect(error.options).toEqual({ foo: ":bar" });
   });
 
   it("initialize without type", () => {
-    const error = new ModelError(new Person(), "name");
+    const error = new ModelError(new Person(), ":name");
     expect(error.type).toBe(":invalid");
     expect(error.options).toEqual({});
   });
 
   it("initialize without type but with options", () => {
     const options = { message: "bar" };
-    const error = new ModelError(new Person(), "name", undefined, options);
+    const error = new ModelError(new Person(), ":name", undefined, options);
     expect(error.options).toEqual(options);
   });
 
   it("match? handles mixed condition", () => {
-    const subject = new ModelError(new Person(), "mineral", ":not_enough", { count: 2 });
-    expect(subject.match("mineral", ":too_coarse")).toBeFalsy();
-    expect(subject.match("mineral", ":not_enough")).toBeTruthy();
-    expect(subject.match("mineral", ":not_enough", { count: 2 })).toBeTruthy();
-    expect(subject.match("mineral", ":not_enough", { count: 1 })).toBeFalsy();
+    const subject = new ModelError(new Person(), ":mineral", ":not_enough", { count: 2 });
+    expect(subject.match(":mineral", ":too_coarse")).toBeFalsy();
+    expect(subject.match(":mineral", ":not_enough")).toBeTruthy();
+    expect(subject.match(":mineral", ":not_enough", { count: 2 })).toBeTruthy();
+    expect(subject.match(":mineral", ":not_enough", { count: 1 })).toBeFalsy();
   });
 
   it("match? handles attribute match", () => {
-    const subject = new ModelError(new Person(), "mineral", ":not_enough", { count: 2 });
-    expect(subject.match("foo")).toBeFalsy();
-    expect(subject.match("mineral")).toBeTruthy();
+    const subject = new ModelError(new Person(), ":mineral", ":not_enough", { count: 2 });
+    expect(subject.match(":foo")).toBeFalsy();
+    expect(subject.match(":mineral")).toBeTruthy();
   });
 
   it("match? handles error type match", () => {
-    const subject = new ModelError(new Person(), "mineral", ":not_enough", { count: 2 });
-    expect(subject.match("mineral", ":too_coarse")).toBeFalsy();
-    expect(subject.match("mineral", ":not_enough")).toBeTruthy();
+    const subject = new ModelError(new Person(), ":mineral", ":not_enough", { count: 2 });
+    expect(subject.match(":mineral", ":too_coarse")).toBeFalsy();
+    expect(subject.match(":mineral", ":not_enough")).toBeTruthy();
   });
 
   it("match? handles extra options match", () => {
-    const subject = new ModelError(new Person(), "mineral", ":not_enough", { count: 2 });
-    expect(subject.match("mineral", ":not_enough", { count: 1 })).toBeFalsy();
-    expect(subject.match("mineral", ":not_enough", { count: 2 })).toBeTruthy();
+    const subject = new ModelError(new Person(), ":mineral", ":not_enough", { count: 2 });
+    expect(subject.match(":mineral", ":not_enough", { count: 1 })).toBeFalsy();
+    expect(subject.match(":mineral", ":not_enough", { count: 2 })).toBeTruthy();
   });
 
   it("message with type as a symbol", () => {
-    const error = new ModelError(new Person(), "name", ":blank");
+    const error = new ModelError(new Person(), ":name", ":blank");
     expect(error.message).toBe("can't be blank");
   });
 
   it("message with custom interpolation", () => {
-    const subject = new ModelError(new Person(), "name", ":inclusion", {
+    const subject = new ModelError(new Person(), ":name", ":inclusion", {
       message: "custom message %{value}",
       value: "name",
     });
@@ -118,17 +131,17 @@ describe("ErrorTest", () => {
   });
 
   it("message returns plural interpolation", () => {
-    const subject = new ModelError(new Person(), "name", ":too_long", { count: 10 });
+    const subject = new ModelError(new Person(), ":name", ":too_long", { count: 10 });
     expect(subject.message).toBe("is too long (maximum is 10 characters)");
   });
 
   it("message returns singular interpolation", () => {
-    const subject = new ModelError(new Person(), "name", ":too_long", { count: 1 });
+    const subject = new ModelError(new Person(), ":name", ":too_long", { count: 1 });
     expect(subject.message).toBe("is too long (maximum is 1 character)");
   });
 
   it("message returns count interpolation", () => {
-    const subject = new ModelError(new Person(), "name", ":too_long", {
+    const subject = new ModelError(new Person(), ":name", ":too_long", {
       message: "custom message %{count}",
       count: 10,
     });
@@ -136,7 +149,7 @@ describe("ErrorTest", () => {
   });
 
   it("message handles lambda in messages and option values, and i18n interpolation", () => {
-    const subject = new ModelError(new Person(), "name", ":invalid", {
+    const subject = new ModelError(new Person(), ":name", ":invalid", {
       foo: "foo",
       bar: "bar",
       baz: () => "baz",
@@ -148,7 +161,7 @@ describe("ErrorTest", () => {
 
   it("generate_message works without i18n_scope", async () => {
     const person = new Person();
-    const error = new ModelError(person, "name", ":blank");
+    const error = new ModelError(person, ":name", ":blank");
     assertNotRespondTo(Person, "i18nScope");
     await assertNothingRaised(() => {
       return error.message;
@@ -156,14 +169,14 @@ describe("ErrorTest", () => {
   });
 
   it("message with type as custom message", () => {
-    const error = new ModelError(new Person(), "name", undefined, {
+    const error = new ModelError(new Person(), ":name", undefined, {
       message: "cannot be blank",
     });
     expect(error.message).toBe("cannot be blank");
   });
 
   it("message with options[:message] as custom message", () => {
-    const error = new ModelError(new Person(), "name", ":blank", {
+    const error = new ModelError(new Person(), ":name", ":blank", {
       message: "cannot be blank",
     });
     expect(error.message).toBe("cannot be blank");
@@ -177,7 +190,7 @@ describe("ErrorTest", () => {
     });
 
     I18n.withLocale("en", () => {
-      error = new ModelError(new Person(), "name", ":invalid");
+      error = new ModelError(new Person(), ":name", ":invalid");
     });
     I18n.withLocale("pl", () => {
       expect(error!.message).toBe("jest nieprawidłowe");
@@ -197,7 +210,7 @@ describe("ErrorTest", () => {
       },
     });
 
-    const error = new ModelError(new Manager(), "reports[123].name", ":presence");
+    const error = new ModelError(new Manager(), ":reports[123].name", ":presence");
 
     expect(error.message).toBe("must be present");
   });
@@ -206,24 +219,24 @@ describe("ErrorTest", () => {
     I18n.backend().storeTranslations("en", {
       errors: { messages: { inadequate: "Inadequate %{attribute} found!" } },
     });
-    const error = new ModelError(new Person(), "name", ":inadequate");
+    const error = new ModelError(new Person(), ":name", ":inadequate");
     expect(error.message).toBe("Inadequate name found!");
   });
 
   it("full_message returns the given message when attribute is :base", () => {
-    const error = new ModelError(new Person(), "base", undefined, {
+    const error = new ModelError(new Person(), ":base", undefined, {
       message: "press the button",
     });
     expect(error.fullMessage).toBe("press the button");
   });
 
   it("full_message returns the given message with the attribute name included", () => {
-    const error = new ModelError(new Person(), "name", ":blank");
+    const error = new ModelError(new Person(), ":name", ":blank");
     expect(error.fullMessage).toBe("name can't be blank");
   });
 
   it("full_message uses default format", () => {
-    const error = new ModelError(new Person(), "name", undefined, {
+    const error = new ModelError(new Person(), ":name", undefined, {
       message: "can't be blank",
     });
 
@@ -235,8 +248,8 @@ describe("ErrorTest", () => {
   it("equality by base attribute, type and options", () => {
     const person = new Person();
 
-    const e1 = new ModelError(person, "name", undefined, { foo: ":bar" });
-    const e2 = new ModelError(person, "name", undefined, { foo: ":bar" });
+    const e1 = new ModelError(person, ":name", undefined, { foo: ":bar" });
+    const e2 = new ModelError(person, ":name", undefined, { foo: ":bar" });
     (e2 as unknown as Record<string, unknown>)._humanizedAttribute = "Name";
 
     expect(e1.equals(e2)).toBe(true);
@@ -244,31 +257,33 @@ describe("ErrorTest", () => {
 
   it("inequality", () => {
     const person = new Person();
-    const error = new ModelError(person, "name", undefined, { foo: ":bar" });
+    const error = new ModelError(person, ":name", undefined, { foo: ":bar" });
 
-    expect(!error.equals(new ModelError(person, "name", undefined, { foo: ":baz" }))).toBeTruthy();
-    expect(!error.equals(new ModelError(person, "name"))).toBeTruthy();
-    expect(!error.equals(new ModelError(person, "title", undefined, { foo: ":bar" }))).toBeTruthy();
+    expect(!error.equals(new ModelError(person, ":name", undefined, { foo: ":baz" }))).toBeTruthy();
+    expect(!error.equals(new ModelError(person, ":name"))).toBeTruthy();
     expect(
-      !error.equals(new ModelError(new Person(), "name", undefined, { foo: ":bar" })),
+      !error.equals(new ModelError(person, ":title", undefined, { foo: ":bar" })),
+    ).toBeTruthy();
+    expect(
+      !error.equals(new ModelError(new Person(), ":name", undefined, { foo: ":bar" })),
     ).toBeTruthy();
   });
 
   it("comparing against different class would not raise error", () => {
     const person = new Person();
-    const error = new ModelError(person, "name", undefined, { foo: ":bar" });
+    const error = new ModelError(person, ":name", undefined, { foo: ":bar" });
 
     expect(error).not.toEqual(person);
   });
 
   it("full_message returns the given message when the attribute contains base", () => {
-    const error = new ModelError(new Person(), "foo.base", "press the button");
+    const error = new ModelError(new Person(), ":foo.base", "press the button");
     expect(error.fullMessage).toBe("foo.base press the button");
   });
 
   it("details which ignores callback and message options", () => {
     const person = new Person();
-    const error = new ModelError(person, "name", ":too_short", {
+    const error = new ModelError(person, ":name", ":too_short", {
       foo: ":bar",
       if: ":foo",
       unless: ":bar",
@@ -284,7 +299,7 @@ describe("ErrorTest", () => {
 
   it("details which has no raw_type", () => {
     const person = new Person();
-    const error = new ModelError(person, "name", undefined, { foo: ":bar" });
+    const error = new ModelError(person, ":name", undefined, { foo: ":bar" });
 
     expect(error.details).toEqual({ error: ":invalid", foo: ":bar" });
   });

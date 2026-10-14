@@ -30,10 +30,7 @@ export class Pool extends PersistedSecure {
     delete this.defaultOptions["allowFallback"];
   }
 
-  /**
-   * @missingRailsCall key? — PERMANENT
-   * @missingRailsArgs super(*args) — PERMANENT
-   */
+  /** @missingRailsArgs super(*args) — PERMANENT */
   override generateSid({ useMutex: _useMutex = true }: { useMutex?: boolean } = {}): SessionId {
     for (;;) {
       const sid = super.generateSid();
@@ -66,7 +63,6 @@ export class Pool extends PersistedSecure {
     return sessionId;
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   override deleteSession(
     _req: PersistedRequest,
     sessionId: SessionId,

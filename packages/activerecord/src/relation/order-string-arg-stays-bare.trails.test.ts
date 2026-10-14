@@ -1,13 +1,16 @@
-import { describe, it, expect } from "vitest";
-import { fixtures } from "../test-fixtures.js";
+import { beforeEach, describe, it, expect } from "vitest";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Customer } from "../test-helpers/models/customer.js";
-import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 
-const qualifiedName = regexpEscape(quoteTableName("customers.name"));
+let qualifiedName: string;
 
 describe("order string arg stays bare", () => {
-  fixtures([]);
+  const { self } = fixtures([]);
+
+  beforeEach(() => {
+    qualifiedName = regexpEscape(self().quoteTableName("customers.name"));
+  });
 
   it("leaves a string order fragment bare", () => {
     expect(Customer.order("name ASC").toSql()).toContain("ORDER BY name ASC");

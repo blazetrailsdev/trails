@@ -28,7 +28,7 @@ describe("ArGenerateMigrationTest", () => {
 
   it("renders add_*_to_* migration with addColumn calls; tableizes singular table segment", () => {
     const src = renderMigration("add_name_to_user", [{ name: "name", type: "string" }]);
-    expect(src).toContain("export class AddNameToUser extends Migration");
+    expect(src).toContain("export class AddNameToUser extends Migration.get(8.0)");
     expect(src).toContain('this.addColumn("users", "name", "string")');
   });
 

@@ -714,5 +714,710 @@
         "rubyFile": "arel/visitors/to_sql.rb"
       }
     ]
+  },
+  "bareRaises": {
+    "activerecord": {
+      "aggregations.ts": {
+        "*": {
+          "writerMethod": ["ArgumentError"]
+        },
+        "ClassMethods": {
+          "writerMethod": ["ArgumentError"]
+        }
+      },
+      "associations/belongs-to-association.ts": {
+        "*": {
+          "handleDependency": ["Rollback"]
+        },
+        "BelongsToAssociation": {
+          "handleDependency": ["Rollback"]
+        }
+      },
+      "associations/builder/association.ts": {
+        "*": {
+          "macro": ["NotImplementedError"],
+          "validDependentOptions": ["NotImplementedError"]
+        },
+        "Association": {
+          "macro": ["NotImplementedError"],
+          "validDependentOptions": ["NotImplementedError"]
+        }
+      },
+      "associations/collection-association.ts": {
+        "*": {
+          "_createRecord": ["Rollback"],
+          "deleteRecords": ["NotImplementedError"],
+          "concatRecords": ["Rollback"]
+        },
+        "CollectionAssociation": {
+          "_createRecord": ["Rollback"],
+          "deleteRecords": ["NotImplementedError"],
+          "concatRecords": ["Rollback"]
+        }
+      },
+      "associations/join-dependency/join-part.ts": {
+        "*": {
+          "table": ["NotImplementedError"]
+        },
+        "JoinPart": {
+          "table": ["NotImplementedError"]
+        }
+      },
+      "autosave-association.ts": {
+        "*": {
+          "saveHasOneAssociation": ["Rollback"]
+        },
+        "AutosaveAssociation": {
+          "saveHasOneAssociation": ["Rollback"]
+        }
+      },
+      "connection-adapters/abstract/connection-pool.ts": {
+        "*": {
+          "checkoutNewConnection": ["ConnectionNotEstablished"]
+        },
+        "ConnectionPool": {
+          "checkoutNewConnection": ["ConnectionNotEstablished"]
+        }
+      },
+      "connection-adapters/abstract/database-statements.ts": {
+        "*": {
+          "isWriteQuery": ["NotImplementedError"],
+          "writeQuery": ["NotImplementedError"],
+          "explain": ["NotImplementedError"],
+          "performQuery": ["NotImplementedError"],
+          "castResult": ["NotImplementedError"],
+          "affectedRows": ["NotImplementedError"]
+        },
+        "DatabaseStatements": {
+          "isWriteQuery": ["NotImplementedError"],
+          "writeQuery": ["NotImplementedError"],
+          "explain": ["NotImplementedError"],
+          "performQuery": ["NotImplementedError"],
+          "castResult": ["NotImplementedError"],
+          "affectedRows": ["NotImplementedError"]
+        }
+      },
+      "connection-adapters/abstract/quoting.ts": {
+        "*": {
+          "quoteColumnName": ["NotImplementedError"]
+        },
+        "ClassMethods": {
+          "quoteColumnName": ["NotImplementedError"]
+        }
+      },
+      "connection-adapters/abstract/schema-statements.ts": {
+        "*": {
+          "checkConstraints": ["NotImplementedError"],
+          "dataSourceSql": ["NotImplementedError"],
+          "quotedScope": ["NotImplementedError"]
+        },
+        "SchemaStatements": {
+          "checkConstraints": ["NotImplementedError"],
+          "dataSourceSql": ["NotImplementedError"],
+          "quotedScope": ["NotImplementedError"]
+        }
+      },
+      "connection-adapters/abstract-adapter.ts": {
+        "*": {
+          "dbconsole": ["NotImplementedError"],
+          "reconnect": ["NotImplementedError"]
+        },
+        "AbstractAdapter": {
+          "dbconsole": ["NotImplementedError"],
+          "reconnect": ["NotImplementedError"]
+        }
+      },
+      "connection-adapters/abstract-mysql-adapter.ts": {
+        "*": {
+          "errorNumber": ["NotImplementedError"],
+          "foreignKeys": ["ArgumentError"],
+          "checkConstraints": ["NotImplementedError"],
+          "primaryKeys": ["ArgumentError"]
+        },
+        "AbstractMysqlAdapter": {
+          "errorNumber": ["NotImplementedError"],
+          "foreignKeys": ["ArgumentError"],
+          "checkConstraints": ["NotImplementedError"],
+          "primaryKeys": ["ArgumentError"]
+        }
+      },
+      "connection-adapters/sqlite3-adapter.ts": {
+        "*": {
+          "newClient": ["NoDatabaseError"]
+        },
+        "SQLite3Adapter": {
+          "newClient": ["NoDatabaseError"]
+        }
+      },
+      "connection-adapters/statement-pool.ts": {
+        "*": {
+          "dealloc": ["NotImplementedError"]
+        },
+        "StatementPool": {
+          "dealloc": ["NotImplementedError"]
+        }
+      },
+      "core.ts": {
+        "*": {
+          "cachedFindBy": ["StatementInvalid"]
+        },
+        "ClassMethods": {
+          "cachedFindBy": ["StatementInvalid"]
+        }
+      },
+      "database-configurations/database-config.ts": {
+        "*": {
+          "host": ["NotImplementedError"],
+          "database": ["NotImplementedError"],
+          "_database": ["NotImplementedError"],
+          "adapter": ["NotImplementedError"],
+          "pool": ["NotImplementedError"],
+          "minThreads": ["NotImplementedError"],
+          "maxThreads": ["NotImplementedError"],
+          "maxQueue": ["NotImplementedError"],
+          "queryCache": ["NotImplementedError"],
+          "checkoutTimeout": ["NotImplementedError"],
+          "reapingFrequency": ["NotImplementedError"],
+          "idleTimeout": ["NotImplementedError"],
+          "isReplica": ["NotImplementedError"],
+          "replica": ["NotImplementedError"],
+          "migrationsPaths": ["NotImplementedError"],
+          "schemaCachePath": ["NotImplementedError"],
+          "isUseMetadataTable": ["NotImplementedError"],
+          "useMetadataTable": ["NotImplementedError"],
+          "isSeeds": ["NotImplementedError"],
+          "seeds": ["NotImplementedError"],
+          "hasSeeds": ["NotImplementedError"]
+        },
+        "DatabaseConfig": {
+          "host": ["NotImplementedError"],
+          "database": ["NotImplementedError"],
+          "_database": ["NotImplementedError"],
+          "adapter": ["NotImplementedError"],
+          "pool": ["NotImplementedError"],
+          "minThreads": ["NotImplementedError"],
+          "maxThreads": ["NotImplementedError"],
+          "maxQueue": ["NotImplementedError"],
+          "queryCache": ["NotImplementedError"],
+          "checkoutTimeout": ["NotImplementedError"],
+          "reapingFrequency": ["NotImplementedError"],
+          "idleTimeout": ["NotImplementedError"],
+          "isReplica": ["NotImplementedError"],
+          "replica": ["NotImplementedError"],
+          "migrationsPaths": ["NotImplementedError"],
+          "schemaCachePath": ["NotImplementedError"],
+          "isUseMetadataTable": ["NotImplementedError"],
+          "useMetadataTable": ["NotImplementedError"],
+          "isSeeds": ["NotImplementedError"],
+          "seeds": ["NotImplementedError"],
+          "hasSeeds": ["NotImplementedError"]
+        }
+      },
+      "dynamic-matchers.ts": {
+        "*": {
+          "prefix": ["NotImplementedError"],
+          "finder": ["NotImplementedError"]
+        },
+        "Method": {
+          "prefix": ["NotImplementedError"],
+          "finder": ["NotImplementedError"]
+        }
+      },
+      "encryption/cipher/aes256-gcm.ts": {
+        "*": {
+          "decrypt": ["Decryption", "EncryptedContentIntegrity"]
+        },
+        "Aes256Gcm": {
+          "decrypt": ["Decryption", "EncryptedContentIntegrity"]
+        }
+      },
+      "encryption/encryptor.ts": {
+        "*": {
+          "decrypt": ["Decryption"],
+          "deserializeMessage": ["Encoding"]
+        },
+        "Encryptor": {
+          "decrypt": ["Decryption"],
+          "deserializeMessage": ["Encoding"]
+        }
+      },
+      "encryption/message-pack-message-serializer.ts": {
+        "*": {
+          "dump": ["ForbiddenClass"],
+          "load": ["Decryption"]
+        },
+        "MessagePackMessageSerializer": {
+          "dump": ["ForbiddenClass"],
+          "load": ["Decryption"]
+        }
+      },
+      "encryption/message-serializer.ts": {
+        "*": {
+          "load": ["Encoding"],
+          "dump": ["ForbiddenClass"],
+          "decodeIfNeeded": ["Encoding"]
+        },
+        "MessageSerializer": {
+          "load": ["Encoding"],
+          "dump": ["ForbiddenClass"],
+          "decodeIfNeeded": ["Encoding"]
+        }
+      },
+      "future-result.ts": {
+        "*": {
+          "result": ["Canceled"]
+        },
+        "FutureResult": {
+          "result": ["Canceled"]
+        }
+      },
+      "migration.ts": {
+        "*": {
+          "lastStoredEnvironment": ["NoEnvironmentInSchemaError"]
+        },
+        "MigrationContext": {
+          "lastStoredEnvironment": ["NoEnvironmentInSchemaError"]
+        }
+      },
+      "reflection.ts": {
+        "*": {
+          "macro": ["NotImplementedError"],
+          "associationClass": ["NotImplementedError"]
+        },
+        "AssociationReflection": {
+          "macro": ["NotImplementedError"],
+          "associationClass": ["NotImplementedError"]
+        }
+      },
+      "relation/query-methods.ts": {
+        "*": {
+          "assertModifiableBang": ["UnmodifiableRelation"]
+        },
+        "QueryMethods": {
+          "assertModifiableBang": ["UnmodifiableRelation"]
+        }
+      },
+      "tasks/sqlite-database-tasks.ts": {
+        "*": {
+          "create": ["DatabaseAlreadyExists"]
+        },
+        "SQLiteDatabaseTasks": {
+          "create": ["DatabaseAlreadyExists"]
+        }
+      },
+      "token-for.ts": {
+        "*": {
+          "findByTokenForBang": ["InvalidSignature"]
+        },
+        "RelationMethods": {
+          "findByTokenForBang": ["InvalidSignature"]
+        }
+      },
+      "transactions.ts": {
+        "*": {
+          "withTransactionReturningStatus": ["Rollback"]
+        },
+        "Transactions": {
+          "withTransactionReturningStatus": ["Rollback"]
+        }
+      },
+      "type/hash-lookup-type-map.ts": {
+        "*": {
+          "registerType": ["ArgumentError"]
+        },
+        "HashLookupTypeMap": {
+          "registerType": ["ArgumentError"]
+        }
+      },
+      "type/type-map.ts": {
+        "*": {
+          "registerType": ["ArgumentError"]
+        },
+        "TypeMap": {
+          "registerType": ["ArgumentError"]
+        }
+      }
+    },
+    "activemodel": {
+      "attribute.ts": {
+        "*": {
+          "typeCast": ["NotImplementedError"]
+        },
+        "Attribute": {
+          "typeCast": ["NotImplementedError"]
+        }
+      },
+      "forbidden-attributes-protection.ts": {
+        "*": {
+          "sanitizeForMassAssignment": ["ForbiddenAttributesError"]
+        },
+        "ForbiddenAttributesProtection": {
+          "sanitizeForMassAssignment": ["ForbiddenAttributesError"]
+        }
+      },
+      "type/value.ts": {
+        "*": {
+          "asJson": ["NoMethodError"]
+        },
+        "Value": {
+          "asJson": ["NoMethodError"]
+        }
+      }
+    },
+    "activesupport": {
+      "cache.ts": {
+        "*": {
+          "readEntry": ["NotImplementedError"],
+          "writeEntry": ["NotImplementedError"],
+          "deleteEntry": ["NotImplementedError"]
+        },
+        "Store": {
+          "readEntry": ["NotImplementedError"],
+          "writeEntry": ["NotImplementedError"],
+          "deleteEntry": ["NotImplementedError"]
+        }
+      },
+      "callbacks.ts": {
+        "*": {
+          "expand": ["ArgumentError"],
+          "makeLambda": ["ArgumentError"],
+          "invertedLambda": ["ArgumentError"]
+        },
+        "InstanceExec2": {
+          "expand": ["ArgumentError"],
+          "makeLambda": ["ArgumentError"],
+          "invertedLambda": ["ArgumentError"]
+        }
+      },
+      "concern.ts": {
+        "*": {
+          "included": ["MultipleIncludedBlocks"],
+          "prepended": ["MultiplePrependBlocks"]
+        },
+        "Concern": {
+          "included": ["MultipleIncludedBlocks"],
+          "prepended": ["MultiplePrependBlocks"]
+        }
+      },
+      "core-ext/range/overlap.ts": {
+        "*": {
+          "isOverlap": ["TypeError"],
+          "overlap": ["TypeError"]
+        },
+        "Range": {
+          "isOverlap": ["TypeError"],
+          "overlap": ["TypeError"]
+        }
+      },
+      "core-ext/string/output-safety.ts": {
+        "*": {
+          "safeConcat": ["SafeConcatError"]
+        },
+        "SafeBuffer": {
+          "safeConcat": ["SafeConcatError"]
+        }
+      },
+      "encrypted-file.ts": {
+        "*": {
+          "checkKeyLength": ["InvalidKeyLengthError"]
+        },
+        "EncryptedFile": {
+          "checkKeyLength": ["InvalidKeyLengthError"]
+        }
+      },
+      "messages/rotation-coordinator.ts": {
+        "*": {
+          "build": ["NotImplementedError"]
+        },
+        "RotationCoordinator": {
+          "build": ["NotImplementedError"]
+        }
+      },
+      "secure-compare-rotator.ts": {
+        "*": {
+          "secureCompareBang": ["InvalidMatch"]
+        },
+        "SecureCompareRotator": {
+          "secureCompareBang": ["InvalidMatch"]
+        }
+      },
+      "testing/parallelization/server.ts": {
+        "*": {
+          "record": ["DRbConnError"]
+        },
+        "Server": {
+          "record": ["DRbConnError"]
+        }
+      }
+    },
+    "arel": {
+      "select-manager.ts": {
+        "*": {
+          "join": ["EmptyJoinError"]
+        },
+        "SelectManager": {
+          "join": ["EmptyJoinError"]
+        }
+      },
+      "table.ts": {
+        "*": {
+          "join": ["EmptyJoinError"]
+        },
+        "Table": {
+          "join": ["EmptyJoinError"]
+        }
+      }
+    },
+    "actionpack": {
+      "action-controller/metal/mime-responds.ts": {
+        "*": {
+          "respondTo": ["RespondToMismatchError", "UnknownFormat"]
+        },
+        "MimeResponds": {
+          "respondTo": ["RespondToMismatchError", "UnknownFormat"]
+        }
+      },
+      "action-controller/metal/redirecting.ts": {
+        "*": {
+          "redirectTo": ["DoubleRenderError"]
+        },
+        "Redirecting": {
+          "redirectTo": ["DoubleRenderError"]
+        }
+      },
+      "action-controller/metal/rendering.ts": {
+        "*": {
+          "render": ["DoubleRenderError"]
+        },
+        "Rendering": {
+          "render": ["DoubleRenderError"]
+        }
+      },
+      "action-controller/metal/strong-parameters.ts": {
+        "*": {
+          "toH": ["UnfilteredParameters"]
+        },
+        "Parameters": {
+          "toH": ["UnfilteredParameters"]
+        }
+      },
+      "action-dispatch/http/param-builder.ts": {
+        "*": {
+          "storeNestedParam": ["ParamsTooDeepError"]
+        },
+        "ParamBuilder": {
+          "storeNestedParam": ["ParamsTooDeepError"]
+        }
+      },
+      "action-dispatch/journey/nodes/node.ts": {
+        "*": {
+          "type": ["NotImplementedError"]
+        },
+        "Node": {
+          "type": ["NotImplementedError"]
+        }
+      },
+      "action-dispatch/middleware/session/abstract-store.ts": {
+        "*": {
+          "staleSessionCheckBang": ["SessionRestoreError"]
+        },
+        "StaleSessionCheck": {
+          "staleSessionCheckBang": ["SessionRestoreError"]
+        }
+      }
+    },
+    "actionview": {
+      "helpers/tags/datetime-field.ts": {
+        "*": {
+          "formatDatetime": ["NotImplementedError"]
+        },
+        "DatetimeField": {
+          "formatDatetime": ["NotImplementedError"]
+        }
+      },
+      "renderer/abstract-renderer.ts": {
+        "*": {
+          "render": ["NotImplementedError"]
+        },
+        "AbstractRenderer": {
+          "render": ["NotImplementedError"]
+        }
+      }
+    },
+    "rack": {
+      "multipart/parser.ts": {
+        "*": {
+          "handleEmptyContentBang": ["EmptyContentError"]
+        },
+        "Parser": {
+          "handleEmptyContentBang": ["EmptyContentError"]
+        }
+      },
+      "query-parser.ts": {
+        "*": {
+          "_normalizeParams": ["ParamsTooDeepError"]
+        },
+        "QueryParser": {
+          "_normalizeParams": ["ParamsTooDeepError"]
+        }
+      },
+      "response.ts": {
+        "*": {
+          "hasHeader": ["ArgumentError"],
+          "isHasHeader": ["ArgumentError"],
+          "getHeader": ["ArgumentError"],
+          "setHeader": ["ArgumentError"],
+          "deleteHeader": ["ArgumentError"],
+          "addHeader": ["ArgumentError"]
+        },
+        "Helpers": {
+          "addHeader": ["ArgumentError"]
+        },
+        "Response": {
+          "hasHeader": ["ArgumentError"],
+          "isHasHeader": ["ArgumentError"],
+          "getHeader": ["ArgumentError"],
+          "setHeader": ["ArgumentError"],
+          "deleteHeader": ["ArgumentError"]
+        }
+      }
+    },
+    "trailties": {
+      "test-unit/reporter.ts": {
+        "*": {
+          "record": ["Interrupt"]
+        },
+        "TestUnitReporter": {
+          "record": ["Interrupt"]
+        }
+      },
+      "thor/base.ts": {
+        "*": {
+          "dispatch": ["NotImplementedError"]
+        },
+        "ClassMethods": {
+          "dispatch": ["NotImplementedError"]
+        }
+      },
+      "thor/shell/basic.ts": {
+        "*": {
+          "fileCollision": ["SystemExit"]
+        },
+        "Basic": {
+          "fileCollision": ["SystemExit"]
+        }
+      }
+    },
+    "activejob": {
+      "arguments.ts": {
+        "*": {
+          "deserialize": ["DeserializationError"]
+        },
+        "Arguments": {
+          "deserialize": ["DeserializationError"]
+        }
+      },
+      "execution.ts": {
+        "*": {
+          "perform": ["NotImplementedError"]
+        },
+        "Execution": {
+          "perform": ["NotImplementedError"]
+        }
+      },
+      "queue-adapter.ts": {
+        "*": {
+          "queueAdapter": ["ArgumentError"],
+          "setQueueAdapter": ["ArgumentError"]
+        },
+        "ClassMethods": {
+          "queueAdapter": ["ArgumentError"],
+          "setQueueAdapter": ["ArgumentError"]
+        }
+      },
+      "queue-adapters/abstract-adapter.ts": {
+        "*": {
+          "enqueue": ["NotImplementedError"],
+          "enqueueAt": ["NotImplementedError"]
+        },
+        "AbstractAdapter": {
+          "enqueue": ["NotImplementedError"],
+          "enqueueAt": ["NotImplementedError"]
+        }
+      },
+      "serializers/object-serializer.ts": {
+        "*": {
+          "deserialize": ["NotImplementedError"],
+          "klass": ["NotImplementedError"]
+        },
+        "ObjectSerializer": {
+          "deserialize": ["NotImplementedError"],
+          "klass": ["NotImplementedError"]
+        }
+      }
+    },
+    "bcrypt": {
+      "password.ts": {
+        "*": {
+          "create": ["ArgumentError"]
+        },
+        "Password": {
+          "create": ["ArgumentError"]
+        }
+      }
+    },
+    "date": {},
+    "did-you-mean": {},
+    "globalid": {},
+    "i18n": {
+      "i18n.ts": {
+        "*": {
+          "interpolationKeys": ["ArgumentError"],
+          "isExists": ["ArgumentError"],
+          "exists": ["ArgumentError"]
+        },
+        "Base": {
+          "interpolationKeys": ["ArgumentError"],
+          "isExists": ["ArgumentError"],
+          "exists": ["ArgumentError"]
+        }
+      },
+      "backend/base.ts": {
+        "*": {
+          "storeTranslations": ["NotImplementedError"],
+          "translate": ["ArgumentError"],
+          "availableLocales": ["NotImplementedError"],
+          "lookup": ["NotImplementedError"]
+        },
+        "Base": {
+          "storeTranslations": ["NotImplementedError"],
+          "translate": ["ArgumentError"],
+          "availableLocales": ["NotImplementedError"],
+          "lookup": ["NotImplementedError"]
+        }
+      }
+    },
+    "msgpack": {},
+    "rack-session": {},
+    "rack-test": {}
+  },
+  "errinfo": {
+    "activerecord": ["StatementInvalid"],
+    "activemodel": [],
+    "activesupport": [],
+    "arel": [],
+    "actionpack": ["BadRequest", "ParseError", "SessionRestoreError"],
+    "actionview": ["Error"],
+    "rack": [],
+    "trailties": [],
+    "activejob": ["DeserializationError"],
+    "bcrypt": [],
+    "date": [],
+    "did-you-mean": [],
+    "globalid": [],
+    "i18n": [],
+    "msgpack": [],
+    "rack-session": [],
+    "rack-test": []
   }
 }

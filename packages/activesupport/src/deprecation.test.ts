@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NameError, StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+import {
+  NameError,
+  StandardError,
+  Thread,
+  rbEqual,
+  stderr,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { Module, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
   DeprecationException,
@@ -18,7 +25,6 @@ import { deprecate } from "./core-ext/module/deprecation.js";
 import { sole } from "./enumerable-utils.js";
 import { VERSION } from "./gem-version.js";
 import { ArgumentError } from "./hash-utils.js";
-import { registerConstant } from "./inflector.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { TopLevel } from "./namespaces.js";
@@ -82,7 +88,10 @@ expect.addEqualityTesters([
   },
 ]);
 
-const UndeprecatedFoo = Object.assign(new Module(), { name: "Undeprecated::Foo", BAR: "foo bar" });
+class Undeprecated {}
+const UndeprecatedFoo = Object.assign(rbModConstSet(Undeprecated, "Foo", new Module()), {
+  BAR: "foo bar",
+});
 registerConstant("Undeprecated::Foo", UndeprecatedFoo);
 registerConstant("Undeprecated::Foo::BAR", UndeprecatedFoo.BAR);
 class UndeprecatedError extends StandardError {}
@@ -334,15 +343,16 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedObjectProxy", async () => {
-    const deprecatedObject = DeprecatedObjectProxy.new({}, ":bomb:", deprecator);
+    const deprecatedObject = new DeprecatedObjectProxy({}, ":bomb:", deprecator);
     await assertDeprecated(/:bomb:/, deprecator, () =>
-      (deprecatedObject as { toS(): unknown }).toS(),
+      (deprecatedObject as unknown as { toS(): unknown }).toS(),
     );
   });
 
   it("DeprecatedObjectProxy requires a deprecator", async () => {
     await assertRaises([ArgumentError], {}, () => {
-      DeprecatedObjectProxy.new({}, ":bomb:");
+      // @ts-expect-error -- Ruby raises ArgumentError for the missing deprecator
+      new DeprecatedObjectProxy({}, ":bomb:");
     });
   });
 
@@ -512,7 +522,7 @@ describe("DeprecationTest", () => {
   it("DeprecatedInstanceVariableProxy", async () => {
     const instance = new Deprecatee();
     instance.setFubar(
-      DeprecatedInstanceVariableProxy.new(instance, "fooBar", "@fubar", { deprecator }),
+      new DeprecatedInstanceVariableProxy(instance, "fooBar", "@fubar", { deprecator }),
     );
     instance.setFooBar("foo bar!");
 
@@ -530,7 +540,7 @@ describe("DeprecationTest", () => {
   it("DeprecatedInstanceVariableProxy does not warn on inspect", async () => {
     const instance = new Deprecatee();
     instance.setFubar(
-      DeprecatedInstanceVariableProxy.new(instance, "fooBar", "@fubar", { deprecator }),
+      new DeprecatedInstanceVariableProxy(instance, "fooBar", "@fubar", { deprecator }),
     );
     instance.setFooBar("foo bar!");
 
@@ -542,12 +552,12 @@ describe("DeprecationTest", () => {
 
   it("DeprecatedInstanceVariableProxy requires a deprecator", async () => {
     await assertRaises([ArgumentError], {}, () => {
-      DeprecatedInstanceVariableProxy.new(new Deprecatee(), "foobar", "@fubar");
+      new DeprecatedInstanceVariableProxy(new Deprecatee(), "foobar", "@fubar");
     });
   });
 
   it("DeprecatedConstantProxy", async () => {
-    const proxy = DeprecatedConstantProxy.new("FUBAR", "Undeprecated::Foo::BAR", deprecator);
+    const proxy = new DeprecatedConstantProxy("FUBAR", "Undeprecated::Foo::BAR", deprecator);
 
     await assertDeprecated("FUBAR", deprecator, () => {
       expect(proxy).toEqual(UndeprecatedFoo.BAR);
@@ -555,7 +565,7 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedConstantProxy does not warn on .class", async () => {
-    const proxy = DeprecatedConstantProxy.new("FUBAR", "Undeprecated::Foo::BAR", deprecator);
+    const proxy = new DeprecatedConstantProxy("FUBAR", "Undeprecated::Foo::BAR", deprecator);
 
     const fubarClass = await assertNotDeprecated(deprecator, () =>
       (proxy as { class(): unknown }).class(),
@@ -564,24 +574,25 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedConstantProxy with child constant", async () => {
-    const proxy = DeprecatedConstantProxy.new("Fuu", "Undeprecated::Foo", deprecator);
+    const proxy = new DeprecatedConstantProxy("Fuu", "Undeprecated::Foo", deprecator);
 
     await assertDeprecated("Fuu", deprecator, () => {
-      expect((proxy as { BAR: unknown }).BAR).toEqual(UndeprecatedFoo.BAR);
+      expect((proxy as unknown as { BAR: unknown }).BAR).toEqual(UndeprecatedFoo.BAR);
     });
 
     await assertDeprecated("Fuu", deprecator, async () => {
       await assertRaises(
         [NameError],
         {},
-        () => (proxy as { DOES_NOT_EXIST: unknown }).DOES_NOT_EXIST,
+        () => (proxy as unknown as { DOES_NOT_EXIST: unknown }).DOES_NOT_EXIST,
       );
     });
   });
 
   it("DeprecatedConstantProxy requires a deprecator", async () => {
     await assertRaise([ArgumentError], {}, () => {
-      DeprecatedConstantProxy.new("Fuu", "Undeprecated::Foo");
+      // @ts-expect-error -- Ruby raises ArgumentError for the missing deprecator
+      new DeprecatedConstantProxy("Fuu", "Undeprecated::Foo");
     });
   });
 
@@ -805,7 +816,7 @@ describe("DeprecationTest", () => {
   it("DeprecatedConstantProxy with message", () => {
     const deprecator = deprecatorWithMessages();
 
-    const OLD = DeprecatedConstantProxy.new("klass::OLD", "Undeprecated::Foo::BAR", deprecator, {
+    const OLD = new DeprecatedConstantProxy("klass::OLD", "Undeprecated::Foo::BAR", deprecator, {
       message: "foo",
     });
 

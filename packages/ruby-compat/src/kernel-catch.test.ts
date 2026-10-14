@@ -113,7 +113,7 @@ describe("Kernel.catch", () => {
 
 describe("Kernel#catch", () => {
   it.skip("is a private method", () => {
-    // PERMANENT-SKIP: method visibility is not a runtime fact in JS (CLAUDE.md)
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   });
 });
 
@@ -189,6 +189,6 @@ describe("Kernel.throw", () => {
 
 describe("Kernel#throw", () => {
   it.skip("is a private method", () => {
-    // PERMANENT-SKIP: method visibility is not a runtime fact in JS (CLAUDE.md)
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   });
 });

@@ -1,33 +1,26 @@
 import { Nodes } from "../namespaces.js";
-import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { Node } from "./node.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import type { NodeOrValue } from "./binary.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
+import { WindowPredications, type WindowPredicationsModule } from "../window-predications.js";
+import { FilterPredications, type FilterPredicationsModule } from "../filter-predications.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
   expressions: NodeOrValue[] | NodeOrValue;
+  alias: SqlLiteral | null;
   distinct: boolean | null;
-  private _alias: Node | null;
-
-  get alias(): Node | null {
-    return this._alias;
-  }
-
-  set alias(value: Node | string | null) {
-    this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
-  }
-
-  constructor(expr: NodeOrValue[] | NodeOrValue, aliaz: Node | string | null = null) {
+  constructor(expr: NodeOrValue[] | NodeOrValue, aliaz: string | SqlLiteral | null = null) {
     super();
     this.expressions = expr;
-    this._alias = typeof aliaz === "string" ? new SqlLiteral(aliaz) : aliaz;
+    this.alias = aliaz == null ? null : new SqlLiteral(aliaz);
     this.distinct = false;
   }
 
   as(aliaz: string): this {
-    this.alias = aliaz;
+    this.alias = new SqlLiteral(aliaz);
     return this;
   }
 
@@ -54,14 +47,15 @@ export class Max extends Function {}
 export class Min extends Function {}
 export class Avg extends Function {}
 
-type _WindowPredications = import("../window-predications.js").WindowPredicationsModule;
-type _FilterPredications = import("../filter-predications.js").FilterPredicationsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Function extends _WindowPredications, _FilterPredications {}
+export interface Function extends WindowPredicationsModule, FilterPredicationsModule {}
 
-Nodes.Function = Function;
-Nodes.Exists = Exists;
-Nodes.Sum = Sum;
-Nodes.Max = Max;
-Nodes.Min = Min;
-Nodes.Avg = Avg;
+include(Function, WindowPredications);
+include(Function, FilterPredications);
+
+rbModConstSet(Nodes, "Function", Function);
+rbModConstSet(Nodes, "Exists", Exists);
+rbModConstSet(Nodes, "Sum", Sum);
+rbModConstSet(Nodes, "Max", Max);
+rbModConstSet(Nodes, "Min", Min);
+rbModConstSet(Nodes, "Avg", Avg);

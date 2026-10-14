@@ -63,14 +63,14 @@ describe("FlashHashTest", () => {
   });
 
   it("empty?", () => {
-    expect(new FlashHash().empty).toBe(true);
-    expect(new FlashHash({ a: "1" }).empty).toBe(false);
+    expect(new FlashHash().isEmpty()).toBe(true);
+    expect(new FlashHash({ a: "1" }).isEmpty()).toBe(false);
   });
 
   it("each", () => {
     const flash = new FlashHash({ a: "1", b: "2" });
     const entries: [string, unknown][] = [];
-    flash.each((k, v) => entries.push([k, v]));
+    flash.each(([k, v]) => entries.push([k, v]));
     expect(entries).toEqual([
       ["a", "1"],
       ["b", "2"],
@@ -88,7 +88,7 @@ describe("FlashHashTest", () => {
     const flash = new FlashHash({ a: "1", b: "2" });
     flash.discard();
     flash.sweep();
-    expect(flash.empty).toBe(true);
+    expect(flash.isEmpty()).toBe(true);
   });
 
   it("discard one arg", () => {
@@ -135,7 +135,7 @@ describe("FlashHashTest", () => {
   it("clear sweep", () => {
     const flash = new FlashHash({ a: "1", b: "2" });
     flash.clear();
-    expect(flash.empty).toBe(true);
+    expect(flash.isEmpty()).toBe(true);
   });
 
   it("replace sweep", () => {

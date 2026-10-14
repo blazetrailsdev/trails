@@ -1,18 +1,32 @@
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterEach,
-  vi,
-  type MockInstance,
-} from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { assertEmpty, assertNothingRaised, assertRaises, getEnv } from "@blazetrails/activesupport";
-import { stdout, stderr, setEnv, getProcessAdapter, RuntimeError } from "@blazetrails/ruby-compat";
+  assertCalled,
+  assertCalledWith as assertCalledWithArgs,
+  assertEmpty,
+  assertMock,
+  assertNotCalled,
+  assertNothingRaised,
+  assertRaises,
+  capture,
+  EnvironmentInquirer,
+  getEnv,
+  Mock,
+  stub,
+} from "@blazetrails/activesupport";
+import {
+  Dir,
+  File,
+  FileUtils,
+  StringIO,
+  stdout,
+  stderr,
+  setEnv,
+  Kernel,
+  rbObjDup,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -23,91 +37,106 @@ import {
 } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
-import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import { ConnectionAdapters } from "../namespaces.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
-import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
+import { adapterType } from "../test-adapter.js";
+import { Backup } from "../sqlite/backup.js";
+import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
+import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { fixtures } from "../test-fixtures.js";
-import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
-
-let originalConfigurations: DatabaseConfigurations | null = null;
-const originalTrailsEnv = getEnv("TRAILS_ENV");
-beforeAll(() => {
-  originalConfigurations = DatabaseTasks.databaseConfiguration;
-});
-afterEach(() => {
-  setEnv("TRAILS_ENV", originalTrailsEnv);
-});
+import { fixtures } from "../test-helpers/use-fixtures.js";
+import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
+import { Course } from "../test-helpers/models/course.js";
+import { College } from "../test-helpers/models/college.js";
+import type { InternalMetadata } from "../internal-metadata.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 function configFor(envName: string, name: string): HashConfig | undefined {
-  return DatabaseTasks.databaseConfiguration!.configsFor({ envName, name });
-}
-
-function sameCall(actual: unknown[], expected: unknown[]): boolean {
-  return actual.length === expected.length && expected.every((arg, i) => Object.is(arg, actual[i]));
-}
-
-function assertCalledWith(spy: MockInstance<any>, args: unknown[]): void {
-  expect(spy.mock.calls.some((call) => sameCall(call, args))).toBeTruthy();
+  return Base.configurations().configsFor({ envName, name });
 }
 
 async function assertCalledForConfigs(
   methodName: "create" | "drop" | "truncateTables",
   configs: unknown[][],
-  block: () => Promise<void>,
+  block: () => void | Promise<void>,
 ): Promise<void> {
-  const mock = vi.spyOn(DatabaseTasks, methodName).mockResolvedValue(undefined as never);
-  let calls: unknown[][];
+  const mock = new Mock();
+  for (const config of configs) mock.expect("call", null, config);
+
+  await stub(DatabaseTasks, methodName, mock, undefined, block);
+  assertMock(mock);
+}
+
+const [mysqlTasks, postgresqlTasks, sqliteTasks] = Array(3).fill(
+  new (class {
+    create() {}
+    drop() {}
+    purge() {}
+    charset() {}
+    charsetCurrent() {}
+    collation() {}
+    collationCurrent() {}
+    structureDump() {}
+    structureLoad() {}
+  })(),
+);
+const tasks = { mysqlTasks, postgresqlTasks, sqliteTasks } as Record<
+  string,
+  Record<string, unknown>
+>;
+
+const stubbedNew = (instance: object) =>
+  class {
+    constructor() {
+      return instance;
+    }
+  };
+
+async function withStubbedNew(block: () => void | Promise<void>): Promise<void> {
+  DatabaseTasks.registerTask(/mysql/, stubbedNew(mysqlTasks));
+  DatabaseTasks.registerTask(/trilogy/, stubbedNew(mysqlTasks));
+  DatabaseTasks.registerTask(/postgresql/, stubbedNew(postgresqlTasks));
+  DatabaseTasks.registerTask(/sqlite/, stubbedNew(sqliteTasks));
   try {
     await block();
   } finally {
-    calls = [...mock.mock.calls];
-    mock.mockRestore();
+    resetRegisteredTasks();
   }
-  expect(
-    calls!.length === configs.length && configs.every((call, i) => sameCall(calls[i], call)),
-  ).toBeTruthy();
 }
 
+const ADAPTERS_TASKS = {
+  mysql2: "mysqlTasks",
+  trilogy: "mysqlTasks",
+  postgresql: "postgresqlTasks",
+  sqlite3: "sqliteTasks",
+};
+
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
+  const recreateMetadataTables = async () => {
+    if (adapterType !== "sqlite" || inMemoryDb()) return;
+    const schemaMigration = Base.connectionPool().schemaMigration;
+    await schemaMigration.dropTable();
+    await schemaMigration.createTable();
+
+    const internalMetadata = Base.connectionPool().internalMetadata;
+    await internalMetadata.dropTable();
+    await internalMetadata.createTable();
+  };
+
+  beforeEach(recreateMetadataTables);
+  afterEach(recreateMetadataTables);
+
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "raises an error when called with protected environment",
     async () => {
       const protectedEnvironments = Base.protectedEnvironments;
-      const currentEnv = DatabaseTasks.env;
-      const env = "arunit";
-      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-protected-env-"));
-      const dbFile = path.join(tmp, "primary.sqlite3");
-      DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-        [env]: { primary: { adapter: "sqlite3", database: dbFile } },
-      });
-      DatabaseTasks.registerTask(
-        "sqlite",
-        class {
-          async create(): Promise<void> {}
-        },
-      );
-
-      const { BetterSQLite3Adapter } =
-        await import("../connection-adapters/better-sqlite3-adapter.js");
-      const adapter = new BetterSQLite3Adapter({ database: dbFile });
-      try {
-        await adapter.execute(
-          "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
-        );
-        await adapter.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
-        await adapter.execute(
-          "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
-        );
-        await adapter.execute(
-          `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${currentEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        );
-      } finally {
-        await adapter.disconnectBang();
-      }
+      const currentEnv = Base.connectionPool().migrationContext.currentEnvironment;
 
       try {
+        await Base.connectionPool().internalMetadata.set("environment", currentEnv);
+
         await assertCalledOnInstanceOf(
           MigrationContext,
           "currentVersion",
@@ -115,75 +144,71 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
           { times: 6, returns: 1 },
           async () => {
             expect(protectedEnvironments).not.toContain(currentEnv);
-            await DatabaseTasks.checkProtectedEnvironmentsBang(env);
+            await DatabaseTasks.checkProtectedEnvironmentsBang("arunit");
 
             Base.protectedEnvironments = [currentEnv];
 
-            await expect(DatabaseTasks.checkProtectedEnvironmentsBang(env)).rejects.toThrow(
+            await expect(DatabaseTasks.checkProtectedEnvironmentsBang("arunit")).rejects.toThrow(
               ProtectedEnvironmentError,
             );
           },
         );
       } finally {
         Base.protectedEnvironments = protectedEnvironments;
-        const cleanup = new BetterSQLite3Adapter({ database: dbFile });
-
-        await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
-
-        await cleanup.execute("DROP TABLE IF EXISTS ar_internal_metadata");
-        await cleanup.disconnectBang();
-        DatabaseTasks.databaseConfiguration = originalConfigurations;
-        clearRegisteredTasks();
-        fs.rmSync(tmp, { recursive: true, force: true });
       }
     },
   );
 
-  it.skip("raises an error when called with protected environment which name is a symbol", () => {
-    // PERMANENT-SKIP: Ruby-only (Symbol env names) — protected_environments
-  });
+  it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
+    "raises an error when called with protected environment which name is a symbol",
+    async () => {
+      const protectedEnvironments = Base.protectedEnvironments;
+      const currentEnv = Base.connectionPool().migrationContext.currentEnvironment;
+
+      try {
+        await Base.connectionPool().internalMetadata.set("environment", currentEnv);
+
+        await assertCalledOnInstanceOf(
+          MigrationContext,
+          "currentVersion",
+          null,
+          { times: 6, returns: 1 },
+          async () => {
+            expect(protectedEnvironments).not.toContain(currentEnv);
+            await DatabaseTasks.checkProtectedEnvironmentsBang("arunit");
+
+            Base.protectedEnvironments = [currentEnv];
+
+            await expect(DatabaseTasks.checkProtectedEnvironmentsBang("arunit")).rejects.toThrow(
+              ProtectedEnvironmentError,
+            );
+          },
+        );
+      } finally {
+        Base.protectedEnvironments = protectedEnvironments;
+      }
+    },
+  );
 
   it("raises an error if no migrations have been made", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-env-"));
-    const dbFile = path.join(tmp, "test.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      arunit: { adapter: "sqlite3", database: dbFile },
-    });
-    DatabaseTasks.registerTask(
-      "sqlite",
-      class {
-        async create(): Promise<void> {}
-      },
-    );
-    const { BetterSQLite3Adapter } =
-      await import("../connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter({ database: dbFile });
+    const pool = Base.connectionPool();
+    const internalMetadata = pool.internalMetadata;
+    const schemaMigration = pool.schemaMigration;
     try {
-      await adapter.execute(
-        "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
-      );
-      await adapter.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
+      await schemaMigration.createTable();
+      await schemaMigration.createVersion("1");
 
-      await adapter.execute(
-        "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
-      );
-      expect(await adapter.tableExists("ar_internal_metadata")).toBeTruthy();
-      await adapter.execute("DROP TABLE IF EXISTS ar_internal_metadata");
-      expect(await adapter.tableExists("ar_internal_metadata")).toBeFalsy();
-    } finally {
-      await adapter.disconnectBang();
-    }
-    try {
+      expect(await internalMetadata.tableExists()).toBeTruthy();
+      await internalMetadata.dropTable();
+      expect(await internalMetadata.tableExists()).toBeFalsy();
+
       await expect(DatabaseTasks.checkProtectedEnvironmentsBang("arunit")).rejects.toThrow(
         NoEnvironmentInSchemaError,
       );
     } finally {
-      const cleanup = new BetterSQLite3Adapter({ database: dbFile });
-      await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
-      await cleanup.disconnectBang();
-      DatabaseTasks.databaseConfiguration = originalConfigurations;
-      clearRegisteredTasks();
-      fs.rmSync(tmp, { recursive: true, force: true });
+      pool.automaticReconnect = true;
+      await schemaMigration.deleteVersion("1");
+      await internalMetadata.createTable();
     }
   });
 });
@@ -191,411 +216,486 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())("with multiple databases", async () => {
     const env = DEFAULT_ENV();
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-multi-db-"));
-    const primaryDb = path.join(tmp, "primary.sqlite3");
-    const secondaryDb = path.join(tmp, "secondary.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+
+    await withMultiDbConfigurations(env, async () => {
+      const protectedEnvironments = Base.protectedEnvironments;
+      try {
+        const currentEnv = Base.connectionPool().migrationContext.currentEnvironment;
+        expect(currentEnv).toBe(env);
+
+        await Base.establishConnection(":primary");
+        await Base.connectionPool().internalMetadata.createTableAndSetFlags(currentEnv);
+
+        await Base.establishConnection(":secondary");
+        await Base.connectionPool().internalMetadata.createTableAndSetFlags(currentEnv);
+
+        expect(protectedEnvironments).not.toContain(currentEnv);
+        await DatabaseTasks.checkProtectedEnvironmentsBang(env);
+
+        await Base.establishConnection(":secondary");
+        const pool = Base.connectionPool();
+        const schemaMigration = pool.schemaMigration;
+        await schemaMigration.createTable();
+        await schemaMigration.createVersion("1");
+
+        Base.protectedEnvironments = [currentEnv];
+
+        await expect(DatabaseTasks.checkProtectedEnvironmentsBang(env)).rejects.toThrow(
+          ProtectedEnvironmentError,
+        );
+      } finally {
+        Base.protectedEnvironments = protectedEnvironments;
+      }
+    });
+  });
+
+  const withMultiDbConfigurations = async (
+    env: string,
+    block: () => Promise<void>,
+  ): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations({
       [env]: {
-        primary: { adapter: "sqlite3", database: primaryDb },
-        secondary: { adapter: "sqlite3", database: secondaryDb },
+        primary: {
+          adapter: "sqlite3",
+          database: oldConfigurations.configsFor({ envName: "arunit", name: "primary" })!.database,
+        },
+        secondary: {
+          adapter: "sqlite3",
+          database: oldConfigurations.configsFor({ envName: "arunit2", name: "primary" })!.database,
+        },
       },
     });
-    DatabaseTasks.registerTask(
-      "sqlite",
-      class {
-        async create(): Promise<void> {}
-      },
-    );
-    const { BetterSQLite3Adapter } =
-      await import("../connection-adapters/better-sqlite3-adapter.js");
-    const protectedEnvironments = Base.protectedEnvironments;
-
-    for (const dbFile of [primaryDb, secondaryDb]) {
-      const adapter = new BetterSQLite3Adapter({ database: dbFile });
-      try {
-        await adapter.execute(
-          "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
-        );
-        await adapter.execute(
-          `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${env}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        );
-      } finally {
-        await adapter.disconnectBang();
-      }
-    }
 
     try {
-      const currentEnv = Base.connectionPool().migrationContext.currentEnvironment;
-      expect(currentEnv).toBe(env);
-      expect(protectedEnvironments).not.toContain(env);
-      await DatabaseTasks.checkProtectedEnvironmentsBang(env);
-
-      const secondary = new BetterSQLite3Adapter({ database: secondaryDb });
-      try {
-        await secondary.execute(
-          "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
-        );
-        await secondary.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
-      } finally {
-        await secondary.disconnectBang();
-      }
-
-      Base.protectedEnvironments = [env];
-      await expect(DatabaseTasks.checkProtectedEnvironmentsBang(env)).rejects.toThrow(
-        ProtectedEnvironmentError,
-      );
+      await Base.establishConnection(":primary");
+      await block();
     } finally {
-      Base.protectedEnvironments = protectedEnvironments;
-      DatabaseTasks.databaseConfiguration = originalConfigurations;
-      clearRegisteredTasks();
-      fs.rmSync(tmp, { recursive: true, force: true });
+      for (const db of [":primary", ":secondary"]) {
+        await Base.establishConnection(db);
+        await Base.connectionPool().schemaMigration.deleteAllVersions();
+        await Base.connectionPool().internalMetadata.deleteAllEntries();
+      }
+      Base.configurations(oldConfigurations);
+      await Base.establishConnection(":arunit");
     }
-  });
+  };
 });
 
 describe("DatabaseTasksRegisterTask", () => {
+  let tasksWas: unknown;
+  let adaptersWas: unknown;
+
+  beforeEach(() => {
+    tasksWas = rbObjDup(rbObjIvarGet(DatabaseTasks, "@tasks") as object);
+    adaptersWas = rbObjDup(rbObjIvarGet(ConnectionAdapters, "@adapters") as object);
+  });
+
   afterEach(() => {
-    clearRegisteredTasks();
+    rbObjIvarSet(DatabaseTasks, "@tasks", tasksWas);
+    rbObjIvarSet(ConnectionAdapters, "@adapters", adaptersWas);
   });
 
   it("register task", async () => {
-    let instance: { structureDump: ReturnType<typeof vi.fn> } | undefined;
     const klazz = class {
-      structureDump = vi.fn(async (_filename: string, _flags?: unknown): Promise<void> => {});
-      constructor(..._arguments: unknown[]) {
-        instance = this;
-      }
+      constructor(..._arguments: unknown[]) {}
+      structureDump(_filename: string) {}
     };
+    const instance = new klazz();
 
-    DatabaseTasks.registerTask(/abstract/, klazz);
-    await DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
-
-    expect(instance!.structureDump).toHaveBeenCalledWith("awesome-file.sql", null);
+    await assertCalledWithArgs(instance, "structureDump", ["awesome-file.sql", null], {}, () => {
+      DatabaseTasks.registerTask(/abstract/, stubbedNew(instance));
+      return DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
+    });
   });
 
   it("register task precedence", async () => {
-    let instance: { structureDump: ReturnType<typeof vi.fn> } | undefined;
     const klazz = class {
-      structureDump = vi.fn(async (_filename: string, _flags?: unknown): Promise<void> => {});
-      constructor(..._arguments: unknown[]) {
-        instance = this;
-      }
+      constructor(..._arguments: unknown[]) {}
+      structureDump(_filename: string) {}
     };
+    const instance = new klazz();
 
-    DatabaseTasks.registerTask(/abstract/, class {});
-    DatabaseTasks.registerTask(/abstract/, klazz);
-    await DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
-
-    expect(instance!.structureDump).toHaveBeenCalledWith("awesome-file.sql", null);
+    await assertCalledWithArgs(instance, "structureDump", ["awesome-file.sql", null], {}, () => {
+      ConnectionAdapters.register(
+        "custom_mysql",
+        "ActiveRecord::ConnectionAdapters::Mysql2Adapter",
+        "active_record/connection_adapters/mysql2_adapter",
+      );
+      DatabaseTasks.registerTask(/custom_mysql/, stubbedNew(instance));
+      return DatabaseTasks.structureDump({ adapter: "custom_mysql" }, "awesome-file.sql");
+    });
   });
 
-  it("unregistered task", () => {
-    expect(() => DatabaseTasks["classForAdapter"]("nonexistent")).toThrow(DatabaseNotSupported);
+  it("unregistered task", async () => {
+    await assertRaises([DatabaseNotSupported], {}, () =>
+      DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql"),
+    );
   });
 });
 
 describe("DatabaseTasksDumpSchemaCacheTest", () => {
   fixtures([]);
 
-  let originalDbDir: string;
-
-  beforeEach(() => {
-    originalDbDir = DatabaseTasks.dbDir;
-  });
-  afterEach(() => {
-    DatabaseTasks.dbDir = originalDbDir;
-  });
-
   it("dump schema cache", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dump-sc-"));
-    const cachePath = path.join(tmp, "schema_cache.yml");
     try {
-      expect(fs.existsSync(cachePath)).toBeFalsy();
-      const adapter = await Base.leaseConnection();
-      await DatabaseTasks.dumpSchemaCache(adapter, cachePath);
-      expect(fs.existsSync(cachePath)).toBeTruthy();
+      await Dir.mktmpdir(null, null, {}, (dir) =>
+        stub(DatabaseTasks, "dbDir", dir, undefined, async () => {
+          const path = File.join(dir, "schema_cache.yml");
+          expect(File.isFile(path)).toBeFalsy();
+          await DatabaseTasks.dumpSchemaCache(await Base.leaseConnection(), path);
+          expect(File.isFile(path)).toBeTruthy();
+        }),
+      );
     } finally {
-      Base.clearCacheBang();
-      fs.rmSync(tmp, { recursive: true, force: true });
+      await Base.clearCacheBang();
     }
   });
+
   it("clear schema cache", () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-clear-sc-"));
-    const cachePath = path.join(tmp, "schema_cache.yml");
-    fs.writeFileSync(cachePath, "This is a cache.");
-    try {
-      expect(fs.existsSync(cachePath)).toBeTruthy();
-      DatabaseTasks.clearSchemaCache(cachePath);
-      expect(fs.existsSync(cachePath)).toBeFalsy();
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
+    Dir.mktmpdir(null, null, {}, (dir) => {
+      stub(DatabaseTasks, "dbDir", dir, undefined, () => {
+        const path = File.join(dir, "schema_cache.yml");
+        File.open(path, "wb", (f) => {
+          f.puts("This is a cache.");
+        });
+        expect(File.isFile(path)).toBeTruthy();
+        DatabaseTasks.clearSchemaCache(path);
+        expect(File.isFile(path)).toBeFalsy();
+      });
+    });
   });
+
   it("cache dump default filename", () => {
     const config = new HashConfig("development", "primary", {});
 
-    DatabaseTasks.dbDir = "db";
-    const expected = "db/schema_cache.yml";
-    const dumpPath = DatabaseTasks.cacheDumpFilename(config);
-    expect(dumpPath).toBe(expected);
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
+      const path = DatabaseTasks.cacheDumpFilename(config);
+      expect(path).toBe("db/schema_cache.yml");
+    });
   });
+
   it("cache dump default filename with custom db dir", () => {
     const config = new HashConfig("development", "primary", {});
 
-    DatabaseTasks.dbDir = "my_db";
-    const expected = "my_db/schema_cache.yml";
-    const dumpPath = DatabaseTasks.cacheDumpFilename(config);
-    expect(dumpPath).toBe(expected);
+    stub(DatabaseTasks, "dbDir", "my_db", undefined, () => {
+      const path = DatabaseTasks.cacheDumpFilename(config);
+      expect(path).toBe("my_db/schema_cache.yml");
+    });
   });
+
   it("cache dump alternate filename", () => {
     const config = new HashConfig("development", "alternate", {});
 
-    DatabaseTasks.dbDir = "db";
-    const expected = "db/alternate_schema_cache.yml";
-    const dumpPath = DatabaseTasks.cacheDumpFilename(config);
-    expect(dumpPath).toBe(expected);
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
+      const path = DatabaseTasks.cacheDumpFilename(config);
+      expect(path).toBe("db/alternate_schema_cache.yml");
+    });
   });
+
   it("cache dump filename with path from db config", () => {
     const config = new HashConfig("development", "primary", {
       schemaCachePath: "tmp/something.yml",
     });
 
-    DatabaseTasks.dbDir = "db";
-    expect(DatabaseTasks.cacheDumpFilename(config)).toBe("tmp/something.yml");
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
+      const path = DatabaseTasks.cacheDumpFilename(config);
+      expect(path).toBe("tmp/something.yml");
+    });
   });
+
   it("cache dump filename with path from the argument has precedence", () => {
     const config = new HashConfig("development", "primary", {
       schemaCachePath: "tmp/something.yml",
     });
 
-    DatabaseTasks.dbDir = "db";
-    expect(DatabaseTasks.cacheDumpFilename(config, { schemaCachePath: "tmp/another.yml" })).toBe(
-      "tmp/another.yml",
-    );
+    stub(DatabaseTasks, "dbDir", "db", undefined, () => {
+      const path = DatabaseTasks.cacheDumpFilename(config, {
+        schemaCachePath: "tmp/another.yml",
+      });
+      expect(path).toBe("tmp/another.yml");
+    });
   });
 });
 
 describe("DatabaseTasksDumpSchemaTest", () => {
   it("ensure db dir", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-"));
-    const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-db-"));
-    const dbFile = path.join(dbTmp, "arunit.sqlite3");
-    const prevDbDir = DatabaseTasks.dbDir;
-    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     try {
-      DatabaseTasks.dbDir = tmp;
-      const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
-      const config = new HashConfig("arunit", "primary", {
-        adapter: "sqlite3",
-        database: dbFile,
-        schemaDump: "fake_db_config_schema.ts",
-      });
-      fs.rmSync(tmp, { recursive: true, force: true });
-      expect(fs.existsSync(schemaPath)).toBeFalsy();
-      await DatabaseTasks.dumpSchema(config);
-      expect(fs.existsSync(schemaPath)).toBeTruthy();
+      await Dir.mktmpdir(null, null, {}, (dir) =>
+        stub(DatabaseTasks, "dbDir", dir, undefined, async () => {
+          const updatedHash = {
+            ...Base.configurations().configsFor({ envName: "arunit", name: "primary" })!
+              .configurationHash,
+            schemaDump: "fake_db_config_schema.ts",
+          };
+          const dbConfig = new HashConfig("arunit", "primary", updatedHash);
+          const path = `${dir}/fake_db_config_schema.ts`;
+
+          FileUtils.rmRf(dir);
+          expect(File.isFile(path)).toBeFalsy();
+
+          await DatabaseTasks.dumpSchema(dbConfig);
+
+          expect(File.isFile(path)).toBeTruthy();
+        }),
+      );
     } finally {
-      DatabaseTasks.dbDir = prevDbDir;
-      try {
-        await Base.removeConnection();
-      } catch {}
-      fs.rmSync(tmp, { recursive: true, force: true });
-      fs.rmSync(dbTmp, { recursive: true, force: true });
+      await Base.clearCacheBang();
     }
   });
+
   it("db dir ignored if included in schema dump", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-"));
-    const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-db-"));
-    const dbFile = path.join(dbTmp, "arunit.sqlite3");
-    const prevDbDir = DatabaseTasks.dbDir;
-    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     try {
-      DatabaseTasks.dbDir = tmp;
-      const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
-      const config = new HashConfig("arunit", "primary", {
-        adapter: "sqlite3",
-        database: dbFile,
-        schemaDump: schemaPath,
-      });
-      fs.rmSync(tmp, { recursive: true, force: true });
-      expect(fs.existsSync(schemaPath)).toBeFalsy();
-      await DatabaseTasks.dumpSchema(config);
-      expect(fs.existsSync(schemaPath)).toBeTruthy();
+      await Dir.mktmpdir(null, null, {}, (dir) =>
+        stub(DatabaseTasks, "dbDir", dir, undefined, async () => {
+          const updatedHash = {
+            ...Base.configurations().configsFor({ envName: "arunit", name: "primary" })!
+              .configurationHash,
+            schemaDump: `${dir}/fake_db_config_schema.ts`,
+          };
+          const dbConfig = new HashConfig("arunit", "primary", updatedHash);
+          const path = `${dir}/fake_db_config_schema.ts`;
+
+          FileUtils.rmRf(dir);
+          expect(File.isFile(path)).toBeFalsy();
+
+          await DatabaseTasks.dumpSchema(dbConfig);
+
+          expect(File.isFile(path)).toBeTruthy();
+        }),
+      );
     } finally {
-      DatabaseTasks.dbDir = prevDbDir;
-      try {
-        await Base.removeConnection();
-      } catch {}
-      fs.rmSync(tmp, { recursive: true, force: true });
-      fs.rmSync(dbTmp, { recursive: true, force: true });
+      await Base.clearCacheBang();
     }
   });
 });
 
-function captureStdoutAndStderr(): void {
-  let stdoutSpy: MockInstance;
-  let stderrSpy: MockInstance;
+function captureStdoutAndStderr(): { stdout: StringIO; stderr: StringIO } {
+  const io = { stdout: new StringIO(), stderr: new StringIO() };
+  let originalStdout: typeof stdout.write;
+  let originalStderr: typeof stderr.write;
   beforeEach(() => {
-    stdoutSpy = vi.spyOn(stdout, "write").mockImplementation(() => true);
-    stderrSpy = vi.spyOn(stderr, "write").mockImplementation(() => true);
+    [io.stdout, originalStdout] = [new StringIO(), stdout.write];
+    [io.stderr, originalStderr] = [new StringIO(), stderr.write];
+    stdout.write = (chunk) => (io.stdout.write(chunk), true);
+    stderr.write = (chunk) => (io.stderr.write(chunk), true);
   });
   afterEach(() => {
-    stdoutSpy.mockRestore();
-    stderrSpy.mockRestore();
+    [stdout.write, stderr.write] = [originalStdout, originalStderr];
   });
+  return io;
 }
 
-describe("DatabaseTasksCreateAllTest", () => {
+describe("DatabaseTasksCreateTest", () => {
   captureStdoutAndStderr();
 
-  let createSpy: MockInstance<any>;
-  beforeEach(async () => {
-    await Base.establishConnection(ambientPoolConfiguration());
-    vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
-    createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
-  });
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    vi.restoreAllMocks();
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} create`, async () => {
+      await withStubbedNew(() =>
+        assertCalled(tasks[v], "create", null, {}, async () => {
+          await DatabaseTasks.create({ adapter: k });
+        }),
+      );
+    });
+  }
+});
+
+describe("DatabaseTasksCreateAllTest", () => {
+  const $ = captureStdoutAndStderr();
+
+  let configurations: Record<string, Record<string, unknown>>;
+  beforeEach(() => {
+    configurations = { development: { adapter: "abstract", database: "my-db" } };
   });
 
   it("ignores configurations without databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract" },
-    });
-    await DatabaseTasks.createAll();
-    expect(createSpy).not.toHaveBeenCalled();
+    configurations["development"]["database"] = null;
+
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertNotCalled(DatabaseTasks, "create", null, async () => {
+        await DatabaseTasks.createAll();
+      }),
+    );
   });
 
   it("ignores remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
-    });
-    vi.spyOn(stderr, "write").mockImplementation(() => true);
-    await DatabaseTasks.createAll();
-    expect(createSpy).not.toHaveBeenCalled();
-  });
-  it("warning for remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
-    });
-    const writes: string[] = [];
-    vi.spyOn(stderr, "write").mockImplementation((chunk) => {
-      writes.push(String(chunk));
-      return true;
-    });
-    await DatabaseTasks.createAll();
-    expect(writes.join("")).toMatch(
-      /This task only modifies local databases\. my-db is on a remote host\./,
+    configurations["development"]["host"] = "my.server.tld";
+
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertNotCalled(DatabaseTasks, "create", null, async () => {
+        await DatabaseTasks.createAll();
+      }),
     );
+  });
+
+  it("warning for remote databases", async () => {
+    configurations["development"]["host"] = "my.server.tld";
+
+    await withStubbedConfigurationsEstablishConnection(async () => {
+      await DatabaseTasks.createAll();
+
+      expect($.stderr.string()).toMatch(
+        /This task only modifies local databases\. my-db is on a remote host\./,
+      );
+    });
   });
 
   it("creates configurations with local ip", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "127.0.0.1" },
-    });
-    await DatabaseTasks.createAll();
-    expect(createSpy).toHaveBeenCalled();
+    configurations["development"]["host"] = "127.0.0.1";
+
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalled(DatabaseTasks, "create", null, {}, async () => {
+        await DatabaseTasks.createAll();
+      }),
+    );
   });
 
   it("creates configurations with local host", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "localhost" },
-    });
-    await DatabaseTasks.createAll();
-    expect(createSpy).toHaveBeenCalled();
+    configurations["development"]["host"] = "localhost";
+
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalled(DatabaseTasks, "create", null, {}, async () => {
+        await DatabaseTasks.createAll();
+      }),
+    );
   });
 
   it("creates configurations with blank hosts", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "" },
-    });
-    await DatabaseTasks.createAll();
-    expect(createSpy).toHaveBeenCalled();
+    configurations["development"]["host"] = null;
+
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalled(DatabaseTasks, "create", null, {}, async () => {
+        await DatabaseTasks.createAll();
+      }),
+    );
   });
+
+  const withStubbedConfigurationsEstablishConnection = async (
+    block: () => void | Promise<void>,
+  ): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations);
+
+    try {
+      await stub(Base.connectionHandler, "establishConnection", null, undefined, block);
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });
 
 describe("DatabaseTasksCreateCurrentTest", () => {
-  captureStdoutAndStderr();
-
-  let establishSpy: MockInstance<any>;
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    configurations = {
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
       production: { url: "abstract://prod-db-host/prod-db" },
-    });
-  });
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
+    };
   });
 
   it("creates current environment database", async () => {
-    const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
-    DatabaseTasks.env = "test";
-    await DatabaseTasks.createCurrent("test");
-    assertCalledWith(createSpy, [configFor("test", "primary")]);
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalledWithArgs(
+        DatabaseTasks,
+        "create",
+        [configFor("test", "primary")],
+        {},
+        async () => {
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("test"));
+        },
+      ),
+    );
   });
 
   it("creates current environment database with url", async () => {
-    const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
-    DatabaseTasks.env = "production";
-    await DatabaseTasks.createCurrent("production");
-    assertCalledWith(createSpy, [configFor("production", "primary")]);
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalledWithArgs(
+        DatabaseTasks,
+        "create",
+        [configFor("production", "primary")],
+        {},
+        async () => {
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("production"));
+        },
+      ),
+    );
   });
 
   it("creates test and development databases when env was not specified", async () => {
-    DatabaseTasks.env = "development";
-    await assertCalledForConfigs(
-      "create",
-      [[configFor("development", "primary")], [configFor("test", "primary")]],
-      async () => {
-        await DatabaseTasks.createCurrent("development");
-      },
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalledForConfigs(
+        "create",
+        [[configFor("development", "primary")], [configFor("test", "primary")]],
+        async () => {
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+        },
+      ),
     );
   });
 
   it("creates test and development databases when rails env is development", async () => {
+    const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
-    await assertCalledForConfigs(
-      "create",
-      [[configFor("development", "primary")], [configFor("test", "primary")]],
-      async () => {
-        await DatabaseTasks.createCurrent("development");
-      },
-    );
+
+    try {
+      await withStubbedConfigurationsEstablishConnection(() =>
+        assertCalledForConfigs(
+          "create",
+          [[configFor("development", "primary")], [configFor("test", "primary")]],
+          async () => {
+            await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+          },
+        ),
+      );
+    } finally {
+      setEnv("TRAILS_ENV", oldEnv);
+    }
   });
 
   it("creates development database without test database when skip test database", async () => {
+    const oldEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "development");
     setEnv("SKIP_TEST_DATABASE", "true");
+
     try {
-      setEnv("TRAILS_ENV", "development");
-      await assertCalledForConfigs("create", [[configFor("development", "primary")]], async () => {
-        await DatabaseTasks.createCurrent("development");
-      });
+      await withStubbedConfigurationsEstablishConnection(() =>
+        assertCalledForConfigs("create", [[configFor("development", "primary")]], async () => {
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+        }),
+      );
     } finally {
+      setEnv("TRAILS_ENV", oldEnv);
       setEnv("SKIP_TEST_DATABASE", undefined);
     }
   });
+
   it("establishes connection for the given environments", async () => {
-    vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
-    await DatabaseTasks.createCurrent("development");
-    assertCalledWith(establishSpy, [":development"]);
+    await stub(DatabaseTasks, "create", null, undefined, () =>
+      assertCalledWithArgs(Base, "establishConnection", [":development"], {}, async () => {
+        await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+      }),
+    );
   });
+
+  const withStubbedConfigurationsEstablishConnection = async (
+    block: () => void | Promise<void>,
+  ): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations);
+
+    try {
+      await stub(Base.connectionHandler, "establishConnection", null, undefined, block);
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });
 
 describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
-  captureStdoutAndStderr();
-
-  let establishSpy: MockInstance<any>;
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    configurations = {
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -608,204 +708,271 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
         primary: { url: "abstract://prod-db-host/prod-db" },
         secondary: { url: "abstract://secondary-prod-db-host/secondary-prod-db" },
       },
-    });
-  });
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
+    };
   });
 
   it("creates current environment database", async () => {
-    DatabaseTasks.env = "test";
-    await assertCalledForConfigs(
-      "create",
-      [[configFor("test", "primary")], [configFor("test", "secondary")]],
-      async () => {
-        await DatabaseTasks.createCurrent("test");
-      },
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalledForConfigs(
+        "create",
+        [[configFor("test", "primary")], [configFor("test", "secondary")]],
+        async () => {
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("test"));
+        },
+      ),
     );
   });
 
   it("creates current environment database with url", async () => {
-    DatabaseTasks.env = "production";
-    await assertCalledForConfigs(
-      "create",
-      [[configFor("production", "primary")], [configFor("production", "secondary")]],
-      async () => {
-        await DatabaseTasks.createCurrent("production");
-      },
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalledForConfigs(
+        "create",
+        [[configFor("production", "primary")], [configFor("production", "secondary")]],
+        async () => {
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("production"));
+        },
+      ),
     );
   });
 
   it("creates test and development databases when env was not specified", async () => {
-    DatabaseTasks.env = "development";
-    await assertCalledForConfigs(
-      "create",
-      [
-        [configFor("development", "primary")],
-        [configFor("development", "secondary")],
-        [configFor("test", "primary")],
-        [configFor("test", "secondary")],
-      ],
-      async () => {
-        await DatabaseTasks.createCurrent("development");
-      },
+    await withStubbedConfigurationsEstablishConnection(() =>
+      assertCalledForConfigs(
+        "create",
+        [
+          [configFor("development", "primary")],
+          [configFor("development", "secondary")],
+          [configFor("test", "primary")],
+          [configFor("test", "secondary")],
+        ],
+        async () => {
+          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+        },
+      ),
     );
   });
 
   it("creates test and development databases when rails env is development", async () => {
+    const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
-    await assertCalledForConfigs(
-      "create",
-      [
-        [configFor("development", "primary")],
-        [configFor("development", "secondary")],
-        [configFor("test", "primary")],
-        [configFor("test", "secondary")],
-      ],
-      async () => {
-        await DatabaseTasks.createCurrent("development");
-      },
-    );
+
+    try {
+      await withStubbedConfigurationsEstablishConnection(() =>
+        assertCalledForConfigs(
+          "create",
+          [
+            [configFor("development", "primary")],
+            [configFor("development", "secondary")],
+            [configFor("test", "primary")],
+            [configFor("test", "secondary")],
+          ],
+          async () => {
+            await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+          },
+        ),
+      );
+    } finally {
+      setEnv("TRAILS_ENV", oldEnv);
+    }
   });
 
   it("establishes connection for the given environments config", async () => {
-    vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
-    await DatabaseTasks.createCurrent("development");
-    assertCalledWith(establishSpy, [":development"]);
-  });
-});
-
-describe("DatabaseTasksDropAllTest", () => {
-  captureStdoutAndStderr();
-
-  let dropSpy: MockInstance<any>;
-  beforeEach(() => {
-    dropSpy = vi.spyOn(DatabaseTasks, "drop").mockResolvedValue(undefined as never);
-  });
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    vi.restoreAllMocks();
-  });
-
-  it("ignores configurations without databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract" },
-    });
-    await DatabaseTasks.dropAll();
-    expect(dropSpy).not.toHaveBeenCalled();
-  });
-
-  it("ignores remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
-    });
-    vi.spyOn(stderr, "write").mockImplementation(() => true);
-    await DatabaseTasks.dropAll();
-    expect(dropSpy).not.toHaveBeenCalled();
-  });
-  it("warning for remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
-    });
-    const writes: string[] = [];
-    vi.spyOn(stderr, "write").mockImplementation((chunk) => {
-      writes.push(String(chunk));
-      return true;
-    });
-    await DatabaseTasks.dropAll();
-    expect(writes.join("")).toMatch(
-      /This task only modifies local databases\. my-db is on a remote host\./,
+    await stub(DatabaseTasks, "create", null, undefined, () =>
+      assertCalledWithArgs(Base, "establishConnection", [":development"], {}, async () => {
+        await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+      }),
     );
   });
 
-  it("drops configurations with local ip", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "127.0.0.1" },
+  const withStubbedConfigurationsEstablishConnection = async (
+    block: () => void | Promise<void>,
+  ): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations);
+
+    try {
+      await stub(Base.connectionHandler, "establishConnection", null, undefined, block);
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
+});
+
+describe("DatabaseTasksDropTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} drop`, async () => {
+      await withStubbedNew(() =>
+        assertCalled(tasks[v], "drop", null, {}, async () => {
+          await DatabaseTasks.drop({ adapter: k });
+        }),
+      );
     });
-    await DatabaseTasks.dropAll();
-    expect(dropSpy).toHaveBeenCalled();
+  }
+});
+
+describe("DatabaseTasksDropAllTest", () => {
+  const $ = captureStdoutAndStderr();
+
+  let configurations: Record<string, Record<string, unknown>>;
+  beforeEach(() => {
+    configurations = { development: { adapter: "abstract", database: "my-db" } };
+  });
+
+  it("ignores configurations without databases", async () => {
+    configurations["development"]["database"] = null;
+
+    await withStubbedConfigurations(() =>
+      assertNotCalled(DatabaseTasks, "drop", null, async () => {
+        await DatabaseTasks.dropAll();
+      }),
+    );
+  });
+
+  it("ignores remote databases", async () => {
+    configurations["development"]["host"] = "my.server.tld";
+
+    await withStubbedConfigurations(() =>
+      assertNotCalled(DatabaseTasks, "drop", null, async () => {
+        await DatabaseTasks.dropAll();
+      }),
+    );
+  });
+
+  it("warning for remote databases", async () => {
+    configurations["development"]["host"] = "my.server.tld";
+
+    await withStubbedConfigurations(async () => {
+      await DatabaseTasks.dropAll();
+
+      expect($.stderr.string()).toMatch(
+        /This task only modifies local databases\. my-db is on a remote host\./,
+      );
+    });
+  });
+
+  it("drops configurations with local ip", async () => {
+    configurations["development"]["host"] = "127.0.0.1";
+
+    await withStubbedConfigurations(() =>
+      assertCalled(DatabaseTasks, "drop", null, {}, async () => {
+        await DatabaseTasks.dropAll();
+      }),
+    );
   });
 
   it("drops configurations with local host", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "localhost" },
-    });
-    await DatabaseTasks.dropAll();
-    expect(dropSpy).toHaveBeenCalled();
+    configurations["development"]["host"] = "localhost";
+
+    await withStubbedConfigurations(() =>
+      assertCalled(DatabaseTasks, "drop", null, {}, async () => {
+        await DatabaseTasks.dropAll();
+      }),
+    );
   });
 
   it("drops configurations with blank hosts", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db", host: "" },
-    });
-    await DatabaseTasks.dropAll();
-    expect(dropSpy).toHaveBeenCalled();
+    configurations["development"]["host"] = null;
+
+    await withStubbedConfigurations(() =>
+      assertCalled(DatabaseTasks, "drop", null, {}, async () => {
+        await DatabaseTasks.dropAll();
+      }),
+    );
   });
+
+  const withStubbedConfigurations = async (block: () => void | Promise<void>): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations);
+
+    try {
+      await block();
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });
 
 describe("DatabaseTasksDropCurrentTest", () => {
-  captureStdoutAndStderr();
-
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    configurations = {
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
       production: { url: "abstract://prod-db-host/prod-db" },
-    });
-  });
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
+    };
   });
 
   it("drops current environment database", async () => {
-    const dropSpy = vi.spyOn(DatabaseTasks, "drop").mockResolvedValue(undefined as never);
-    DatabaseTasks.env = "test";
-    await DatabaseTasks.dropCurrent("test");
-    assertCalledWith(dropSpy, [configFor("test", "primary")]);
+    await withStubbedConfigurations(() =>
+      assertCalledWithArgs(DatabaseTasks, "drop", [configFor("test", "primary")], {}, async () => {
+        await DatabaseTasks.dropCurrent(new EnvironmentInquirer("test"));
+      }),
+    );
   });
 
   it("drops current environment database with url", async () => {
-    const dropSpy = vi.spyOn(DatabaseTasks, "drop").mockResolvedValue(undefined as never);
-    DatabaseTasks.env = "production";
-    await DatabaseTasks.dropCurrent("production");
-    assertCalledWith(dropSpy, [configFor("production", "primary")]);
+    await withStubbedConfigurations(() =>
+      assertCalledWithArgs(
+        DatabaseTasks,
+        "drop",
+        [configFor("production", "primary")],
+        {},
+        async () => {
+          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("production"));
+        },
+      ),
+    );
   });
 
   it("drops test and development databases when env was not specified", async () => {
-    DatabaseTasks.env = "development";
-    await assertCalledForConfigs(
-      "drop",
-      [[configFor("development", "primary")], [configFor("test", "primary")]],
-      async () => {
-        await DatabaseTasks.dropCurrent("development");
-      },
+    await withStubbedConfigurations(() =>
+      assertCalledForConfigs(
+        "drop",
+        [[configFor("development", "primary")], [configFor("test", "primary")]],
+        async () => {
+          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+        },
+      ),
     );
   });
 
   it("drops testand development databases when rails env is development", async () => {
+    const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
-    await assertCalledForConfigs(
-      "drop",
-      [[configFor("development", "primary")], [configFor("test", "primary")]],
-      async () => {
-        await DatabaseTasks.dropCurrent("development");
-      },
-    );
+
+    try {
+      await withStubbedConfigurations(() =>
+        assertCalledForConfigs(
+          "drop",
+          [[configFor("development", "primary")], [configFor("test", "primary")]],
+          async () => {
+            await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+          },
+        ),
+      );
+    } finally {
+      setEnv("TRAILS_ENV", oldEnv);
+    }
   });
+
+  const withStubbedConfigurations = async (block: () => void | Promise<void>): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations);
+
+    try {
+      await block();
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });
 
 describe("DatabaseTasksDropCurrentThreeTierTest", () => {
-  captureStdoutAndStderr();
-
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    configurations = {
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -818,290 +985,267 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
         primary: { url: "abstract://prod-db-host/prod-db" },
         secondary: { url: "abstract://secondary-prod-db-host/secondary-prod-db" },
       },
-    });
-  });
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
+    };
   });
 
   it("drops current environment database", async () => {
-    DatabaseTasks.env = "test";
-    await assertCalledForConfigs(
-      "drop",
-      [[configFor("test", "primary")], [configFor("test", "secondary")]],
-      async () => {
-        await DatabaseTasks.dropCurrent("test");
-      },
+    await withStubbedConfigurations(() =>
+      assertCalledForConfigs(
+        "drop",
+        [[configFor("test", "primary")], [configFor("test", "secondary")]],
+        async () => {
+          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("test"));
+        },
+      ),
     );
   });
 
   it("drops current environment database with url", async () => {
-    DatabaseTasks.env = "production";
-    await assertCalledForConfigs(
-      "drop",
-      [[configFor("production", "primary")], [configFor("production", "secondary")]],
-      async () => {
-        await DatabaseTasks.dropCurrent("production");
-      },
+    await withStubbedConfigurations(() =>
+      assertCalledForConfigs(
+        "drop",
+        [[configFor("production", "primary")], [configFor("production", "secondary")]],
+        async () => {
+          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("production"));
+        },
+      ),
     );
   });
 
   it("drops test and development databases when env was not specified", async () => {
-    DatabaseTasks.env = "development";
-    await assertCalledForConfigs(
-      "drop",
-      [
-        [configFor("development", "primary")],
-        [configFor("development", "secondary")],
-        [configFor("test", "primary")],
-        [configFor("test", "secondary")],
-      ],
-      async () => {
-        await DatabaseTasks.dropCurrent("development");
-      },
+    await withStubbedConfigurations(() =>
+      assertCalledForConfigs(
+        "drop",
+        [
+          [configFor("development", "primary")],
+          [configFor("development", "secondary")],
+          [configFor("test", "primary")],
+          [configFor("test", "secondary")],
+        ],
+        async () => {
+          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+        },
+      ),
     );
   });
 
   it("drops testand development databases when rails env is development", async () => {
+    const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
-    await assertCalledForConfigs(
-      "drop",
-      [
-        [configFor("development", "primary")],
-        [configFor("development", "secondary")],
-        [configFor("test", "primary")],
-        [configFor("test", "secondary")],
-      ],
-      async () => {
-        await DatabaseTasks.dropCurrent("development");
-      },
-    );
+
+    try {
+      await withStubbedConfigurations(() =>
+        assertCalledForConfigs(
+          "drop",
+          [
+            [configFor("development", "primary")],
+            [configFor("development", "secondary")],
+            [configFor("test", "primary")],
+            [configFor("test", "secondary")],
+          ],
+          async () => {
+            await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+          },
+        ),
+      );
+    } finally {
+      setEnv("TRAILS_ENV", oldEnv);
+    }
   });
+
+  const withStubbedConfigurations = async (block: () => void | Promise<void>): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations);
+
+    try {
+      await block();
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });
 
 const skipMigrationTestCase = adapterType !== "sqlite" || inMemoryDb();
 
-interface MigrationTestCase {
+function databaseTasksMigrationTestCase(folderName = "valid"): {
   captureMigrationOutput(): Promise<string>;
-  captureStdout(fn: () => Promise<void>): Promise<string>;
-}
-
-async function backupIntoConnection(sourceFile: string): Promise<void> {
-  const adapter = await Base.connectionPool().leaseConnection();
-  await adapter.execute(`ATTACH DATABASE ${adapter.quote(sourceFile)} AS backupSource`);
-  try {
-    const objects = await adapter.selectRows(
-      "SELECT type, name, sql FROM backupSource.sqlite_master " +
-        "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'",
-    );
-    for (const [, , sql] of objects) {
-      await adapter.execute(String(sql));
-    }
-    for (const [type, name] of objects) {
-      if (type !== "table") continue;
-      const table = adapter.quoteTableName(String(name));
-      const columns = await adapter.selectRows(
-        `SELECT name FROM pragma_table_info(${adapter.quote(String(name))}, 'backupSource')`,
-      );
-      const columnList = columns.map(([column]) => adapter.quoteColumnName(String(column)));
-      if (columnList.length === 0) continue;
-      await adapter.execute(
-        `INSERT INTO main.${table} (${columnList.join(", ")}) ` +
-          `SELECT ${columnList.join(", ")} FROM backupSource.${table}`,
-      );
-    }
-    const [[sequences]] = await adapter.selectRows(
-      "SELECT count(*) FROM backupSource.sqlite_master WHERE name = 'sqlite_sequence'",
-    );
-    if (Number(sequences) > 0) {
-      await adapter.execute("DELETE FROM main.sqlite_sequence");
-      await adapter.execute(
-        "INSERT INTO main.sqlite_sequence (name, seq) SELECT name, seq FROM backupSource.sqlite_sequence",
-      );
-    }
-  } finally {
-    await adapter.execute("DETACH DATABASE backupSource");
-  }
-}
-
-const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
-
-function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase {
-  let stdoutChunks: string[] = [];
-  let stdoutSpy: MockInstance | undefined;
+} {
+  let conn: Awaited<ReturnType<typeof Base.establishConnection>> | undefined;
 
   beforeEach(async () => {
     if (skipMigrationTestCase) return;
-    stdoutChunks = [];
-    stdoutSpy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
-      stdoutChunks.push(chunk);
-      return true;
-    });
-    const ambient = ambientPoolConfiguration();
-    const sourceFile = String(ambient.database);
     const migrationsPath = [MIGRATIONS_ROOT, folderName].join("/");
-    await Base.establishConnection({
-      ...ambient,
+    const file = await (await (
+      (await Base.leaseConnection()) as SQLite3Adapter
+    ).rawConnection())!.filename();
+    conn = await Base.establishConnection({
+      adapter: "sqlite3",
       database: ":memory:",
-      pool: 1,
       migrationsPaths: migrationsPath,
     });
-    await backupIntoConnection(sourceFile);
+    const sourceDb = await betterSqlite3Driver.open({ database: file! });
+    const destDb = (await ((await Base.leaseConnection()) as SQLite3Adapter).rawConnection())!;
+    const backup = new Backup(destDb, "main", sourceDb, "main");
+    await backup.step(-1);
+    backup.finish();
   });
 
   afterEach(async () => {
-    stdoutSpy?.mockRestore();
-    stdoutSpy = undefined;
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    clearRegisteredTasks();
-    try {
-      await Base.removeConnection();
-    } catch {}
-    if (!skipMigrationTestCase) await Base.establishConnection(":arunit");
+    if (skipMigrationTestCase) return;
+    if (conn) conn.releaseConnection();
+    await Base.establishConnection(":arunit");
   });
 
-  const captureStdout = async (fn: () => Promise<void>): Promise<string> => {
-    stdoutChunks = [];
-    await fn();
-    return stdoutChunks.join("");
-  };
+  const captureMigrationOutput = (): Promise<string> =>
+    capture("stdout", async () => {
+      await DatabaseTasks.migrate();
+    });
 
-  return {
-    captureStdout,
-    captureMigrationOutput: () => captureStdout(() => DatabaseTasks.migrate()),
-  };
+  return { captureMigrationOutput };
 }
 
 describe("DatabaseTasksMigrateTest", () => {
-  let originalVerbose: string | undefined;
-  let originalVersion: string | undefined;
-  const testCase = databaseTasksMigrationTestCase();
-
-  beforeEach(() => {
-    originalVerbose = process.env.VERBOSE;
-    originalVersion = process.env.VERSION;
-  });
-  afterEach(() => {
-    if (originalVerbose === undefined) delete process.env.VERBOSE;
-    else process.env.VERBOSE = originalVerbose;
-    if (originalVersion === undefined) delete process.env.VERSION;
-    else process.env.VERSION = originalVersion;
-  });
+  const { captureMigrationOutput } = databaseTasksMigrationTestCase();
 
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset empty values for verbose and version env vars",
     async () => {
-      process.env.VERSION = "2";
-      process.env.VERBOSE = "false";
+      const [verbose, version] = [getEnv("VERBOSE"), getEnv("VERSION")];
 
-      assertEmpty(await testCase.captureMigrationOutput());
+      try {
+        setEnv("VERSION", "2");
+        setEnv("VERBOSE", "false");
 
-      process.env.VERBOSE = "";
-      process.env.VERSION = "";
+        assertEmpty(await captureMigrationOutput());
 
-      expect(await testCase.captureMigrationOutput()).toContain("migrating");
+        setEnv("VERBOSE", "");
+        setEnv("VERSION", "");
+
+        expect(await captureMigrationOutput()).toContain("migrating");
+      } finally {
+        setEnv("VERBOSE", verbose);
+        setEnv("VERSION", version);
+      }
     },
   );
 
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset nonsense values for verbose and version env vars",
     async () => {
-      process.env.VERSION = "2";
-      process.env.VERBOSE = "false";
+      const [verbose, version] = [getEnv("VERBOSE"), getEnv("VERSION")];
 
-      assertEmpty(await testCase.captureMigrationOutput());
+      try {
+        setEnv("VERSION", "2");
+        setEnv("VERBOSE", "false");
 
-      process.env.VERBOSE = "yes";
-      process.env.VERSION = "2";
+        assertEmpty(await captureMigrationOutput());
 
-      assertEmpty(await testCase.captureMigrationOutput());
+        setEnv("VERBOSE", "yes");
+        setEnv("VERSION", "2");
+
+        assertEmpty(await captureMigrationOutput());
+      } finally {
+        setEnv("VERBOSE", verbose);
+        setEnv("VERSION", version);
+      }
     },
   );
 });
 
 describe("DatabaseTasksMigrateScopeTest", () => {
-  let originalVerbose: string | undefined;
-  let originalVersion: string | undefined;
-  let originalScope: string | undefined;
-  const testCase = databaseTasksMigrationTestCase("scope");
-
-  beforeEach(() => {
-    if (skipMigrationTestCase) return;
-    originalVerbose = process.env.VERBOSE;
-    originalVersion = process.env.VERSION;
-    originalScope = process.env.SCOPE;
-  });
-
-  afterEach(() => {
-    if (originalVerbose === undefined) delete process.env.VERBOSE;
-    else process.env.VERBOSE = originalVerbose;
-    if (originalVersion === undefined) delete process.env.VERSION;
-    else process.env.VERSION = originalVersion;
-    if (originalScope === undefined) delete process.env.SCOPE;
-    else process.env.SCOPE = originalScope;
-  });
+  const { captureMigrationOutput } = databaseTasksMigrationTestCase("scope");
 
   it.skipIf(skipMigrationTestCase)("migrate using scope and verbose mode", async () => {
-    process.env.VERSION = "2";
-    process.env.VERBOSE = "true";
-    process.env.SCOPE = "mysql";
+    const [verbose, version, scope] = [getEnv("VERBOSE"), getEnv("VERSION"), getEnv("SCOPE")];
 
-    const output1 = await testCase.captureMigrationOutput();
-    expect(output1).toContain("migrating");
-    expect(output1).not.toContain("No migrations ran. (using mysql scope)");
+    try {
+      setEnv("VERSION", "2");
+      setEnv("VERBOSE", "true");
+      setEnv("SCOPE", "mysql");
 
-    const output2 = await testCase.captureMigrationOutput();
-    expect(output2).toContain("No migrations ran. (using mysql scope)");
-    expect(output2).not.toContain("migrating");
+      let output = await captureMigrationOutput();
+      expect(output).toContain("migrating");
+      expect(output).not.toContain("No migrations ran. (using mysql scope)");
+
+      output = await captureMigrationOutput();
+      expect(output).toContain("No migrations ran. (using mysql scope)");
+      expect(output).not.toContain("migrating");
+    } finally {
+      setEnv("VERBOSE", verbose);
+      setEnv("VERSION", version);
+      setEnv("SCOPE", scope);
+    }
   });
 
   it.skipIf(skipMigrationTestCase)("migrate using scope and non verbose mode", async () => {
-    process.env.VERSION = "2";
-    process.env.VERBOSE = "false";
-    process.env.SCOPE = "mysql";
+    const [verbose, version, scope] = [getEnv("VERBOSE"), getEnv("VERSION"), getEnv("SCOPE")];
 
-    assertEmpty(await testCase.captureMigrationOutput());
-    assertEmpty(await testCase.captureMigrationOutput());
+    try {
+      setEnv("VERSION", "2");
+      setEnv("VERBOSE", "false");
+      setEnv("SCOPE", "mysql");
+
+      assertEmpty(await captureMigrationOutput());
+
+      assertEmpty(await captureMigrationOutput());
+    } finally {
+      setEnv("VERBOSE", verbose);
+      setEnv("VERSION", version);
+      setEnv("SCOPE", scope);
+    }
   });
 
   it.skipIf(skipMigrationTestCase)("migrate using empty scope and verbose mode", async () => {
-    process.env.VERSION = "2";
-    process.env.VERBOSE = "true";
-    process.env.SCOPE = "";
+    const [verbose, version, scope] = [getEnv("VERBOSE"), getEnv("VERSION"), getEnv("SCOPE")];
 
-    const output1 = await testCase.captureMigrationOutput();
-    expect(output1).toContain("migrating");
-    expect(output1).not.toContain("No migrations ran. (using mysql scope)");
+    try {
+      setEnv("VERSION", "2");
+      setEnv("VERBOSE", "true");
+      setEnv("SCOPE", "");
 
-    const output2 = await testCase.captureMigrationOutput();
-    assertEmpty(output2);
-    expect(output2).not.toContain("No migrations ran. (using mysql scope)");
+      let output = await captureMigrationOutput();
+      expect(output).toContain("migrating");
+      expect(output).not.toContain("No migrations ran. (using mysql scope)");
+
+      output = await captureMigrationOutput();
+      assertEmpty(output);
+      expect(output).not.toContain("No migrations ran. (using mysql scope)");
+    } finally {
+      setEnv("VERBOSE", verbose);
+      setEnv("VERSION", version);
+      setEnv("SCOPE", scope);
+    }
   });
 });
 
 describe("DatabaseTasksMigrateStatusTest", () => {
-  const testCase = databaseTasksMigrationTestCase();
+  databaseTasksMigrationTestCase();
 
-  beforeEach(async () => {
+  let schemaMigration: SchemaMigration;
+  beforeEach(() => {
     if (skipMigrationTestCase) return;
-    const pool = Base.connectionPool();
-    await new SchemaMigration(pool).createTable();
+    schemaMigration = Base.connectionPool().schemaMigration;
   });
 
   it.skipIf(skipMigrationTestCase)("migrate status table", async () => {
-    const output = await testCase.captureStdout(() => DatabaseTasks.migrateStatus());
+    await schemaMigration.createTable();
+    const output = await captureMigrationStatus();
     expect(output).toMatch(/database: :memory:/);
-    expect(output).toMatch(/down\s+001\s+Valid people have last names/);
-    expect(output).toMatch(/down\s+002\s+We need reminders/);
-    expect(output).toMatch(/down\s+003\s+Innocent jointable/);
+    expect(output).toMatch(/down {4}001 {13}Valid people have last names/);
+    expect(output).toMatch(/down {4}002 {13}We need reminders/);
+    expect(output).toMatch(/down {4}003 {13}Innocent jointable/);
+    await schemaMigration.deleteAllVersions();
   });
+
+  const captureMigrationStatus = (): Promise<string> =>
+    capture("stdout", async () => {
+      await DatabaseTasks.migrateStatus();
+    });
 });
 
 describe("DatabaseTasksMigrateErrorTest", () => {
   it("migrate raise error on invalid version format", async () => {
+    const version = getEnv("VERSION");
     let e: Error;
 
     try {
@@ -1137,162 +1281,177 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
     } finally {
-      setEnv("VERSION", undefined);
+      setEnv("VERSION", version);
     }
   });
 
   it("migrate raise error on failed check target version", async () => {
-    const spy = vi.spyOn(DatabaseTasks, "checkTargetVersion").mockImplementation(() => {
+    const raiseFoo = () => {
       throw new RuntimeError("foo");
-    });
-    try {
+    };
+    await stub(DatabaseTasks, "checkTargetVersion", raiseFoo, undefined, async () => {
       const e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toBe("foo");
-    } finally {
-      spy.mockRestore();
-    }
+    });
   });
 
   it("migrate clears schema cache afterward", async () => {
-    const { SchemaReflection } = await import("../connection-adapters/schema-cache.js");
-    const originalVersion = process.env.VERSION;
-    delete process.env.VERSION;
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-cache-"));
-    const dbFile = path.join(tmp, "arunit.sqlite3");
-    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
-    DatabaseTasks.registerTask(
-      "sqlite",
-      class {
-        async create(): Promise<void> {}
-      },
-    );
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: { adapter: "sqlite3", database: dbFile },
-    });
-    const clearSpy = vi.spyOn(SchemaReflection.prototype, "clearBang");
-    try {
+    await assertCalled(Base.schemaCache(), "clearBang", null, {}, async () => {
       await DatabaseTasks.migrate();
-      expect(clearSpy).toHaveBeenCalled();
-    } finally {
-      clearSpy.mockRestore();
-      if (originalVersion === undefined) delete process.env.VERSION;
-      else process.env.VERSION = originalVersion;
-      try {
-        await Base.removeConnection();
-      } catch {}
-      DatabaseTasks.databaseConfiguration = originalConfigurations;
-      clearRegisteredTasks();
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
+    });
   });
 });
 
-describe("DatabaseTasksPurgeCurrentTest", () => {
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
-  });
+describe("DatabaseTasksPurgeTest", () => {
+  captureStdoutAndStderr();
 
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} purge`, async () => {
+      await withStubbedNew(() =>
+        assertCalled(tasks[v], "purge", null, {}, async () => {
+          await DatabaseTasks.purge({ adapter: k });
+        }),
+      );
+    });
+  }
+});
+
+describe("DatabaseTasksPurgeCurrentTest", () => {
   it("purges current environment database", async () => {
-    const establishSpy = vi
-      .spyOn(Base, "establishConnection")
-      .mockResolvedValue(undefined as never);
-    const purgeSpy = vi.spyOn(DatabaseTasks, "purge").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    const oldConfigurations = Base.configurations();
+    const configurations = {
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
       production: { adapter: "abstract", database: "prod-db" },
-    });
-    DatabaseTasks.env = "test";
+    };
 
-    await DatabaseTasks.purgeCurrent("production");
+    try {
+      Base.configurations(configurations);
 
-    assertCalledWith(purgeSpy, [configFor("production", "primary")]);
-    assertCalledWith(establishSpy, [":production"]);
+      await assertCalledWithArgs(
+        DatabaseTasks,
+        "purge",
+        [Base.configurations().configsFor({ envName: "production", name: "primary" })],
+        {},
+        () =>
+          assertCalledWithArgs(Base, "establishConnection", [":production"], {}, async () => {
+            await DatabaseTasks.purgeCurrent("production");
+          }),
+      );
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
   });
 });
 
 describe("DatabaseTasksPurgeAllTest", () => {
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    vi.restoreAllMocks();
-  });
-
   it("purge all local configurations", async () => {
-    const purgeSpy = vi.spyOn(DatabaseTasks, "purge").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db" },
-    });
+    const oldConfigurations = Base.configurations();
+    const configurations = { development: { adapter: "abstract", database: "my-db" } };
 
-    await DatabaseTasks.purgeAll();
+    try {
+      Base.configurations(configurations);
 
-    assertCalledWith(purgeSpy, [configFor("development", "primary")]);
+      await assertCalledWithArgs(
+        DatabaseTasks,
+        "purge",
+        [Base.configurations().configsFor({ envName: "development", name: "primary" })],
+        {},
+        async () => {
+          await DatabaseTasks.purgeAll();
+        },
+      );
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
   });
 });
 
 describe("DatabaseTasksTruncateAllTest", () => {
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
+  const { self } = fixtures(["courses", "colleges"], { useTransactionalTests: false });
+
+  let schemaMigration: SchemaMigration;
+  let internalMetadata: InternalMetadata;
+  let oldConfigurations: DatabaseConfigurations;
+  beforeEach(async () => {
+    if (inMemoryDb()) return;
+    const pool = ARUnit2Model.connectionPool();
+    schemaMigration = pool.schemaMigration;
+    await schemaMigration.createTable();
+    await schemaMigration.createVersion(schemaMigration.tableName);
+
+    internalMetadata = pool.internalMetadata;
+    await internalMetadata.createTable();
+    await internalMetadata.set(internalMetadata.tableName, null);
+
+    oldConfigurations = Base.configurations();
   });
 
-  it("truncate tables", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-truncate-all-"));
-    const dbPath = path.join(tmp, "truncate-all.sqlite3");
-    const { BetterSQLite3Adapter } =
-      await import("../connection-adapters/better-sqlite3-adapter.js");
-    const seed = new BetterSQLite3Adapter({ database: dbPath });
-    await seed.execute("CREATE TABLE courses (id INTEGER PRIMARY KEY, name TEXT)");
-    await seed.execute("CREATE TABLE colleges (id INTEGER PRIMARY KEY, name TEXT)");
-    await seed.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
-    await seed.execute("CREATE TABLE ar_internal_metadata (key TEXT PRIMARY KEY, value TEXT)");
-    await seed.execute("INSERT INTO courses (name) VALUES ('ruby')");
-    await seed.execute("INSERT INTO colleges (name) VALUES ('trails')");
-    await seed.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
-    await seed.execute("INSERT INTO ar_internal_metadata (key, value) VALUES ('a', 'b')");
-    expect((await seed.execute("SELECT * FROM schema_migrations"))!.length).toBeGreaterThan(0);
-    expect((await seed.execute("SELECT * FROM ar_internal_metadata"))!.length).toBeGreaterThan(0);
-    expect((await seed.execute("SELECT * FROM courses"))!.length).toBeGreaterThan(0);
-    expect((await seed.execute("SELECT * FROM colleges"))!.length).toBeGreaterThan(0);
-    await seed.disconnectBang();
+  afterEach(async () => {
+    if (inMemoryDb()) return;
+    await schemaMigration.deleteAllVersions();
+    await internalMetadata.deleteAllEntries();
+    self().cleanUpConnectionHandler();
+    Base.configurations(oldConfigurations);
+  });
 
-    clearRegisteredTasks();
-    DatabaseTasks.registerTask(/sqlite/, class {});
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: dbPath },
+  async function testTruncateTables(): Promise<void> {
+    expect(await schemaMigration.count()).toBeGreaterThan(0);
+    expect(await internalMetadata.count()).toBeGreaterThan(0);
+    expect(await Course.count()).toBeGreaterThan(0);
+    expect(await College.count()).toBeGreaterThan(0);
+
+    const dbConfig = Base.configurations().configsFor({ envName: "arunit2", name: "primary" })!;
+    const configurations = { development: dbConfig.configurationHash };
+    Base.configurations(configurations);
+
+    await stub(DatabaseTasks, "root", null, undefined, async () => {
+      await DatabaseTasks.truncateAll(new EnvironmentInquirer("development"));
     });
-    DatabaseTasks.env = "development";
-    await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    try {
-      await DatabaseTasks.truncateAll("development");
-    } finally {
-      await Base.removeConnection();
-    }
 
-    const reader = new BetterSQLite3Adapter({ database: dbPath });
-    try {
-      expect((await reader.execute("SELECT * FROM schema_migrations"))!.length).toBeGreaterThan(0);
-      expect((await reader.execute("SELECT * FROM ar_internal_metadata"))!.length).toBeGreaterThan(
-        0,
-      );
-      expect((await reader.execute("SELECT * FROM courses"))!.length).toBe(0);
-      expect((await reader.execute("SELECT * FROM colleges"))!.length).toBe(0);
-    } finally {
-      await reader.execute("DROP TABLE IF EXISTS courses");
-      await reader.execute("DROP TABLE IF EXISTS colleges");
-      await reader.disconnectBang();
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
+    expect(await schemaMigration.count()).toBeGreaterThan(0);
+    expect(await internalMetadata.count()).toBeGreaterThan(0);
+    expect(await Course.count()).toBe(0);
+    expect(await College.count()).toBe(0);
+  }
+
+  it.skipIf(inMemoryDb())("truncate tables", async () => {
+    await testTruncateTables();
+  });
+
+  describe("DatabaseTasksTruncateAllWithPrefixTest", () => {
+    beforeAll(() => {
+      Base.tableNamePrefix = "p_";
+    });
+
+    afterAll(() => {
+      Base.tableNamePrefix = "";
+    });
+
+    it.skipIf(inMemoryDb())("truncate tables", async () => {
+      await testTruncateTables();
+    });
+  });
+
+  describe("DatabaseTasksTruncateAllWithSuffixTest", () => {
+    beforeAll(() => {
+      Base.tableNameSuffix = "_s";
+    });
+
+    afterAll(() => {
+      Base.tableNameSuffix = "";
+    });
+
+    it.skipIf(inMemoryDb())("truncate tables", async () => {
+      await testTruncateTables();
+    });
   });
 });
 
 describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    configurations = {
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -1305,349 +1464,454 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
         primary: { url: "abstract://prod-db-host/prod-db" },
         secondary: { url: "abstract://secondary-prod-db-host/secondary-prod-db" },
       },
-    });
-  });
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
+    };
   });
 
   it("truncate all databases for environment", async () => {
-    await assertCalledForConfigs(
-      "truncateTables",
-      [[configFor("test", "primary")], [configFor("test", "secondary")]],
-      async () => {
-        await DatabaseTasks.truncateAll("test");
-      },
+    await withStubbedConfigurations(() =>
+      assertCalledForConfigs(
+        "truncateTables",
+        [[configFor("test", "primary")], [configFor("test", "secondary")]],
+        async () => {
+          await DatabaseTasks.truncateAll(new EnvironmentInquirer("test"));
+        },
+      ),
     );
   });
 
   it("truncate all databases with url for environment", async () => {
-    await assertCalledForConfigs(
-      "truncateTables",
-      [[configFor("production", "primary")], [configFor("production", "secondary")]],
-      async () => {
-        await DatabaseTasks.truncateAll("production");
-      },
+    await withStubbedConfigurations(() =>
+      assertCalledForConfigs(
+        "truncateTables",
+        [[configFor("production", "primary")], [configFor("production", "secondary")]],
+        async () => {
+          await DatabaseTasks.truncateAll(new EnvironmentInquirer("production"));
+        },
+      ),
     );
   });
 
   it("truncate all development databases when env is not specified", async () => {
-    await assertCalledForConfigs(
-      "truncateTables",
-      [[configFor("development", "primary")], [configFor("development", "secondary")]],
-      async () => {
-        await DatabaseTasks.truncateAll("development");
-      },
+    await withStubbedConfigurations(() =>
+      assertCalledForConfigs(
+        "truncateTables",
+        [[configFor("development", "primary")], [configFor("development", "secondary")]],
+        async () => {
+          await DatabaseTasks.truncateAll(new EnvironmentInquirer("development"));
+        },
+      ),
     );
   });
 
   it("truncate all development databases when env is development", async () => {
+    const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
-    await assertCalledForConfigs(
-      "truncateTables",
-      [[configFor("development", "primary")], [configFor("development", "secondary")]],
-      async () => {
-        await DatabaseTasks.truncateAll("development");
-      },
-    );
+
+    try {
+      await withStubbedConfigurations(() =>
+        assertCalledForConfigs(
+          "truncateTables",
+          [[configFor("development", "primary")], [configFor("development", "secondary")]],
+          async () => {
+            await DatabaseTasks.truncateAll(new EnvironmentInquirer("development"));
+          },
+        ),
+      );
+    } finally {
+      setEnv("TRAILS_ENV", oldEnv);
+    }
   });
+
+  const withStubbedConfigurations = async (block: () => void | Promise<void>): Promise<void> => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations);
+
+    try {
+      await block();
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });
 
 describe("DatabaseTasksCharsetTest", () => {
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
-  });
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} charset`, async () => {
+      await withStubbedNew(() =>
+        assertCalled(tasks[v], "charset", null, {}, async () => {
+          await DatabaseTasks.charset({ adapter: k });
+        }),
+      );
+    });
+  }
 
   it("charset current", async () => {
-    const charsetSpy = vi.spyOn(DatabaseTasks, "charset").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    const oldConfigurations = Base.configurations();
+    const configurations = {
       production: { adapter: "abstract", database: "prod-db" },
-    });
+    };
 
-    await DatabaseTasks.charsetCurrent("production", "primary");
+    try {
+      Base.configurations(configurations);
 
-    assertCalledWith(charsetSpy, [configFor("production", "primary")]);
+      await assertCalledWithArgs(
+        DatabaseTasks,
+        "charset",
+        [Base.configurations().configsFor({ envName: "production", name: "primary" })],
+        {},
+        async () => {
+          await DatabaseTasks.charsetCurrent("production", "primary");
+        },
+      );
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
   });
 });
 
 describe("DatabaseTasksCollationTest", () => {
-  afterEach(() => {
-    clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.env = "development";
-    vi.restoreAllMocks();
-  });
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} collation`, async () => {
+      await withStubbedNew(() =>
+        assertCalled(tasks[v], "collation", null, {}, async () => {
+          await DatabaseTasks.collation({ adapter: k });
+        }),
+      );
+    });
+  }
 
   it("collation current", async () => {
-    const collationSpy = vi.spyOn(DatabaseTasks, "collation").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    const oldConfigurations = Base.configurations();
+    const configurations = {
       production: { adapter: "abstract", database: "prod-db" },
-    });
+    };
 
-    await DatabaseTasks.collationCurrent("production", "primary");
+    try {
+      Base.configurations(configurations);
 
-    assertCalledWith(collationSpy, [configFor("production", "primary")]);
+      await assertCalledWithArgs(
+        DatabaseTasks,
+        "collation",
+        [Base.configurations().configsFor({ envName: "production", name: "primary" })],
+        {},
+        async () => {
+          await DatabaseTasks.collationCurrent("production", "primary");
+        },
+      );
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
   });
 });
 
-describe("DatabaseTaskTargetVersionTest", () => {
-  let originalVersion: string | undefined;
-  beforeEach(() => {
-    originalVersion = getEnv("VERSION");
-  });
-  afterEach(() => {
-    setEnv("VERSION", originalVersion);
-  });
+describe("DatabaseTasksStructureDumpTest", () => {
+  captureStdoutAndStderr();
 
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} structure dump`, async () => {
+      await withStubbedNew(() =>
+        assertCalledWithArgs(
+          tasks[v],
+          "structureDump",
+          ["awesome-file.sql", null],
+          {},
+          async () => {
+            await DatabaseTasks.structureDump({ adapter: k }, "awesome-file.sql");
+          },
+        ),
+      );
+    });
+  }
+});
+
+describe("DatabaseTasksStructureLoadTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} structure load`, async () => {
+      await withStubbedNew(() =>
+        assertCalledWithArgs(
+          tasks[v],
+          "structureLoad",
+          ["awesome-file.sql", null],
+          {},
+          async () => {
+            await DatabaseTasks.structureLoad({ adapter: k }, "awesome-file.sql");
+          },
+        ),
+      );
+    });
+  }
+});
+
+describe("DatabaseTaskTargetVersionTest", () => {
   it("target version returns nil if version does not exist", () => {
+    const version = getEnv("VERSION");
     setEnv("VERSION", undefined);
-    expect(DatabaseTasks.targetVersion()).toBeNull();
+
+    try {
+      expect(DatabaseTasks.targetVersion()).toBeNull();
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("target version returns nil if version is empty", () => {
-    setEnv("VERSION", "");
-    expect(DatabaseTasks.targetVersion()).toBeNull();
+    const version = getEnv("VERSION");
+
+    try {
+      setEnv("VERSION", "");
+      expect(DatabaseTasks.targetVersion()).toBeNull();
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("target version returns converted to integer env version if version exists", () => {
-    setEnv("VERSION", "0");
-    expect(DatabaseTasks.targetVersion()).toBe(0);
+    const version = getEnv("VERSION");
 
-    setEnv("VERSION", "42");
-    expect(DatabaseTasks.targetVersion()).toBe(42);
+    try {
+      setEnv("VERSION", "0");
+      expect(DatabaseTasks.targetVersion()).toBe(0);
 
-    setEnv("VERSION", "042");
-    expect(DatabaseTasks.targetVersion()).toBe(42);
+      setEnv("VERSION", "42");
+      expect(DatabaseTasks.targetVersion()).toBe(42);
 
-    setEnv("VERSION", "2000_01_01_000042");
-    expect(DatabaseTasks.targetVersion()).toBe(20000101000042);
+      setEnv("VERSION", "042");
+      expect(DatabaseTasks.targetVersion()).toBe(42);
+
+      setEnv("VERSION", "2000_01_01_000042");
+      expect(DatabaseTasks.targetVersion()).toBe(20000101000042);
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 });
 
 describe("DatabaseTaskCheckTargetVersionTest", () => {
-  let originalVersion: string | undefined;
-  beforeEach(() => {
-    originalVersion = getEnv("VERSION");
-  });
-  afterEach(() => {
-    setEnv("VERSION", originalVersion);
+  it("check target version does not raise error on empty version", async () => {
+    const version = getEnv("VERSION");
+
+    try {
+      setEnv("VERSION", "");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
-  it("check target version does not raise error on empty version", () => {
-    setEnv("VERSION", "");
-    expect(() => DatabaseTasks.checkTargetVersion()).not.toThrow();
-  });
-
-  it("check target version does not raise error if version is not set", () => {
+  it("check target version does not raise error if version is not set", async () => {
+    const version = getEnv("VERSION");
     setEnv("VERSION", undefined);
-    expect(() => DatabaseTasks.checkTargetVersion()).not.toThrow();
+
+    try {
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("check target version raises error on invalid version format", async () => {
     let e: Error;
+    const version = getEnv("VERSION");
 
-    setEnv("VERSION", "unknown");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+    try {
+      setEnv("VERSION", "unknown");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "0.1.11");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "0.1.11");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1.1.11");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1.1.11");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "0 ");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "0 ");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1.");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1.");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1_");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1_");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
 
-    setEnv("VERSION", "1_name");
-    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
-    expect(e.message).toMatch(/Invalid format of target version/);
+      setEnv("VERSION", "1_name");
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
+      expect(e.message).toMatch(/Invalid format of target version/);
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 
   it("check target version does not raise error on valid version format", async () => {
-    setEnv("VERSION", "0");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    const version = getEnv("VERSION");
 
-    setEnv("VERSION", "1");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    try {
+      setEnv("VERSION", "0");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    setEnv("VERSION", "001");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+      setEnv("VERSION", "1");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    setEnv("VERSION", "1_001");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+      setEnv("VERSION", "001");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    setEnv("VERSION", "001_name.ts");
-    await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+      setEnv("VERSION", "1_001");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+
+      setEnv("VERSION", "001_name.ts");
+      await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
+    } finally {
+      setEnv("VERSION", version);
+    }
   });
 });
 
 describe("DatabaseTasksCheckSchemaFileTest", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("check schema file", () => {
-    const adapter = getProcessAdapter();
-    vi.spyOn(adapter, "setExitCode").mockImplementation(() => {});
-    const writeSpy = vi
-      .spyOn(adapter.stderr, "write")
-      .mockImplementation(() => true) as unknown as MockInstance<any>;
-
-    try {
+  it("check schema file", async () => {
+    await assertCalledWithArgs(Kernel, "abort", [/awesome-file.sql/], {}, () => {
       DatabaseTasks.checkSchemaFile("awesome-file.sql");
-    } catch {}
-
-    expect(writeSpy).toHaveBeenCalledWith(
-      "awesome-file.sql doesn't exist yet. Run `bin/rails db:migrate` to create it, then try again.\n",
-    );
+    });
   });
 });
 
 describe("DatabaseTasksCheckSchemaFileMethods", () => {
-  let originalSchema: string | undefined;
-  let originalDbDir: string;
+  const FORMATS: Record<string, ["ts" | "sql", string]> = {
+    ruby: ["ts", "schema.ts"],
+    sql: ["sql", "structure.sql"],
+  };
+  let configurations: Record<string, Record<string, unknown>>;
   beforeEach(() => {
-    originalSchema = process.env.SCHEMA;
-    originalDbDir = DatabaseTasks.dbDir;
-    delete process.env.SCHEMA;
-    DatabaseTasks.dbDir = "/tmp";
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "abstract", database: "my-db" },
-    });
-  });
-  afterEach(() => {
-    if (originalSchema === undefined) delete process.env.SCHEMA;
-    else process.env.SCHEMA = originalSchema;
-    DatabaseTasks.dbDir = originalDbDir;
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    configurations = { development: { adapter: "abstract", database: "my-db" } };
   });
 
   it("check dump filename defaults", () => {
-    const expected = "/tmp/schema.ts";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe(expected);
+    stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+      withStubbedConfigurations(undefined, () => {
+        expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe(
+          "/tmp/schema.ts",
+        );
+      });
+    });
   });
 
   it("check dump filename with schema env", () => {
-    process.env.SCHEMA = "schema_path";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe("schema_path");
+    const schema = getEnv("SCHEMA");
+    setEnv("SCHEMA", "schema_path");
+    try {
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        withStubbedConfigurations(undefined, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe(
+            "schema_path",
+          );
+        });
+      });
+    } finally {
+      setEnv("SCHEMA", schema);
+    }
   });
 
-  it("check dump filename defaults for non primary databases", () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: {
-        primary: { adapter: "abstract", database: "dev-db" },
-        secondary: { adapter: "abstract", database: "secondary-dev-db" },
-      },
+  for (const [fmt, [format, filename]] of Object.entries(FORMATS)) {
+    it(`check dump filename for ${fmt} format`, () => {
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        withStubbedConfigurations(undefined, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!, format)).toBe(
+            `/tmp/${filename}`,
+          );
+        });
+      });
     });
-    const expected = "/tmp/secondary_schema.ts";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(expected);
+  }
+
+  it("check dump filename defaults for non primary databases", () => {
+    stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+      const configurations = {
+        development: {
+          primary: { adapter: "abstract", database: "dev-db" },
+          secondary: { adapter: "abstract", database: "secondary-dev-db" },
+        },
+      };
+      withStubbedConfigurations(configurations, () => {
+        expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(
+          "/tmp/secondary_schema.ts",
+        );
+      });
+    });
   });
 
   it("setting schema dump to nil", () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: {
-        primary: { adapter: "abstract", database: "dev-db", schemaDump: false },
-      },
+    stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+      const configurations = {
+        development: {
+          primary: { adapter: "abstract", database: "dev-db", schemaDump: false },
+        },
+      };
+      withStubbedConfigurations(configurations, () => {
+        expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBeNull();
+      });
     });
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBeNull();
   });
 
   it("check dump filename with schema env with non primary databases", () => {
-    process.env.SCHEMA = "schema_path";
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: {
-        primary: { adapter: "abstract", database: "dev-db" },
-        secondary: { adapter: "abstract", database: "secondary-dev-db" },
-      },
-    });
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(
-      "schema_path",
-    );
-  });
-});
-
-describe("DatabaseTasksWithTemporaryPoolTest", () => {
-  afterEach(async () => {
-    await Base.establishConnection(ambientPoolConfiguration());
-  });
-
-  it.skipIf(adapterType !== "sqlite")(
-    "reuses the ambient pool for a relative sqlite path",
-    async () => {
-      const config = new HashConfig(DatabaseTasks.env, "primary", {
-        adapter: "sqlite3",
-        database: "db/relative.sqlite3",
-        pool: 1,
-      });
-      await Base.establishConnection(config);
-      const ambientPool = Base.connectionPool();
-      let temporaryPool: ConnectionPool | null = null;
-      await DatabaseTasks.withTemporaryPool(config, async (pool) => {
-        temporaryPool = pool;
-      });
-      expect(temporaryPool).toBe(ambientPool);
-      expect(Base.connectionPool()).toBe(ambientPool);
-      expect(config.database).toBe("db/relative.sqlite3");
-    },
-  );
-
-  it.skipIf(adapterType !== "sqlite")("replaces the ambient pool when clobber", async () => {
-    const config = new HashConfig(DatabaseTasks.env, "primary", {
-      adapter: "sqlite3",
-      database: "db/clobber.sqlite3",
-      pool: 1,
-    });
-    await Base.establishConnection(config);
-    const ambientPool = Base.connectionPool();
-    let temporaryPool: ConnectionPool | null = null;
-    await DatabaseTasks.withTemporaryPool(
-      config,
-      async (pool) => {
-        temporaryPool = pool;
-      },
-      { clobber: true },
-    );
-    expect(temporaryPool).not.toBe(ambientPool);
-  });
-
-  it.skipIf(adapterType !== "sqlite")("createAll restores the original pool", async () => {
-    const config = new HashConfig(DatabaseTasks.env, "primary", {
-      adapter: "sqlite3",
-      database: "db/ambient.sqlite3",
-      pool: 1,
-    });
-    await Base.establishConnection(config);
-    const ambientPool = Base.connectionPool();
-    const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
-    const previousConfiguration = DatabaseTasks.databaseConfiguration;
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: { adapter: "sqlite3", database: "db/other.sqlite3" },
-    });
+    const schema = getEnv("SCHEMA");
+    setEnv("SCHEMA", "schema_path");
     try {
-      await DatabaseTasks.createAll();
-      expect(createSpy).toHaveBeenCalled();
-      expect(Base.connectionPool()).toBe(ambientPool);
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        const configurations = {
+          development: {
+            primary: { adapter: "abstract", database: "dev-db" },
+            secondary: { adapter: "abstract", database: "secondary-dev-db" },
+          },
+        };
+        withStubbedConfigurations(configurations, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(
+            "schema_path",
+          );
+        });
+      });
     } finally {
-      createSpy.mockRestore();
-      DatabaseTasks.databaseConfiguration = previousConfiguration;
+      setEnv("SCHEMA", schema);
     }
   });
+
+  for (const [fmt, [format, filename]] of Object.entries(FORMATS)) {
+    it(`check dump filename for ${fmt} format with non primary databases`, () => {
+      stub(DatabaseTasks, "dbDir", "/tmp", undefined, () => {
+        const configurations = {
+          development: {
+            primary: { adapter: "abstract", database: "dev-db" },
+            secondary: { adapter: "abstract", database: "secondary-dev-db" },
+          },
+        };
+        withStubbedConfigurations(configurations, () => {
+          expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!, format)).toBe(
+            `/tmp/secondary_${filename}`,
+          );
+        });
+      });
+    });
+  }
+
+  const withStubbedConfigurations = (
+    configurations_: Record<string, Record<string, unknown>> = configurations,
+    block: () => void,
+  ): void => {
+    const oldConfigurations = Base.configurations();
+    Base.configurations(configurations_);
+
+    try {
+      block();
+    } finally {
+      Base.configurations(oldConfigurations);
+    }
+  };
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { constantize } from "@blazetrails/activesupport";
+import { Autoload, constantize } from "@blazetrails/activesupport";
 import "./index.js";
 import {
   Associations,
@@ -22,7 +22,7 @@ import { NullEncryptor } from "./encryption/null-encryptor.js";
 import { Scheme } from "./encryption/scheme.js";
 import * as Errors from "./encryption/errors.js";
 import { Optimistic } from "./locking/optimistic.js";
-import * as Pessimistic from "./locking/pessimistic.js";
+import { Pessimistic } from "./locking/pessimistic.js";
 import { Default } from "./scoping/default.js";
 import * as Named from "./scoping/named.js";
 import { Dirty } from "./attribute-methods/dirty.js";
@@ -120,5 +120,43 @@ describe("ActiveRecord namespaces", () => {
     );
     expect(constantize("ActiveRecord::Associations::AssociationScope")).toBe(AssociationScope);
     expect(constantize("ActiveRecord::Associations::AliasTracker")).toBe(AliasTracker);
+  });
+
+  it("Associations.eager_load! seats every constant associations.rb:29-41 eager autoloads", async () => {
+    await Associations.eagerLoadBang();
+    expect(
+      [
+        "BelongsToAssociation",
+        "BelongsToPolymorphicAssociation",
+        "HasManyAssociation",
+        "HasManyThroughAssociation",
+        "HasOneAssociation",
+        "HasOneThroughAssociation",
+        "Preloader",
+        "JoinDependency",
+        "AssociationScope",
+        "DisableJoinsAssociationScope",
+        "AliasTracker",
+      ].filter(
+        (constName) =>
+          (Associations as unknown as Record<string, unknown>)[constName] === undefined ||
+          constantize(`ActiveRecord::Associations::${constName}`) !==
+            (Associations as unknown as Record<string, unknown>)[constName],
+      ),
+    ).toEqual([]);
+  });
+
+  it("Associations.eager_load! calls super, then Preloader and JoinDependency", async () => {
+    const order: string[] = [];
+    vi.spyOn(Autoload, "eagerLoadBang").mockImplementation(async () => void order.push("super"));
+    vi.spyOn(Preloader, "eagerLoadBang").mockImplementation(
+      async () => void order.push("Preloader"),
+    );
+    vi.spyOn(JoinDependency, "eagerLoadBang").mockImplementation(
+      async () => void order.push("JoinDependency"),
+    );
+    await Associations.eagerLoadBang();
+    vi.restoreAllMocks();
+    expect(order).toEqual(["super", "Preloader", "JoinDependency"]);
   });
 });

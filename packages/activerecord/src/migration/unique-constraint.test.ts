@@ -1,17 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  assertEmpty,
-  assertNoChanges,
-  assertRaises,
-  registerConstant,
-} from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
+import { assertEmpty, assertNoChanges, assertRaises } from "@blazetrails/activesupport";
+import { Module, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 registerConstant("ActiveRecord::Migration::UniqueConstraintTest", new Module());
 
@@ -32,6 +27,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line blazetrails/require-canonical-rebuild -- unique_constraint_test.rb:22-24 drops it; the fixtures() transaction rolls the DDL back
     await connection.dropTable("sections", { ifExists: true });
   });
 

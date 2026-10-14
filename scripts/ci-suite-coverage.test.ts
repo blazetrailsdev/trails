@@ -178,11 +178,11 @@ function gateRegex(yml: string, name: string): RegExp {
  *
  *  AR_PKGS_RE
  *  AR workspace deps: arel/activemodel/activesupport/globalid/
- *  did-you-mean (per packages/activerecord/package.json). Also
- *  consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
- *  CLI + type-virtualization modules (see packages/activerecord/src/
- *  tsc-wrapper, schema-columns-dump.test.ts), so trails-tsc changes
- *  can fail AR vitest suites — include it in the gate.
+ *  did-you-mean (per packages/activerecord/package.json).
+ *  activerecord-cli consumes @blazetrails/trails-tsc at runtime via its
+ *  tsc-wrapper CLI + type-virtualization modules (see
+ *  packages/activerecord-cli/src/), so trails-tsc changes can fail the
+ *  suites the AR jobs run — include it in the gate.
  *  activerecord-cli E2E suites run in the three AR DB jobs (its tests
  *  exercise the CLI against real DBs), so cli source changes must also
  *  flip activerecord_affected.
@@ -212,7 +212,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  TRAILS_TSC_PKGS_RE
  *  trails_tsc_affected gates the virtualized DX type tests, the
  *  blocking trails-tsc-tests job, and trails-tsc-coverage.
- *  Workspace consumers of @blazetrails/trails-tsc today: activerecord
+ *  Workspace consumers of @blazetrails/trails-tsc today: activerecord-cli
  *  (tsc-wrapper + type-virtualization) and scripts/guides-typecheck;
  *  AR consumption is the reason trails-tsc is also in AR_PKGS_RE.
  *
@@ -243,7 +243,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  - trailties-tests runs `pnpm vitest run packages/trailties`.
  *    @blazetrails/activerecord is a runtime dependency
  *    (trailties/package.json) imported by src/database.ts,
- *    src/migration-loader.ts, src/schema-source.ts, src/commands/db.ts
+ *    src/migration-loader.ts, src/commands/db.ts
  *    and the generators — all of which have their own .test.ts. The AR
  *    clause in TRAILTIES_PKGS_RE is load-bearing.
  *
@@ -443,9 +443,9 @@ function gateRegex(yml: string, name: string): RegExp {
  *  Thor imports nothing outside src/thor/, but trailties imports Thor
  *  (generators/base.ts includes Thor::Actions), so the flag narrows rather
  *  than skips:
- *  - trailties-tests runs `vitest related` over the thor sources, through
- *    vitest.trailties.config.ts (the root `other` project narrowed to
- *    packages/trailties; related mode cannot crawl eslint/*.test.mjs).
+ *  - trailties-tests runs `vitest related` over the thor sources, on the
+ *    root config's `trailties` project (related mode crawls the whole
+ *    include list of the project it runs).
  *  - virtualized-dx-type-tests and leaf-tests' DX type step skip: thor has
  *    no DX-type surface. The ci aggregate accepts those skips only when
  *    thor_only is true.
@@ -456,7 +456,15 @@ function gateRegex(yml: string, name: string): RegExp {
  *    package test trees; lint-call-mismatches and baseline-json read the
  *    committed call-mismatch shards. mixin-declaration-drift and
  *    non-transactional-row-writes are not kept: they read only
- *    packages/activerecord/. rails-comparison is not narrowed.
+ *    packages/activerecord/.
+ *  - rails-comparison skips and rails-comparison-thor runs in its place:
+ *    scripts/ci/thor-comparison.sh fetches, extracts and compares the
+ *    `thor` package alone. Each gate it runs is scoped (`--package thor`,
+ *    scripts/api-compare/scope.ts) unless it reads no artifact; each
+ *    whole-surface script it does not run is in THOR_COMPARISON_SKIPS below,
+ *    with the reason. The vendor cache is restore-only there, so a thor-only
+ *    fetch is never saved under the key rails-comparison shares. The ci
+ *    aggregate accepts each job's skip only on the other's side of thor_only.
  *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
@@ -484,6 +492,31 @@ type GateOpts = { cwd?: string; base?: string; head?: string };
 
 /** The filter step's last gate line; ci.yml names the script repo-relative. */
 const THOR_ONLY_CALL = "bash scripts/ci/thor-only.sh";
+
+/**
+ * The whole-surface comparison scripts scripts/ci/thor-comparison.sh does not
+ * run, each with why a thor-only diff cannot move its answer. The population
+ * premises are asserted by scripts/api-compare/scope.test.ts: param-name-mark's
+ * GATED_PACKAGES (which the block-param ratchet gates by too), and the
+ * dependency rules. The receipt-audit package and the
+ * method-order and test-name lint paths, which ci.yml states, are asserted by
+ * the test that reads this table.
+ */
+const THOR_COMPARISON_SKIPS: Record<string, string> = {
+  "scripts/api-compare/lint-param-names.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-block-params.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-deps.ts": "no dependency rule names thor",
+  "scripts/api-compare/receipt-audit.ts": "runs for --package activerecord only",
+  "scripts/build-rails-file-structure-manifest.ts": "method order: arel and activemodel only",
+  "scripts/build-rails-test-names-manifest.ts": "test names: no thor path is enrolled",
+  "scripts/parity/conventions-doc.ts": "generated from conventions.ts",
+  "scripts/generate-standalone-associations-exclude.ts": "reads packages/activerecord only",
+  "scripts/test-deps/rails-test-deps.ts": "reads packages/activerecord only",
+  "scripts/test-deps/build-fixture-baseline.ts": "reads packages/activerecord only",
+  "scripts/test-compare/closure-cli.ts": "reads vendored activesupport tests only",
+  "scripts/fixtures-compare/compare.ts": "reads activerecord fixtures and models only",
+  "scripts/schema-compare/compare.ts": "reads the activerecord test schema only",
+};
 
 async function gateRunner(
   yml: string,
@@ -1323,6 +1356,60 @@ describe("CI runs every tooling test suite", () => {
     expect(aggregate).toContain(
       '[ "$AR_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }',
     );
+  });
+
+  it("runs exactly one comparison job on either side of thor_only", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const flat = (x: string): string => x.replace(/\s+/g, " ");
+    const aggregate = flat(wf.jobs.ci.steps[0].run);
+    const gated =
+      "needs.changes.outputs.docs_only != 'true' && " +
+      "needs.changes.outputs.comparison_affected == 'true' && " +
+      "needs.changes.outputs.thor_only";
+
+    expect(flat(wf.jobs["rails-comparison"].if).trim()).toBe(`${gated} != 'true'`);
+    expect(flat(wf.jobs["rails-comparison-thor"].if).trim()).toBe(`${gated} == 'true'`);
+    expect(wf.jobs.ci.needs).toContain("rails-comparison-thor");
+    expect(aggregate).toContain(
+      'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then continue',
+    );
+    expect(aggregate).toContain(
+      'rails-comparison-thor) if [ "$COMPARISON_AFFECTED" = "false" ] || ' +
+        '[ "$THOR_ONLY" != "true" ]; then continue',
+    );
+
+    const steps = wf.jobs["rails-comparison-thor"].steps as { uses?: string; run?: string }[];
+    expect(steps.map((step) => step.uses)).toContain("actions/cache/restore@v4");
+    expect(steps.map((step) => step.uses)).not.toContain("actions/cache@v4");
+    expect(steps.map((step) => step.run)).toContain("pnpm vendor:fetch --source thor");
+  });
+
+  it("accounts for every whole-surface comparison script in the thor driver", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const steps = wf.jobs["rails-comparison"].steps as { run?: string }[];
+    const scripts = new Set(
+      steps.flatMap((step) => (step.run ?? "").match(/scripts\/[\w/-]+\.ts/g) ?? []),
+    );
+    const driver = (await readFile(path.join(REPO_ROOT, "scripts/ci/thor-comparison.sh"), "utf8"))
+      .replaceAll("$api/", "scripts/api-compare/")
+      .replaceAll("$tests/", "scripts/test-compare/");
+
+    const run = [...scripts].filter((script) => driver.includes(script));
+    const skipped = Object.keys(THOR_COMPARISON_SKIPS);
+
+    expect(scripts.size).toBeGreaterThan(30);
+    expect([...scripts].filter((s) => !run.includes(s) && !skipped.includes(s))).toEqual([]);
+    expect(skipped.filter((s) => !scripts.has(s) || run.includes(s))).toEqual([]);
+
+    const lines = steps.flatMap((step) => (step.run ?? "").split("\n").map((l) => l.trim()));
+    for (const pkg of ["activerecord", "activemodel"]) {
+      expect(lines.some((l) => l.includes(`receipt-audit.ts --package ${pkg} --gate`))).toBe(true);
+    }
+    for (const id of ["method-order", "test-names"]) {
+      const lint = lines.filter((l) => l.startsWith(`${id} after `));
+      expect(lint).toHaveLength(1);
+      expect(lint[0]).not.toContain("packages/trailties");
+    }
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {

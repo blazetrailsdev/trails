@@ -2,37 +2,28 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { __resetPrimaryAbstractClass } from "./inheritance.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class PrimaryAppRecord extends Base {}
 PrimaryAppRecord.abstractClass = true;
 
 class AnotherAppRecord extends PrimaryAppRecord {
-  static override _abstractClass = true;
+  static {
+    this.abstractClass = true;
+  }
 }
 
 class ApplicationRecord extends Base {
-  static override _abstractClass = true;
+  static {
+    this.abstractClass = true;
+  }
 }
 
 describe("PrimaryClassTest", () => {
-  fixtures({}, { useTransactionalTests: false });
-
-  function cleanUpConnectionHandler(): void {
-    const managers: Map<string, { roleNames: string[]; removeRole(role: string): unknown }> = (
-      Base.connectionHandler as unknown as {
-        _connectionNameToPoolManager: Map<string, never>;
-      }
-    )._connectionNameToPoolManager as never;
-    for (const [, poolManager] of managers) {
-      for (const role of [...poolManager.roleNames]) {
-        if (role !== Base.defaultRole) poolManager.removeRole(role);
-      }
-    }
-  }
+  const { self } = fixtures({}, { useTransactionalTests: false });
 
   afterEach(() => {
-    cleanUpConnectionHandler();
+    self().cleanUpConnectionHandler();
     __resetPrimaryAbstractClass();
     delete (globalThis as Record<string, unknown>)["ApplicationRecord"];
   });

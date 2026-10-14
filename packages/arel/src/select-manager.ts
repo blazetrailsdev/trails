@@ -10,33 +10,44 @@ import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
 import { StringJoin } from "./nodes/string-join.js";
 import { EmptyJoinError } from "./errors.js";
-import { Union, UnionAll, Intersect, Except } from "./nodes/binary.js";
-import { With, WithRecursive } from "./nodes/with.js";
+import { Union, Intersect, Except } from "./nodes/binary.js";
+import { With } from "./nodes/with.js";
 import { TableAlias } from "./nodes/table-alias.js";
 import { Exists } from "./nodes/function.js";
 import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
 import { sql } from "./arel.js";
-import { Arel } from "./namespaces.js";
+import { Arel, Nodes } from "./namespaces.js";
+import {
+  capitalize,
+  compact,
+  isEmpty,
+  isSymbol,
+  rbConstGet,
+  rbModConstSet,
+  rbObjAsString,
+  rtest,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/nary.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { Crud } from "./crud.js";
 import { include } from "@blazetrails/activesupport";
+import type { ArelNode } from "./arel.js";
 
-const UNION_NODE_CLASSES: Record<
-  string,
-  new (left: SelectStatement, right: SelectStatement) => Union
-> = { UnionAll };
+type Subqueries = Node | Subqueries[];
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class SelectManager extends TreeManager {
-  ast: SelectStatement;
+export class SelectManager extends TreeManager<SelectStatement> {
+  /** @internal */
+  private ctx: SelectCore;
 
-  constructor(table?: Table | Node | null) {
+  constructor(table: Table | ArelNode | null = null) {
     super();
-    this.ast = new SelectStatement(table ?? null);
+    this.ast = new SelectStatement(table);
+    this.ctx = this.ast.cores.at(-1)!;
   }
 
   get limit(): Limit["expr"] | null {
@@ -51,8 +62,8 @@ export class SelectManager extends TreeManager {
     return this.limit;
   }
 
-  get constraints(): Node[] {
-    return [...this.core.wheres];
+  get constraints(): ArelNode[] {
+    return [...this.ctx.wheres];
   }
 
   get offset(): Offset["expr"] | null {
@@ -79,7 +90,7 @@ export class SelectManager extends TreeManager {
     );
   }
 
-  lock(locking: string | Node | boolean = sql("FOR UPDATE")): this {
+  lock(locking: string | ArelNode | boolean = sql("FOR UPDATE")): this {
     if (locking === true) {
       locking = sql("FOR UPDATE");
     } else if (locking instanceof SqlLiteral) {
@@ -96,141 +107,144 @@ export class SelectManager extends TreeManager {
     return this.ast.lock;
   }
 
-  on(...exprs: (Node | string | null | undefined)[]): this {
-    const joins = this.core.source.right;
+  on(...exprs: (ArelNode | string | null | undefined)[]): this {
+    const joins = this.ctx.source.right;
     const lastJoin = joins[joins.length - 1] as unknown as { right: Node | null };
     lastJoin.right = new On(this.collapse(exprs));
     return this;
   }
 
-  group(...columns: (Node | string)[]): this {
-    for (const column of columns) {
-      if (typeof column === "string") {
-        this.core.groups.push(new Group(new SqlLiteral(column)));
-      } else {
-        this.core.groups.push(new Group(column));
-      }
+  group(...columns: (ArelNode | string)[]): this {
+    for (let column of columns) {
+      if (typeof column === "string" && !isSymbol(column)) column = new SqlLiteral(column);
+      if (isSymbol(column)) column = new SqlLiteral(symbolToS(column));
+
+      this.ctx.groups.push(new Group(column));
     }
     return this;
   }
 
-  from(table: Table | Node | string): this {
+  from(table: Table | ArelNode | string): this {
     const node = typeof table === "string" ? new SqlLiteral(table) : table;
     if (node instanceof Join) {
-      this.core.source.right.push(node);
+      this.ctx.source.right.push(node);
     } else {
-      this.core.source.left = node;
+      this.ctx.source.left = node;
     }
     return this;
   }
 
-  get froms(): Node[] {
-    return this.ast.cores.map((c) => c.from).filter((x): x is Node => x !== null);
+  get froms(): ArelNode[] {
+    return this.ast.cores.map((c) => c.from).filter((x): x is ArelNode => x !== null);
   }
 
   join(
-    relation: Node | Table | string | null | undefined,
-    klass: new (left: Node | Table, right: Node | null) => Join = InnerJoin,
+    relation: ArelNode | Table | string | null | undefined,
+    klass: new (left: ArelNode | Table, right: ArelNode | null) => Join = InnerJoin,
   ): this {
     if (relation == null) return this;
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
-      const text = typeof relation === "string" ? relation : relation.value;
-      if (text.length === 0) throw new EmptyJoinError();
-      klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
+      if (isEmpty(relation)) throw new EmptyJoinError();
+      klass = StringJoin;
     }
 
-    this.core.source.right.push(this.createJoin(relation, null, klass));
+    this.ctx.source.right.push(this.createJoin(relation, null, klass));
     return this;
   }
 
-  outerJoin(relation: Node | Table | string | null | undefined): this {
+  outerJoin(relation: ArelNode | Table | string | null | undefined): this {
     return this.join(relation, OuterJoin);
   }
 
-  having(expr: Node): this {
-    this.core.havings.push(expr);
+  having(expr: ArelNode): this {
+    this.ctx.havings.push(expr);
     return this;
   }
 
   window(name: string): NamedWindow {
     const window = new NamedWindow(name);
-    this.core.windows.push(window);
+    this.ctx.windows.push(window);
     return window;
   }
 
-  project(...projections: (Node | string)[]): this {
+  project(...projections: (ArelNode | string)[]): this {
     for (const x of projections) {
       if (typeof x === "string") {
-        this.core.projections.push(new SqlLiteral(x));
+        this.ctx.projections.push(new SqlLiteral(x));
       } else {
-        this.core.projections.push(x);
+        this.ctx.projections.push(x);
       }
     }
     return this;
   }
 
-  get projections(): Node[] {
-    return [...this.core.projections];
+  get projections(): (ArelNode | ArelNode[])[] {
+    return [...this.ctx.projections];
   }
 
-  set projections(value: Node[]) {
-    this.core.projections.length = 0;
-    this.core.projections.push(...value);
+  set projections(value: (ArelNode | ArelNode[])[]) {
+    this.ctx.projections.length = 0;
+    this.ctx.projections.push(...value);
   }
 
   optimizerHints(...hints: (string | SqlLiteral)[]): this {
     if (hints.length > 0) {
-      this.core.optimizerHints = new OptimizerHints(hints);
+      this.ctx.optimizerHints = new OptimizerHints(hints);
     }
     return this;
   }
 
   distinct(value: unknown = true): this {
-    this.core.setQuantifier = value === false || value == null ? null : new Distinct();
+    if (rtest(value)) {
+      this.ctx.setQuantifier = new Distinct();
+    } else {
+      this.ctx.setQuantifier = null;
+    }
     return this;
   }
 
-  distinctOn(value: Node | false | null): this {
-    this.core.setQuantifier = value === false || value == null ? null : new DistinctOn(value);
+  distinctOn(value: ArelNode | false | null): this {
+    if (rtest(value)) {
+      this.ctx.setQuantifier = new DistinctOn(value);
+    } else {
+      this.ctx.setQuantifier = null;
+    }
     return this;
   }
 
-  order(...expr: (Node | string)[]): this {
+  order(...expr: (ArelNode | string)[]): this {
     this.ast.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
-  get orders(): Node[] {
+  get orders(): ArelNode[] {
     return [...this.ast.orders];
   }
 
-  where(expr: Node | TreeManager): this {
-    this.core.wheres.push(expr instanceof TreeManager ? expr.ast : expr);
+  where(expr: ArelNode | TreeManager): this {
+    this.ctx.wheres.push(expr instanceof TreeManager ? expr.ast : expr);
     return this;
   }
 
   whereSql(engine: ArelEngine | null = _engine.current): SqlLiteral | null {
-    if (this.core.wheres.length === 0) return null;
-    return new SqlLiteral(`WHERE ${new And(this.core.wheres).toSql(engine)}`);
+    if (this.ctx.wheres.length === 0) return null;
+    return new SqlLiteral(`WHERE ${new And(this.ctx.wheres).toSql(engine)}`);
   }
 
-  union(
-    operation: string | SelectManager | SelectStatement,
-    other: SelectManager | SelectStatement | null = null,
-  ): Union {
-    let nodeClass: new (left: SelectStatement, right: SelectStatement) => Union;
-    if (other) {
-      const name = String(operation).slice(1);
-      const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-      nodeClass = UNION_NODE_CLASSES[`Union${capitalized}`];
+  union(operation: string | SelectManager, other: SelectManager | null = null): Union {
+    let nodeClass: typeof Union;
+    if (other != null) {
+      nodeClass = rbConstGet(
+        Nodes,
+        `Union${capitalize(rbObjAsString(operation), [])}`,
+      ) as typeof Union;
     } else {
-      other = operation as SelectManager | SelectStatement;
+      other = operation as SelectManager;
       nodeClass = Union;
     }
 
-    const otherAst = other instanceof SelectManager ? other.ast : other;
-    return new nodeClass(this.ast, otherAst);
+    return new nodeClass(this.ast, other.ast);
   }
 
   intersect(other: SelectManager): Intersect {
@@ -250,8 +264,18 @@ export class SelectManager extends TreeManager {
     return new Lateral(base);
   }
 
-  with(...subqueries: Node[]): this {
-    this.ast.with = new With(subqueries);
+  with(...subqueries: (string | Subqueries)[]): this {
+    let nodeClass: typeof With;
+    if (isSymbol(subqueries[0])) {
+      nodeClass = rbConstGet(
+        Nodes,
+        `With${capitalize(symbolToS(subqueries.shift() as string), [])}`,
+      ) as typeof With;
+    } else {
+      nodeClass = With;
+    }
+    this.ast.with = new nodeClass((subqueries as unknown[]).flat(Infinity) as Node[]);
+
     return this;
   }
 
@@ -261,33 +285,28 @@ export class SelectManager extends TreeManager {
   }
 
   joinSources(): Join[] {
-    return this.core.source.right as Join[];
+    return this.ctx.source.right as Join[];
   }
 
   get source(): JoinSource {
-    return this.core.source;
+    return this.ctx.source;
   }
 
   comment(...values: string[]): this {
-    this.core.comment = new Comment(values);
+    this.ctx.comment = new Comment(values);
     return this;
   }
 
-  protected collapse(exprs: unknown[]): Node {
-    exprs = exprs
-      .filter((expr) => expr !== null && expr !== undefined)
-      .map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
+  protected collapse(exprs: unknown[]): ArelNode {
+    exprs = compact(exprs);
+    exprs = exprs.map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
     if (exprs.length === 1) return exprs[0] as Node;
     return this.createAnd(exprs as Node[]);
   }
 
-  private get core(): SelectCore {
-    return this.ast.cores[this.ast.cores.length - 1];
-  }
-
-  withRecursive(...ctes: Node[]): this {
-    this.ast.with = new WithRecursive(ctes);
-    return this;
+  override initializeCopy(other: SelectManager): void {
+    super.initializeCopy(other);
+    this.ctx = this.ast.cores.at(-1)!;
   }
 }
 
@@ -298,4 +317,4 @@ export interface SelectManager extends _FactoryMethodsModule, Crud {}
 
 include(SelectManager, Crud);
 
-Arel.SelectManager = SelectManager;
+rbModConstSet(Arel, "SelectManager", SelectManager);

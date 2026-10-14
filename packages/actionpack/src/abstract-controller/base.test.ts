@@ -28,3 +28,44 @@ describe("ActionNotFound#corrections", () => {
     expect(error.corrections).toEqual([]);
   });
 });
+
+describe("AbstractController::Base, an action is named by its method", () => {
+  class StoriesController extends AbstractController {
+    ran: string[] = [];
+    nextBundle(): void {
+      this.ran.push("nextBundle");
+    }
+    sekrit_data(): void {
+      this.ran.push("sekrit_data");
+    }
+  }
+
+  it("lists its actions under the names their methods are declared with", () => {
+    expect([...StoriesController.actionMethods()].sort()).toEqual(["nextBundle", "sekrit_data"]);
+  });
+
+  it("dispatches an action by its method's name and records that name", async () => {
+    const controller = new StoriesController();
+
+    await controller.process("nextBundle");
+
+    expect(controller.ran).toEqual(["nextBundle"]);
+    expect(controller.actionName).toBe("nextBundle");
+  });
+
+  it("does not find a camelCase method under its underscored name", async () => {
+    const controller = new StoriesController();
+
+    await expect(controller.process("next_bundle")).rejects.toThrow(ActionNotFound);
+    expect(controller.ran).toEqual([]);
+  });
+
+  it("does not find an underscored method under its camelCase name", async () => {
+    const controller = new StoriesController();
+
+    await controller.process("sekrit_data");
+    await expect(controller.process("sekritData")).rejects.toThrow(ActionNotFound);
+
+    expect(controller.ran).toEqual(["sekrit_data"]);
+  });
+});

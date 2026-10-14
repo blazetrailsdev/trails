@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 
@@ -10,7 +10,7 @@ registerModel(Post);
 describe("CollectionProxy to: :records delegates share one loader", () => {
   fixtures(["authors", "posts"]);
 
-  const newOwner = () => Author.new({ name: "unsaved" });
+  const newOwner = () => new Author({ name: "unsaved" });
 
   it("a Rails-named delegate marks the proxy loaded", async () => {
     const author = newOwner();

@@ -1,15 +1,18 @@
+import { include } from "@blazetrails/activesupport";
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ArelEngine, Node, _engine } from "./nodes/node.js";
-import { Visitors } from "./namespaces.js";
-import { cloneSlot, objectClone } from "./clone-support.js";
+import { Visitors, Arel } from "./namespaces.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
+import { FactoryMethods, type FactoryMethodsModule } from "./factory-methods.js";
+import type { ArelNode } from "./arel.js";
 
 type StatementMethodsHost = {
   ast: {
     key?: unknown;
-    wheres?: Node[];
-    orders?: Node[];
+    wheres: ArelNode[];
+    orders?: ArelNode[];
     limit?: Node | null;
     offset?: Node | null;
   };
@@ -28,7 +31,7 @@ export class StatementMethods {
     return this;
   }
 
-  order(this: StatementMethodsHost, ...expr: Node[]): unknown {
+  order(this: StatementMethodsHost, ...expr: ArelNode[]): unknown {
     this.ast.orders = expr;
     return this;
   }
@@ -41,28 +44,25 @@ export class StatementMethods {
     return this.ast.key;
   }
 
-  set wheres(exprs: Node[]) {
+  set wheres(exprs: ArelNode[]) {
     this.ast.wheres = exprs;
   }
 
-  get wheres(): Node[] {
-    return this.ast.wheres ?? [];
+  get wheres(): ArelNode[] {
+    return this.ast.wheres;
   }
 
-  where(this: StatementMethodsHost, expr: Node): unknown {
-    (this.ast.wheres ??= []).push(expr);
+  where(this: StatementMethodsHost, expr: ArelNode): unknown {
+    this.ast.wheres.push(expr);
     return this;
   }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class TreeManager {
-  abstract ast: Node;
-
+export abstract class TreeManager<T extends Node = Node> {
   toDot(): string {
-    const collector = new PlainString();
-    const dot = new Visitors.Dot();
-    dot.accept(this.ast, collector);
+    let collector = new PlainString();
+    collector = new Visitors.Dot().accept(this.ast, collector);
     return collector.value;
   }
 
@@ -70,22 +70,15 @@ export abstract class TreeManager {
     return this.ast.toSql(engine);
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.ast = cloneSlot(this.ast);
-    return copy;
+  initializeCopy(_other: TreeManager<T>): void {
+    this.ast = rbObjClone(this.ast);
   }
 }
 
-/**
- * Methods supplied by the FactoryMethods mixin (runtime wiring in ./index.ts).
- * See node.ts for why this uses the explicit `FactoryMethodsModule` interface
- * rather than `Included<typeof FactoryMethods>`.
- *
- * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
- */
-type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
+export interface TreeManager<T extends Node = Node> extends FactoryMethodsModule {
+  ast: T;
+}
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
-   @typescript-eslint/no-unsafe-declaration-merging */
-export interface TreeManager extends _FactoryMethodsModule {}
+include(TreeManager, FactoryMethods);
+
+rbModConstSet(Arel, "TreeManager", TreeManager);

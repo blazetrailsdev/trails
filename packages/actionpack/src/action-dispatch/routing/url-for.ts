@@ -3,17 +3,20 @@ import {
   classAttribute,
   Concern,
   mattrWriter,
-  reverseMerge,
+  reverseMergeBang,
 } from "@blazetrails/activesupport";
 import {
   extend,
+  type Hash,
+  dup,
+  hashDelete,
   include,
-  initialize as moduleInitialize,
   isSymbol,
   Module,
   rbFPublicSend,
   rbObjRespondTo,
   symbolToS,
+  toH,
 } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import {
@@ -65,36 +68,34 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (options == null) {
     return this._routes!.urlFor({ ...this.urlOptions() });
   }
-  if (typeof options === "string" && !isSymbol(options)) {
-    return options;
-  }
-  if (Array.isArray(options)) {
-    const components = [...options];
-    const opts = extractOptions(components);
-    if (typeof this.polymorphicUrl !== "function") {
-      throw new Error("urlFor(Array) requires PolymorphicRoutes#polymorphicUrl on the host.");
-    }
-    return this.polymorphicUrl(components, opts);
-  }
-  const asHash = coerceHashOrParameters(options);
-  if (asHash) {
-    const routeName = asHash["useRoute"];
-    delete asHash["useRoute"];
-    const mergedUrlOptions = reverseMerge({ ...asHash }, this.urlOptions());
+  if (isPlainObject(options) || options instanceof Parameters) {
+    const routeName =
+      options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
+    const mergedUrlOptions = reverseMergeBang(
+      dup(toH<Record<string, unknown> | Hash<string, unknown>>(options)),
+      this.urlOptions(),
+    );
     return this._routes!.urlFor(
       mergedUrlOptions,
       routeName == null ? null : isSymbol(routeName) ? symbolToS(routeName) : String(routeName),
     );
   }
-  const builder = HelperMethodBuilder.url();
+  if (typeof options === "string" && !isSymbol(options)) {
+    return options;
+  }
   const target = this as unknown as PolymorphicHost;
   if (isSymbol(options)) {
-    return builder.handleStringCall(target, options);
+    return HelperMethodBuilder.url().handleStringCall(target, options);
+  }
+  if (Array.isArray(options)) {
+    const components = [...options];
+    const opts = extractOptions(components);
+    return this.polymorphicUrl!(components, opts);
   }
   if (isModelClass(options)) {
-    return builder.handleClassCall(target, options);
+    return HelperMethodBuilder.url().handleClassCall(target, options);
   }
-  return builder.handleModelCall(target, options as ToModel);
+  return HelperMethodBuilder.url().handleModelCall(target, options as ToModel);
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {
@@ -147,13 +148,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /** @internal */
-function coerceHashOrParameters(value: unknown): Record<string, unknown> | null {
-  if (isPlainObject(value)) return value;
-  if (value instanceof Parameters) return value.toH();
-  return null;
-}
-
-/** @internal */
 function extractOptions(arr: unknown[]): Record<string, unknown> {
   const last = arr[arr.length - 1];
   if (isPlainObject(last)) {
@@ -187,10 +181,6 @@ export const UrlFor = new Module((mod) => {
 
     if (rbObjRespondTo(this, "_urlForModules")) include(this, this._urlForModules!());
   });
-
-  (mod as unknown as Record<symbol, unknown>)[moduleInitialize] = function (this: UrlForHost) {
-    this._routes = null;
-  };
 
   mod.moduleEval((m) => {
     Object.assign(m, {

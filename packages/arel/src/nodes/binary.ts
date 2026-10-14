@@ -1,20 +1,19 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Attributes, Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { And, Or } from "./nary.js";
-import { Not } from "./unary.js";
-import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
 import type { SelectManager } from "../select-manager.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
+import type { Attribute } from "../attributes/attribute.js";
 
 export type NodeOrValue =
-  | Node
+  | ArelNode
   | ModelAttribute
   | SelectManager
   | Table
@@ -27,23 +26,20 @@ export type NodeOrValue =
   | Temporal.PlainDateTime
   | Temporal.PlainDate
   | Temporal.PlainTime
-  | Node[]
+  | NodeOrValue[]
   | null;
 
 export const FetchAttribute = {
-  fetchAttribute(this: Binary, block: (attr: Node) => boolean): boolean | undefined {
-    if (this.left instanceof Attributes.Attribute) return block(this.left as Node);
-    if (this.right instanceof Attributes.Attribute) return block(this.right as Node);
+  fetchAttribute(this: Binary, block: (attr: Attribute) => boolean): boolean | undefined {
+    if (this.left instanceof Attributes.Attribute) return block(this.left);
+    if (this.right instanceof Attributes.Attribute) return block(this.right);
     return undefined;
   },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Binary extends NodeExpression {
-  left: NodeOrValue;
-  right: NodeOrValue;
-
-  constructor(left: NodeOrValue, right: NodeOrValue) {
+export class Binary<L = NodeOrValue, R = NodeOrValue> extends NodeExpression {
+  constructor(left: L, right: R) {
     super();
     this.left = left;
     this.right = right;
@@ -62,23 +58,9 @@ export class Binary extends NodeExpression {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.left != null && this.left !== false) copy.left = cloneSlot(this.left);
-    if (this.right != null && this.right !== false) copy.right = cloneSlot(this.right);
-    return copy;
-  }
-
-  and(other: Node): And {
-    return new And([this, other]);
-  }
-
-  or(other: Node): Grouping {
-    return new Grouping(new Or([this, other]));
-  }
-
-  not(): Not {
-    return new Not(this);
+  initializeCopy(_other: Binary): void {
+    if (this.left != null) this.left = rbObjClone(this.left);
+    if (this.right != null) this.right = rbObjClone(this.right);
   }
 }
 
@@ -141,46 +123,46 @@ export class NotIn extends Binary {
 export class Assignment extends Binary {}
 
 export abstract class Join extends Binary {
-  declare left: Node | Table;
-  declare right: Node | Table | null;
+  declare left: ArelNode | Table;
+  declare right: ArelNode | Table | null;
 
-  constructor(left: Node | Table, right: Node | Table | null = null) {
+  constructor(left: ArelNode | Table, right: ArelNode | Table | null = null) {
     super(left, right);
   }
 }
 
 export class Union extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }
 
 export class UnionAll extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }
 
 export class Intersect extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }
 
 export class Except extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }
@@ -201,23 +183,25 @@ include(IsNotDistinctFrom as unknown as Includable, fetchAttributeModule);
 include(NotIn as unknown as Includable, fetchAttributeModule);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Binary extends _AliasPredication {}
+export interface Binary<L = NodeOrValue, R = NodeOrValue> extends _AliasPredication {
+  left: L;
+  right: R;
+}
 
-Nodes.Binary = Binary;
-Nodes.Assignment = Assignment;
-Nodes.As = As;
-Nodes.Between = Between;
-Nodes.NotEqual = NotEqual;
-Nodes.GreaterThan = GreaterThan;
-Nodes.GreaterThanOrEqual = GreaterThanOrEqual;
-Nodes.LessThan = LessThan;
-Nodes.LessThanOrEqual = LessThanOrEqual;
-Nodes.IsDistinctFrom = IsDistinctFrom;
-Nodes.IsNotDistinctFrom = IsNotDistinctFrom;
-Nodes.NotIn = NotIn;
-Nodes.Join = Join;
-Nodes.Union = Union;
-Nodes.UnionAll = UnionAll;
-Nodes.Intersect = Intersect;
-Nodes.Except = Except;
+rbModConstSet(Nodes, "Binary", Binary);
+rbModConstSet(Nodes, "Assignment", Assignment);
+rbModConstSet(Nodes, "As", As);
+rbModConstSet(Nodes, "Between", Between);
+rbModConstSet(Nodes, "NotEqual", NotEqual);
+rbModConstSet(Nodes, "GreaterThan", GreaterThan);
+rbModConstSet(Nodes, "GreaterThanOrEqual", GreaterThanOrEqual);
+rbModConstSet(Nodes, "LessThan", LessThan);
+rbModConstSet(Nodes, "LessThanOrEqual", LessThanOrEqual);
+rbModConstSet(Nodes, "IsDistinctFrom", IsDistinctFrom);
+rbModConstSet(Nodes, "IsNotDistinctFrom", IsNotDistinctFrom);
+rbModConstSet(Nodes, "NotIn", NotIn);
+rbModConstSet(Nodes, "Join", Join);
+rbModConstSet(Nodes, "Union", Union);
+rbModConstSet(Nodes, "UnionAll", UnionAll);
+rbModConstSet(Nodes, "Intersect", Intersect);
+rbModConstSet(Nodes, "Except", Except);

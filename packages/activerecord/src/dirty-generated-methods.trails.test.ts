@@ -20,14 +20,14 @@ describe("DirtyGeneratedMethods", () => {
   }
 
   it("<attr>InDatabase returns the persisted value", () => {
-    const p = Person.new({ name: "Alice" }) as unknown as Generated;
+    const p = new Person({ name: "Alice" }) as unknown as Generated;
     p.changesApplied();
     p.name = "Bob";
     expect(p.nameInDatabase).toBe("Alice");
   });
 
   it("<attr>BeforeLastSave surfaces the prior persisted value", () => {
-    const p = Person.new({ name: "Alice" }) as unknown as Generated;
+    const p = new Person({ name: "Alice" }) as unknown as Generated;
     p.changesApplied();
     p.name = "Bob";
     p.changesApplied();
@@ -35,7 +35,7 @@ describe("DirtyGeneratedMethods", () => {
   });
 
   it("savedChangeTo<Attr> and willSaveChangeTo<Attr> follow save lifecycle", () => {
-    const p = Person.new({}) as unknown as Generated;
+    const p = new Person({}) as unknown as Generated;
     p.changesApplied();
     p.name = "Bob";
     expect(p.isWillSaveChangeToName()).toBe(true);
@@ -46,7 +46,7 @@ describe("DirtyGeneratedMethods", () => {
   });
 
   it("savedChangeTo<Attr> returns the last save's [old, new] pair", () => {
-    const p = Person.new({ name: "Alice" }) as unknown as Generated;
+    const p = new Person({ name: "Alice" }) as unknown as Generated;
     p.changesApplied();
     expect(p.savedChangeToName).toEqual([null, "Alice"]);
     p.name = "Bob";

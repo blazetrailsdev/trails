@@ -1,11 +1,13 @@
 /** @internal */
 
-import { Module } from "@blazetrails/ruby-compat";
+import { include, includedModules, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
 
-import type { HelperMethodsModule, HelpersClassMethods } from "../helpers.js";
+import type { HelpersClassMethods } from "../helpers.js";
+
+type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
 
 export interface UrlHelpersRouteSet {
-  urlHelpers(includePathHelpers?: boolean): HelperMethodsModule;
+  urlHelpers(includePathHelpers?: boolean): HelperMethodsModule | Module;
 }
 
 export interface RoutesHelpersClassMethods extends HelpersClassMethods {
@@ -19,26 +21,26 @@ export function withRoutesHelpers(
 ): (cls: RoutesHelpersControllerClass) => void {
   return (cls) => {
     const namespaceBuilder = findTrailtieUrlHelpers(cls);
-    const urlHelpersModule = (): HelperMethodsModule =>
+    const urlHelpersModule = (): HelperMethodsModule | Module =>
       namespaceBuilder
         ? namespaceBuilder(includePathHelpers)
         : routes.urlHelpers(includePathHelpers);
     const proto = cls.prototype;
     Object.setPrototypeOf(
       proto,
-      new Proxy(Object.getPrototypeOf(proto) as object, {
+      new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
         get(target, key, receiver) {
           if (typeof key === "string") {
-            const accessor = includedAccessor(urlHelpersModule(), key);
+            const accessor = includedAccessor(cls, urlHelpersModule(), key);
             if (accessor) return accessor.get!.call(receiver);
-            const member = includedMember(urlHelpersModule(), key);
+            const member = includedMember(cls, urlHelpersModule(), key);
             if (member !== undefined) return member;
           }
           return Reflect.get(target, key, receiver);
         },
         set(target, key, value, receiver) {
           const accessor =
-            typeof key === "string" ? includedAccessor(urlHelpersModule(), key) : undefined;
+            typeof key === "string" ? includedAccessor(cls, urlHelpersModule(), key) : undefined;
           if (accessor?.set) {
             accessor.set.call(receiver, value);
             return true;
@@ -46,7 +48,11 @@ export function withRoutesHelpers(
           return Reflect.set(target, key, value, receiver);
         },
         has(target, key) {
-          if (typeof key === "string" && includedMember(urlHelpersModule(), key) !== undefined) {
+          if (
+            typeof key === "string" &&
+            (includedAccessor(cls, urlHelpersModule(), key) ||
+              includedMember(cls, urlHelpersModule(), key) !== undefined)
+          ) {
             return true;
           }
           return Reflect.has(target, key);
@@ -61,17 +67,23 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
   prototype: object;
 }
 
-function includedAccessor(mod: HelperMethodsModule, key: string): PropertyDescriptor | undefined {
+function includedAccessor(
+  cls: RoutesHelpersControllerClass,
+  mod: HelperMethodsModule | Module,
+  key: string,
+): PropertyDescriptor | undefined {
   if (!(mod instanceof Module)) return undefined;
-  const descriptor = mod.instanceMethod(key);
+  const descriptor = moduleInstanceMethod(cls, mod, key);
   return descriptor?.get ? descriptor : undefined;
 }
 
-function includedMember(mod: HelperMethodsModule, key: string): unknown {
+function includedMember(
+  cls: RoutesHelpersControllerClass,
+  mod: HelperMethodsModule | Module,
+  key: string,
+): unknown {
+  if (mod instanceof Module) return moduleInstanceMethod(cls, mod, key)?.value;
   let current: object | null = mod;
-  if (mod instanceof Module) {
-    current = Object.getPrototypeOf(mod) as object | null;
-  }
   while (current && current !== Object.prototype) {
     const own = Object.getOwnPropertyDescriptor(current, key);
     if (own && (own.enumerable || !Object.prototype.hasOwnProperty.call(current, "constructor"))) {
@@ -79,6 +91,48 @@ function includedMember(mod: HelperMethodsModule, key: string): unknown {
       return typeof value === "function" || key === "_routes" ? value : undefined;
     }
     current = Object.getPrototypeOf(current) as object | null;
+  }
+  return undefined;
+}
+
+interface IncludedMethodTable {
+  prototype: object;
+  ancestry: object;
+}
+
+const includedMethodTables = new WeakMap<object, WeakMap<Module, IncludedMethodTable>>();
+
+/** @noRailsEquivalent PERMANENT */
+function moduleInstanceMethod(
+  cls: RoutesHelpersControllerClass,
+  mod: Module,
+  key: string,
+): PropertyDescriptor | undefined {
+  if (key === "constructor") return undefined;
+  let tables = includedMethodTables.get(cls);
+  if (!tables) includedMethodTables.set(cls, (tables = new WeakMap()));
+  let table = tables.get(mod);
+  if (!table) {
+    const scan = class {};
+    include(scan, mod);
+    const ancestry = class {};
+    for (const included of includedModules(scan).reverse()) {
+      if (included !== mod && isModuleIncluded(cls, included as object)) {
+        include(ancestry, included as object);
+      }
+    }
+    const probe = class extends ancestry {};
+    include(probe, mod);
+    table = { prototype: probe.prototype, ancestry: ancestry.prototype };
+    tables.set(mod, table);
+  }
+  for (
+    let current: object | null = table.prototype;
+    current && current !== table.ancestry;
+    current = Object.getPrototypeOf(current) as object | null
+  ) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+    if (descriptor) return descriptor;
   }
   return undefined;
 }

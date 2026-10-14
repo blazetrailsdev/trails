@@ -1,3 +1,6 @@
+import { Concern, dasherize, extend } from "@blazetrails/activesupport";
+import { rbClassSuperclass } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
 import { LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
@@ -18,6 +21,10 @@ export interface ViewPathsClass {
   readonly name: string;
   isAbstract(): boolean;
   controllerPath(): string;
+  /** @internal */
+  _prefixes(): string[];
+  /** @internal */
+  localPrefixes(): string[];
   /** @internal */
   _prefixesMemo?: string[];
 }
@@ -41,12 +48,12 @@ export class ClassMethods {
   /** @internal */
   static _prefixes(this: ViewPathsClass): string[] {
     if (Object.prototype.hasOwnProperty.call(this, "_prefixesMemo")) return this._prefixesMemo!;
-    const superclass = Object.getPrototypeOf(this) as ViewPathsClass | null;
-    const local = ClassMethods.localPrefixes.call(this);
+    const superclass = rbClassSuperclass(this);
+    const local = this.localPrefixes();
     return (this._prefixesMemo =
       !superclass || typeof superclass.isAbstract !== "function" || superclass.isAbstract()
         ? local
-        : [...local, ...ClassMethods._prefixes.call(superclass)]);
+        : [...local, ...superclass._prefixes()]);
   }
 
   /** @internal */
@@ -79,9 +86,12 @@ export class ClassMethods {
     writeInternalViewPaths.call(this, ClassMethods._buildViewPaths.call(this, paths));
   }
 
-  /** @internal */
+  /**
+   * @inventedArm dasherize — PERMANENT
+   * @internal
+   */
   static localPrefixes(this: ViewPathsClass): string[] {
-    return [this.controllerPath()];
+    return [dasherize(this.controllerPath())];
   }
 }
 
@@ -91,7 +101,7 @@ const writeInternalViewPaths: (this: ViewPathsClass, paths: PathSet) => void =
 
 /** @internal */
 export function _prefixes(this: ViewPaths): string[] {
-  return ClassMethods._prefixes.call(this.constructor);
+  return this.constructor._prefixes();
 }
 
 export function lookupContext(this: ViewPaths): LookupContext {
@@ -110,13 +120,13 @@ export function detailsForLookup(this: ViewPaths): Record<string, DetailValue> {
 export function appendViewPath(this: ViewPaths, path: ViewPathsInput): void {
   lookupContext
     .call(this)
-    .appendViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toArray());
+    .appendViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toAry());
 }
 
 export function prependViewPath(this: ViewPaths, path: ViewPathsInput): void {
   lookupContext
     .call(this)
-    .prependViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toArray());
+    .prependViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toAry());
 }
 
 export function templateExists(
@@ -158,3 +168,29 @@ export function locale(this: ViewPaths): string | null {
 export function setLocale(this: ViewPaths, value: string | null): void {
   lookupContext.call(this).locale = value;
 }
+
+export const ViewPaths = new Module((mod) => {
+  extend(mod, Concern);
+
+  (
+    mod as unknown as { included(base: null, block: (this: ViewPathsClass) => void): void }
+  ).included(null, function (this: ViewPathsClass) {
+    PathRegistry.setViewPaths(this, new PathSet());
+  });
+
+  mod.moduleEval((m) => {
+    Object.defineProperties(m, {
+      viewPaths: { get: viewPaths, configurable: true },
+      formats: { get: formats, set: setFormats, configurable: true },
+      locale: { get: locale, set: setLocale, configurable: true },
+      lookupContext: { get: lookupContext, configurable: true },
+    });
+  });
+  mod.defineMethod("templateExists", templateExists);
+  mod.defineMethod("isAnyTemplates", isAnyTemplates);
+  mod.defineMethod("_prefixes", _prefixes);
+  mod.defineMethod("detailsForLookup", detailsForLookup);
+  mod.defineMethod("appendViewPath", appendViewPath);
+  mod.defineMethod("prependViewPath", prependViewPath);
+}) as Module & { ClassMethods: typeof ClassMethods };
+ViewPaths.ClassMethods = ClassMethods;

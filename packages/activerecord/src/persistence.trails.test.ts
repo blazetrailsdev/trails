@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ActiveRecordError, RecordInvalid, registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
@@ -10,10 +10,11 @@ import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
 import { Company } from "./test-helpers/models/company.js";
-import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import { queryConstraints, queryConstraintsList } from "./persistence.js";
 
 describe("PersistenceTest (trails)", () => {
   const Topic = CanonicalTopic;
@@ -37,6 +38,19 @@ describe("PersistenceTest (trails)", () => {
     expect(all.every((t) => t.title === "same")).toBe(true);
   });
 
+  it("reload replaces the attributes of a record loaded with a selected alias", async () => {
+    const topic = (await Topic.select("id, title AS aliased_title").first()) as InstanceType<
+      typeof Topic
+    >;
+    expect(topic.readAttribute("aliased_title")).toBe("The First Topic");
+
+    await topic.reload();
+
+    expect(topic.hasAttribute("aliased_title")).toBe(false);
+    expect(topic.readAttribute("aliased_title")).toBeNull();
+    expect(topic.title).toBe("The First Topic");
+  });
+
   it("create awaits an async block before saving", async () => {
     const topic = await Topic.create({ title: "before" }, async (t: Base) => {
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -51,6 +65,28 @@ describe("PersistenceTest (trails)", () => {
       (t as InstanceType<typeof Topic>).title = "after";
     });
     expect((await Topic.find(topic.id)).title).toBe("after");
+  });
+
+  it("a bare new runs the block and the initialize callbacks once", () => {
+    class Counted extends Topic {}
+    let initialized = 0;
+    Counted.afterInitialize(() => {
+      initialized += 1;
+    });
+    let yielded = 0;
+    const topic = new Counted({ title: "a" }, () => {
+      yielded += 1;
+    });
+    expect(topic).toBeInstanceOf(Counted);
+    expect([initialized, yielded]).toEqual([1, 1]);
+  });
+
+  it("create inside a scope keeps an explicit attribute over the scope's", async () => {
+    const scope = Topic.where({ title: "scoped", author_name: "Scope" });
+    const topic = await scope.scoping(() => Topic.create({ title: "explicit" }));
+    expect([topic.title, topic.author_name]).toEqual(["explicit", "Scope"]);
+    const built = scope.scoping(() => new Topic({ title: "explicit" }));
+    expect([built.title, built.author_name]).toEqual(["explicit", "Scope"]);
   });
 
   it("create with an array recurses and returns an array of records", async () => {
@@ -76,12 +112,6 @@ describe("PersistenceTest (trails)", () => {
     const many = Topic.build([{ title: "b" }, { title: "c" }]);
     expect(many).toHaveLength(2);
     expect(many.every((t) => t.isNewRecord())).toBe(true);
-  });
-
-  it("new with an array returns unsaved records", () => {
-    const result = Topic.new([{ title: "a" }, { title: "b" }]);
-    expect(result).toHaveLength(2);
-    expect(result.every((t) => t.isNewRecord())).toBe(true);
   });
 
   it("create yields to block before save", async () => {
@@ -122,7 +152,7 @@ describe("PersistenceTest (trails)", () => {
   });
 
   it("save! runs validations before the destroyed guard", async () => {
-    const developer = CanonicalDeveloper.new({ name: "DC", salary: 1_000_000 });
+    const developer = new CanonicalDeveloper({ name: "DC", salary: 1_000_000 });
     (developer as unknown as { _destroyed: boolean })._destroyed = true;
     await expect(developer.saveBang()).rejects.toThrow(RecordInvalid);
   });
@@ -156,11 +186,11 @@ describe("PersistenceTest (trails)", () => {
 });
 
 describe("PersistenceTest (trails)", () => {
-  const { clothingItems } = fixtures(["clothingItems"]);
+  const { self, clothingItems } = fixtures(["clothingItems"]);
 
   it("updateColumns targets query_constraints columns in the WHERE", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.updateColumns({ description: "Lovely green t-shirt" });
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -188,7 +218,7 @@ describe("PersistenceTest (trails)", () => {
 
     void Aircraft.resetColumnInformation();
 
-    const before = (await Aircraft.count()) as number;
+    const before = await Aircraft.count();
     const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as unknown as {
       name: string | null;
       wingspan: unknown;
@@ -278,6 +308,48 @@ describe("PersistenceTest (trails)", () => {
   });
 });
 
+describe("Persistence.queryConstraintsList (trails)", () => {
+  const host = (
+    primaryKey: string | string[],
+    baseClass?: object,
+  ): ThisParameterType<typeof queryConstraintsList> => {
+    const klass: Record<string, unknown> = {
+      primaryKey,
+      isBaseClass: () => baseClass === undefined,
+    };
+    klass.baseClass = baseClass ?? klass;
+    return klass as unknown as ThisParameterType<typeof queryConstraintsList>;
+  };
+
+  it("answers a base class's composite primary key and nil for a single one", () => {
+    expect(queryConstraintsList.call(host(["shop_id", "id"]))).toEqual(["shop_id", "id"]);
+    expect(queryConstraintsList.call(host("id"))).toBeNull();
+  });
+
+  it("reads the base class's list when a subclass shares its primary key", () => {
+    const base = host(["shop_id", "id"]);
+    queryConstraints.call(base, "tenant_id", "id");
+    expect(queryConstraintsList.call(host(["shop_id", "id"], base))).toEqual(["tenant_id", "id"]);
+  });
+
+  it("answers a subclass's own primary key when it differs from the base class's", () => {
+    const base = host(["shop_id", "id"]);
+    expect(queryConstraintsList.call(host(["region_id", "id"], base))).toEqual(["region_id", "id"]);
+    expect(queryConstraintsList.call(host("uuid", base))).toBeNull();
+  });
+
+  it("memoizes on the class it was asked of, not on a subclass's parent", () => {
+    const base = host(["shop_id", "id"]);
+    const sub = Object.create(base, {
+      primaryKey: { value: ["region_id", "id"] },
+      isBaseClass: { value: () => false },
+      baseClass: { value: base },
+    });
+    expect(queryConstraintsList.call(base)).toEqual(["shop_id", "id"]);
+    expect(queryConstraintsList.call(sub)).toEqual(["region_id", "id"]);
+  });
+});
+
 describe("PersistenceTest#verifyReadonlyAttribute (trails)", () => {
   fixtures(["minivans"]);
 
@@ -286,5 +358,18 @@ describe("PersistenceTest#verifyReadonlyAttribute (trails)", () => {
     await expect(minivan.updateColumn("color", "black")).rejects.toThrow(
       new ActiveRecordError("color is marked as readonly"),
     );
+  });
+});
+
+describe("PersistenceTest (trails)", () => {
+  fixtures(["posts", "comments"]);
+
+  it("new and create inside a scope on an association take the scope's foreign key", async () => {
+    const post = await CanonicalPost.first();
+    const scope = Comment.where({ post });
+    const built = scope.scoping(() => new Comment({ body: "built" }));
+    expect(built.post_id).toBe(post!.id);
+    const created = await scope.scoping(() => Comment.create({ body: "created" }));
+    expect((await Comment.find(created.id)).post_id).toBe(post!.id);
   });
 });

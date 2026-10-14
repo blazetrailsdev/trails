@@ -3,7 +3,14 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import { runCmd } from "./sqlite-database-tasks.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
+import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
+
+const tasks = new SQLiteDatabaseTasks(
+  new HashConfig("development", "primary", { adapter: "sqlite3", database: ":memory:" }),
+  "/rails/root",
+) as unknown as { runCmd(cmd: string, args: string[], out: string): Promise<void> };
+const runCmd = (cmd: string, args: string[], out: string) => tasks.runCmd(cmd, args, out);
 
 describe("SQLiteDatabaseTasks run_cmd output redirect", () => {
   const created: string[] = [];
@@ -36,10 +43,11 @@ describe("SQLiteDatabaseTasks run_cmd output redirect", () => {
     expect(fs.readFileSync(out, "utf8")).toBe("ok");
   });
 
-  it("raises with the failed command and its stderr", async () => {
+  it("raises run_cmd_error for a failed command", async () => {
     const out = tmpOutPath();
-    await expect(runCmd("sh", ["-c", "echo boom 1>&2; exit 3"], out)).rejects.toThrow(
-      /failed to execute:\nsh -c[\s\S]*Exit status: 3[\s\S]*stderr:\nboom/,
+    await expect(runCmd("sh", ["-c", "exit 3"], out)).rejects.toThrow(
+      "failed to execute:\nsh -c exit 3\n\n" +
+        "Please check the output above for any errors and make sure that `sh` is installed in your PATH and has proper permissions.\n\n",
     );
   });
 });

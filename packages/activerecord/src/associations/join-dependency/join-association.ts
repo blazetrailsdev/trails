@@ -1,10 +1,16 @@
 import type { Base } from "../../base.js";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
-import type { AbstractReflection } from "../../reflection.js";
+import type {
+  AbstractReflection,
+  AssociationReflection,
+  ConcreteReflection,
+  ThroughReflection,
+} from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
-import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
-import { structuralUnionEq } from "../../relation/query-methods.js";
+import type { AliasTracker } from "../alias-tracker.js";
+import { extractBang } from "@blazetrails/activesupport";
+import { first, isEmpty, rbEqual, rtest, union } from "@blazetrails/ruby-compat";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -13,13 +19,13 @@ type TableResolver = (
 ) => [Table | Nodes.TableAlias, boolean];
 
 export class JoinAssociation extends JoinPart {
-  readonly reflection: AbstractReflection;
+  readonly reflection: AssociationReflection | ThroughReflection;
   private _table: Table | Nodes.TableAlias | null = null;
-  readonly tables: (Table | Nodes.TableAlias)[] = [];
-  private _readonly?: boolean;
-  private _strictLoading?: boolean;
+  readonly tables: (Table | Nodes.TableAlias)[] | null = null;
+  declare private _readonly?: unknown;
+  declare private _strictLoading?: unknown;
 
-  constructor(reflection: AbstractReflection, children?: JoinPart[]) {
+  constructor(reflection: AssociationReflection | ThroughReflection, children?: JoinAssociation[]) {
     super(reflection.klass, children);
     this.reflection = reflection;
   }
@@ -45,93 +51,57 @@ export class JoinAssociation extends JoinPart {
     return this.isMatch(other);
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT
-   * @missingRailsCall first — PERMANENT
-   */
   joinConstraints(
     foreignTable: Table | Nodes.TableAlias,
     foreignKlass: typeof Base,
     joinType: JoinType,
-    aliasTracker?: AliasTracker,
-    resolveTable?: TableResolver,
+    aliasTracker: AliasTracker,
+    block: TableResolver,
   ): Nodes.Node[] {
     const joins: Nodes.Node[] = [];
     const chain: [AbstractReflection, Table | Nodes.TableAlias][] = [];
 
     const reflectionChain = this.reflection.chain;
+    for (const [index, reflection] of reflectionChain.entries()) {
+      const [table, terminated] = block(reflection, reflectionChain.slice(index));
+      this._table ||= table;
 
-    for (let index = 0; index < reflectionChain.length; index++) {
-      const refl = reflectionChain[index];
-      let table: Table | Nodes.TableAlias;
-      let terminated = false;
-
-      if (resolveTable) {
-        [table, terminated] = resolveTable(refl, reflectionChain.slice(index));
-      } else {
-        table = aliasedArelTableForReflection(refl, refl.tableName!);
-      }
-
-      if (!this._table) this._table = table;
-      if (
-        !this.tables.some(
-          (t) => String(t.tableAlias ?? t.name) === String(table.tableAlias ?? table.name),
-        )
-      ) {
-        this.tables.push(table);
-      }
-
-      if (terminated) {
+      if (rtest(terminated)) {
         foreignTable = table;
-        foreignKlass = refl.klass;
+        foreignKlass = reflection.klass;
         break;
       }
 
-      chain.push([refl, table]);
+      chain.push([reflection, table]);
     }
 
-    chain.reverse();
+    for (const [reflection, table] of chain.reverse()) {
+      const klass = reflection.klass;
 
-    for (const [refl, table] of chain) {
-      const klass = refl.klass;
+      const scope = reflection.joinScope(table, foreignTable, foreignKlass);
 
-      const scope = refl.joinScope(table, foreignTable, foreignKlass);
+      if (!isEmpty(scope.referencesValues)) {
+        const associations = union(scope.eagerLoadValues, scope.includesValues);
 
-      if (scope && scope.referencesValues.length > 0) {
-        const associations = [...scope.eagerLoadValues];
-        for (const spec of scope.includesValues) {
-          if (!associations.some((seen: unknown) => structuralUnionEq(seen, spec))) {
-            associations.push(spec);
-          }
-        }
-
-        if (associations.length > 0) {
+        if (!isEmpty(associations)) {
           scope.joinsBang(scope.constructJoinDependency(associations, Nodes.OuterJoin));
         }
       }
 
       const arel = scope.arel(aliasTracker);
-      let nodes: Nodes.Node = arel.constraints[0];
+      const nodes: Nodes.And["children"][number] = first(arel.constraints)!;
 
-      const others: Nodes.Node[] = [];
+      let others: Nodes.And["children"] | undefined;
       if (nodes instanceof Nodes.And) {
-        const remaining: Nodes.Node[] = [];
-        for (const child of nodes.children) {
-          if (!nodeReferencesTable(child, String(table.tableAlias ?? table.name))) {
-            others.push(child);
-          } else {
-            remaining.push(child);
-          }
-        }
-        if (others.length > 0) {
-          if (remaining.length === 0) nodes = new Nodes.True();
-          else nodes = remaining.length === 1 ? remaining[0] : new Nodes.And(remaining);
-        }
+        others = extractBang(
+          nodes.children,
+          (node) => !fetchAttribute(node, (attr) => rbEqual(attr.relation.name, table.name)),
+        );
       }
 
       joins.push(new joinType(table, new Nodes.On(nodes)));
 
-      if (others.length > 0) {
+      if (others != null && !isEmpty(others)) {
         const sources: Nodes.Node[] = [...arel.joinSources()] as Nodes.Node[];
         joins.push(...sources);
         const lastIdx = joins.length - 1;
@@ -146,58 +116,34 @@ export class JoinAssociation extends JoinPart {
     return joins;
   }
 
-  isReadonly(): boolean {
-    if (this._readonly !== undefined) return this._readonly;
-    this._readonly = !!this._scopeRelation()?.readonlyValue;
-    return this._readonly;
+  isReadonly(): unknown {
+    if (Object.hasOwn(this, "_readonly")) return this._readonly;
+
+    const reflection = this.reflection as AbstractReflection & ConcreteReflection;
+    return (this._readonly =
+      reflection.scope && reflection.scopeFor(this.baseKlass.unscoped()).readonlyValue);
   }
 
-  isStrictLoading(): boolean {
-    if (this._strictLoading !== undefined) return this._strictLoading;
-    this._strictLoading =
-      !!(this.reflection as any)?.strictLoading || !!this._scopeRelation()?.strictLoadingValue;
-    return this._strictLoading;
-  }
+  isStrictLoading(): unknown {
+    if (Object.hasOwn(this, "_strictLoading")) return this._strictLoading;
 
-  /** @internal */
-  private _scopeRelation(): any | null {
-    const refl = this.reflection as any;
-    if (!refl?.scope || typeof refl.scopeFor !== "function") return null;
-    try {
-      const unscoped = (this.baseKlass as any).unscoped?.();
-      return unscoped ? (refl.scopeFor(unscoped) ?? null) : null;
-    } catch {
-      return null;
-    }
+    const reflection = this.reflection as AbstractReflection & ConcreteReflection;
+    return (this._strictLoading =
+      reflection.scope && reflection.scopeFor(this.baseKlass.unscoped()).strictLoadingValue);
   }
-}
-
-function nodeReferencesTable(node: Nodes.Node, tableName: string): boolean {
-  let found = false;
-  fetchAttribute(node, (attr: Nodes.Node): boolean => {
-    if (attr instanceof Arel.Attribute) {
-      const rel = attr.relation;
-      if (String(rel.tableAlias ?? rel.name) === tableName) {
-        found = true;
-        return false;
-      }
-    }
-    return !found;
-  });
-  return found;
 }
 
 /** @internal */
 function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | null {
   void Nodes.StringJoin;
   if (!join || !constraints.length) return join as Nodes.Node | null;
-  constraints = constraints.filter((c): c is Nodes.Node => c instanceof Nodes.Node);
+  constraints = constraints.filter(Arel.arelNode);
   if (!constraints.length) return join as Nodes.Node | null;
   const joinAny = join as any;
   if (join instanceof Nodes.StringJoin) {
     const joinString = new Nodes.And([joinAny.left, ...constraints]);
     return new Nodes.StringJoin(joinString);
-  } else if (joinAny.right?.expr instanceof Nodes.Node) {
+  } else if (Arel.arelNode(joinAny.right?.expr)) {
     const right = joinAny.right;
     return new (join as any).constructor(
       joinAny.left,

@@ -1,4 +1,7 @@
+import { Admin } from "../admin.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
+import { registerModel } from "../../../associations.js";
 
 class Coder {
   #default: Record<string, unknown>;
@@ -17,12 +20,13 @@ class Coder {
 }
 
 export class AdminUserJson extends Base {
-  static _tableName = "admin_user_jsons";
-  static moduleName = "Admin";
-  static _demodulizedName = "UserJSON";
+  static {
+    registerModel(rbModConstSet(Admin, "UserJSON", this));
+    rbModConstSet(this, "Coder", Coder);
+  }
 
   static {
-    this.belongsTo("account", { className: "AdminAccount" });
+    this.belongsTo("account");
 
     this.store("params", { accessors: ["token"], coder: JSON });
     this.store("settings", { accessors: ["color", "homepage"], coder: new Coder() });

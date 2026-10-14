@@ -6,12 +6,13 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Duration } from "@blazetrails/activesupport";
 import { Error as ModelError } from "./error.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { NestedError } from "./nested-error.js";
+import { Range, rbHash } from "@blazetrails/ruby-compat";
 import { Errors, Model } from "./index.js";
 import { I18n } from "./i18n.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { deepDup, include } from "@blazetrails/activesupport";
 
 class Person extends Model {
   name: string | null = null;
@@ -22,40 +23,40 @@ describe("Error option value equality", () => {
   const base = {} as never;
 
   it("compares two separately-constructed equal Ranges as equal", () => {
-    const error = new ModelError(base, "name", ":too_long", { count: new Range(5, 20) });
+    const error = new ModelError(base, ":name", ":too_long", { count: new Range(5, 20) });
 
-    expect(error.match("name", ":too_long", { count: new Range(5, 20) })).toBe(true);
-    expect(error.match("name", ":too_long", { count: new Range(5, 21) })).toBe(false);
-    expect(error.match("name", ":too_long", { count: new Range(5, 20, true) })).toBe(false);
-    expect(error.strictMatch("name", ":too_long", { count: new Range(5, 20) })).toBe(true);
+    expect(error.match(":name", ":too_long", { count: new Range(5, 20) })).toBe(true);
+    expect(error.match(":name", ":too_long", { count: new Range(5, 21) })).toBe(false);
+    expect(error.match(":name", ":too_long", { count: new Range(5, 20, true) })).toBe(false);
+    expect(error.strictMatch(":name", ":too_long", { count: new Range(5, 20) })).toBe(true);
     expect(
-      error.equals(new ModelError(base, "name", ":too_long", { count: new Range(5, 20) })),
+      error.equals(new ModelError(base, ":name", ":too_long", { count: new Range(5, 20) })),
     ).toBe(true);
   });
 
   it("compares two separately-constructed equal Durations as equal", () => {
-    const error = new ModelError(base, "startsAt", ":greater_than", { count: Duration.days(2) });
+    const error = new ModelError(base, ":startsAt", ":greater_than", { count: Duration.days(2) });
 
-    expect(error.match("startsAt", ":greater_than", { count: Duration.days(2) })).toBe(true);
-    expect(error.match("startsAt", ":greater_than", { count: Duration.days(3) })).toBe(false);
-    expect(error.strictMatch("startsAt", ":greater_than", { count: Duration.days(2) })).toBe(true);
+    expect(error.match(":startsAt", ":greater_than", { count: Duration.days(2) })).toBe(true);
+    expect(error.match(":startsAt", ":greater_than", { count: Duration.days(3) })).toBe(false);
+    expect(error.strictMatch(":startsAt", ":greater_than", { count: Duration.days(2) })).toBe(true);
     expect(
-      error.equals(new ModelError(base, "startsAt", ":greater_than", { count: Duration.days(2) })),
+      error.equals(new ModelError(base, ":startsAt", ":greater_than", { count: Duration.days(2) })),
     ).toBe(true);
   });
 
   it("compares two separately-constructed equal Times as equal", () => {
     const at = () => Temporal.Instant.from("2026-08-20T00:00:00Z");
-    const error = new ModelError(base, "startsAt", ":greater_than", { count: at() });
+    const error = new ModelError(base, ":startsAt", ":greater_than", { count: at() });
 
-    expect(error.match("startsAt", ":greater_than", { count: at() })).toBe(true);
+    expect(error.match(":startsAt", ":greater_than", { count: at() })).toBe(true);
     expect(
-      error.match("startsAt", ":greater_than", {
+      error.match(":startsAt", ":greater_than", {
         count: Temporal.Instant.from("2026-08-21T00:00:00Z"),
       }),
     ).toBe(false);
-    expect(error.strictMatch("startsAt", ":greater_than", { count: at() })).toBe(true);
-    expect(error.equals(new ModelError(base, "startsAt", ":greater_than", { count: at() }))).toBe(
+    expect(error.strictMatch(":startsAt", ":greater_than", { count: at() })).toBe(true);
+    expect(error.equals(new ModelError(base, ":startsAt", ":greater_than", { count: at() }))).toBe(
       true,
     );
   });
@@ -69,6 +70,58 @@ describe("Error and Errors surface", () => {
     expect(str).toContain("ActiveModel::Errors");
     expect(str).toContain("name");
     expect(str).toContain("blank");
+  });
+
+  it("inspect renders the type with to_s and the options with inspect", () => {
+    const errors = new Errors({});
+    errors.add("name", ":blank");
+    errors.add("name", "is odd");
+    expect(errors.objects[0].inspect()).toBe(
+      "#<ActiveModel::Error attribute=name, type=blank, options={}>",
+    );
+    expect(errors.objects[1].inspect()).toBe(
+      "#<ActiveModel::Error attribute=name, type=is odd, options={}>",
+    );
+    expect(errors.inspect()).toBe(
+      "#<ActiveModel::Errors [" +
+        "#<ActiveModel::Error attribute=name, type=blank, options={}>, " +
+        "#<ActiveModel::Error attribute=name, type=is odd, options={}>]>",
+    );
+  });
+
+  it("inspect renders the receiver's class name", () => {
+    class LocalError extends ModelError {}
+    const error = new ModelError({} as never, ":name", ":blank");
+    expect(new NestedError({}, error).inspect()).toBe(
+      "#<ActiveModel::NestedError attribute=name, type=blank, options={}>",
+    );
+    expect(new LocalError({} as never, "name", ":blank").inspect()).toBe(
+      "#<LocalError attribute=name, type=blank, options={}>",
+    );
+    class LocalErrors extends Errors {}
+    expect(new LocalErrors({}).inspect()).toBe("#<LocalErrors []>");
+  });
+
+  it("dup gives the copy its own options and its own errors", () => {
+    const errors = new Errors({});
+    const error = errors.add("name", ":too_short", { count: 3, tags: ["a"] });
+    const copy = deepDup(error);
+    expect(copy).toBeInstanceOf(ModelError);
+    expect(copy.options).toEqual(error.options);
+    expect(copy.options).not.toBe(error.options);
+    expect(copy.options.tags).not.toBe(error.options.tags);
+    expect([copy.attribute, copy.rawType, copy.type]).toEqual([
+      ":name",
+      ":too_short",
+      ":too_short",
+    ]);
+
+    const duped = errors.dup();
+    expect(duped).toBeInstanceOf(Errors);
+    expect(duped.objects).toHaveLength(1);
+    expect(duped.objects[0]).not.toBe(error);
+    duped.add("name", ":blank");
+    expect(errors.objects).toHaveLength(1);
   });
 
   it("full_messages doesn't require the base object to respond to :errors", () => {
@@ -89,7 +142,9 @@ describe("Error and Errors surface", () => {
     class Parent extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
 
-      static i18nScope = "activemodel";
+      static get i18nScope(): string {
+        return "activemodel";
+      }
       static {
         include(this, Attributes);
         this.attribute("name", "string");
@@ -118,7 +173,7 @@ describe("Error and Errors surface", () => {
 
     try {
       const record = new Child({ name: "" }) as any;
-      const msg = ModelError.generateMessage("name", ":blank", record);
+      const msg = ModelError.generateMessage("name", ":blank", record, {});
       expect(msg).toBe("parent-level blank");
     } finally {
       resetI18n();
@@ -129,7 +184,9 @@ describe("Error and Errors surface", () => {
     class ARModel extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
 
-      static i18nScope = "activerecord";
+      static get i18nScope(): string {
+        return "activerecord";
+      }
       static {
         include(this, Attributes);
         this.attribute("name", "string");
@@ -138,7 +195,7 @@ describe("Error and Errors surface", () => {
     interface ARModel extends Attributes {}
 
     const record = new ARModel({}) as any;
-    const msg = ModelError.generateMessage("name", ":blank", record);
+    const msg = ModelError.generateMessage("name", ":blank", record, {});
     expect(msg).toBe("can't be blank");
   });
 
@@ -189,5 +246,25 @@ describe("Error and Errors surface", () => {
     e.add("name", ":blank");
     e.add("name", ":blank");
     expect(e.objects[0].equals(e.objects[1])).toBe(true);
+  });
+
+  it("eql and hash go through attributesForHash (error.rb:190-197)", () => {
+    const base = new Person();
+    const a = new ModelError(base, ":name", ":too_long", { count: 5, if: "admin" });
+    const b = new ModelError(base, ":name", ":too_long", { count: 5, unless: "guest" });
+
+    expect(a.eql(b)).toBe(true);
+    expect(rbHash(a)).toBe(rbHash(b));
+    expect(a.hash()).toBe(rbHash([base, ":name", ":too_long", { count: 5 }]));
+
+    for (const other of [
+      new ModelError(new Person(), ":name", ":too_long", { count: 5 }),
+      new ModelError(base, ":title", ":too_long", { count: 5 }),
+      new ModelError(base, ":name", ":too_short", { count: 5 }),
+      new ModelError(base, ":name", ":too_long", { count: 6 }),
+    ]) {
+      expect(a.eql(other)).toBe(false);
+      expect(rbHash(a)).not.toBe(rbHash(other));
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { excBacktraceLocations, File, hasKey, type Location } from "@blazetrails/ruby-compat";
+import { excBacktraceLocations, File, type Location } from "@blazetrails/ruby-compat";
 
 import { ActionableError, cattrAccessor, type BacktraceCleaner } from "@blazetrails/activesupport";
 import { statusCode } from "@blazetrails/rack";
@@ -220,7 +220,7 @@ export class ExceptionWrapper {
   }
 
   rescueTemplate(): string {
-    return hasKey(this.rescueTemplates, this.exceptionClassName)
+    return Object.hasOwn(this.rescueTemplates, this.exceptionClassName)
       ? this.rescueTemplates[this.exceptionClassName]
       : "diagnostics";
   }
@@ -295,7 +295,7 @@ export class ExceptionWrapper {
   }
 
   static statusCodeForException(className: string): number {
-    const status = hasKey(this.rescueResponses, className)
+    const status = Object.hasOwn(this.rescueResponses, className)
       ? this.rescueResponses[className]
       : ":internal_server_error";
     return statusCode(status.slice(1));
@@ -309,7 +309,7 @@ export class ExceptionWrapper {
   }
 
   rescueResponse(): boolean {
-    return hasKey(this.rescueResponses, this.exceptionClassName);
+    return Object.hasOwn(this.rescueResponses, this.exceptionClassName);
   }
 
   exceptionInspect(): string {
@@ -422,7 +422,10 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall open — CONVERGEABLE source-fragment-resolves-against-cwd-not-rails-root
+   */
   sourceFragment(
     path: string,
     line: number,

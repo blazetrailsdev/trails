@@ -1,10 +1,25 @@
 import { describe, it, expect } from "vitest";
 import { testConnection } from "../test-helpers/connection.js";
-import { Table, star, Nodes, Visitors } from "../index.js";
+import { Collectors, Table, arelNode, star, Nodes, Visitors } from "../index.js";
 
 describe("AttributeTest (trails)", () => {
   const users = new Table("users");
   const visitor = new Visitors.ToSql(testConnection);
+
+  it("is a Struct of relation and name, not a Node, and an arel_node?", () => {
+    const attr = users.get("id");
+    expect(attr).not.toBeInstanceOf(Nodes.Node);
+    expect("not" in attr).toBe(false);
+    expect(attr.members()).toEqual(["relation", "name"]);
+    expect(arelNode(attr)).toBe(true);
+  });
+
+  it("is visited as the right side of an Assignment", () => {
+    const node = new Nodes.Assignment(users.get("id"), users.get("name"));
+    expect(visitor.accept(node, new Collectors.SQLString()).value).toBe(
+      '"users"."id" = "users"."name"',
+    );
+  });
 
   describe("#in", () => {
     it("expands a Set through the Enumerable arm", () => {

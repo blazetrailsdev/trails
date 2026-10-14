@@ -17,6 +17,12 @@ describe("SelectManagerTest (trails)", () => {
     expect(() => mgr.join(new Nodes.SqlLiteral(""))).toThrow(EmptyJoinError);
   });
 
+  it("groups by a Symbol's name", () => {
+    const mgr = new SelectManager(users);
+    mgr.group(":foo");
+    expect(mgr.toSql()).toBe('SELECT FROM "users" GROUP BY foo');
+  });
+
   it("does not raise on a whitespace-only relation", () => {
     const mgr = new SelectManager(users);
     expect(() => mgr.join(" ")).not.toThrow();
@@ -55,6 +61,25 @@ describe("SelectManagerTest (trails)", () => {
     it("defaults to FOR UPDATE with no argument", () => {
       const mgr = new SelectManager(users).project(star);
       expect(mgr.lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
+    });
+  });
+
+  describe("union", () => {
+    it("resolves a String operation as it does a Symbol", () => {
+      const m1 = new SelectManager(users).project(star());
+      const m2 = new SelectManager(users).project(star());
+      expect(m1.union("all", m2)).toBeInstanceOf(Nodes.UnionAll);
+    });
+
+    it("raises NameError for an operation naming no Union node", () => {
+      const m1 = new SelectManager(users).project(star());
+      const m2 = new SelectManager(users).project(star());
+      expect(() => m1.union("bogus", m2)).toThrow(
+        expect.objectContaining({
+          name: "NameError",
+          message: expect.stringContaining("uninitialized constant Arel::Nodes::UnionBogus"),
+        }),
+      );
     });
   });
 

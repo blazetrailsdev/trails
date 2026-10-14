@@ -1,11 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assertRaises, assertInDelta } from "@blazetrails/activesupport";
+import { assertEqual, assertRaises, assertInDelta } from "@blazetrails/activesupport";
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { inTimeZone } from "./cases/helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 import { Base } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Rational } from "@blazetrails/ruby-compat";
@@ -16,7 +15,7 @@ afterEach(() => {
 });
 
 describe("DateTimeTest", () => {
-  fixtures({});
+  const { self } = fixtures({});
 
   it("default timezone validation", async () => {
     await assertRaises([ArgumentError], {}, () => {
@@ -39,8 +38,8 @@ describe("DateTimeTest", () => {
   });
 
   it("saves both date and time", async () => {
-    await withEnvTz("America/New_York", async () => {
-      await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withEnvTz("America/New_York", async () => {
+      await self().withTimezoneConfig({ default: "utc" }, async () => {
         const timeValues = [1807, 2, 10, 15, 30, 45] as const;
         const localOffset = new Rational(RubyTime.local(...timeValues).utcOffset, 86400);
         const now = DateTime.civil(...timeValues, localOffset);
@@ -100,9 +99,9 @@ describe("DateTimeTest", () => {
 
   it("assign in local timezone", async () => {
     const now = DateTime.civil(2017, 3, 1, 12, 0, 0);
-    await withTimezoneConfig({ default: "local" }, () => {
+    await self().withTimezoneConfig({ default: "local" }, () => {
       const task = new Task({ starting: now });
-      expect(task.starting!.compare(now)).toBe(0);
+      assertEqual(now, task.starting);
     });
   });
 

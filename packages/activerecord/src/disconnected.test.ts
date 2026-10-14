@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 
@@ -21,7 +21,7 @@ describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {
     if (adapterType === "sqlite") {
       return sqlite._rawConnection?.isOpen() ? sqlite._rawConnection : null;
     }
-    return (conn as unknown as { _connection: unknown })._connection;
+    return (conn as unknown as { _rawConnection: unknown })._rawConnection;
   }
 
   it("reconnects to execute statements when disconnected", async () => {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { NameError } from "@blazetrails/activesupport";
 import { Migration, MigrationProxy } from "./migration.js";
 
-class CreateUsers extends Migration {
+class CreateUsers extends Migration.Current {
   async up(): Promise<void> {}
 }
 
@@ -31,7 +31,7 @@ describe("MigrationProxy", () => {
   });
 
   it("delegates migrate, announce, write, and disableDdlTransaction to the loaded migration", async () => {
-    class NoTransaction extends Migration {
+    class NoTransaction extends Migration.Current {
       async up(): Promise<void> {}
     }
     NoTransaction.disableDdlTransactionBang();

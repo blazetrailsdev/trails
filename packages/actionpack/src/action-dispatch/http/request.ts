@@ -1,5 +1,5 @@
 import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
-import { rbModPrivate, rbStrDump } from "@blazetrails/ruby-compat";
+import { rbRegMatchP, rbStrDump, toI } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -220,10 +220,30 @@ export class Request {
 
   #method?: string;
   #requestMethod?: string;
-  #port?: number;
+  #protocol: string | null;
+  #port: number | null;
+  /** @internal */
+  declare _filteredParameters: Record<string, unknown> | null;
+  /** @internal */
+  declare _filteredEnv: Record<string, unknown> | null;
+  /** @internal */
+  declare _filteredPath: string | null;
+  /** @internal */
+  declare _parameterFilter: ParameterFilter | null;
 
+  /**
+   * @inlinedFrom Rack::Request::Env#initialize rack/v3.1.14/lib/rack/request.rb:86-91
+   * @inlinedFrom ActionDispatch::Http::URL#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/url.rb:181-185
+   * @inlinedFrom ActionDispatch::Http::FilterParameters#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/filter_parameters.rb:24-30
+   */
   constructor(env: RackEnv = {}) {
     this.env = env;
+    this._filteredParameters = null;
+    this._filteredEnv = null;
+    this._filteredPath = null;
+    this._parameterFilter = null;
+    this.#protocol = null;
+    this.#port = null;
   }
 
   get method(): string {
@@ -258,7 +278,7 @@ export class Request {
   }
 
   get protocol(): string {
-    return this.ssl ? "https://" : "http://";
+    return (this.#protocol ??= this.ssl ? "https://" : "http://");
   }
 
   get rawHostWithPort(): string {
@@ -274,7 +294,7 @@ export class Request {
   }
 
   get port(): number {
-    if (this.#port === undefined) {
+    if (this.#port == null) {
       const match = this.rawHostWithPort.match(/:(\d+)$/);
       this.#port = match ? parseInt(match[1], 10) : this.standardPort;
     }
@@ -342,12 +362,9 @@ export class Request {
     return this.contentMimeType?.toString();
   }
 
-  get contentLength(): number | undefined {
+  get contentLength(): number {
     if (this.hasHeader(TRANSFER_ENCODING)) return new TextEncoder().encode(this.rawPost).length;
-    const cl = this.getHeader("CONTENT_LENGTH") as string | undefined;
-    if (!cl) return undefined;
-    const n = parseInt(cl, 10);
-    return isNaN(n) ? undefined : n;
+    return Number(toI(this.rackRequest.contentLength));
   }
 
   declare readonly ifModifiedSince: Date | undefined;
@@ -381,12 +398,8 @@ export class Request {
     mimeHost(this).variant = value;
   }
 
-  static get ignoreAcceptHeader(): boolean {
-    return _MimeNegotiation.ignoreAcceptHeader;
-  }
-  static set ignoreAcceptHeader(value: boolean) {
-    _MimeNegotiation.ignoreAcceptHeader = value;
-  }
+  declare static ignoreAcceptHeader: boolean;
+  declare ignoreAcceptHeader: boolean;
 
   declare filteredParameters: () => Record<string, unknown>;
   declare filteredEnv: () => Record<string, unknown>;
@@ -410,7 +423,10 @@ export class Request {
   }
 
   get isXmlHttpRequest(): boolean {
-    return (this.getHeader("HTTP_X_REQUESTED_WITH") as string)?.toLowerCase() === "xmlhttprequest";
+    return rbRegMatchP(
+      /XMLHttpRequest/i,
+      this.getHeader("HTTP_X_REQUESTED_WITH") as string | null | undefined,
+    );
   }
 
   get xhr(): boolean {
@@ -446,7 +462,7 @@ export class Request {
     if (!this.hasHeader("RAW_POST_DATA")) {
       this.setHeader("RAW_POST_DATA", this.readBodyStream());
     }
-    return String(this.getHeader("RAW_POST_DATA"));
+    return this.getHeader("RAW_POST_DATA") as string;
   }
 
   get params(): Record<string, unknown> {
@@ -856,7 +872,7 @@ export class Request {
   /** @internal */
   declare isParamsReadable: () => boolean;
 
-  controllerClass(): DispatchableControllerClass | typeof PassNotFound {
+  controllerClass(): DispatchableControllerClass | typeof PassNotFound | null {
     const params = this.pathParameters;
     if (params["action"] == null) params["action"] = "index";
     return this.controllerClassFor(params["controller"] as string | undefined);
@@ -935,6 +951,7 @@ Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
 
 include(Request, RequestHelpers);
+include(Request, _MimeNegotiation);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request extends Omit<
   RequestHelpers,
@@ -1011,6 +1028,7 @@ function mimeHost(req: Request): MimeHost {
   let h = MIME_HOSTS.get(req);
   if (!h) {
     h = Object.create(_MimeNegotiation.prototype, {
+      constructor: { get: () => req.constructor },
       getHeader: { value: (k: string) => req.env[k] },
       setHeader: {
         value: (k: string, v: unknown) => {
@@ -1136,14 +1154,5 @@ Request.prototype.formatFromPathExtension = function (this: Request) {
 Request.prototype.isParamsReadable = function (this: Request) {
   return _paramsReadable.call(mimeHost(this));
 };
-
-rbModPrivate(
-  Request,
-  "checkMethod",
-  "defaultSession",
-  "readBodyStream",
-  "resetStream",
-  "fallbackRequestParameters",
-);
 
 ActionDispatch.Request = Request;

@@ -16,10 +16,10 @@ import { Temporal, Date as RubyDate, Time, tzdataIsdst } from "@blazetrails/date
 import {
   equals as cmpEquals,
   fetch,
-  hasKey,
   KeyError,
   Rational,
   sprintf,
+  stringValue,
 } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
@@ -327,6 +327,7 @@ const UTC_OFFSET_WITHOUT_COLON = UTC_OFFSET_WITH_COLON.replaceAll(":", "");
 
 const zoneCache = new Map<string, TimeZone>();
 let zones: TimeZone[] | null = null;
+let creating = false;
 const countryZonesMemo = new Map<string, TimeZone[]>();
 let zonesMapMemo: Record<string, TimeZone> | null = null;
 
@@ -595,11 +596,17 @@ export class Timezone {
 }
 
 export class TimeZone {
-  readonly name: string;
-  readonly tzinfo: Timezone;
-  private readonly _utcOffset: number | null;
+  declare readonly name: string;
+  declare readonly tzinfo: Timezone;
+  declare private readonly _utcOffset: number | null;
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm create — PERMANENT
+   */
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
+    if (!creating) return TimeZone.find(name) ?? TimeZone.create(name);
+    creating = false;
     this.name = name;
     this._utcOffset = utcOffset;
     this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
@@ -615,17 +622,18 @@ export class TimeZone {
 
   static find(arg: unknown): TimeZone | null {
     if (arg instanceof TimeZone) return arg;
-    if (typeof arg === "string") {
-      const cached = zoneCache.get(arg);
+    if (typeof arg === "string" || arg instanceof Uint8Array) {
+      const name = stringValue(arg);
+      const cached = zoneCache.get(name);
       if (cached) return cached;
       let tz: TimeZone;
       try {
-        tz = TimeZone.create(arg);
+        tz = TimeZone.create(name);
       } catch (error) {
         if (!(error instanceof InvalidTimezoneIdentifier)) throw error;
         return null;
       }
-      zoneCache.set(arg, tz);
+      zoneCache.set(name, tz);
       return tz;
     }
     if (arg instanceof Timezone) {
@@ -652,7 +660,12 @@ export class TimeZone {
     utcOffset: number | null = null,
     tzinfo: Timezone | null = null,
   ): TimeZone {
-    return new TimeZone(name, utcOffset, tzinfo);
+    creating = true;
+    try {
+      return new TimeZone(name, utcOffset, tzinfo);
+    } finally {
+      creating = false;
+    }
   }
 
   static all(): TimeZone[] {
@@ -835,7 +848,7 @@ export class TimeZone {
 
       let month: number;
       let day: number;
-      if (hasKey(parts, "yday")) {
+      if ("yday" in parts) {
         const ordinalDate = RubyDate.ordinal(year, fetch<number>(parts, "yday"));
         month = ordinalDate.month;
         day = ordinalDate.day;

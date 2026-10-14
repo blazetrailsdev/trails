@@ -1,4 +1,5 @@
 import { include } from "@blazetrails/activesupport";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Binary, NotEqual, FetchAttribute } from "./binary.js";
 import type { Node } from "./node.js";
@@ -18,4 +19,4 @@ include(
   FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,
 );
 
-Nodes.Equality = Equality;
+rbModConstSet(Nodes, "Equality", Equality);

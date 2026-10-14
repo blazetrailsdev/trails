@@ -55,6 +55,12 @@ describe("LogSubscriber nil payload name (trails)", () => {
     expect(logger.messages[0]).toBe("   (0.0ms)  select 1");
   });
 
+  it("returns what debug returns, and nil for an ignored payload name", () => {
+    expect(subscriber.sql(makeEvent({ sql: "select 1", name: "Topic Load" }))).toBeUndefined();
+    expect(logger.messages.length).toBe(1);
+    expect(subscriber.sql(makeEvent({ sql: "select 1", name: "SCHEMA" }))).toBeUndefined();
+  });
+
   it("colorizes a nil name the same as SQL", () => {
     BaseLogSubscriber.colorizeLogging = true;
     LogSubscriber.colorizeLogging = true;
@@ -87,7 +93,7 @@ describe("LogSubscriber bigint bind rendering (trails)", () => {
       makeEvent({
         sql: "select * from topics where id = ?",
         name: "SQL",
-        binds: [null],
+        binds: [10n],
         type_casted_binds: [10n],
       }),
     );
@@ -99,7 +105,7 @@ describe("LogSubscriber bigint bind rendering (trails)", () => {
       makeEvent({
         sql: "select * from topics where title = ?",
         name: "SQL",
-        binds: [null],
+        binds: ["@bigint@123@bigint@"],
         type_casted_binds: ["@bigint@123@bigint@"],
       }),
     );
@@ -111,7 +117,7 @@ describe("LogSubscriber bigint bind rendering (trails)", () => {
       makeEvent({
         sql: "select * from topics where id = ? and title = ?",
         name: "SQL",
-        binds: [null, null],
+        binds: [7n, "@bigint@7@bigint@"],
         type_casted_binds: [7n, "@bigint@7@bigint@"],
       }),
     );

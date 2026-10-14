@@ -1,16 +1,15 @@
 import { describe, it, expect, afterEach, afterAll, beforeAll, vi } from "vitest";
-import { Inflections, camelize } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, Inflections, camelize } from "@blazetrails/activesupport";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
   detectNegativeEnumConditionsBang,
-  enumTypeOf,
   EnumType,
 } from "./enum.js";
-import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
-import { Base } from "./index.js";
+import { ArgumentError, DecimalType, IntegerType } from "@blazetrails/activemodel";
+import { Base, registerModel } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Lion } from "./test-helpers/models/cat.js";
 
@@ -87,6 +86,42 @@ describe("Enum name conflict detection", () => {
       }
       new Child();
     }).not.toThrow();
+  });
+
+  it("gives a subclass its own defined_enums holding the parent's mappings", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { proposed: 0, written: 1 });
+      }
+    }
+    class Child extends Parent {
+      static {
+        this.enum("difficulty", { easy: 0, hard: 1 });
+      }
+    }
+
+    expect(Object.keys(Parent.definedEnums)).toEqual(["status"]);
+    expect(Object.keys(Child.definedEnums)).toEqual(["status", "difficulty"]);
+    expect(Child.definedEnums.status).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(Child.definedEnums.status).not.toBe(Parent.definedEnums.status);
+    expect(Child.definedEnums.status.fetch("written", null)).toBe(1);
+    expect(Child.definedEnums.status.get("proposed")).toBe(0);
+  });
+
+  it("keeps a subclass's enum out of its ancestors' defined_enums", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+    }
+    class Child extends Parent {}
+    class Grandchild extends Child {}
+    Parent.enum("status", { proposed: 0, written: 1 });
+    Grandchild.enum("difficulty", { easy: 0, hard: 1 });
+
+    expect(Object.keys(Base.definedEnums)).not.toContain("status");
+    expect(Object.keys(Parent.definedEnums)).toEqual(["status"]);
+    expect(Object.keys(Child.definedEnums)).not.toContain("difficulty");
+    expect(Object.keys(Grandchild.definedEnums)).toEqual(["status", "difficulty"]);
   });
 
   it("does not treat a user class method on an ancestor as a plural-accessor conflict", () => {
@@ -304,7 +339,7 @@ describe("Enum subtype resolved from the reflected column type", () => {
   });
 
   it("serializes an enum label through the reflected decimal subtype", () => {
-    expect(enumTypeOf(Book, "status")!.serialize("written")).toEqual(
+    expect((Book.typeForAttribute("status") as EnumType).serialize("written")).toEqual(
       new DecimalType().serialize(1),
     );
   });
@@ -342,15 +377,15 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   }
 
   it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {
-    const type = enumTypeOf(NumericEnum, "decimal_number");
+    const type = NumericEnum.typeForAttribute("decimal_number") as EnumType;
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.type()).toBe("decimal");
-    expect(type!.subtype.type()).toBe("decimal");
+    expect(type.type()).toBe("decimal");
+    expect(type.subtype.type()).toBe("decimal");
   });
 
   it("serializes labels through the reflected decimal subtype on both read paths", () => {
-    const subtype = enumTypeOf(NumericEnum, "decimal_number")!.subtype;
-    expect(enumTypeOf(NumericEnum, "decimal_number")!.serialize("mid")).toEqual(
+    const subtype = (NumericEnum.typeForAttribute("decimal_number") as EnumType).subtype;
+    expect((NumericEnum.typeForAttribute("decimal_number") as EnumType).serialize("mid")).toEqual(
       subtype.serialize(1),
     );
     const caster = new MapCaster(NumericEnum);
@@ -358,17 +393,17 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   });
 
   it("resolves the reflected subtype for a default-only attribute (no explicit type)", () => {
-    const type = enumTypeOf(DefaultOnlyNumericEnum, "decimal_number");
+    const type = DefaultOnlyNumericEnum.typeForAttribute("decimal_number") as EnumType;
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.type()).toBe("decimal");
-    expect(type!.subtype.type()).toBe("decimal");
+    expect(type.type()).toBe("decimal");
+    expect(type.subtype.type()).toBe("decimal");
   });
 
   it("keeps an explicitly-typed enum's declared subtype over the reflected column", () => {
-    const type = enumTypeOf(ExplicitNumericEnum, "decimal_number");
+    const type = ExplicitNumericEnum.typeForAttribute("decimal_number") as EnumType;
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.type()).toBe("integer");
-    expect(type!.subtype.type()).toBe("integer");
+    expect(type.type()).toBe("integer");
+    expect(type.subtype.type()).toBe("integer");
   });
 });
 
@@ -382,9 +417,9 @@ describe("Enum with an undeclared type raises on the serialize path", () => {
   }
 
   it("castEnumValue raises for an enum with no column and no explicit type", async () => {
-    expect(() => enumTypeOf(TypelessBook, "typeless_genre")!.serialize("comic")).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in/,
-    );
+    expect(() =>
+      (TypelessBook.typeForAttribute("typeless_genre") as EnumType).serialize("comic"),
+    ).toThrow(/Undeclared attribute type for enum 'typeless_genre' in/);
   });
 });
 
@@ -426,10 +461,9 @@ describe("Enum acronym method name consistency", () => {
     const proto = AcroBook.prototype as unknown as Record<string, unknown>;
     expect(typeof proto.isApiKey).toBe("function");
     expect(proto.isAPIKey).toBeUndefined();
-    const recorded = (AcroBook as unknown as { _enumMethodsModuleNames: Set<string> })
-      ._enumMethodsModuleNames;
-    expect(recorded.has("isApiKey")).toBe(true);
-    expect(recorded.has("isAPIKey")).toBe(false);
+    const recorded = (AcroBook as typeof Base)._enumMethodsModule();
+    expect(recorded.isMethodDefined("isApiKey")).toBe(true);
+    expect(recorded.isMethodDefined("isAPIKey")).toBe(false);
   });
 
   it("detects a conflict on the name it actually generates for an acronym label", () => {
@@ -471,5 +505,97 @@ describe("Enum inherited from an abstract parent (Lion < Cat)", () => {
 
   it("builds a new Lion without routing the parent's default scope through a tableless class", () => {
     expect(() => new Lion()).not.toThrow();
+  });
+});
+
+describe("EnumType reads its mapping at call time", () => {
+  it("answers for a mapping filled after the type is built", () => {
+    const mapping = new HashWithIndifferentAccess<number | string | boolean | null>();
+    const type = new EnumType("status", mapping, new IntegerType());
+    mapping.set("proposed", 0);
+    mapping.set("written", 1);
+
+    expect(type.cast(1)).toBe("written");
+    expect(type.deserialize(0)).toBe("proposed");
+    expect(() => type.assertValidValue(1)).not.toThrow();
+    expect(() => type.assertValidValue(2)).toThrow(ArgumentError);
+  });
+});
+
+describe("Enum declared on an attribute with no column type", () => {
+  fixtures(["books"]);
+
+  it("enum declared before alias_attribute raises on first use", async () => {
+    class Klass extends Base {
+      declare isProposed: () => boolean;
+      static _tableName = "books";
+      static {
+        this.enum("aliased_status", ["proposed", "written", "published"]);
+        this.aliasAttribute("aliased_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    await expect(Klass.create({ status: "written" })).rejects.toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+    expect(() => Klass.typeForAttribute("aliased_status")).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+    expect(() => new Klass().isProposed()).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+  });
+
+  it("column-backed enum whose name is later aliased does not raise", () => {
+    class Klass extends Base {
+      declare isSingle: () => boolean;
+      static _tableName = "books";
+      static {
+        this.enum("nullable_status", ["single", "married"]);
+        this.aliasAttribute("nullable_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    expect(() => Klass.typeForAttribute("nullable_status")).not.toThrow();
+    expect(() => new Klass().isSingle()).not.toThrow();
+  });
+
+  it("enum on abstract parent resolves against concrete subclass columns", () => {
+    class AbstractParent extends Base {
+      static {
+        this.abstractClass = true;
+        this.enum("typeless_genre", ["adventure", "comic"]);
+      }
+    }
+    class Concrete extends AbstractParent {
+      static _tableName = "books";
+    }
+    registerModel(Concrete);
+
+    expect(() => Concrete.typeForAttribute("typeless_genre")).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
+    );
+  });
+
+  it("enum on abstract parent raises through subclass materialization", () => {
+    class AbstractParent extends Base {
+      static {
+        this.abstractClass = true;
+        this.enum("typeless_genre", ["adventure", "comic"]);
+      }
+    }
+    class Concrete extends AbstractParent {
+      static _tableName = "books";
+    }
+    registerModel(Concrete);
+
+    expect(() => Concrete._defaultAttributes()).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
+    );
+    expect(() => new Concrete({})).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
+    );
   });
 });

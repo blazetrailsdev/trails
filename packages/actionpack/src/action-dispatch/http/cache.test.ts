@@ -101,15 +101,15 @@ describe("Cache::Response", () => {
 
   it("merge_and_normalize_cache_control! emits directives in Rails order", () => {
     const r = res();
-    mergeAndNormalizeCacheControlBang.call(r, { max_age: 60, public: true });
+    mergeAndNormalizeCacheControlBang.call(r, { maxAge: 60, public: true });
     expect(r.getHeader("Cache-Control")).toBe("max-age=60, public");
 
     const r2 = res();
-    mergeAndNormalizeCacheControlBang.call(r2, { no_store: true, private: true });
+    mergeAndNormalizeCacheControlBang.call(r2, { noStore: true, private: true });
     expect(r2.getHeader("Cache-Control")).toBe("private, no-store");
 
     const r3 = res({ "Cache-Control": "no-cache, community=internal" });
-    mergeAndNormalizeCacheControlBang.call(r3, { max_age: 10, public: true });
+    mergeAndNormalizeCacheControlBang.call(r3, { maxAge: 10, public: true });
     expect(r3.getHeader("Cache-Control")).toBe("max-age=10, public, community=internal");
   });
 

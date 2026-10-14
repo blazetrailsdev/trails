@@ -46,6 +46,7 @@ export const NON_TABLE_CATALOGUES = {
   "information_schema.check_constraints": "constraint names and their clauses",
   "information_schema.columns":
     "carries table_name, so SELECT DISTINCT table_name FROM it WOULD enumerate tables — excluded deliberately because every read of it in this repo is a column probe (WHERE table_name = $1), and listing it would arm the sweep check on all of them; a sweep that really chose its victims this way is an accepted, recorded miss",
+  "information_schema.processlist": "server sessions and the statement each is running",
   "information_schema.schemata": "schema names",
   pg_arrays: "a test table, not a catalogue",
   pg_dates_inf: "a test table, not a catalogue",

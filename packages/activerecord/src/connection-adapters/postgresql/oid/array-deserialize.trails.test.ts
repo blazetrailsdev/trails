@@ -9,16 +9,18 @@ describe("PostgreSQL array deserialize of an already-decoded array", () => {
     typeCastForSchema: (value: unknown) => value,
   };
 
-  it("routes elements through the subtype's deserialize, not its cast", () => {
+  it("falls through to cast, as Type::Value#deserialize does", () => {
     const type = new OidArray(subtype);
 
-    expect(type.deserialize(["a", "b"])).toEqual(["deserialize(a)", "deserialize(b)"]);
+    expect(type.deserialize(["a", "b"])).toEqual(["cast(a)", "cast(b)"]);
+    expect(type.deserialize([["a"], ["b"]])).toEqual([["cast(a)"], ["cast(b)"]]);
   });
 
-  it("recurses into nested arrays through deserialize", () => {
+  it("routes the elements of an array literal through the subtype's deserialize", () => {
     const type = new OidArray(subtype);
 
-    expect(type.deserialize([["a"], ["b"]])).toEqual([["deserialize(a)"], ["deserialize(b)"]]);
+    expect(type.deserialize("{a,b}")).toEqual(["deserialize(a)", "deserialize(b)"]);
+    expect(type.deserialize("{{a},{b}}")).toEqual([["deserialize(a)"], ["deserialize(b)"]]);
   });
 
   it("still routes cast of an already-decoded array through the subtype's cast", () => {

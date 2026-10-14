@@ -2,7 +2,13 @@ import { Encryption } from "../namespaces.js";
 import { deflateSync, inflateSync } from "zlib";
 
 import { presence } from "@blazetrails/activesupport";
-import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
+import {
+  OpenSSL,
+  rbModAttrReader,
+  rbModAttrWriter,
+  type Bytes,
+  type DigestClass,
+} from "@blazetrails/ruby-compat";
 
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -10,34 +16,55 @@ import { KeyGenerator } from "./key-generator.js";
 import { Scheme, type SchemeOptions } from "./scheme.js";
 
 export interface Compressor {
-  deflate(data: string): Buffer | Uint8Array;
-  inflate(data: Buffer | Uint8Array): string;
+  deflate(data: string | Bytes): Bytes;
+  inflate(data: string | Bytes): Bytes;
 }
 
 const Zlib: Compressor = {
-  deflate(data: string): Buffer {
-    return deflateSync(Buffer.from(data, "utf-8"));
+  deflate(data: string | Bytes): Bytes {
+    return deflateSync(data);
   },
-  inflate(data: Buffer | Uint8Array): string {
-    return inflateSync(data).toString("utf-8");
+  inflate(data: string | Bytes): Bytes {
+    return inflateSync(data);
   },
 };
 
 export class Config {
-  private _primaryKey?: string | string[];
-  private _deterministicKey?: string;
-  private _keyDerivationSalt?: string;
-  storeKeyReferences: boolean = false;
-  supportUnencryptedData: boolean = false;
-  encryptFixtures: boolean = false;
-  validateColumnSize: boolean = true;
-  addToFilterParameters: boolean = true;
-  excludedFromFilterParameters: string[] = [];
-  previousSchemes: Scheme[] = [];
-  extendQueries: boolean = false;
-  hashDigestClass: DigestClass = OpenSSL.Digest.SHA1;
-  compressor: Compressor = Zlib;
-  forcedEncodingForDeterministicEncryption: string = "UTF-8";
+  private _primaryKey?: string | string[] | null;
+  private _deterministicKey?: string | null;
+  private _keyDerivationSalt?: string | null;
+  declare storeKeyReferences: boolean;
+  declare hashDigestClass: DigestClass;
+  declare supportUnencryptedData: boolean;
+  declare encryptFixtures: boolean;
+  declare validateColumnSize: boolean;
+  declare addToFilterParameters: boolean;
+  declare excludedFromFilterParameters: string[];
+  declare extendQueries: boolean;
+  declare previousSchemes: Scheme[];
+  declare forcedEncodingForDeterministicEncryption: string;
+  declare compressor: Compressor;
+
+  static {
+    const attrs = [
+      "primaryKey",
+      "deterministicKey",
+      "storeKeyReferences",
+      "keyDerivationSalt",
+      "hashDigestClass",
+      "supportUnencryptedData",
+      "encryptFixtures",
+      "validateColumnSize",
+      "addToFilterParameters",
+      "excludedFromFilterParameters",
+      "extendQueries",
+      "previousSchemes",
+      "forcedEncodingForDeterministicEncryption",
+      "compressor",
+    ];
+    rbModAttrReader(this, ...attrs.filter((id) => !Object.hasOwn(this.prototype, id)));
+    rbModAttrWriter(this, ...attrs);
+  }
 
   constructor() {
     this.setDefaults();
@@ -59,21 +86,21 @@ export class Config {
     }
   }
 
-  hasKeyDerivationSalt(): string | undefined {
+  hasKeyDerivationSalt(): string | null | undefined {
     return presence(this._keyDerivationSalt);
   }
 
-  hasPrimaryKey(): string | string[] | undefined {
+  hasPrimaryKey(): string | string[] | null | undefined {
     return presence(this._primaryKey);
   }
 
-  hasDeterministicKey(): string | undefined {
+  hasDeterministicKey(): string | null | undefined {
     return presence(this._deterministicKey);
   }
 
   get keyDerivationSalt(): string {
     const value = this.hasKeyDerivationSalt();
-    if (value === undefined) {
+    if (value == null) {
       throw new Configuration(
         "Missing Active Record encryption credential: active_record_encryption.key_derivation_salt",
       );
@@ -81,13 +108,13 @@ export class Config {
     return value;
   }
 
-  set keyDerivationSalt(value: string | undefined) {
+  set keyDerivationSalt(value: string | null | undefined) {
     this._keyDerivationSalt = value;
   }
 
   get primaryKey(): string | string[] {
     const value = this.hasPrimaryKey();
-    if (value === undefined) {
+    if (value == null) {
       throw new Configuration(
         "Missing Active Record encryption credential: active_record_encryption.primary_key",
       );
@@ -95,13 +122,13 @@ export class Config {
     return value;
   }
 
-  set primaryKey(value: string | string[] | undefined) {
+  set primaryKey(value: string | string[] | null | undefined) {
     this._primaryKey = value;
   }
 
   get deterministicKey(): string {
     const value = this.hasDeterministicKey();
-    if (value === undefined) {
+    if (value == null) {
       throw new Configuration(
         "Missing Active Record encryption credential: active_record_encryption.deterministic_key",
       );
@@ -109,7 +136,7 @@ export class Config {
     return value;
   }
 
-  set deterministicKey(value: string | undefined) {
+  set deterministicKey(value: string | null | undefined) {
     this._deterministicKey = value;
   }
 

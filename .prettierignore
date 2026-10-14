@@ -39,3 +39,6 @@ packages/activerecord/src/fixture-set/test-data/
 # FIXTURE_LOAD_PATH. Templates like localized/*.html carry no trailing newline,
 # and localized_templates_test.rb asserts the rendered body exactly.
 packages/actionpack/src/test-helpers/fixtures/
+# Byte-for-byte copies of vendor/thor/v1.3.2/spec/fixtures; the `.ts` beside them are the ported `.thor` files.
+packages/trailties/src/thor/test-helpers/fixtures/*
+!packages/trailties/src/thor/test-helpers/fixtures/*.ts

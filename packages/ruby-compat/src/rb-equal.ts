@@ -1,4 +1,5 @@
-import { rbObjRespondTo, rtest } from "./object.js";
+import { rbCString, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
+import { rbRegEqual } from "./regexp.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
 /**
@@ -6,6 +7,11 @@ import { temporalTag, widenPlainDate } from "./temporal-tag.js";
  * then the receiver's own `==`. Ported callers (`Range#==`'s endpoint
  * comparison, `Duration#==`'s non-Duration arm) all need the same dispatch,
  * and JS `===` only covers its first arm.
+ *
+ * `rb_str_equal` (`vendor/ruby/v3.3.11/string.c:3742`) compares a UTF-8 String
+ * with a binary one, whose seat is a `Uint8Array`, only where
+ * `rb_str_comparable` (`string.c:3671`) allows it, which is when one of them is
+ * 7-bit, and then by their bytes.
  *
  * @noRailsEquivalent PERMANENT — `rb_equal` is a C primitive
  *   (`vendor/ruby/v3.3.11/object.c:147`), not a
@@ -44,10 +50,35 @@ export function rbEql(a: unknown, b: unknown): boolean {
 function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  if (a instanceof String || b instanceof String) {
+    return equalOrEql(
+      a instanceof String ? a.valueOf() : a,
+      b instanceof String ? b.valueOf() : b,
+      eql,
+    );
+  }
+  if (typeof a === "string" && b instanceof Uint8Array) {
+    return a.length === b.length && b.every((byte, i) => byte < 0x80 && byte === a.charCodeAt(i));
+  }
+  if (a instanceof Uint8Array && typeof b === "string") return equalOrEql(b, a, eql);
+  /* A `Uint8Array` stands in for a Ruby binary String (the representation
+     `ActiveModel::Type::Binary#cast` produces, binary.rb:20-27). `rb_str_equal`
+     (`vendor/ruby/v3.3.11/string.c:3742`) compares two of them by their bytes,
+     and asks a non-String `other == self` only when it answers `to_str`;
+     `rb_str_eql` (`string.c:3773`) answers false for any non-String. Tried
+     ahead of the `equals` arm: a Node `Buffer` carries an `equals` of its own,
+     which raises for a non-buffer operand. */
+  if (a instanceof Uint8Array) {
+    if (b instanceof Uint8Array) {
+      return a.length === b.length && a.every((byte, i) => byte === b[i]);
+    }
+    if (eql || !rbObjRespondTo(b, "toStr")) return false;
+    return equalOrEql(b, a, eql);
+  }
   /* `rb_str_equal` (`vendor/ruby/v3.3.11/string.c:3742`): a non-String answering
      `to_str` is asked `other == self` in turn. */
   if (typeof a === "string" && typeof b !== "string") {
-    if (!rbObjRespondTo(b, "toStr")) return false;
+    if (!(b instanceof rbCString) && !rbObjRespondTo(b, "toStr")) return false;
     return equalOrEql(b, a, eql);
   }
   /* `rb_int_equal` (`vendor/ruby/v3.3.11/numeric.c:4634`) compares by value, and Ruby
@@ -118,26 +149,21 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
       a.every((element, i) => equalOrEql(element, b[i], eql))
     );
   }
-  /* A `Uint8Array` stands in for a Ruby binary String (the representation
-     `ActiveModel::Type::Binary#cast` produces, binary.rb:20-27), whose `==`
-     (`vendor/ruby/v3.3.11/string.c:3269` `rb_str_equal`) compares bytes rather than
-     identity. */
-  if (a instanceof Uint8Array) {
-    return b instanceof Uint8Array && a.length === b.length && a.every((byte, i) => byte === b[i]);
-  }
   /* boundary: a JS Date is one of the values a ported `==` is handed, and
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/v3.3.11/time.c:3951` `time_cmp`)
      compare by value where JS `===` does not. */
+  if (a instanceof RegExp) return rbRegEqual(a, b);
   if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime();
   /* `rb_hash_equal` (`vendor/ruby/v3.3.11/hash.c:3808`), which `hash_equal`
      (`hash.c:3746`) answers by size and then by `rb_equal` per key. A Ruby
      Hash has two JS seats — a plain object and a `Map` (ruby-compat's `Hash`,
      and `HashWithIndifferentAccess` under it) — and both stand for the same
      Ruby value, so the arm reads whichever the operand is. */
-  const entriesA = hashEntries(a);
-  if (entriesA !== null) {
-    const entriesB = hashEntries(b);
-    if (entriesB === null || entriesA.length !== entriesB.length) return false;
+  if (isHash(a)) {
+    if (!isHash(b)) return false;
+    const entriesA = hashEntries(a)!;
+    const entriesB = hashEntries(b)!;
+    if (entriesA.length !== entriesB.length) return false;
     /* `eql_i` (`vendor/ruby/v3.3.11/hash.c:3714`) finds hash2's entry with
        `hash_stlike_lookup` (`hash.c:3719`), by
        the Hash's own key semantics — `hash` then `eql?`, never `==` — not by
@@ -152,17 +178,27 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   return false;
 }
 
-/** The `RHASH` of `hash_equal` (`vendor/ruby/v3.3.11/hash.c:3746`) over both JS seats. */
-function hashEntries(value: unknown): [unknown, unknown][] | null {
+/**
+ * The `RHASH` of `hash_equal` (`vendor/ruby/v3.3.11/hash.c:3746`) over both JS seats.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function hashEntries(value: unknown): [unknown, unknown][] | null {
   if (value instanceof Map) return [...value.entries()];
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    [Object.prototype, null].includes(Object.getPrototypeOf(value))
-  ) {
-    return Object.entries(value as Record<string, unknown>);
-  }
+  if (isHash(value)) return Object.entries(value as Record<string, unknown>);
   return null;
+}
+
+/* `RB_TYPE_P(hash2, T_HASH)` (`vendor/ruby/v3.3.11/hash.c:3751`), which
+   `hash_equal` asks of the other operand before it reads either table. Its
+   `to_hash` arm for a non-Hash operand (`hash.c:3752-3764`) is not ported. */
+function isHash(value: unknown): boolean {
+  return (
+    value instanceof Map ||
+    (typeof value === "object" &&
+      value !== null &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(value)))
+  );
 }
 
 /**
@@ -191,10 +227,8 @@ export function rbEqq(pattern: unknown, target: unknown): boolean {
   }
   if (pattern instanceof Set) return pattern.has(target);
   if (typeof pattern === "function") {
-    if (Object.getOwnPropertyDescriptor(pattern, "prototype")?.writable === false) {
-      return Object(target) instanceof pattern;
-    }
-    return rtest((pattern as (arg: unknown) => unknown)(target));
+    if (!rbObjIsProc(pattern)) return Object(target) instanceof pattern;
+    return rtest(pattern(target));
   }
   return rbEqual(pattern, target);
 }

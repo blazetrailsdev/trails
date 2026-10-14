@@ -137,7 +137,7 @@ function inspectError(e: unknown): string {
 function isNil(value: unknown): boolean {
   if (value == null) return true;
   if (typeof value !== "object") return false;
-  const nil = (value as { nil?: unknown }).nil;
+  const nil = (value as { isNil?: unknown }).isNil;
   return typeof nil === "function" && (nil as () => boolean).call(value) === true;
 }
 

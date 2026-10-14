@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -44,14 +44,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("not included in schema dump", async () => {
       PostgreSQLAdapter.createUnloggedTables = true;
       await connection.createTable(TABLE_NAME, () => {});
-      const output = await dumpTableSchema(connection, TABLE_NAME);
+      const output = await dumpTableSchema(TABLE_NAME);
       expect(output).not.toMatch(/unlogged/i);
     });
 
     it("not changed in change table", async () => {
       await connection.createTable(TABLE_NAME, () => {});
       PostgreSQLAdapter.createUnloggedTables = true;
-      await connection.changeTable(TABLE_NAME, async (t) => {
+      await connection.changeTable(TABLE_NAME, {}, async (t) => {
         await t.column("name", "string");
       });
       const rows = (await connection.execute(LOGGED_QUERY)) as Array<Record<string, string>>;

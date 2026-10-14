@@ -159,11 +159,7 @@ interface TableMeta {
 
 export async function emitTableIndexes(
   ss: {
-    addIndex(
-      table: string,
-      columns: string | string[],
-      options: AddIndexOptions,
-    ): Promise<void> | void;
+    addIndex(table: string, columns: string | string[], options: AddIndexOptions): unknown;
   },
   adapter: DatabaseAdapter,
   table: string,
@@ -265,13 +261,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name", { null: true });
   });
 
-  await define("admin_regions", {}, (t) => {
-    t.string("name");
-  });
-
   await define("admin_users", {}, (t) => {
     t.string("name");
-    t.integer("region_id");
     t.string("settings", { limit: 1024, null: true });
     t.string("parent", { limit: 1024, null: true });
     t.string("spouse", { limit: 1024, null: true });
@@ -1131,10 +1122,11 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("parrot_sti_class");
     t.integer("killer_id");
     t.integer("updated_count", { default: 0 });
-    t.datetime("created_at");
-    t.datetime("created_on");
-    t.datetime("updated_at");
-    t.datetime("updated_on");
+    t.integer("integer", { default: 0 });
+    t.datetime("created_at", { precision: 0 });
+    t.datetime("created_on", { precision: 0 });
+    t.datetime("updated_at", { precision: 0 });
+    t.datetime("updated_on", { precision: 0 });
   });
 
   await define("pirates", {}, (t) => {
@@ -1463,6 +1455,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.integer("toy_id");
     t.string("name");
     t.integer("pet_id");
+    t.integer("integer");
     t.datetime("created_at", { null: false });
     t.datetime("updated_at", { null: false });
   });
@@ -1711,285 +1704,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("courses_professors", { id: false, arunit2: true }, (t) => {
     t.references("course");
     t.references("professor");
-  });
-
-  await define("to_be_linked_accounts", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("to_be_linked_users", {}, (t) => {
-    t.string("name");
-    t.integer("account_id");
-    t.text("settings");
-  });
-
-  await define("appointments", {}, (t) => {
-    t.integer("doctor_id");
-    t.integer("patient_id");
-  });
-
-  await define("bookmarks", {}, (t) => {
-    t.string("author_name");
-  });
-
-  await define("cat_categories", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("catalog_categories", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("catalog_products", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("clients", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("company2s", {}, (t) => {});
-
-  await define("content_pages", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("contract2s", {}, (t) => {
-    t.integer("company2_id");
-  });
-
-  await define("crews", {}, (t) => {
-    t.integer("ship_id");
-  });
-
-  await define("doctors", {}, (t) => {});
-
-  await define("essay_authors", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("essay_cats", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("essay_models", {}, (t) => {
-    t.string("name");
-    t.integer("writer_id");
-    t.string("writer_type");
-    t.integer("category_id");
-  });
-
-  await define("firms", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("habtm_posts", {}, (t) => {
-    t.string("title");
-  });
-
-  await define("host_as", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("hot_accounts", {}, (t) => {
-    t.integer("hot_owner_id");
-  });
-
-  await define("hot_owners", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("hot_profiles", {}, (t) => {
-    t.integer("hot_account_id");
-  });
-
-  await define("jt_categories", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("jt_products", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ms_departments", {}, (t) => {
-    t.integer("hotel_id");
-  });
-
-  await define("ms_hotels", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("nested_nested_users", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("nested_users", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("no_pk_models", {}, (t) => {});
-
-  await define("no_pk_owners", {}, (t) => {});
-
-  await define("ns_admin_users", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ns_billing_accounts", {}, (t) => {
-    t.integer("firm_id");
-  });
-
-  await define("ns_billing_firms", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ns_billing_nested_firms", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ns_biz_clients", {}, (t) => {
-    t.string("name");
-    t.integer("firm_id");
-  });
-
-  await define("ns_biz_firms", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ns_post_bs", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ns_posts", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ns_tag_bs", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("ns_tags", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("orgs", {}, (t) => {});
-
-  await define("orphan2s", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("orphans", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("patients", {}, (t) => {});
-
-  await define("post_tags", {}, (t) => {
-    t.integer("post_id");
-    t.integer("tag_id");
-  });
-
-  await define("profiles", {}, (t) => {
-    t.integer("user_id");
-  });
-
-  await define("publishers", {}, (t) => {});
-
-  await define("sc2_chef_lists", {}, (t) => {
-    t.integer("employable_list_id");
-    t.string("employable_list_type");
-    t.integer("employable_id");
-    t.string("employable_type");
-  });
-
-  await define("sc2_hotels", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("sc2_mocktails", {}, (t) => {});
-
-  await define("sc3_authors", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("sc3_books", {}, (t) => {
-    t.integer("author_id");
-    t.integer("format_record_id");
-    t.string("format_record_type");
-  });
-
-  await define("sc3_hardbacks", {}, (t) => {});
-
-  await define("sc4_chefs", {}, (t) => {
-    t.integer("department_id");
-    t.integer("employable_id");
-    t.string("employable_type");
-  });
-
-  await define("sc4_depts", {}, (t) => {
-    t.integer("hotel_id");
-  });
-
-  await define("sc4_drinks", {}, (t) => {});
-
-  await define("sc4_hotels", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("sc4_recipes", {}, (t) => {
-    t.integer("chef_id");
-    t.integer("hotel_id");
-  });
-
-  await define("sc_cakes", {}, (t) => {});
-
-  await define("sc_chefs", {}, (t) => {
-    t.integer("department_id");
-    t.integer("employable_id");
-    t.string("employable_type");
-  });
-
-  await define("sc_depts", {}, (t) => {
-    t.integer("hotel_id");
-  });
-
-  await define("sc_drinks", {}, (t) => {});
-
-  await define("sc_hotels", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("special_books", {}, (t) => {
-    t.string("isbn");
-    t.integer("author_id");
-  });
-
-  await define("standalones", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("sub_books", {}, (t) => {
-    t.string("title");
-  });
-
-  await define("target_as", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("targets", {}, (t) => {});
-
-  await define("teams", {}, (t) => {});
-
-  await define("tenants", {}, (t) => {
-    t.integer("tenant_id");
-  });
-
-  await define("top_users", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("topic2s", {}, (t) => {
-    t.string("title");
   });
 
   _registry = tables;

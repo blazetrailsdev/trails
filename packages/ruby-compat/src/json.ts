@@ -1,8 +1,36 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `JSON` module is a
    namespace of module functions; ESM syntax cannot spell `JSON.dump`. */
 import { ArgumentError } from "./argument-error.js";
+import { rbObjClassname } from "./object.js";
 
 const globalJSON = globalThis.JSON;
+
+function stripJsonComments(value: string): string {
+  let out = "";
+  let index = 0;
+  while (index < value.length) {
+    const char = value[index];
+    if (char === '"') {
+      const start = index++;
+      while (index < value.length && value[index] !== '"') {
+        index += value[index] === "\\" ? 2 : 1;
+      }
+      out += value.slice(start, ++index);
+    } else if (char === "/" && value[index + 1] === "*") {
+      const end = value.indexOf("*/", index + 2);
+      index = end === -1 ? value.length : end + 2;
+      out += end === -1 ? "/*" : " ";
+    } else if (char === "/" && value[index + 1] === "/") {
+      const end = value.indexOf("\n", index + 2);
+      index = end === -1 ? value.length : end;
+      out += " ";
+    } else {
+      out += char;
+      index++;
+    }
+  }
+  return out;
+}
 
 /**
  * Ruby's stdlib `JSON` module, the two entry points Rails hands to a
@@ -38,6 +66,36 @@ export namespace JSON {
       constant = (constant as Record<string, unknown>)[name];
     }
     return constant;
+  }
+
+  /**
+   * `JSON.parse` (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`). The parser
+   * takes the source through `StringValue` and `convert_encoding`
+   * (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:673-687,805`), which reads an
+   * `ASCII-8BIT` source as UTF-8, so a source held as its bytes is decoded here.
+   * A malformed source raises `SyntaxError`, JS's `JSON::ParserError`.
+   *
+   * @inventedArm try — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
+   * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
+   */
+  export function parse(source: string | Uint8Array): unknown {
+    if (source instanceof Uint8Array) {
+      try {
+        source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(source);
+      } catch {
+        throw new SyntaxError("source sequence is illegal/malformed utf-8");
+      }
+    }
+    if (typeof source !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbObjClassname(source)} into String`);
+    }
+    try {
+      return globalJSON.parse(source);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      return globalJSON.parse(stripJsonComments(source));
+    }
   }
 
   export function dump(value: unknown): string {

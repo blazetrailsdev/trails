@@ -1,5 +1,10 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  kernelFloat,
+  rbEqual,
+  rbObjAsString,
+  registerConstant,
+  rbStrSend,
+} from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType {
@@ -28,8 +33,7 @@ export class LegacyPoint extends ValueType {
   }
 
   private numberForPoint(number: unknown): string {
-    const s = String(number);
-    return s.endsWith(".0") ? s.slice(0, -2) : s;
+    return rbStrSend(rbObjAsString(number), "deleteSuffix", ".0")[0] as string;
   }
 
   override isMutable(): boolean {

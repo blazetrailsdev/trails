@@ -1,6 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Developer } from "./developer.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Mentor extends Base {
   declare developers: AssociationProxy<Developer>;
@@ -10,3 +11,4 @@ export class Mentor extends Base {
     this.hasMany("developers");
   }
 }
+registerModel(Mentor);

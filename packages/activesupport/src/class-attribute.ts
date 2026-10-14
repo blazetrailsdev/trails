@@ -1,4 +1,4 @@
-import { TypeError, rbModSingletonP } from "@blazetrails/ruby-compat";
+import { CLASS_METHOD_TABLE, TypeError, rbModSingletonP } from "@blazetrails/ruby-compat";
 
 export interface ClassAttributeOptions {
   instanceAccessor?: boolean;
@@ -69,7 +69,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     const namespacedName = `__class_attr_${name}`;
     ClassAttribute.redefine(this, name, namespacedName, defaultValue);
 
-    Object.defineProperty(this, name, {
+    const delegators: PropertyDescriptor = {
       configurable: true,
       enumerable: false,
       get(this: any) {
@@ -78,26 +78,28 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
       set(this: any, value: unknown) {
         this[namespacedName] = value;
       },
-    });
+    };
 
-    if (instanceReader || instanceWriter) {
-      const descriptor: PropertyDescriptor = { configurable: true, enumerable: false };
-      if (instanceReader) {
-        descriptor.get = function (this: any) {
-          if (Object.prototype.hasOwnProperty.call(this, `@${name}`)) {
-            return this[`@${name}`];
-          } else {
-            return this.constructor[name];
-          }
-        };
-      }
-      if (instanceWriter) {
-        descriptor.set = function (this: any, value: unknown) {
-          this[`@${name}`] = value;
-        };
-      }
-      Object.defineProperty(this.prototype, name, descriptor);
+    Object.defineProperty(this, name, delegators);
+    const methods: PropertyDescriptor = { configurable: true, enumerable: false };
+    if (rbModSingletonP(this)) {
+      Object.assign(methods, delegators);
+    } else if (instanceReader) {
+      methods.get = function (this: any) {
+        if (Object.prototype.hasOwnProperty.call(this, `@${name}`)) {
+          return this[`@${name}`];
+        } else {
+          return this.constructor[name];
+        }
+      };
     }
+
+    if (instanceWriter) {
+      methods.set = function (this: any, value: unknown) {
+        this[`@${name}`] = value;
+      };
+    }
+    if (methods.get || methods.set) Object.defineProperty(this.prototype, name, methods);
 
     if (instancePredicate) {
       const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
@@ -112,3 +114,10 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     }
   }
 }
+
+CLASS_METHOD_TABLE.classAttribute = function (
+  self: object,
+  ...attrs: (string | ClassAttributeOptions)[]
+): void {
+  classAttribute.call(self, ...attrs);
+};

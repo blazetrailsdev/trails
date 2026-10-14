@@ -7,13 +7,13 @@ import { DatabaseTasks } from "./database-tasks.js";
 import "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
-import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
+import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
 describe("DatabaseTasksTruncateTablesTest", () => {
   const created: string[] = [];
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     try {
       await Base.removeConnection();
     } catch {
@@ -39,7 +39,7 @@ describe("DatabaseTasksTruncateTablesTest", () => {
     await seed.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
     await seed.disconnectBang();
 
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
     await DatabaseTasks.truncateTables(config);
 

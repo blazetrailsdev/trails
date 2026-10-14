@@ -5,7 +5,7 @@ import {
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
 import { Command } from "commander";
-import { bootApplicationBang } from "../command/actions.js";
+import { Actions } from "../command/actions.js";
 import { UnusedRoutesCommand } from "./unused-routes.js";
 import { Trails } from "../rails.js";
 
@@ -25,7 +25,7 @@ export function routesCommand(): Command {
         await new UnusedRoutesCommand(options).perform();
         return;
       }
-      await bootApplicationBang();
+      await Actions.bootApplicationBang();
       await Trails.application!.reloadRoutesUnlessLoaded();
       console.log(inspector().format(formatter(options), routesFilter(options)));
     });

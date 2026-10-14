@@ -1,11 +1,13 @@
 import { assertValidKeys, isPlainObject } from "@blazetrails/activesupport";
+import { Enumerable, include, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
-import { FormatError } from "../fixtures.js";
+import { ActiveRecord } from "../namespaces.js";
 import { RenderContext } from "./render-context.js";
 
 const fixtureModules = new Map<string, Record<string, unknown>>();
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (fixture_set/file.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export class File {
   /** @noRailsEquivalent PERMANENT */
   static registerModule(file: string, rows: Record<string, unknown>): void {
@@ -33,10 +35,7 @@ export class File {
     this.file = file;
   }
 
-  each(): IterableIterator<[string, unknown]>;
-  each(block: (row: [string, unknown]) => void): void;
-  each(block?: (row: [string, unknown]) => void): IterableIterator<[string, unknown]> | void {
-    if (block === undefined) return this.rows()[Symbol.iterator]();
+  each(block: (row: [string, unknown]) => void): void {
     this.rows().forEach(block);
   }
 
@@ -53,39 +52,42 @@ export class File {
   }
 
   private configRow(): Record<string, unknown> {
-    if (this.#configRow === undefined) {
+    return (this.#configRow ??= (() => {
       const row = this.rawRows().find(([fixtureName]) => fixtureName === "_fixture");
-      this.#configRow = row ? this.validateConfigRow(row[1]) : { model_class: null, ignore: null };
-    }
-    return this.#configRow;
+      if (row) {
+        return this.validateConfigRow(row[1]);
+      } else {
+        return { model_class: null, ignore: null };
+      }
+    })());
   }
 
+  /** @inventedArm if — PERMANENT */
   private rawRows(): [string, unknown][] {
-    if (this.#rawRows === undefined) {
-      let data: unknown;
-      const rows = fixtureModules.get(this.file);
-      if (rows !== undefined) {
-        data = Object.fromEntries(
-          Object.entries(rows).map(([key, row]) => [key, isPlainObject(row) ? { ...row } : row]),
-        );
-      } else {
-        try {
+    return (this.#rawRows ??= (() => {
+      try {
+        let data: unknown;
+        const rows = fixtureModules.get(this.file);
+        if (rows !== undefined) {
+          data = Object.fromEntries(
+            Object.entries(rows).map(([key, row]) => [key, isPlainObject(row) ? { ...row } : row]),
+          );
+        } else {
           data = ConfigurationFile.parse(this.file, {
             context: new (RenderContext.createSubclass())().getBinding(),
           });
-        } catch (error: unknown) {
-          if (!(error instanceof ConfigurationFile.FormatError)) throw error;
-          throw new FormatError(error.message);
         }
+        return rtest(data) ? toA(this.validate(data)) : [];
+      } catch (error: unknown) {
+        if (!(error instanceof RuntimeError)) throw error;
+        throw new ActiveRecord.Fixture.FormatError(error.message);
       }
-      this.#rawRows = data != null && data !== false ? toA(this.validate(data)) : [];
-    }
-    return this.#rawRows;
+    })());
   }
 
   private validateConfigRow(data: unknown): Record<string, unknown> {
     if (!isPlainObject(data)) {
-      throw new FormatError(
+      throw new ActiveRecord.Fixture.FormatError(
         `Invalid \`_fixture\` section: \`_fixture\` must be a hash: ${this.file}`,
       );
     }
@@ -93,7 +95,7 @@ export class File {
     try {
       assertValidKeys(data, ["model_class", "ignore"]);
     } catch (error: unknown) {
-      throw new FormatError(
+      throw new ActiveRecord.Fixture.FormatError(
         `Invalid \`_fixture\` section: ${(error as Error).message}: ${this.file}`,
       );
     }
@@ -103,12 +105,12 @@ export class File {
 
   private validate(data: unknown): Record<string, unknown> | Map<unknown, unknown> {
     if (!isPlainObject(data) && !(data instanceof Map)) {
-      throw new FormatError(`fixture is not a hash: ${this.file}`);
+      throw new ActiveRecord.Fixture.FormatError(`fixture is not a hash: ${this.file}`);
     }
 
     const invalid = toA(data).filter(([, row]) => !isPlainObject(row));
     if (invalid.length > 0) {
-      throw new FormatError(
+      throw new ActiveRecord.Fixture.FormatError(
         `fixture key is not a hash: ${this.file}, keys: ` +
           `[${invalid.map(([key]) => JSON.stringify(key)).join(", ")}]`,
       );
@@ -116,6 +118,13 @@ export class File {
     return data;
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (fixture_set/file.rb:8); the class/interface merge is how `include()` surfaces on the type side.
+export interface File {
+  [Symbol.iterator](): IterableIterator<[string, unknown]>;
+}
+
+include(File, Enumerable);
 
 function toA(hash: Record<string, unknown> | Map<unknown, unknown>): [string, unknown][] {
   return hash instanceof Map

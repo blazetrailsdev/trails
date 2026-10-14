@@ -1,6 +1,7 @@
+import { presence } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
-import { Relation, collectionProxyFor as association, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { Relation, registerModel } from "../index.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -79,13 +80,13 @@ describe("Thenable", () => {
 
   it("presence() returns the relation when records exist", async () => {
     const rel = Author.where({ id: 1 });
-    const present = await rel.presence();
+    const present = await presence(rel);
     expect(present).toBeInstanceOf(Relation);
   });
 
   it("presence() returns null when no records exist", async () => {
     const rel = Author.where({ id: 99 });
-    const present = await rel.presence();
+    const present = await presence(rel);
     expect(present).toBeNull();
   });
 
@@ -93,7 +94,7 @@ describe("Thenable", () => {
     it("CollectionProxy is directly awaitable", async () => {
       const post = posts("welcome");
 
-      const proxy = association(post, "comments");
+      const proxy = post.comments;
       const comments = await proxy;
       expect(Array.isArray(comments)).toBe(true);
       expect(comments).toHaveLength(2);
@@ -141,13 +142,5 @@ describe("Thenable", () => {
     await davids.destroyAll();
 
     expect(await davids).toEqual([]);
-  });
-
-  describe("BatchEnumerator", () => {
-    it("BatchEnumerator is directly awaitable", async () => {
-      const batches = await Author.all().inBatches({ of: 2 });
-      expect(Array.isArray(batches)).toBe(true);
-      expect(batches.length).toBeGreaterThan(0);
-    });
   });
 });

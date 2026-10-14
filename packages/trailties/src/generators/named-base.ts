@@ -36,7 +36,10 @@ export class NamedBase extends GeneratorBase {
     this.name = options.name;
     this.assignNamesBang(this.name);
     this.attributes = (options.attributes ?? []).map((a) => GeneratedAttribute.parse(a));
-    initializeIncludedModules(this);
+    initializeIncludedModules(this, [], this.options, {
+      behavior: options.behavior,
+      destinationRoot: options.cwd,
+    });
   }
 
   singularName = (): string => this.fileName;

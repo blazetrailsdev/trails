@@ -1,3 +1,5 @@
+import { Admin } from "../admin.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   ActiveSupportJSON,
   isPresent,
@@ -5,6 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Base } from "../../../base.js";
 import { YAMLColumn } from "../../../coders/yaml-column.js";
+import { registerModel } from "../../../associations.js";
 
 class Coder {
   #default: Record<string, unknown>;
@@ -29,12 +32,13 @@ export class AdminUser extends Base {
   declare params: HashWithIndifferentAccess<unknown>;
   declare settings: HashWithIndifferentAccess<unknown>;
   declare spouse: HashWithIndifferentAccess<unknown>;
-  static _tableName = "admin_users";
-  static moduleName = "Admin";
-  static _demodulizedName = "User";
+  static {
+    registerModel(rbModConstSet(Admin, "User", this));
+    rbModConstSet(this, "Coder", Coder);
+  }
 
   static {
-    this.belongsTo("account", { className: "AdminAccount" });
+    this.belongsTo("account");
 
     this.store("params", { accessors: ["token"], coder: YAMLColumn });
     this.store("settings", { accessors: ["color", "homepage"] });

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Logger } from "@blazetrails/activesupport";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { Base, Migration, Migrator } from "../../index.js";
 import type { MigrationProxy } from "../../migration.js";
 import {
@@ -18,8 +17,7 @@ const skipNoTableOptions =
   mysqlVersion === "" ||
   new Version(mysqlVersion.replace(/-.*$/, "")).compare("5.7.22") >= 0;
 
-const dumpTable = (adapter: Mysql2Adapter, tableName: string) =>
-  dumpTableSchema(adapter as unknown as SchemaSource, tableName);
+const dumpTable = (adapter: Mysql2Adapter, tableName: string) => dumpTableSchema(tableName);
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -122,7 +120,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("DefaultEngineOptionTest", () => {
     let loggerWas: unknown;
     let log: string[];
-    let verboseWas: boolean;
+    let verboseWas: boolean | undefined;
 
     beforeEach(() => {
       loggerWas = Base.logger;

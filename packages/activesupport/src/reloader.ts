@@ -1,5 +1,4 @@
 import { classAttribute } from "./class-attribute.js";
-import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
 import type { FilterListEntry } from "./callbacks.js";
 import { ExecutionWrapper } from "./execution-wrapper.js";
 import type { CompletableExecution } from "./execution-wrapper.js";
@@ -21,22 +20,22 @@ export class Reloader extends ExecutionWrapper {
   static _shouldReload?: boolean;
 
   static {
-    defineCallbacks(this.prototype, "prepare");
-    defineCallbacks(this.prototype, "class_unload");
+    this.defineCallbacks("prepare");
+    this.defineCallbacks("class_unload");
   }
 
   #locked = false;
 
   static toPrepare(...args: FilterListEntry[]): void {
-    setCallback(this.prototype, "prepare", ...args);
+    this.setCallback("prepare", ...args);
   }
 
   static beforeClassUnload(...args: FilterListEntry[]): void {
-    setCallback(this.prototype, "class_unload", ...args);
+    this.setCallback("class_unload", ...args);
   }
 
   static afterClassUnload(...args: FilterListEntry[]): void {
-    setCallback(this.prototype, "class_unload", "after", ...args);
+    this.setCallback("class_unload", "after", ...args);
   }
 
   static {
@@ -111,7 +110,7 @@ export class Reloader extends ExecutionWrapper {
   }
 
   static prepareBang(): void {
-    runCallbacks(new this(), "prepare", () => undefined);
+    new this().runCallbacks("prepare");
   }
 
   requireUnloadLockBang(): void {
@@ -134,7 +133,7 @@ export class Reloader extends ExecutionWrapper {
 
   classUnloadBang(block?: () => unknown): unknown {
     this.requireUnloadLockBang();
-    return runCallbacks(this, "class_unload", block);
+    return this.runCallbacks("class_unload", block);
   }
 
   completeBang(): unknown {

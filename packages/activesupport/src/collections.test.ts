@@ -197,6 +197,14 @@ describe("reverseMerge", () => {
     expect(reverseMerge({ a: 1 }, { a: 99, b: 2 })).toEqual({ a: 1, b: 2 });
   });
 
+  it("reads the defaults of a Hash", () => {
+    const defaults = new Map([
+      ["a", 99],
+      ["b", 2],
+    ]);
+    expect(reverseMerge({ a: 1 }, defaults)).toEqual({ a: 1, b: 2 });
+  });
+
   it("does not mutate the original", () => {
     const obj = { a: 1 };
     reverseMerge(obj, { b: 2 });

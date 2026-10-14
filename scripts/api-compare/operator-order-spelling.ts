@@ -65,20 +65,29 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // `SimpleType#equals` (the class Rails aliases to `Types` at :47), and the
   // singleton `def [](type)` inside `class << self` (:13-14) → `static get`.
   "ActionView::Template::SimpleType": { "self.[]": ["get"], "==": ["equals"] },
+  // action_controller/metal/strong_parameters.rb:797 `def [](key)` →
+  // metal/strong-parameters.ts `Parameters#get`, and :803 `def []=(key, value)` → `set`.
+  "ActionController::Parameters": { "[]": ["get"], "[]=": ["set"] },
   "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
   "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
+  // arel/nodes/table_alias.rb:10 `def [](name)` → nodes/table-alias.ts `get`.
+  "Arel::Nodes::TableAlias": { "[]": ["get"] },
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.
   "ActiveModel::Errors": { "[]": ["get"] },
   // attribute_set/builder.rb:110 `def [](key)` → builder.ts
-  // `LazyAttributeHash#getAttribute`, and :114 `def []=(key, value)` → `set`,
-  // the same spellings AttributeSet uses below (RFC 0115 retired the Map-facade
-  // `get`/`has` pair this class used to carry). The class is declared at
+  // `LazyAttributeHash#get`, and :114 `def []=(key, value)` → `set`. Native
+  // element access (`h[k]`, `h.k`, `h[k] = v`) is the default port of a Hash
+  // `[]` / `[]=` (RFC 0190): both extractors record it as `ref:get` /
+  // `assign:computed`, and no gate tells it from a `hashAref` / `hashAset`
+  // call. Those two helpers are the DISPATCHING form, for a receiver that may
+  // be this class or another non-Hash one, whose `[]` / `[]=` they send to
+  // `get` / `set`. The class is declared at
   // builder.rb:94 directly under `module ActiveModel`, so its fqn is NOT nested
   // under `AttributeSet`. :134 `def ==(other)` → `equals`.
   "ActiveModel::LazyAttributeHash": {
-    "[]": ["getAttribute"],
+    "[]": ["get"],
     "[]=": ["set"],
     "==": ["equals"],
   },
@@ -97,11 +106,16 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // error.rb:190 `def ==(other)` → error.ts `equals`.
   "ActiveModel::Error": { "==": ["equals"] },
   // naming.rb:151 `delegate :==, :===, :<=>, :=~, :"!~", :eql?, …, to: :name` →
-  // naming.ts `equals`, `caseEquals` and `compare` (`eql?` is not an operator;
-  // it ports as `eql` and `rubyMethodToTs` already spells it). `=~` and `!~`
-  // stay UNMAPPED under the naming.rb entry in `SCOPED_SKIP_GROUPS`, which
-  // carries the reason.
-  "ActiveModel::Name": { "==": ["equals"], "===": ["caseEquals"], "<=>": ["compare"] },
+  // naming.ts `equals`, `caseEquals`, `compare`, `matchOperator` and
+  // `notMatchOperator` (`eql?` is not an operator; it ports as `eql` and
+  // `rubyMethodToTs` already spells it).
+  "ActiveModel::Name": {
+    "==": ["equals"],
+    "===": ["caseEquals"],
+    "<=>": ["compare"],
+    "=~": ["matchOperator"],
+    "!~": ["notMatchOperator"],
+  },
   // multibyte/chars.rb:53 `delegate :<=>, :=~, :match?, :acts_like_string?, to: :wrapped_string`
   // → chars.ts `compareTo` and `matchOperator` (`match?` is `isMatch`).
   "ActiveSupport::Multibyte::Chars": { "<=>": ["compareTo"], "=~": ["matchOperator"] },
@@ -177,8 +191,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // → attribute-methods.ts `get` / `set`.
   "ActiveRecord::AttributeMethods": { "[]": ["get"], "[]=": ["set"] },
   // type/adapter_specific_registry.rb:63 `def <=>(other)` →
-  // type/adapter-specific-registry.ts `Registration#compare`.
-  "ActiveRecord::Type::Registration": { "<=>": ["compare"] },
+  // type/adapter-specific-registry.ts `Registration#compareTo`.
+  "ActiveRecord::Type::Registration": { "<=>": ["compareTo"] },
   // migration.rb:629 `def self.[](version)` → migration.ts `static get`.
   "ActiveRecord::Migration": { "self.[]": ["get"] },
   // schema.rb:72 `def self.[](version)` → schema.ts `static get`.
@@ -189,6 +203,13 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // statement_cache.rb:72 `def <<(str)` →
   // statement-cache.ts `PartialQueryCollector#append`.
   "ActiveRecord::StatementCache::PartialQueryCollector": { "<<": ["append"] },
+  // arel/collectors: `def <<(str)` at plain_string.rb:14, bind.rb:12,
+  // composite.rb:20 and substitute_binds.rb:13 → `append` on each collector
+  // class (`SQLString` inherits PlainString's).
+  "Arel::Collectors::PlainString": { "<<": ["append"] },
+  "Arel::Collectors::Bind": { "<<": ["append"] },
+  "Arel::Collectors::Composite": { "<<": ["append"] },
+  "Arel::Collectors::SubstituteBinds": { "<<": ["append"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
   // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },
@@ -231,6 +252,10 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // rack-test cookie_jar.rb:150 `def [](name)` / :160 `def []=(name, value)` /
   // :197 `def <<(new_cookie)` → cookie-jar.ts `CookieJar#get` / `set` / `push`.
   "Rack::Test::CookieJar": { "[]": ["get"], "[]=": ["set"], "<<": ["push"] },
+  // thor core_ext/hash_with_indifferent_access.rb:18 `def [](key)` / :22
+  // `def []=(key, value)` → core-ext/hash-with-indifferent-access.ts
+  // `HashWithIndifferentAccess#get` / `set`.
+  "Thor::CoreExt::HashWithIndifferentAccess": { "[]": ["get"], "[]=": ["set"] },
 };
 
 // `fqn#operator` keys this process has actually resolved. A key that is never

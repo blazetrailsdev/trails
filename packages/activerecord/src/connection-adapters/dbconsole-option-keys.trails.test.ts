@@ -11,13 +11,17 @@ import type { DatabaseConfigOptions } from "../database-configurations/database-
 const dbConfig = (hash: Record<string, unknown>): HashConfig =>
   new HashConfig("test", "primary", hash as DatabaseConfigOptions);
 
+let findCmdAndExec: ReturnType<typeof vi.fn>;
+
+const argv = (): unknown[] => {
+  const [commands, ...args] = findCmdAndExec.mock.calls[0];
+  return [Array.isArray(commands) ? commands[0] : commands, ...args];
+};
+
 beforeEach(() => {
-  vi.spyOn(AbstractAdapter, "findCmdAndExec").mockImplementation(
-    (commands: string | string[], ...args: string[]) => [
-      Array.isArray(commands) ? commands[0] : commands,
-      ...args,
-    ],
-  );
+  findCmdAndExec = vi
+    .spyOn(AbstractAdapter, "findCmdAndExec")
+    .mockReturnValue(undefined as never) as never;
 });
 
 afterEach(() => {
@@ -33,9 +37,8 @@ describe("AbstractMysqlAdapter.dbconsole option keys", () => {
   });
 
   it("keeps Ruby-truthy empty-string and zero config values", () => {
-    const args = AbstractMysqlAdapter.dbconsole(
-      dbConfig({ host: "", username: "", port: 0, socket: "" }),
-    );
+    AbstractMysqlAdapter.dbconsole(dbConfig({ host: "", username: "", port: 0, socket: "" }));
+    const args = argv();
     expect(args).toContain("--host=");
     expect(args).toContain("--user=");
     expect(args).toContain("--port=0");
@@ -43,7 +46,8 @@ describe("AbstractMysqlAdapter.dbconsole option keys", () => {
   });
 
   it("pushes an empty-string database, as Rails' unconditional args << config.database does", () => {
-    expect(AbstractMysqlAdapter.dbconsole(dbConfig({ database: "" }))).toEqual(["mysql", ""]);
+    AbstractMysqlAdapter.dbconsole(dbConfig({ database: "" }));
+    expect(argv()).toEqual(["mysql", ""]);
   });
 });
 
@@ -51,20 +55,13 @@ describe("SQLite3Adapter.dbconsole option keys", () => {
   const expanded = (database: string) => File.expandPath(database, trailsRoot() ?? undefined);
 
   it("prepends -#{mode} and -header before the database path", () => {
-    expect(
-      SQLite3Adapter.dbconsole(dbConfig({ database: "db.sqlite3" }), {
-        mode: "html",
-        header: true,
-      }),
-    ).toEqual(["sqlite3", "-html", "-header", expanded("db.sqlite3")]);
+    SQLite3Adapter.dbconsole(dbConfig({ database: "db.sqlite3" }), { mode: "html", header: true });
+    expect(argv()).toEqual(["sqlite3", "-html", "-header", expanded("db.sqlite3")]);
   });
 
   it("keeps a Ruby-truthy empty-string mode", () => {
-    expect(SQLite3Adapter.dbconsole(dbConfig({ database: "db.sqlite3" }), { mode: "" })).toEqual([
-      "sqlite3",
-      "-",
-      expanded("db.sqlite3"),
-    ]);
+    SQLite3Adapter.dbconsole(dbConfig({ database: "db.sqlite3" }), { mode: "" });
+    expect(argv()).toEqual(["sqlite3", "-", expanded("db.sqlite3")]);
   });
 });
 

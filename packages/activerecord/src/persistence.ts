@@ -1,10 +1,30 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
-import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import {
+  basicObjRespondTo,
+  Hash,
+  isEmpty,
+  keys,
+  merge,
+  Module,
+  rbEqual,
+  rbFPublicSend,
+  rbObjAsString,
+  rbObjSingletonClass,
+  rtest,
+  union,
+  zip,
+  eachPair,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
-import { ArgumentError, AttributeMethods } from "@blazetrails/activemodel";
-import { extractOptionsBang, runCallbacks, transformKeys } from "@blazetrails/activesupport";
+import type { IndexedRow } from "./result.js";
+import {
+  ArgumentError,
+  AttributeMethods,
+  type PermittedAttributes,
+} from "@blazetrails/activemodel";
+import { extractOptionsBang, indexWith, transformKeys } from "@blazetrails/activesupport";
 import {
   InsertManager,
   UpdateManager,
@@ -13,56 +33,46 @@ import {
   Nodes,
 } from "@blazetrails/arel";
 import { ActiveRecordError, ReadOnlyRecord, RecordNotDestroyed, RecordNotSaved } from "./errors.js";
-import { withConnection } from "./connection-handling.js";
-import * as LockingOptimistic from "./locking/optimistic.js";
-import {
-  attributesForCreate,
-  attributesForUpdate,
-  attributesWithValues,
-} from "./attribute-methods.js";
-import * as Inheritance from "./inheritance.js";
-import { getStiBase, isStiSubclass } from "./inheritance.js";
+import { attributesWithValues } from "./attribute-methods.js";
 import { withTransactionReturningStatus } from "./transactions.js";
-import { registry } from "./suppressor.js";
-import {
-  performValidations,
-  raiseValidationError,
-  RecordInvalid,
-  type ValidationContextArg,
-} from "./validations.js";
+import { isDefaultScopes } from "./scoping/default.js";
+import { RecordInvalid } from "./validations.js";
+import { ActiveRecord } from "./namespaces.js";
 
 interface PersistenceHost {
-  new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
-  _instantiate(
-    row: Record<string, unknown>,
-    block?: (record: any) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): any;
+  new (attrs?: Record<string, unknown> | PermittedAttributes, block?: (record: any) => void): any;
   /** @internal */
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
-  _hasQueryConstraints?: boolean;
-  _isBaseClass?: boolean;
+  _hasQueryConstraints?: string[] | false;
+  isBaseClass(): boolean;
+  baseClass: PersistenceHost;
   ensureSchemaLoaded(): Promise<void>;
+  /** @internal */
+  discriminateClassForRecord(record: Record<string, unknown> | IndexedRow): typeof Base;
+  /** @internal */
+  instantiateInstanceOf(
+    klass: typeof Base,
+    attributes: Record<string, unknown> | IndexedRow,
+    columnTypes?: Record<string, unknown>,
+    block?: (r: any) => void,
+  ): any;
 }
 
 export async function create(
   this: PersistenceHost,
-  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
     const records: any[] = [];
-    for (const a of attributes) {
-      records.push(await (this as any).create(a, block));
-    }
+    for (const attr of attributes) records.push(await (this as any).create(attr, block));
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   let yielded: unknown;
   const record = new this(
-    mergedAttrs,
+    attributes,
     block &&
       ((record: any) => {
         yielded = block(record);
@@ -75,21 +85,18 @@ export async function create(
 
 export async function createBang(
   this: PersistenceHost,
-  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
     const records: any[] = [];
-    for (const a of attributes) {
-      records.push(await (this as any).createBang(a, block));
-    }
+    for (const attr of attributes) records.push(await (this as any).createBang(attr, block));
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   let yielded: unknown;
   const record = new this(
-    mergedAttrs,
+    attributes,
     block &&
       ((record: any) => {
         yielded = block(record);
@@ -106,21 +113,134 @@ export function build(
   block?: (record: any) => void,
 ): any {
   if (Array.isArray(attributes)) {
-    return attributes.map((a) => build.call(this, a, block));
+    return attributes.map((attr) => build.call(this, attr, block));
+  } else {
+    return new this(attributes, block);
   }
-  const record = new this(attributes ?? {});
-  if (block) block(record);
-  return record;
 }
 
 export function instantiate(
   this: PersistenceHost,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | IndexedRow,
   columnTypes: Record<string, unknown> = {},
   block?: (record: any) => void,
 ): any {
-  const klass = Inheritance.discriminateClassForRecord(this as never, attributes);
-  return instantiateInstanceOf(klass, attributes, columnTypes, block);
+  const klass = this.discriminateClassForRecord(attributes);
+  return this.instantiateInstanceOf(klass, attributes, columnTypes, block);
+}
+
+export class ClassMethods {
+  static update<T extends typeof Base>(
+    this: T,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static update<T extends typeof Base>(
+    this: T,
+    id: ":all",
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static update<T extends typeof Base>(
+    this: T,
+    id: unknown[],
+    attributes: Record<string, unknown>[],
+  ): Promise<InstanceType<T>[]>;
+  static update<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>>;
+  static async update<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
+  ): Promise<InstanceType<T> | InstanceType<T>[]> {
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
+    if (Array.isArray(id)) {
+      if (id.some((oneId) => oneId instanceof ActiveRecord.Base)) {
+        throw new ArgumentError(
+          "You are passing an array of ActiveRecord::Base instances to `update`. " +
+            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
+        );
+      }
+      const objects: InstanceType<T>[] = [];
+      for (const oneId of id) objects.push(await this.find(oneId));
+      for (const [idx, object] of objects.entries()) {
+        await object.update((attributes as Record<string, unknown>[])[idx]);
+      }
+      return objects;
+    } else if (id === ":all") {
+      const records = await this.all();
+      for (const record of records) await record.update(attributes as Record<string, unknown>);
+      return records;
+    } else {
+      if (id instanceof ActiveRecord.Base) {
+        throw new ArgumentError(
+          "You are passing an instance of ActiveRecord::Base to `update`. " +
+            "Please pass the id of the object by calling `.id`.",
+        );
+      }
+      const object = await this.find(id);
+      await object.update(attributes as Record<string, unknown>);
+      return object;
+    }
+  }
+
+  static updateBang<T extends typeof Base>(
+    this: T,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static updateBang<T extends typeof Base>(
+    this: T,
+    id: ":all",
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static updateBang<T extends typeof Base>(
+    this: T,
+    id: unknown[],
+    attributes: Record<string, unknown>[],
+  ): Promise<InstanceType<T>[]>;
+  static updateBang<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>>;
+  static async updateBang<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
+  ): Promise<InstanceType<T> | InstanceType<T>[]> {
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
+    if (Array.isArray(id)) {
+      if (id.some((oneId) => oneId instanceof ActiveRecord.Base)) {
+        throw new ArgumentError(
+          "You are passing an array of ActiveRecord::Base instances to `update!`. " +
+            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
+        );
+      }
+      const objects: InstanceType<T>[] = [];
+      for (const oneId of id) objects.push(await this.find(oneId));
+      for (const [idx, object] of objects.entries()) {
+        await object.updateBang((attributes as Record<string, unknown>[])[idx]);
+      }
+      return objects;
+    } else if (id === ":all") {
+      const records = await this.all();
+      for (const record of records) await record.updateBang(attributes as Record<string, unknown>);
+      return records;
+    } else {
+      if (id instanceof ActiveRecord.Base) {
+        throw new ArgumentError(
+          "You are passing an instance of ActiveRecord::Base to `update!`. " +
+            "Please pass the id of the object by calling `.id`.",
+        );
+      }
+      const object = await this.find(id);
+      await object.updateBang(attributes as Record<string, unknown>);
+      return object;
+    }
+  }
+
+  static queryConstraintsList = queryConstraintsList;
 }
 
 export function queryConstraints(this: PersistenceHost, ...columnsList: string[]): void {
@@ -128,31 +248,23 @@ export function queryConstraints(this: PersistenceHost, ...columnsList: string[]
     throw new ArgumentError("You must specify at least one column to be used in querying");
   }
   this._queryConstraintsList = columnsList.map(String);
-  this._hasQueryConstraints = true;
+  this._hasQueryConstraints = this._queryConstraintsList;
 }
 
-export function hasQueryConstraints(this: PersistenceHost): boolean {
-  return !!this._hasQueryConstraints;
+export function hasQueryConstraints(this: PersistenceHost): string[] | false {
+  return Object.hasOwn(this, "_hasQueryConstraints") ? this._hasQueryConstraints! : false;
 }
 
 export function queryConstraintsList(this: PersistenceHost): string[] | null {
-  if (this._queryConstraintsList) return this._queryConstraintsList;
-
-  const parent = Object.getPrototypeOf(this) as PersistenceHost | null;
-  const parentIsBase = !parent || typeof parent !== "function" || parent.name === "Base";
-  const isBase = this._isBaseClass ?? parentIsBase;
-  if (isBase) {
-    const pk = this.primaryKey;
-    return Array.isArray(pk) ? pk : null;
-  }
-
-  if (parent && this.primaryKey !== parent.primaryKey) {
-    const pk = this.primaryKey;
-    return Array.isArray(pk) ? pk : null;
-  }
-
-  if (parent && typeof parent === "function") return queryConstraintsList.call(parent);
-  return null;
+  return (
+    Object.getOwnPropertyDescriptor(this, "_queryConstraintsList")?.value ||
+    (this._queryConstraintsList =
+      this.isBaseClass() || !rbEqual(this.primaryKey, this.baseClass.primaryKey)
+        ? Array.isArray(this.primaryKey)
+          ? this.primaryKey
+          : null
+        : queryConstraintsList.call(this.baseClass))
+  );
 }
 
 export function compositeQueryConstraintsList(this: PersistenceHost): string[] {
@@ -168,30 +280,31 @@ export async function _insertRecord(
     insert(arel: unknown, ...args: unknown[]): Promise<unknown>;
     emptyInsertStatementValue(pk?: string | null): string;
   },
-  values: Record<string, unknown>,
+  values: Hash<string, unknown>,
   returning?: string[] | null,
 ): Promise<unknown> {
   const ctor = this as any;
   const primaryKey = ctor.primaryKey;
   let primaryKeyValue: unknown = null;
   if (ctor.isPrefetchPrimaryKey() && primaryKey) {
-    if (values[primaryKey] == null || values[primaryKey] === false) {
-      primaryKeyValue = ctor.nextSequenceValue();
-      values[primaryKey] = ctor
-        ._defaultAttributes()
-        .getAttribute(primaryKey)
-        .withCastValue(primaryKeyValue);
+    if (!rtest(values.get(primaryKey))) {
+      values.set(
+        primaryKey,
+        (() => {
+          primaryKeyValue = ctor.nextSequenceValue();
+          return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
+        })(),
+      );
     }
   }
 
   const arelTable: ArelTable = ctor.arelTable;
   const im = new InsertManager(arelTable);
 
-  const entries = Object.entries(values);
-  if (entries.length === 0) {
+  if (isEmpty(values)) {
     im.insert(connection.emptyInsertStatementValue(primaryKey));
   } else {
-    im.insert(entries.map(([col, val]) => [arelTable.get(col), val]));
+    im.insert(transformKeys(values, (name) => arelTable.get(name)));
   }
 
   return connection.insert(
@@ -209,7 +322,7 @@ export async function _insertRecord(
 
 export async function _updateRecord(
   this: PersistenceHost,
-  values: Record<string, unknown>,
+  values: Map<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
   const klass = this as unknown as typeof Base;
@@ -227,7 +340,7 @@ export async function _updateRecord(
   }
 
   const um = new UpdateManager(arelTable);
-  um.set(Object.entries(values).map(([name, value]) => [arelTable.get(name), value]));
+  um.set(transformKeys(values, (name) => arelTable.get(name)));
   um.wheres = wheres;
 
   return klass.withConnection((c) => c.update(um, `${klass.name} Update`));
@@ -288,6 +401,8 @@ export function isPreviouslyPersisted(this: PersistenceRecordDispatch): boolean 
 }
 
 interface AttributeIO {
+  get(attrName: string): unknown;
+  set(attrName: string, value: unknown): void;
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   attributeWriterMissing(name: string, value: unknown): void;
@@ -297,8 +412,6 @@ type TouchOption = boolean | string | string[];
 
 interface CounterBangRecord extends AttributeIO {
   id: unknown;
-  attributeInDatabase(name: string): unknown;
-  clearAttributeChange(name: string): void;
   constructor: {
     updateCounters(id: unknown, counters: CounterCacheCounters): Promise<number>;
   };
@@ -309,16 +422,9 @@ interface ToggleBangRecord extends AttributeIO {
 }
 
 export function increment<T extends AttributeIO>(this: T, attribute: string, by: number = 1): T {
-  const name = resolveAttributeAlias(this, attribute);
-  const current = Number(this.readAttribute(name)) || 0;
-  this.writeAttribute(name, current + by);
+  if (!rtest(this.get(attribute))) this.set(attribute, 0);
+  this.set(attribute, (this.get(attribute) as number) + by);
   return this;
-}
-
-function resolveAttributeAlias(record: object, attribute: string): string {
-  const aliases = (record.constructor as { attributeAliases?: Record<string, string> })
-    .attributeAliases;
-  return aliases?.[attribute] ?? attribute;
 }
 
 export function decrement<T extends AttributeIO & { increment(a: string, b?: number): T }>(
@@ -341,18 +447,14 @@ export async function incrementBang<T extends CounterBangRecord>(
   options: { touch?: TouchOption } = {},
 ) {
   if (attribute === undefined) {
-    throw new Error("wrong number of arguments (given 0, expected 1..3)");
+    throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");
   }
-  attribute = resolveAttributeAlias(this, attribute);
   this.increment(attribute, by);
+  const inDatabase = rbFPublicSend(this, `${attribute}InDatabase`);
   const change =
-    Number(this.readAttribute(attribute)) - (Number(this.attributeInDatabase(attribute)) || 0);
+    (rbFPublicSend(this, attribute) as number) - (rtest(inDatabase) ? (inDatabase as number) : 0);
   await this.constructor.updateCounters(this.id, { [attribute]: change, touch: options.touch });
-  this.clearAttributeChange(attribute);
-  if (options.touch != null) {
-    const ctor = this.constructor as unknown as { prototype: object };
-    await runCallbacks(this, "touch");
-  }
+  rbFPublicSend(this, `clear${attribute.charAt(0).toUpperCase()}${attribute.slice(1)}Change`);
   return this;
 }
 
@@ -379,7 +481,7 @@ interface UpdateRecord extends AttributeIO {
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function update<T extends UpdateRecord>(
   this: T,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<boolean | undefined> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -391,7 +493,7 @@ export async function update<T extends UpdateRecord>(
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function updateBang<T extends UpdateRecord>(
   this: T,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<true | undefined> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -429,88 +531,31 @@ async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
 export { deleteRow as delete };
 
 interface SaveRecord {
-  _destroyed: boolean;
-  _readonly: boolean;
-  _newRecord: boolean;
-  _attributes: { writeCastValue(key: string, val: unknown): void };
-  readAttribute(name: string): unknown;
-  _readAttribute(name: string): unknown;
-  errors: { isAny(): boolean; isEmpty(): boolean };
-  isValid(context?: ValidationContextArg): Promise<boolean>;
-  constructor: {
-    name: string;
-  };
+  createOrUpdate(touch?: boolean, block?: (record: any) => void): Promise<boolean>;
 }
 
-export async function save<T extends SaveRecord>(
-  this: T,
+export async function save(
+  this: SaveRecord,
   options?: { validate?: boolean; touch?: boolean },
-  block?: (record: T) => void,
-): Promise<boolean | undefined> {
-  if (registry()[(this.constructor as { name: string }).name]) {
-    return true;
-  }
-  await (
-    this.constructor as unknown as { ensureSchemaLoaded(): Promise<void> }
-  ).ensureSchemaLoaded();
-  const self = this as any;
-  const ctor = this.constructor;
-
+  block?: (record: any) => void,
+): Promise<boolean> {
   try {
-    return (await withTransactionReturningStatus.call(self, async () => {
-      if (options?.validate !== false && typeof self._runBelongsToDefaults === "function") {
-        await self._runBelongsToDefaults();
-        self._belongsToDefaultsApplied = true;
-      }
-      let validationsPassed: boolean;
-      try {
-        validationsPassed = await performValidations.call(this, options);
-      } finally {
-        self._belongsToDefaultsApplied = false;
-      }
-      if (!validationsPassed) return false;
-      if (this._readonly) {
-        throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-      }
-      if (this._destroyed) {
-        return false;
-      }
-
-      if (this._newRecord && isStiSubclass(ctor)) {
-        const col = getStiBase(ctor).inheritanceColumn;
-        if (col && !this._readAttribute(col)) {
-          this._attributes.writeCastValue(col, this.constructor.name);
-        }
-      }
-
-      return self.createOrUpdate(options?.touch ?? true, block);
-    })) as boolean | undefined;
+    return await this.createOrUpdate(options?.touch ?? true, block);
   } catch (e) {
     if (e instanceof RecordInvalid) return false;
     throw e;
   }
 }
 
-export async function saveBang<
-  T extends SaveRecord & {
-    save(
-      o?: { validate?: boolean; touch?: boolean },
-      block?: (record: T) => void,
-    ): Promise<boolean | undefined>;
-  },
->(
-  this: T,
+export async function saveBang(
+  this: SaveRecord,
   options?: { validate?: boolean; touch?: boolean },
-  block?: (record: T) => void,
-): Promise<true | undefined> {
-  const result = await this.save(options, block);
-  if (result === false) {
-    if ((this as unknown as { errors: { isAny(): boolean } }).errors.isAny()) {
-      raiseValidationError(this);
-    }
+  block?: (record: any) => void,
+): Promise<true> {
+  if (!(await this.createOrUpdate(options?.touch ?? true, block))) {
     throw new RecordNotSaved("Failed to save the record", this as unknown as object);
   }
-  return result;
+  return true;
 }
 
 interface DestroyRecord {
@@ -518,28 +563,20 @@ interface DestroyRecord {
   constructor: { name: string };
 }
 
-export async function destroy<T extends DestroyRecord>(this: T): Promise<T | false> {
-  if (this.isReadonly()) {
-    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  }
-
+export async function destroy<T extends DestroyRecord>(this: T): Promise<T> {
   const self = this as any;
-  if (self._destroyCallbackAlreadyCalled) return this;
-  self._destroyCallbackAlreadyCalled = true;
-  try {
-    const result = await withTransactionReturningStatus.call(self, () => self._destroyRow());
-    return result ? this : false;
-  } finally {
-    self._destroyCallbackAlreadyCalled = false;
-  }
+  if (this.isReadonly()) self._raiseReadonlyRecordError();
+  await self.destroyAssociations();
+  self._triggerDestroyCallback ||= self.isPersisted() && (await self.destroyRow()) > 0;
+  self._destroyed = true;
+  self._previouslyNewRecord = false;
+  return self.freeze();
 }
 
-export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | false> }>(
+export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | boolean> }>(
   this: T,
 ): Promise<T> {
-  const result = await this.destroy();
-  if (result === false) (this as any)._raiseRecordNotDestroyed();
-  return result as T;
+  return (await this.destroy()) || (this as any)._raiseRecordNotDestroyed();
 }
 
 interface AttributeSingleSave {
@@ -583,7 +620,7 @@ interface UpdateColumnsRecord {
   constructor: {
     attributeAliases: Record<string, string>;
     _updateRecord(
-      values: Record<string, unknown>,
+      values: Map<string, unknown>,
       constraints: Record<string, unknown>,
     ): Promise<number>;
   };
@@ -599,7 +636,7 @@ export async function updateColumn<T extends UpdateColumnsRecord>(
 
 export async function updateColumns<T extends UpdateColumnsRecord>(
   this: T,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): Promise<boolean> {
   if (this.isNewRecord()) throw new ActiveRecordError("cannot update a new record");
   if (this.isDestroyed()) throw new ActiveRecordError("cannot update a destroyed record");
@@ -613,11 +650,12 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   });
 
   const updateConstraints = this._queryConstraintsHash();
-  attributes = Object.entries(attributes).reduce<Record<string, unknown>>((h, [k, v]) => {
-    h[k] = this._attributes.writeCastValue(k, v);
+  const h = new Hash<string, unknown>();
+  eachPair(attributes, (k, v) => {
+    h.set(k, this._attributes.writeCastValue(k, v));
     this.clearAttributeChange(k);
-    return h;
-  }, {});
+  });
+  attributes = h;
 
   const affectedRows = await this.constructor._updateRecord(attributes, updateConstraints);
 
@@ -625,74 +663,42 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
 }
 
 interface ReloadRecord {
-  _attributes: unknown;
+  _attributes: { keys(): Iterable<string> };
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
-  _mutationsBeforeLastSave: unknown;
-  _mutationsFromDatabase: unknown;
   _associationCache: Map<string, { owner: unknown }>;
-  id: unknown;
+  isApplyScoping(options: object | null): unknown;
+  _findRecord(options: object | null): Promise<unknown>;
   constructor: {
-    name: string;
-    primaryKey: string | string[];
-    clearQueryCachesForCurrentThread?(): void;
+    prototype: object;
+    connectionPool(): { clearQueryCache(): void };
     unscoped<R>(block: () => R | Promise<R>): Promise<R>;
   };
 }
 
-/**
- * Re-fetch the record from the database and overwrite in-memory attributes,
- * resetting dirty tracking and clearing association/proxy caches.
- *
- * The refetch routes through `_findRecord` so default scopes apply exactly as
- * Rails' `apply_scoping?` dictates: with an all_queries default scope (or a
- * global current scope) and no `unscoped: true`, `_findRecord` runs with
- * `all_queries: true`; otherwise the fetch is wrapped in `unscoped { }`. This
- * also makes reload raise `RecordNotFound` when the active scope excludes the
- * just-saved row (Rails uses `find_by!`).
- *
- * Mirrors: ActiveRecord::Persistence#reload
- *
- * @missingRailsCall merge — PERMANENT: persistence.rb:746 `(options ||
- *   {}).merge(all_queries: true)` — Ruby Hash#merge returning a new hash is JS
- *   object spread (`{ ...findOptions, allQueries: true }`, persistence.ts:1422);
- *   there is no Hash object to call `merge` on. Language shortcoming.
- */
 export async function reload<T extends ReloadRecord>(
   this: T,
-  options?: { lock?: boolean | string; unscoped?: boolean },
+  options: { lock?: boolean | string; unscoped?: boolean } | null = null,
 ): Promise<T> {
-  const ctor = this.constructor;
-  ctor.clearQueryCachesForCurrentThread?.();
+  this.constructor.connectionPool().clearQueryCache();
 
-  const findOptions = { lock: options?.lock };
-  const fresh = (
-    isApplyScoping.call(this as never, options)
-      ? await _findRecord.call(this as never, { ...findOptions, allQueries: true })
-      : await ctor.unscoped(() => _findRecord.call(this as never, findOptions))
-  ) as {
-    _attributes: unknown;
-    _associationCache: Map<string, { owner: unknown }>;
-  };
+  const freshObject = (await (this.isApplyScoping(options)
+    ? this._findRecord(merge(options || {}, { allQueries: true }))
+    : this.constructor.unscoped(() => this._findRecord(options)))) as ReloadRecord;
 
-  this._attributes = fresh._attributes;
-  if (Object.getPrototypeOf(this) !== (ctor as { prototype?: object }).prototype) {
+  this._associationCache = freshObject._associationCache;
+  for (const association of this._associationCache.values()) association.owner = this;
+  this._attributes = freshObject._attributes;
+  if (Object.getPrototypeOf(this) !== this.constructor.prototype) {
     AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
   }
-  for (const name of (this._attributes as { keys(): Iterable<string> }).keys()) {
+  for (const name of this._attributes.keys()) {
     if (!basicObjRespondTo(this, name, false)) {
       (rbObjSingletonClass(this) as unknown as typeof Base).defineAttributeMethod(name);
     }
   }
   this._newRecord = false;
   this._previouslyNewRecord = false;
-  this._mutationsBeforeLastSave = null;
-  this._mutationsFromDatabase = null;
-
-  this._associationCache = fresh._associationCache;
-  for (const association of this._associationCache.values()) {
-    association.owner = this;
-  }
   return this;
 }
 
@@ -701,7 +707,7 @@ interface BecomesRecord {
   _newRecord: boolean;
   _destroyed: boolean;
   _mutationsFromDatabase: unknown;
-  errors: unknown;
+  errors: { copyBang(other: unknown): unknown };
 }
 
 /** @missingRailsName instanceVariableGet — PERMANENT */
@@ -730,10 +736,7 @@ export function becomes<
       becoming._newRecord = this._newRecord;
       becoming._destroyed = this._destroyed;
       becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
-      const targetErrors = becoming.errors as { copyBang?(other: unknown): void };
-      if (typeof targetErrors.copyBang === "function") {
-        targetErrors.copyBang(this.errors);
-      }
+      becoming.errors.copyBang(this.errors);
     }) as InstanceType<K>;
   } finally {
     if (hadOwn) ctor._suppressStiNewDispatch = prev;
@@ -762,13 +765,16 @@ interface PersistencePrivateHost {
   _destroyed: boolean;
   _previouslyNewRecord: boolean;
   _readonly?: boolean;
+  attribute(attrName: string): unknown;
+  _inMemoryQueryConstraintsHash(): Record<string, unknown>;
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   isNewRecord(): boolean;
   isDestroyed(): boolean;
   id: unknown;
   idInDatabase: unknown;
-  attributeInDatabase?(col: string): unknown;
+  attributeInDatabase(col: string): unknown;
+  _primaryKey?: string | string[] | null;
   _associationCache?: Map<
     string,
     { owner?: { isStrictLoading?(): boolean; isStrictLoadingNPlusOneOnly?(): boolean } } | null
@@ -789,7 +795,7 @@ type PersistenceInternalHost = PersistencePrivateHost & {
   _writeAttribute(name: string, val: unknown): void;
   _triggerUpdateCallback?: boolean | null;
   _attributes?: { keys?(): Iterable<string> };
-  currentTimeFromProperTimezone(): RubyTime;
+  currentTimeFromProperTimezone(): Promise<RubyTime>;
   constructor: PersistencePrivateHost["constructor"] & {
     columnNames?(): string[];
     _counterCacheColumns?: string[];
@@ -806,11 +812,15 @@ type PersistenceInstanceChainHost = {
   isWillSaveChangeToAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
+  typeForAttribute(name: string): { deserialize(value: unknown): unknown };
+  attributesForCreate(attributeNames: string[]): string[];
+  attributesForUpdate(attributeNames: string[]): string[];
+  attributesWithValues(attributeNames: string[]): Hash<string, unknown>;
 };
 
 /** @internal */
-export function initInternals(this: PersistencePrivateHost, super_: () => void): void {
-  super_();
+export function initInternals(this: PersistencePrivateHost): void {
+  Persistence.superMethod(this, "initInternals")!();
   (this as any)._triggerDestroyCallback = (this as any)._triggerUpdateCallback = null;
   this._previouslyNewRecord = false;
 }
@@ -825,10 +835,7 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
     .map(([name]) => name);
 }
 
-/**
- * @internal
- * @missingRailsName _inMemoryQueryConstraintsHash — PERMANENT
- */
+/** @internal */
 export function _findRecord(
   this: PersistencePrivateHost & { constructor: any },
   options?: { lock?: boolean | string; allQueries?: boolean | null },
@@ -838,50 +845,47 @@ export function _findRecord(
   let scope = ctor.all({ allQueries: options?.allQueries ?? null });
   if (preloads.length > 0) scope = scope.preload(...preloads);
   if (options?.lock) scope = scope.lock(options.lock);
-  return scope.findByBang(_inMemoryQueryConstraintsHash.call(this));
+  return scope.findByBang(this._inMemoryQueryConstraintsHash());
 }
 
-/**
- * @internal
- * @missingRailsCall attribute — PERMANENT
- */
+/** @internal */
 export function _inMemoryQueryConstraintsHash(
   this: PersistencePrivateHost,
 ): Record<string, unknown> {
-  const constraintsList = queryConstraintsList.call(this.constructor as any);
-  if (!constraintsList) {
-    const pk = this.constructor.primaryKey as string;
-    return { [pk]: this.id };
+  if (queryConstraintsList.call(this.constructor as any) == null) {
+    return { [this._primaryKey as string]: this.id };
+  } else {
+    return Object.fromEntries(
+      indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+        this.attribute(columnName),
+      ),
+    );
   }
-  return Object.fromEntries(constraintsList.map((col) => [col, this.readAttribute(col)]));
 }
 
 /** @internal */
 export function isApplyScoping(
   this: PersistencePrivateHost,
-  options?: { unscoped?: boolean },
-): boolean {
-  if (options?.unscoped) return false;
-  const ctor = this.constructor as any;
-  const hasAllQueriesDefaultScope = !!ctor.defaultScopes?.some((s: any) => s.allQueries);
-  return !!(hasAllQueriesDefaultScope || ctor.globalCurrentScope());
+  options?: { unscoped?: boolean } | null,
+): unknown {
+  return (
+    !(options && options.unscoped) &&
+    (isDefaultScopes.call(this.constructor as any, { allQueries: true }) ||
+      (this.constructor as any).globalCurrentScope())
+  );
 }
 
 /** @internal */
 export function _queryConstraintsHash(this: PersistencePrivateHost): Record<string, unknown> {
-  const constraintsList = queryConstraintsList.call(this.constructor as any);
-  if (!constraintsList) {
-    const pk = this.constructor.primaryKey as string;
-    return { [pk]: this.idInDatabase };
+  if (queryConstraintsList.call(this.constructor as any) == null) {
+    return { [this._primaryKey as string]: this.idInDatabase };
+  } else {
+    return Object.fromEntries(
+      indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+        this.attributeInDatabase(columnName),
+      ),
+    );
   }
-  return Object.fromEntries(
-    constraintsList.map((columnName: string) => [
-      columnName,
-      this.attributeInDatabase
-        ? this.attributeInDatabase(columnName)
-        : this.readAttribute(columnName),
-    ]),
-  );
 }
 
 /** @internal */
@@ -899,47 +903,37 @@ export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
 
 export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   const { time = null } = extractOptionsBang(names as unknown[]) as TouchOptions;
-  const ctor = this.constructor as typeof Base;
-  if (!this.isPersisted()) raiseRecordNotTouchedError();
-  if (this.isReadonly()) {
-    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  }
+  if (!this.isPersisted()) (this as any)._raiseRecordNotTouchedError();
+  if (this.isReadonly()) (this as any)._raiseReadonlyRecordError();
 
-  const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
-  const resolvedNames = (names as string[]).map((name) => aliases[name] ?? name);
-
-  const updateTimestampAttrs: string[] = (this as any).timestampAttributesForUpdateInModel();
-  for (const name of new Set([...updateTimestampAttrs, ...resolvedNames])) {
-    verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
-  }
-
-  const attributeNames = Array.from(new Set([...updateTimestampAttrs, ...resolvedNames]));
+  let attributeNames: string[] = (this as any).timestampAttributesForUpdateInModel();
+  attributeNames = union(attributeNames, names as string[]).map((name) => {
+    name = String(name);
+    name = (this.constructor as typeof Base).attributeAliases[name] || name;
+    (this as any).verifyReadonlyAttribute(name);
+    return name;
+  });
 
   if (attributeNames.length > 0) {
     const affectedRows = await (this as any)._touchRow(attributeNames, time);
-    (this as any)._triggerUpdateCallback = affectedRows === 1;
+    return ((this as any)._triggerUpdateCallback = affectedRows === 1);
+  } else {
+    return true;
   }
-  return true;
-}
-
-function raiseRecordNotTouchedError(): never {
-  throw new ActiveRecordError(
-    "Cannot touch on a new or destroyed record object. Consider using " +
-      "persisted?, new_record?, or destroyed? before touching.",
-  );
 }
 
 /** @internal */
-export function _touchRow(
+export async function _touchRow(
   this: PersistenceInternalHost,
   attributeNames: string[],
-  time?: RubyTime | Date | null,
+  time?: RubyTime | null,
 ): Promise<number> {
-  time ??= this.currentTimeFromProperTimezone();
-  if (time instanceof Date) time = RubyTime.at(new Rational(time.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
+  time ||= await this.currentTimeFromProperTimezone();
+
   for (const attrName of attributeNames) {
     this._writeAttribute(attrName, time);
   }
+
   return (this as any)._updateRow(attributeNames, "touch");
 }
 
@@ -956,93 +950,100 @@ export function _updateRow(
 }
 
 /** @internal */
-async function instanceUpdateRecord(
-  this: PersistenceInstanceChainHost,
-  attributeNames?: string[],
+export async function createOrUpdate(
+  this: PersistenceInstanceChainHost & {
+    isReadonly(): boolean;
+    isDestroyed(): boolean;
+    isNewRecord(): boolean;
+    _raiseReadonlyRecordError(): never;
+    _createRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
+    _updateRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
+  },
   block?: (record: any) => void,
-): Promise<number> {
-  attributeNames = attributesForUpdate.call(this as any, attributeNames ?? this.attributeNames());
-
-  let affectedRows: number;
-  if (attributeNames.length === 0) {
-    affectedRows = 0;
-    (this as any)._triggerUpdateCallback = true;
-  } else {
-    affectedRows = await (this as any)._updateRow(attributeNames);
-    (this as any)._triggerUpdateCallback = affectedRows === 1;
-  }
-
-  this._previouslyNewRecord = false;
-  block?.(this);
-  return affectedRows;
+): Promise<boolean> {
+  if (this.isReadonly()) this._raiseReadonlyRecordError();
+  if (this.isDestroyed()) return false;
+  const result = this.isNewRecord()
+    ? await this._createRecord(undefined, block)
+    : await this._updateRecord(undefined, block);
+  return result !== false;
 }
+
+export const Persistence = new Module((mod) => {
+  mod.defineMethod("save", save);
+  mod.defineMethod("saveBang", saveBang);
+  mod.defineMethod("destroy", destroy);
+  mod.defineMethod("touch", touch);
+  mod.defineMethod("_queryConstraintsHash", _queryConstraintsHash);
+  mod.defineMethod("destroyRow", destroyRow);
+  mod.defineMethod("_touchRow", _touchRow);
+  mod.defineMethod("_updateRow", _updateRow);
+  mod.defineMethod("createOrUpdate", createOrUpdate);
+  mod.defineMethod(
+    "_updateRecord",
+    /** @internal */
+    async function _updateRecord(
+      this: PersistenceInstanceChainHost,
+      attributeNames?: string[],
+      block?: (record: any) => void,
+    ): Promise<number> {
+      attributeNames = this.attributesForUpdate(attributeNames ?? this.attributeNames());
+
+      let affectedRows: number;
+      if (attributeNames.length === 0) {
+        affectedRows = 0;
+        (this as any)._triggerUpdateCallback = true;
+      } else {
+        affectedRows = await (this as any)._updateRow(attributeNames);
+        (this as any)._triggerUpdateCallback = affectedRows === 1;
+      }
+
+      this._previouslyNewRecord = false;
+      block?.(this);
+      return affectedRows;
+    },
+  );
+  mod.defineMethod("_createRecord", _createRecord);
+  mod.defineMethod("initInternals", initInternals);
+  mod.defineMethod("incrementBang", incrementBang);
+  mod.defineMethod("reload", reload);
+});
 
 /** @internal */
 export async function _createRecord(
   this: PersistenceInstanceChainHost,
-  attributeNames?: string[],
+  attributeNames: string[] = this.attributeNames(),
   block?: (record: any) => void,
 ): Promise<unknown> {
-  const ctor = this.constructor;
-  if (ctor.lockingEnabled) {
-    const lockCol = ctor.lockingColumn;
-    const defaults = ctor._defaultAttributes();
-    if (defaults.isKey(lockCol) && this._readAttribute(lockCol) == null) {
-      this._writeAttribute(lockCol, defaults.getAttribute(lockCol).value);
-    }
-  }
+  attributeNames = this.attributesForCreate(attributeNames);
 
-  const attrs = this._attributes.valuesForDatabase();
-  const names = LockingOptimistic._createRecord.call(
-    this as any,
-    attributeNames ?? this.attributeNames(),
-    (n: string[]) => n,
-  ) as string[];
-  const columns = attributesForCreate.call(this as any, names);
+  await this.constructor.withConnection(async (connection: any) => {
+    const returningColumns = await this.constructor._returningColumnsForInsert(connection);
 
-  await withConnection.call(ctor as unknown as typeof Base, async (connection) => {
-    const returningColumns = await ctor._returningColumnsForInsert(connection);
-    const supportsReturning =
-      (await (
-        connection as { supportsInsertReturning?(): Promise<boolean> }
-      ).supportsInsertReturning?.()) ?? false;
-    const returning = supportsReturning && returningColumns.length > 0 ? returningColumns : null;
-
-    const returningValues = await _insertRecord.call(
-      ctor,
+    const returningValues = (await _insertRecord.call(
+      this.constructor,
       connection,
-      attributesWithValues.call(this as any, columns),
-      returning,
-    );
+      this.attributesWithValues(attributeNames),
+      returningColumns,
+    )) as unknown[] | null | undefined;
 
-    const writeBack = (column: string, value: unknown): boolean => {
-      if (value == null) return false;
-      const current = this._readAttribute(column);
-      if (current != null && current !== false) return false;
-      const type = ctor.typeForAttribute?.(column);
-      this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
-      return true;
-    };
-
-    if (returning) {
-      const returnValues = Array.isArray(returningValues) ? returningValues : [returningValues];
-      returning.forEach((column: string, i: number) => writeBack(column, returnValues[i]));
-    } else {
-      const insertedId = Array.isArray(returningValues) ? returningValues[0] : returningValues;
-      for (const column of returningColumns) {
-        if (writeBack(column, insertedId)) break;
+    if (returningValues != null) {
+      for (const [column, value] of zip<string, unknown>(returningColumns, returningValues)) {
+        if (!rtest(this._readAttribute(column as string))) {
+          this._writeAttribute(
+            column as string,
+            this.typeForAttribute(column as string).deserialize(value),
+          );
+        }
       }
     }
   });
-  if (ctor.lockingEnabled) {
-    const lockCol = ctor.lockingColumn;
-    const writtenLockValue = attrs[lockCol] ?? null;
-    this._attributes.writeFromDatabase(lockCol, writtenLockValue);
-  }
 
-  this._previouslyNewRecord = true;
   this._newRecord = false;
-  block?.(this);
+  this._previouslyNewRecord = true;
+
+  if (block) block(this);
+
   return (this as any).id;
 }
 
@@ -1057,12 +1058,11 @@ export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: stri
 export function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
   (this as any)._associationDestroyException ??= null;
   const key = this.constructor.primaryKey;
-  const keyStr = Array.isArray(key) ? key.join(", ") : key;
   try {
     throw (
       (this as any)._associationDestroyException ??
       new RecordNotDestroyed(
-        `Failed to destroy ${this.constructor.name} with ${keyStr}=${String(this.id)}`,
+        `Failed to destroy ${this.constructor.name} with ${rbObjAsString(key)}=${rbObjAsString(this.id)}`,
         this as unknown as object,
       )
     );
@@ -1083,28 +1083,35 @@ export function _raiseRecordNotTouchedError(): never {
   );
 }
 
-/** @internal */
-function instantiateInstanceOf(
-  klass: {
-    _instantiate(
-      attrs: Record<string, unknown>,
-      block?: (r: any) => void,
-      columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-    ): any;
-  },
-  attributes: Record<string, unknown>,
+/**
+ * @internal
+ * @inventedArm loop — PERMANENT
+ * @inventedArm if — PERMANENT
+ * @inventedArm keys — PERMANENT
+ * @inventedArm basicObjRespondTo — PERMANENT
+ * @inventedArm rbObjSingletonClass — PERMANENT
+ * @inventedArm defineAttributeMethod — PERMANENT
+ */
+export function instantiateInstanceOf(
+  this: PersistenceHost,
+  klass: typeof Base,
+  attributes: Record<string, unknown> | IndexedRow,
   columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
-  return klass._instantiate(
-    attributes,
-    block,
-    columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-  );
+  const names = keys(attributes as Record<string, unknown>);
+  attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
+  const record = klass.allocate() as any;
+  for (const name of names) {
+    if (!basicObjRespondTo(record, name, false)) {
+      (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
+    }
+  }
+  return record.initWithAttributes(attributes, false, block);
 }
 
 /** @internal */
-function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown>): T {
+function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown> | IndexedRow): T {
   return klass;
 }
 
@@ -1119,8 +1126,3 @@ export function buildDefaultConstraint(this: {
   const defaultWhereClause = this.defaultScoped({ allQueries: true }).whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
-
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
-  _updateRecord: instanceUpdateRecord,
-};

@@ -3,16 +3,10 @@ import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-handler.js";
 import { SchemaReflection } from "./schema-cache.js";
-import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { synchronize } from "@blazetrails/activesupport";
+import { ObjectSpace } from "@blazetrails/ruby-compat";
 
-const INSTANCES = new Set<WeakRef<PoolConfig>>();
-const registry =
-  typeof FinalizationRegistry !== "undefined"
-    ? new FinalizationRegistry<WeakRef<PoolConfig>>((ref) => {
-        INSTANCES.delete(ref);
-      })
-    : null;
+const INSTANCES = new ObjectSpace.WeakMap<PoolConfig, PoolConfig>();
 
 export class PoolConfig {
   readonly role: string;
@@ -22,8 +16,6 @@ export class PoolConfig {
   private _connectionDescriptor!: ConnectionDescriptor;
   private _schemaReflection: SchemaReflection | null = null;
   private _serverVersion: unknown = null;
-  private _serverVersionInFlight: { connection: DatabaseAdapter; fetch: Promise<unknown> } | null =
-    null;
 
   get connectionDescriptor(): ConnectionDescriptor {
     return this._connectionDescriptor;
@@ -38,11 +30,7 @@ export class PoolConfig {
   }
 
   get schemaReflection(): SchemaReflection {
-    if (!this._schemaReflection) {
-      const lazySchemaCachePath = this._lazySchemaCachePath();
-      this._schemaReflection = new SchemaReflection(lazySchemaCachePath);
-    }
-    return this._schemaReflection;
+    return (this._schemaReflection ??= new SchemaReflection(this.dbConfig.lazySchemaCachePath()));
   }
 
   set schemaReflection(value: SchemaReflection) {
@@ -52,21 +40,9 @@ export class PoolConfig {
   serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      connection.lock.synchronize(async () => {
-        const inFlight = this._serverVersionInFlight;
-        if (this._serverVersion == null && inFlight && inFlight.connection !== connection) {
-          await inFlight.fetch.catch(() => undefined);
-        }
-        if (this._serverVersion != null) return this._serverVersion;
-        const fetch = Promise.resolve(connection.getDatabaseVersion?.());
-        this._serverVersionInFlight = { connection, fetch };
-        try {
-          this._serverVersion ??= await fetch;
-        } finally {
-          if (this._serverVersionInFlight?.fetch === fetch) this._serverVersionInFlight = null;
-        }
-        return this._serverVersion;
-      })
+      connection.lock.synchronize(
+        async () => (this._serverVersion ??= await connection.getDatabaseVersion()),
+      )
     );
   }
 
@@ -74,30 +50,12 @@ export class PoolConfig {
     this._serverVersion = value;
   }
 
-  /** @missingRailsCall each_key — PERMANENT */
   static async discardPoolsBang(): Promise<void> {
-    for (const ref of INSTANCES) {
-      const config = ref.deref();
-      if (!config) {
-        INSTANCES.delete(ref);
-        continue;
-      }
-      await config.discardPoolBang();
-    }
+    await INSTANCES.eachKey((c) => c.discardPoolBang());
   }
 
-  /** @missingRailsCall each_key — PERMANENT */
   static async disconnectAllBang(): Promise<void> {
-    const drains: Array<Promise<void>> = [];
-    for (const ref of INSTANCES) {
-      const config = ref.deref();
-      if (!config) {
-        INSTANCES.delete(ref);
-        continue;
-      }
-      drains.push(config.disconnectBang({ automaticReconnect: true }));
-    }
-    await Promise.all(drains);
+    await INSTANCES.eachKey((c) => c.disconnectBang({ automaticReconnect: true }));
   }
 
   constructor(
@@ -111,9 +69,7 @@ export class PoolConfig {
     this.role = role;
     this.shard = shard;
 
-    const ref = new WeakRef(this);
-    INSTANCES.add(ref);
-    registry?.register(this, ref);
+    INSTANCES.set(this, this);
   }
 
   async disconnectBang({
@@ -130,10 +86,7 @@ export class PoolConfig {
   }
 
   get pool(): ConnectionPool {
-    if (!this._pool) {
-      this._pool = new ConnectionPool(this);
-    }
-    return this._pool;
+    return (this._pool ??= new ConnectionPool(this));
   }
 
   async discardPoolBang(): Promise<void> {
@@ -145,30 +98,6 @@ export class PoolConfig {
       await this._pool.discardBang();
       this._pool = null;
     });
-  }
-
-  private _lazySchemaCachePath(): string | null {
-    const cfg = this.dbConfig as unknown as {
-      defaultSchemaCachePath?: (dbDir?: string) => string | null | undefined;
-      schemaCachePath?: string | null;
-    };
-    const dbDir = this._resolveDbDir();
-    let raw: string | null | undefined;
-    if (cfg && "schemaCachePath" in cfg && cfg.schemaCachePath != null) {
-      raw = cfg.schemaCachePath;
-    } else if (typeof cfg?.defaultSchemaCachePath === "function") {
-      raw = cfg.defaultSchemaCachePath(dbDir);
-    }
-    const trimmed = typeof raw === "string" ? raw.trim() : "";
-    return trimmed.length > 0 ? trimmed : null;
-  }
-
-  private _resolveDbDir(): string {
-    try {
-      return DatabaseTasks.dbDir ?? "db";
-    } catch {
-      return "db";
-    }
   }
 }
 
@@ -190,21 +119,17 @@ export interface SQLite3Config extends TrailsAdapterOptions {
   strict?: boolean;
   timeout?: number | string | false;
   retries?: number | string | false;
-  remoteUrl?: string;
   driverOptions?: Record<string, unknown>;
 }
 
 export interface MysqlAdapterOptions extends TrailsAdapterOptions {
+  flags?: number | string[];
   strict?: boolean | ":default";
   waitTimeout?: number | string;
   readTimeout?: number;
   encoding?: string;
   collation?: string;
   variables?: Record<string, string | number | boolean | null | ":default">;
-  /** @internal */
-  initSql?: string;
-  /** @internal */
-  _fakeConnection?: boolean;
 }
 
 export interface PostgreSQLAdapterOptions extends TrailsAdapterOptions {

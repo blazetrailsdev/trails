@@ -37,7 +37,7 @@ import {
   setQueryTransformers,
   setVerboseQueryLogs,
 } from "@blazetrails/activerecord";
-import { Configurable, Encryption } from "@blazetrails/activerecord/encryption";
+import { Encryption } from "@blazetrails/activerecord/encryption";
 import { Configuration } from "../application/configuration.js";
 import { Configuration as TrailtieConfiguration } from "../trailtie/configuration.js";
 import { MiddlewareStackProxy } from "../configuration.js";
@@ -70,9 +70,9 @@ describe("RailtieTest (trails-only)", () => {
   useInMemoryDatabaseUrl();
 
   it("runInitializers configures Encryption with the active_record_encryption credentials", async () => {
-    const primaryKey = Configurable.config.hasPrimaryKey();
-    const deterministicKey = Configurable.config.hasDeterministicKey();
-    const keyDerivationSalt = Configurable.config.hasKeyDerivationSalt();
+    const primaryKey = Encryption.config.hasPrimaryKey();
+    const deterministicKey = Encryption.config.hasDeterministicKey();
+    const keyDerivationSalt = Encryption.config.hasKeyDerivationSalt();
     try {
       const fs = getFs();
       const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}config-`);
@@ -90,11 +90,11 @@ describe("RailtieTest (trails-only)", () => {
         credentials: () => credentials(dir),
       });
       runLoadHooks("active_record_encryption", Encryption);
-      expect(Configurable.config.primaryKey).toBe("credentials-primary-key");
-      expect(Configurable.config.deterministicKey).toBe("credentials-deterministic-key");
-      expect(Configurable.config.keyDerivationSalt).toBe("credentials-salt");
+      expect(Encryption.config.primaryKey).toBe("credentials-primary-key");
+      expect(Encryption.config.deterministicKey).toBe("credentials-deterministic-key");
+      expect(Encryption.config.keyDerivationSalt).toBe("credentials-salt");
     } finally {
-      Object.assign(Configurable.config, { primaryKey, deterministicKey, keyDerivationSalt });
+      Object.assign(Encryption.config, { primaryKey, deterministicKey, keyDerivationSalt });
     }
   });
 

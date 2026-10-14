@@ -10,7 +10,7 @@ import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
-import { parse as yamlLoad } from "@blazetrails/activesupport/yaml";
+import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "@blazetrails/activerecord";
 
 class ModelGeneratorTestApp extends Application {}
@@ -148,7 +148,7 @@ describe("ModelGeneratorTest", () => {
     await makeGen().run("Account", ["name:string", "age:integer"]);
     await assertMigration(
       "db/migrate/create_accounts.ts",
-      /class CreateAccounts extends Migration/,
+      /class CreateAccounts extends Migration\.get\(8\.0\)/,
     );
   });
 

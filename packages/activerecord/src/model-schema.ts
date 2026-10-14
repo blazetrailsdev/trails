@@ -1,23 +1,36 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  type Hash,
+  fetch,
+  hashAref,
+  isEmpty,
+  block as rbBlock,
+  rbObjAsString,
+  rbClassSuperclass,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { pluralize, underscore } from "@blazetrails/activesupport";
+import { indexBy, kernelArray, pluralize, underscore } from "@blazetrails/activesupport";
 import {
   AttributeSetBuilder,
   YAMLEncoder,
   type AttributeSet,
   type ValueType,
 } from "@blazetrails/activemodel";
-import { classAttribute, included, moduleParents } from "@blazetrails/activesupport";
-import { isBaseClass, baseClass, qualifiedName } from "./inheritance.js";
+import {
+  classAttribute,
+  delegate,
+  included,
+  moduleParent,
+  moduleParents,
+} from "@blazetrails/activesupport";
+import { isBaseClass, baseClass } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
-import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
-import { EncryptableRecord } from "./encryption/encryptable-record.js";
-import { NullColumn } from "./connection-adapters/column.js";
-import { withConnection, isConnected } from "./connection-handling.js";
+import { NullColumn, type Column } from "./connection-adapters/column.js";
+import { isConnected } from "./connection-handling.js";
 
 function reflectionAdapter(klass: any): any {
   const pool = klass.connectionPool();
@@ -53,10 +66,9 @@ function undecoratedTableName(modelName: string, pluralizes = true): string {
 }
 
 function containedTableNamePrefix(this: typeof Base): string {
-  const moduleName = (this as any).moduleName as string | undefined;
-  if (!moduleName) return "";
-  const parent = modelRegistry.get(moduleName);
-  if (!parent || (parent as any).abstractClass) return "";
+  const parent = moduleParent(this) as typeof Base;
+  if (!(typeof parent === "function" && parent.prototype instanceof ActiveRecord.Base)) return "";
+  if (parent.abstractClass) return "";
   const contained =
     ((parent as any).pluralizeTableNames ?? true)
       ? singularize(parent.tableName!)
@@ -96,7 +108,7 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
 export function buildPkWhereNode(
   this: typeof Base,
   idValue: unknown,
-): InstanceType<typeof Nodes.Node> {
+): Nodes.Node | Nodes.SqlLiteral {
   const table = this.arelTable;
   const pk = this.primaryKey;
   if (Array.isArray(pk)) {
@@ -153,75 +165,38 @@ export function buildWhereNodeFromConstraints(
 
 export function columnNames(this: typeof Base): string[] {
   const host = this as unknown as SchemaHost;
-  const memo = Object.prototype.hasOwnProperty.call(host, "_columnNamesMemo")
-    ? host._columnNamesMemo
-    : undefined;
-  if (memo) return memo.names as string[];
-  const names = this.columns().map((c: { name: string }) => c.name);
-  if (ownSchemaMemo(host, "_schemaLoaded")) {
-    const frozen = Object.freeze(names);
-    host._columnNamesMemo = { names: frozen };
-    return frozen as string[];
-  }
-  return names;
+  return (ownSchemaMemo(host, "_columnNames") ??
+    (host._columnNames = Object.freeze(
+      this.columns().map((c: { name: string }) => c.name),
+    ))) as string[];
 }
 
-export interface ColumnLike {
-  name: string;
-  type?: string | null;
-  sqlType?: string;
-  default?: unknown;
-  [key: string]: unknown;
-}
-
-export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
+export function columnsHash(this: typeof Base): Record<string, Column> {
   if (ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash") == null) {
     loadSchema.call(this as SchemaHost);
   }
 
-  const memoized = ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash");
-  if (memoized != null) return memoized as Record<string, ColumnLike>;
-
-  const klass = this;
-  let adapter: DatabaseAdapterLike | null = null;
-  try {
-    adapter = reflectionAdapter(klass) as DatabaseAdapterLike;
-  } catch {
-    adapter = null;
-  }
-  const cache = adapter?.internalSchemaCache as
-    | {
-        getCachedColumnsHash?: (t: string | null) => Record<string, ColumnLike> | undefined;
-      }
-    | undefined;
-  const table = klass.tableName;
-  if (cache && typeof cache.getCachedColumnsHash === "function") {
-    const cached = cache.getCachedColumnsHash(table);
-    if (cached) {
-      const ignored = new Set(this.ignoredColumns ?? []);
-      const filtered: Record<string, ColumnLike> = {};
-      for (const [k, v] of Object.entries(cached)) {
-        if (ignored.has(k)) continue;
-        filtered[k] = v;
-      }
-      return filtered;
-    }
-  }
-
-  return {};
+  return ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash") ?? {};
 }
 
-type DatabaseAdapterLike = { internalSchemaCache?: unknown };
-
 export function contentColumns(this: typeof Base): any[] {
-  const pk = this.primaryKey;
-  const inheritance = this.inheritanceColumn;
-  return columns.call(this as unknown as SchemaHost).filter((col: { name: string }) => {
-    if (col.name === pk) return false;
-    if (col.name === inheritance) return false;
-    if (col.name.endsWith("_id") || col.name.endsWith("_count")) return false;
-    return true;
-  });
+  const host = this as unknown as SchemaHost;
+  return (
+    ownSchemaMemo(host, "_contentColumns") ??
+    (host._contentColumns = Object.freeze(
+      columns
+        .call(host)
+        .filter(
+          (c: { name: string }) =>
+            !(
+              c.name === this.primaryKey ||
+              c.name === this.inheritanceColumn ||
+              c.name.endsWith("_id") ||
+              c.name.endsWith("_count")
+            ),
+        ),
+    ) as any[])
+  );
 }
 
 export interface SchemaHost {
@@ -231,22 +206,30 @@ export interface SchemaHost {
   _tableName: string | null;
   tableNamePrefix: string;
   tableNameSuffix: string;
-  _sequenceName: string | null;
+  _sequenceName: string | null | Promise<string | null>;
+  /** @internal */
+  _explicitSequenceName?: boolean;
   _inheritanceColumn?: string | null;
   _abstractClass?: boolean;
   _ignoredColumns?: string[];
   _protectedEnvironments?: string[];
   _defaultAttributes(): AttributeSet;
-  _columnsHash?: Record<string, unknown>;
+  _columnsHash?: Record<string, Column>;
   _columns?: any[];
   _returningColumnsForInsertCache?: string[];
   _attributesBuilder?: any;
   _yamlEncoder?: YAMLEncoder;
-  attributeTypes(): Record<string, any>;
+  attributeTypes(): Record<string, any> | Hash<string, any>;
   _schemaLoaded?: boolean;
   loadSchemaBang(): void;
   /** @internal */
-  _columnNamesMemo?: { names: readonly string[] };
+  _columnNames?: readonly string[];
+  /** @internal */
+  _contentColumns?: any[];
+  /** @internal */
+  _columnDefaults?: Readonly<Record<string, unknown>>;
+  /** @internal */
+  _symbolColumnToStringNameHash?: Record<string, string>;
   connection: any;
   prototype: object;
   superclass?: SchemaHost;
@@ -262,40 +245,38 @@ export function deriveJoinTableName(firstTable: string | null, secondTable: stri
 }
 
 export function quotedTableName(this: SchemaHost): string {
-  return reflectionAdapter(this).quoteTableName(this.tableName);
+  return (this as unknown as typeof Base).adapterClass().quoteTableName(this.tableName);
 }
 
 export function resetTableName(this: SchemaHost): string | null {
   const klass = this as unknown as typeof Base;
-  const superclass = Object.getPrototypeOf(klass) as typeof Base | null;
-  tableName.call(
+  const superclass = rbClassSuperclass(klass) as typeof Base;
+  setTableName.call(
     this,
-    Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase")
+    klass === ActiveRecord.Base
       ? null
       : klass.abstractClass
-        ? (superclass?.tableName ?? null)
-        : superclass?.abstractClass
+        ? superclass.tableName
+        : superclass.abstractClass
           ? superclass.tableName || computeTableName.call(klass)
           : computeTableName.call(klass),
   );
   return this._tableName;
 }
 
-/** @missingRailsArgs module_parents — PERMANENT */
 export function fullTableNamePrefix(this: SchemaHost): string {
   return (
-    (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
-      rbObjRespondTo(p, "tableNamePrefix"),
-    ) as SchemaHost | undefined) ?? this
+    (moduleParents(this).find((p) => rbObjRespondTo(p, "tableNamePrefix")) as
+      | SchemaHost
+      | undefined) ?? this
   ).tableNamePrefix;
 }
 
-/** @missingRailsArgs module_parents — PERMANENT */
 export function fullTableNameSuffix(this: SchemaHost): string {
   return (
-    (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
-      rbObjRespondTo(p, "tableNameSuffix"),
-    ) as SchemaHost | undefined) ?? this
+    (moduleParents(this).find((p) => rbObjRespondTo(p, "tableNameSuffix")) as
+      | SchemaHost
+      | undefined) ?? this
   ).tableNameSuffix;
 }
 
@@ -307,32 +288,43 @@ export const _inheritanceColumn = realInheritanceColumn;
 
 export async function _returningColumnsForInsert(
   this: SchemaHost,
-  connection: { returnValueAfterInsert?(column: { name: string }): Promise<boolean> },
+  connection: { returnValueAfterInsert(column: { name: string }): Promise<boolean> },
 ): Promise<string[]> {
-  if (Object.prototype.hasOwnProperty.call(this, "_returningColumnsForInsertCache")) {
-    const memo = this._returningColumnsForInsertCache;
-    if (memo !== undefined) return memo;
+  const memo = ownSchemaMemo(this, "_returningColumnsForInsertCache");
+  if (memo) return memo;
+
+  const autoPopulatedColumns: string[] = [];
+  for (const c of columns.call(this) as { name: string }[]) {
+    if (await connection.returnValueAfterInsert(c)) autoPopulatedColumns.push(c.name);
   }
-  const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
-  const memoize = (value: string[]): string[] => (this._returningColumnsForInsertCache = value);
-  const autoPopulated: string[] = [];
-  for (const c of cols) {
-    if (
-      typeof c.isAutoPopulated === "function" &&
-      ((await connection.returnValueAfterInsert?.(c)) ?? false)
-    ) {
-      autoPopulated.push(c.name);
-    }
-  }
-  if (autoPopulated.length > 0) return memoize(autoPopulated);
-  const colNames = new Set(cols.map((c) => c.name));
-  const pk = this.primaryKey;
-  const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
-  return memoize(pkArr.filter((p) => colNames.has(p)));
+
+  return (this._returningColumnsForInsertCache = isEmpty(autoPopulatedColumns)
+    ? kernelArray(this.primaryKey)
+    : autoPopulatedColumns);
 }
 
-export function resetSequenceName(this: SchemaHost): void {
-  this._sequenceName = null;
+/** @inventedArm if — PERMANENT */
+export function resetSequenceName(this: SchemaHost): Promise<string | null> {
+  this._explicitSequenceName = false;
+  const sequenceName = (this as unknown as typeof Base).withConnection((c) =>
+    (
+      c as unknown as {
+        defaultSequenceName(
+          tableName: string | null,
+          primaryKey: string | string[],
+        ): Promise<string | null> | string | null;
+      }
+    ).defaultSequenceName(this.tableName, this.primaryKey),
+  );
+  sequenceName.then(
+    (value) => {
+      if (this._sequenceName === sequenceName) this._sequenceName = value;
+    },
+    () => {
+      if (this._sequenceName === sequenceName) this._sequenceName = null;
+    },
+  );
+  return (this._sequenceName = sequenceName);
 }
 
 export function isPrefetchPrimaryKey(this: SchemaHost): boolean {
@@ -344,64 +336,87 @@ export function nextSequenceValue(this: SchemaHost): number | null {
 }
 
 export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
-  const ownBuilder = ownSchemaMemo(this, "_attributesBuilder");
-  if (ownBuilder) return ownBuilder;
-
-  const primaryKey = this.primaryKey;
-  const defaults = this._defaultAttributes().except(
-    ...columnNames.call(this as unknown as typeof Base).filter((name) => name !== primaryKey),
+  return (
+    ownSchemaMemo(this, "_attributesBuilder") ??
+    (this._attributesBuilder = (() => {
+      const defaults = this._defaultAttributes().except(
+        ...columnNames
+          .call(this as unknown as typeof Base)
+          .filter((name) => name !== this.primaryKey),
+      );
+      return new AttributeSetBuilder(this.attributeTypes(), defaults);
+    })())
   );
-  const builder = new AttributeSetBuilder(this.attributeTypes(), defaults);
-  this._attributesBuilder = builder;
-  return builder;
 }
 
 /** @missingRailsName columnsHash — PERMANENT */
 export function columns(this: SchemaHost): any[] {
-  const ownColumns = ownSchemaMemo(this, "_columns");
-  if (ownColumns != null) return ownColumns;
-  const built = Object.values(columnsHash.call(this as unknown as typeof Base));
-  this._columns = built;
-  return built;
+  return (
+    ownSchemaMemo(this, "_columns") ??
+    (this._columns = Object.freeze(
+      Object.values(columnsHash.call(this as unknown as typeof Base)),
+    ) as any[])
+  );
 }
 
 export function yamlEncoder(this: SchemaHost): YAMLEncoder {
-  const own = ownSchemaMemo(this, "_yamlEncoder");
-  if (own) return own;
-  this._yamlEncoder = new YAMLEncoder(this.attributeTypes());
-  return this._yamlEncoder;
+  return (
+    ownSchemaMemo(this, "_yamlEncoder") ??
+    (this._yamlEncoder = new YAMLEncoder(this.attributeTypes()))
+  );
 }
 
 export function columnForAttribute(this: SchemaHost, name: string): any {
-  loadSchema.call(this);
-  const hash = getColumnsHash(this);
-  return name in hash ? hash[name] : new NullColumn(name);
+  name = rbObjAsString(name);
+  return fetch(
+    (this as unknown as typeof Base).columnsHash(),
+    name,
+    rbBlock(() => new NullColumn(name)),
+  );
 }
 
-export function symbolColumnToString(this: SchemaHost, nameSymbol: string): string | undefined {
+export function columnDefaults(this: SchemaHost): Record<string, unknown> {
   loadSchema.call(this);
-  const hash = getColumnsHash(this);
-  return hash[nameSymbol] ? nameSymbol : undefined;
+  return (
+    ownSchemaMemo(this, "_columnDefaults") ??
+    (this._columnDefaults = Object.freeze(this._defaultAttributes().deepDup().toHash()))
+  );
+}
+
+export function symbolColumnToString(this: SchemaHost, nameSymbol: string): string | null {
+  const symbolColumnToStringNameHash =
+    ownSchemaMemo(this, "_symbolColumnToStringNameHash") ??
+    (this._symbolColumnToStringNameHash = indexBy(
+      columnNames.call(this as unknown as typeof Base),
+      (name) => name,
+    ));
+  return hashAref(symbolColumnToStringNameHash, nameSymbol) as string | null;
 }
 
 function clearAdapterDataSourceCache(host: SchemaHost): void {
   type Cache = {
     clearDataSourceCacheBang?: (connection: unknown, name: string) => void;
   };
-  let cache: Cache | null | undefined;
+  type Reflection = {
+    loadedCache: Cache | null;
+    clearCachedColumnsHash?: (tableName: string) => void;
+  };
+  let schemaReflection: Reflection | undefined;
   let table: string | undefined;
   try {
     table = (host as unknown as { tableName?: string }).tableName;
     const pool = (
       host as unknown as {
-        connectionPool?: () => { poolConfig?: { schemaReflection: { loadedCache: Cache | null } } };
+        connectionPool?: () => { poolConfig?: { schemaReflection: Reflection } };
       }
     ).connectionPool?.();
-    cache = pool?.poolConfig?.schemaReflection.loadedCache;
+    schemaReflection = pool?.poolConfig?.schemaReflection;
   } catch {
     return;
   }
   if (!table) return;
+  schemaReflection?.clearCachedColumnsHash?.(table);
+  const cache = schemaReflection?.loadedCache;
   if (typeof cache?.clearDataSourceCacheBang === "function") {
     cache.clearDataSourceCacheBang(null, table);
   }
@@ -428,6 +443,10 @@ function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
   };
 }
 
+/**
+ * @inventedArm try — CONVERGEABLE reset-column-information-rewarm-is-not-in-rails
+ * @inventedArm rescue — CONVERGEABLE reset-column-information-rewarm-is-not-in-rails
+ */
 export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | void {
   try {
     void (
@@ -436,22 +455,27 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
       } | null
     )?.clearCacheBang?.();
   } catch {}
-  (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   clearAdapterDataSourceCache(this);
+
   this.reloadSchemaFromCache();
+  (this as unknown as typeof Base).initializeFindByCache();
   return rewarmDataSourceCache(this);
 }
 
 /** @internal */
 export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   this._returningColumnsForInsertCache = undefined;
-  this._columnNamesMemo = undefined;
+  (this as { _arelTable?: unknown })._arelTable = undefined;
+  this._columnNames = undefined;
+  this._symbolColumnToStringNameHash = undefined;
+  this._contentColumns = undefined;
+  this._columnDefaults = undefined;
   this._attributesBuilder = undefined;
   this._columns = undefined;
   this._columnsHash = undefined;
   this._schemaLoaded = false;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-  (this as SchemaHost & { _attributeNamesMemo?: unknown })._attributeNamesMemo = undefined;
+  (this as SchemaHost & { _attributeNames?: unknown })._attributeNames = undefined;
   this._yamlEncoder = undefined;
   if (recursive) {
     for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
@@ -491,17 +515,9 @@ export function loadSchemaBang(this: SchemaHost): void {
   this._columnsHash = {};
 }
 
-function getColumnsHash(host: SchemaHost): Record<string, unknown> {
-  const own = ownSchemaMemo(host, "_columnsHash");
-  if (own != null) return own;
-  const ch = (host as any).columnsHash;
-  if (typeof ch === "function") return ch.call(host) ?? {};
-  return {};
-}
-
-function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void {
+function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void {
   const ignored = new Set(host._ignoredColumns ?? []);
-  const filteredHash: Record<string, unknown> = {};
+  const filteredHash: Record<string, Column> = {};
   for (const [name, column] of Object.entries(hash)) {
     if (ignored.has(name)) continue;
     filteredHash[name] = column;
@@ -514,7 +530,11 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     _cachedAttributeTypes?: unknown;
     _columnsHash?: unknown;
     _columns?: unknown;
-    _attributeNamesMemo?: unknown;
+    _columnNames?: unknown;
+    _contentColumns?: unknown;
+    _columnDefaults?: unknown;
+    _symbolColumnToStringNameHash?: unknown;
+    _attributeNames?: unknown;
   };
   const bag = host as CacheBag;
   bag._attributesBuilder = undefined;
@@ -522,16 +542,17 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   bag._cachedDefaultAttributes = null;
   bag._cachedAttributeTypes = null;
   bag._columns = undefined;
-  bag._attributeNamesMemo = undefined;
+  bag._columnNames = undefined;
+  bag._contentColumns = undefined;
+  bag._columnDefaults = undefined;
+  bag._symbolColumnToStringNameHash = undefined;
+  bag._attributeNames = undefined;
   host._columnsHash = filteredHash;
 
   const methodHost = host as unknown as {
     _attributeMethodsGenerated?: boolean;
   };
   methodHost._attributeMethodsGenerated = false;
-
-  const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
-  EncryptableRecord.requireOriginalColumnsAfterReflection(host, reflectedColumnNames);
 }
 
 /**
@@ -560,25 +581,42 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  * pool to scope against and skips it, as does a pool-less model, whose
  * `connection_pool` throws where Ruby's always answers.
  *
+ * Rails latches `@primary_key` at the first `primary_key` read
+ * (attribute_methods/primary_key.rb:80-81), where `get_primary_key` asks the
+ * current pool (`:101-108`). That read is synchronous here and only peeks, so
+ * a pool whose cache is cold answers the "id" convention. The warm above is
+ * the awaited half of that read, and `resetPrimaryKey` under `primary_key`'s
+ * own guard latches its answer while the cache is known warm. The guard is
+ * spelled out because the reader (`getPrimaryKeyAttr`) latches only after its
+ * own peek of the cache succeeds and answers the convention unlatched when it
+ * does not, so reading it here would not guarantee the latch. It retires with
+ * story `latch-primary-key-resolution-into-reset-primary-key-memo`.
+ *
  * @internal
  * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
-  let startingAdapter: SchemaHost["connection"] | undefined;
+  let pool: ReturnType<typeof Base.connectionPool>;
   try {
-    startingAdapter =
-      (this as unknown as typeof Base).connectionPool().activeConnection ?? undefined;
+    pool = (this as unknown as typeof Base).connectionPool();
   } catch {
-    startingAdapter = undefined;
+    return;
   }
+  const startingAdapter: SchemaHost["connection"] | undefined = pool.activeConnection ?? undefined;
   if (!startingAdapter) {
+    let verifying = false;
     try {
-      return await withConnection.call<typeof Base, [() => Promise<void>], Promise<void>>(
-        this as unknown as typeof Base,
-        () => loadSchemaFromAdapter.call(this),
-      );
-    } catch {
+      return await pool.withConnection(async (connection: SchemaHost["connection"]) => {
+        if (connection.typeMap === null) {
+          verifying = true;
+          await connection.verifyBang();
+          verifying = false;
+        }
+        return loadSchemaFromAdapter.call(this);
+      });
+    } catch (error) {
+      if (verifying) throw error;
       return;
     }
   }
@@ -594,6 +632,8 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
 
   await cache.primaryKeys(table);
 
+  if (startingAdapter.typeMap === null) await startingAdapter.verifyBang();
+
   let currentAdapter: SchemaHost["connection"] | undefined;
   try {
     currentAdapter = reflectionAdapter(adapterOwner);
@@ -602,70 +642,45 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (currentAdapter !== startingAdapter) return;
 
-  this.loadSchemaBang();
+  if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+    (this as unknown as typeof Base).resetPrimaryKey();
+  }
+  loadSchema.call(this);
 }
 
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
-  let adapter: SchemaHost["connection"] | undefined;
+  let pool: ReturnType<typeof Base.connectionPool>;
   try {
-    adapter = reflectionAdapter(host);
+    pool = (host as unknown as typeof Base).connectionPool();
   } catch {
-    adapter = undefined;
+    return false;
   }
-  if (!adapter) return false;
-  const cache = adapter.internalSchemaCache;
-  if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
+  const schemaCache = pool.schemaCache;
   const table = host.tableName;
   if (table == null) return false;
-  let hash = cache.getCachedColumnsHash(table);
-  if (!hash) hash = warmColumnsHashSync(adapter, cache, table);
-  if (!hash) return false;
-  applyColumnsHash(host, hash);
+  const columnsHash = schemaCache?.getCachedColumnsHash(table);
+  if (!columnsHash) return false;
+  applyColumnsHash(host, columnsHash);
   return true;
 }
 
-function warmColumnsHashSync(
-  adapter: NonNullable<SchemaHost["connection"]>,
-  cache: {
-    setColumns?: (table: string, cols: any[]) => void;
-    getCachedColumnsHash: (table: string) => Record<string, unknown> | undefined;
-  },
-  table: string,
-): Record<string, unknown> | undefined {
-  if (typeof adapter.columns !== "function" || typeof cache.setColumns !== "function") {
-    return undefined;
-  }
-  let cols: unknown;
-  try {
-    cols = adapter.columns(table);
-  } catch {
-    return undefined;
-  }
-  if (cols != null && typeof (cols as any).then === "function") {
-    void (cols as Promise<unknown>).catch(() => {});
-    return undefined;
-  }
-  if (!Array.isArray(cols) || cols.length === 0) return undefined;
-  cache.setColumns(table, cols);
-  return cache.getCachedColumnsHash(table);
-}
-
-export function tableName(this: SchemaHost, value?: string | null): string | null {
-  if (value !== undefined) {
-    value = value == null ? null : String(value);
-    if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
-      if (value === this._tableName) return this._tableName;
-      if (isConnected.call(this as unknown as typeof Base)) {
-        void Promise.resolve(resetColumnInformation.call(this)).catch(() => {});
-      }
-    }
-    this._tableName = value;
-    (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
-    (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
-    return this._tableName;
-  }
+export function tableName(this: SchemaHost): string | null {
   if (!Object.prototype.hasOwnProperty.call(this, "_tableName")) resetTableName.call(this);
   return this._tableName;
+}
+
+export function setTableName(this: SchemaHost, value: string | null): void {
+  value = value == null ? null : String(value);
+
+  if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
+    if (value === this._tableName) return;
+    if (isConnected.call(this as unknown as typeof Base)) void resetColumnInformation.call(this);
+  }
+
+  this._tableName = value;
+  (this as { _arelTable?: unknown })._arelTable = null;
+  if (!ownSchemaMemo(this, "_explicitSequenceName")) this._sequenceName = null;
+  (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
 }
 
 export function protectedEnvironments(this: SchemaHost, value?: string[]): string[] {
@@ -679,29 +694,30 @@ export function inheritanceColumn(this: SchemaHost, value?: string | null): stri
   return this._inheritanceColumn ?? "type";
 }
 
-export function sequenceName(this: SchemaHost, value?: string | null): string | null {
-  if (value !== undefined) {
-    this._sequenceName = value == null ? "" : String(value);
-    return this._sequenceName;
-  }
+export async function sequenceName(this: SchemaHost): Promise<string | null> {
   if (isBaseClass(this as unknown as typeof Base)) {
-    const pk = this.primaryKey;
-    if (Array.isArray(pk)) return this._sequenceName;
-    return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
+    return ownSchemaMemo(this, "_sequenceName") ?? resetSequenceName.call(this);
+  } else {
+    return (
+      ownSchemaMemo(this, "_sequenceName") ??
+      (this._sequenceName = null) ??
+      baseClass.call(this as unknown as typeof Base).sequenceName
+    );
   }
-  return this._sequenceName ?? baseClass.call(this as unknown as typeof Base).sequenceName;
 }
 
-export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
-  if (value !== undefined) {
-    this.reloadSchemaFromCache();
-    this._ignoredColumns = value.map(String);
-  }
+export function setSequenceName(this: SchemaHost, value: string | null): void {
+  this._sequenceName = rbObjAsString(value);
+  this._explicitSequenceName = true;
+}
+
+export function ignoredColumns(this: SchemaHost): string[] {
   return this._ignoredColumns ?? [];
 }
 
-export function columnDefaults(this: SchemaHost): Record<string, unknown> {
-  return this._defaultAttributes().deepDup().toHash();
+export function setIgnoredColumns(this: SchemaHost, columns: string[]): void {
+  this.reloadSchemaFromCache();
+  this._ignoredColumns = Object.freeze(columns.map(String)) as string[];
 }
 
 /**
@@ -714,15 +730,13 @@ export function columnDefaults(this: SchemaHost): Record<string, unknown> {
  * @noRailsEquivalent CONVERGEABLE cache-only view of ModelSchema#table_exists? (model_schema.rb:416) for the sync callers; retires with RFC 0073.
  */
 export function cachedTableExists(this: SchemaHost): boolean | undefined {
-  let conn: any;
+  let pool: ReturnType<typeof Base.connectionPool>;
   try {
-    conn = reflectionAdapter(this);
+    pool = (this as unknown as typeof Base).connectionPool();
   } catch {
     return undefined;
   }
-  const cache = conn?.internalSchemaCache;
-  if (!cache || typeof cache.getCachedDataSourceExists !== "function") return undefined;
-  return cache.getCachedDataSourceExists(this.tableName);
+  return pool.schemaCache?.getCachedDataSourceExists(this.tableName as string);
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
@@ -756,6 +770,15 @@ export const ModelSchema = {
     classAttribute.call(base, "pluralizeTableNames", { instanceWriter: false, default: true });
     classAttribute.call(base, "implicitOrderColumn", { instanceAccessor: false });
     classAttribute.call(base, "immutableStringsByDefault", { instanceAccessor: false });
+
+    delegate.call(
+      (base as { prototype: object }).prototype,
+      "typeForAttribute",
+      "columnForAttribute",
+      {
+        to: "class",
+      },
+    );
   },
 };
 
@@ -779,25 +802,6 @@ export const ClassMethods = {
   _returningColumnsForInsert,
   loadSchemaBang,
   loadSchemaFromAdapter,
-};
-
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
-  typeForAttribute(
-    this: { constructor: unknown },
-    name: string,
-    block?: () => ValueType,
-  ): ValueType | null {
-    return (
-      this.constructor as { typeForAttribute(n: string, b?: () => ValueType): ValueType | null }
-    ).typeForAttribute(name, block);
-  },
-
-  columnForAttribute(this: { constructor: unknown }, name: string): unknown {
-    return (this.constructor as { columnForAttribute(n: string): unknown }).columnForAttribute(
-      name,
-    );
-  },
 };
 
 /** @internal */

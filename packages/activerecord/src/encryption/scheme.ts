@@ -6,7 +6,6 @@ import type { MessageSerializerLike } from "./message-serializer.js";
 import type { Context } from "./context.js";
 import { isPresent, wrap } from "@blazetrails/activesupport";
 
-import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
@@ -40,32 +39,35 @@ export class Scheme {
   private compressor?: Compressor;
   private _contextProperties: Partial<Context>;
 
-  constructor(options: SchemeOptions = {}) {
-    this._keyProviderParam = options.keyProvider;
-    this.key = options.key;
-    this.deterministic = options.deterministic;
-    this._supportUnencryptedData = options.supportUnencryptedData;
-    this.downcase = options.downcase || options.ignoreCase;
-    this.ignoreCase = options.ignoreCase;
-    this._previousSchemesParam = options.previousSchemes;
-    this.previousSchemes = wrap(options.previousSchemes);
-
-    this._contextProperties = {};
-    if (options.encryptor !== undefined) {
-      this._contextProperties.encryptor = options.encryptor;
-    }
-    if (options.messageSerializer !== undefined) {
-      this._contextProperties.messageSerializer = options.messageSerializer;
-    }
-    this.compress = options.compress ?? true;
-    this.compressor = options.compressor;
+  constructor({
+    keyProvider,
+    key,
+    deterministic,
+    supportUnencryptedData,
+    downcase,
+    ignoreCase,
+    previousSchemes,
+    compress = true,
+    compressor,
+    ...contextProperties
+  }: SchemeOptions = {}) {
+    this._keyProviderParam = keyProvider;
+    this.key = key;
+    this.deterministic = deterministic;
+    this._supportUnencryptedData = supportUnencryptedData;
+    this.downcase = downcase || ignoreCase;
+    this.ignoreCase = ignoreCase;
+    this._previousSchemesParam = previousSchemes;
+    this.previousSchemes = wrap(previousSchemes);
+    this._contextProperties = contextProperties;
+    this.compress = compress;
+    this.compressor = compressor;
 
     this.validateConfigBang();
 
     if (!this.compress)
       this._contextProperties.encryptor = new Encryptor({ compress: this.compress });
-    if (options.compressor)
-      this._contextProperties.encryptor = new Encryptor({ compressor: options.compressor });
+    if (compressor) this._contextProperties.encryptor = new Encryptor({ compressor });
   }
 
   isDeterministic(): boolean {
@@ -82,7 +84,9 @@ export class Scheme {
   }
 
   isSupportUnencryptedData(): boolean {
-    return this._supportUnencryptedData ?? Encryption.config.supportUnencryptedData;
+    return this._supportUnencryptedData == null
+      ? Encryption.config.supportUnencryptedData
+      : this._supportUnencryptedData;
   }
 
   isFixed(): boolean {
@@ -99,7 +103,7 @@ export class Scheme {
 
   withContext<T>(fn: () => T): T {
     if (isPresent(this._contextProperties)) {
-      return Contexts.withEncryptionContext(this._contextProperties, fn);
+      return Encryption.withEncryptionContext(this._contextProperties, fn);
     }
     return fn();
   }

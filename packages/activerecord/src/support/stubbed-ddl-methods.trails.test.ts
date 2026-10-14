@@ -40,7 +40,6 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ["_statements", "prepared-statement slot clearCacheBang resets, not a DDL emitter"],
   ["lock", "the connection monitor clearCacheBang synchronizes on, not a DDL emitter"],
   ["_schemaCache", "memoized backing slot of the schemaCache read"],
-  ["_poolSchemaReflection", "pool reflection the schemaCache read binds to"],
   ["quoteColumnName", "renderer input — quotes a name into DDL the renderer is already building"],
   ["quoteTableName", "renderer input — quotes a table name into DDL, emits nothing itself"],
   ["quoteDefaultExpression", "renderer input — renders a column default, emits nothing itself"],
@@ -53,6 +52,14 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   [
     "supportsCheckConstraints",
     "capability read — decides whether the renderer emits inline CHECK constraints",
+  ],
+  [
+    "supportsExclusionConstraints",
+    "capability read — decides whether the renderer emits inline EXCLUDE constraints",
+  ],
+  [
+    "supportsUniqueConstraints",
+    "capability read — decides whether the renderer emits inline UNIQUE constraints",
   ],
   ["supportsPartialIndex", "capability read — decides whether an index renders its WHERE clause"],
   ["supportsIndexInclude", "capability read — decides whether an index renders INCLUDE (...)"],

@@ -5,8 +5,11 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 import { Result } from "../../result.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 let adapter: SQLite3Adapter;
+
+fixtures([]);
 
 beforeEach(async () => {
   adapter = new BetterSQLite3Adapter({ database: ":memory:" });
@@ -52,10 +55,10 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('b')`);
 
     expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
 
     await adapter.execute(`SELECT * FROM "pq"`);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
   });
 
   it("affectedRows is preserved across DDL", async () => {
@@ -64,14 +67,14 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
 
     await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
   });
 
   it("execute returns the rows an INSERT ... RETURNING produces", async () => {
     await expect(
       adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id", "nick"`),
     ).resolves.toEqual([{ id: 1, nick: "a" }]);
-    expect(adapter.affectedRows()).toBe(1);
+    expect(adapter.affectedRows(null)).toBe(1);
   });
 
   it("affectedRows is not reset by transaction control in the run branch", async () => {
@@ -80,7 +83,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.execute(`BEGIN`);
     expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
     await adapter.execute(`COMMIT`);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
   });
 
   it("insert returns the inserted id for INSERT ... RETURNING", async () => {
@@ -89,7 +92,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
     const second = await adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('b')`);
     expect(second).toBe(2);
-    expect(adapter.affectedRows()).toBe(1);
+    expect(adapter.affectedRows(null)).toBe(1);
   });
 
   it("returns distinct insert ids for concurrent inserts", async () => {
@@ -183,7 +186,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
   it("does not close the handle out from under a statement holding the lock", async () => {
     const closing = new BetterSQLite3Adapter({ database: ":memory:" });
-    // eslint-disable-next-line blazetrails/require-table-teardown
+
     await closing.execute(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
@@ -200,12 +203,12 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await expect(queued).resolves.toBe(1);
     await disconnecting;
 
-    expect(closing.isActive()).toBe(false);
+    expect(closing.isActive()).toBeFalsy();
   });
 
   it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
     const closing = new BetterSQLite3Adapter({ database: ":memory:" });
-    // eslint-disable-next-line blazetrails/require-table-teardown
+
     await closing.execute(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
@@ -223,7 +226,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     const answered = closing.active();
 
     expect(await answered).toBe(false);
-    expect(closing.isActive()).toBe(false);
+    expect(closing.isActive()).toBeFalsy();
   });
 
   it("returns the rowid of each of two RETURNING inserts issued together", async () => {

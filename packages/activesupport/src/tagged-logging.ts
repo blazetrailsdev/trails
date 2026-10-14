@@ -189,7 +189,6 @@ export const TaggedLogging = {
     return this.formatter.clearTagsBang();
   },
 
-  /** @missingRailsArgs extend — PERMANENT */
   tagged(this: TaggedLogger, ...tags: (Tag | ((logger: TaggedLogger) => unknown))[]): unknown {
     const block =
       typeof tags.at(-1) === "function" ? (tags.pop() as (logger: TaggedLogger) => unknown) : null;

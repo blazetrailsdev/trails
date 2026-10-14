@@ -1,7 +1,6 @@
 import type { Company } from "./company.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
-import { registerSubclass } from "../../inheritance.js";
 
 export class Vegetable extends Base {
   declare custom_type: string;
@@ -16,14 +15,19 @@ export class Vegetable extends Base {
     return "custom_type";
   }
 }
+registerModel(Vegetable);
 
 export class Cucumber extends Vegetable {}
+registerModel(Cucumber);
 
 export class Cabbage extends Vegetable {}
+registerModel(Cabbage);
 
 export class GreenCabbage extends Cabbage {}
+registerModel(GreenCabbage);
 
 export class KingCole extends GreenCabbage {}
+registerModel(KingCole);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RedCabbage extends Cabbage {
@@ -31,15 +35,11 @@ export class RedCabbage extends Cabbage {
     this.belongsTo("seller", { className: "Company" });
   }
 }
+registerModel(RedCabbage);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RedCabbage {
   get seller(): Company | null | Promise<Company | null>;
   set seller(value: Company | null);
-}
-
-registerModel([Vegetable, Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]);
-for (const klass of [Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]) {
-  registerSubclass(klass);
 }
 
 export class YellingVegetable extends Vegetable {
@@ -54,3 +54,4 @@ export class YellingVegetable extends Vegetable {
     this.writeAttribute("name", name?.toUpperCase() ?? null);
   }
 }
+registerModel(YellingVegetable);

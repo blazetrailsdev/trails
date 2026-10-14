@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { assertInDelta, assertNothingRaised, travel, travelBack } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   Developer,
   DeveloperCalledJamis,
@@ -120,12 +120,12 @@ describe("TimestampTest", () => {
 
   it("touching updates timestamp with given time", async () => {
     const previouslyUpdatedAt2 = developer.legacy_updated_at as RubyTime;
-    const newTime = new Date(Date.UTC(2015, 1, 16, 0, 0, 0));
+    const newTime = RubyTime.utc(2015, 2, 16, 0, 0, 0);
     await developer.touch({ time: newTime });
 
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
     const updatedAt = developer.legacy_updated_at as RubyTime;
-    expect(updatedAt.toF() * 1000).toBe(newTime.getTime());
+    expect(updatedAt.toF()).toBe(newTime.toF());
   });
 
   it("touching an attribute updates timestamp", async () => {
@@ -167,15 +167,15 @@ describe("TimestampTest", () => {
   it("touching an attribute updates timestamp with given time", async () => {
     const previouslyUpdatedAt2 = developer.legacy_updated_at as RubyTime;
     const previousCreatedAt = developer.legacy_created_at as RubyTime;
-    const newTime = new Date(Date.UTC(2015, 1, 16, 4, 54, 0));
+    const newTime = RubyTime.utc(2015, 2, 16, 4, 54, 0);
     await developer.touch("legacy_created_at", { time: newTime });
 
     expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
     const createdAt = developer.legacy_created_at as RubyTime;
     const updatedAt = developer.legacy_updated_at as RubyTime;
-    expect(createdAt.toF() * 1000).toBe(newTime.getTime());
-    expect(updatedAt.toF() * 1000).toBe(newTime.getTime());
+    expect(createdAt.toF()).toBe(newTime.toF());
+    expect(updatedAt.toF()).toBe(newTime.toF());
   });
 
   it("touching many attributes updates them", async () => {
@@ -355,7 +355,7 @@ describe("TimestampTest", () => {
   it("touching a record with a belongs to that uses a counter cache should update the parent", async () => {
     const pet = await PetCounterCacheTouch.find((pets("parrot") as any).readAttribute("pet_id"));
     const ownerInst = await (pet as any).owner;
-    const threeDAgo = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    const threeDAgo = RubyTime.now().minus(3 * 86400);
     await ownerInst.updateColumns({ happy_at: threeDAgo });
     const previousOwnerUpdatedAt = ownerInst.updated_at as RubyTime;
 
@@ -374,7 +374,7 @@ describe("TimestampTest", () => {
     const toy = await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"));
     const pet = await (toy as any).pet;
     const ownerInst = await pet.owner;
-    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    const time = RubyTime.now().minus(3 * 86400);
 
     await ownerInst.updateColumns({ updated_at: time });
     await toy.touch();
@@ -385,7 +385,7 @@ describe("TimestampTest", () => {
 
   it("touching a record touches polymorphic record", async () => {
     const toy = (await Toy.find((toys("bone") as any).readAttribute("toy_id"))) as any;
-    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    const time = RubyTime.now().minus(3 * 86400);
     await toy.updateColumns({ updated_at: time });
 
     const wheel = new WheelPolymorphicTouch() as any;
@@ -402,7 +402,7 @@ describe("TimestampTest", () => {
 
     const toy2 = (await ToyTouchPet.find((toys("doll") as any).readAttribute("toy_id"))) as any;
     const newPet = await toy2.pet;
-    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    const time = RubyTime.now().minus(3 * 86400);
 
     await oldPet.updateColumns({ updated_at: time });
     await newPet.updateColumns({ updated_at: time });
@@ -423,7 +423,7 @@ describe("TimestampTest", () => {
 
     const wheel = (await WheelPolymorphicTouch.create({ wheelable: car1 })) as any;
 
-    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    const time = RubyTime.now().minus(3 * 86400);
 
     await car1.updateColumns({ updated_at: time });
     await car2.updateColumns({ updated_at: time });
@@ -441,7 +441,7 @@ describe("TimestampTest", () => {
 
     const wheel = (await WheelPolymorphicTouch.create({ wheelable: car })) as any;
 
-    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    const time = RubyTime.now().minus(3 * 86400);
 
     await car.updateColumns({ updated_at: time });
     await toy.updateColumns({ updated_at: time });
@@ -456,7 +456,7 @@ describe("TimestampTest", () => {
   it("clearing association touches the old record", async () => {
     const toy = (await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"))) as any;
     const pet = await toy.pet;
-    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    const time = RubyTime.now().minus(3 * 86400);
 
     await pet.updateColumns({ updated_at: time });
 

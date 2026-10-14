@@ -2,7 +2,13 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
-import { Range as RangeValue } from "@blazetrails/ruby-compat";
+import {
+  ARRAY_METHOD_TABLE,
+  Kernel,
+  Range as RangeValue,
+  STRING_METHOD_TABLE,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 import { formattedOffset } from "../time/conversions.js";
@@ -41,6 +47,10 @@ export class Object {
   }
 }
 
+Kernel.defineMethod("asJson", function (this: object, options: EncodeOptions | null = null) {
+  return Object.asJson(this, options);
+});
+
 export class TrueClass {
   static asJson(value: boolean, options: EncodeOptions | null = null): boolean {
     return value;
@@ -58,6 +68,15 @@ export class String {
     return value;
   }
 }
+
+declare module "@blazetrails/ruby-compat" {
+  interface StringInstance {
+    asJson(options?: EncodeOptions | null): string;
+  }
+}
+
+STRING_METHOD_TABLE.asJson = (self, options = null) =>
+  String.asJson(self.string, options as EncodeOptions | null);
 
 export class Numeric {
   static asJson(value: number | bigint, options: EncodeOptions | null = null): number | string {
@@ -143,6 +162,9 @@ export class Array {
   }
 }
 
+ARRAY_METHOD_TABLE.asJson = (self, options: EncodeOptions | null = null) =>
+  Array.asJson(self, options);
+
 export class Hash {
   static asJson(
     value: unknown,
@@ -177,7 +199,7 @@ export class Hash {
         if (!globalThis.Object.isFrozen(options))
           options = globalThis.Object.freeze({ ...options });
         for (const [k, v] of subset) {
-          globalThis.Object.defineProperty(result, globalThis.String(k), {
+          globalThis.Object.defineProperty(result, toS(k), {
             value: asJson(v, options),
             writable: true,
             enumerable: true,
@@ -186,7 +208,7 @@ export class Hash {
         }
       } else {
         for (const [k, v] of subset) {
-          globalThis.Object.defineProperty(result, globalThis.String(k), {
+          globalThis.Object.defineProperty(result, toS(k), {
             value: asJson(v),
             writable: true,
             enumerable: true,

@@ -4,15 +4,15 @@ import { Scheme } from "./scheme.js";
 
 const compressor: Compressor = {
   deflate: (data) => Buffer.from(data),
-  inflate: (data) => Buffer.from(data).toString(),
+  inflate: (data) => Buffer.from(data),
 };
 
 describe("ActiveRecord::Encryption::ConfigTest", () => {
   it("credential predicates answer the stored value's presence", () => {
     const config = new Config();
-    expect(config.hasPrimaryKey()).toBeUndefined();
-    expect(config.hasDeterministicKey()).toBeUndefined();
-    expect(config.hasKeyDerivationSalt()).toBeUndefined();
+    expect(config.hasPrimaryKey()).toBeNull();
+    expect(config.hasDeterministicKey()).toBeNull();
+    expect(config.hasKeyDerivationSalt()).toBeNull();
 
     config.primaryKey = "the primary key";
     config.deterministicKey = "the deterministic key";
@@ -42,8 +42,8 @@ describe("ActiveRecord::Encryption::ConfigTest", () => {
     config.deterministicKey = "  ";
     config.keyDerivationSalt = "";
 
-    expect(config.hasPrimaryKey()).toBeUndefined();
-    expect(config.hasDeterministicKey()).toBeUndefined();
-    expect(config.hasKeyDerivationSalt()).toBeUndefined();
+    expect(config.hasPrimaryKey()).toBeNull();
+    expect(config.hasDeterministicKey()).toBeNull();
+    expect(config.hasKeyDerivationSalt()).toBeNull();
   });
 });

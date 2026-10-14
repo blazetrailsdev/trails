@@ -2,12 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import {
-  assertMatch,
-  assertNoMatch,
-  registerConstant,
-  unregisterConstant,
-} from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import * as Assertions from "../../testing/assertions.js";
 import { ActiveModel } from "../../active-model.js";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
@@ -22,7 +18,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 
@@ -56,13 +52,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
         await assertInstanceMethod("show", content);
 
         await assertInstanceMethod("new", content, (m) => {
-          assertMatch(/this\.user = User\.new\(\)/, m);
+          assertMatch(/this\.user = new User\(\)/, m);
         });
 
         await assertInstanceMethod("edit", content);
 
         await assertInstanceMethod("create", content, (m) => {
-          assertMatch(/this\.user = User\.new\(this\.userParams\(\)\)/, m);
+          assertMatch(/this\.user = new User\(this\.userParams\(\)\)/, m);
           assertMatch(/this\.user\.save\(\)/, m);
           assertMatch(/this\.redirectTo\(this\.user/, m);
         });
@@ -228,12 +224,12 @@ describe("ScaffoldControllerGeneratorTest", () => {
 
   it("add routes", async () => {
     await runGenerator("User");
-    expect(read("config/routes.ts")).toContain('mapper.resources("users")');
+    expect(read("config/routes.ts")).toContain('this.resources("users")');
   });
 
   it("skip routes", async () => {
     await runGenerator("User", [], { skipRoutes: true });
-    expect(read("config/routes.ts")).not.toContain('mapper.resources("users")');
+    expect(read("config/routes.ts")).not.toContain('this.resources("users")');
   });
 
   it("default orm is used", async () => {
@@ -309,9 +305,9 @@ describe("ScaffoldControllerGeneratorTest", () => {
     expect(parseTs(c).diagnostics).toEqual([]);
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/admin/accounts-helper.ts"))).toBe(true);
     const routes = read("config/routes.ts");
-    expect(routes).toContain('mapper.namespace("admin"');
-    expect(routes).toContain('mapper.resources("accounts")');
-    expect(routes).not.toContain('mapper.resources("admin/accounts")');
+    expect(routes).toContain('this.namespace("admin"');
+    expect(routes).toContain('this.resources("accounts")');
+    expect(routes).not.toContain('this.resources("admin/accounts")');
   });
 
   it("singularizes plural input for model + params key", async () => {
@@ -326,8 +322,8 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("uses underscored namespace in routes (not dasherized)", async () => {
     await runGenerator("admin_panel/users");
     const routes = read("config/routes.ts");
-    expect(routes).toContain('mapper.namespace("admin_panel"');
-    expect(routes).not.toContain('mapper.namespace("admin-panel"');
+    expect(routes).toContain('this.namespace("admin_panel"');
+    expect(routes).not.toContain('this.namespace("admin-panel"');
     expect(routes.match(/\n\n\n/)).toBeNull();
   });
 });

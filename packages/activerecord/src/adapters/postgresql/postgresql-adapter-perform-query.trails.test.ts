@@ -5,13 +5,16 @@ import { Value } from "../../type.js";
 import { Base } from "../../base.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "../../errors.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   let adapter: PostgreSQLAdapter;
   let connection: AbstractAdapter;
 
+  fixtures([]);
+
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await adapter.execute(`DROP TABLE IF EXISTS pq`);
     await adapter.execute(`DROP TABLE IF EXISTS pq_ddl`);
     await adapter.execute(`CREATE TABLE pq (id serial primary key, nick character varying(255))`);
@@ -58,7 +61,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     subscriber.start();
     try {
       await adapter.transaction(async () => {
-        expect(await adapter.insert(`INSERT INTO pq_ddl (nick) VALUES ('a')`)).toBeUndefined();
+        expect(await adapter.insert(`INSERT INTO pq_ddl (nick) VALUES ('a')`)).toBeNull();
       });
       const inserts = subscriber.logged.filter(([sql]) => sql.startsWith("INSERT"));
       expect(inserts).toEqual([[`INSERT INTO pq_ddl (nick) VALUES ('a')`, "", []]]);
@@ -70,15 +73,17 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
 
   it("errors when a write is routed through insert while preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await expect(connection.insert(`INSERT INTO pq (nick) VALUES ('a')`)).rejects.toThrow(
-        ReadOnlyError,
-      );
+      await expect(
+        connection.insert(`INSERT INTO subscribers(nick) VALUES ('pq')`),
+      ).rejects.toThrow(ReadOnlyError);
     });
   });
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await expect(connection.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
+      await expect(
+        connection.execute(`SELECT * FROM subscribers WHERE nick = 'pq'`),
+      ).resolves.toEqual([]);
     });
   });
 

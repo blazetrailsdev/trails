@@ -1,20 +1,27 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
-import { registerConstant } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
+import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import { env, includedModules, setEnv } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  env,
+  include,
+  includedModules,
+  setEnv,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 
 class BootAppIntegrationTest extends ActionController.IntegrationTest {
   declare "@post": { title: string };
+  declare posts: FixtureSetAccessor<{ title: string }>;
 
   static {
     this.setup(async function (this: BootAppIntegrationTest) {
-      const self = this as BootAppIntegrationTest & { fixture(...names: string[]): unknown };
-      this["@post"] = (await self.fixture("posts", "welcome")) as { title: string };
+      this["@post"] = await this.posts("welcome");
     });
   }
 }
@@ -66,11 +73,12 @@ describe("test_help wires a booted app into the test case classes", () => {
   describe("BootAppIntegrationTest", () => {
     it("points IntegrationTest and ActionController::TestCase at the application's routes", async ({
       testCase,
+      task,
     }) => {
       const session = testCase as BootAppIntegrationTest;
       expect(session.routes).toBe(Trails.application!.routes());
 
-      const controllerTest = new ActionController.TestCase(ActionController.Base) as unknown as {
+      const controllerTest = new ActionController.TestCase(task.name) as unknown as {
         routes?: unknown;
         beforeSetup(): void;
       };
@@ -106,13 +114,37 @@ describe("test_help wires a booted app into the test case classes", () => {
     }
   });
 
-  it("renders a view through ActionController::TestCase", async () => {
+  it("reaches a module included onto ActionController::TestCase after test_help loads", async ({
+    task,
+  }) => {
+    const ran: string[] = [];
+    const Included = new Module();
+    Included.defineMethod("beforeSetup", function (this: object) {
+      ran.push("included");
+      return Included.superMethod(this, "beforeSetup")!();
+    });
+    const proto = ActionController.TestCase.prototype;
+    const parent = Object.getPrototypeOf(proto);
+    include(ActionController.TestCase, Included);
+    try {
+      const controllerTest = new ActionController.TestCase(task.name);
+      await controllerTest.beforeSetup();
+      expect(ran).toEqual(["included"]);
+      expect(controllerTest.routes).toBe(Trails.application!.routes());
+    } finally {
+      Object.setPrototypeOf(proto, parent);
+    }
+  });
+
+  it("renders a view through ActionController::TestCase", async ({ task }) => {
     const { PostsController } =
       await import("./__fixtures__/boot-app/app/controllers/posts-controller.js");
-    const controllerTest = new ActionController.TestCase(PostsController);
+    const controllerTest = new ActionController.TestCase(task.name);
+    controllerTest.controller = new PostsController();
+    await controllerTest.beforeSetup();
     await controllerTest.get("show");
     expect(controllerTest.response.status).toBe(200);
-    expect(controllerTest.responseBody).toContain("<p>Hello from TSE</p>");
+    expect(controllerTest.response.body).toContain("<p>Hello from TSE</p>");
   });
 
   it("rolls a model test's writes back after the test", async () => {

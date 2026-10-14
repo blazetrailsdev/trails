@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { DisallowedClass } from "@blazetrails/activesupport/yaml";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { YAMLColumn } from "./yaml-column.js";
 import { Temporal } from "@blazetrails/date";
 import { setUseYamlUnsafeLoad } from "../active-record.js";
@@ -32,13 +32,13 @@ describe("YAMLColumn round-trip", () => {
       secret = "s3cret";
     }
 
-    it("raises DisallowedClass when dumping an unpermitted class instance", () => {
+    it("raises Psych.DisallowedClass when dumping an unpermitted class instance", () => {
       const coder = new YAMLColumn("params");
-      expect(() => coder.dump(new Unpermitted())).toThrow(DisallowedClass);
+      expect(() => coder.dump(new Unpermitted())).toThrow(Psych.DisallowedClass);
       expect(() => coder.dump(new Unpermitted())).toThrow(
         /Tried to dump unspecified class: Unpermitted/,
       );
-      expect(() => coder.dump({ nested: [new Unpermitted()] })).toThrow(DisallowedClass);
+      expect(() => coder.dump({ nested: [new Unpermitted()] })).toThrow(Psych.DisallowedClass);
     });
 
     it("dumps unpermitted class instances when use_yaml_unsafe_load is set", () => {
@@ -85,7 +85,7 @@ describe("YAMLColumnTestWithSafeLoad", () => {
   });
   it("yaml column permitted classes are consumed by safe dump", () => {
     const coder = new YAMLColumn("attr_name");
-    expect(() => coder.dump([Temporal.Now.instant()])).toThrow(DisallowedClass);
+    expect(() => coder.dump([Temporal.Now.instant()])).toThrow(Psych.DisallowedClass);
   });
   it.skip("yaml column permitted classes option", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml

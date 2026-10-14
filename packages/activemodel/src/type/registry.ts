@@ -1,3 +1,4 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../attribute-assignment.js";
 import { ValueType } from "./value.js";
 
@@ -11,7 +12,6 @@ export type TypeClass = new (...args: never[]) => ValueType;
 export class TypeRegistry {
   /** @internal */
   protected registrationsMap: Map<string, TypeFactory>;
-  readonly #keysByClass = new Map<TypeClass, string>();
 
   constructor() {
     this.registrationsMap = new Map();
@@ -20,11 +20,11 @@ export class TypeRegistry {
   register(typeName: string, klass: TypeClass | null = null, block?: TypeFactory): void {
     if (block === undefined) {
       block = (_: string, ...args: unknown[]) => new klass!(...(args as never[]));
+      if (rbObjRespondTo(block, "ruby2Keywords")) {
+        (block as unknown as { ruby2Keywords(): void }).ruby2Keywords();
+      }
     }
     this.registrations.set(typeName, block);
-    if (klass !== null && !this.#keysByClass.has(klass)) {
-      this.#keysByClass.set(klass, typeName);
-    }
   }
 
   lookup(symbol: string, ...args: unknown[]): ValueType {
@@ -42,11 +42,7 @@ export class TypeRegistry {
     return this.registrationsMap;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  keyFor(type: ValueType): string | null {
-    return this.#keysByClass.get(type.constructor as TypeClass) ?? null;
+  initializeCopy(_other: TypeRegistry): void {
+    this.registrationsMap = new Map(this.registrationsMap);
   }
 }
-
-/** @noRailsEquivalent PERMANENT */
-export const typeRegistry = new TypeRegistry();

@@ -1,13 +1,15 @@
 export { ArgumentError } from "./argument-error.js";
 export { ConverterNotFoundError } from "./converter-not-found-error.js";
-export { DelegateClass } from "./delegate.js";
+export { DelegateClass, Delegator, SimpleDelegator } from "./delegate.js";
 export { Dir } from "./dir.js";
 export { EncodingError } from "./encoding-error.js";
 export { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
+export { UndefinedConversionError } from "./undefined-conversion-error.js";
 export { EOFError } from "./eof-error.js";
+export { Errno, SystemCallError } from "./errno.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";
-export { IO, STDOUT } from "./io.js";
+export { IO, STDOUT, print, printf, puts } from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,
@@ -24,31 +26,64 @@ export {
   rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
-export { Enumerable } from "./enumerable.js";
-export type { Each } from "./enumerable.js";
+export { AsyncEnumerable, Enumerable, reduce } from "./enumerable.js";
+export type { AsyncEach, AsyncEnumerator, Each } from "./enumerable.js";
 export {
   basicObjRespondTo,
+  objRespondToMissing,
   rbBuiltinClassName,
   rbInspect,
+  rbDefineInspectCustom,
   rbObjInspect,
   rbAnyToS,
   rbObjId,
   rbObjAsString,
+  ENUMERABLE_METHOD_TABLE,
+  CLASS_METHOD_TABLE,
+  OBJECT_METHOD_TABLE,
+  TEMPORAL_METHOD_TABLE,
   rbDeclareIvar,
   rbObjInstanceVariables,
+  rbObjIvarDefined,
   rbObjIvarGet,
   rbObjIvarSet,
+  classpaths,
+  rbCClass,
+  rbClassOf,
+  rbClassSuperclass,
+  rbCDate,
+  rbCDateTime,
+  rbCFalseClass,
+  rbCFloat,
+  rbCInteger,
+  rbCNilClass,
+  rbCNumeric,
+  rbCString,
+  rbCSymbol,
+  rbCTime,
+  rbCTrueClass,
+  rbObjClass,
+  rbObjIsProc,
+  rbModName,
   rbModSingletonP,
   rbModToS,
-  rbObjClass,
+  rbObjClassname,
+  rbObjFrozenP,
   rbObjRespondTo,
   rbObjSingletonClass,
+  rbSetClassPathString,
   rbFPublicSend,
   rbFSend,
-  rbModPrivate,
+  toS,
+  toSym,
+  rbModAttrReader,
+  rbModAttrWriter,
+  rbModDefineMethod,
+  rbModMethodDefined,
   rbModPublicMethodDefined,
-  rbModProtected,
   rtest,
+  isNil,
+  rbCBasicObject,
 } from "./object.js";
 export {
   Hash,
@@ -62,12 +97,20 @@ export {
   except,
   fetch,
   hasKey,
+  hashAref,
+  hashAset,
   hashDelete,
+  hashReplace,
   inspect,
+  isInclude,
+  keys,
   merge,
   mergeBang,
   rbBlockGivenP,
+  rbHashSRuby2KeywordsHash,
+  rbHashSRuby2KeywordsHashP,
   reject,
+  size,
   slice,
   transformValues,
   update,
@@ -75,6 +118,7 @@ export {
 } from "./hash.js";
 export type { Block, ConflictBlock } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
+export { Set } from "./set.js";
 export { FileUtils } from "./file-utils.js";
 export {
   cryptoAdapterConfig,
@@ -106,11 +150,19 @@ export type {
   ChildProcessAdapter,
   SpawnSyncOptions,
   SpawnSyncResult,
+  WaitStatus,
 } from "./child-process-adapter.js";
 export { FloatDomainError } from "./float-domain-error.js";
 export { BigDecimal, toD } from "./big-decimal.js";
 export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
-export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-adapter.js";
+export type {
+  HttpAdapter,
+  HttpRequest,
+  HttpResponse,
+  HttpServer,
+  HttpSocket,
+  HttpUpgradeListener,
+} from "./http-adapter.js";
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
 export { Gem } from "./gem.js";
 export { RbConfig } from "./rb-config.js";
@@ -123,17 +175,39 @@ export {
 } from "./zlib-adapter.js";
 export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter.js";
 export {
+  aryCount,
   aryDelete,
+  aryDeleteIf,
+  aryFetch,
+  aryIncludes,
+  aryJoin,
   aryPop,
   arySlice,
   compact,
+  compactBang,
+  deleteAt,
   drop,
+  each,
   first,
+  flatten,
+  rbFArray,
+  rbCheckArrayType,
+  groupBy,
+  last,
   pack,
+  partition,
+  aryReject,
   sort,
+  take,
   toA,
+  toH,
+  zip,
+  isIntersect,
+  union,
   uniq,
+  unpack,
   unpack1,
+  ARRAY_METHOD_TABLE,
 } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";
@@ -141,39 +215,62 @@ export { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter
 export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";
 export {
   Module,
+  rbModConstDefined,
+  rbModConstSet,
   defineModule,
+  Kernel,
   extend,
   extended,
   rbObjClone,
+  rbClassNewInstance,
+  rbDefineAllocFunc,
+  rbObjDup,
   include,
   included,
   initialize,
   includedModules,
   initializeIncludedModules,
   isModuleIncluded,
+  rbModAncestors,
+  rbClassInheritedP,
+  rbObjIsKindOf,
+  rbModInstanceMethod,
+  rbModPublicInstanceMethod,
+  type UnboundMethod,
   moduleVisibility,
   publicInstanceMethods,
 } from "./include.js";
-export type { Extended, Included, ModuleVisibility } from "./include.js";
+export type { Extended, Included, Initialized, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
-export { kernelCatch, kernelThrow, UncaughtThrowError } from "./kernel-catch.js";
+export { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kernel-catch.js";
 export { kernelFloat } from "./kernel-float.js";
 export { format, sprintf } from "./kernel-format.js";
+export { warn } from "./kernel-warn.js";
 export { kernelInteger } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
+export { rbFSystem } from "./kernel-system.js";
 export { IndexError } from "./index-error.js";
+export { StopIteration } from "./stop-iteration.js";
 export { RangeError } from "./range-error.js";
 export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";
 export { LoadError } from "./load-error.js";
+export { rbFLoad } from "./load.js";
 export { IPAddr } from "./ipaddr.js";
 export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
-export { anybits, round, toI } from "./numeric.js";
+export { anybits, fixDiv, fixMod, isFinite, isNan, round, toF, toI } from "./numeric.js";
 export {
+  intXor,
+  numericMinus,
+  numericUminus,
+  numericModulo,
+  numericMul,
   numericPlus,
+  numericPow,
+  rbAbsintSize,
   rbBigNorm,
   rbDbl2num,
   rbFloatTypeP,
@@ -183,6 +280,7 @@ export {
 export { Complex, complex } from "./complex.js";
 export { NotImplementedError } from "./not-implemented-error.js";
 export { prepend } from "./prepend.js";
+export { Open3 } from "./open3.js";
 export { Process } from "./process.js";
 export {
   SystemExit,
@@ -191,75 +289,157 @@ export {
   argv,
   chdir,
   env,
+  exec,
   exit,
   getProcessAdapter,
   onSignal,
   processAdapterConfig,
+  rbArgv,
+  rbProgname,
+  setArg0,
+  isRubyTzUptodate,
   registerProcessAdapter,
   setEnv,
   setExitCode,
   stderr,
   stdin,
+  setRubyTzUptodate,
   stdout,
 } from "./process-adapter.js";
-export type { ProcessAdapter, ReadStream, SignalName, WriteStream } from "./process-adapter.js";
-export type { PrependMethod, PrependModule } from "./prepend.js";
-export { Method, rbCheckArity, rbObjMethod } from "./method.js";
-export { regexpEscape } from "./regexp.js";
+export type {
+  ProcessAdapter,
+  ReadStream,
+  SignalName,
+  StdStream,
+  WriteStream,
+} from "./process-adapter.js";
+export type { ClassModule, PrependMethod, PrependModule } from "./prepend.js";
+export {
+  Method,
+  iseqLocationSetup,
+  rbCheckArity,
+  rbObjMethod,
+  rbObjMethods,
+  rbObjPrivateMethods,
+  rbObjProtectedMethods,
+  rbObjPublicMethods,
+} from "./method.js";
+export {
+  rbRegEqual,
+  rbRegInitStr,
+  rbRegMatchP,
+  rbRegSUnion,
+  rbRegToS,
+  regexpEscape,
+} from "./regexp.js";
+export { Pathname } from "./pathname.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
 export { Enumerator, toEnum } from "./enumerator.js";
-export { RUBY_PLATFORM } from "./ruby-platform.js";
+export { RUBY_ENGINE, RUBY_PLATFORM } from "./ruby-platform.js";
 export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
-export { rbConstGet, rbConstMissing, rbModConstMissing } from "./variable.js";
+export {
+  resetConstants,
+  isRegisteredConstant,
+  rbConstGet,
+  rbGvGet,
+  rbGvSet,
+  rbModConstGet,
+  rbModConstants,
+  rbConstMissing,
+  rbModConstMissing,
+  rbPathToClass,
+  rbFBinding,
+  registerConstant,
+  registeredConstant,
+  rbModRemoveConst,
+  unregisterConstant,
+} from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
-export { Exception } from "./exception.js";
+export { Exception, excSetupMessage } from "./exception.js";
+export { excToS } from "./exc-to-s.js";
+export { excDetailedMessage, rbDecorateMessage } from "./exc-detailed-message.js";
 export { StandardError } from "./standard-error.js";
+export { Interrupt, SignalException } from "./signal-exception.js";
 export { ObjectSpace } from "./object-space.js";
 export { SecureRandom } from "./secure-random.js";
 export { Digest, DigestClass, DigestInstance } from "./digest.js";
 export { Cipher, HMAC, OpenSSL } from "./openssl.js";
 export { StringIO } from "./string-io.js";
+export { PrettyPrint } from "./pretty-print.js";
+export type { PrettyPrintOutput } from "./pretty-print.js";
+export { PP } from "./pp.js";
 export { b } from "./string/b.js";
-export { bytes } from "./string/bytes.js";
-export { byteslice } from "./string/byte-methods.js";
+export { bytes, strNew } from "./string/bytes.js";
+export { byteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
+export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
-export { rbStrDump } from "./string/convert.js";
+export { rbStrDump, rbStrHex, rbStrToF, rbStrToI } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
+export { strCount } from "./string/tr.js";
 export {
+  center,
+  lastMatchGetter,
+  matchOperator,
+  rbDefineMethod,
+  rbObjNotMatch,
   rbStrMatch,
   rbStrRespondTo,
   rbStrSend,
+  rstrip,
+  strip,
   STRING_METHOD_TABLE,
+  stringSuperclass,
   type StringReceiver,
+  type StringInstance,
 } from "./string/method-table.js";
+export { Struct, isStruct, rbStructInitialize, rstructGet, type StructInstance } from "./struct.js";
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
-export { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
+export { rbStrPartition, rbStrScanSubexpCall } from "./string/sub.js";
+export { rbCheckStringType, rbStrSNew, stringValue, strlen, strUminus } from "./string/support.js";
+export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
+export { encode } from "./string/encode.js";
 export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
 export { succ } from "./string/succ.js";
 export { isSymbol, rbMethodName, stringToSym, symbolToS } from "./symbol.js";
 export { Monitor, isMonOwned, synchronize } from "./monitor.js";
 export { Mutex } from "./mutex.js";
+export { rbEnsure } from "./ensure.js";
+export { coreHashMergeKwd, keywordSplat, rbGetKwargs, rbScanArgs } from "./keyword-splat.js";
 export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
 export { Thread } from "./thread.js";
-export { Location, excBacktraceLocations } from "./backtrace-location.js";
+export {
+  Location,
+  excBacktrace,
+  excBacktraceLocations,
+  excSetBacktrace,
+  rbFCaller,
+} from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
-export { ThreadPoolExecutor } from "./thread-pool-executor.js";
+export { Timeout } from "./timeout.js";
+export { CachedThreadPool, ThreadPoolExecutor } from "./thread-pool-executor.js";
+export { ImmediateExecutor } from "./immediate-executor.js";
+export { ScheduledTask } from "./scheduled-task.js";
+export { Concurrent } from "./concurrent/map.js";
+import "./concurrent/count-down-latch.js";
+import "./concurrent/event.js";
 export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";
 export type { TempfileBasename } from "./tempfile.js";
+export { temporalTag } from "./temporal-tag.js";
 export { TypeError } from "./type-error.js";
 export { setVerbose, verbose } from "./verbose.js";
+export { Marshal } from "./marshal.js";
 export { Zlib } from "./zlib.js";
 export {
   BadURIError,
@@ -275,3 +455,7 @@ export {
   RFC3986_PARSER,
   URI,
 } from "./uri.js";
+
+import { Kernel } from "./include.js";
+import { abort } from "./process-adapter.js";
+Kernel.abort = abort;

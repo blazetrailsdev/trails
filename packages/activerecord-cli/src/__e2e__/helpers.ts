@@ -1,4 +1,4 @@
-import { DatabaseTasks, Migrator } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -7,7 +7,7 @@ import { vi } from "vitest";
 export const MIGRATION_BODY = `\
 import { Migration } from "@blazetrails/activerecord";
 
-export class AddUsersTable extends Migration {
+export class AddUsersTable extends Migration.Current {
   async up() {
     await this.connection.createTable("users", (t) => {
       t.string("name");
@@ -39,6 +39,7 @@ export async function mkE2eTmpDir(prefix: string): Promise<string> {
 
 export async function teardownE2eFixture(tmpDir: string): Promise<void> {
   DatabaseTasks.databaseConfiguration = null;
+  Base.configurations({});
   (DatabaseTasks as unknown as { _root: string | null })._root = null;
   Migrator.migrationsPaths = ["db/migrate"];
   DatabaseTasks.seedLoader = null;

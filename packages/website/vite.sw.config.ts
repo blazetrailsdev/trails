@@ -11,12 +11,15 @@ function pkgAlias(name: string, entry: string) {
   };
 }
 
-function stubActivesupportYaml() {
+function stubPsychAdapter() {
   return {
-    name: "stub-activesupport-yaml",
+    name: "stub-psych-adapter",
     enforce: "pre" as const,
     resolveId(source: string, importer: string | undefined) {
-      if (source === "./yaml.js" && importer?.includes("/activesupport/src/")) {
+      if (
+        source === "@blazetrails/ruby-compat/psych-adapter" ||
+        (source.endsWith("/psych-adapter.js") && importer?.includes("/ruby-compat/"))
+      ) {
         return path.resolve(__dirname, "src/stubs/yaml-stub.ts");
       }
       return null;
@@ -38,14 +41,14 @@ function prependImportScripts() {
 }
 
 export default defineConfig({
-  plugins: [stubActivesupportYaml(), prependImportScripts()],
+  plugins: [stubPsychAdapter(), prependImportScripts()],
   resolve: {
     alias: [
       // Subpath imports must come before the base alias. The activerecord
       // sqlite drivers (@blazetrails/activerecord/sqlite/<name>) are handled by
       // the generic activerecord subpath alias below — the src/sqlite/ dir
       // matches the specifier, so no special case is needed.
-      pkgAlias("@blazetrails/activesupport/yaml", "src/stubs/yaml-stub.ts"),
+      pkgAlias("@blazetrails/ruby-compat/psych-adapter", "src/stubs/yaml-stub.ts"),
       {
         find: /^@blazetrails\/activesupport\/(.+)$/,
         replacement: path.resolve(__dirname, "../activesupport/src/$1.ts"),
@@ -67,9 +70,11 @@ export default defineConfig({
       pkgAlias("@blazetrails/globalid/wire", "../globalid/src/wire.ts"),
       pkgAlias("@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"),
       pkgAlias("@blazetrails/globalid", "../globalid/src/index.ts"),
+      pkgAlias("@blazetrails/bcrypt", "../bcrypt/src/index.ts"),
       pkgAlias("@blazetrails/date", "../date/src/index.ts"),
       pkgAlias("@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"),
       pkgAlias("@blazetrails/i18n", "../i18n/src/index.ts"),
+      pkgAlias("@blazetrails/msgpack", "../msgpack/src/index.ts"),
       pkgAlias("@blazetrails/nokogiri", "src/stubs/nokogiri-stub.ts"),
     ],
   },

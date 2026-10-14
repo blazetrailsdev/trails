@@ -1,5 +1,14 @@
 import { Attributes, Nodes, Visitors } from "../namespaces.js";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import {
+  aryDeleteIf,
+  isEmpty,
+  isNil,
+  NotImplementedError,
+  rbObjClone,
+  rbModConstSet,
+  rbObjRespondTo,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -18,10 +27,7 @@ export class UnsupportedVisitError extends Error {
 
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
-
-function isActiveModelAttribute(v: unknown): boolean {
-  return v instanceof ModelAttribute;
-}
+import type { ArelNode } from "../arel.js";
 
 function constructorName(v: unknown): string {
   if (v === null || v === undefined) return "NilClass";
@@ -38,10 +44,10 @@ export class ToSql extends Visitor {
     this.connection = connection;
   }
 
-  compile(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>): string;
-  compile<T>(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
+  compile(node: ArelNode | Table | ReadonlyArray<Nodes.NodeOrValue>): string;
+  compile<T>(node: ArelNode | Table | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
   compile(
-    node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>,
+    node: ArelNode | Table | ReadonlyArray<Nodes.NodeOrValue>,
     collector: { value: unknown } = new SQLString(),
   ): unknown {
     return this.accept(node, collector as unknown as SQLString).value;
@@ -60,7 +66,7 @@ export class ToSql extends Visitor {
     } else {
       collector.append("DELETE FROM ");
     }
-    if (o.relation) this.visit(o.relation, collector);
+    collector = this.visit(o.relation, collector);
 
     this.collectNodesFor(o.wheres, collector, " WHERE ", " AND ");
     this.collectNodesFor(o.orders, collector, " ORDER BY ");
@@ -74,7 +80,7 @@ export class ToSql extends Visitor {
     collector.retryable = false;
     o = this.prepareUpdateStatement(o);
     collector.append("UPDATE ");
-    if (o.relation) this.visit(o.relation, collector);
+    collector = this.visit(o.relation, collector);
 
     this.collectNodesFor(o.values, collector, " SET ");
 
@@ -89,17 +95,14 @@ export class ToSql extends Visitor {
   ): SQLString {
     collector.retryable = false;
     collector.append("INSERT INTO ");
-    if (o.relation) this.visit(o.relation, collector);
+    collector = this.visit(o.relation, collector);
 
     if (o.columns.length > 0) {
       collector.append(" (");
-      const colNames = o.columns.map((c) => {
-        if (c instanceof Nodes.SqlLiteral) return c.value;
-        const name =
-          c instanceof Attributes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
-        return this.quoteColumnName(name);
+      o.columns.forEach((x, i) => {
+        if (i !== 0) collector.append(", ");
+        collector.append(this.quoteColumnName((x as Attribute).name));
       });
-      collector.append(colNames.join(", "));
       collector.append(")");
     }
 
@@ -124,18 +127,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesCasted(o: Nodes.Casted, collector: SQLString): SQLString {
-    let valueForDatabase = o.valueForDatabase();
-    if (
-      valueForDatabase &&
-      typeof valueForDatabase === "object" &&
-      "valueForDatabase" in valueForDatabase
-    ) {
-      const held = valueForDatabase;
-      const inner = (held as Record<string, unknown>).valueForDatabase;
-      valueForDatabase = typeof inner === "function" ? (inner as () => unknown).call(held) : inner;
-    }
-    collector.append(this.quote(valueForDatabase));
-    return collector;
+    return collector.append(this.quote(o.valueForDatabase()));
   }
 
   private visitArelNodesQuoted(o: Nodes.Quoted, collector: SQLString): SQLString {
@@ -163,7 +155,7 @@ export class ToSql extends Visitor {
         if (
           value instanceof Nodes.SqlLiteral ||
           value instanceof Nodes.BindParam ||
-          isActiveModelAttribute(value)
+          value instanceof ModelAttribute
         ) {
           this.visit(value as Node, collector);
         } else {
@@ -205,7 +197,7 @@ export class ToSql extends Visitor {
     collector.append("SELECT");
 
     this.collectOptimizerHints(o, collector);
-    this.maybeVisit(o.setQuantifier ?? null, collector);
+    this.maybeVisit(o.setQuantifier, collector);
 
     this.collectNodesFor(o.projections, collector, " ");
 
@@ -219,7 +211,7 @@ export class ToSql extends Visitor {
     this.collectNodesFor(o.havings, collector, " HAVING ", " AND ");
     this.collectNodesFor(o.windows, collector, " WINDOW ");
 
-    this.maybeVisit(o.comment ?? null, collector);
+    this.maybeVisit(o.comment, collector);
 
     return collector;
   }
@@ -237,7 +229,7 @@ export class ToSql extends Visitor {
   }
 
   protected collectNodesFor(
-    nodes: Node[],
+    nodes: (ArelNode | ArelNode[] | string)[],
     collector: SQLString,
     spacer: string,
     connector = ", ",
@@ -510,51 +502,63 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesBetween(o: Nodes.Between, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
+    collector = this.visit(o.left, collector);
     collector.append(" BETWEEN ");
-    if (o.right instanceof Nodes.And) {
-      const and = o.right;
-      this.visit(and.children[0], collector);
-      collector.append(" AND ");
-      this.visit(and.children[1], collector);
-    } else {
-      this.visit(o.right, collector);
-    }
-    return collector;
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesGreaterThanOrEqual(
     o: Nodes.GreaterThanOrEqual,
     collector: SQLString,
   ): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=0");
-    if (sign === -1) return collector.append("1=1");
-    return this.visitBinaryOp(o, ">=", collector);
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=0");
+      case -1:
+        return collector.append("1=1");
+    }
+    collector = this.visit(o.left, collector);
+    collector.append(" >= ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesGreaterThan(o: Nodes.GreaterThan, collector: SQLString): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=0");
-    if (sign === -1) return collector.append("1=1");
-    return this.visitBinaryOp(o, ">", collector);
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=0");
+      case -1:
+        return collector.append("1=1");
+    }
+    collector = this.visit(o.left, collector);
+    collector.append(" > ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesLessThanOrEqual(
     o: Nodes.LessThanOrEqual,
     collector: SQLString,
   ): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=1");
-    if (sign === -1) return collector.append("1=0");
-    return this.visitBinaryOp(o, "<=", collector);
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=1");
+      case -1:
+        return collector.append("1=0");
+    }
+    collector = this.visit(o.left, collector);
+    collector.append(" <= ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesLessThan(o: Nodes.LessThan, collector: SQLString): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=1");
-    if (sign === -1) return collector.append("1=0");
-    return this.visitBinaryOp(o, "<", collector);
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=1");
+      case -1:
+        return collector.append("1=0");
+    }
+    collector = this.visit(o.left, collector);
+    collector.append(" < ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesMatches(o: Nodes.Matches, collector: SQLString): SQLString {
@@ -667,69 +671,38 @@ export class ToSql extends Visitor {
 
   private visitArelNodesIn(o: Nodes.In, collector: SQLString): SQLString {
     const attr = o.left;
-    let values = o.right;
+    const values = o.right;
+
     if (Array.isArray(values)) {
       collector.preparable = false;
-      if (values.length > 0) {
-        values = values.filter((v) => this.unboundableSign(v) === 0);
+
+      if (!isEmpty(values)) {
+        aryDeleteIf(values, (value) => this.isUnboundable(value));
       }
-      if (values.length === 0) {
-        collector.append("1=0");
-        return collector;
-      }
+
+      if (isEmpty(values)) return collector.append("1=0");
     }
-    this.visit(attr, collector);
-    if (
-      values &&
-      typeof values === "object" &&
-      !Array.isArray(values) &&
-      "ast" in (values as unknown as Record<string, unknown>) &&
-      "toSql" in (values as unknown as Record<string, unknown>)
-    ) {
-      collector.append(" IN ");
-      this.visit(values, collector);
-      return collector;
-    }
-    collector.append(" IN (");
-    if (Array.isArray(values)) {
-      for (let i = 0; i < values.length; i++) {
-        if (i > 0) collector.append(", ");
-        this.visit(values[i], collector);
-      }
-    } else {
-      this.visit(values, collector);
-    }
-    collector.append(")");
-    return collector;
+
+    this.visit(attr, collector).append(" IN (");
+    return this.visit(values, collector).append(")");
   }
 
   private visitArelNodesNotIn(o: Nodes.NotIn, collector: SQLString): SQLString {
     const attr = o.left;
-    let values = o.right;
+    const values = o.right;
+
     if (Array.isArray(values)) {
       collector.preparable = false;
-      if (values.length > 0) {
-        values = values.filter((v) => this.unboundableSign(v) === 0);
+
+      if (!isEmpty(values)) {
+        aryDeleteIf(values, (value) => this.isUnboundable(value));
       }
-      if (values.length === 0) {
-        collector.append("1=1");
-        return collector;
-      }
+
+      if (isEmpty(values)) return collector.append("1=1");
     }
-    this.visit(attr, collector);
-    if (Array.isArray(values)) {
-      collector.append(" NOT IN (");
-      for (let i = 0; i < values.length; i++) {
-        if (i > 0) collector.append(", ");
-        this.visit(values[i], collector);
-      }
-      collector.append(")");
-    } else {
-      collector.append(" NOT IN (");
-      this.visit(values, collector);
-      collector.append(")");
-    }
-    return collector;
+
+    this.visit(attr, collector).append(" NOT IN (");
+    return this.visit(values, collector).append(")");
   }
 
   private visitArelNodesAnd(o: Nodes.And, collector: SQLString): SQLString {
@@ -743,7 +716,11 @@ export class ToSql extends Visitor {
   private visitArelNodesAssignment(o: Nodes.Assignment, collector: SQLString): SQLString {
     this.visit(o.left, collector);
     collector.append(" = ");
-    if (o.right instanceof Node || isActiveModelAttribute(o.right)) {
+    if (
+      o.right instanceof Node ||
+      o.right instanceof Attributes.Attribute ||
+      o.right instanceof ModelAttribute
+    ) {
       this.visit(o.right, collector);
     } else {
       collector.append(this.quote(o.right));
@@ -754,13 +731,11 @@ export class ToSql extends Visitor {
   private visitArelNodesEquality(o: Nodes.Equality, collector: SQLString): SQLString {
     const right = o.right;
 
-    if (this.unboundableSign(right) !== 0) {
-      return collector.append("1=0");
-    }
+    if (rtest(this.isUnboundable(right))) return collector.append("1=0");
 
     this.visit(o.left, collector);
 
-    if (this.rightIsNull(right)) {
+    if (isNil(right)) {
       collector.append(" IS NULL");
     } else {
       collector.append(" = ");
@@ -773,7 +748,7 @@ export class ToSql extends Visitor {
     o: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (this.rightIsNull(o.right)) {
+    if (isNil(o.right)) {
       this.visit(o.left, collector);
       collector.append(" IS NULL");
       return collector;
@@ -784,7 +759,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesIsDistinctFrom(o: Nodes.IsDistinctFrom, collector: SQLString): SQLString {
-    if (this.rightIsNull(o.right)) {
+    if (isNil(o.right)) {
       this.visit(o.left, collector);
       collector.append(" IS NOT NULL");
       return collector;
@@ -797,13 +772,11 @@ export class ToSql extends Visitor {
   private visitArelNodesNotEqual(o: Nodes.NotEqual, collector: SQLString): SQLString {
     const right = o.right;
 
-    if (this.unboundableSign(right) !== 0) {
-      return collector.append("1=1");
-    }
+    if (rtest(this.isUnboundable(right))) return collector.append("1=1");
 
     this.visit(o.left, collector);
 
-    if (this.rightIsNull(right)) {
+    if (isNil(right)) {
       collector.append(" IS NOT NULL");
     } else {
       collector.append(" != ");
@@ -855,7 +828,7 @@ export class ToSql extends Visitor {
     o: Nodes.UnqualifiedColumn,
     collector: SQLString,
   ): SQLString {
-    collector.append(this.quoteColumnName(o.name as string | Node | null));
+    collector.append(this.quoteColumnName(o.name as string | ArelNode | null));
     return collector;
   }
 
@@ -893,34 +866,62 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesSqlLiteral(o: Nodes.SqlLiteral, collector: SQLString): SQLString {
-    if (!(o as { retryable?: boolean }).retryable) {
-      collector.retryable = false;
-    }
     collector.preparable = false;
-    collector.append(o.value);
-    return collector;
+    collector.retryable &&= o.retryable;
+    return collector.append(o.toString());
   }
 
   private visitArelNodesBoundSqlLiteral(o: Nodes.BoundSqlLiteral, collector: SQLString): SQLString {
     collector.retryable = false;
-    const sql = o.sqlWithPlaceholders;
+    let bindIndex = 0;
+
+    const newBind = (value: unknown): void => {
+      if (arelNode(value)) {
+        this.visit(value, collector);
+      } else if (Array.isArray(value)) {
+        if (value.length === 0) {
+          collector.append(this.connection.quote(null));
+        } else {
+          if (!value.some((v) => arelNode(v))) {
+            collector.addBinds(
+              value.map((v) => this.connection.castBoundValue(v)),
+              null,
+              this.bindBlock(),
+            );
+          } else {
+            value.forEach((v, i) => {
+              if (i !== 0) collector.append(", ");
+              if (arelNode(v)) {
+                this.visit(v, collector);
+              } else {
+                collector.addBind(this.connection.castBoundValue(v), this.bindBlock());
+              }
+            });
+          }
+        }
+      } else {
+        collector.addBind(this.connection.castBoundValue(value), this.bindBlock());
+      }
+    };
 
     if (o.positionalBinds) {
-      const positionalBinds = o.positionalBinds;
-      const segments = sql.split("?");
-      for (let i = 0; i < segments.length; i++) {
-        if (segments[i]) collector.append(segments[i]);
-        if (i < segments.length - 1) this.visitBindValue(positionalBinds[i] ?? null, collector);
+      for (const m of o.sqlWithPlaceholders.matchAll(/\?|([^?]+)/g)) {
+        if (m[1] != null) {
+          collector.append(m[1]);
+        } else {
+          const value = o.positionalBinds[bindIndex];
+          bindIndex += 1;
+
+          newBind(value);
+        }
       }
     } else {
-      const namedBinds = o.namedBinds ?? {};
-      const re = /:(?<!::)([a-zA-Z]\w*)|([^:]+|.)/gy;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(sql)) !== null) {
-        if (m[2] !== undefined) {
+      for (const m of o.sqlWithPlaceholders.matchAll(/:(?<!::)([a-zA-Z]\w*)|([^:]+|.)/g)) {
+        if (m[2] != null) {
           collector.append(m[2]);
         } else {
-          this.visitBindValue(namedBinds[m[1]] ?? null, collector);
+          const value = o.namedBinds![m[1]];
+          newBind(value);
         }
       }
     }
@@ -1019,24 +1020,24 @@ export class ToSql extends Visitor {
   }
 
   protected quote(value: unknown): string {
-    if (value instanceof Nodes.SqlLiteral) return value.value;
+    if (value instanceof Nodes.SqlLiteral) return value.toString();
     return this.connection.quote(value);
   }
 
   /** @internal */
-  protected quoteTableName(name: string | Node | null): string {
-    if (name instanceof Nodes.SqlLiteral) return name.value;
+  protected quoteTableName(name: string | ArelNode | null): string {
+    if (name instanceof Nodes.SqlLiteral) return name.toString();
     return this.connection.quoteTableName(name);
   }
 
   /** @internal */
-  protected quoteColumnName(name: string | Node | null): string {
-    if (name instanceof Nodes.SqlLiteral) return name.value;
+  protected quoteColumnName(name: string | ArelNode | null): string {
+    if (name instanceof Nodes.SqlLiteral) return name.toString();
     return this.connection.quoteColumnName(name);
   }
 
   protected sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string {
-    if (value instanceof Nodes.SqlLiteral) return value.value;
+    if (value instanceof Nodes.SqlLiteral) return value.toString();
     return this.connection.sanitizeAsSqlComment(String(value));
   }
 
@@ -1044,7 +1045,7 @@ export class ToSql extends Visitor {
     return this.maybeVisit(o.optimizerHints, collector);
   }
 
-  protected maybeVisit(thing: Node | null | undefined, collector: SQLString): SQLString {
+  protected maybeVisit(thing: ArelNode | null | undefined, collector: SQLString): SQLString {
     if (!thing) return collector;
     collector.append(" ");
     this.visit(thing, collector);
@@ -1063,18 +1064,21 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  protected isUnboundable(value: unknown): boolean {
-    return this.unboundableSign(value) !== 0;
+  protected isUnboundable(value: unknown): 1 | -1 | false {
+    return (
+      rbObjRespondTo(value, "isUnboundable") &&
+      (value as { isUnboundable(): 1 | -1 | false }).isUnboundable()
+    );
   }
 
-  protected hasJoinSources(o: { relation: Node | Table | null }): boolean {
+  protected hasJoinSources(o: { relation: ArelNode | Table | null }): boolean {
     return o.relation instanceof Nodes.JoinSource && o.relation.right.length > 0;
   }
 
   protected hasLimitOrOffsetOrOrders(o: {
     limit: Node | null;
     offset: Node | null;
-    orders: Node[];
+    orders: ArelNode[];
   }): boolean {
     return !!(o.limit || o.offset || o.orders.length > 0);
   }
@@ -1083,66 +1087,53 @@ export class ToSql extends Visitor {
     return o.groups.length > 0 && o.havings.length > 0;
   }
 
-  protected prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
+  protected prepareUpdateStatement<T extends Nodes.UpdateStatement | Nodes.DeleteStatement>(
+    o: T,
+  ): T {
     if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = o.clone();
+      const stmt = rbObjClone(o);
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];
-      const key = Array.isArray(o.key)
-        ? o.key.map((k) => this.subselectKey(k))
-        : this.subselectKey(o.key);
-      const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
-      if (this.hasJoinSources(o)) {
-        stmt.relation = (o.relation as Nodes.JoinSource).left;
-      }
+      const columns = new Nodes.Grouping(o.key);
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(o.key, o)])];
+      if (this.hasJoinSources(o)) stmt.relation = (o.relation as Nodes.JoinSource).left;
+      if (!(o.groups.length === 0)) stmt.groups = o.groups;
+      if (!(o.havings.length === 0)) stmt.havings = o.havings;
       return stmt;
+    } else {
+      return o;
     }
-    return o;
   }
 
-  protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = o.clone();
-      stmt.limit = null;
-      stmt.offset = null;
-      stmt.orders = [];
-      const key = Array.isArray(o.key)
-        ? o.key.map((k) => this.subselectKey(k))
-        : this.subselectKey(o.key);
-      const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
-      if (this.hasJoinSources(o)) {
-        stmt.relation = (o.relation as Nodes.JoinSource).left;
-      }
-      return stmt;
-    }
-    return o;
+  protected prepareDeleteStatement<T extends Nodes.UpdateStatement | Nodes.DeleteStatement>(
+    o: T,
+  ): T {
+    return this.prepareUpdateStatement(o);
   }
 
   protected buildSubselect(
-    key: Node | Node[],
+    key: ArelNode | ArelNode[],
     o: {
-      relation: Node | Table | null;
-      wheres: Node[];
-      groups: Node[];
-      havings: Node[];
+      relation: ArelNode | Table | null;
+      wheres: ArelNode[];
+      groups: ArelNode[];
+      havings: (ArelNode | string)[];
       limit: Node | null;
       offset: Node | null;
-      orders: Node[];
+      orders: ArelNode[];
     },
   ): Nodes.SelectStatement {
     const stmt = new Nodes.SelectStatement();
     const core = stmt.cores[0];
-    if (o.relation) core.source = new Nodes.JoinSource(o.relation);
-    core.wheres = [...o.wheres];
-    core.projections = Array.isArray(key) ? [...key] : [key];
-    core.groups = [...o.groups];
-    core.havings = [...o.havings];
+    core.froms = o.relation;
+    core.wheres = o.wheres;
+    core.projections = [key];
+    if (!(o.groups.length === 0)) core.groups = o.groups;
+    if (!(o.havings.length === 0)) core.havings = o.havings;
     stmt.limit = o.limit;
     stmt.offset = o.offset;
-    stmt.orders = [...o.orders];
+    stmt.orders = o.orders;
     return stmt;
   }
 
@@ -1158,12 +1149,12 @@ export class ToSql extends Visitor {
   }
 
   protected infixValueWithParen(
-    o: Node & { left: Node; right: Node },
+    o: Node & { left: ArelNode; right: ArelNode },
     collector: SQLString,
     value: string,
     suppressParens = false,
   ): SQLString {
-    const sameClass = (child: Node): child is typeof o =>
+    const sameClass = (child: ArelNode): child is typeof o =>
       Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
 
     if (!suppressParens) collector.append("( ");
@@ -1183,7 +1174,7 @@ export class ToSql extends Visitor {
   }
 
   protected groupingParentheses(
-    o: Node,
+    o: ArelNode,
     collector: SQLString,
     alwaysWrapSelects = true,
   ): SQLString {
@@ -1242,49 +1233,8 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  private subselectKey(key: Node): Node {
-    if (key instanceof Nodes.Equality) {
-      return key.left as Node;
-    }
-    return key;
-  }
-
-  protected visitBinaryOp(o: Nodes.Binary, op: string, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
-    collector.append(` ${op} `);
-    this.visit(o.right, collector);
-    return collector;
-  }
-
   protected addDateBind(value: unknown, collector: SQLString): void {
     collector.addBind(value, this.bindBlock());
-  }
-
-  private visitBindValue(value: unknown, collector: SQLString): void {
-    if (arelNode(value)) {
-      this.visit(value as Node, collector);
-    } else if (Array.isArray(value)) {
-      if (value.length === 0) {
-        collector.append(this.quote(null));
-      } else if (!value.some((v) => arelNode(v))) {
-        collector.addBinds(
-          value.map((v) => this.connection.castBoundValue(v)),
-          null,
-          this.bindBlock(),
-        );
-      } else {
-        value.forEach((v, i) => {
-          if (i > 0) collector.append(", ");
-          if (arelNode(v)) {
-            this.visit(v as Node, collector);
-          } else {
-            collector.addBind(this.connection.castBoundValue(v), this.bindBlock());
-          }
-        });
-      }
-    } else {
-      collector.addBind(this.connection.castBoundValue(value), this.bindBlock());
-    }
   }
 
   protected visitArelNodesConcat(o: Nodes.Concat, collector: SQLString): SQLString {
@@ -1293,22 +1243,7 @@ export class ToSql extends Visitor {
     this.visit(o.right, collector);
     return collector;
   }
-
-  protected unboundableSign(value: unknown): 1 | -1 | 0 {
-    const v = value as { isUnboundable?: () => unknown } | null | undefined;
-    if (typeof v?.isUnboundable !== "function") return 0;
-    const r = v.isUnboundable();
-    if (r === 1) return 1;
-    if (r === -1) return -1;
-    return 0;
-  }
-
-  protected rightIsNull(right: unknown): boolean {
-    if (right === null || right === undefined) return true;
-    const maybe = right as { isNil?: () => boolean };
-    return typeof maybe?.isNil === "function" && maybe.isNil();
-  }
 }
 
-Visitors.UnsupportedVisitError = UnsupportedVisitError;
-Visitors.ToSql = ToSql;
+rbModConstSet(Visitors, "UnsupportedVisitError", UnsupportedVisitError);
+rbModConstSet(Visitors, "ToSql", ToSql);

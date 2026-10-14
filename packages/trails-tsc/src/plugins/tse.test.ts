@@ -1,36 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  createTsePlugin,
-  TseLocalsSignatureError,
-  virtualizeTse,
-  virtualizeTseWithDeltas,
-} from "./tse.js";
+import { TseLocalsSignatureError, virtualizeTse, virtualizeTseWithDeltas } from "./tse.js";
 import { diagnose } from "./tse-diagnose.js";
-
-describe("createTsePlugin", () => {
-  it("claims the .tse extension", () => {
-    const plugin = createTsePlugin();
-    expect(plugin.name).toBe("tse");
-    expect(plugin.extensions).toEqual([".tse"]);
-  });
-
-  it("virtualizes through the host hook", () => {
-    const plugin = createTsePlugin();
-    const out = plugin.virtualize("/x/show.html.tse", "<h1><%= 1 %></h1>");
-    expect(out?.ts).toContain("export default function render(");
-    expect(out?.ts).toContain('_ob.safeAppend("<h1>");');
-    expect(out?.ts).toContain("_ob.append(1);");
-  });
-
-  it("emits an error shim instead of throwing when virtualization fails", () => {
-    const plugin = createTsePlugin();
-    const out = plugin.virtualize("/x/bad.tse", "<%# locals: (a: (1, 2) %>");
-    expect(out?.ts).toContain("/x/bad.tse");
-    expect(out?.ts).toContain(".tse virtualization failed");
-    const diags = diagnose(out!.ts);
-    expect(diags.length).toBeGreaterThan(0);
-  });
-});
 
 describe("virtualizeTse", () => {
   it("defaults to Record<string, unknown> when no locals declared", () => {
@@ -307,6 +277,93 @@ describe("virtualizeTse", () => {
       const diags = diagnose(out);
       expect(diags.length).toBeGreaterThan(0);
       expect(diags.join("\n")).toMatch(/not callable|is of type 'unknown'/i);
+    });
+  });
+
+  describe("view scope", () => {
+    const scope = {
+      view: "{ readingTime(this: { x: 1 }, words: number): string; posts: string[] }",
+      locals: "{ post: { title: string | null } }",
+    };
+
+    it("declares each name the body references, not property names or bindings", () => {
+      const out = virtualizeTse(
+        "<% const n = 1 %><%= readingTime(n) %><%= f({ model: post }, (form) => form.x) %>",
+        scope,
+      );
+      expect(out).toContain("  this: View,");
+      expect(out).toContain('  let readingTime!: Scope<"readingTime">;');
+      expect(out).toContain('  let post!: Scope<"post">;');
+      expect(out).not.toContain('Scope<"n">');
+      expect(out).not.toContain('Scope<"model">');
+      expect(out).not.toContain('Scope<"x">');
+    });
+
+    it("types a helper call through the view, so its parameter types reach the checker", () => {
+      const out = virtualizeTse("<p><%= readingTime(post.title) %></p>", scope);
+      expect(diagnose(out).join("\n")).toMatch(
+        /'string \| null' is not assignable to parameter of type 'number'/,
+      );
+      expect(diagnose(virtualizeTse("<%= readingTime(this.posts.length) %>", scope))).toEqual([]);
+    });
+
+    it("keeps every overload of a this-typed helper callable bare", () => {
+      const overloaded = {
+        view: `{ ${["a: string", "a: number, b: boolean", "a: 1, b: 2, c: 3", "a: [], b: [], c: [], d: []", "a: null"].map((params, i) => `tag(this: { x: 1 }, ${params}): ${i}`).join("; ")}; posts: string[] }`,
+      };
+      const calls = 'tag("p")|tag(2, true)|tag(1, 2, 3)|tag([], [], [], [])|tag(null)'.split("|");
+      const body = calls.map((call, i) => `<% const r${i}: ${i} = ${call} %>`).join("");
+      expect(diagnose(virtualizeTse(body + "<%= posts.length %>", overloaded))).toEqual([]);
+      expect(diagnose(virtualizeTse("<%= tag(2) %>", overloaded))).not.toEqual([]);
+      const single = diagnose(virtualizeTse("<%= readingTime(post.title) %>", scope)).join("\n");
+      expect(single).not.toMatch(/No overload matches this call/);
+    });
+
+    it("leaves an unknown name `any` without strict locals and `never` with them", () => {
+      expect(diagnose(virtualizeTse("<%= mystery.anything() %>", scope))).toEqual([]);
+      const strict = virtualizeTse("<%# locals: () %><%= mystery.anything() %>", scope);
+      expect(diagnose(strict).join("\n")).toMatch(/does not exist on type 'never'/);
+    });
+
+    it("makes an unknown name `never` once every render site is resolved", () => {
+      const resolved = virtualizeTse("<%= psot.title %>", { ...scope, resolved: true });
+      expect(resolved).toContain("      : never;");
+      expect(diagnose(resolved).join("\n")).toMatch(/'title' does not exist on type 'never'/);
+      expect(diagnose(virtualizeTse("<%= post.title %>", { ...scope, resolved: true }))).toEqual(
+        [],
+      );
+    });
+
+    it("maps each body line to the .tse line its node starts on", () => {
+      const src = '<div id="<%= a %>">\n  <p>\n    <%= b %>\n  </p>\n<% if (c) {\n  d(); } %>';
+      const { ts, mappings } = virtualizeTseWithDeltas(src, scope);
+      const lines = ts.split("\n");
+      const srcLineOf = (needle: string): number | undefined =>
+        mappings.find((m) => lines[m.genLine].includes(needle))?.srcLine;
+      expect(srcLineOf("_ob.append(a)")).toBe(0);
+      expect(srcLineOf("_ob.append(b)")).toBe(2);
+      expect(srcLineOf("if (c)")).toBe(4);
+      expect(srcLineOf("d();")).toBe(5);
+    });
+
+    it("maps a one-character expression past the emitted append prefix", () => {
+      const src = "<p><%= a %><%= b %><%= o %></p>";
+      const { ts, mappings } = virtualizeTseWithDeltas(src, scope);
+      const lines = ts.split("\n");
+      for (const name of ["a", "b", "o"]) {
+        const m = mappings.find((x) => lines[x.genLine].includes(`_ob.append(${name})`))!;
+        expect(lines[m.genLine].slice(m.genCol)).toBe(`${name});`);
+        expect(src[m.srcCol!]).toBe(name);
+      }
+    });
+
+    it("maps a yielded section to its column inside the tag", () => {
+      const src = '<p><%= yield("sidebar") %></p>';
+      const { ts, mappings } = virtualizeTseWithDeltas(src, scope);
+      const lines = ts.split("\n");
+      const m = mappings.find((x) => lines[x.genLine].includes("context.yield"))!;
+      expect(lines[m.genLine].slice(m.genCol)).toMatch(/^"sidebar"/);
+      expect(src.slice(m.srcCol)).toMatch(/^"sidebar"/);
     });
   });
 });

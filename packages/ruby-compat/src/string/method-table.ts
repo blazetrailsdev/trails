@@ -3,7 +3,9 @@ import { cmp } from "../comparable.js";
 import { Encoding } from "../encoding.js";
 import { IndexError } from "../index-error.js";
 import { format } from "../kernel-format.js";
+import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
+import { rbCString, rbObjClassname, rtest } from "../object.js";
 import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
 import { rbHash } from "../rb-hash.js";
@@ -88,7 +90,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     compareTo: rbDefineMethod(1, (self, other) => rbStrCmpM(self.string, other)),
     equals: rbDefineMethod(1, (self, other) => rbStrEqual(self.string, other)),
     caseEquals: rbDefineMethod(1, (self, other) => rbStrEqual(self.string, other)),
-    eql: rbDefineMethod(1, (self, other) => typeof other === "string" && self.string === other),
+    eql: rbDefineMethod(1, (self, other) => rbStrEql(self.string, other)),
     hash: rbDefineMethod(0, (self) => rbHash(self.string)),
     casecmp: rbDefineMethod(1, (self, other) => casecmp(self.string, other)),
     isCasecmp: rbDefineMethod(1, (self, other) => isCasecmp(self.string, other)),
@@ -167,7 +169,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     gsub: (self, ...argv) => strGsub(self, argv, false),
     chop: rbDefineMethod(0, (self) => rbStrChop(self.string)),
     chomp: (self, ...args) => rbStrChomp(self.string, args),
-    strip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
+    strip: rbDefineMethod(0, (self) => strip(self.string)),
     lstrip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "")),
     rstrip: rbDefineMethod(0, (self) => self.string.replace(RSTRIP, "")),
     deletePrefix: rbDefineMethod(1, (self, prefix) => deletePrefix(self.string, prefix)),
@@ -213,6 +215,76 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
   } satisfies Record<string, Method>,
 );
 
+const stringClasses = new WeakSet<object>();
+const RSTRING_PTR = Symbol("RSTRING_PTR");
+
+function isTString(value: unknown): boolean {
+  if (typeof value === "string") return true;
+  if (typeof value !== "object" || value === null) return false;
+  for (let proto = Object.getPrototypeOf(value); proto; proto = Object.getPrototypeOf(proto)) {
+    if (stringClasses.has(proto)) return true;
+  }
+  return false;
+}
+
+function rbStrEql(str1: string, str2: unknown): boolean {
+  if (!isTString(str2)) return false;
+  return str1 === String(str2);
+}
+
+/**
+ * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12119`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface StringInstance {
+  eql(other: unknown): boolean;
+  hash(): number;
+  isEmpty(): boolean;
+}
+
+/**
+ * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12119`) as the superclass of
+ * `class X < String`: a class answering the String methods named, each sent
+ * through {@link STRING_METHOD_TABLE} at call time with the receiver's `to_s`
+ * as its string, so an entry a package reopening String assigns is found too.
+ * An instance is a `T_STRING` to `rb_str_eql`, holds the contents
+ * `String#initialize` gave it, and answers them from `to_s` (`rb_str_to_s`,
+ * `vendor/ruby/v3.3.11/string.c:6648`), which is a plain String for a subclass
+ * instance. One `initialize` never ran on is empty, as the String allocator
+ * leaves it (`empty_str_alloc`, `vendor/ruby/v3.3.11/string.c:858`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function stringSuperclass<M extends keyof StringInstance>(
+  ...methods: M[]
+): new (orig?: unknown) => Pick<StringInstance, M> {
+  const klass = class extends (rbCString as new () => object) {
+    /** `String#initialize` (`vendor/ruby/v3.3.11/string.c:1832` `rb_str_init`). */
+    constructor(orig: unknown = "") {
+      super();
+      (this as unknown as Record<symbol, string>)[RSTRING_PTR] = isTString(orig)
+        ? String(orig)
+        : stringValue(orig);
+    }
+
+    toString(): string {
+      return (this as unknown as Record<symbol, string>)[RSTRING_PTR] ?? "";
+    }
+  };
+  stringClasses.add(klass.prototype);
+  for (const method of methods) {
+    Object.defineProperty(klass.prototype, method, {
+      value(this: object, ...args: unknown[]): unknown {
+        return rbStrSend(String(this), method, ...args)[0];
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+  return klass as unknown as new (orig?: unknown) => Pick<StringInstance, M>;
+}
+
 const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));
 
 /**
@@ -240,7 +312,7 @@ export function rbStrSend(str: string, method: string, ...args: unknown[]): [unk
 /**
  * `str.respond_to?` (`vendor/ruby/v3.3.11/vm_method.c:2977` `obj_respond_to`) over
  * {@link rbStrSend}'s names: JS's own `String.prototype` members are not
- * Ruby's. See CLAUDE.md, "Method visibility is a side table".
+ * Ruby's. See CLAUDE.md, "Method visibility is compile-time only".
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -265,16 +337,104 @@ export function rbStrMatch(x: string, y: unknown): unknown {
   if (typeof y === "string") throw new TypeError("type mismatch: String given");
   if (y instanceof RegExp) {
     const match = rbRegSearch(y, x, 0, false);
+    backref = match;
     return match ? rbStrSublen(x, match.index) : null;
   }
   return (y as { matchOperator(x: string): unknown }).matchOperator(x);
 }
 
+let backref: RegExpExecArray | null = null;
+
+/**
+ * `$&` (`last_match_getter`, `vendor/ruby/v3.3.11/re.c:1989`, over
+ * `rb_reg_last_match` at `vendor/ruby/v3.3.11/re.c:1882`): the text of the last
+ * match, `nil` when it failed. `$~` is the one `String#=~` ({@link rbStrMatch})
+ * sets, as `rb_reg_search_set_match` does (`vendor/ruby/v3.3.11/re.c:1750,1783`).
+ * MRI keeps `$~` per frame; JS has no frame-local seat, so this is the last
+ * `=~` of the whole program and is read straight after it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function lastMatchGetter(): string | null {
+  return backref ? backref[0] : null;
+}
+
+/**
+ * Ruby's `obj =~ pattern` send, dispatched on the receiver's class:
+ * `NilClass#=~` (`vendor/ruby/v3.3.11/object.c:4419` `nil_match`), which answers
+ * `nil` for any pattern, `String#=~` ({@link rbStrMatch}), else the receiver's
+ * own `matchOperator`. A receiver with none raises `NoMethodError`
+ * (`rb_method_missing`, `vendor/ruby/v3.3.11/vm_eval.c:919`): `Object#=~` is gone
+ * since Ruby 3.2.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
+ * for on `null` or a primitive.
+ */
+export function matchOperator(obj: unknown, pattern: unknown): unknown {
+  if (obj == null) return NilClass.matchOperator(pattern);
+  if (typeof obj === "string") return rbStrMatch(obj, pattern);
+  const method = (obj as { matchOperator?: unknown }).matchOperator;
+  if (typeof method !== "function") {
+    throw new NoMethodError(
+      `undefined method '=~' for an instance of ${rbObjClassname(obj)}`,
+      "=~",
+      { receiver: obj },
+    );
+  }
+  return (method as (pattern: unknown) => unknown).call(obj, pattern);
+}
+
+/**
+ * `Kernel#!~` (`vendor/ruby/v3.3.11/object.c:1639` `rb_obj_not_match`): the negation
+ * of the receiver's `=~`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjNotMatch(obj1: unknown, obj2: unknown): boolean {
+  const result = matchOperator(obj1, obj2);
+  return !rtest(result);
+}
+
+/**
+ * `String#strip` (`vendor/ruby/v3.3.11/string.c:10020` `rb_str_strip`): the receiver
+ * without its leading and trailing NUL and ASCII whitespace
+ * (`lstrip_offset`, `rstrip_offset`). JS `trim()` also removes NBSP, U+FEFF
+ * and the Unicode space separators, which Ruby keeps.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#strip`, which Thor calls on
+ * a prompt's answer (`vendor/thor/v1.3.2/lib/thor/shell/basic.rb:339`).
+ */
+export function strip(str: string): string {
+  return str.replace(LSTRIP, "").replace(RSTRIP, "");
+}
+
+/**
+ * `String#rstrip` (`vendor/ruby/v3.3.11/string.c:9952` `rb_str_rstrip`): the
+ * receiver without its trailing NUL and ASCII whitespace (`rstrip_offset`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rstrip(str: string): string {
+  return str.replace(RSTRIP, "");
+}
+
+/**
+ * `String#center` (`vendor/ruby/v3.3.11/string.c:10560` `rb_str_center`):
+ * `str` centred in `width` characters, padded with `padstr`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function center(str: string, ...argv: unknown[]): string {
+  return rbStrJustify(argv, str, "c");
+}
+
 /**
  * `rb_define_method` (`vendor/ruby/v3.3.11/class.c:2134`) with a fixed `argc`, which MRI
  * checks.
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function rbDefineMethod<A extends unknown[]>(
+export function rbDefineMethod<A extends unknown[]>(
   argc: number,
   func: (self: StringReceiver, ...args: A) => unknown,
 ): Method {

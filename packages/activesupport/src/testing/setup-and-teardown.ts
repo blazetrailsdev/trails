@@ -1,33 +1,56 @@
-import { defineCallbacks, setCallback, runCallbacks } from "../callbacks.js";
+import { Callbacks } from "../callbacks.js";
 import type { FilterListEntry } from "../callbacks.js";
+import { extend, include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { Assertion, UnexpectedError } from "./assertions.js";
-import type { RunningTest } from "./tests-without-assertions.js";
+import type { Test } from "./assertions.js";
 
-export function prepended(klass: object): void {
-  defineCallbacks(klass, "setup");
-  defineCallbacks(klass, "teardown");
+interface CallbacksInstance {
+  runCallbacks: Included<typeof Callbacks>["runCallbacks"];
 }
 
-export function setup(this: object, ...args: FilterListEntry<object>[]): void {
-  setCallback(this, "setup", "before", ...args);
+export function prepended(klass: abstract new (...args: never[]) => object): void {
+  include(klass, Callbacks);
+  (klass as typeof klass & Extended<typeof Callbacks.ClassMethods>).defineCallbacks(
+    "setup",
+    "teardown",
+  );
+  extend(klass, ClassMethods);
 }
 
-export function teardown(this: object, ...args: FilterListEntry<object>[]): void {
-  setCallback(this, "teardown", "after", ...args);
+export const ClassMethods = {
+  setup(this: Extended<typeof Callbacks.ClassMethods>, ...args: FilterListEntry<object>[]): void {
+    this.setCallback("setup", "before", ...args);
+  },
+
+  teardown(
+    this: Extended<typeof Callbacks.ClassMethods>,
+    ...args: FilterListEntry<object>[]
+  ): void {
+    this.setCallback("teardown", "after", ...args);
+  },
+};
+
+export function beforeSetup(this: CallbacksInstance, super_: () => unknown): unknown {
+  const result = super_();
+  return result instanceof Promise
+    ? result.then(() => this.runCallbacks("setup"))
+    : this.runCallbacks("setup");
 }
 
-export function beforeSetup(this: object): unknown {
-  return runCallbacks(this, "setup");
-}
-
-export function afterTeardown(this: object, test: Pick<RunningTest, "failures">): void {
-  try {
-    runCallbacks(this, "teardown");
-  } catch (e) {
+export function afterTeardown(this: Test & CallbacksInstance, super_: () => unknown): unknown {
+  const rescue = (e: unknown): void => {
     if (e instanceof Assertion) {
-      test.failures.push(e);
+      this.failures.push(e);
     } else {
-      test.failures.push(new UnexpectedError(e as Error));
+      this.failures.push(new UnexpectedError(e as Error));
     }
+  };
+  try {
+    const result = this.runCallbacks("teardown");
+    if (result instanceof Promise) return result.then(() => {}, rescue).then(() => super_());
+  } catch (e) {
+    rescue(e);
   }
+
+  return super_();
 }

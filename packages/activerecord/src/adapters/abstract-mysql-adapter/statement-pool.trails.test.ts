@@ -26,7 +26,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
         await adapter.internalExecQuery("SELECT ? AS n", "SQL", [2], { prepare: true });
-        const pool = adapter._statements!;
+        const pool = adapter._statements;
         expect(pool).toBeDefined();
         expect(pool.length).toBe(1);
 
@@ -44,7 +44,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
         await adapter.internalExecQuery("SELECT ? AS s", "SQL", ["a"], { prepare: true });
-        expect(adapter._statements!.length).toBe(1);
+        expect(adapter._statements.length).toBe(1);
       } finally {
         await adapter.rollbackDbTransaction();
         await adapter.disconnectBang();
@@ -88,7 +88,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
             prepare: true,
           },
         );
-        const pool = adapter._statements!;
+        const pool = adapter._statements;
         expect(pool.length).toBe(1);
       } finally {
         await adapter.rollbackDbTransaction();
@@ -97,11 +97,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("dealloc does not raise on inactive connection", async () => {
-      const closable = new Mysql2Adapter(MYSQL_TEST_URL);
+      const closable = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       closable.preparedStatements = true;
       await closable.beginDbTransaction();
       await closable.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
-      const pool = closable._statements!;
+      const pool = closable._statements;
       await closable.rollbackDbTransaction();
       await closable.disconnectBang();
       expect(() => pool.clear()).not.toThrow();
@@ -143,7 +143,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await zero.disconnectBang();
       }
 
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
+      const adapter2 = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       try {
         (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
         expect(adapter2.preparedStatements).toBe(true);
@@ -157,7 +157,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
         await adapter.internalExecQuery("SELECT ? AS s", "SQL", ["a"], { prepare: true });
-        const pool = adapter._statements!;
+        const pool = adapter._statements;
         expect(pool.length).toBe(2);
         await adapter.clearCacheBang();
         expect(pool.length).toBe(0);

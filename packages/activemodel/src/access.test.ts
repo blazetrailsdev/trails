@@ -37,7 +37,7 @@ describe("AccessTest", () => {
 
   it("slice", () => {
     const expected = withIndifferentAccess({ z: point.z, x: point.x });
-    const actual = point.slice("z", "x");
+    const actual = point.slice(":z", ":x");
 
     expect([...actual.keys()]).toEqual([...expected.keys()]);
 
@@ -49,16 +49,16 @@ describe("AccessTest", () => {
 
   it("slice with array", () => {
     const expected = withIndifferentAccess({ z: point.z, x: point.x });
-    expect(point.slice(["z", "x"])).toEqual(expected);
+    expect(point.slice([":z", ":x"])).toEqual(expected);
   });
 
   it("values_at", () => {
-    expect(point.valuesAt("x", "z")).toEqual([point.x, point.z]);
-    expect(point.valuesAt("z", "x")).toEqual([point.z, point.x]);
+    expect(point.valuesAt(":x", ":z")).toEqual([point.x, point.z]);
+    expect(point.valuesAt(":z", ":x")).toEqual([point.z, point.x]);
   });
 
   it("values_at with array", () => {
-    expect(point.valuesAt(["x", "z"])).toEqual([point.x, point.z]);
-    expect(point.valuesAt(["z", "x"])).toEqual([point.z, point.x]);
+    expect(point.valuesAt([":x", ":z"])).toEqual([point.x, point.z]);
+    expect(point.valuesAt([":z", ":x"])).toEqual([point.z, point.x]);
   });
 });

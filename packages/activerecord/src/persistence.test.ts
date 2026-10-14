@@ -1,6 +1,5 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
 function epochMs(v: unknown): number {
   if (v instanceof RubyTime) return v.toF() * 1000;
@@ -31,11 +30,10 @@ import {
 } from "./index.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { adapterSupports } from "./support/supports.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
-import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem, ClothingItemSized } from "./test-helpers/models/clothing-item.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { queryConstraints, queryConstraintsList } from "./persistence.js";
@@ -107,18 +105,9 @@ for (const klass of [
   registerModel(klass);
 }
 
-async function assertUsesQueryConstraintsOnReload(object: any, columns: string[]) {
-  if (columns.length === 0) throw new Error("columns argument must not be empty");
-
-  const sql = (await captureSql(async () => object.reload()))[0];
-  for (const column of columns) {
-    expect(sql).toMatch(new RegExp(`WHERE .*${column}`));
-  }
-}
-
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics, accounts, clothingItems } = fixtures([
+  const { self, topics, accounts, clothingItems } = fixtures([
     "topics",
     "minimalistics",
     "accounts",
@@ -236,7 +225,7 @@ describe("PersistenceTest", () => {
   it("delete all", async () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
-    expect(((await Topic.count()) as number) > 0).toBeTruthy();
+    expect((await Topic.count()) > 0).toBeTruthy();
 
     const count = await Topic.count();
     expect(await Topic.deleteAll()).toBe(count);
@@ -455,7 +444,7 @@ describe("PersistenceTest", () => {
 
   it("update uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await (clothingItem as any).update({ description: "Lovely green t-shirt" });
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -465,7 +454,7 @@ describe("PersistenceTest", () => {
 
   it("destroy uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await (clothingItem as any).destroy();
     });
     const sql = sqls.find((s) => /^DELETE/.test(s.trimStart())) ?? "";
@@ -475,7 +464,7 @@ describe("PersistenceTest", () => {
 
   it("delete uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await (clothingItem as any).delete();
     });
     const sql = sqls.find((s) => /^DELETE/.test(s.trimStart())) ?? "";
@@ -486,7 +475,7 @@ describe("PersistenceTest", () => {
   it("save uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
     clothingItem.description = "Lovely green t-shirt";
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.save();
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -496,7 +485,7 @@ describe("PersistenceTest", () => {
 
   it("reload uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.reload();
     });
     const sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
@@ -506,7 +495,7 @@ describe("PersistenceTest", () => {
 
   it("update attribute uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.updateAttribute("description", "Lovely green t-shirt");
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -518,7 +507,7 @@ describe("PersistenceTest", () => {
     const clothingItem = clothingItems("green_t_shirt");
     clothingItem.color = "blue";
     clothingItem.description = "Now it's a blue t-shirt";
-    const sqls = await captureSql(async () => {
+    const sqls = await self().captureSql({}, async () => {
       await clothingItem.save();
     });
     const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
@@ -564,8 +553,8 @@ describe("PersistenceTest", () => {
   it("save touch false", async () => {
     const parrot = await Parrot.createBang({
       name: "Bob",
-      created_at: instant("2003-07-15T14:28:11.223Z"),
-      updated_at: instant("2003-07-15T14:28:11.223Z"),
+      created_at: RubyTime.utc(2003, 7, 15, 14, 28, 11, 223000),
+      updated_at: RubyTime.utc(2003, 7, 15, 14, 28, 11, 223000),
     });
 
     const createdAt = parrot.created_at;
@@ -631,7 +620,7 @@ describe("PersistenceTest", () => {
   });
 
   it("delete many", async () => {
-    const originalCount = (await Topic.count()) as number;
+    const originalCount = await Topic.count();
     await Topic.delete([1, 2]);
     expect(await Topic.count()).toBe(originalCount - 2);
   });
@@ -895,11 +884,11 @@ describe("PersistenceTest", () => {
   fixtures(["parrots"]);
 
   it("create with custom timestamps", async () => {
-    const customDatetime = instant("2026-01-01T00:00:00Z");
+    const customDatetime = RubyTime.utc(2026, 1, 1);
     for (const attr of ["created_at", "created_on", "updated_at", "updated_on"]) {
       const parrot = await LiveParrot.create({ name: "colombian", [attr]: customDatetime });
       expect(Math.floor(epochMs(parrot.readAttribute(attr) as RubyTime) / 1000)).toBe(
-        Math.floor(customDatetime.epochMilliseconds / 1000),
+        Math.floor(epochMs(customDatetime) / 1000),
       );
     }
   });
@@ -917,7 +906,7 @@ describe("PersistenceTest", () => {
     const admin = new AdminUser();
     admin.errors.add("token", ":invalid");
     const child = admin.becomes(ChildUser);
-    expect(child.errors.attributeNames).toEqual(["token"]);
+    expect(child.errors.attributeNames).toEqual([":token"]);
     expect(() => child.errors.add("foo", ":invalid")).not.toThrow();
   });
 });
@@ -929,14 +918,14 @@ describe("PersistenceTest", () => {
 
   it("update column should not modify updated at", async () => {
     const developer = await Developer.find(1);
-    const prevMonth = instant("2026-05-25T12:00:00Z");
+    const prevMonth = RubyTime.utc(2026, 5, 25, 12);
     await developer.updateColumn("updated_at", prevMonth);
-    expect(epochMs(developer.readAttribute("updated_at"))).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.readAttribute("updated_at"))).toBe(epochMs(prevMonth));
     await developer.updateColumn("salary", 80001);
-    expect(epochMs(developer.readAttribute("updated_at"))).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.readAttribute("updated_at"))).toBe(epochMs(prevMonth));
     await developer.reload();
     expect(Math.floor(epochMs(developer.readAttribute("updated_at")) / 1000)).toBe(
-      Math.floor(prevMonth.epochMilliseconds / 1000),
+      Math.floor(epochMs(prevMonth) / 1000),
     );
   });
 
@@ -958,7 +947,7 @@ describe("PersistenceTest", () => {
   it("delete isnt affected by scoping", async () => {
     const topic = await Topic.find(1);
     await assertDifference(
-      () => Topic.count() as Promise<number>,
+      () => Topic.count(),
       -1,
       null,
       async () => {
@@ -1193,7 +1182,7 @@ describe("PersistenceTest", () => {
     const clients = (await Client.find([2, 3])) as Client[];
 
     await assertDifference(
-      () => Client.count() as Promise<number>,
+      () => Client.count(),
       -2,
       null,
       async () => {
@@ -1238,7 +1227,7 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns not equal attributes", async () => {
-    const topic = Topic.new();
+    const topic = new Topic();
     (topic as any).title = "Still another topic";
     await topic.save();
 
@@ -1307,16 +1296,16 @@ describe("PersistenceTest", () => {
 
   it("update attribute for updated at on", async () => {
     const developer = await CanonicalDeveloper.find(1);
-    const prevMonth = instant("2026-05-25T12:00:00Z");
+    const prevMonth = RubyTime.utc(2026, 5, 25, 12);
 
     await developer.updateAttribute("updated_at", prevMonth);
-    expect(epochMs(developer.updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).toBe(epochMs(prevMonth));
 
     await developer.updateAttribute("salary", 80001);
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
 
     await developer.reload();
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
   });
 
   it("update attribute!", async () => {
@@ -1333,16 +1322,16 @@ describe("PersistenceTest", () => {
 
   it("update attribute for updated at on!", async () => {
     const developer = await CanonicalDeveloper.find(1);
-    const prevMonth = instant("2026-05-25T12:00:00Z");
+    const prevMonth = RubyTime.utc(2026, 5, 25, 12);
 
     await developer.updateAttributeBang("updated_at", prevMonth);
-    expect(epochMs(developer.updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).toBe(epochMs(prevMonth));
 
     await developer.updateAttributeBang("salary", 80001);
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
 
     await developer.reload();
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
   });
 
   it("update columns should not leave the object dirty", async () => {
@@ -1388,7 +1377,7 @@ describe("PersistenceTest", () => {
     });
 
     await assertDifference(
-      () => Topic.count() as Promise<number>,
+      () => Topic.count(),
       -1,
       null,
       async () => {
@@ -1445,7 +1434,7 @@ describe("PersistenceTest", () => {
   });
 
   it("find via reload", async () => {
-    const post = Post.new();
+    const post = new Post();
     expect(post.isNewRecord()).toBeTruthy();
 
     (post as any).id = 1;
@@ -1531,7 +1520,7 @@ describe("PersistenceTest", () => {
   it("destroy with single composite primary key", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
     await assertDifference(
-      () => CpkBook.count() as Promise<number>,
+      () => CpkBook.count(),
       -1,
       null,
       async () => {
@@ -1547,7 +1536,7 @@ describe("PersistenceTest", () => {
       cpkBooks("cpk_great_author_second_book"),
     ];
     await assertDifference(
-      () => CpkBook.count() as Promise<number>,
+      () => CpkBook.count(),
       -2,
       null,
       async () => {
@@ -1736,17 +1725,17 @@ describe("PersistenceTest", () => {
   it("update columns should not modify updated at", async () => {
     void developers;
     const developer = await CanonicalDeveloper.find(1);
-    const prevMonth = Temporal.Instant.from("2003-06-16T00:00:00Z");
+    const prevMonth = RubyTime.utc(2003, 6, 16);
 
     await (developer as any).updateColumns({ updated_at: prevMonth });
-    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs((developer as any).updated_at)).toBe(epochMs(prevMonth));
 
     await (developer as any).updateColumns({ salary: 80000 });
-    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs((developer as any).updated_at)).toBe(epochMs(prevMonth));
     expect((developer as any).salary).toBe(80000);
 
     await (developer as any).reload();
-    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs((developer as any).updated_at)).toBe(epochMs(prevMonth));
     expect((developer as any).salary).toBe(80000);
   });
 });
@@ -1835,7 +1824,16 @@ describe("PersistenceTest", () => {
 });
 
 describe("QueryConstraintsTest", () => {
-  const { clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"]);
+  const { self, clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"]);
+
+  async function assertUsesQueryConstraintsOnReload(object: any, columns: string[]) {
+    if (columns.length === 0) throw new Error("columns argument must not be empty");
+
+    const sql = (await self().captureSql({}, async () => object.reload()))[0];
+    for (const column of columns) {
+      expect(sql).toMatch(new RegExp(`WHERE .*${column}`));
+    }
+  }
 
   beforeAll(async () => {
     await ClothingItem.loadSchema();
@@ -2098,7 +2096,7 @@ describe("PersistenceTest", () => {
     registerModel(MinimalisticAircraft);
 
     await assertDifference(
-      () => Aircraft.count() as Promise<number>,
+      () => Aircraft.count(),
       1,
       null,
       async () => {

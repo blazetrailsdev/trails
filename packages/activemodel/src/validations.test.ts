@@ -221,14 +221,14 @@ describe("ValidationsTest", () => {
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
 
     let key: string;
-    expect((key = t.errors.attributeNames[0])).toEqual("title");
+    expect((key = t.errors.attributeNames[0])).toEqual(":title");
     expect(t.errors.messagesFor(key)[0]).toEqual("can't be blank");
     expect(t.errors.messagesFor(key)[1]).toEqual("is too short (minimum is 2 characters)");
-    expect((key = t.errors.attributeNames[1])).toEqual("authorName");
+    expect((key = t.errors.attributeNames[1])).toEqual(":authorName");
     expect(t.errors.messagesFor(key)[0]).toEqual("can't be blank");
-    expect((key = t.errors.attributeNames[2])).toEqual("author_email_address");
+    expect((key = t.errors.attributeNames[2])).toEqual(":author_email_address");
     expect(t.errors.messagesFor(key)[0]).toEqual("will never be valid");
-    expect((key = t.errors.attributeNames[3])).toEqual("content");
+    expect((key = t.errors.attributeNames[3])).toEqual(":content");
     expect(t.errors.messagesFor(key)[0]).toEqual("is too short (minimum is 2 characters)");
   });
 

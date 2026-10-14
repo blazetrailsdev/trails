@@ -38,10 +38,6 @@
       "types": "./dist/connection-adapters/mysql2-adapter.d.ts",
       "default": "./dist/connection-adapters/mysql2-adapter.js"
     },
-    "./type-virtualization/*.js": {
-      "types": "./dist/type-virtualization/*.d.ts",
-      "default": "./dist/type-virtualization/*.js"
-    },
     "./encryption": {
       "types": "./dist/encryption/index.d.ts",
       "default": "./dist/encryption/index.js"
@@ -69,14 +65,17 @@
     "@blazetrails/i18n": "workspace:*"
   },
   "peerDependencies": {
+    "@blazetrails/msgpack": "workspace:*",
     "better-sqlite3": "^12.6.2",
     "expo-sqlite": "^15.0.0",
     "libsql": "^0.5.29",
     "mysql2": "^3.18.2",
-    "pg": "^8.19.0",
-    "typescript": "7.1.0-dev.20260920.1"
+    "pg": "^8.19.0"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/msgpack": {
+      "optional": true
+    },
     "better-sqlite3": {
       "optional": true
     },
@@ -91,9 +90,6 @@
     },
     "pg": {
       "optional": true
-    },
-    "typescript": {
-      "optional": true
     }
   },
   "files": [
@@ -103,6 +99,7 @@
   "license": "MIT",
   "devDependencies": {
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   }

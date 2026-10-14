@@ -13,6 +13,7 @@ import railsErrorParity from "./eslint/rails-error-parity.mjs";
 import railsCallbackInvocations from "./eslint/rails-callback-invocations.mjs";
 import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
+import inlinedFromOnlyOnConstructors from "./eslint/inlined-from-only-on-constructors.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import noConditionalInTest from "./eslint/no-conditional-in-test.mjs";
@@ -47,6 +48,8 @@ import {
 import rubyCompatNeedsMriCitation from "./eslint/ruby-compat-needs-mri-citation.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl.mjs";
+import thorImportBoundary from "./eslint/thor-import-boundary.mjs";
+import thorCommandRegistration from "./eslint/thor-command-registration.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
 import noJsRenderingInRailsMessages from "./eslint/no-js-rendering-in-rails-messages.mjs";
@@ -98,19 +101,6 @@ const requireTableTeardownRawSqlExclude = JSON.parse(
     "utf8",
   ),
 );
-// AR test files exempt from require-canonical-rebuild, in two permanent groups.
-// `privateAdapter` files own an adapter of their own — a `:memory:` database or
-// a throwaway file under a per-test tmpdir — so a canonical table they drop
-// cannot drift the shared per-worker database. `nonExecuting` files name a
-// canonical table in a drop that never reaches a database at all: SQL captured
-// for assertion, or a hand-rolled fake adapter. Neither group is backlog; a
-// file that really does leave a canonical table dropped belongs in neither and
-// must be fixed. See eslint/require-canonical-rebuild.mjs.
-/** @type {{ privateAdapter: string[], nonExecuting: string[] }} */
-const requireCanonicalRebuildExclude = JSON.parse(
-  readFileSync(new URL("./eslint/require-canonical-rebuild-exclude.json", import.meta.url), "utf8"),
-);
-
 /**
  * The canonical table names — the top-level keys of `TEST_SCHEMA` in
  * test-helpers/test-schema.ts, which the lint rule needs but cannot import
@@ -139,7 +129,7 @@ const canonicalTables = canonicalTableNames();
 
 // Linting the whole repo (`pnpm lint`) needs more than node's ~4.5 GB default
 // heap now that `scripts/**` is in scope — 500 extra files, several of them
-// thousands of lines. package.json's `lint` script raises it to 6144 MB; a
+// thousands of lines. package.json's `lint` script raises it to 10240 MB; a
 // bare `eslint .` OOMs.
 export default defineConfig(
   {
@@ -159,7 +149,7 @@ export default defineConfig(
       // parser's project service cannot resolve them when linted by path.
       "packages/website/vite.sw.config.ts",
       "packages/website/vitest.config.ts",
-      "packages/activerecord/src/type-virtualization/fixtures/**",
+      "packages/activerecord-cli/src/type-virtualization/fixtures/**",
       // `strip-asany`'s input sample is a file full of `as any` by
       // construction — linting it would be linting the codemod's test data.
       "scripts/__fixtures__/**",
@@ -298,6 +288,7 @@ export default defineConfig(
           "rails-callback-invocations": railsCallbackInvocations,
           "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
+          "inlined-from-only-on-constructors": inlinedFromOnlyOnConstructors,
           "no-native-date": noNativeDate,
           "no-conditional-in-test": noConditionalInTest,
           "no-getter-called-as-method": noGetterCalledAsMethod,
@@ -318,6 +309,8 @@ export default defineConfig(
           "ruby-compat-needs-mri-citation": rubyCompatNeedsMriCitation,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
+          "thor-import-boundary": thorImportBoundary,
+          "thor-command-registration": thorCommandRegistration,
           "no-explicit-any-disable": noExplicitAnyDisable,
           "no-raw-control-bytes": noRawControlBytes,
           "no-js-rendering-in-rails-messages": noJsRenderingInRailsMessages,
@@ -423,11 +416,13 @@ export default defineConfig(
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
+      "packages/bcrypt/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -452,6 +447,7 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
+      "packages/bcrypt/src/**/*.ts",
       "packages/arel/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
@@ -499,14 +495,35 @@ export default defineConfig(
     },
   },
 
+  {
+    files: [
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/trailties/src/**/*.ts",
+      "packages/activejob/src/**/*.ts",
+      "packages/bcrypt/src/**/*.ts",
+      "packages/date/src/**/*.ts",
+      "packages/did-you-mean/src/**/*.ts",
+      "packages/globalid/src/**/*.ts",
+      "packages/i18n/src/**/*.ts",
+      "packages/msgpack/src/**/*.ts",
+      "packages/rack-session/src/**/*.ts",
+      "packages/rack-test/src/**/*.ts",
+    ],
+    ignores: ["**/*.test.ts", "**/test-helpers/**"],
+    rules: {
+      "blazetrails/rails-error-parity": "error",
+    },
+  },
+
   // ── rails-callback-invocations: a ported ActiveRecord method whose Rails
   //    counterpart fires lifecycle callbacks (`_run_<event>_callbacks` /
   //    `run_callbacks(:event)`) must keep firing them via
   //    `runCallbacks("<event>")` / `runAllCallbacks`. Manifest:
   //    eslint/rails-callback-invocations.json (built by
   //    `pnpm tsx scripts/build-rails-privates-manifest.ts`, refreshed on
-  //    `pnpm parity:api`). Pre-existing violators are grandfathered in
-  //    eslint/rails-callback-invocations-exclude.json and ratcheted down. ──
+  //    `pnpm parity:api`). ──
   {
     files: ["packages/activerecord/src/**/*.ts"],
     ignores: ["**/*.test.ts"],
@@ -530,6 +547,13 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-arel-tosql": "error",
+    },
+  },
+
+  {
+    files: ["packages/*/src/**/*.ts"],
+    rules: {
+      "blazetrails/inlined-from-only-on-constructors": "error",
     },
   },
 
@@ -681,11 +705,7 @@ export default defineConfig(
   //    test. See eslint/require-canonical-rebuild.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: [
-      ...testInfraExemptIgnores,
-      ...requireCanonicalRebuildExclude.privateAdapter,
-      ...requireCanonicalRebuildExclude.nonExecuting,
-    ],
+    ignores: testInfraExemptIgnores,
     rules: {
       "blazetrails/require-canonical-rebuild": ["error", { canonicalTables }],
     },
@@ -781,6 +801,36 @@ export default defineConfig(
     files: canonicalLoaderEnforcedGlobs,
     rules: {
       "blazetrails/no-internal-canonical-loaders": "error",
+    },
+  },
+
+  {
+    files: ["packages/trailties/src/thor/**/*.ts"],
+    ignores: [
+      "packages/trailties/src/thor/actions.trails.test.ts",
+      "packages/trailties/src/thor/actions/create-file.trails.test.ts",
+      "packages/trailties/src/thor/actions/file-manipulation.trails.test.ts",
+      "packages/trailties/src/thor/line-editor/basic.test.ts",
+      "packages/trailties/src/thor/nested-context.test.ts",
+      "packages/trailties/src/thor/parser/argument.test.ts",
+      "packages/trailties/src/thor/parser/arguments.test.ts",
+      "packages/trailties/src/thor/parser/option.test.ts",
+      "packages/trailties/src/thor/parser/options.test.ts",
+      "packages/trailties/src/thor/shell.test.ts",
+      "packages/trailties/src/thor/shell.trails.test.ts",
+      "packages/trailties/src/thor/shell/color.test.ts",
+      "packages/trailties/src/thor/shell/table-printer.trails.test.ts",
+      "packages/trailties/src/thor/util.test.ts",
+    ],
+    rules: {
+      "blazetrails/thor-import-boundary": "error",
+    },
+  },
+
+  {
+    files: ["packages/trailties/src/**/*.ts"],
+    rules: {
+      "blazetrails/thor-command-registration": "error",
     },
   },
 
@@ -967,7 +1017,6 @@ export default defineConfig(
       "eslint.config.mjs",
       "vitest.config.ts",
       "vitest.dx-tests.config.ts",
-      "vitest.trailties.config.ts",
     ],
     rules: {
       "blazetrails/no-freeform-comments": "error",
@@ -1085,7 +1134,6 @@ export default defineConfig(
             "packages/website/docs/.vitepress/config.ts",
             "vitest.config.ts",
             "vitest.dx-tests.config.ts",
-            "vitest.trailties.config.ts",
           ],
         },
         tsconfigRootDir: import.meta.dirname,

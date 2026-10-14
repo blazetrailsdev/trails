@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { include, RuntimeError } from "@blazetrails/ruby-compat";
+import { type Hash, include, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { _routes as abstractControllerRoutes } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
@@ -19,9 +19,10 @@ import {
 import { RouteSet } from "./route-set.js";
 
 function makeRoutes(): UrlForRoutes & {
-  calls: Array<[Record<string, unknown>, string | null | undefined]>;
+  calls: Array<[Record<string, unknown> | Hash<string, unknown>, string | null | undefined]>;
 } {
-  const calls: Array<[Record<string, unknown>, string | null | undefined]> = [];
+  const calls: Array<[Record<string, unknown> | Hash<string, unknown>, string | null | undefined]> =
+    [];
   return {
     calls,
     urlFor(opts, routeName) {
@@ -137,10 +138,6 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(polymorphicUrl).toHaveBeenCalledWith([{ id: 1 }], { only_path: true });
   });
 
-  it("array options throw when polymorphicUrl missing", () => {
-    expect(() => fullUrlFor.call(makeHost(), [{ id: 1 }])).toThrow(/PolymorphicRoutes/);
-  });
-
   it("routeFor calls `${name}_url` on the host (matches generateRouteHelpers)", () => {
     const userUrl = vi.fn(() => "/users/42");
     const host = makeHost();
@@ -159,7 +156,26 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const host = makeHost();
     const routes = host._routes as ReturnType<typeof makeRoutes>;
     fullUrlFor.call(host, params);
-    expect(routes.calls[0][0]).toEqual({ controller: "posts", action: "show", id: 7 });
+    expect(Object.fromEntries(routes.calls[0][0] as Hash<string, unknown>)).toEqual({
+      controller: "posts",
+      action: "show",
+      id: 7,
+    });
+  });
+
+  it("leaves the caller's hash untouched when url_options are merged in", () => {
+    const host = makeHost({ urlOptions: () => ({ host: "www.example.com" }) });
+    const options = { controller: "posts", action: "show" };
+    fullUrlFor.call(host, options);
+    expect(options).toEqual({ controller: "posts", action: "show" });
+  });
+
+  it("leaves a permitted Parameters' hash untouched when url_options are merged in", () => {
+    const host = makeHost({ urlOptions: () => ({ host: "www.example.com" }) });
+    const params = new Parameters({ controller: "posts", action: "show" });
+    params.permitBang();
+    fullUrlFor.call(host, params);
+    expect(params.toH().has("host")).toBeFalsy();
   });
 
   it("unpermitted Parameters throw UnfilteredParameters from toH()", () => {
@@ -259,8 +275,8 @@ describe("ActionDispatch::Routing::UrlFor", () => {
 describe("ActionDispatch::Routing::UrlFor#route_for against a drawn RouteSet", () => {
   it("dispatches to the named route's url helper", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/users/:id", { to: "users#show", as: "user" });
+    routes.draw(function () {
+      this.get("/users/:id", { to: "users#show", as: "user" });
     });
     class Host {}
     include(Host, routes.urlHelpers());

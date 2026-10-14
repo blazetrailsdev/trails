@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import mysql from "mysql2/promise";
 import "../sqlite/better-sqlite3.js";
@@ -6,6 +7,7 @@ import { ConnectionPool } from "../connection-adapters/abstract/connection-pool.
 import { ConnectionDescriptor } from "../connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "../connection-adapters/pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { ConnectionAdapters } from "../namespaces.js";
 import { loadSchema } from "./load-schema-helper.js";
 import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
 import {
@@ -47,7 +49,8 @@ async function pooledTemplateAdapter(
   configurationHash: Record<string, unknown>,
 ): Promise<{ adapter: DatabaseAdapter; pool: ConnectionPool }> {
   const dbConfig = new HashConfig("arunit", "primary", configurationHash);
-  await dbConfig.adapterClass();
+  await ConnectionAdapters.load(dbConfig.adapter);
+  dbConfig.validateBang();
   const poolConfig = new PoolConfig(
     new ConnectionDescriptor("primary"),
     dbConfig,
@@ -100,7 +103,7 @@ const sqliteAdapter: DbTemplateAdapter = {
 
   async provision() {
     if (++_sqliteBuilds > 1) {
-      throw new Error(
+      throw new RuntimeError(
         `sqlite template globalSetup ran ${_sqliteBuilds} times; expected exactly once`,
       );
     }

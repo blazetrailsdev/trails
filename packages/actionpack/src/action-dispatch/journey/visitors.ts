@@ -11,7 +11,6 @@ export class Parameter {
     readonly escaper: Escaper,
   ) {}
 
-  /** @missingRailsCall call — PERMANENT */
   escape(value: unknown): string {
     return this.escaper(value);
   }

@@ -74,3 +74,42 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
     .filter((line) => /^\s+at\s/.test(line))
     .map((line) => new Location(line));
 }
+
+/**
+ * `Exception#backtrace` (`vendor/ruby/v3.3.11/error.c:1741` `exc_backtrace`): nil for
+ * an exception that was never raised, else one String per frame.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function excBacktrace(exc: Error): string[] | null {
+  const locations = excBacktraceLocations(exc);
+  if (locations === null) return null;
+  return locations.map((location) => location.toString());
+}
+
+/**
+ * `Exception#set_backtrace` (`vendor/ruby/v3.3.11/error.c:1833` `exc_set_backtrace`),
+ * which `raise klass, message, backtrace` calls: the frames replace the
+ * exception's own, under the header line V8 keeps the message in.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function excSetBacktrace(exc: Error, bt: string[]): string[] {
+  exc.stack = [`${exc.name}: ${exc.message}`, ...bt.map((frame) => `    ${frame}`)].join("\n");
+  return bt;
+}
+
+/**
+ * `Kernel#caller` (`vendor/ruby/v3.3.11/vm_backtrace.c:1233` `rb_f_caller`): the
+ * frames above the method calling it, each as `Exception#backtrace` spells it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbFCaller(): string[] {
+  const exc = new Error();
+  (Error as { captureStackTrace?: (exc: object, fn: unknown) => void }).captureStackTrace?.(
+    exc,
+    rbFCaller,
+  );
+  return (excBacktraceLocations(exc) ?? []).slice(1).map((location) => location.toString());
+}

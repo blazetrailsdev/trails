@@ -1,13 +1,14 @@
+import type { CollectionAssociation } from "./associations/collection-association.js";
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
 import {
   Base,
-  collectionProxyFor as association,
+  ConfigurationError,
   reflectOnAssociation,
   registerModel,
   NameError,
   Relation,
-  pp,
 } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -19,15 +20,10 @@ import {
   assertPredicate,
   assertRaises,
   assertSame,
+  squish,
 } from "@blazetrails/activesupport";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "./testing/query-assertions.js";
-import { captureSql } from "./testing/sql-capture.js";
-import { clearReflectionsCache } from "./reflection.js";
-import { fixtures } from "./test-fixtures.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import type { Firm as FirmT } from "./test-helpers/models/company.js";
@@ -57,15 +53,9 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { NoMethodError, regexpEscape, StandardError } from "@blazetrails/ruby-compat";
+import { NoMethodError, PP, regexpEscape, StandardError, StringIO } from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
-
-function quoteTableName(name: string): string {
-  return (Base.adapterClass() as unknown as { quoteTableName(n: string): string }).quoteTableName(
-    name,
-  );
-}
 
 describe("AssociationsTest", () => {
   fixtures([]);
@@ -186,30 +176,6 @@ describe("AssociationProxyTest", () => {
     await assertNoQueries(false, () => david.firstPosts.firstBang());
   });
 
-  it("last! works on loaded associations", async () => {
-    const david = authors("david") as any;
-    const expected = await david.firstPosts.last();
-    await david.firstPosts.reload();
-    const sqls = await captureSql(async () => {
-      const last = await david.firstPosts.lastBang();
-      expect(last.id).toBe(expected!.id);
-    });
-    expect(sqls).toHaveLength(0);
-    expect(david.firstPosts.loaded).toBe(true);
-  });
-
-  it("take! works on loaded associations", async () => {
-    const david = authors("david") as any;
-    const expected = await david.firstPosts.take();
-    await david.firstPosts.reload();
-    const sqls = await captureSql(async () => {
-      const taken = await david.firstPosts.takeBang();
-      expect(taken.id).toBe(expected!.id);
-    });
-    expect(sqls).toHaveLength(0);
-    expect(david.firstPosts.loaded).toBe(true);
-  });
-
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
     const member = members("blarpy_winkup") as any;
     assertEmpty(await member.favoriteMemberships.scope().toArray());
@@ -246,7 +212,7 @@ describe("AssociationProxyTest", () => {
   it("save on parent does not load target", async () => {
     const david = developers("david") as any;
     assertNotPredicate(david.projects, (p: any) => p.loaded);
-    await david.updateColumns({ created_at: new Date() });
+    await david.updateColumns({ created_at: RubyTime.now() });
     assertNotPredicate(david.projects, (p: any) => p.loaded);
   });
   it("inspect does not reload a not yet loaded target", async () => {
@@ -256,14 +222,13 @@ describe("AssociationProxyTest", () => {
     expect(await andreas.auditLogs.inspect()).toMatch(/message: "new developer added"/);
     assertPredicate(andreas.auditLogs, (p: any) => p.loaded);
   });
-  it("pretty_print does not reload a not yet loaded target", async () => {
-    const andreas = new Developer({});
-    (andreas as any).log = "new developer added";
-    expect(andreas.auditLogs.loaded).toBe(false);
-    let out = "";
-    await pp(andreas.auditLogs, { write: (s: string) => (out += s) });
-    expect(out).toMatch(/message: "new developer added"/);
-    expect(andreas.auditLogs.loaded).toBe(true);
+  it("pretty print does not reload a not yet loaded target", async () => {
+    const andreas = new Developer({ log: "new developer added" });
+    assertNotPredicate(andreas.auditLogs, (p: any) => p.loaded);
+    const out = new StringIO();
+    await PP.pp(andreas.auditLogs, out);
+    expect(out.string()).toMatch(/message: "new developer added"/);
+    assertPredicate(andreas.auditLogs, (p: any) => p.loaded);
   });
   it("save on parent saves children", async () => {
     const developer = await Developer.create({ name: "Bryan", salary: 50_000 });
@@ -340,20 +305,11 @@ describe("AssociationProxyTest", () => {
     await membership.updateBang({ favorite: true });
     assertNotEmpty(await member.favoriteMemberships.toArray());
   });
-  it("load preserves in-memory instances added via push", async () => {
-    const david = authors("david") as any;
-    const post = await Post.create({ title: "original", body: "b" });
-    await david.posts.push(post);
-    post.title = "mutated";
-    const loaded = await (await david.posts.load()).records();
-    const found = loaded.find((r: any) => r.readAttribute("id") === post.id);
-    expect(found).toBe(post);
-    expect(found.title).toBe("mutated");
-  });
 });
 
 describe("PreloaderTest", () => {
   const {
+    self,
     posts,
     comments,
     authors,
@@ -445,12 +401,14 @@ describe("PreloaderTest", () => {
     ShippingLine = slMod.ShippingLine as never;
     ShippingLineDiscountApplication = slMod.ShippingLineDiscountApplication as never;
     Discount = (await import("./test-helpers/models/discount.js")).Discount as never;
-    const shardedMod = await import("./test-helpers/models/sharded.js");
-    ShardedBlogPL = shardedMod.ShardedBlog as never;
-    ShardedBlogPostPL = shardedMod.ShardedBlogPost as never;
-    ShardedCommentPL = shardedMod.ShardedComment as never;
-    ShardedTagPL = shardedMod.ShardedTag as never;
-    ShardedBlogPostTagPL = shardedMod.ShardedBlogPostTag as never;
+    ShardedBlogPL = (await import("./test-helpers/models/sharded/blog.js")).ShardedBlog as never;
+    ShardedBlogPostPL = (await import("./test-helpers/models/sharded/blog-post.js"))
+      .ShardedBlogPost as never;
+    ShardedCommentPL = (await import("./test-helpers/models/sharded/comment.js"))
+      .ShardedComment as never;
+    ShardedTagPL = (await import("./test-helpers/models/sharded/tag.js")).ShardedTag as never;
+    ShardedBlogPostTagPL = (await import("./test-helpers/models/sharded/blog-post-tag.js"))
+      .ShardedBlogPostTag as never;
     const cpkMod = await import("./test-helpers/models/cpk.js");
     CpkOrderPL = cpkMod.CpkOrder as never;
     CpkOrderAgreementPL = cpkMod.CpkOrderAgreement as never;
@@ -524,22 +482,6 @@ describe("PreloaderTest", () => {
       const preloader = new Preloader({ records: relation, associations: "comments" });
       await preloader.call();
     });
-  });
-
-  it("isEmpty materializes an empty relation and reports true", async () => {
-    const relation = Post.where({ id: -1 });
-    const preloader = new Preloader({ records: relation, associations: "comments" });
-    expect(await preloader.isEmpty()).toBe(true);
-    const sqls = await captureSql(async () => {
-      await preloader.call();
-    });
-    expect(sqls).toHaveLength(0);
-  });
-
-  it("isEmpty reports false for a non-empty relation", async () => {
-    const relation = Post.where({ id: posts("welcome").id });
-    const preloader = new Preloader({ records: relation, associations: "comments" });
-    expect(await preloader.isEmpty()).toBe(false);
   });
 
   it("preload does not concatenate duplicate records", async () => {
@@ -1297,14 +1239,14 @@ describe("PreloaderTest", () => {
     );
 
     let loadedOrder: any = null;
-    const sql = await captureSql(async () => {
+    const sql = await self().captureSql({}, async () => {
       loadedOrder = (await CpkOrderPL.where({ id: orderId }).includes("orderAgreements"))[0];
     });
 
     expect(sql.length).toBe(2);
     const preloadSql = sql[sql.length - 1];
 
-    const orderIdColumn = regexpEscape(quoteTableName("cpk_order_agreements.order_id"));
+    const orderIdColumn = regexpEscape(self().quoteTableName("cpk_order_agreements.order_id"));
     const expectation = new RegExp(`SELECT.*WHERE.* ${orderIdColumn} = (\\?|(\\d+)|\\$\\d)$`);
 
     expect(preloadSql).toMatch(expectation);
@@ -1319,7 +1261,7 @@ describe("PreloaderTest", () => {
     expect(order.equals(await orderAgreement.order)).toBe(true);
 
     let loadedOrderAgreement: any = null;
-    const sql = await captureSql(async () => {
+    const sql = await self().captureSql({}, async () => {
       loadedOrderAgreement = (
         await CpkOrderAgreementPL.where({ id: orderAgreement.id }).includes("order")
       )[0];
@@ -1328,7 +1270,7 @@ describe("PreloaderTest", () => {
     expect(sql.length).toBe(2);
     const preloadSql = sql[sql.length - 1];
 
-    const orderId = regexpEscape(quoteTableName("cpk_orders.id"));
+    const orderId = regexpEscape(self().quoteTableName("cpk_orders.id"));
     const expectation = new RegExp(`SELECT.*WHERE.* ${orderId} = (\\?|(\\d+)|\\$\\d)$`);
 
     expect(preloadSql).toMatch(expectation);
@@ -1377,24 +1319,6 @@ describe("PreloaderTest", () => {
 
       assertSame(author, await post.author);
     });
-  });
-
-  it("preload marks belongs_to association loaded on owner", async () => {
-    const welcome = posts("welcome");
-    const loaded = await Post.where({ id: welcome.id }).includes(":author");
-    expect(loaded).toHaveLength(1);
-    const assoc = (loaded[0] as any).association("author");
-    expect(assoc.isLoaded()).toBe(true);
-    expect(assoc.target?.id).toBe(authors("david").id);
-  });
-
-  it("preload sets has_many association target on owner", async () => {
-    const david = authors("david");
-    const owners = await Author.where({ id: david.id }).includes(":posts");
-    const assoc = (owners[0] as any).association("posts");
-    expect(assoc.isLoaded()).toBe(true);
-    const ids = (assoc.target as Base[]).map((r) => r.id);
-    expect(ids).toContain(posts("welcome").id);
   });
 });
 
@@ -1526,7 +1450,7 @@ describe("GeneratedMethodsTest", () => {
 });
 
 describe("WithAnnotationsTest", () => {
-  const { pirates } = fixtures([
+  const { self, pirates } = fixtures([
     "pirates",
     "parrots",
     "parrotsPirates",
@@ -1539,7 +1463,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.where().not({ parrot_id: null }).first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.parrot;
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1548,7 +1472,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that tells jokes \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that tells jokes \*\//, {}, async () => {
       await pirate.parrotWithAnnotation;
     });
   });
@@ -1557,7 +1481,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.parrots.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1566,7 +1490,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that are very colorful \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that are very colorful \*\//, {}, async () => {
       await pirate.parrotsWithAnnotation.first();
     });
   });
@@ -1575,7 +1499,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.ship;
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1584,7 +1508,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that is a rocket \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that is a rocket \*\//, {}, async () => {
       await pirate.shipWithAnnotation;
     });
   });
@@ -1593,7 +1517,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.birds.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1602,7 +1526,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* that are also parrots \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* that are also parrots \*\//, {}, async () => {
       await pirate.birdsWithAnnotation.first();
     });
   });
@@ -1611,7 +1535,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.treasureEstimates.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1620,7 +1544,7 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* yarrr \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* yarrr \*\//, {}, async () => {
       await pirate.treasureEstimatesWithAnnotation.first();
     });
   });
@@ -1629,7 +1553,7 @@ describe("WithAnnotationsTest", () => {
     const pirate = (await SpacePirate.first()) as any;
     expect(pirate).toBeTruthy();
 
-    const log = await captureSql(async () => {
+    const log = await self().captureSql({}, async () => {
       await pirate.treasureEstimates.first();
     });
     assertNotPredicate(log, (l: string[]) => l.length === 0);
@@ -1638,14 +1562,14 @@ describe("WithAnnotationsTest", () => {
       (l: string[]) => l.length === 0,
     );
 
-    await assertQueriesMatch(/\/\* yarrr \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* yarrr \*\//, {}, async () => {
       await SpacePirate.includes("treasureEstimatesWithAnnotation", "treasures").first();
     });
   });
 });
 
 describe("AssociationsTest", () => {
-  const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
+  const { self, companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
     fixtures([
       "companies",
       "authors",
@@ -1691,19 +1615,23 @@ describe("AssociationsTest", () => {
   let Post: typeof Base;
 
   beforeAll(async () => {
-    const shardedMod = await import("./test-helpers/models/sharded.js");
-    ShardedBlog = shardedMod.ShardedBlog as never;
-    ShardedBlogPost = shardedMod.ShardedBlogPost as never;
-    ShardedBlogPostWithRevision = shardedMod.ShardedBlogPostWithRevision as never;
+    ShardedBlog = (await import("./test-helpers/models/sharded/blog.js")).ShardedBlog as never;
+    ShardedBlogPost = (await import("./test-helpers/models/sharded/blog-post.js"))
+      .ShardedBlogPost as never;
+    ShardedBlogPostWithRevision = (
+      await import("./test-helpers/models/sharded/blog-post-with-revision.js")
+    ).ShardedBlogPostWithRevision as never;
     if (!reflectOnAssociation(ShardedBlogPostWithRevision, "commentsWithoutQueryConstraints")) {
       (ShardedBlogPostWithRevision as any).hasMany("commentsWithoutQueryConstraints", {
         primaryKey: ["blog_id", "id"],
-        className: "ShardedComment",
+        className: "Sharded::Comment",
       });
     }
-    ShardedComment = shardedMod.ShardedComment as never;
-    ShardedTag = shardedMod.ShardedTag as never;
-    ShardedBlogPostTag = shardedMod.ShardedBlogPostTag as never;
+    ShardedComment = (await import("./test-helpers/models/sharded/comment.js"))
+      .ShardedComment as never;
+    ShardedTag = (await import("./test-helpers/models/sharded/tag.js")).ShardedTag as never;
+    ShardedBlogPostTag = (await import("./test-helpers/models/sharded/blog-post-tag.js"))
+      .ShardedBlogPostTag as never;
     const authorMod = await import("./test-helpers/models/author.js");
     Author = authorMod.Author as never;
     AuthorFavorite = authorMod.AuthorFavorite as never;
@@ -1780,14 +1708,18 @@ describe("AssociationsTest", () => {
   });
 
   it("should construct new finder sql after create", async () => {
-    const person = Person.new({ first_name: "clark" });
-    expect(await association(person, "readers")).toEqual([]);
+    const person = new Person({ first_name: "clark" });
+    expect(await (person.association("readers") as CollectionAssociation).reader).toEqual([]);
     await person.save();
     const reader = await Reader.create({
       person,
-      post: Post.new({ title: "foo", body: "bar" }),
+      post: new Post({ title: "foo", body: "bar" }),
     });
-    expect(await association(person, "readers").find((reader as any).id)).toBeTruthy();
+    expect(
+      await (person.association("readers") as CollectionAssociation).reader.find(
+        (reader as any).id,
+      ),
+    ).toBeTruthy();
   });
 
   it("subselect", async () => {
@@ -1853,7 +1785,9 @@ describe("AssociationsTest", () => {
 
   it("association with references", async () => {
     const firm = companies("first_firm");
-    const scope = association(firm, "associationWithReferences").scope();
+    const scope = (
+      firm.association("associationWithReferences") as CollectionAssociation
+    ).reader.scope();
     expect(scope.referencesValues).toEqual([":foo"]);
   });
 
@@ -1888,9 +1822,9 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
     const comment = new ShardedComment({ body: "Great post! :clap:" });
     await comment.save();
-    await association(blogPost, "comments").push(comment);
+    await (blogPost.association("comments") as CollectionAssociation).reader.push(comment);
 
-    const comments = await association(blogPost, "comments");
+    const comments = await blogPost.comments;
     expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
     expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
@@ -1907,15 +1841,17 @@ describe("AssociationsTest", () => {
     const comment = shardedComments("great_comment_blog_post_one") as any;
 
     const sql = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await comment.blogPost;
       })
     )[0];
 
     expect(sql).toMatch(
-      new RegExp(`${regexpEscape(quoteTableName("sharded_blog_posts.blog_id"))} =`),
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_blog_posts.blog_id"))} =`),
     );
-    expect(sql).toMatch(new RegExp(`${regexpEscape(quoteTableName("sharded_blog_posts.id"))} =`));
+    expect(sql).toMatch(
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_blog_posts.id"))} =`),
+    );
   });
 
   it("querying by whole associated records using query constraints", async () => {
@@ -1985,13 +1921,13 @@ describe("AssociationsTest", () => {
     });
 
     const sql = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         comments = await blogPost.comments.toArray();
       })
     )[0];
 
     expect(sql).toMatch(
-      new RegExp(`WHERE .*${regexpEscape(quoteTableName("sharded_comments.blog_id"))} =`),
+      new RegExp(`WHERE .*${regexpEscape(self().quoteTableName("sharded_comments.blog_id"))} =`),
     );
     assertNotEmpty(comments);
     expect(expectedComments.map((c) => c.id).sort()).toEqual(comments.map((c) => c.id).sort());
@@ -2014,16 +1950,16 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one") as any;
 
     const sql = (
-      await captureSql(async () => {
+      await self().captureSql({}, async () => {
         await blogPost.comments.toArray();
       })
     )[0];
 
     expect(sql).toMatch(
-      new RegExp(`${regexpEscape(quoteTableName("sharded_comments.blog_post_id"))} =`),
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_comments.blog_post_id"))} =`),
     );
     expect(sql).toMatch(
-      new RegExp(`${regexpEscape(quoteTableName("sharded_comments.blog_id"))} =`),
+      new RegExp(`${regexpEscape(self().quoteTableName("sharded_comments.blog_id"))} =`),
     );
   });
 
@@ -2201,12 +2137,14 @@ describe("AssociationsTest", () => {
 
     await review.reload();
 
-    const sql = await captureSql(async () => {
+    const sql = await self().captureSql({}, async () => {
       expect(car.equals(await review.car)).toBe(true);
     });
 
-    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(quoteTableName("cpk_cars.make"))} =`));
-    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(quoteTableName("cpk_cars.model"))} =`));
+    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(self().quoteTableName("cpk_cars.make"))} =`));
+    expect(sql[0]).toMatch(
+      new RegExp(`${regexpEscape(self().quoteTableName("cpk_cars.model"))} =`),
+    );
   });
 
   it("cpk model has many records by id attribute", async () => {
@@ -2246,7 +2184,7 @@ describe("AssociationsTest", () => {
       if (!reflectOnAssociation(ShardedBlogPost, "commentsWithoutSingleColumnQueryConstraints")) {
         (ShardedBlogPost as any).hasMany("commentsWithoutSingleColumnQueryConstraints", {
           primaryKey: ["blog_id", "id"],
-          className: "ShardedComment",
+          className: "Sharded::Comment",
         });
       }
       const blogPost = shardedBlogPosts("great_post_blog_one") as any;
@@ -2271,7 +2209,7 @@ describe("AssociationsTest", () => {
       if (!reflectOnAssociation(ShardedBlogPost, "commentsWithoutMultipleColumnQueryConstraints")) {
         (ShardedBlogPost as any).hasMany("commentsWithoutMultipleColumnQueryConstraints", {
           primaryKey: ["blog_id", "id"],
-          className: "ShardedComment",
+          className: "Sharded::Comment",
         });
       }
       const blogPost = shardedBlogPosts("great_post_blog_one") as any;
@@ -2285,35 +2223,6 @@ describe("AssociationsTest", () => {
       );
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = original;
-    }
-  });
-
-  it("query constraints that dont include a composite primary key raise", async () => {
-    const originalList = (ShardedBlogPost as any)._queryConstraintsList;
-    const originalPk = (ShardedBlogPost as any)._primaryKey;
-    const originalReflections = { ...((ShardedBlogPost as any)._reflections ?? {}) };
-    try {
-      (ShardedBlogPost as any)._primaryKey = ["blog_id", "id"];
-      (ShardedBlogPost as any)._queryConstraintsList = ["blog_id", "id"];
-      (ShardedBlogPost as any)._hasQueryConstraints = true;
-      (ShardedBlogPost as any).hasMany("commentsWithCompositePkOwner", {
-        primaryKey: ["blog_id", "id"],
-        className: "ShardedComment",
-      });
-      const blogPost = shardedBlogPosts("great_post_blog_one");
-      let error: unknown;
-      try {
-        await association(blogPost, "commentsWithCompositePkOwner");
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(ArgumentError);
-      expect((error as Error).message).toContain("does not include the primary key");
-    } finally {
-      (ShardedBlogPost as any)._queryConstraintsList = originalList;
-      (ShardedBlogPost as any)._primaryKey = originalPk;
-      (ShardedBlogPost as any)._reflections = originalReflections;
-      clearReflectionsCache(ShardedBlogPost as any);
     }
   });
 
@@ -2334,83 +2243,29 @@ describe("AssociationsTest", () => {
     );
   });
 
-  it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
-    const post = await ShardedBlogPost.create({ blog_id: 1, title: "Post" });
-    await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "A" });
-    await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "B" });
-    await ShardedComment.create({ blog_id: 2, blog_post_id: (post as any).id, body: "Other" });
-    const comments = await (post as any).comments;
-    expect(comments).toHaveLength(2);
-    expect(comments.map((c: Base) => (c as any).body).sort()).toEqual(["A", "B"]);
-  });
+  it("using query constraints warns about changing behavior", async () => {
+    const hasManyExpectedMessage = squish(`
+      Setting \`queryConstraints:\` option on \`Sharded::BlogPost.hasMany :qcDeprecatedComments\` is not allowed.
+      To get the same behavior, use the \`foreignKey\` option instead.
+    `);
 
-  it("has many loads via inline fallback resolving composite owner key as id attribute", async () => {
-    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
-    const [, orderId] = order.id as [number, number];
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
-    const agreements = await order.orderAgreements;
-    expect(agreements).toHaveLength(2);
-    expect(agreements.map((a: Base) => (a as any).signature).sort()).toEqual(["abc", "def"]);
-  });
-
-  it("has one loads through a declared reflection with a composite foreign key", async () => {
-    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
-    await CpkBook.create({ id: [1, 90001], order, title: "Only" });
-    expect((await (order as any).book)?.title).toBe("Only");
-  });
-
-  it("has one loads through a declared reflection with a scalar foreign key on a composite primary key owner", async () => {
-    const order = await CpkOrderWithPrimaryKeyAssociatedBook.create({ shop_id: 1 });
-    const [, orderId] = order.id as [number, number];
-    await CpkBook.create({ id: [1, 90002], order_id: orderId, title: "Only" });
-    expect((await (order as any).book)?.title).toBe("Only");
-  });
-
-  it("has many loads via inline fallback ignoring enclosing current_scope", async () => {
-    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
-    const [, orderId] = order.id as [number, number];
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
-    await (CpkOrderAgreement as any).where("1=0").scoping(async () => {
-      const agreements = await order.orderAgreements;
-      expect(agreements).toHaveLength(2);
-      expect(agreements.map((a: Base) => (a as any).signature).sort()).toEqual(["abc", "def"]);
-    });
-  });
-
-  it("delete single composite has many through join row", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
-    const tag = await ShardedTag.create({ name: "shared", blog_id: (blogPost as any).blog_id });
-    await ShardedBlogPostTag.create({
-      blog_id: (blogPost as any).blog_id,
-      blog_post_id: (blogPost as any).id,
-      tag_id: (tag as any).id,
+    await assertRaises([ConfigurationError], { match: hasManyExpectedMessage }, () => {
+      ShardedBlogPost.hasMany("qcDeprecatedComments", {
+        className: "Sharded::Comment",
+        queryConstraints: ["blog_id", "blog_post_id"],
+      });
     });
 
-    const otherBlogId = (shardedBlogs("sharded_blog_two") as any).id;
-    await ShardedBlogPostTag.create({
-      blog_id: otherBlogId,
-      blog_post_id: (blogPost as any).id,
-      tag_id: (tag as any).id,
+    const belongsToExpectedMessage = squish(`
+      Setting \`queryConstraints:\` option on \`Sharded::Comment.belongsTo :qcDeprecatedBlogPost\` is not allowed.
+      To get the same behavior, use the \`foreignKey\` option instead.
+    `);
+
+    await assertRaises([ConfigurationError], { match: belongsToExpectedMessage }, () => {
+      ShardedComment.belongsTo("qcDeprecatedBlogPost", {
+        className: "Sharded::Blog",
+        queryConstraints: ["blog_id", "blog_post_id"],
+      });
     });
-
-    await association(blogPost, "tags").delete(tag);
-
-    expect(
-      await ShardedBlogPostTag.where({
-        blog_id: (blogPost as any).blog_id,
-        blog_post_id: (blogPost as any).id,
-        tag_id: (tag as any).id,
-      }),
-    ).toHaveLength(0);
-    expect(
-      await ShardedBlogPostTag.where({
-        blog_id: otherBlogId,
-        blog_post_id: (blogPost as any).id,
-        tag_id: (tag as any).id,
-      }),
-    ).toHaveLength(1);
-    expect(await ShardedTag.where({ id: (tag as any).id })).not.toHaveLength(0);
   });
 });

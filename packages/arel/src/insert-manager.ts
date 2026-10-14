@@ -1,17 +1,17 @@
-import { Node } from "./nodes/node.js";
 import { TreeManager } from "./tree-manager.js";
 import { InsertStatement, type InsertSelectSource } from "./nodes/insert-statement.js";
 import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
+import { first, isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Arel } from "./namespaces.js";
+import type { ArelNode } from "./arel.js";
 
-export class InsertManager extends TreeManager {
-  readonly ast: InsertStatement;
-
-  constructor(table?: Table | null) {
+export class InsertManager extends TreeManager<InsertStatement> {
+  constructor(table: Table | null = null) {
     super();
-    this.ast = new InsertStatement(table ?? null);
+    this.ast = new InsertStatement(table);
   }
 
   into(table: Table): this {
@@ -19,11 +19,11 @@ export class InsertManager extends TreeManager {
     return this;
   }
 
-  get columns(): Node[] {
+  get columns(): ArelNode[] {
     return this.ast.columns;
   }
 
-  set values(val: Node | null) {
+  set values(val: ArelNode | null) {
     this.ast.values = val;
   }
 
@@ -32,27 +32,22 @@ export class InsertManager extends TreeManager {
     return this;
   }
 
-  insert(fields: string | [Attribute | Node, unknown][] | null | undefined): this {
-    if (fields == null) return this;
+  insert(fields: string | [ArelNode, unknown][] | Map<ArelNode, unknown>): this | undefined {
+    if (isEmpty(fields)) return;
 
     if (typeof fields === "string") {
       this.ast.values = new SqlLiteral(fields);
-      return this;
-    }
+    } else {
+      this.ast.relation ||= (first(first(fields)!) as Attribute).relation as Table | ArelNode;
 
-    if (fields.length === 0) return this;
+      const values: unknown[] = [];
 
-    if (this.ast.relation == null) {
-      const first = fields[0]?.[0] as { relation?: Node } | undefined;
-      if (first?.relation) this.ast.relation = first.relation;
+      for (const [column, value] of fields) {
+        this.ast.columns.push(column);
+        values.push(value);
+      }
+      this.ast.values = this.createValues(values);
     }
-
-    const values: unknown[] = [];
-    for (const [column, value] of fields) {
-      this.ast.columns.push(column);
-      values.push(value);
-    }
-    this.ast.values = this.createValues(values);
     return this;
   }
 
@@ -64,3 +59,5 @@ export class InsertManager extends TreeManager {
     return new ValuesList(rows);
   }
 }
+
+rbModConstSet(Arel, "InsertManager", InsertManager);

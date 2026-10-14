@@ -12,10 +12,15 @@ import {
   getChildProcess,
   rbAnyToS,
   rbEqual,
+  rbModToS,
   rbObjClass,
+  rbFSend,
+  rbObjClassname,
   rbStrRespondTo,
   regexpEscape,
+  SignalException,
   stderr,
+  SystemExit,
   verbose,
 } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
@@ -39,6 +44,139 @@ export class UnexpectedError extends Assertion {
 
   get resultLabel(): string {
     return "Error";
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+export class Skip extends Assertion {
+  override name = "Skip";
+}
+
+/** @noRailsEquivalent PERMANENT */
+export class Test {
+  /** @noRailsEquivalent PERMANENT */
+  static PASSTHROUGH_EXCEPTIONS = [SignalException, SystemExit];
+  /** @noRailsEquivalent PERMANENT */
+  static SETUP_METHODS = ["beforeSetup", "setup", "afterSetup"];
+  /** @noRailsEquivalent PERMANENT */
+  static TEARDOWN_METHODS = ["beforeTeardown", "teardown", "afterTeardown"];
+
+  /** @noRailsEquivalent PERMANENT */
+  name: string;
+  /** @noRailsEquivalent PERMANENT */
+  failures: Assertion[];
+  /** @noRailsEquivalent PERMANENT */
+  time: number | null = null;
+  private _assertions: number;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(name: string) {
+    this.name = name;
+    this.failures = [];
+    this._assertions = 0;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get assertions(): number {
+    return this._assertions;
+  }
+
+  set assertions(assertions: number) {
+    this._assertions = assertions;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get failure(): Assertion | undefined {
+    return this.failures[0];
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isPassed(): boolean {
+    return !this.failure;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async run(): Promise<this> {
+    await this.timeIt(async () => {
+      await this.captureExceptions(async () => {
+        for (const hook of Test.SETUP_METHODS) {
+          await rbFSend(this, hook);
+        }
+
+        await rbFSend(this, this.name);
+      });
+
+      for (const hook of Test.TEARDOWN_METHODS) {
+        await this.captureExceptions(async () => {
+          await rbFSend(this, hook);
+        });
+      }
+    });
+
+    return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async timeIt(block: () => unknown): Promise<void> {
+    const t0 = performance.now() / 1000;
+
+    try {
+      await block();
+    } finally {
+      this.time = performance.now() / 1000 - t0;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async captureExceptions(block: () => unknown): Promise<void> {
+    try {
+      await block();
+    } catch (e) {
+      if (Test.PASSTHROUGH_EXCEPTIONS.some((klass) => e instanceof klass)) throw e;
+      if (e instanceof Assertion) {
+        this.failures.push(e);
+      } else {
+        this.failures.push(new UnexpectedError(e as Error));
+      }
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isSkipped(): boolean {
+    return this.failure != null && this.failure instanceof Skip;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isError(): boolean {
+    return this.failures.some((failure) => failure instanceof UnexpectedError);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  beforeSetup(): unknown {
+    return undefined;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  setup(): void {}
+
+  /** @noRailsEquivalent PERMANENT */
+  afterSetup(): unknown {
+    return undefined;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  beforeTeardown(): unknown {
+    return undefined;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  teardown(): unknown {
+    return undefined;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  afterTeardown(): unknown {
+    return undefined;
   }
 }
 
@@ -77,10 +215,12 @@ export class BacktraceFilter {
 /** @noRailsEquivalent PERMANENT */
 export const Minitest: {
   VERSION: string;
+  Test: typeof Test;
   backtraceFilter: { filter(bt: string[] | null): string[] };
   filterBacktrace(bt: string[] | null): string[];
 } = {
   VERSION: "5.27.0",
+  Test,
   backtraceFilter: new BacktraceFilter(),
 
   filterBacktrace(bt: string[] | null): string[] {
@@ -417,7 +557,7 @@ export function assertRespondTo(
   msg = message(
     msg,
     null,
-    () => `Expected ${inspect(obj)} (${rbObjClass(obj)}) to respond to #${meth}`,
+    () => `Expected ${inspect(obj)} (${rbObjClassname(obj)}) to respond to #${meth}`,
   );
   assert(respondsTo(Object(obj), meth, includeAll), msg);
 }
@@ -598,7 +738,7 @@ function diff(exp: unknown, act: unknown): string {
       result = result.replace(/^\+\+\+ .+/m, "+++ actual");
 
       if (result === "") {
-        const klass = rbObjClass(exp);
+        const klass = rbObjClassname(exp);
         result = [
           `No visible difference in the ${klass}#inspect output.\n`,
           "You should look at the implementation of #== on ",
@@ -726,6 +866,45 @@ export function assertNotNil(obj: unknown, msg: string | (() => string) | null =
   return refuteNil(obj, msg);
 }
 
+export function assertInstanceOf(
+  cls: abstract new (...args: never) => unknown,
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  msg = message(
+    msg,
+    null,
+    () =>
+      `Expected ${inspect(obj)} to be an instance of ${rbModToS(cls)}, not ${rbObjClassname(obj)}`,
+  );
+
+  return assert(rbObjClass(obj) === cls, msg);
+}
+
+export function assertKindOf(
+  cls: abstract new (...args: never) => unknown,
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  msg = message(
+    msg,
+    null,
+    () => `Expected ${inspect(obj)} to be a kind of ${rbModToS(cls)}, not ${rbObjClassname(obj)}`,
+  );
+
+  return assert(Object(obj) instanceof cls, msg);
+}
+
+export function assertNotKindOf(
+  cls: abstract new (...args: never) => unknown,
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  msg = message(msg, null, () => `Expected ${inspect(obj)} to not be a kind of ${rbModToS(cls)}`);
+
+  return assertNot(Object(obj) instanceof cls, msg);
+}
+
 export function assertMatch(
   matcher: RegExp | string,
   obj: string,
@@ -734,7 +913,7 @@ export function assertMatch(
   msg = message(msg, null, () => `Expected ${inspect(matcher)} to match ${inspect(obj)}`);
   assert(
     typeof matcher === "string" || matcher instanceof RegExp,
-    `Expected ${inspect(matcher)} (${rbObjClass(matcher)}) to respond to #=~`,
+    `Expected ${inspect(matcher)} (${rbObjClassname(matcher)}) to respond to #=~`,
   );
   if (typeof matcher === "string") matcher = new RegExp(regexpEscape(matcher));
   const lastMatch = matcher.exec(obj);

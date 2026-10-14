@@ -2,6 +2,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { FamilyTree } from "./family-tree.js";
 import type { Member } from "./member.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Family extends Base {
   declare familyTrees: AssociationProxy<FamilyTree>;
@@ -14,3 +15,4 @@ export class Family extends Base {
     this.hasMany("members", { through: "familyTrees" });
   }
 }
+registerModel(Family);

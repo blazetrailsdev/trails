@@ -74,7 +74,6 @@ export class Router {
     return [404, { [X_CASCADE]: "pass" }, ["Not Found"]] as unknown as RackishResponse;
   }
 
-  /** @missingRailsArgs merge — PERMANENT */
   recognize(
     railsReq: RouterRequest,
     block: (route: Route, parameters: Record<string, unknown>) => unknown,

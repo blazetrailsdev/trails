@@ -1,7 +1,18 @@
-import { kernelCatch, NoMethodError, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  kernelCatch,
+  Module,
+  NoMethodError,
+  rbBlockGivenP,
+  rbClassSuperclass,
+  rbModSingletonP,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
-import { ArgumentError } from "./hash-utils.js";
+import { classAttribute } from "./class-attribute.js";
+import { Concern } from "./concern.js";
+import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { camelize } from "./inflector.js";
 
@@ -23,6 +34,7 @@ export interface DefineCallbacksOptions<T extends object = object> {
   terminator?: ((target: T, fn: () => unknown) => boolean | Promise<boolean>) | false;
   skipAfterCallbacksIfTerminated?: boolean;
   scope?: string[];
+  strict?: "sync";
 }
 
 export type BeforeCallback<T extends object = object> = (target: T) => unknown;
@@ -88,6 +100,7 @@ export class MethodCall implements CallTemplate {
   private send(target: object, block?: (() => unknown) | null): unknown {
     const method = (target as Record<PropertyKey, unknown>)[this.methodName];
     if (typeof method !== "function") {
+      if (this.methodName in target) return method;
       throw new NoMethodError(
         `undefined method '${String(this.methodName)}' for an instance of ${target.constructor.name}`,
       );
@@ -293,6 +306,8 @@ export interface FilterEnvironment {
   target: object;
   halted: boolean;
   value: unknown;
+  /** @noRailsEquivalent PERMANENT */
+  syncChain?: string;
 }
 
 export class Before {
@@ -321,12 +336,8 @@ export class Before {
     this.name = name;
   }
 
-  call(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): FilterEnvironment | Promise<FilterEnvironment> {
-    const { target, value, halted } = env;
+  call(env: FilterEnvironment): FilterEnvironment | Promise<FilterEnvironment> {
+    const { target, value, halted, syncChain } = env;
     if (halted || !this.userConditions.every((c) => c(target, value))) return env;
 
     const terminatorFn = this.terminator;
@@ -335,10 +346,10 @@ export class Before {
     if (terminatorFn === false) {
       const r = resultLambda();
       if (!isThenable(r)) return env;
-      if (opts?.strict === "sync") {
+      if (syncChain !== undefined) {
         swallowRejection(r);
         throw new RuntimeError(
-          `Async callback on sync chain "${chainName}" — before returned a Promise`,
+          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
       }
       return Promise.resolve(r).then(() => env);
@@ -351,6 +362,12 @@ export class Before {
         return cbResult;
       });
       if (isThenable(halt)) {
+        if (syncChain !== undefined) {
+          swallowRejection(halt);
+          throw new RuntimeError(
+            `Async callback on sync chain "${syncChain}" — before returned a Promise`,
+          );
+        }
         return Promise.resolve(halt).then((h) => {
           if (h) this.halt(env);
           return env;
@@ -358,13 +375,13 @@ export class Before {
       }
       if (isThenable(cbResult)) {
         swallowRejection(cbResult);
-        if (opts?.strict === "sync") {
+        if (syncChain !== undefined) {
           throw new RuntimeError(
-            `Async callback on sync chain "${chainName}" — before returned a Promise`,
+            `Async callback on sync chain "${syncChain}" — before returned a Promise`,
           );
         }
         throw new RuntimeError(
-          `Async before callback on chain "${chainName}" is unsupported with a custom terminator. ` +
+          `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
             `Custom terminators cannot evaluate Promise-returning callbacks. ` +
             `Use the default terminator (halt via throw(:abort)) or make all before callbacks synchronous.`,
         );
@@ -380,10 +397,10 @@ export class Before {
         terminate = false;
         return;
       }
-      if (opts?.strict === "sync") {
+      if (syncChain !== undefined) {
         swallowRejection(cbResult);
         throw new RuntimeError(
-          `Async callback on sync chain "${chainName}" — before returned a Promise`,
+          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
       }
       return Promise.resolve(cbResult).then(() => {
@@ -446,19 +463,15 @@ export class After {
     this.halting = chainConfig.skipAfterCallbacksIfTerminated ?? false;
   }
 
-  call(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): FilterEnvironment | Promise<FilterEnvironment> {
-    const { target, value, halted } = env;
+  call(env: FilterEnvironment): FilterEnvironment | Promise<FilterEnvironment> {
+    const { target, value, halted, syncChain } = env;
     if ((!halted || !this.halting) && this.userConditions.every((c) => c(target, value))) {
       const r = this.userCallback(target, value);
       if (isThenable(r)) {
-        if (opts?.strict === "sync") {
+        if (syncChain !== undefined) {
           swallowRejection(r);
           throw new RuntimeError(
-            `Async callback on sync chain "${chainName}" — after returned a Promise`,
+            `Async callback on sync chain "${syncChain}" — after returned a Promise`,
           );
         }
         return Promise.resolve(r).then(() => env);
@@ -680,34 +693,24 @@ export class CallbackSequence {
     return this.callTemplate!.expand(arg.target, arg.value, block);
   }
 
-  invokeBefore(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): void | Promise<void> {
-    return this._runFilters(this.beforeList, 0, env, opts, chainName);
+  invokeBefore(arg: FilterEnvironment): void | Promise<void> {
+    return this._runFilters(this.beforeList, 0, arg);
   }
 
-  invokeAfter(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): void | Promise<void> {
-    return this._runFilters(this.afterList, 0, env, opts, chainName);
+  invokeAfter(arg: FilterEnvironment): void | Promise<void> {
+    return this._runFilters(this.afterList, 0, arg);
   }
 
   private _runFilters(
     list: Array<Before | After> | null,
     start: number,
     env: FilterEnvironment,
-    opts: RunCallbacksOptions | undefined,
-    chainName: string,
   ): void | Promise<void> {
     if (!list) return;
     for (let i = start; i < list.length; i++) {
-      const r = list[i].call(env, opts, chainName);
+      const r = list[i].call(env);
       if (isThenable(r)) {
-        return Promise.resolve(r).then(() => this._runFilters(list, i + 1, env, opts, chainName));
+        return Promise.resolve(r).then(() => this._runFilters(list, i + 1, env));
       }
     }
   }
@@ -746,10 +749,10 @@ export class CallbackChain {
     this.chain.splice(index, 0, o);
   }
 
-  delete(o: Callback): void {
+  delete(o: Callback | undefined): void {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
-    const i = this.chain.indexOf(o);
+    const i = this.chain.indexOf(o as Callback);
     if (i !== -1) this.chain.splice(i, 1);
   }
 
@@ -788,10 +791,11 @@ export class CallbackChain {
     this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
   }
 
-  clear(): void {
+  clear(): this {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
     this.chain = [];
+    return this;
   }
 
   dup(): CallbackChain {
@@ -856,31 +860,6 @@ function isCallbackOptions(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-/**
- * @missingRailsCall descendants — CONVERGEABLE callbacks-update-callbacks-reads-its-own-descendants
- * @missingRailsCall prepend — CONVERGEABLE callbacks-update-callbacks-reads-its-own-descendants
- */
-export function __updateCallbacks(
-  name: string,
-  targets: Array<{
-    getCallbacks(name: string): CallbackChain;
-    setCallbacks(name: string, chain: CallbackChain): void;
-  }>,
-  fn: (target: object, chain: CallbackChain) => void,
-): void {
-  [...targets].reverse().forEach((target) => {
-    const chain = target.getCallbacks(name);
-    const dup = new CallbackChain(chain.name, chain.config);
-    chain.entries.forEach((e) =>
-      dup.append(
-        new Callback(e.name, e.filter, e.kind, { ...e.options }, dup.config, e.originalObject),
-      ),
-    );
-    fn(target, dup);
-    target.setCallbacks(name, dup);
-  });
-}
-
 const _ct = { MethodCall, ObjectCall, InstanceExec0, InstanceExec1, InstanceExec2, ProcCall };
 export namespace CallTemplate {
   export const MethodCall = _ct.MethodCall;
@@ -924,47 +903,16 @@ export interface ClassMethods<T extends object = object> {
   resetCallbacks(name: string): void;
 }
 
-const CALLBACKS = Symbol("callbacks");
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function peekCallbackChain(target: object, name: string): CallbackChain | undefined {
-  let t: object | null = target;
-  while (t !== null) {
-    if (Object.prototype.hasOwnProperty.call(t, CALLBACKS)) {
-      return (t as Record<symbol, Map<string, CallbackChain>>)[CALLBACKS].get(name);
-    }
-    t = Object.getPrototypeOf(t);
-  }
-  return undefined;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function getCallbackChains(target: object): Map<string, CallbackChain> {
-  const t = target as Record<symbol, unknown>;
-  if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
-    const parent = t[CALLBACKS] as Map<string, CallbackChain> | undefined;
-    const own = new Map<string, CallbackChain>();
-    if (parent) {
-      for (const [name, chain] of parent) {
-        own.set(name, chain.dup());
-      }
-    }
-    t[CALLBACKS] = own;
-    for (
-      let klass = target.constructor as AnyClass;
-      Object.getPrototypeOf(klass) !== Function.prototype;
-      klass = Object.getPrototypeOf(klass) as AnyClass
-    ) {
-      DescendantsTracker.registerSubclass(Object.getPrototypeOf(klass) as AnyClass, klass);
-    }
-  }
-  return t[CALLBACKS] as Map<string, CallbackChain>;
+interface CallbacksClass {
+  prototype: object;
+  __callbacks: Record<string, CallbackChain>;
+  readonly descendants: CallbacksClass[];
+  getCallbacks(name: string): CallbackChain;
+  setCallbacks(name: string, callbacks: CallbackChain): Record<string, CallbackChain>;
+  __updateCallbacks(
+    name: string,
+    block: (target: CallbacksClass, chain: CallbackChain) => void,
+  ): void;
 }
 
 export type FilterListEntry<T extends object = object> =
@@ -984,20 +932,15 @@ interface ProceedTracker {
   observed: boolean;
 }
 
-function assignYield(
-  env: FilterEnvironment,
-  y: unknown,
-  opts: RunCallbacksOptions | undefined,
-  chainName: string,
-): void | Promise<void> {
+function assignYield(env: FilterEnvironment, y: unknown): void | Promise<void> {
   if (!isThenable(y)) {
     env.value = y;
     return;
   }
-  if (opts?.strict === "sync") {
+  if (env.syncChain !== undefined) {
     swallowRejection(y);
     throw new RuntimeError(
-      `Async callback on sync chain "${chainName}" — block returned a Promise`,
+      `Async callback on sync chain "${env.syncChain}" — block returned a Promise`,
     );
   }
   return Promise.resolve(y).then((v) => {
@@ -1040,231 +983,231 @@ function observeProceed(
   };
 }
 
-export namespace Callbacks {
-  export function defineCallbacks<T extends object>(
-    target: T,
+export const ClassMethods = {
+  __updateCallbacks(
+    this: CallbacksClass,
     name: string,
-    options: DefineCallbacksOptions<T> = {},
+    block: (target: CallbacksClass, chain: CallbackChain) => void,
   ): void {
-    const chains = getCallbackChains(target);
-    if (!chains.has(name)) {
-      chains.set(name, new CallbackChain(name, options as DefineCallbacksOptions));
-    }
+    const targets = this.descendants;
+    targets.unshift(this);
+    targets.reverse().forEach((target) => {
+      const chain = target.getCallbacks(name);
+      block(target, chain.dup());
+    });
+  },
 
-    if (Object.prototype.hasOwnProperty.call(target, "constructor")) {
-      Object.defineProperty(target.constructor, `_${camelize(name, false)}Callbacks`, {
-        get(this: { prototype: object }) {
-          return ClassMethods.getCallbacks.call(this, name);
-        },
-        set(this: { prototype: object }, value: CallbackChain) {
-          ClassMethods.setCallbacks.call(this, name, value);
-        },
-        configurable: true,
-      });
-    }
-  }
-
-  export function setCallback<T extends object>(
-    target: T,
-    name: string,
-    ...filterList: FilterListEntry<T>[]
-  ): void {
+  setCallback(this: CallbacksClass, name: string, ...filterList: FilterListEntry<any>[]): void {
+    const block = rbBlockGivenP(filterList[filterList.length - 1])
+      ? (filterList.pop() as AnyCallback)
+      : null;
     const [type, filters, options] = normalizeCallbackParams(
       filterList as Parameters<typeof normalizeCallbackParams>[0],
-      null,
+      block,
     );
-    const chains = getCallbackChains(target);
-    const chain = chains.get(name);
-    if (!chain) {
-      throw new RuntimeError(`No callback chain "${name}" defined. Call defineCallbacks first.`);
-    }
+
+    const selfChain = this.getCallbacks(name);
     const mapped = filters.map((filter) =>
       Callback.build(
-        chain,
+        selfChain,
         filter as AnyCallback | CallbackObject,
         type,
         options as CallbackOptions,
       ),
     );
-    if (options.prepend) {
-      chain.prepend(...mapped);
-    } else {
-      chain.append(...mapped);
-    }
-  }
 
-  export function skipCallback<T extends object>(
-    target: T,
-    name: string,
-    ...filterList: FilterListEntry<T>[]
-  ): void {
+    this.__updateCallbacks(name, (target, chain) => {
+      if (options.prepend) {
+        chain.prepend(...mapped);
+      } else {
+        chain.append(...mapped);
+      }
+      target.setCallbacks(name, chain);
+    });
+  },
+
+  skipCallback(this: CallbacksClass, name: string, ...filterList: FilterListEntry<any>[]): void {
+    const block = rbBlockGivenP(filterList[filterList.length - 1])
+      ? (filterList.pop() as AnyCallback)
+      : null;
     const [type, filters, options] = normalizeCallbackParams(
       filterList as Parameters<typeof normalizeCallbackParams>[0],
-      null,
+      block,
     );
+
     if (!("raise" in options)) options.raise = true;
 
-    let chain = peekCallbackChain(target, name);
-    if (!chain) return;
-    for (const filter of filters) {
-      let callback = chain.entries.find((c) =>
-        c.matches(type, filter as AnyCallback | CallbackObject),
-      );
-
-      if (!callback && options.raise) {
-        throw new ArgumentError(
-          `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
-        );
-      }
-      if (!callback) continue;
-
-      if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
-        chain = getCallbackChains(target).get(name)!;
-        callback = chain.entries.find((c) =>
+    this.__updateCallbacks(name, (target, chain) => {
+      filters.forEach((filter) => {
+        const callback = chain.entries.find((c) =>
           c.matches(type, filter as AnyCallback | CallbackObject),
-        )!;
-      }
+        );
 
-      if ("if" in options || "unless" in options) {
-        const newCallback = callback.mergeConditionalOptions(chain, {
-          ifOption: options.if,
-          unlessOption: options.unless,
-        });
-        chain.insert(chain.index(callback), newCallback);
-      }
-      chain.delete(callback);
-    }
-  }
+        if (!callback && options.raise) {
+          throw new ArgumentError(
+            `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
+          );
+        }
 
-  export function resetCallbacks(target: object, name: string): void {
-    const callbacks = getCallbackChains(target).get(name)!;
-    const klass = target.constructor as AnyClass;
+        if (callback && ("if" in options || "unless" in options)) {
+          const newCallback = callback.mergeConditionalOptions(chain, {
+            ifOption: options.if,
+            unlessOption: options.unless,
+          });
+          chain.insert(chain.index(callback), newCallback);
+        }
 
-    for (const target of DescendantsTracker.descendants(klass)) {
-      const chain = getCallbackChains(target.prototype as object).get(name)!;
+        chain.delete(callback);
+      });
+      target.setCallbacks(name, chain);
+    });
+  },
+
+  resetCallbacks(this: CallbacksClass, name: string): void {
+    const callbacks = this.getCallbacks(name);
+
+    this.descendants.forEach((target) => {
+      const chain = target.getCallbacks(name).dup();
       callbacks.each((c) => chain.delete(c));
+      target.setCallbacks(name, chain);
+    });
+
+    this.setCallbacks(name, callbacks.dup().clear());
+  },
+
+  defineCallbacks(
+    this: CallbacksClass,
+    ...names: Array<string | DefineCallbacksOptions<any>>
+  ): void {
+    const options = extractOptionsBang(names) as DefineCallbacksOptions;
+
+    (names as string[]).forEach((name) => {
+      [this, ...this.descendants].forEach((target) => {
+        target.setCallbacks(name, new CallbackChain(name, options));
+      });
+
+      Object.defineProperty(this.prototype, `_run${camelize(name)}Callbacks`, {
+        value(this: { runCallbacks: typeof runCallbacks }, block?: () => unknown) {
+          return this.runCallbacks(name, block);
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      Object.defineProperty(this, `_${camelize(name, false)}Callbacks`, {
+        get(this: CallbacksClass) {
+          return this.getCallbacks(name);
+        },
+        set(this: CallbacksClass, value: CallbackChain) {
+          this.setCallbacks(name, value);
+        },
+        configurable: true,
+      });
+
+      Object.defineProperty(this.prototype, `_${camelize(name, false)}Callbacks`, {
+        get(this: { __callbacks: Record<string, CallbackChain> }) {
+          return this.__callbacks[name];
+        },
+        configurable: true,
+      });
+    });
+  },
+
+  /** @internal */
+  getCallbacks(this: CallbacksClass, name: string): CallbackChain {
+    return this.__callbacks[name];
+  },
+
+  /** @internal */
+  setCallbacks(
+    this: CallbacksClass,
+    name: string,
+    callbacks: CallbackChain,
+  ): Record<string, CallbackChain> {
+    if (!Object.prototype.hasOwnProperty.call(this, "__class_attr___callbacks")) {
+      this.__callbacks = { ...this.__callbacks };
+      if (!rbModSingletonP(this)) {
+        let klass = this as unknown as AnyClass;
+        for (let superclass; (superclass = rbClassSuperclass(klass)); klass = superclass) {
+          DescendantsTracker.registerSubclass(superclass, klass);
+        }
+      }
     }
+    this.__callbacks[name] = callbacks;
+    return this.__callbacks;
+  },
+};
 
-    callbacks.clear();
-  }
+export const Callbacks = new Module() as Module<{
+  runCallbacks: typeof runCallbacks;
+  haltedCallbackHook(_filter: unknown, _name: string): void;
+}> & { ClassMethods: typeof ClassMethods };
+extend(Callbacks, Concern);
 
-  export const ClassMethods = {
-    setCallback(
-      this: { prototype: object },
-      name: string,
-      ...filterList: FilterListEntry<any>[]
-    ): void {
-      Callbacks.setCallback(this.prototype, name, ...filterList);
-    },
+Concern.included.call(Callbacks, null, function (this: AnyClass) {
+  extend(this as never, DescendantsTracker);
+  classAttribute.call(this, "__callbacks", {
+    instanceWriter: false,
+    instancePredicate: false,
+    default: {},
+  });
+});
 
-    skipCallback(
-      this: { prototype: object },
-      name: string,
-      ...filterList: FilterListEntry<any>[]
-    ): void {
-      Callbacks.skipCallback(this.prototype, name, ...filterList);
-    },
+Callbacks.ClassMethods = ClassMethods;
 
-    resetCallbacks(this: { prototype: object }, name: string): void {
-      Callbacks.resetCallbacks(this.prototype, name);
-    },
+Callbacks.moduleEval((mod) => {
+  mod.runCallbacks = runCallbacks;
 
-    getCallbacks(this: { prototype: object }, name: string): CallbackChain | undefined {
-      return peekCallbackChain(this.prototype, name);
-    },
+  mod.haltedCallbackHook = function (_filter: unknown, _name: string): void {};
+});
 
-    setCallbacks(
-      this: { prototype: object },
-      name: string,
-      callbacks: CallbackChain,
-    ): Map<string, CallbackChain> {
-      const __callbacks = getCallbackChains(this.prototype);
-      __callbacks.set(name, callbacks);
-      return __callbacks;
-    },
-  };
-
-  export const InstanceMethods = {
-    runCallbacks(
-      this: object,
-      name: string,
-      block?: () => unknown,
-      opts?: RunCallbacksOptions,
-      type?: CallbackKind,
-    ): unknown {
-      return runCallbacks(this, name, block, opts, type);
-    },
-
-    haltedCallbackHook(_filter: unknown, _name: string): void {},
-  };
-}
-
-export function defineCallbacks<T extends object>(
-  target: T,
-  name: string,
-  options: DefineCallbacksOptions<T> = {},
-): void {
-  Callbacks.defineCallbacks(target, name, options);
-}
-
-export function setCallback<T extends object>(
-  target: T,
-  name: string,
-  ...filterList: FilterListEntry<T>[]
-): void {
-  Callbacks.setCallback(target, name, ...filterList);
-}
-
-export function skipCallback<T extends object>(
-  target: T,
-  name: string,
-  ...filterList: FilterListEntry<T>[]
-): void {
-  Callbacks.skipCallback(target, name, ...filterList);
-}
-
-export function resetCallbacks(target: object, name: string): void {
-  Callbacks.resetCallbacks(target, name);
-}
-
-export function runCallbacks(
-  target: object,
-  name: string,
+function runCallbacks(
+  this: object,
+  kind: string,
   block?: () => unknown,
   opts?: RunCallbacksOptions,
   type?: CallbackKind,
 ): unknown {
-  const callbacks = peekCallbackChain(target, name);
+  const callbacks = (this as { __callbacks: Record<string, CallbackChain> }).__callbacks[kind];
+  const strict = opts?.strict ?? callbacks.config.strict;
 
-  if (!callbacks || callbacks.isEmpty) {
+  if (callbacks.isEmpty) {
     const r = block?.();
     if (!isThenable(r)) return r;
-    if (opts?.strict === "sync") {
+    if (strict === "sync") {
       swallowRejection(r);
       throw new RuntimeError("Async block on chain with no callbacks");
     }
     return r;
   }
-  const chainName = callbacks.name;
-  const env: FilterEnvironment = { target, halted: false, value: undefined };
+  const env: FilterEnvironment = {
+    target: this,
+    halted: false,
+    value: undefined,
+    syncChain: strict === "sync" ? callbacks.name : undefined,
+  };
 
-  const nextSequence = callbacks.compile(type);
+  let nextSequence = callbacks.compile(type);
+  let resume: InvokeSequenceState | null = null;
+  let tracker: ProceedTracker | null = null;
 
-  const invokeSequence = (
-    start: CallbackSequence,
-    resume: InvokeSequenceState | null,
-    proceed: ProceedTracker | null,
-  ): unknown => {
-    let current = resume?.current ?? start;
+  const invokeSequence = (): unknown => {
+    const proceed = resume ? null : tracker;
+    let current = resume?.current ?? nextSequence;
     let skipped = resume?.skipped ?? null;
     let step = resume?.step ?? "before";
+    resume = null;
     const suspend = (r: PromiseLike<unknown>, at: InvokeSequenceState["step"]) =>
-      Promise.resolve(r).then(() => invokeSequence(start, { current, skipped, step: at }, null));
+      Promise.resolve(r).then(() => {
+        resume = { current, skipped, step: at };
+        return invokeSequence();
+      });
 
     let result: unknown;
     sequence: while (true) {
       if (step === "before") {
-        const beforeDone = current.invokeBefore(env, opts, chainName);
+        current = nextSequence;
+        const beforeDone = current.invokeBefore(env);
         step = "yield";
         if (isThenable(beforeDone)) {
           result = suspend(beforeDone, "yield");
@@ -1274,29 +1217,26 @@ export function runCallbacks(
       if (step === "yield") {
         step = "after";
         if (current.isFinal()) {
-          const yielded = assignYield(
-            env,
-            env.halted ? false : block ? block() : true,
-            opts,
-            chainName,
-          );
+          const yielded = assignYield(env, env.halted ? false : block ? block() : true);
           if (isThenable(yielded)) {
             result = suspend(yielded, "after");
             break sequence;
           }
         } else if (current.isSkip(env)) {
           (skipped ??= []).push(current);
-          current = current.nested!;
+          nextSequence = nextSequence.nested!;
           step = "before";
           continue;
         } else {
-          const tracker: ProceedTracker = { pending: undefined, observed: false };
-          const [receiver, blk, method, ...args] = current.expandCallTemplate(
-            env,
-            invokeSequence.bind(null, current.nested!, null, tracker),
-          ) as [unknown, unknown, string, ...unknown[]];
+          nextSequence = nextSequence.nested!;
+          const proceeding = tracker;
+          const own: ProceedTracker = (tracker = { pending: undefined, observed: false });
           let cbResult: unknown;
           try {
+            const [receiver, blk, method, ...args] = current.expandCallTemplate(
+              env,
+              invokeSequence,
+            ) as [unknown, unknown, string, ...unknown[]];
             if (method === "instanceExec") {
               cbResult = (blk as (...a: unknown[]) => unknown).apply(receiver, args);
             } else if (method === "call") {
@@ -1308,51 +1248,66 @@ export function runCallbacks(
               );
             }
           } catch (err) {
-            if (tracker.pending) {
-              const pending = tracker.pending;
+            if (own.pending) {
+              const pending = own.pending;
               result = (async () => {
-                await pending.catch(() => {});
+                try {
+                  await pending.catch(() => {});
+                } finally {
+                  nextSequence = current;
+                  tracker = proceeding;
+                }
                 throw err;
               })();
               break sequence;
             }
             throw err;
+          } finally {
+            if (env.syncChain !== undefined || !(isThenable(cbResult) || own.pending)) {
+              nextSequence = current;
+              tracker = proceeding;
+            }
           }
-          if (isThenable(cbResult) || tracker.pending) {
-            if (opts?.strict === "sync") {
+          if (isThenable(cbResult) || own.pending) {
+            if (env.syncChain !== undefined) {
               swallowRejection(cbResult);
-              swallowRejection(tracker.pending);
+              swallowRejection(own.pending);
               throw new RuntimeError(
-                `Async callback on sync chain "${chainName}" — around callback or block returned a Promise`,
+                `Async callback on sync chain "${env.syncChain}" — around callback or block returned a Promise`,
               );
             }
-            const around = cbResult;
             result = (async () => {
               try {
-                await around;
-              } catch (err) {
-                if (tracker.pending) await tracker.pending.catch(() => {});
-                throw err;
+                try {
+                  await cbResult;
+                } catch (err) {
+                  if (own.pending) await own.pending.catch(() => {});
+                  throw err;
+                }
+                if (own.pending) {
+                  if (own.observed) await own.pending.catch(() => {});
+                  else await own.pending;
+                }
+              } finally {
+                nextSequence = current;
+                tracker = proceeding;
               }
-              if (tracker.pending) {
-                if (tracker.observed) await tracker.pending.catch(() => {});
-                else await tracker.pending;
-              }
-              return invokeSequence(start, { current, skipped, step: "after" }, null);
+              resume = { current, skipped, step: "after" };
+              return invokeSequence();
             })();
             break sequence;
           }
         }
       }
       if (step === "after") {
-        const afterDone = current.invokeAfter(env, opts, chainName);
+        const afterDone = current.invokeAfter(env);
         if (isThenable(afterDone)) {
           result = suspend(afterDone, "skipped");
           break sequence;
         }
       }
       while (skipped && skipped.length > 0) {
-        const afterDone = skipped.pop()!.invokeAfter(env, opts, chainName);
+        const afterDone = skipped.pop()!.invokeAfter(env);
         if (isThenable(afterDone)) {
           result = suspend(afterDone, "skipped");
           break sequence;
@@ -1365,89 +1320,24 @@ export function runCallbacks(
   };
 
   if (nextSequence.isFinal()) {
-    const beforeDone = nextSequence.invokeBefore(env, opts, chainName);
+    const beforeDone = nextSequence.invokeBefore(env);
     if (isThenable(beforeDone)) {
-      return Promise.resolve(beforeDone).then(() =>
-        invokeSequence(nextSequence, { current: nextSequence, skipped: null, step: "yield" }, null),
-      );
+      return Promise.resolve(beforeDone).then(() => {
+        resume = { current: nextSequence, skipped: null, step: "yield" };
+        return invokeSequence();
+      });
     }
-    const yielded = assignYield(env, env.halted ? false : block ? block() : true, opts, chainName);
+    const yielded = assignYield(env, env.halted ? false : block ? block() : true);
     if (isThenable(yielded)) {
-      return yielded.then(() =>
-        invokeSequence(nextSequence, { current: nextSequence, skipped: null, step: "after" }, null),
-      );
+      return yielded.then(() => {
+        resume = { current: nextSequence, skipped: null, step: "after" };
+        return invokeSequence();
+      });
     }
-    const afterDone = nextSequence.invokeAfter(env, opts, chainName);
+    const afterDone = nextSequence.invokeAfter(env);
     if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => env.value);
     return env.value;
   } else {
-    return invokeSequence(nextSequence, null, null);
+    return invokeSequence();
   }
-}
-
-export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
-  const ActualBase = (Base ?? class {}) as TBase;
-
-  class WithCallbacks extends ActualBase {
-    static defineCallbacks<T extends object>(
-      this: { prototype: T },
-      name: string,
-      options: DefineCallbacksOptions<T> = {},
-    ): void {
-      defineCallbacks(this.prototype, name, options);
-    }
-
-    static beforeCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      callback: BeforeCallback<T> | CallbackObject,
-      options: CallbackOptions<T> = {},
-    ): void {
-      setCallback(this.prototype, name, "before", callback, options);
-    }
-
-    static afterCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      callback: AfterCallback<T> | CallbackObject,
-      options: CallbackOptions<T> = {},
-    ): void {
-      setCallback(this.prototype, name, "after", callback, options);
-    }
-
-    static aroundCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      callback: AroundCallback<T> | CallbackObject,
-      options: CallbackOptions<T> = {},
-    ): void {
-      setCallback(this.prototype, name, "around", callback, options);
-    }
-
-    static skipCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      ...filterList: FilterListEntry<T>[]
-    ): void {
-      skipCallback(this.prototype, name, ...filterList);
-    }
-
-    static resetCallbacks(name: string): void {
-      resetCallbacks(this.prototype, name);
-    }
-
-    runCallbacks(
-      name: string,
-      block?: () => unknown,
-      opts?: RunCallbacksOptions,
-      type?: CallbackKind,
-    ): unknown {
-      return runCallbacks(this, name, block, opts, type);
-    }
-
-    /** @internal */
-    haltedCallbackHook(_filter: unknown, _name: string): void {}
-  }
-
-  return WithCallbacks;
 }

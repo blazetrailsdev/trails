@@ -1,59 +1,99 @@
+import { mattrAccessor, threadMattrAccessor } from "@blazetrails/activesupport";
+import {
+  getAsyncContext,
+  included,
+  last,
+  rbEnsure,
+  rbFSend,
+  rbObjDup,
+  Thread,
+  type AsyncContext,
+  type AsyncContextAdapter,
+} from "@blazetrails/ruby-compat";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 
-const customContexts: Context[] = [];
+interface Block {
+  thread: Thread;
+  customContexts: Context[] | null;
+}
 
-let _defaultContext: Context | undefined;
+let _adapter: AsyncContextAdapter | null = null;
+let _blocks: AsyncContext<Block> | null = null;
+
+function blocks(): AsyncContext<Block> {
+  const adapter = getAsyncContext();
+  if (!_blocks || _adapter !== adapter) {
+    _adapter = adapter;
+    _blocks = adapter.create<Block>();
+  }
+  return _blocks;
+}
+
+function openBlock(): Block | null {
+  const block = blocks().getStore();
+  return block && block.thread === Thread.current() ? block : null;
+}
 
 export class Contexts {
-  static get defaultContext(): Context {
-    return (_defaultContext ??= new Context());
+  declare static defaultContext: Context;
+  declare static customContexts: Context[] | null;
+  declare defaultContext: Context;
+  declare customContexts: Context[] | null;
+
+  static [included](base: object): void {
+    mattrAccessor.call(base, "defaultContext", { default: new Context() });
+    threadMattrAccessor.call(base, "customContexts");
+
+    const threadLocal = Object.getOwnPropertyDescriptor(base, "customContexts")!;
+    Object.defineProperty(base, "customContexts", {
+      ...threadLocal,
+      get(this: object) {
+        const block = openBlock();
+        return block ? block.customContexts : threadLocal.get!.call(this);
+      },
+      set(this: object, value: Context[] | null) {
+        const block = openBlock();
+        if (block) block.customContexts = value;
+        else threadLocal.set!.call(this, value);
+      },
+    });
   }
 
-  static set defaultContext(value: Context) {
-    _defaultContext = value;
-  }
+  /** @inventedArm run — CONVERGEABLE thread-local-block-stacks-fork-per-async-block-at-the-root */
+  static withEncryptionContext<T>(properties: Partial<Context>, block: () => T): T {
+    const own: Block = {
+      thread: Thread.current(),
+      customContexts: [...(this.customContexts ||= [])],
+    };
+    return blocks().run(own, () =>
+      rbEnsure(
+        () => {
+          this.customContexts ||= [];
+          this.customContexts.push(rbObjDup(this.defaultContext));
+          for (const [key, value] of Object.entries(properties)) {
+            rbFSend(this.currentCustomContext, `${key}=`, value);
+          }
 
-  static withEncryptionContext<T>(properties: Partial<Context>, fn: () => T): T {
-    const frame: Context = Object.assign(
-      Object.create(Object.getPrototypeOf(this.defaultContext)),
-      this.defaultContext,
+          return block();
+        },
+        () => {
+          this.customContexts!.pop();
+        },
+      ),
     );
-    Object.assign(frame, properties);
-    customContexts.push(frame);
-    let result: T;
-    try {
-      result = fn();
-    } catch (e) {
-      customContexts.pop();
-      throw e;
-    }
-    if (result && typeof (result as { then?: unknown }).then === "function") {
-      return (result as unknown as Promise<unknown>).then(
-        (val) => {
-          customContexts.pop();
-          return val;
-        },
-        (err) => {
-          customContexts.pop();
-          throw err;
-        },
-      ) as unknown as T;
-    }
-    customContexts.pop();
-    return result;
   }
 
-  static withoutEncryption<T>(fn: () => T): T {
-    return this.withEncryptionContext({ encryptor: new NullEncryptor() }, fn);
+  static withoutEncryption<T>(block: () => T): T {
+    return this.withEncryptionContext({ encryptor: new NullEncryptor() }, block);
   }
 
-  static protectingEncryptedData<T>(fn: () => T): T {
+  static protectingEncryptedData<T>(block: () => T): T {
     return this.withEncryptionContext(
       { encryptor: new EncryptingOnlyEncryptor(), frozenEncryption: true },
-      fn,
+      block,
     );
   }
 
@@ -61,13 +101,12 @@ export class Contexts {
     return this.currentCustomContext ?? this.defaultContext;
   }
 
-  /** @missingRailsCall last — PERMANENT */
-  static get currentCustomContext(): Context | null {
-    return customContexts.length > 0 ? customContexts[customContexts.length - 1] : null;
+  static get currentCustomContext(): Context | null | undefined {
+    return this.customContexts && last(this.customContexts);
   }
 
   static resetDefaultContext(): void {
-    _defaultContext = new Context();
+    this.defaultContext = new Context();
   }
 }
 

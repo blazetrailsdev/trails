@@ -10,7 +10,8 @@ import {
   upcaseFirst,
   type Deprecators,
 } from "@blazetrails/activesupport";
-import { except, prepend, Process, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { except, Process, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import {
@@ -22,10 +23,8 @@ import {
   ControllerRuntime,
   LogSubscriber,
   QueryCache,
-  Relation,
   SchemaReflection,
   Migration,
-  UniquenessValidator,
   deprecator,
   QueryLogs,
   type AutoFilteredParametersApp,
@@ -34,9 +33,7 @@ import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapte
 import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 import {
   Encryption,
-  EncryptedAttributeType,
   EncryptedFixtures,
-  EncryptedUniquenessValidator,
   ExtendedDeterministicQueries,
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
@@ -101,11 +98,8 @@ const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
 
 const installEncryptionExtendedQueries = (): void => {
   if (Encryption.config.extendQueries) {
-    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
-    ExtendedDeterministicUniquenessValidator.installSupport({
-      UniquenessValidator,
-      EncryptedUniquenessValidator,
-    });
+    ExtendedDeterministicQueries.installSupport();
+    ExtendedDeterministicUniquenessValidator.installSupport();
   }
 };
 
@@ -321,10 +315,7 @@ export class Trailtie extends BaseTrailtie {
 
       onLoad("active_record_fixture_set", () => {
         if (Encryption.config.encryptFixtures) {
-          prepend(
-            (constantize("ActiveRecord::Fixture") as { prototype: object }).prototype,
-            EncryptedFixtures,
-          );
+          prepend(constantize("ActiveRecord::Fixture") as new () => object, EncryptedFixtures);
         }
       });
     });

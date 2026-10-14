@@ -21,7 +21,7 @@ import {
   complex,
   rational,
   rbEqual,
-  rbObjClass,
+  rbObjClassname,
   toI,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
@@ -76,7 +76,7 @@ function range(first: number, last: number): number[] {
 }
 
 function assertTypedEqual(e: unknown, v: unknown, cls: string, msg?: string): void {
-  expect(rbObjClass(v), msg).toBe(cls);
+  expect(rbObjClassname(v), msg).toBe(cls);
   assertEqual(e, v, msg);
 }
 

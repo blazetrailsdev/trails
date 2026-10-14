@@ -1,4 +1,19 @@
-import { block, fetch, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  block,
+  except,
+  fetch,
+  include,
+  included,
+  isSymbol,
+  keywordSplat,
+  merge,
+  Module,
+  rbRegMatchP,
+  registerConstant,
+  slice,
+  symbolToS,
+  update,
+} from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
@@ -7,7 +22,10 @@ import {
   singularize,
   pluralize,
   assertValidKeys,
+  extractOptionsBang,
   isBlank,
+  isPlainObject,
+  underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -177,9 +195,8 @@ export class ForeignKeyDefinition {
     return this.isValidate;
   }
 
-  /** @missingRailsCall match? — PERMANENT */
-  get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? this.name.search(SchemaDumper.fkIgnorePattern) === -1 : false;
+  get isExportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.fkIgnorePattern, this.name) : null;
   }
 
   isDefinedFor({
@@ -187,10 +204,7 @@ export class ForeignKeyDefinition {
     validate = null,
     ...options
   }: ForeignKeyLookupOptions = {}): boolean {
-    const slice: Record<string, unknown> = {};
-    for (const k of Object.keys(this.options)) {
-      if (k in options) slice[k] = (options as Record<string, unknown>)[k];
-    }
+    const sliced = slice(options as Record<string, unknown>, ...Object.keys(this.options));
 
     const toStrings = (c: unknown): string[] =>
       c === undefined || c === null ? [] : Array.isArray(c) ? c.map(String) : [String(c)];
@@ -198,7 +212,7 @@ export class ForeignKeyDefinition {
     return (
       (toTable == null || toTable.toString() === this.toTable) &&
       (validate == null || validate === fetch(this.options, "validate", validate)) &&
-      Object.entries(slice).every(([k, v]) => {
+      Object.entries(sliced).every(([k, v]) => {
         const mine = toStrings((this.options as Record<string, unknown>)[k]);
         const theirs = toStrings(v);
         return mine.length === theirs.length && mine.every((x, i) => x === theirs[i]);
@@ -244,13 +258,13 @@ export class CheckConstraintDefinition {
     return "validate" in this.options ? (this.options.validate as boolean | null) : true;
   }
 
-  get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? this.name.search(SchemaDumper.chkIgnorePattern) === -1 : false;
+  get isExportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.chkIgnorePattern, this.name) : null;
   }
 
   isDefinedFor(options: {
     name: string | null | undefined;
-    expression?: string;
+    expression?: string | null;
     validate?: boolean | null;
     [key: string]: unknown;
   }): boolean {
@@ -339,7 +353,7 @@ export interface AddIndexOptions {
   ifNotExists?: boolean;
   length?: number | null | Record<string, number>;
   opclass?: Record<string, string>;
-  include?: string | string[];
+  include?: string | string[] | null;
   nullsNotDistinct?: boolean;
   algorithm?: string;
 }
@@ -371,9 +385,9 @@ export class IndexDefinition {
   readonly opclasses: Record<string, string> | string;
   readonly type?: string;
   readonly using?: string;
-  readonly include?: string | string[];
+  readonly include?: string | string[] | null;
   readonly nullsNotDistinct?: boolean;
-  readonly comment?: string;
+  readonly comment?: string | null;
   readonly valid: boolean;
   readonly algorithm?: string;
   readonly ifNotExists?: boolean;
@@ -390,11 +404,11 @@ export class IndexDefinition {
       opclasses?: Record<string, string> | string;
       type?: string;
       using?: string;
-      include?: string | string[];
+      include?: string | string[] | null;
       algorithm?: string;
       ifNotExists?: boolean;
       nullsNotDistinct?: boolean;
-      comment?: string;
+      comment?: string | null;
       valid?: boolean;
     } = {},
   ) {
@@ -438,7 +452,7 @@ export class IndexDefinition {
       name?: string;
       unique?: boolean;
       valid?: boolean;
-      include?: string | string[];
+      include?: string | string[] | null;
       nullsNotDistinct?: boolean;
     } = {},
   ): boolean {
@@ -509,6 +523,47 @@ export interface ColumnMethods {
   ): unknown;
 }
 
+function primaryKey(
+  this: { column(name: string, type: ColumnType, options: ColumnOptions): unknown },
+  name: string,
+  type: ColumnType = "primary_key",
+  options: ColumnOptions = {},
+): unknown {
+  return this.column(name, type, { ...options, primaryKey: true });
+}
+
+export type ColumnMethodsBase = {
+  defineColumnMethods(...columnTypes: string[]): void;
+  prototype: Record<string, unknown>;
+};
+
+export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
+  new Module();
+
+ColumnMethods.defineMethod("primaryKey", primaryKey);
+
+ColumnMethods[included] = function (base: ColumnMethodsBase): void {
+  base.defineColumnMethods(
+    "bigint",
+    "binary",
+    "boolean",
+    "date",
+    "datetime",
+    "decimal",
+    "float",
+    "integer",
+    "json",
+    "string",
+    "text",
+    "time",
+    "timestamp",
+    "virtual",
+  );
+
+  base.prototype.blob = base.prototype.binary;
+  base.prototype.numeric = base.prototype.decimal;
+};
+
 /** @internal */
 export interface ReferenceDefinitionConnection {
   addColumn(
@@ -516,8 +571,8 @@ export interface ReferenceDefinitionConnection {
     columnName: string,
     type: ColumnType,
     options?: ColumnOptions,
-  ): Promise<void>;
-  addIndex(tableName: string, columnNames: string[], options?: AddIndexOptions): Promise<void>;
+  ): Promise<unknown>;
+  addIndex(tableName: string, columnNames: string[], options?: AddIndexOptions): Promise<unknown>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
 }
 
@@ -598,30 +653,17 @@ export class ReferenceDefinition {
       : {};
   }
 
-  /**
-   * @internal
-   * @missingRailsCall slice — PERMANENT
-   */
+  /** @internal */
   private conditionalOptions(): Pick<ColumnOptions, "ifExists" | "ifNotExists"> {
-    const result: Pick<ColumnOptions, "ifExists" | "ifNotExists"> = {};
-    if (this.options.ifExists !== undefined) result.ifExists = this.options.ifExists;
-    if (this.options.ifNotExists !== undefined) result.ifNotExists = this.options.ifNotExists;
-    return result;
+    return slice(this.options as Record<string, unknown>, "ifExists", "ifNotExists");
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   * @missingRailsCall slice — PERMANENT
-   */
+  /** @internal */
   private polymorphicOptions(): ColumnOptions {
-    return {
-      ...this.asOptions(this.polymorphic),
-      ...this.conditionalOptions(),
-      ...(this.options.null !== undefined ? { null: this.options.null } : {}),
-      ...(this.options.first !== undefined ? { first: this.options.first } : {}),
-      ...(this.options.after !== undefined ? { after: this.options.after } : {}),
-    };
+    return merge(
+      merge(this.asOptions(this.polymorphic), this.conditionalOptions()),
+      slice(this.options as Record<string, unknown>, "null", "first", "after"),
+    );
   }
 
   /** @internal */
@@ -629,34 +671,25 @@ export class ReferenceDefinition {
     return `index_${tableName}_on_${this.name}`;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   protected indexOptions(tableName: string): AddIndexOptions {
-    const opts: AddIndexOptions = {
-      ...this.asOptions(this.index),
-      ...this.conditionalOptions(),
-    };
+    const indexOptions: AddIndexOptions = merge(
+      this.asOptions(this.index),
+      this.conditionalOptions(),
+    );
 
-    if (this.options._usesLegacyReferenceIndexName) return opts;
+    if (this.options._usesLegacyReferenceIndexName) return indexOptions;
 
-    if (this.polymorphic && !opts.name) {
-      opts.name = this.polymorphicIndexName(tableName);
-    }
-    return opts;
+    if (this.polymorphic) indexOptions.name ||= this.polymorphicIndexName(tableName);
+    return indexOptions;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   private foreignKeyOptions(): ReferenceForeignKeyOptions {
-    return {
-      ...this.asOptions(this.foreignKey),
+    return merge(this.asOptions(this.foreignKey), {
       column: this.columnName(),
       ...this.conditionalOptions(),
-    } as ReferenceForeignKeyOptions;
+    }) as ReferenceForeignKeyOptions;
   }
 
   /** @internal */
@@ -680,14 +713,10 @@ export class ReferenceDefinition {
     return this.columns().map(([n]) => n);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs fetch — PERMANENT
-   */
+  /** @internal */
   private foreignTableName(): string {
-    const fkOpts = this.foreignKeyOptions();
     return fetch<string>(
-      fkOpts as unknown as Record<string, unknown>,
+      this.foreignKeyOptions() as unknown as Record<string, unknown>,
       "toTable",
       block(() => (ActiveRecord.Base.pluralizeTableNames ? pluralize(this.name) : this.name)),
     );
@@ -753,6 +782,8 @@ export type TableOf<A> = A extends {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition {
+  declare primaryKey: (name: string, type?: ColumnType, options?: ColumnOptions) => this;
+
   readonly name: string;
   protected readonly columnsHash = new Map<string, ColumnDefinition | null>();
   readonly indexes: Array<[string | string[], AddIndexOptions]> = [];
@@ -791,26 +822,23 @@ export class TableDefinition {
 
   setPrimaryKey(
     tableName: string,
-    id: boolean | ColumnType | IdHashOptions,
+    id: false | ColumnType | IdHashOptions,
     primaryKey?: string | string[] | false,
     options: Record<string, unknown> = {},
   ): void {
-    if (!id || this.as) return;
+    if (id && !this.as) {
+      const pk = primaryKey || (ActiveRecord.Base.getPrimaryKey(singularize(tableName)) as string);
 
-    const pk = primaryKey || (ActiveRecord.Base.getPrimaryKey(singularize(tableName)) as string);
+      if (isPlainObject(id)) {
+        update(options, except(id as Record<string, unknown>, "type"));
+        id = fetch(id as Record<string, ColumnType>, "type", "primary_key");
+      }
 
-    let pkOptions: ColumnOptions = { ...(options as Partial<ColumnOptions>) };
-    let pkType: ColumnType = typeof id === "string" ? id : "primary_key";
-    if (typeof id === "object" && id !== null) {
-      const { type, ...rest } = id;
-      pkOptions = { ...pkOptions, ...(rest as Partial<ColumnOptions>) };
-      pkType = "type" in id ? (type as ColumnType) : "primary_key";
-    }
-
-    if (Array.isArray(pk)) {
-      this.primaryKeys(pk);
-    } else {
-      this.primaryKey(pk, pkType, pkOptions);
+      if (Array.isArray(pk)) {
+        this.primaryKeys(pk);
+      } else {
+        this.primaryKey(pk, id as ColumnType, options);
+      }
     }
   }
 
@@ -856,7 +884,10 @@ export class TableDefinition {
     return this;
   }
 
-  checkConstraint(expression: string, options: { name?: string; validate?: boolean } = {}): this {
+  checkConstraint(
+    expression: string,
+    options: { name?: string; validate?: boolean | null; [key: string]: unknown } = {},
+  ): this {
     this.checkConstraints.push(this.newCheckConstraintDefinition(expression, options));
     return this;
   }
@@ -929,7 +960,7 @@ export class TableDefinition {
 
   newCheckConstraintDefinition(
     expression: string,
-    options: { name?: string; validate?: boolean } = {},
+    options: { name?: string; validate?: boolean | null; [key: string]: unknown } = {},
   ): CheckConstraintDefinition {
     options = this.conn.checkConstraintOptions(this.name, expression, options) as {
       name?: string;
@@ -992,10 +1023,6 @@ export class TableDefinition {
     }
   }
 
-  primaryKey(name: string, type: ColumnType = "primary_key", options: ColumnOptions = {}): this {
-    return this.column(name, type, { ...options, primaryKey: true });
-  }
-
   /** @internal */
   static defineColumnMethods(...columnTypes: string[]): void {
     for (const columnType of columnTypes) {
@@ -1018,27 +1045,12 @@ export class TableDefinition {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:367`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TableDefinition extends ColumnMethods {}
 
-TableDefinition.defineColumnMethods(
-  "bigint",
-  "binary",
-  "boolean",
-  "date",
-  "datetime",
-  "decimal",
-  "float",
-  "integer",
-  "json",
-  "string",
-  "text",
-  "time",
-  "timestamp",
-  "virtual",
-);
-TableDefinition.prototype.blob = TableDefinition.prototype.binary;
-TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
+include(TableDefinition, ColumnMethods);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table {
+  declare primaryKey: (name: string, type?: ColumnType, options?: ColumnOptions) => Promise<void>;
+
   get name(): string {
     return this._tableName;
   }
@@ -1055,14 +1067,10 @@ export class Table {
   ): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     const { index: indexOpt, ...colOpts } = options;
-    if (Object.keys(colOpts).length === 0) {
-      await this._schema.addColumn(this.name, columnName, type);
-    } else {
-      await this._schema.addColumn(this.name, columnName, type, colOpts as ColumnOptions);
-    }
+    await this._schema.addColumn(this.name, columnName, type, ...keywordSplat(colOpts));
     if (indexOpt) {
-      const opts: AddIndexOptions = typeof indexOpt === "object" ? indexOpt : {};
-      await this._schema.addIndex(this.name, columnName, opts);
+      const indexOptions: AddIndexOptions = typeof indexOpt === "object" ? indexOpt : {};
+      await this.index(columnName, indexOptions);
     }
   }
 
@@ -1071,40 +1079,30 @@ export class Table {
     type?: ColumnType,
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.columnExists(this.name, columnName, type);
-    }
-    return this._schema.columnExists(this.name, columnName, type, options);
+    return this._schema.columnExists(this.name, columnName, type, ...keywordSplat(options));
   }
   async index(columns: string | string[], options: AddIndexOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.addIndex(this.name, columns);
-    } else {
-      await this._schema.addIndex(this.name, columns, options);
-    }
+    await this._schema.addIndex(this.name, columns, ...keywordSplat(options));
   }
   async indexExists(
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.indexExists(this.name, columnName);
-    }
-    return this._schema.indexExists(this.name, columnName, options);
+    return this._schema.indexExists(this.name, columnName, ...keywordSplat(options));
   }
   async renameIndex(indexName: string, newIndexName: string): Promise<void> {
     return this._schema.renameIndex(this.name, indexName, newIndexName);
   }
   async timestamps(options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.addTimestamps(this.name);
-    } else {
-      await this._schema.addTimestamps(this.name, options);
-    }
+    await this._schema.addTimestamps(this.name, ...keywordSplat(options));
   }
-  async change(columnName: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
+  async change(
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): Promise<unknown> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     return this._schema.changeColumn(this.name, columnName, type, options);
   }
@@ -1122,38 +1120,26 @@ export class Table {
 
   async remove(...columnNames: string[]): Promise<void>;
   async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
-  async remove(...args: unknown[]): Promise<void> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.removeColumns(
-      this.name,
-      ...(rest as string[]),
-      ...(Object.keys(options).length > 0 ? [options] : []),
-    );
+  async remove(...columnNames: Array<string | ColumnOptions>): Promise<void> {
+    const options = extractOptionsBang(columnNames);
+    this.raiseOnIfExistOptions(options);
+    await this._schema.removeColumns(this.name, ...columnNames, ...keywordSplat(options));
   }
 
   async removeIndex(
-    columnName: string | string[] | { column?: string | string[]; name?: string } = {},
+    columnName?: string | string[] | { column?: string | string[]; name?: string },
     options: { column?: string | string[]; name?: string } = {},
-  ): Promise<void> {
-    const isColumn = typeof columnName === "string" || Array.isArray(columnName);
-    const column = isColumn ? columnName : undefined;
-    options = isColumn ? options : { ...columnName, ...options };
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.removeIndex(this.name, column);
-    } else {
-      await this._schema.removeIndex(this.name, column, options);
+  ): Promise<unknown> {
+    if (isPlainObject(columnName)) {
+      options = columnName;
+      columnName = undefined;
     }
+    this.raiseOnIfExistOptions(options);
+    return this._schema.removeIndex(this.name, columnName, ...keywordSplat(options));
   }
 
   async removeTimestamps(options: ColumnOptions = {}): Promise<void> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.removeTimestamps(this.name);
-    }
-    return this._schema.removeTimestamps(this.name, options);
+    return this._schema.removeTimestamps(this.name, ...keywordSplat(options));
   }
 
   async rename(columnName: string, newColumnName: string): Promise<void> {
@@ -1162,37 +1148,29 @@ export class Table {
 
   async references(...refNames: string[]): Promise<void>;
   async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
-  async references(...args: unknown[]): Promise<void> {
-    const { names, options } = this._splitRefNames(args);
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    for (const refName of names) {
-      if (Object.keys(options).length === 0) {
-        await this._schema.addReference(this.name, refName);
-      } else {
-        await this._schema.addReference(this.name, refName, options);
-      }
+  async references(...args: Array<string | AddReferenceOptions>): Promise<void> {
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    for (const refName of args) {
+      await this._schema.addReference(this.name, refName as string, ...keywordSplat(options));
     }
   }
 
   async belongsTo(...refNames: string[]): Promise<void>;
   async belongsTo(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
   async belongsTo(...args: unknown[]): Promise<void> {
-    return (this.references as (...a: unknown[]) => Promise<void>)(...args);
+    return this.references(...(args as string[]));
   }
 
   async removeReferences(...refNames: string[]): Promise<void>;
   async removeReferences(
     ...args: [...refNames: string[], options: AddReferenceOptions]
   ): Promise<void>;
-  async removeReferences(...args: unknown[]): Promise<void> {
-    const { names, options } = this._splitRefNames(args);
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    for (const refName of names) {
-      if (Object.keys(options).length === 0) {
-        await this._schema.removeReference(this.name, refName);
-      } else {
-        await this._schema.removeReference(this.name, refName, options);
-      }
+  async removeReferences(...args: Array<string | AddReferenceOptions>): Promise<void> {
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    for (const refName of args) {
+      await this._schema.removeReference(this.name, refName as string, ...keywordSplat(options));
     }
   }
 
@@ -1201,79 +1179,63 @@ export class Table {
     ...args: [...refNames: string[], options: AddReferenceOptions]
   ): Promise<void>;
   async removeBelongsTo(...args: unknown[]): Promise<void> {
-    return (this.removeReferences as (...a: unknown[]) => Promise<void>)(...args);
+    return this.removeReferences(...(args as string[]));
   }
 
-  async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      return this._schema.addForeignKey(this.name, toTable);
-    }
-    return this._schema.addForeignKey(this.name, toTable, options);
+  async foreignKey(...args: Array<string | Partial<AddForeignKeyOptions>>): Promise<void> {
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    return this._schema.addForeignKey(this.name, ...(args as [string]), ...keywordSplat(options));
   }
+
   async removeForeignKey(
-    toTableOrOptions: string | { column?: string; name?: string } = {},
+    ...args: [toTable?: string | null, options?: { column?: string; name?: string }]
   ): Promise<void> {
-    this.raiseOnIfExistOptions(
-      (typeof toTableOrOptions === "object" ? toTableOrOptions : {}) as Record<string, unknown>,
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    return this._schema.removeForeignKey(
+      this.name,
+      ...(args as [string?]),
+      ...keywordSplat(options),
     );
-    if (typeof toTableOrOptions === "object" && Object.keys(toTableOrOptions).length === 0) {
-      return this._schema.removeForeignKey(this.name);
-    }
-    return this._schema.removeForeignKey(this.name, toTableOrOptions);
   }
 
-  async foreignKeyExists(...args: string[]): Promise<boolean>;
-  async foreignKeyExists(...args: [...unknown[], Record<string, unknown>]): Promise<boolean>;
-  async foreignKeyExists(...args: unknown[]): Promise<boolean> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as Record<
-      string,
-      unknown
-    >;
-    if (Object.keys(options).length === 0) {
-      return this._schema.foreignKeyExists(this.name, ...(rest as []));
-    }
-    return this._schema.foreignKeyExists(this.name, ...(rest as []), options);
+  async foreignKeyExists(
+    ...args: [toTable?: string | null, options?: Record<string, unknown>]
+  ): Promise<boolean> {
+    const options = extractOptionsBang(args);
+    return this._schema.foreignKeyExists(
+      this.name,
+      ...(args as [string?]),
+      ...keywordSplat(options),
+    );
   }
 
-  async checkConstraint(expression: string, options: Record<string, unknown> = {}): Promise<void> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.addCheckConstraint(this.name, expression);
-    }
-    return this._schema.addCheckConstraint(this.name, expression, options);
+  async checkConstraint(...args: Array<string | Record<string, unknown>>): Promise<void> {
+    const options = extractOptionsBang(args);
+    return this._schema.addCheckConstraint(
+      this.name,
+      ...(args as [string]),
+      ...keywordSplat(options),
+    );
   }
 
-  async removeCheckConstraint(...args: string[]): Promise<void>;
-  async removeCheckConstraint(...args: [...unknown[], { name?: string }]): Promise<void>;
-  async removeCheckConstraint(...args: unknown[]): Promise<void> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
-      name?: string;
-    };
-    if (Object.keys(options).length === 0) {
-      return this._schema.removeCheckConstraint(this.name, ...(rest as []));
-    }
-    return this._schema.removeCheckConstraint(this.name, ...(rest as []), options);
+  async removeCheckConstraint(
+    ...args: [expression?: string | null, options?: { name?: string }]
+  ): Promise<void> {
+    const options = extractOptionsBang(args);
+    return this._schema.removeCheckConstraint(
+      this.name,
+      ...(args as [string?]),
+      ...keywordSplat(options),
+    );
   }
 
-  async checkConstraintExists(...args: string[]): Promise<boolean>;
   async checkConstraintExists(
-    ...args: [...unknown[], { name?: string; expression?: string }]
-  ): Promise<boolean>;
-  async checkConstraintExists(...args: unknown[]): Promise<boolean> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
-      name?: string;
-      expression?: string;
-    };
-    if (Object.keys(options).length === 0) {
-      return this._schema.checkConstraintExists(this.name, ...(rest as []));
-    }
-    return this._schema.checkConstraintExists(this.name, ...(rest as []), options);
+    ...args: Array<{ name?: string; expression?: string }>
+  ): Promise<boolean> {
+    const options = extractOptionsBang(args);
+    return this._schema.checkConstraintExists(this.name, ...args, ...keywordSplat(options));
   }
 
   /** @internal */
@@ -1283,10 +1245,9 @@ export class Table {
     );
     if (unrecognizedOption) {
       const conditional = unrecognizedOption === "ifExists" ? "if" : "unless";
-      const railsKey = unrecognizedOption === "ifExists" ? "if_exists" : "if_not_exists";
       throw new ArgumentError(
-        `Option ${railsKey} will be ignored. If you are calling an expression like\n` +
-          `\`t.column(.., ${railsKey}: true)\` from inside a change_table block, try a\n` +
+        `Option ${underscore(unrecognizedOption)} will be ignored. If you are calling an expression like\n` +
+          `\`t.column(.., ${underscore(unrecognizedOption)}: true)\` from inside a change_table block, try a\n` +
           `conditional clause instead, as in \`t.column(..) ${conditional} t.column_exists?(..)\``,
       );
     }
@@ -1315,24 +1276,7 @@ export class Table {
     }
   }
 
-  private _splitRefNames(args: unknown[]): { names: string[]; options: AddReferenceOptions } {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (
-      typeof last === "object" && last !== null ? rest.pop() : {}
-    ) as AddReferenceOptions;
-    return { names: rest as string[], options };
-  }
-
-  async primaryKey(
-    name: string,
-    type: ColumnType = "primary_key",
-    options: ColumnOptions = {},
-  ): Promise<void> {
-    await this.column(name, type, { ...options, primaryKey: true });
-  }
-
-  async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
+  async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<unknown> {
     return this._schema.addColumn(this.name, columnName, type, options);
   }
 }
@@ -1340,21 +1284,6 @@ export class Table {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:716`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Table extends ColumnMethods {}
 
-Table.defineColumnMethods(
-  "bigint",
-  "binary",
-  "boolean",
-  "date",
-  "datetime",
-  "decimal",
-  "float",
-  "integer",
-  "json",
-  "string",
-  "text",
-  "time",
-  "timestamp",
-  "virtual",
-);
-Table.prototype.blob = Table.prototype.binary;
-Table.prototype.numeric = Table.prototype.decimal;
+include(Table, ColumnMethods);
+
+registerConstant("ActiveRecord::ConnectionAdapters::IndexDefinition", IndexDefinition);

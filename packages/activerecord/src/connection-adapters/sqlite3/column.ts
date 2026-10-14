@@ -1,46 +1,32 @@
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { rbHash } from "@blazetrails/ruby-compat";
+import type { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { rbHash, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _autoIncrement: boolean;
   rowid: boolean;
   private _generatedType: "stored" | "virtual" | null;
 
+  /** @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
   constructor(
     name: string,
-    defaultValue: unknown,
-    sqlTypeMetadata: {
-      sqlType?: string | null;
-      type?: string;
-      precision?: number | null;
-      limit?: number | null;
-      scale?: number | null;
-    } = {},
+    defaultValue: string | Uint8Array | null,
+    sqlTypeMetadata: SqlTypeMetadata | null = null,
     null_: boolean = true,
+    defaultFunction: string | null = null,
     options: {
       collation?: string | null;
-      defaultFunction?: string | null;
       autoIncrement?: boolean;
       rowid?: boolean;
       generatedType?: "stored" | "virtual" | null;
     } = {},
   ) {
-    const meta = new SqlTypeMetadata({
-      sqlType: sqlTypeMetadata.sqlType ?? undefined,
-      type: sqlTypeMetadata.type,
-      precision: sqlTypeMetadata.precision ?? undefined,
-      limit: sqlTypeMetadata.limit ?? undefined,
-      scale: sqlTypeMetadata.scale ?? undefined,
-    });
-    super(name, defaultValue, meta, null_, {
-      collation: options.collation,
-      defaultFunction: options.defaultFunction,
-    });
+    super(name, defaultValue, sqlTypeMetadata, null_, defaultFunction, options);
     this._autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
     this._generatedType = options.generatedType ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   isAutoIncrement(): boolean {
@@ -71,6 +57,10 @@ export class Column extends BaseColumn {
     );
   }
 
+  override eql(other: unknown): boolean {
+    return this.equals(other);
+  }
+
   override hash(): number {
     return (
       rbHash(Column) ^ rbHash(super.hash()) ^ rbHash(this.isAutoIncrement()) ^ rbHash(this.rowid)
@@ -87,3 +77,5 @@ export class Column extends BaseColumn {
     super.encodeWith(coder);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::SQLite3::Column", Column);

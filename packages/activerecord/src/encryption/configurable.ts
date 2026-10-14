@@ -1,108 +1,96 @@
 import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
+import { included, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Config } from "./config.js";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
-import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import type { SchemeOptions } from "./scheme.js";
 
-type DeclarationListener = (klass: any, name: string) => void;
+export type DeclarationListener = (klass: any, name: string) => void;
 
 export class Configurable {
-  declare static config: Config;
-  declare static encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
-  declare config: Config;
-  declare encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
-
-  static {
-    mattrReader.call(this, "config", { default: new Config() });
-    mattrAccessor.call(this, "encryptedAttributeDeclarationListeners");
+  static [included](base: object): void {
+    mattrReader.call(base, "config", { default: new Config() });
+    mattrAccessor.call(base, "encryptedAttributeDeclarationListeners");
   }
 
   static get keyProvider(): unknown {
-    return Contexts.context.keyProvider;
+    return Encryption.context.keyProvider;
   }
 
   static get keyGenerator(): unknown {
-    return Contexts.context.keyGenerator;
+    return Encryption.context.keyGenerator;
   }
 
   static get cipher(): Cipher {
-    return Contexts.context.cipher as Cipher;
+    return Encryption.context.cipher as Cipher;
   }
 
   static get messageSerializer(): MessageSerializerLike | undefined {
-    return Contexts.context.messageSerializer;
+    return Encryption.context.messageSerializer;
   }
 
   static get encryptor(): EncryptorLike | undefined {
-    return Contexts.context.encryptor as EncryptorLike | undefined;
+    return Encryption.context.encryptor as EncryptorLike | undefined;
   }
 
   static get frozenEncryption(): boolean {
-    return Contexts.context.frozenEncryption;
+    return Encryption.context.frozenEncryption;
   }
 
-  static configure(options: {
-    primaryKey?: string | string[];
-    deterministicKey?: string;
-    keyDerivationSalt?: string;
-    previous?: SchemeOptions[];
-    [key: string]: unknown;
-  }): void {
-    const config = this.config;
-    config.primaryKey = options.primaryKey;
-    config.deterministicKey = options.deterministicKey;
-    config.keyDerivationSalt = options.keyDerivationSalt;
+  static configure(
+    this: typeof Encryption,
+    {
+      primaryKey,
+      deterministicKey,
+      keyDerivationSalt,
+      ...properties
+    }: {
+      primaryKey?: string | string[];
+      deterministicKey?: string;
+      keyDerivationSalt?: string;
+      previous?: SchemeOptions[];
+      [key: string]: unknown;
+    },
+  ): void {
+    this.config.primaryKey = primaryKey;
+    this.config.deterministicKey = deterministicKey;
+    this.config.keyDerivationSalt = keyDerivationSalt;
 
-    const properties: Record<string, unknown> = { ...options };
-    properties.supportSha1ForNonDeterministicEncryption ??= true;
+    if (properties.supportSha1ForNonDeterministicEncryption == null) {
+      properties.supportSha1ForNonDeterministicEncryption = true;
+    }
 
-    for (const [key, value] of Object.entries(properties)) {
-      if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
-        continue;
-      }
-      if (value === undefined) continue;
-      const writer = `set${key[0].toUpperCase()}${key.slice(1)}`;
-      if (typeof (config as unknown as Record<string, unknown>)[writer] === "function") {
-        (config as unknown as Record<string, (v: unknown) => void>)[writer](value);
-        continue;
-      }
-      if (key in config) {
-        (config as any)[key] = value;
+    for (const [name, value] of Object.entries(properties)) {
+      if (rbObjRespondTo(Encryption.config, `${name}=`)) {
+        rbFSend(Encryption.config, `${name}=`, value);
       }
     }
 
-    Contexts.resetDefaultContext();
+    Encryption.resetDefaultContext();
 
-    for (const [key, value] of Object.entries(properties)) {
-      if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
-        continue;
+    for (const [name, value] of Object.entries(properties)) {
+      if (rbObjRespondTo(Encryption.context, `${name}=`)) {
+        rbFSend(Encryption.context, `${name}=`, value);
       }
-      if (value === undefined) continue;
-      if (!(Context.PROPERTIES as readonly string[]).includes(key)) continue;
-      (Contexts.context as unknown as Record<string, unknown>)[key] = value;
     }
   }
 
-  /** @missingRailsCall new — PERMANENT */
-  static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
-    const listeners = (this.encryptedAttributeDeclarationListeners ??= []);
-    listeners.push(callback);
-    return () => {
-      const idx = listeners.indexOf(callback);
-      if (idx !== -1) listeners.splice(idx, 1);
-    };
+  static onEncryptedAttributeDeclared(
+    this: typeof Encryption,
+    block: DeclarationListener,
+  ): DeclarationListener[] {
+    this.encryptedAttributeDeclarationListeners ||= [];
+    this.encryptedAttributeDeclarationListeners.push(block);
+    return this.encryptedAttributeDeclarationListeners;
   }
 
-  static encryptedAttributeWasDeclared(klass: any, name: string): void {
-    const listeners = this.encryptedAttributeDeclarationListeners;
-    if (!listeners) return;
-    for (const listener of [...listeners]) {
-      listener(klass, name);
-    }
+  static encryptedAttributeWasDeclared(this: typeof Encryption, klass: any, name: string): void {
+    this.encryptedAttributeDeclarationListeners?.forEach((block) => {
+      block(klass, name);
+    });
   }
 }
 

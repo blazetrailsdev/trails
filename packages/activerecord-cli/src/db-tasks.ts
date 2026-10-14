@@ -112,7 +112,7 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   const previousVersion = getEnv("VERSION");
   if (version !== undefined) setEnv("VERSION", version);
   try {
-    await withEnvironmentConnection(() => DatabaseTasks.migrateAll(), DatabaseTasks.env);
+    await withEnvironmentConnection(() => DatabaseTasks.migrateAll(), DatabaseTasks.env.toString());
     return 0;
   } catch (err) {
     console.error(`ar: db:migrate failed — ${String(err)}`);
@@ -135,7 +135,7 @@ export async function dbRollback(cwd: string, args: string[]): Promise<number> {
   try {
     await withEnvironmentConnection(
       () => DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step),
-      DatabaseTasks.env,
+      DatabaseTasks.env.toString(),
     );
     return 0;
   } catch (err) {

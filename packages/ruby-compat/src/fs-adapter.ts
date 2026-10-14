@@ -103,12 +103,16 @@ export interface FsAdapter {
     options?: { mode?: number },
   ): Promise<void>;
   unlink?(path: string): Promise<void>;
+  rm?(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
   rename?(src: string, dest: string): Promise<void>;
   mkdtemp?(prefix: string): Promise<string>;
   realpath?(path: string): Promise<string>;
   rmdir?(path: string): Promise<void>;
   readdir?(path: string): Promise<string[]>;
   mkdir?(path: string, options?: { recursive?: boolean }): Promise<void>;
+  symlink?(target: string, path: string): Promise<void>;
+  link?(existingPath: string, newPath: string): Promise<void>;
+  chmod?(path: string, mode: number): Promise<void>;
 }
 
 export interface PathAdapter {
@@ -231,6 +235,39 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   return nodeModule.createRequire("file:///ruby-compat");
 }
 
+const NODE_SYNC_VERBS = [
+  "readFileSync",
+  "writeFileSync",
+  "existsSync",
+  "mkdirSync",
+  "appendFileSync",
+  "unlinkSync",
+  "readdirSync",
+  "rmSync",
+  "rmdirSync",
+  "renameSync",
+  "statSync",
+  "fstatSync",
+  "lstatSync",
+  "chmodSync",
+  "utimesSync",
+  "chownSync",
+  "lchmodSync",
+  "lchownSync",
+  "readlinkSync",
+  "symlinkSync",
+  "realpathSync",
+  "accessSync",
+  "openSync",
+  "readSync",
+  "writeSync",
+  "closeSync",
+  "copyFileSync",
+  "mkdtempSync",
+] as const satisfies readonly (keyof FsAdapter)[];
+
+type NodeSyncFs = Pick<FsAdapter, (typeof NODE_SYNC_VERBS)[number]>;
+
 function tryAutoRegisterNode(): boolean {
   if (registry.has("node")) return true;
   if (nodeAttempted) return false;
@@ -242,7 +279,10 @@ function tryAutoRegisterNode(): boolean {
     }
     const req = syncBuiltinLoader();
     if (!req) return false;
-    const nodeFs = req("node:fs") as Omit<FsAdapter, "cwd" | "exists" | "stat" | "lstat">;
+    const nodeFs = req("node:fs") as NodeSyncFs;
+    const syncFs = Object.fromEntries(
+      NODE_SYNC_VERBS.map((verb) => [verb, nodeFs[verb]]),
+    ) as NodeSyncFs;
     const fsPromises = req("node:fs/promises") as {
       access(p: string): Promise<void>;
       stat(p: string): Promise<FsStatResult>;
@@ -250,17 +290,26 @@ function tryAutoRegisterNode(): boolean {
       readFile(p: string, enc?: string): Promise<Bytes | string>;
       writeFile(p: string, c: string | Uint8Array, opts?: unknown): Promise<void>;
       unlink(p: string): Promise<void>;
+      rm(p: string, opts?: { recursive?: boolean; force?: boolean }): Promise<void>;
       rename(src: string, dest: string): Promise<void>;
       mkdtemp(prefix: string): Promise<string>;
       realpath(path: string): Promise<string>;
       rmdir(path: string): Promise<void>;
       readdir(path: string): Promise<string[]>;
       mkdir(path: string, opts?: { recursive?: boolean }): Promise<string | undefined>;
+      symlink(target: string, path: string): Promise<void>;
+      link(existingPath: string, newPath: string): Promise<void>;
+      chmod(path: string, mode: number): Promise<void>;
     };
     const withExecutable = (stat: FsStatResult): FsStatResult =>
-      Object.assign(stat, { isExecutable: () => (stat.mode & 0o111) !== 0 });
-    const fs: FsAdapter = Object.assign({}, nodeFs, {
+      Object.assign(stat, {
+        isExecutable: () => (stat.mode & 0o111) !== 0,
+        mtime: new Date(Math.trunc((stat as FsStatResult & { mtimeMs: number }).mtimeMs)),
+      });
+    const fs: FsAdapter = Object.assign(syncFs, {
       statSync: (p: string) => withExecutable(nodeFs.statSync(p)),
+      fstatSync: (fd: number) => withExecutable(nodeFs.fstatSync!(fd)),
+      lstatSync: (p: string) => withExecutable(nodeFs.lstatSync(p)),
       cwd: () => proc.cwd(),
       exists: (p: string) =>
         fsPromises.access(p).then(
@@ -272,12 +321,13 @@ function tryAutoRegisterNode(): boolean {
           },
         ),
       stat: (p: string) => fsPromises.stat(p).then(withExecutable),
-      lstat: (p: string) => fsPromises.lstat(p),
+      lstat: (p: string) => fsPromises.lstat(p).then(withExecutable),
       readFile: (p: string, enc?: string) =>
         enc ? fsPromises.readFile(p, enc) : fsPromises.readFile(p),
       writeFile: (p: string, c: string | Uint8Array, opts?: { mode?: number }) =>
         fsPromises.writeFile(p, c, opts),
       unlink: (p: string) => fsPromises.unlink(p),
+      rm: (p: string, opts?: { recursive?: boolean; force?: boolean }) => fsPromises.rm(p, opts),
       rename: (src: string, dest: string) => fsPromises.rename(src, dest),
       mkdtemp: (prefix: string) => fsPromises.mkdtemp(prefix),
       realpath: (p: string) => fsPromises.realpath(p),
@@ -285,6 +335,9 @@ function tryAutoRegisterNode(): boolean {
       readdir: (p: string) => fsPromises.readdir(p),
       mkdir: (p: string, opts?: { recursive?: boolean }) =>
         fsPromises.mkdir(p, opts).then(() => undefined),
+      symlink: (target: string, p: string) => fsPromises.symlink(target, p),
+      link: (existingPath: string, newPath: string) => fsPromises.link(existingPath, newPath),
+      chmod: (p: string, mode: number) => fsPromises.chmod(p, mode),
       ...withFlock(nodeFs as unknown as FlockableFs),
     }) as FsAdapter;
     const nodePath = req("node:path") as Required<Omit<PathAdapter, "pathToFileURL">>;

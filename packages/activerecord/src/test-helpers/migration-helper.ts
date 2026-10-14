@@ -2,7 +2,16 @@ import { delegate } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/ruby-compat";
 import type { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
+import { Migration } from "../migration.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+
+declare module "../migration.js" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- `class << self; attr_accessor :message_count; end` reopens `Migration` (`activerecord/test/cases/migration/helper.rb:7-8`); a namespace merged onto the class is how the added static surfaces on the type side.
+  namespace Migration {
+    let messageCount: number;
+  }
+}
+Migration.messageCount = 0;
 
 export const CONNECTION_METHODS = [
   "addColumn",
@@ -66,7 +75,7 @@ export const TestHelper = {
 
   async teardown(this: TestHelper): Promise<void> {
     TestModel.resetTableName();
-    TestModel.resetSequenceName();
+    await TestModel.resetSequenceName();
     await this.connection.dropTable("test_models", { ifExists: true });
   },
 };

@@ -29,8 +29,8 @@ describe("Resource routing", () => {
   describe("resources()", () => {
     it("generates index route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       const m = routes.recognizePath("/posts");
       expect(m.action).toBe("index");
@@ -39,8 +39,8 @@ describe("Resource routing", () => {
 
     it("generates show route with id", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       const m = routes.recognizePath("/posts/42");
       expect(m.action).toBe("show");
@@ -49,8 +49,8 @@ describe("Resource routing", () => {
 
     it("generates new route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       const m = routes.recognizePath("/posts/new");
       expect(m.action).toBe("new");
@@ -58,16 +58,16 @@ describe("Resource routing", () => {
 
     it("generates create route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       expect(routes.recognizePath("/posts", { method: "post" }).action).toBe("create");
     });
 
     it("generates edit route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       const m = routes.recognizePath("/posts/42/edit");
       expect(m.action).toBe("edit");
@@ -76,32 +76,32 @@ describe("Resource routing", () => {
 
     it("generates update route (PUT)", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       expect(routes.recognizePath("/posts/42", { method: "put" }).action).toBe("update");
     });
 
     it("generates update route (PATCH)", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       expect(routes.recognizePath("/posts/42", { method: "patch" }).action).toBe("update");
     });
 
     it("generates destroy route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       expect(routes.recognizePath("/posts/42", { method: "delete" }).action).toBe("destroy");
     });
 
     it("generates named routes", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       const named = routes.namedRoutes.routes;
       expect(named.has("posts")).toBe(true);
@@ -112,8 +112,8 @@ describe("Resource routing", () => {
 
     it("pathFor generates correct paths for all actions", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       expect(routes.pathFor({}, "posts")).toBe("/posts");
       expect(routes.pathFor({ id: "1" }, "post")).toBe("/posts/1");
@@ -125,56 +125,56 @@ describe("Resource routing", () => {
   describe("resource() (singular)", () => {
     it("generates show route at singular path", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       expect(routes.recognizePath("/session").action).toBe("show");
     });
 
     it("generates create route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
     });
 
     it("generates destroy route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
     });
 
     it("generates update route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       expect(routes.recognizePath("/session", { method: "put" }).action).toBe("update");
     });
 
     it("generates new route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       expect(routes.recognizePath("/session/new").action).toBe("new");
     });
 
     it("generates edit route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       expect(routes.recognizePath("/session/edit").action).toBe("edit");
     });
 
     it("has no index route", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       const all = routes.routes.routes;
       const actions = all.map((r) => r.defaults.action);
@@ -183,8 +183,8 @@ describe("Resource routing", () => {
 
     it("generates named routes", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session");
+      routes.draw(function () {
+        this.resource("session");
       });
       const named = routes.namedRoutes.routes;
       expect(named.has("session")).toBe(true);
@@ -196,8 +196,8 @@ describe("Resource routing", () => {
   describe("only and except options", () => {
     it("only limits generated routes", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", { only: ["index", "show"] });
+      routes.draw(function () {
+        this.resources("posts", { only: ["index", "show"] });
       });
       expect(() => routes.recognizePath("/posts")).not.toThrow();
       expect(() => routes.recognizePath("/posts/1")).not.toThrow();
@@ -207,8 +207,8 @@ describe("Resource routing", () => {
 
     it("except excludes specified routes", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", { except: ["destroy", "edit", "update"] });
+      routes.draw(function () {
+        this.resources("posts", { except: ["destroy", "edit", "update"] });
       });
       expect(() => routes.recognizePath("/posts")).not.toThrow();
       expect(() => routes.recognizePath("/posts", { method: "post" })).not.toThrow();
@@ -217,8 +217,8 @@ describe("Resource routing", () => {
 
     it("only on singular resource", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resource("session", { only: ["show", "create"] });
+      routes.draw(function () {
+        this.resource("session", { only: ["show", "create"] });
       });
       expect(() => routes.recognizePath("/session")).not.toThrow();
       expect(() => routes.recognizePath("/session", { method: "post" })).not.toThrow();
@@ -229,9 +229,9 @@ describe("Resource routing", () => {
   describe("nested resources", () => {
     it("nests collection route under parent", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", {}, (posts) => {
-          posts.resources("comments");
+      routes.draw(function () {
+        this.resources("posts", {}, () => {
+          this.resources("comments");
         });
       });
       const m = routes.recognizePath("/posts/1/comments");
@@ -242,9 +242,9 @@ describe("Resource routing", () => {
 
     it("nests member route under parent", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", {}, (posts) => {
-          posts.resources("comments");
+      routes.draw(function () {
+        this.resources("posts", {}, () => {
+          this.resources("comments");
         });
       });
       const m = routes.recognizePath("/posts/1/comments/5");
@@ -255,9 +255,9 @@ describe("Resource routing", () => {
 
     it("generates named routes for nested resources", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", {}, (posts) => {
-          posts.resources("comments");
+      routes.draw(function () {
+        this.resources("posts", {}, () => {
+          this.resources("comments");
         });
       });
       const named = routes.namedRoutes.routes;
@@ -267,9 +267,9 @@ describe("Resource routing", () => {
 
     it("generates paths for nested resources", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", {}, (posts) => {
-          posts.resources("comments");
+      routes.draw(function () {
+        this.resources("posts", {}, () => {
+          this.resources("comments");
         });
       });
       expect(routes.pathFor({ post_id: "1" }, "post_comments")).toBe("/posts/1/comments");
@@ -280,9 +280,9 @@ describe("Resource routing", () => {
   describe("shallow nested resources", () => {
     it("collection routes are nested under parent", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", { shallow: true }, (posts) => {
-          posts.resources("comments");
+      routes.draw(function () {
+        this.resources("posts", { shallow: true }, () => {
+          this.resources("comments");
         });
       });
       const m = routes.recognizePath("/posts/1/comments");
@@ -291,9 +291,9 @@ describe("Resource routing", () => {
 
     it("member routes are at top level", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", { shallow: true }, (posts) => {
-          posts.resources("comments");
+      routes.draw(function () {
+        this.resources("posts", { shallow: true }, () => {
+          this.resources("comments");
         });
       });
       const m = routes.recognizePath("/comments/5");
@@ -304,9 +304,9 @@ describe("Resource routing", () => {
   describe("namespace with resources", () => {
     it("prefixes path with namespace", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.namespace("admin", (admin) => {
-          admin.resources("posts");
+      routes.draw(function () {
+        this.namespace("admin", () => {
+          this.resources("posts");
         });
       });
       const m = routes.recognizePath("/admin/posts");
@@ -315,9 +315,9 @@ describe("Resource routing", () => {
 
     it("prefixes named routes with namespace", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.namespace("admin", (admin) => {
-          admin.resources("posts");
+      routes.draw(function () {
+        this.namespace("admin", () => {
+          this.resources("posts");
         });
       });
       const named = routes.namedRoutes.routes;
@@ -327,10 +327,10 @@ describe("Resource routing", () => {
 
     it("deeply nested namespace", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.namespace("api", (api) => {
-          api.namespace("v1", (v1) => {
-            v1.resources("articles");
+      routes.draw(function () {
+        this.namespace("api", () => {
+          this.namespace("v1", () => {
+            this.resources("articles");
           });
         });
       });
@@ -340,9 +340,9 @@ describe("Resource routing", () => {
 
     it("generates paths for namespaced resources", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.namespace("admin", (admin) => {
-          admin.resources("posts");
+      routes.draw(function () {
+        this.namespace("admin", () => {
+          this.resources("posts");
         });
       });
       expect(routes.pathFor({}, "admin_posts")).toBe("/admin/posts");
@@ -353,8 +353,8 @@ describe("Resource routing", () => {
   describe("custom path names", () => {
     it("customizes new path", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", { pathNames: { new: "nuevo" } });
+      routes.draw(function () {
+        this.resources("posts", { pathNames: { new: "nuevo" } });
       });
       const m = routes.recognizePath("/posts/nuevo");
       expect(m.action).toBe("new");
@@ -362,8 +362,8 @@ describe("Resource routing", () => {
 
     it("customizes edit path", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", { pathNames: { edit: "editar" } });
+      routes.draw(function () {
+        this.resources("posts", { pathNames: { edit: "editar" } });
       });
       const m = routes.recognizePath("/posts/1/editar");
       expect(m.action).toBe("edit");
@@ -373,10 +373,10 @@ describe("Resource routing", () => {
   describe("member and collection routes", () => {
     it("member route adds action on single resource", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", {}, (posts) => {
-          posts.member((m) => {
-            m.post("/publish", { to: "posts#publish" });
+      routes.draw(function () {
+        this.resources("posts", {}, () => {
+          this.member(() => {
+            this.post("/publish", { to: "posts#publish" });
           });
         });
       });
@@ -386,10 +386,10 @@ describe("Resource routing", () => {
 
     it("collection route adds action on collection", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", {}, (posts) => {
-          posts.collection((c) => {
-            c.get("/search", { to: "posts#search" });
+      routes.draw(function () {
+        this.resources("posts", {}, () => {
+          this.collection(() => {
+            this.get("/search", { to: "posts#search" });
           });
         });
       });
@@ -401,12 +401,12 @@ describe("Resource routing", () => {
   describe("concerns", () => {
     it("defines and includes concern routes", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.concern("commentable", (c) => {
+      routes.draw(function () {
+        this.concern("commentable", (c) => {
           c.resources("comments");
         });
-        map.resources("posts", {}, (posts) => {
-          posts.concerns("commentable");
+        this.resources("posts", {}, () => {
+          this.concerns("commentable");
         });
       });
       const m = routes.recognizePath("/posts/1/comments");
@@ -415,15 +415,15 @@ describe("Resource routing", () => {
 
     it("reuses concerns across multiple resources", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.concern("commentable", (c) => {
+      routes.draw(function () {
+        this.concern("commentable", (c) => {
           c.resources("comments");
         });
-        map.resources("posts", {}, (posts) => {
-          posts.concerns("commentable");
+        this.resources("posts", {}, () => {
+          this.concerns("commentable");
         });
-        map.resources("articles", {}, (articles) => {
-          articles.concerns("commentable");
+        this.resources("articles", {}, () => {
+          this.concerns("commentable");
         });
       });
       expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
@@ -434,8 +434,8 @@ describe("Resource routing", () => {
   describe("constraints on resources", () => {
     it("constrains id format", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts", { constraints: { id: /\d+/ } });
+      routes.draw(function () {
+        this.resources("posts", { constraints: { id: /\d+/ } });
       });
       expect(() => routes.recognizePath("/posts/123")).not.toThrow();
       expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
@@ -445,8 +445,8 @@ describe("Resource routing", () => {
   describe("route introspection", () => {
     it("getNamedRoutes returns named route map", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("posts");
+      routes.draw(function () {
+        this.resources("posts");
       });
       const named = routes.namedRoutes.routes;
       expect(named.size).toBeGreaterThanOrEqual(4);
@@ -456,9 +456,9 @@ describe("Resource routing", () => {
   describe("resources with nested singular resource", () => {
     it("nests singular resource under plural", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("users", {}, (users) => {
-          users.resource("profile");
+      routes.draw(function () {
+        this.resources("users", {}, () => {
+          this.resource("profile");
         });
       });
       const m = routes.recognizePath("/users/1/profile");
@@ -471,8 +471,8 @@ describe("Resource routing", () => {
     it("resources with non-inflecting name does not generate duplicate named routes", () => {
       const routes = new RouteSet();
       expect(() => {
-        routes.draw((map) => {
-          map.resources("sheep");
+        routes.draw(function () {
+          this.resources("sheep");
         });
       }).not.toThrow();
       const named = routes.namedRoutes.routes;
@@ -481,8 +481,8 @@ describe("Resource routing", () => {
 
     it("resources generates no duplicate [verb, path] pairs", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.resources("messages");
+      routes.draw(function () {
+        this.resources("messages");
       });
       const all = routes.routes.routes;
       const seen = new Set<string>();
@@ -496,9 +496,9 @@ describe("Resource routing", () => {
     it("duplicate explicit route name raises ArgumentError (Rails parity)", () => {
       const routes = new RouteSet();
       expect(() =>
-        routes.draw((map) => {
-          map.get("/foo", { to: "pages#foo", as: "foo" });
-          map.get("/bar", { to: "pages#bar", as: "foo" });
+        routes.draw(function () {
+          this.get("/foo", { to: "pages#foo", as: "foo" });
+          this.get("/bar", { to: "pages#bar", as: "foo" });
         }),
       ).toThrow(ArgumentError);
     });

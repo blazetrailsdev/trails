@@ -13,6 +13,7 @@ import {
 import {
   ArgumentError,
   InvalidURIError,
+  Module,
   RFC2396_PARSER,
   RuntimeError,
   URI,
@@ -25,8 +26,11 @@ import {
 
 import { RoutingUrlFor } from "../routing-url-for.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
-import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
-import { contentTag, tag, type TagHelperHost } from "./tag-helper.js";
+import {
+  ContentExfiltrationPreventionHelper,
+  preventContentExfiltration,
+} from "./content-exfiltration-prevention-helper.js";
+import { TagHelper, contentTag, tag, type TagHelperHost } from "./tag-helper.js";
 
 export interface UrlHelperHost {
   controller: unknown;
@@ -133,7 +137,7 @@ export function buttonTo(
 ): SafeBuffer {
   if (block) [htmlOptions, options] = [options as HtmlOptions | null, name];
   if (!rtest(htmlOptions)) htmlOptions = {};
-  htmlOptions = stringifyKeys(htmlOptions!);
+  htmlOptions = stringifyKeys(htmlOptions);
 
   const url = options === false ? null : this.urlFor(options);
 
@@ -361,7 +365,7 @@ export function convertOptionsToDataAttributes(
   htmlOptions: HtmlOptions | null,
 ): HtmlOptions {
   if (rtest(htmlOptions)) {
-    htmlOptions = stringifyKeys(htmlOptions!);
+    htmlOptions = stringifyKeys(htmlOptions);
     if (isLinkToRemoteOptions(options) || isLinkToRemoteOptions(htmlOptions)) {
       htmlOptions["data-remote"] = "true";
     }
@@ -506,3 +510,17 @@ export function removeTrailingSlashBang(urlString: string): string {
   if (urlString[at] === "/") return urlString.slice(0, at) + urlString.slice(at + 1);
   return urlString;
 }
+
+export const UrlHelper = new Module((mod) => {
+  mod.include(TagHelper);
+  mod.include(ContentExfiltrationPreventionHelper);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { urlFor, _backUrl, _filteredReferrer });
+    Object.assign(m, { linkTo, buttonTo, linkToUnlessCurrent, linkToUnless, linkToIf, mailTo });
+    Object.assign(m, { isCurrentPage, smsTo, phoneTo });
+    Object.assign(m, { convertOptionsToDataAttributes, urlTarget, isLinkToRemoteOptions });
+    Object.assign(m, { addMethodToAttributesBang, methodForOptions, isMethodNotGetMethod });
+    Object.assign(m, { tokenTag, methodTag, toFormParams, removeTrailingSlashBang });
+  });
+});

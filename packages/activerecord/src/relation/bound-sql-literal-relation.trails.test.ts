@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
 import { Range, registerModel } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 
 registerModel(Topic);
@@ -71,7 +71,7 @@ describe("bound SQL literal with Relation bind value", () => {
 
     const bind = node.positionalBinds![0];
     expect(bind).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((bind as Nodes.SqlLiteral).value).toContain("SELECT");
+    expect((bind as Nodes.SqlLiteral).toString()).toContain("SELECT");
   });
 
   it("buildNamedBoundSqlLiteral inlines a Relation named bind as a SqlLiteral", () => {
@@ -81,7 +81,7 @@ describe("bound SQL literal with Relation bind value", () => {
 
     const bind = node.namedBinds!.ids;
     expect(bind).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((bind as Nodes.SqlLiteral).value).toContain("SELECT");
+    expect((bind as Nodes.SqlLiteral).toString()).toContain("SELECT");
   });
 
   it("maps a Range positional bind to its members", async () => {

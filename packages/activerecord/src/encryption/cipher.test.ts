@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as crypto from "crypto";
 import { Cipher } from "./cipher.js";
 import { Decryption } from "./errors.js";
-import { Configuration } from "./errors.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 function generateKey(): string {
   return crypto.randomBytes(32).toString("base64");
@@ -35,7 +35,7 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
   it("raises an ArgumentError when provided a key with the wrong length", () => {
     const cipher = new Cipher();
     expect(() => cipher.encrypt("clean text", { key: Buffer.alloc(4).toString("base64") })).toThrow(
-      Configuration,
+      ArgumentError,
     );
   });
 

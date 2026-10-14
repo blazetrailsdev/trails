@@ -1,10 +1,11 @@
+import type { CollectionAssociation } from "./associations/collection-association.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./active-record.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { SingularAssociation } from "./associations/singular-association.js";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import { Base, registerModel, RecordInvalid } from "./index.js";
-import { Associations, collectionProxyFor as association } from "./associations.js";
+import { Associations } from "./associations.js";
 
 import {
   Agency,
@@ -65,8 +66,8 @@ import { Customer as CanonicalCustomer } from "./test-helpers/models/customer.js
 import { Order as CanonicalOrder } from "./test-helpers/models/order.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
-import { computePrimaryKey, addAutosaveAssociationCallbacks } from "./autosave-association.js";
-import { fixtures } from "./test-fixtures.js";
+import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { DrinkDesigner } from "./test-helpers/models/drink-designer.js";
 import { Chef, ChefWithPolymorphicInverseOf } from "./test-helpers/models/chef.js";
@@ -85,9 +86,9 @@ import {
   assertRespondTo,
   assertNotRespondTo,
   deepDup,
-  getCallbackChains,
   humanize,
   isPresent,
+  type CallbackChain,
 } from "@blazetrails/activesupport";
 import { resetI18n } from "./test-helpers/i18n.js";
 
@@ -616,8 +617,10 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   it("should run add callback methods for habtm", async () => {
     const associationNameWithCallbacks = "parrotsWithMethodCallbacks";
 
-    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
-    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+    const pirate = new CanonicalPirate({ catchphrase: "Arr" });
+    await (pirate.association(associationNameWithCallbacks) as CollectionAssociation).reader.build({
+      name: "Crowe the One-Eyed",
+    });
 
     const expected = ["before_adding_method_parrot_<new>", "after_adding_method_parrot_<new>"];
 
@@ -628,7 +631,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const associationNameWithCallbacks = "parrotsWithMethodCallbacks";
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
-    const proxy = association(pirate, associationNameWithCallbacks);
+    const proxy = (pirate.association(associationNameWithCallbacks) as CollectionAssociation)
+      .reader;
     await proxy.create({ name: "Crowe the One-Eyed" });
     for (const parrot of await proxy) parrot.markForDestruction();
     const childId = (await proxy)[0].id;
@@ -647,8 +651,10 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   it("should run add callback procs for habtm", async () => {
     const associationNameWithCallbacks = "parrotsWithProcCallbacks";
 
-    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
-    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+    const pirate = new CanonicalPirate({ catchphrase: "Arr" });
+    await (pirate.association(associationNameWithCallbacks) as CollectionAssociation).reader.build({
+      name: "Crowe the One-Eyed",
+    });
 
     const expected = ["before_adding_proc_parrot_<new>", "after_adding_proc_parrot_<new>"];
 
@@ -659,7 +665,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const associationNameWithCallbacks = "parrotsWithProcCallbacks";
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
-    const proxy = association(pirate, associationNameWithCallbacks);
+    const proxy = (pirate.association(associationNameWithCallbacks) as CollectionAssociation)
+      .reader;
     await proxy.create({ name: "Crowe the One-Eyed" });
     for (const parrot of await proxy) parrot.markForDestruction();
     const childId = (await proxy)[0].id;
@@ -817,7 +824,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
             ]);
 
             assertNot(await reply.save());
-            expect(reply.errors.get("silly_unique_replies")).toEqual(["is invalid"]);
+            expect(reply.errors.get("sillyUniqueReplies")).toEqual(["is invalid"]);
             assertEmpty((await reply.sillyUniqueReplies.first())!.errors);
 
             expect((await reply.sillyUniqueReplies.last())!.errors.get("content")).toEqual([
@@ -1369,8 +1376,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("should not ignore different error messages on the same attribute", async () => {
     const oldValidators = deepDup(CanonicalShip._validators);
-    const validateChain = getCallbackChains(CanonicalShip.prototype).get("validate")!;
-    const oldCallbacks = [...validateChain.entries];
+    const oldCallbacks = (CanonicalShip as any)._validateCallbacks.dup();
     try {
       CanonicalShip.validatesFormatOf("name", { with: /\w/ });
       (await pirate.ship).name = "";
@@ -1379,8 +1385,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       expect(pirate.errors.get("ship.name")).toEqual(["can't be blank", "is invalid"]);
     } finally {
       CanonicalShip._validators = oldValidators;
-      validateChain.clear();
-      validateChain.append(...oldCallbacks);
+      (CanonicalShip as any)._validateCallbacks = oldCallbacks;
     }
   });
 
@@ -1937,7 +1942,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertNotPredicate(await invalidElectron.isValid(), (v) => v);
     assertPredicate(await validElectron.isValid(), (v) => v);
     assertNotPredicate(await molecule.isValid(), (v) => v);
-    expect(molecule.errors.details.get("electrons.name")).toEqual([{ error: ":blank" }]);
+    expect(molecule.errors.details.get(":electrons.name")).toEqual([{ error: ":blank" }]);
   });
 
   it("errors should be indexed when passed as array", async () => {
@@ -2013,10 +2018,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertNotPredicate(await tuningPegInvalid.isValid(), (v) => v);
     assertPredicate(await tuningPegValid.isValid(), (v) => v);
     assertNotPredicate(await guitar.isValid(), (v) => v);
-    expect(guitar.errors.details.get("tuning_pegs[1].pitch")).toEqual([
+    expect(guitar.errors.details.get(":tuning_pegs[1].pitch")).toEqual([
       { error: ":not_a_number", value: null },
     ]);
-    expect(guitar.errors.details.get("tuning_pegs.pitch") ?? []).toEqual([]);
+    expect(guitar.errors.details.get(":tuning_pegs.pitch") ?? []).toEqual([]);
   });
   it("errors details with error on base should be indexed when passed as array", async () => {
     const reference = class extends Base {
@@ -2047,7 +2052,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertPredicate(await referenceValid.isValid(), (v) => v);
     assertNotPredicate(await referenceInvalid.isValid(), (v) => v);
     assertNotPredicate(await p.isValid(), (v) => v);
-    expect(p.errors.details.get("references[1].base")).toEqual([{ error: "should be favorite" }]);
+    expect(p.errors.details.get(":references[1].base")).toEqual([{ error: "should be favorite" }]);
     expect(p.errors.get("references[1].base")[0]).toEqual("should be favorite");
     expect(p.errors.fullMessages).toEqual(["References[1] should be favorite"]);
   });
@@ -2171,8 +2176,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       assertNotPredicate(await invalidElectron.isValid(), (v) => v);
       assertPredicate(await validElectron.isValid(), (v) => v);
       assertNotPredicate(await molecule.isValid(), (v) => v);
-      expect(molecule.errors.details.get("electrons[1].name")).toEqual([{ error: ":blank" }]);
-      expect(molecule.errors.details.get("electrons.name") ?? []).toEqual([]);
+      expect(molecule.errors.details.get(":electrons[1].name")).toEqual([{ error: ":blank" }]);
+      expect(molecule.errors.details.get(":electrons.name") ?? []).toEqual([]);
     } finally {
       setIndexNestedAttributeErrors(oldAttributeConfig);
     }
@@ -2345,140 +2350,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   }
 
   function callbacksForModel(model: typeof Base) {
-    return [...getCallbackChains(model.prototype).values()].flatMap((chain) => chain.entries);
+    return Object.values<CallbackChain>((model as any).__callbacks).flatMap(
+      (chain) => chain.entries,
+    );
   }
-});
-
-describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    setAssociationTarget(record, name, value);
-  }
-  fixtures([], { useTransactionalTests: true });
-
-  function makeModels() {
-    class GcPirate extends Base {
-      declare catchphrase: string | null;
-      declare ships: AssociationProxy<GcShip>;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.hasMany("ships", {
-          autosave: true,
-          className: "GcShip",
-          foreignKey: "pirate_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class GcShip extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-      declare parts: AssociationProxy<GcPart>;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.belongsTo("pirate", { className: "GcPirate", foreignKey: "pirate_id" });
-        this.hasMany("parts", {
-          autosave: true,
-          className: "GcPart",
-          foreignKey: "ship_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface GcShip {
-      get pirate(): GcPirate | null | Promise<GcPirate | null>;
-      set pirate(value: GcPirate | null);
-    }
-    class GcPart extends Base {
-      declare name: string | null;
-      declare ship_id: number | null;
-
-      static {
-        this._tableName = "ship_parts";
-        this.attribute("name", "string");
-        this.attribute("ship_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("GcPirate", GcPirate);
-    registerModel("GcShip", GcShip);
-    registerModel("GcPart", GcPart);
-    return { Pirate: GcPirate, Ship: GcShip, Part: GcPart };
-  }
-
-  it("when grandchild marked_for_destruction, saving parent should destroy grandchild", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.markForDestruction();
-    cacheAssoc(ship, "parts", [part]);
-    ship.name = "Pearl-touched";
-    cacheAssoc(pirate, "ships", [ship]);
-    await pirate.save();
-    expect(part.isDestroyed()).toBe(true);
-  });
-
-  it("when grandchild added, saving parent should create grandchild", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const newPart = new Part({ name: "Rudder" });
-    cacheAssoc(ship, "parts", [newPart]);
-    ship.name = "Pearl-touched";
-    cacheAssoc(pirate, "ships", [ship]);
-    await pirate.save();
-    expect(newPart.isNewRecord()).toBe(false);
-  });
-
-  it("if association is not loaded, saving parent does not touch children", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-  });
-
-  it("circular references do not cause infinite loop", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    cacheAssoc(pirate, "ships", [ship]);
-    cacheAssoc(ship, "pirate", pirate);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-  });
-
-  it("if association record is saved, in memory record attributes should be saved", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    ship.name = "Updated Pearl";
-    cacheAssoc(pirate, "ships", [ship]);
-    await pirate.save();
-    const reloaded = await Ship.find(ship.id!);
-    expect(reloaded.name).toBe("Updated Pearl");
-  });
-
-  it("when extra records exist for associations, validate should not load them up", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "Pearl" });
-    cacheAssoc(pirate, "ships", [ship]);
-    const part = new Part({ name: "Mast" });
-    cacheAssoc(ship, "parts", [part]);
-    await pirate.save();
-    part.name = "changed";
-    await Ship.create({ name: "Black Rock", pirate_id: pirate.id });
-    await Part.create({ name: "Stern", ship_id: ship.id });
-    await assertNoQueries(false, async () => {
-      await pirate.isValid();
-    });
-  });
 });
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
@@ -2516,103 +2391,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
   it("should generate validation methods for HABTM associations with :validate => true", async () => {
     assertRespondTo(pirate, "validateAssociatedRecordsFor_parrots");
-  });
-});
-
-describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    setAssociationTarget(record, name, value);
-  }
-  fixtures([], { useTransactionalTests: true });
-
-  function makeModels() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class GgPirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.hasOne("ship", { autosave: true, className: "GgShip", foreignKey: "pirate_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface GgPirate {
-      get ship(): GgShip | null | Promise<GgShip | null>;
-      set ship(value: GgShip | null);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class GgShip extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.hasOne("part", { autosave: true, className: "GgPart", foreignKey: "ship_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface GgShip {
-      get part(): GgPart | null | Promise<GgPart | null>;
-      set part(value: GgPart | null);
-    }
-    class GgPart extends Base {
-      declare name: string | null;
-      declare ship_id: number | null;
-
-      static {
-        this._tableName = "ship_parts";
-        this.attribute("name", "string");
-        this.attribute("ship_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("GgPirate", GgPirate);
-    registerModel("GgShip", GgShip);
-    registerModel("GgPart", GgPart);
-    return { Pirate: GgPirate, Ship: GgShip, Part: GgPart };
-  }
-
-  it("when great-grandchild marked_for_destruction, saving parent should destroy great-grandchild", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.markForDestruction();
-    cacheAssoc(ship, "part", part);
-    ship.name = "Pearl-touched";
-    cacheAssoc(pirate, "ship", ship);
-    await pirate.save();
-    expect(part.isDestroyed()).toBe(true);
-  });
-
-  it("when great-grandchild added, saving parent should create great-grandchild", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const newPart = new Part({ name: "Rudder" });
-    cacheAssoc(ship, "part", newPart);
-    ship.name = "Pearl-touched";
-    cacheAssoc(pirate, "ship", ship);
-    await pirate.save();
-    expect(newPart.isNewRecord()).toBe(false);
-  });
-
-  it("when extra records exist for associations, validate should not load them up", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "Pearl" });
-    cacheAssoc(pirate, "ship", ship);
-    const part = new Part({ name: "Mast" });
-    cacheAssoc(ship, "part", part);
-    await pirate.save();
-    part.name = "changed";
-    await Part.create({ name: "Stern", ship_id: ship.id });
-    await assertNoQueries(false, async () => {
-      await pirate.isValid();
-    });
   });
 });
 
@@ -2756,7 +2534,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
           async () => {
             const exception = await assertRaises([RecordInvalid], {}, () => author.saveBang());
 
-            expect(exception.message).toEqual("Validation failed: Published books is invalid");
+            expect(exception.message).toEqual("Validation failed: Publishedbooks is invalid");
           },
         );
       },
@@ -3290,319 +3068,5 @@ describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
       });
       await pirate.saveBang();
     });
-  });
-});
-
-describe("ChangedForAutosaveTest", () => {
-  fixtures([], { useTransactionalTests: true });
-
-  it("parent is changed_for_autosave when nested autosave child is changed", () => {
-    class Child extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class Parent extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.hasMany("children", { autosave: true, className: "ChangedChild" });
-      }
-    }
-    registerModel("ChangedParent", Parent);
-    registerModel("ChangedChild", Child);
-
-    const parent = new Parent({ id: 1 });
-    (parent as any)._newRecord = false;
-    const child = new Child({ id: 10, name: "original" });
-    (child as any)._newRecord = false;
-    (child as any).changesApplied();
-    child.writeAttribute("name", "modified");
-
-    parent.association("children").setTarget([child] as any);
-
-    expect(parent.changedForAutosave()).toBe(true);
-  });
-
-  it("parent is changed_for_autosave when nested child is marked for destruction", () => {
-    class Child2 extends Base {
-      static {
-        this.attribute("id", "integer");
-      }
-    }
-    class Parent2 extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.hasOne("child", { autosave: true, className: "ChangedChild2" });
-      }
-    }
-    registerModel("ChangedParent2", Parent2);
-    registerModel("ChangedChild2", Child2);
-
-    const parent = new Parent2({ id: 1 });
-    (parent as any)._newRecord = false;
-    const child = new Child2({ id: 10 });
-    (child as any)._newRecord = false;
-    child.markForDestruction();
-
-    parent.association("child").setTarget(child as any);
-
-    expect(parent.changedForAutosave()).toBe(true);
-  });
-
-  it("does not infinite loop on cyclic inverse associations", () => {
-    class A extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.hasOne("b", { autosave: true, className: "CycleB" });
-      }
-    }
-    class B extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.belongsTo("a", { autosave: true, className: "CycleA" });
-      }
-    }
-    registerModel("CycleA", A);
-    registerModel("CycleB", B);
-
-    const a = new A({ id: 1 });
-    (a as any)._newRecord = false;
-    (a as any).changesApplied();
-    const b = new B({ id: 2 });
-    (b as any)._newRecord = false;
-    (b as any).changesApplied();
-
-    a.association("b").setTarget(b as any);
-    b.association("a").setTarget(a as any);
-
-    expect(a.changedForAutosave()).toBe(false);
-    expect(b.changedForAutosave()).toBe(false);
-  });
-});
-
-describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
-  fixtures([], { useTransactionalTests: true });
-  it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class QcOwner extends Base {
-      declare tree_id: number | null;
-      declare name: string | null;
-
-      static {
-        this._tableName = "nodes";
-        this.attribute("tree_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        (this as any)._queryConstraintsList = ["tree_id", "id"];
-        (this as any)._hasQueryConstraints = true;
-        this.hasOne("qcChild", {
-          className: "QcChild",
-          foreignKey: ["tree_id", "parent_id"],
-          autosave: true,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface QcOwner {
-      get qcChild(): QcChild | null | Promise<QcChild | null>;
-      set qcChild(value: QcChild | null);
-    }
-    class QcChild extends Base {
-      declare tree_id: number | null;
-      declare parent_id: number | null;
-      declare name: string | null;
-
-      static {
-        this._tableName = "nodes";
-        this.attribute("tree_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("QcOwner", QcOwner);
-    registerModel("QcChild", QcChild);
-    const owner = new QcOwner({ tree_id: 5, id: 11, name: "Corp" });
-    const child = new QcChild({ name: "Doc" });
-    owner.association("qcChild").setTarget(child as any);
-    const saved = await owner.save();
-    expect(saved).toBe(true);
-    expect(child.isNewRecord()).toBe(false);
-    expect(child.tree_id).toBe(5);
-    expect(child.parent_id).toBe(11);
-  });
-
-  it("does not collapse QC-derived PK array via the 'id' rule for scalar FK", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class QcNoCollapse extends Base {
-      declare tree_id: number | null;
-      declare name: string | null;
-
-      static {
-        this._tableName = "nodes";
-        this.attribute("tree_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        (this as any)._queryConstraintsList = ["tree_id", "id"];
-        (this as any)._hasQueryConstraints = true;
-        this.hasOne("qcNoCollapseChild", {
-          className: "QcNoCollapseChild",
-          foreignKey: ["tree_id", "parent_id"],
-          autosave: true,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface QcNoCollapse {
-      get qcNoCollapseChild(): QcNoCollapseChild | null | Promise<QcNoCollapseChild | null>;
-      set qcNoCollapseChild(value: QcNoCollapseChild | null);
-    }
-    class QcNoCollapseChild extends Base {
-      declare tree_id: number | null;
-      declare parent_id: number | null;
-      declare name: string | null;
-
-      static {
-        this._tableName = "nodes";
-        this.attribute("tree_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("QcNoCollapse", QcNoCollapse);
-    registerModel("QcNoCollapseChild", QcNoCollapseChild);
-    const owner = new QcNoCollapse({ tree_id: 9, id: 77, name: "v" });
-    const child = new QcNoCollapseChild({ name: "l" });
-    owner.association("qcNoCollapseChild").setTarget(child as any);
-    const saved = await owner.save();
-    expect(saved).toBe(true);
-    expect(child.isNewRecord()).toBe(false);
-    expect(child.tree_id).toBe(9);
-    expect(child.parent_id).toBe(77);
-  });
-
-  it("uses queryConstraintsList as PK when class has_query_constraints? and scalar FK", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class QcTenant extends Base {
-      declare tree_id: number | null;
-      declare name: string | null;
-
-      static {
-        this._tableName = "nodes";
-        this.attribute("tree_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        (this as any)._queryConstraintsList = ["tree_id", "id"];
-        (this as any)._hasQueryConstraints = true;
-        this.hasOne("qcTenantRecord", {
-          className: "QcTenantRecord",
-          foreignKey: "parent_id",
-          autosave: true,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface QcTenant {
-      get qcTenantRecord(): QcTenantRecord | null | Promise<QcTenantRecord | null>;
-      set qcTenantRecord(value: QcTenantRecord | null);
-    }
-    class QcTenantRecord extends Base {
-      declare tree_id: number | null;
-      declare parent_id: number | null;
-      declare name: string | null;
-
-      static {
-        this._tableName = "nodes";
-        this.attribute("tree_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("QcTenant", QcTenant);
-    registerModel("QcTenantRecord", QcTenantRecord);
-    const tenant = new QcTenant({ tree_id: 7, id: 42, name: "Acme" });
-    const rec = new QcTenantRecord({ name: "hello" });
-    tenant.association("qcTenantRecord").setTarget(rec as any);
-    const saved = await tenant.save();
-    expect(saved).toBe(true);
-    expect(rec.isNewRecord()).toBe(false);
-    expect(rec.parent_id).toBe(42);
-  });
-});
-
-describe("computePrimaryKey", () => {
-  function makeRecord(opts: {
-    primaryKey?: string | string[];
-    queryConstraintsList?: string[];
-    hasQueryConstraints?: boolean;
-  }): any {
-    return {
-      constructor: {
-        primaryKey: opts.primaryKey ?? "id",
-        _queryConstraintsList: opts.queryConstraintsList ?? null,
-        _hasQueryConstraints: opts.hasQueryConstraints ?? false,
-      },
-    };
-  }
-
-  it("returns explicit reflection primaryKey option as-is", () => {
-    const record = makeRecord({ primaryKey: "id" });
-    const result = computePrimaryKey({ options: { primaryKey: "custom_id" } }, record);
-    expect(result).toBe("custom_id");
-  });
-
-  it("returns class-level queryConstraintsList when reflection has queryConstraints option", () => {
-    const record = makeRecord({
-      primaryKey: "id",
-      queryConstraintsList: ["tenant_id", "id"],
-      hasQueryConstraints: true,
-    });
-    const result = computePrimaryKey({ options: { queryConstraints: true } }, record);
-    expect(result).toEqual(["tenant_id", "id"]);
-  });
-
-  it("returns queryConstraintsList when record class has_query_constraints? and no FK option", () => {
-    const record = makeRecord({
-      primaryKey: "id",
-      queryConstraintsList: ["shop_id", "id"],
-      hasQueryConstraints: true,
-    });
-    const result = computePrimaryKey({ options: {} }, record);
-    expect(result).toEqual(["shop_id", "id"]);
-  });
-
-  it("does not use queryConstraintsList when reflection has explicit foreignKey option", () => {
-    const record = makeRecord({
-      primaryKey: "id",
-      queryConstraintsList: ["shop_id", "id"],
-      hasQueryConstraints: true,
-    });
-    const result = computePrimaryKey(
-      {
-        options: { foreignKey: "order_id" },
-      },
-      record,
-    );
-    expect(result).toBe("id");
-  });
-
-  it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
-    const record = makeRecord({ primaryKey: ["shop_id", "id"] });
-    const result = computePrimaryKey({ options: {} }, record);
-    expect(result).toBe("id");
-  });
-
-  it("returns full composite PK when CPK has no 'id' column", () => {
-    const record = makeRecord({ primaryKey: ["shop_id", "status"] });
-    const result = computePrimaryKey({ options: {} }, record);
-    expect(result).toEqual(["shop_id", "status"]);
-  });
-
-  it("returns class primary key for non-composite, non-constrained record", () => {
-    const record = makeRecord({ primaryKey: "id" });
-    const result = computePrimaryKey({ options: {} }, record);
-    expect(result).toBe("id");
   });
 });

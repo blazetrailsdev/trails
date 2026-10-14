@@ -6,6 +6,7 @@ import type { Member } from "./member.js";
 import type { MemberDetail } from "./member-detail.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Organization extends Base {
@@ -34,6 +35,7 @@ export class Organization extends Base {
     });
   }
 }
+registerModel(Organization);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Organization {
   get author(): Author | null | Promise<Author | null>;

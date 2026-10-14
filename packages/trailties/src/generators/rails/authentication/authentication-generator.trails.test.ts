@@ -27,7 +27,7 @@ const APP_FILES: Record<string, string> = {
   "app/controllers/application-controller.ts": `import { ActionController } from "@blazetrails/actionpack";\nexport class ApplicationController extends ActionController.Base {}\n`,
   "app/models/application-record.ts": `import { Base } from "@blazetrails/activerecord";\nexport class ApplicationRecord extends Base {}\n`,
   "app/mailers/application-mailer.ts": "export class ApplicationMailer { mail(h: object) {} }",
-  "config/routes.ts": "export function drawRoutes(mapper: Mapper): void {\n}\n",
+  "config/routes.ts": "Trails.application!.routes().draw(function () {\n});\n",
 };
 
 describe("AuthenticationGenerator", () => {
@@ -87,6 +87,36 @@ describe("AuthenticationGenerator pending generators", () => {
       );
       expect(createUsers).toContain('t.string("email_address", { null: false });');
       expect(createUsers).toContain('this.addIndex("users", "email_address", { unique: true });');
+    } finally {
+      fs.rmSync(appDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("AuthenticationGenerator enable_bcrypt", () => {
+  it("adds the bcrypt gem port and requires it from config/application.ts", async () => {
+    registerChildProcessAdapter("trailties-auth-bcrypt-test", {
+      spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
+    });
+    childProcessAdapterConfig.adapter = "trailties-auth-bcrypt-test";
+    const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-bcrypt-"));
+    try {
+      const files = {
+        ...APP_FILES,
+        "config/application.ts": `import { Application } from "@blazetrails/trailties";\n\nimport "@blazetrails/trailties/all";\n`,
+      };
+      for (const [rel, content] of Object.entries(files)) {
+        fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
+        fs.writeFileSync(path.join(appDir, rel), content);
+      }
+      await new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
+      await new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
+
+      const json = JSON.parse(fs.readFileSync(path.join(appDir, "package.json"), "utf-8"));
+      expect(json.dependencies["@blazetrails/bcrypt"]).toBe("*");
+      expect(fs.readFileSync(path.join(appDir, "config/application.ts"), "utf-8")).toBe(
+        `import { Application } from "@blazetrails/trailties";\n\nimport "@blazetrails/trailties/all";\nimport "@blazetrails/bcrypt";\n`,
+      );
     } finally {
       fs.rmSync(appDir, { recursive: true, force: true });
     }

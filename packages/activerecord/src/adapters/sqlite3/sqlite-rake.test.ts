@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
+  type ChildProcessAdapter,
   getChildProcess,
   getChildProcessAsync,
   File,
@@ -67,7 +68,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
     vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     const isExist = vi.spyOn(File, "isExist").mockReturnValue(false);
 
-    await DatabaseTasks.create(configuration);
+    await DatabaseTasks.create(configuration, "/rails/root");
 
     expect(isExist).toHaveBeenCalledWith(database);
   });
@@ -76,7 +77,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
     vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     vi.spyOn(File, "isExist").mockReturnValue(false);
 
-    await DatabaseTasks.create(configuration);
+    await DatabaseTasks.create(configuration, "/rails/root");
 
     expect(streams.out()).toEqual(`Created database '${database}'\n`);
   });
@@ -84,7 +85,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
   it("db create when file exists", async () => {
     vi.spyOn(File, "isExist").mockReturnValue(true);
 
-    await DatabaseTasks.create(configuration);
+    await DatabaseTasks.create(configuration, "/rails/root");
 
     expect(streams.err()).toEqual(`Database '${database}' already exists\n`);
   });
@@ -93,7 +94,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
     vi.spyOn(File, "isExist").mockReturnValue(true);
     const establishConnection = vi.spyOn(Base, "establishConnection");
 
-    await DatabaseTasks.create(configuration);
+    await DatabaseTasks.create(configuration, "/rails/root");
 
     expect(establishConnection).not.toHaveBeenCalled();
   });
@@ -106,7 +107,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
     });
     vi.spyOn(File, "isExist").mockReturnValue(false);
 
-    await DatabaseTasks.create(configuration);
+    await DatabaseTasks.create(configuration, "/rails/root");
 
     expect(calls.map((c) => (c[0] as HashConfig).configurationHash)).toEqual([
       configuration.configurationHash,
@@ -119,7 +120,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
       throw new Error("boom");
     });
 
-    await expect(DatabaseTasks.create(configuration)).rejects.toThrow(Error);
+    await expect(DatabaseTasks.create(configuration, "/rails/root")).rejects.toThrow(Error);
     expect(streams.err()).toMatch(
       `Couldn't create '${database}' database. Please check your configuration.`,
     );
@@ -133,7 +134,6 @@ describeIfSqlite("SqliteDBDropTest", () => {
   let configuration: HashConfig;
   let configurationRoot: HashConfig;
   let streams: ReturnType<typeof captureStreams>;
-  let previousRoot: string;
 
   beforeEach(() => {
     configuration = new HashConfig("development", "primary", {
@@ -144,13 +144,10 @@ describeIfSqlite("SqliteDBDropTest", () => {
       adapter: "sqlite3",
       database: databaseRoot,
     });
-    previousRoot = DatabaseTasks.root;
-    DatabaseTasks.root = root;
     streams = captureStreams();
   });
 
   afterEach(() => {
-    DatabaseTasks.root = previousRoot;
     vi.restoreAllMocks();
   });
 
@@ -159,7 +156,7 @@ describeIfSqlite("SqliteDBDropTest", () => {
     vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
-    await DatabaseTasks.drop(configuration);
+    await DatabaseTasks.drop(configuration, root);
 
     expect(isAbsolutePath).toHaveBeenCalledWith(database);
   });
@@ -168,7 +165,7 @@ describeIfSqlite("SqliteDBDropTest", () => {
     const rm = vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     const rmF = vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
-    await DatabaseTasks.drop(configurationRoot);
+    await DatabaseTasks.drop(configurationRoot, root);
 
     expect(rm).toHaveBeenCalledWith(databaseRoot);
     expect(rmF).toHaveBeenCalledWith([`${databaseRoot}-shm`, `${databaseRoot}-wal`]);
@@ -179,7 +176,7 @@ describeIfSqlite("SqliteDBDropTest", () => {
     vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
-    await DatabaseTasks.drop(configuration);
+    await DatabaseTasks.drop(configuration, root);
 
     expect(join).toHaveBeenCalledWith(root, database);
   });
@@ -188,7 +185,7 @@ describeIfSqlite("SqliteDBDropTest", () => {
     const rm = vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     const rmF = vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
-    await DatabaseTasks.drop(configuration);
+    await DatabaseTasks.drop(configuration, root);
 
     expect(rm).toHaveBeenCalledWith(databaseRoot);
     expect(rmF).toHaveBeenCalledWith([`${databaseRoot}-shm`, `${databaseRoot}-wal`]);
@@ -198,7 +195,7 @@ describeIfSqlite("SqliteDBDropTest", () => {
     vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
-    await DatabaseTasks.drop(configuration);
+    await DatabaseTasks.drop(configuration, root);
 
     expect(streams.out()).toEqual(`Dropped database '${database}'\n`);
   });
@@ -221,9 +218,9 @@ describeIfSqlite("SqliteDBCharsetTest", () => {
 
   it("db retrieves charset", async () => {
     const connection = await Base.connectionPool().leaseConnection();
-    const encoding = vi.spyOn(connection as unknown as { encoding: string }, "encoding", "get");
+    const encoding = vi.spyOn(connection as unknown as { encoding(): Promise<string> }, "encoding");
 
-    await DatabaseTasks.charset(configuration);
+    await DatabaseTasks.charset(configuration, "/rails/root");
 
     expect(encoding).toHaveBeenCalled();
   });
@@ -241,7 +238,9 @@ describeIfSqlite("SqliteDBCollationTest", () => {
   });
 
   it("db retrieves collation", async () => {
-    await expect(DatabaseTasks.collation(configuration)).rejects.toThrow(NoMethodError);
+    await expect(DatabaseTasks.collation(configuration, "/rails/root")).rejects.toThrow(
+      NoMethodError,
+    );
   });
 });
 
@@ -317,7 +316,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     created.push(filename);
 
     const childProcess = await getChildProcessAsync();
-    const spawnSync = vi.spyOn(childProcess, "spawnSync");
+    const system = vi.spyOn(childProcess as Required<ChildProcessAdapter>, "system");
 
     let message = "";
     DatabaseTasks.structureDumpFlags = ["--noop"];
@@ -328,10 +327,11 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
       }),
     ).rejects.toThrow(Error);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "sqlite3",
+      expect.anything(),
       ["--noop", database, ".schema --nosys"],
-      expect.objectContaining({ out: filename }),
+      { out: filename },
     );
     expect(message).toMatch("failed to execute:");
   });

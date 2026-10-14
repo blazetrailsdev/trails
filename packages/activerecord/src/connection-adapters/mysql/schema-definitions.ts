@@ -4,6 +4,7 @@ import {
   Table as AbstractTable,
 } from "../abstract/schema-definitions.js";
 import type {
+  ColumnMethodsBase,
   ColumnOptions,
   ColumnType,
   IdHashOptions,
@@ -13,6 +14,7 @@ import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { deprecate } from "@blazetrails/activesupport";
+import { include, included, Module, rtest } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   blob(...names: string[]): unknown;
@@ -42,6 +44,27 @@ export interface ColumnMethods {
   /** @deprecated */
   unsignedDecimal(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
+
+export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
+  new Module();
+
+ColumnMethods[included] = function (base: ColumnMethodsBase): void {
+  base.defineColumnMethods(
+    "blob",
+    "tinyblob",
+    "mediumblob",
+    "longblob",
+    "tinytext",
+    "mediumtext",
+    "longtext",
+    "unsigned_integer",
+    "unsigned_bigint",
+    "unsigned_float",
+    "unsigned_decimal",
+  );
+
+  deprecate.call(base, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition extends AbstractTableDefinition {
@@ -74,21 +97,20 @@ export class TableDefinition extends AbstractTableDefinition {
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
-    let resolvedType = type as string;
-    if (resolvedType === "primary_key") {
-      resolvedType = "integer";
-      (options as any).limit = (options as any).limit ?? 8;
-      (options as any).primaryKey = true;
-    } else if (resolvedType === "virtual") {
-      resolvedType = options.type as string;
-    } else {
-      const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
-      if (unsignedMatch) {
-        resolvedType = unsignedMatch[1];
-        (options as any).unsigned = true;
-      }
+    options = { ...options };
+    let match: RegExpExecArray | null;
+    if (type === "virtual") {
+      type = options.type as ColumnType;
+    } else if (type === "primary_key") {
+      type = "integer";
+      if (!rtest(options.limit)) options.limit = 8;
+      options.primaryKey = true;
+    } else if ((match = /^unsigned_(?<type>.+)$/.exec(type))) {
+      type = match.groups!.type as ColumnType;
+      options.unsigned = true;
     }
-    return super.newColumnDefinition(name, resolvedType as ColumnType, options);
+
+    return super.newColumnDefinition(name, type, options);
   }
 
   /** @internal */
@@ -128,21 +150,7 @@ export class TableDefinition extends AbstractTableDefinition {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`mysql/schema_definitions.rb:56`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TableDefinition extends ColumnMethods {}
 
-TableDefinition.defineColumnMethods(
-  "blob",
-  "tinyblob",
-  "mediumblob",
-  "longblob",
-  "tinytext",
-  "mediumtext",
-  "longtext",
-  "unsigned_integer",
-  "unsigned_bigint",
-  "unsigned_float",
-  "unsigned_decimal",
-);
-
-deprecate.call(TableDefinition, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
+include(TableDefinition, ColumnMethods);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table extends AbstractTable {
@@ -154,18 +162,4 @@ export class Table extends AbstractTable {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`mysql/schema_definitions.rb:102`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Table extends ColumnMethods {}
 
-Table.defineColumnMethods(
-  "blob",
-  "tinyblob",
-  "mediumblob",
-  "longblob",
-  "tinytext",
-  "mediumtext",
-  "longtext",
-  "unsigned_integer",
-  "unsigned_bigint",
-  "unsigned_float",
-  "unsigned_decimal",
-);
-
-deprecate.call(Table, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
+include(Table, ColumnMethods);

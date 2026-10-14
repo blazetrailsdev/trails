@@ -1,12 +1,12 @@
 import {
   Callbacks as ASCallbacks,
-  defineCallbacks,
   extend,
   include,
   included,
-  prepend,
-  runCallbacks,
+  kernelArray as array,
+  type Extended,
 } from "@blazetrails/activesupport";
+import { isIntersect, Module } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
@@ -59,14 +59,12 @@ export const Callbacks = {
   [included](base: AnyClass): void {
     extend(base, ClassMethods);
 
-    include(base, ASCallbacks.InstanceMethods);
-    include(base, { _runValidationCallbacks });
-    extend(base, ASCallbacks.ClassMethods);
-    defineCallbacks(base.prototype, "validation", {
+    include(base, ASCallbacks);
+    (base as AnyClass & Extended<typeof ASCallbacks.ClassMethods>).defineCallbacks("validation", {
       skipAfterCallbacksIfTerminated: true,
       scope: ["kind", "name"],
     });
-    prepend(base.prototype, { runValidationsBang });
+    include(base, SuperMethods);
   },
 };
 
@@ -75,10 +73,12 @@ type Conditional = ((record: unknown) => boolean) | string;
 interface CallbackOptions {
   on?: string | string[] | null;
   if?: Conditional | Conditional[];
-  unless?: Conditional | Conditional[];
 }
 
-export type ValidationCallbackOptions = CallbackOptions & { prepend?: boolean };
+export type ValidationCallbackOptions = CallbackOptions & {
+  unless?: Conditional | Conditional[];
+  prepend?: boolean;
+};
 
 interface CallbackHostRecord {
   validationContext?: string | string[] | null;
@@ -86,37 +86,28 @@ interface CallbackHostRecord {
 
 /** @internal */
 export interface RunValidationsBangHost {
-  _runValidationCallbacks(block: () => Promise<boolean>): Promise<boolean>;
+  _runValidationCallbacks(block: () => unknown): unknown;
 }
 
 /** @internal */
-export async function runValidationsBang(
-  this: RunValidationsBangHost,
-  super_: (...args: unknown[]) => unknown,
-): Promise<boolean> {
-  return this._runValidationCallbacks(async () => (await super_()) as boolean);
+export async function runValidationsBang(this: RunValidationsBangHost): Promise<boolean> {
+  return (await this._runValidationCallbacks(() =>
+    SuperMethods.superMethod(this, "runValidationsBang")!(),
+  )) as boolean;
 }
+
+const SuperMethods = new Module((mod) =>
+  mod.defineMethod("runValidationsBang", runValidationsBang),
+);
 
 /** @internal */
 export function setOptionsForCallback(options: CallbackOptions): void {
-  if (!Object.prototype.hasOwnProperty.call(options, "on")) return;
-  const onArr = Array.isArray(options.on) ? options.on : options.on == null ? [] : [options.on];
-  options.on = onArr;
-  const contextGuard = (o: unknown) => {
-    const ctx = (o as CallbackHostRecord).validationContext;
-    const ctxArr = Array.isArray(ctx) ? ctx : ctx == null ? [] : [ctx];
-    return onArr.some((on) => ctxArr.includes(on));
-  };
-  const existingIf = options.if;
-  const existingArr =
-    existingIf == null ? [] : Array.isArray(existingIf) ? existingIf : [existingIf];
-  options.if = [contextGuard, ...existingArr];
-}
-
-/** @internal */
-export async function _runValidationCallbacks(
-  this: object,
-  block: () => Promise<boolean>,
-): Promise<boolean> {
-  return (await runCallbacks(this, "validation", block)) as boolean;
+  if ("on" in options) {
+    options.on = array(options.on);
+    options.if = [
+      (o: unknown) =>
+        isIntersect(options.on as string[], array((o as CallbackHostRecord).validationContext)),
+      ...array(options.if),
+    ];
+  }
 }

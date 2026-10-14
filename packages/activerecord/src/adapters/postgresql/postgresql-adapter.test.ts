@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
-import { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
+import { UrlConfig } from "../../database-configurations/url-config.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,
@@ -15,29 +15,30 @@ import {
   StatementInvalid,
 } from "../../errors.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
-import {
-  assertQueriesCount,
-  assertNoQueries,
-  assertQueriesMatch,
-} from "../../testing/query-assertions.js";
+import { assertQueriesCount, assertNoQueries } from "../../testing/query-assertions.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
+import * as DdlHelper from "../../support/ddl-helper.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Name } from "../../connection-adapters/postgresql/utils.js";
+import { ConnectionBad } from "../../pg/exceptions.js";
 
-const EX_DEFAULT = "id serial primary key, number integer, data character varying(255)";
+let adapter: PostgreSQLAdapter;
 
-async function withExampleTable(
-  adapter: PostgreSQLAdapter,
-  fn: () => Promise<void>,
-  definition: string = EX_DEFAULT,
-): Promise<void> {
-  await adapter.execute(`CREATE TABLE ex (${definition})`);
+async function withPostgresqlApdaterDecodeDates(fn: () => Promise<void>): Promise<void> {
+  PostgreSQLAdapter.decodeDates = true;
   try {
     await fn();
   } finally {
-    await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);
+    PostgreSQLAdapter.decodeDates = false;
   }
+}
+
+async function withExampleTable(
+  definition = "id serial primary key, number integer, data character varying(255)",
+  block: () => Promise<void>,
+): Promise<void> {
+  await DdlHelper.withExampleTable(adapter, "ex", definition, block);
 }
 
 function connectionWithoutInsertReturning(): PostgreSQLAdapter {
@@ -45,10 +46,8 @@ function connectionWithoutInsertReturning(): PostgreSQLAdapter {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
-
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
 
   afterEach(async () => {
@@ -62,10 +61,18 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLAdapterTest", () => {
-    fixtures(["accounts"], { useTransactionalTests: false });
+    const { self } = fixtures(["accounts"], { useTransactionalTests: false });
+
+    beforeEach(() => {
+      self()._originalDbWarningsAction = "ignore";
+    });
 
     it("connection error", async () => {
-      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
+      const bad = new PostgreSQLAdapter({
+        host: "localhost",
+        port: 59999,
+        database: "nonexistent",
+      });
       const error = await assertRaises([ConnectionNotEstablished], {}, () =>
         bad.execute("SELECT 1"),
       );
@@ -76,7 +83,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("reconnection error", async () => {
       const pgModule = (await import("pg")).default;
       const fakeClient = {
-        connect: () => Promise.reject(new Error("actual bad connection error")),
+        connect: () => Promise.reject(new ConnectionBad("actual bad connection error")),
         end: () => Promise.resolve(),
         on: () => fakeClient,
         query: () => Promise.reject(new Error("not connected")),
@@ -84,7 +91,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const clientSpy = vi
         .spyOn(pgModule, "Client" as never)
         .mockImplementation((() => fakeClient) as never);
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         const error = await assertRaises([ConnectionNotEstablished], {}, () =>
           a.execute("SELECT 1"),
@@ -98,7 +105,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("bad connection", async () => {
-      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
+      const bad = new PostgreSQLAdapter({
+        host: "localhost",
+        port: 59999,
+        database: "nonexistent",
+      });
       await expect(bad.execute("SELECT 1")).rejects.toThrow();
       await bad.disconnectBang();
     });
@@ -106,7 +117,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("bad connection to postgres database", async () => {
       const pgModule = (await import("pg")).default;
       const clientSpy = vi.spyOn(pgModule, "Client" as never).mockImplementation((() => ({
-        connect: () => Promise.reject(new Error('FATAL:  database "postgres" does not exist')),
+        connect: () =>
+          Promise.reject(new ConnectionBad('FATAL:  database "postgres" does not exist')),
         end: () => Promise.resolve(),
         on() {
           return this;
@@ -115,7 +127,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       let connection: PostgreSQLAdapter | null = null;
       try {
         const error = await assertRaises([ConnectionNotEstablished], {}, async () => {
-          connection = new PostgreSQLAdapter(PG_TEST_URL.replace(/\/[^/?]*(\?|$)/, "/postgres$1"));
+          connection = new PostgreSQLAdapter({
+            connectionString: PG_TEST_URL.replace(/\/[^/?]*(\?|$)/, "/postgres$1"),
+          });
           await connection.execQuery("SELECT 1");
         });
         expect(connection).not.toBeNull();
@@ -140,15 +154,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("database exists returns false when the database does not exist", async () => {
       const url = new URL(PG_TEST_URL);
       url.pathname = "/non_extant_database";
-      expect(await PostgreSQLAdapter.databaseExists(url.toString())).toBeFalsy();
+      expect(
+        await PostgreSQLAdapter.databaseExists(
+          new UrlConfig("test", "primary", url.toString()).configurationHash,
+        ),
+      ).toBeFalsy();
     });
 
     it("database exists returns true when the database exists", async () => {
-      expect(await PostgreSQLAdapter.databaseExists(PG_TEST_URL)).toBeTruthy();
+      expect(
+        await PostgreSQLAdapter.databaseExists({ connectionString: PG_TEST_URL }),
+      ).toBeTruthy();
     });
 
     it("primary key", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         expect(await adapter.primaryKey("ex")).toBe("id");
       });
     });
@@ -158,27 +178,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("non standard primary key", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.primaryKey("ex")).toBe("data");
-        },
-        "data character varying(255) primary key",
-      );
+      await withExampleTable("data character varying(255) primary key", async () => {
+        expect(await adapter.primaryKey("ex")).toBe("data");
+      });
     });
 
     it("primary key returns nil for no pk", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.primaryKey("ex")).toBeNull();
-        },
-        "id integer",
-      );
+      await withExampleTable("id integer", async () => {
+        expect(await adapter.primaryKey("ex")).toBeNull();
+      });
     });
 
     it("exec insert with returning disabled", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -198,7 +210,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec insert with returning disabled and no sequence name given", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -217,7 +229,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec insert default values with returning disabled and no sequence name given", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -236,7 +248,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const connection = connectionWithoutInsertReturning();
         try {
           const result = await connection.execInsert(
@@ -275,7 +287,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("pk and sequence for", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
         expect(pk).toBe("id");
         expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "id"));
@@ -283,35 +295,23 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("pk and sequence for with non standard primary key", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
-          expect(pk).toBe("code");
-          expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "code"));
-        },
-        "code serial primary key",
-      );
+      await withExampleTable("code serial primary key", async () => {
+        const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
+        expect(pk).toBe("code");
+        expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "code"));
+      });
     });
 
     it("pk and sequence for returns nil if no seq", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
-        },
-        "id integer primary key",
-      );
+      await withExampleTable("id integer primary key", async () => {
+        expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
+      });
     });
 
     it("pk and sequence for returns nil if no pk", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
-        },
-        "id integer",
-      );
+      await withExampleTable("id integer", async () => {
+        expect(await adapter.pkAndSequenceFor("ex")).toBeNull();
+      });
     });
 
     it("pk and sequence for returns nil if table not found", async () => {
@@ -366,7 +366,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec no binds", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         let result = await adapter.execQuery("SELECT id, data FROM ex");
         expect(result.rows.length).toBe(0);
         expect(result.columns.length).toBe(2);
@@ -383,7 +383,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec with binds", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const string = adapter.quote("foo");
         await adapter.execQuery(`INSERT INTO ex (id, data) VALUES (1, ${string})`);
 
@@ -400,7 +400,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec typecasts bind vals", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const string = adapter.quote("foo");
         await adapter.execQuery(`INSERT INTO ex (id, data) VALUES (1, ${string})`);
 
@@ -417,7 +417,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("partial index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", ["id", "number"], { name: "partial", where: "number > 100" });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "partial");
         expect(index!.where).toBe("(number > 100)");
@@ -426,18 +426,17 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("partial index on column named like keyword", async () => {
       await withExampleTable(
-        adapter,
+        'id serial primary key, number integer, "primary" boolean',
         async () => {
           await adapter.addIndex("ex", "id", { name: "partial", where: "primary" });
           const index = (await adapter.indexes("ex")).find((idx) => idx.name === "partial");
           expect(index!.where).toBe('"primary"');
         },
-        'id serial primary key, number integer, "primary" boolean',
       );
     });
 
     itIfSupports("index_include", "include index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", ["id"], { name: "include", include: ["number"] });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
         expect(index!.include).toEqual(["number"]);
@@ -445,7 +444,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("index_include", "include multiple columns index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", ["id"], { name: "include", include: ["number", "data"] });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
         expect(index!.include).toEqual(["number", "data"]);
@@ -453,31 +452,23 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("index_include", "include keyword column name", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          await adapter.addIndex("ex", "id", { name: "include", include: ["timestamp"] });
-          const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
-          expect(index!.include).toEqual(["timestamp"]);
-        },
-        "id integer, timestamp integer",
-      );
+      await withExampleTable("id integer, timestamp integer", async () => {
+        await adapter.addIndex("ex", "id", { name: "include", include: ["timestamp"] });
+        const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
+        expect(index!.include).toEqual(["timestamp"]);
+      });
     });
 
     itIfSupports("index_include", "include escaped quotes column name", async () => {
-      await withExampleTable(
-        adapter,
-        async () => {
-          await adapter.addIndex("ex", "id", { name: "include", include: ['I"like"quotes'] });
-          const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
-          expect(index!.include).toEqual(['I"like"quotes']);
-        },
-        'id integer, "I""like""quotes" integer',
-      );
+      await withExampleTable('id integer, "I""like""quotes" integer', async () => {
+        await adapter.addIndex("ex", "id", { name: "include", include: ['I"like"quotes'] });
+        const index = (await adapter.indexes("ex")).find((idx) => idx.name === "include");
+        expect(index!.include).toEqual(['I"like"quotes']);
+      });
     });
 
     it("expression index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         const expr = "mod(id, 10), abs(number)";
         await adapter.addIndex("ex", expr, { name: "expression" });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "expression");
@@ -487,7 +478,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("index with opclass", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.addIndex("ex", "data", { opclass: { data: "varchar_pattern_ops" } });
         let index = (await adapter.indexes("ex")).find((idx) => idx.name === "index_ex_on_data");
         expect(index!.columns).toEqual(["data"]);
@@ -499,7 +490,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("invalid index", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
         const error = await assertRaises([RecordNotUnique], {}, () =>
           adapter.addIndex("ex", "number", {
@@ -522,7 +513,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("nulls_not_distinct", "index with not distinct nulls", async () => {
-      await withExampleTable(adapter, async () => {
+      await withExampleTable(undefined, async () => {
         await adapter.execute(
           `CREATE UNIQUE INDEX index_ex_on_data ON ex (data) NULLS NOT DISTINCT WHERE number > 0`,
         );
@@ -614,7 +605,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(result.columnTypes["feeling"]).toBeInstanceOf(OidEnum);
         });
       } finally {
-        await assertQueriesMatch(/from pg_type/i, undefined, true, () =>
+        await self().assertQueriesMatch(/from pg_type/i, { includeSchema: true }, () =>
           adapter.dropEnum("feeling", { ifExists: true }),
         );
       }
@@ -658,7 +649,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("unparsed defaults are at least set when saving", async () => {
       await withExampleTable(
-        adapter,
+        "id SERIAL PRIMARY KEY, number INTEGER NOT NULL DEFAULT (4 + 4) * 2 / 4",
         async () => {
           class NumberKlass extends Base {
             declare number: number | null;
@@ -675,29 +666,24 @@ describeIfPg("PostgreSQLAdapter", () => {
           await firstNumber.saveBang();
           expect((await firstNumber.reload()).number).toBe(4);
         },
-        "id SERIAL PRIMARY KEY, number INTEGER NOT NULL DEFAULT (4 + 4) * 2 / 4",
       );
     });
 
     it("only check for insensitive comparison capability once", async () => {
       await adapter.execute("CREATE DOMAIN example_type AS integer");
       try {
-        await withExampleTable(
-          adapter,
-          async () => {
-            class NumberKlass extends Base {
-              static tableName = "ex";
-            }
-            const attribute = NumberKlass.arelTable.get("number");
-            await assertQueriesCount(undefined, true, async () => {
-              await adapter.caseInsensitiveComparison(attribute, "foo");
-            });
-            await assertNoQueries(false, async () => {
-              await adapter.caseInsensitiveComparison(attribute, "foo");
-            });
-          },
-          "id SERIAL PRIMARY KEY, number example_type",
-        );
+        await withExampleTable("id SERIAL PRIMARY KEY, number example_type", async () => {
+          class NumberKlass extends Base {
+            static tableName = "ex";
+          }
+          const attribute = NumberKlass.arelTable.get("number");
+          await assertQueriesCount(undefined, true, async () => {
+            await adapter.caseInsensitiveComparison(attribute, "foo");
+          });
+          await assertNoQueries(false, async () => {
+            await adapter.caseInsensitiveComparison(attribute, "foo");
+          });
+        });
       } finally {
         await adapter.execute("DROP DOMAIN example_type");
       }
@@ -726,7 +712,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("ignores warnings when behaviour ignore", async () => {
-      await withDbWarningsAction("ignore", async () => {
+      await self().withDbWarningsAction("ignore", undefined, async () => {
         let err = "";
         const listener = (notice: { severity?: string; message?: string }) => {
           err += `${notice.severity}:  ${notice.message}\n`;
@@ -744,7 +730,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("logs warnings when behaviour log", async () => {
-      await withDbWarningsAction("log", async () => {
+      await self().withDbWarningsAction("log", undefined, async () => {
         const sqlWarning = "[ActiveRecord::SQLWarning] PostgreSQL SQL warning (01000)";
         const logger = { warn: vi.fn() };
         const previousLogger = Base.logger;
@@ -759,7 +745,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises warnings when behaviour raise", async () => {
-      await withDbWarningsAction("raise", async () => {
+      await self().withDbWarningsAction("raise", undefined, async () => {
         const error = await assertRaises([SQLWarning], {}, () =>
           adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
         );
@@ -779,7 +765,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       ActiveSupport.errorReporter = reporter;
       try {
-        await withDbWarningsAction("report", async () => {
+        await self().withDbWarningsAction("report", undefined, async () => {
           await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
           const warningEvent = events[0].error;
 
@@ -798,7 +784,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         warningMessage = warning.message;
         warningLevel = warning.level;
       };
-      await withDbWarningsAction(warningAction, async () => {
+      await self().withDbWarningsAction(warningAction, undefined, async () => {
         await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
 
         expect(warningMessage).toBe("PostgreSQL SQL warning");
@@ -807,7 +793,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("allowlist of warnings to ignore", async () => {
-      await withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
+      await self().withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
         const rows = await adapter.execute(
           "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
         );
@@ -816,7 +802,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("allowlist of warning codes to ignore", async () => {
-      await withDbWarningsAction("raise", ["01000"], async () => {
+      await self().withDbWarningsAction("raise", ["01000"], async () => {
         const rows = await adapter.execute(
           "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
         );
@@ -825,7 +811,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("does not raise notice level warnings", async () => {
-      await withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
+      await self().withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
         const result = await adapter.execute("DROP TABLE IF EXISTS non_existent_table");
 
         expect(result).toEqual([]);
@@ -833,22 +819,30 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("date decoding enabled", async () => {
-      const date = (await adapter.selectValue("select '2024-01-01'::date")) as Temporal.PlainDate;
-      expect(date).toEqual(Temporal.PlainDate.from("2024-01-01"));
-      expect(date.constructor).toBe(Temporal.PlainDate);
+      const connection = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+
+      try {
+        await withPostgresqlApdaterDecodeDates(async () => {
+          const date = (await connection.selectValue(
+            "select '2024-01-01'::date",
+          )) as Temporal.PlainDate;
+          expect(date).toEqual(Temporal.PlainDate.from("2024-01-01"));
+          expect(date.constructor).toBe(Temporal.PlainDate);
+        });
+      } finally {
+        await connection.disconnectBang();
+      }
     });
 
     it("date decoding disabled", async () => {
-      const saved = PostgreSQLAdapter.decodeDates;
-      PostgreSQLAdapter.decodeDates = false;
-      const connection = new PostgreSQLAdapter(PG_TEST_URL);
+      const connection = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+
       try {
         const date = await connection.selectValue("select '2024-01-01'::date");
         expect(date).toBe("2024-01-01");
         expect((date as string).constructor).toBe(String);
       } finally {
         await connection.disconnectBang();
-        PostgreSQLAdapter.decodeDates = saved;
       }
     });
 

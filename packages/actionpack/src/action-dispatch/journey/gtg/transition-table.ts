@@ -5,7 +5,7 @@ import {
   type SafeBuffer,
 } from "@blazetrails/activesupport";
 import { Base, Template, TseHandler } from "@blazetrails/actionview";
-import { ArgumentError, File, getChildProcess, rbObjClass } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, getChildProcess, rbObjClassname } from "@blazetrails/ruby-compat";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
 import { Symbol as SymbolNode, Terminal, type Node } from "../nodes/node.js";
 import type { GtgState, TransitionTableLike } from "./simulator.js";
@@ -261,7 +261,7 @@ export class TransitionTable implements TransitionTableLike, DotHost {
         return this._regexpStates as Map<number, Map<Edge, number>>;
       }
     } else {
-      throw new ArgumentError(`unknown symbol: ${rbObjClass(sym)}`);
+      throw new ArgumentError(`unknown symbol: ${rbObjClassname(sym)}`);
     }
   }
 }

@@ -1,50 +1,40 @@
 import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { Mime } from "../http/mime-type.js";
-import {
-  isPresent,
-  reverseMergeBang,
-  runLoadHooks,
-  SetupAndTeardown,
-  type FilterListEntry,
-} from "@blazetrails/activesupport";
+import { isPresent, reverseMergeBang, runLoadHooks } from "@blazetrails/activesupport";
 import {
   HTTPS,
+  RuntimeError,
   URI,
   include,
+  rbFPublicSend,
+  rbFSend,
   rbObjRespondTo,
   stringSplit,
   type Generic,
+  type Included,
+  type StringIO,
 } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
-import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { Metal } from "../../action-controller/metal.js";
-import {
-  flash as testProcessFlash,
-  redirectToUrl as testProcessRedirectToUrl,
-  fileFixtureUpload as testProcessFileFixtureUpload,
-  fixtureFileUpload as testProcessFixtureFileUpload,
-  assigns as assignsFn,
-  type TestProcessHost,
-} from "./test-process.js";
+import { FixtureFile, TestProcess } from "./test-process.js";
 import * as routingAssertions from "./assertions/routing.js";
-import * as responseAssertions from "./assertions/response.js";
-import { htmlDocument as parseHtmlDocument } from "./assertions.js";
+import { Assertions } from "./assertions.js";
 import type { XmlDocument } from "@blazetrails/nokogiri";
 import * as urlForMod from "../routing/url-for.js";
 import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
 import type { UrlForRoutes } from "../routing/url-for.js";
 import { RequestEncoder } from "./request-encoder.js";
+import * as pageDumpHelper from "./test-helpers/page-dump-helper.js";
 import { ActionDispatch } from "../../namespaces.js";
 import { Session as RackTestSession, type CookieJar } from "@blazetrails/rack-test";
 import { DEFAULT_PORTS, type RackApp, type RackMiddleware } from "@blazetrails/rack";
-import type { UploadedFile } from "@blazetrails/rack-test";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 
 export interface IntegrationRequestOptions {
-  params?: Record<string, unknown>;
-  headers?: Record<string, string>;
+  params?: Record<string, unknown> | string | StringIO;
+  headers?: Record<string, unknown>;
   xhr?: boolean;
   env?: Record<string, unknown>;
   as?: string;
@@ -60,10 +50,9 @@ const DEFAULT_ACCEPT =
   "text/html;q=0.9,text/plain;q=0.8,image/png," +
   "*/*;q=0.5";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class IntegrationTest extends TestCase {
   routes: RouteSet = new RouteSet();
-
-  session: Record<string, unknown> = {};
 
   host: string = DEFAULT_HOST;
 
@@ -82,29 +71,15 @@ export class IntegrationTest extends TestCase {
   /** @internal */
   _defaultUrlOptions: Record<string, unknown> = {};
 
-  constructor(name?: string) {
-    super(name!);
-    this.resetBang();
-    const app = this.app as { routes?: unknown } | null;
-    const routes = typeof app?.routes === "function" ? app.routes() : app?.routes;
-    if (rbObjRespondTo(app, "routes") && routes instanceof RouteSet) {
-      const session = this.constructor as typeof IntegrationTest;
-      let klass = APP_SESSIONS.get(app);
-      if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
-        klass = class extends session {};
-        klass.prototype.constructor = session;
-        include(klass, routes.urlHelpers());
-        include(klass, routes.mountedHelpers());
-        APP_SESSIONS.set(app, klass);
-      }
-      Object.setPrototypeOf(this, klass.prototype);
-    }
+  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
+  constructor(...args: ConstructorParameters<typeof TestCase>) {
+    super(...args);
+    this._routesOverride = undefined;
+    this._integrationSession = null;
   }
 
   resetBang(): void {
-    this.session = {};
     this._mockSessionMemo = undefined;
-    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
     this.controller = undefined!;
     this.request = undefined!;
@@ -115,6 +90,7 @@ export class IntegrationTest extends TestCase {
     this.host = DEFAULT_HOST;
     this.remoteAddr = DEFAULT_REMOTE_ADDR;
     this.accept = DEFAULT_ACCEPT;
+    this._integrationSession = this.createSession(this.app);
   }
 
   httpsBang(flag: boolean = true): void {
@@ -135,9 +111,8 @@ export class IntegrationTest extends TestCase {
         );
       }
 
-      const app = this.app as { routes?: RouteSet } | null;
-      if (rbObjRespondTo(app, "routes")) {
-        reverseMergeBang(urlOptions, app!.routes!.defaultUrlOptions);
+      if (rbObjRespondTo(this.app, "routes")) {
+        reverseMergeBang(urlOptions, (rbFSend(this.app, "routes") as RouteSet).defaultUrlOptions);
       }
 
       reverseMergeBang(urlOptions, {
@@ -195,7 +170,7 @@ export class IntegrationTest extends TestCase {
     options: IntegrationRequestOptions = {},
   ): Promise<number> {
     const requestEncoder = RequestEncoder.encoder(options.as);
-    const headers: Record<string, string> = { ...(options.headers ?? {}) };
+    const headers: Record<string, unknown> = { ...(options.headers ?? {}) };
     const params = options.params;
 
     if (method === "GET" && options.as === "json" && params != null) {
@@ -263,7 +238,7 @@ export class IntegrationTest extends TestCase {
       Headers.fromHash(requestEnv).mergeBang(options.env!);
     }
 
-    const session = RackTestSession.new(this._mockSession);
+    const session = new RackTestSession(this._mockSession);
 
     let uri = this.buildFullUri(path, requestEnv);
 
@@ -279,7 +254,6 @@ export class IntegrationTest extends TestCase {
     const response = this._mockSession.lastResponse();
     this.response = TestResponse.fromResponse(response);
     this.response.request = this.request;
-    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
     this._urlOptions = undefined;
 
@@ -292,30 +266,22 @@ export class IntegrationTest extends TestCase {
     this.host = host;
   }
 
-  async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
-    if (!this.isRedirect) throw new Error(`not a redirect! ${this.status} ${this.statusMessage}`);
-    const location = this.redirectUrl;
-    if (!location) throw new Error("not a redirect! (no Location header)");
-
-    const preserveVerb = this.status === 307 || this.status === 308;
-    const method = preserveVerb
-      ? ((this.request?.env?.REQUEST_METHOD as string | undefined)?.toLowerCase() ?? "get")
-      : "get";
-
-    const headers = { ...(options.headers ?? {}) };
-    const hasReferer = Object.keys(headers).some(
-      (k) => k === "HTTP_REFERER" || k.toLowerCase() === "referer",
-    );
-    if (!hasReferer && this.request) {
-      const env = this.request.env as Record<string, string | undefined>;
-      const qs = env.QUERY_STRING ? `?${env.QUERY_STRING}` : "";
-      const prev =
-        `${env["rack.url_scheme"] ?? "http"}://${env.HTTP_HOST ?? this.host}` +
-        `${env.PATH_INFO ?? ""}${qs}`;
-      headers["HTTP_REFERER"] = prev;
+  async followRedirectBang({ headers = {}, ...args }: IntegrationRequestOptions = {}): Promise<
+    number | null
+  > {
+    if (!this.isRedirect) {
+      throw new RuntimeError(`not a redirect! ${this.status} ${this.statusMessage}`);
     }
 
-    await this.process(method, location, { ...options, headers });
+    const method = [307, 308].includes(this.response.status)
+      ? this.request.method.toLowerCase()
+      : "get";
+
+    if (![":HTTP_REFERER", "HTTP_REFERER"].some((key) => Object.hasOwn(headers, key))) {
+      headers["HTTP_REFERER"] = this.request.url;
+    }
+
+    await rbFPublicSend(this, method, this.response.location, { headers, ...args });
     return this.status;
   }
 
@@ -327,8 +293,8 @@ export class IntegrationTest extends TestCase {
 
   response!: TestResponse;
 
-  get status(): number {
-    return this.response?.statusCode ?? this.controller?.status ?? 0;
+  get status(): number | null {
+    return this.response == null ? null : this.response.status;
   }
 
   get statusMessage(): string | null {
@@ -351,37 +317,8 @@ export class IntegrationTest extends TestCase {
     return this.request == null ? null : this.request.path;
   }
 
-  get responseBody(): string {
-    return this.response?.body ?? this.controller?.responseBody ?? "";
-  }
-
-  get parsedBody(): unknown {
-    return JSON.parse(this.responseBody);
-  }
-
-  get redirectUrl(): string | undefined {
-    return this.response?.getHeader("location") ?? this.controller?.headers.get("location");
-  }
-
-  get flash(): FlashHash {
-    if (!this.request) return new FlashHash();
-    return testProcessFlash.call(this as unknown as TestProcessHost);
-  }
-
   get cookies(): CookieJar {
     return this._mockSession.cookieJar;
-  }
-
-  get redirectToUrl(): string | undefined {
-    return testProcessRedirectToUrl.call(this as unknown as TestProcessHost);
-  }
-
-  get htmlDocument(): XmlDocument {
-    if (!this._htmlDocument) {
-      const mimeType = this.response?.getHeader("content-type") ?? undefined;
-      this._htmlDocument = parseHtmlDocument(this.responseBody, mimeType);
-    }
-    return this._htmlDocument;
   }
 
   get documentRootElement() {
@@ -422,17 +359,37 @@ export class IntegrationTest extends TestCase {
     await this.process("OPTIONS", path, options);
   }
 
+  /** @internal */
+  _integrationSession: this | null;
+
   get integrationSession(): this {
-    return this;
+    return (this._integrationSession ??= this.createSession(this.app));
   }
 
-  /** @internal */
-  createSession(app?: unknown): IntegrationTest {
-    const Ctor = this.constructor as new () => IntegrationTest;
-    const sess = new Ctor();
-    sess.routes = this.routes;
-    sess._app = app ?? this._app;
-    return sess;
+  /**
+   * @internal
+   * @missingRailsCall new — CONVERGEABLE integration-runner-merged-into-session
+   */
+  createSession(app: unknown): this {
+    const session = this.constructor as typeof IntegrationTest;
+    let klass = APP_SESSIONS.get(app);
+    if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
+      klass = class extends session {};
+      klass.prototype.constructor = session;
+      const railsApp = app as { routes: RouteSet | (() => RouteSet) };
+      if (
+        rbObjRespondTo(app, "routes") &&
+        (typeof railsApp.routes === "function" ? railsApp.routes() : railsApp.routes) instanceof
+          RouteSet
+      ) {
+        const routes = typeof railsApp.routes === "function" ? railsApp.routes() : railsApp.routes;
+        include(klass, routes.urlHelpers());
+        include(klass, routes.mountedHelpers());
+      }
+      APP_SESSIONS.set(app, klass);
+    }
+    Object.setPrototypeOf(this, klass.prototype);
+    return this;
   }
 
   /** @internal */
@@ -456,17 +413,14 @@ export class IntegrationTest extends TestCase {
   rootSession?: IntegrationTest;
 
   /** @internal */
-  get assertions(): number {
-    return this.rootSession ? this.rootSession.assertions : (this._assertions ?? 0);
+  override get assertions(): number {
+    return this.rootSession ? this.rootSession.assertions : super.assertions;
   }
 
-  set assertions(value: number) {
-    if (this.rootSession) this.rootSession.assertions = value;
-    else this._assertions = value;
+  override set assertions(assertions: number) {
+    if (this.rootSession) this.rootSession.assertions = assertions;
+    else super.assertions = assertions;
   }
-
-  /** @internal */
-  _assertions: number = 0;
 
   /** @internal */
   _htmlDocument?: XmlDocument;
@@ -475,36 +429,15 @@ export class IntegrationTest extends TestCase {
   copySessionVariablesBang(): void {}
 
   /** @internal */
-  beforeSetup(): unknown {
+  override beforeSetup(): unknown {
     this._app = undefined;
-    const result = super.beforeSetup?.();
-    return result instanceof Promise
-      ? result.then(() => SetupAndTeardown.beforeSetup.call(this))
-      : SetupAndTeardown.beforeSetup.call(this);
-  }
-
-  /** @internal */
-  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): unknown {
-    SetupAndTeardown.afterTeardown.call(this, test);
-    return super.afterTeardown?.(test as never);
-  }
-
-  static override setup(this: object, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.setup.call((this as { prototype: object }).prototype, ...args);
-  }
-
-  static override teardown(this: object, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.teardown.call((this as { prototype: object }).prototype, ...args);
+    return super.beforeSetup();
   }
 
   static withRouting = routingAssertions.WithIntegrationRouting.ClassMethods.withRouting;
 
   /** @internal */
   _originalRoutes?: RouteSet;
-
-  setup(): void {
-    routingAssertions.setup.call(this);
-  }
 
   /** @internal */
   _app?: unknown;
@@ -542,44 +475,16 @@ export class IntegrationTest extends TestCase {
     RequestEncoder.registerEncoder(args, options);
   }
 
-  assigns(key?: string | symbol): never {
-    return assignsFn.call(this as unknown as TestProcessHost, key);
-  }
-
-  fileFixtureUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
-    return testProcessFileFixtureUpload.call(
-      this as unknown as TestProcessHost,
-      path,
-      mimeType,
-      binary,
-    );
-  }
-
-  fixtureFileUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
-    return testProcessFixtureFileUpload.call(
-      this as unknown as TestProcessHost,
-      path,
-      mimeType,
-      binary,
-    );
-  }
-
   inspect(): string {
     const url = this.request?.env?.REQUEST_URI ?? "(no request)";
     return `#<${this.constructor.name} ${url}>`;
   }
 
-  // @internal
-  declare assertRecognizes: typeof routingAssertions.assertRecognizes;
-  declare assertGenerates: typeof routingAssertions.assertGenerates;
-  declare assertRouting: typeof routingAssertions.assertRouting;
   declare withRouting: typeof routingAssertions.WithIntegrationRouting.withRouting;
   /** @internal */
   declare createRoutes: typeof routingAssertions.WithIntegrationRouting.createRoutes;
   /** @internal */
   declare resetRoutes: typeof routingAssertions.WithIntegrationRouting.resetRoutes;
-  declare recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
-  declare failOn: typeof routingAssertions.failOn;
   declare urlFor: typeof urlForMod.urlFor;
   declare fullUrlFor: typeof urlForMod.fullUrlFor;
   declare routeFor: typeof urlForMod.routeFor;
@@ -592,45 +497,60 @@ export class IntegrationTest extends TestCase {
   declare polymorphicUrlForAction: typeof polymorphicRoutes.polymorphicUrlForAction;
   declare polymorphicPathForAction: typeof polymorphicRoutes.polymorphicPathForAction;
   declare polymorphicMapping: typeof polymorphicRoutes.polymorphicMapping;
-  declare parameterize: typeof responseAssertions.parameterize;
-  declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
-  declare assertResponse: typeof responseAssertions.assertResponse;
-  declare assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
+  declare saveAndOpenPage: typeof pageDumpHelper.saveAndOpenPage;
   /** @internal */
-  generateResponseMessage(expected: number | string, actual: number): string {
-    return responseAssertions.generateResponseMessage(this, expected, actual);
-  }
+  declare savePage: typeof pageDumpHelper.savePage;
   /** @internal */
-  responseBodyIfShort(): string {
-    return responseAssertions.responseBodyIfShort(this);
-  }
+  declare openFile: typeof pageDumpHelper.openFile;
   /** @internal */
-  exceptionIfPresent(): string {
-    return responseAssertions.exceptionIfPresent(this);
-  }
-  /** @internal */
-  locationIfRedirected(): string {
-    return responseAssertions.locationIfRedirected(this);
-  }
-  /** @internal */
-  codeWithName(codeOrName: number | string): string {
-    return responseAssertions.codeWithName(codeOrName);
-  }
+  declare htmlDumpDefaultPath: typeof pageDumpHelper.htmlDumpDefaultPath;
 
   reset(): void {
     this.resetBang();
   }
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function spliceMethodMissing(proto: object): void {
+  Object.setPrototypeOf(
+    proto,
+    new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
+      get(target, prop, receiver: IntegrationTest) {
+        if (
+          typeof prop === "symbol" ||
+          Reflect.has(target, prop) ||
+          !Object.hasOwn(receiver, "_integrationSession")
+        ) {
+          return Reflect.get(target, prop, receiver);
+        }
+        if (Reflect.has(receiver.integrationSession, prop)) {
+          return Reflect.get(receiver.integrationSession, prop, receiver);
+        } else {
+          return Reflect.get(target, prop, receiver);
+        }
+      },
+    }),
+  );
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include TestProcess` and `include TestProcess::FixtureFile` (`actionpack/lib/action_dispatch/testing/integration.rb:95,651`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface IntegrationTest
+  extends
+    Omit<Included<typeof TestProcess>, "cookies">,
+    Included<typeof FixtureFile>,
+    Omit<Assertions, "withRouting" | "createRoutes" | "resetRoutes"> {}
+
+include(IntegrationTest, Assertions);
+include(IntegrationTest, TestProcess);
+include(IntegrationTest, FixtureFile);
+
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
-proto.assertRecognizes = routingAssertions.assertRecognizes;
-proto.assertGenerates = routingAssertions.assertGenerates;
-proto.assertRouting = routingAssertions.assertRouting;
 proto.withRouting = routingAssertions.WithIntegrationRouting.withRouting;
 proto.createRoutes = routingAssertions.WithIntegrationRouting.createRoutes;
 proto.resetRoutes = routingAssertions.WithIntegrationRouting.resetRoutes;
-proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
-proto.failOn = routingAssertions.failOn;
 proto.urlFor = urlForMod.urlFor;
 proto.fullUrlFor = urlForMod.fullUrlFor;
 proto.routeFor = urlForMod.routeFor;
@@ -642,12 +562,11 @@ proto.polymorphicPath = polymorphicRoutes.polymorphicPath;
 proto.polymorphicUrlForAction = polymorphicRoutes.polymorphicUrlForAction;
 proto.polymorphicPathForAction = polymorphicRoutes.polymorphicPathForAction;
 proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
-proto.parameterize = responseAssertions.parameterize;
-proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
-proto.assertResponse = responseAssertions.assertResponse;
-proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
+proto.saveAndOpenPage = pageDumpHelper.saveAndOpenPage;
+proto.savePage = pageDumpHelper.savePage;
+proto.openFile = pageDumpHelper.openFile;
+proto.htmlDumpDefaultPath = pageDumpHelper.htmlDumpDefaultPath;
+spliceMethodMissing(proto);
 include(IntegrationTest, urlForMod.UrlFor);
-
-SetupAndTeardown.prepended(IntegrationTest.prototype);
 
 runLoadHooks("action_dispatch_integration_test", IntegrationTest);

@@ -6,11 +6,30 @@ import {
   Response as DispatchResponse,
   ResponseBuffer,
 } from "../../action-dispatch/http/response.js";
-import { Queue, RuntimeError, SizedQueue, merge } from "@blazetrails/ruby-compat";
+import {
+  CachedThreadPool,
+  File,
+  Queue,
+  RuntimeError,
+  SizedQueue,
+  Thread,
+  ThreadError,
+  excBacktrace,
+  isSymbol,
+  merge,
+  rbObjClassname,
+  rbObjRespondTo,
+  stringDelete,
+  toS,
+} from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
+import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
+import { Base as ActionViewBase } from "@blazetrails/actionview";
+import { ActionController } from "../../namespaces.js";
 
 export class ClientDisconnected extends RuntimeError {}
 
-type ErrorCallback = () => void;
+type ErrorCallback = () => unknown;
 
 export class Buffer extends ResponseBuffer<Queue<string | null>> {
   static queueSize: number | null = 10;
@@ -22,20 +41,20 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
   /** @internal */
   protected _aborted: boolean;
 
-  constructor(response: DispatchResponse) {
+  constructor(response: DispatchResponse | null) {
     const klass = new.target;
     super(response, klass.prototype.buildQueue(klass.queueSize));
-    this._errorCallback = () => {};
+    this._errorCallback = () => true;
     this._aborted = false;
     this.ignoreDisconnect = false;
   }
 
   override write(string: string): void {
-    if (!this._response.committed) {
-      if (this._response.headers.get("Cache-Control") === undefined) {
-        this._response.headers.set("Cache-Control", "no-cache");
+    if (!this._response!.committed) {
+      if (this._response!.headers.get("Cache-Control") === undefined) {
+        this._response!.headers.set("Cache-Control", "no-cache");
       }
-      this._response.deleteHeader("Content-Length");
+      this._response!.deleteHeader("Content-Length");
     }
 
     super.write(string);
@@ -72,11 +91,18 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     if (this._strBody !== null) {
       yield this._strBody;
     } else {
-      while (true) {
-        const str = this._buf.pop(true);
-        if (str === null) break;
-        yield str;
+      const popped: string[] = [];
+      try {
+        while (true) {
+          const str = this._buf.pop(true);
+          if (str === null) break;
+          popped.push(str);
+        }
+      } catch (e) {
+        if (e instanceof ThreadError) for (const str of popped) void this._buf.push(str);
+        throw e;
       }
+      yield* popped;
     }
   }
 
@@ -84,8 +110,8 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     this._errorCallback = block;
   }
 
-  callOnError(): void {
-    this._errorCallback();
+  callOnError(): unknown {
+    return this._errorCallback();
   }
 
   /** @internal */
@@ -109,11 +135,11 @@ export class SSE {
   static readonly PERMITTED_OPTIONS = ["retry", "event", "id"] as const;
 
   private _stream: { write(s: string): void; close(): void };
-  private _options: { retry?: number | string; event?: string; id?: string };
+  private _options: { retry?: number | string; event?: string; id?: number | string };
 
   constructor(
     stream: { write(s: string): void; close(): void },
-    options: { retry?: number | string; event?: string; id?: string } = {},
+    options: { retry?: number | string; event?: string; id?: number | string } = {},
   ) {
     this._stream = stream;
     this._options = options;
@@ -125,7 +151,7 @@ export class SSE {
 
   write(
     object: unknown,
-    options: { retry?: number | string; event?: string; id?: string } = {},
+    options: { retry?: number | string; event?: string; id?: number | string } = {},
   ): void {
     if (typeof object === "string") {
       this.performWrite(object, options);
@@ -137,7 +163,7 @@ export class SSE {
   /** @internal */
   private performWrite(
     json: string,
-    options: { retry?: number | string; event?: string; id?: string },
+    options: { retry?: number | string; event?: string; id?: number | string },
   ): void {
     const currentOptions: Record<string, string | number | undefined> = merge<
       string | number | undefined
@@ -156,8 +182,6 @@ export class SSE {
 }
 
 export class Response extends DispatchResponse {
-  declare stream: Buffer;
-
   /** @internal */
   protected override beforeCommitted(): void {
     super.beforeCommitted();
@@ -173,95 +197,96 @@ export class Response extends DispatchResponse {
   }
 }
 
-interface LoggerLike {
-  fatal(message: string | (() => string)): void;
-}
-
 export interface LiveControllerHost {
   request: { getHeader?(name: string): string | undefined; format?: unknown };
   response: Response;
-  logger?: LoggerLike;
+  newControllerThread(block: () => void | Promise<void>): Promise<void>;
+  cleanUpThreadLocals(locals: [string, unknown][], thread: Thread): void;
+  logError(exception: Error): void;
 }
 
-export async function process(
-  this: LiveControllerHost,
-  name: string,
-  runAction: (n: string) => void | Promise<void>,
-): Promise<void> {
+export async function process(this: LiveControllerHost, name: string): Promise<void> {
+  const t1 = Thread.current();
+  const locals = t1.keys().map((key): [string, unknown] => [key, t1.get(key)]);
+
   let error: unknown = undefined;
   let errorSet = false;
-  await newControllerThread.call(this, async () => {
+  await this.newControllerThread(async () => {
+    const t2 = Thread.current();
+
+    locals.forEach(([k, v]) => t2.set(k, v));
+    IsolatedExecutionState.shareWith(t1);
+
     try {
-      await runAction(name);
+      await Live.superMethod(this, "process")!(name);
     } catch (e) {
       const resp = this.response;
-      if (resp?.committed) {
+      if (resp.committed) {
         try {
-          resp.stream.callOnError();
-        } catch (inner) {
-          logError.call(this, inner);
-        } finally {
-          logError.call(this, e);
-          try {
-            resp.stream.close();
-          } catch {
-            /** @empty */
+          if ((this.request.format as { symbol?: string } | undefined)?.symbol === ":html") {
+            (resp.stream as Buffer).write(ActionViewBase.streamingCompletionOnException);
           }
+          (resp.stream as Buffer).callOnError();
+        } catch (exception) {
+          this.logError(exception as Error);
+        } finally {
+          this.logError(e as Error);
+          (resp.stream as Buffer).close();
         }
       } else {
         error = e;
         errorSet = true;
       }
     } finally {
-      cleanUpThreadLocals.call(this, [], null);
-      if (!this.response.committed) this.response.close();
+      IsolatedExecutionState.clear();
+      this.cleanUpThreadLocals(locals, t2);
+
+      this.response.commitBang();
     }
   });
+
+  await this.response.awaitCommit();
+
   if (errorSet) throw error;
 }
 
-export function responseBody(this: LiveControllerHost, body: string): void {
-  this.response.body = body;
-  this.response.close();
+export function responseBody(this: LiveControllerHost, body: unknown): void {
+  Live.superMethod(this, "responseBody=")!(body);
+  if (this.response) this.response.close();
 }
 
 export interface SendStreamOptions {
   filename: string;
   disposition?: string;
-  type?: string | symbol | null;
+  type?: string | null;
 }
 
 export async function sendStream(
   this: LiveControllerHost,
-  options: SendStreamOptions,
+  { filename, disposition = "attachment", type = null }: SendStreamOptions,
   block: (stream: Buffer) => void | Promise<void>,
 ): Promise<void> {
-  const { filename, type } = options;
-  const disposition = options.disposition ?? "attachment";
-
-  let resolved =
-    typeof type === "string"
-      ? type
-      : typeof type === "symbol"
-        ? (() => {
-            const desc = type.description;
-            return desc ? (Mime.get(desc)?.toString() ?? null) : null;
-          })()
-        : null;
-  if (!resolved) {
-    const dot = filename.lastIndexOf(".");
-    const ext = dot >= 0 ? filename.slice(dot + 1).toLowerCase() : "";
-    resolved = (ext && MimeType.lookupByExtension(ext)?.toString()) || "application/octet-stream";
-  }
-
-  const res = this.response;
-  res.setHeader("content-type", resolved);
-  res.setHeader("content-disposition", ContentDisposition.format({ disposition, filename }));
-
   try {
-    await block(res.stream);
+    const payload = { filename, disposition, type };
+    await Notifications.instrument("send_stream.action_controller", payload, async () => {
+      this.response.headers.set(
+        "Content-Type",
+        (isSymbol(type) ? (Mime.get(type.slice(1))?.toString() ?? "") : type) ??
+          MimeType.lookupByExtension(
+            stringDelete(File.extname(filename).toLowerCase(), "."),
+          )?.toString() ??
+          "application/octet-stream",
+      );
+
+      this.response.headers.set(
+        "Content-Disposition",
+        ContentDisposition.format({ disposition, filename }),
+      );
+
+      await block(this.response.stream as Buffer);
+    });
   } finally {
-    res.stream.close();
+    (this.response.stream as Buffer).close();
   }
 }
 
@@ -270,52 +295,76 @@ export async function newControllerThread(
   this: LiveControllerHost,
   block: () => void | Promise<void>,
 ): Promise<void> {
-  await liveThreadPoolExecutor().post(block);
+  return liveThreadPoolExecutor().post(() => {
+    const t2 = Thread.current();
+    t2.abortOnException = true;
+    return block();
+  });
 }
 
 /** @internal */
 export function cleanUpThreadLocals(
   this: LiveControllerHost,
-  _locals: unknown,
-  _thread: unknown,
-): void {}
-
-export const originalNewControllerThread = newControllerThread;
-export const originalCleanUpThreadLocals = cleanUpThreadLocals;
-
-interface LiveExecutor {
-  post(fn: () => void | Promise<void>): Promise<void>;
+  locals: [string, unknown][],
+  thread: Thread,
+): void {
+  locals.forEach(([k, _]) => thread.set(k, null));
 }
-let _liveExecutor: LiveExecutor | undefined;
+
+let _liveThreadPoolExecutor: CachedThreadPool | undefined;
 
 /** @internal */
-export function liveThreadPoolExecutor(): LiveExecutor {
-  return (_liveExecutor ??= {
-    post: async (fn) => {
-      await Promise.resolve();
-      await fn();
-    },
+export function liveThreadPoolExecutor(): CachedThreadPool {
+  return (_liveThreadPoolExecutor ??= new CachedThreadPool({ name: "action_controller.live" }));
+}
+
+export function makeResponseBang(this: object, request: Request): DispatchResponse {
+  if ((request.getHeader("SERVER_PROTOCOL") ?? request.getHeader("HTTP_VERSION")) === "HTTP/1.0") {
+    return ClassMethods.superMethod(this, "makeResponseBang")!(request) as DispatchResponse;
+  } else {
+    const res = new Response();
+    res.request = request;
+    return res;
+  }
+}
+
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("makeResponseBang", makeResponseBang);
+});
+
+/** @internal */
+export function logError(this: LiveControllerHost, exception: Error): void {
+  const logger = ActionController.Base.logger;
+  if (logger == null) return;
+
+  logger.fatal(() => {
+    let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;
+    if (rbObjRespondTo(exception, "annotatedSourceCode")) {
+      message += toS(
+        (exception as Error & { annotatedSourceCode(): unknown }).annotatedSourceCode(),
+      );
+    }
+    message += "  " + excBacktrace(exception)!.join("\n  ");
+    return `${message}\n\n`;
   });
 }
 
-export function makeResponseBang(
-  request: Request,
-  superFactory: () => DispatchResponse,
-): DispatchResponse {
-  const protocol = request.getHeader("SERVER_PROTOCOL") ?? request.getHeader("HTTP_VERSION");
-  if (protocol === "HTTP/1.0") return superFactory();
-  const res = new Response();
-  res.request = request;
-  return res;
-}
+export const Live = new Module((mod) => {
+  extend(mod, Concern);
 
-/** @internal */
-export function logError(this: { logger?: LoggerLike }, exception: unknown): void {
-  const logger = this.logger;
-  if (!logger) return;
-  const err = exception as { name?: string; message?: string; stack?: string };
-  const name = err?.name ?? "Error";
-  const message = err?.message ?? String(exception);
-  const stack = err?.stack ?? "";
-  logger.fatal(() => `\n${name} (${message}):\n  ${stack}\n\n`);
-}
+  mod.defineMethod("process", process);
+  mod.moduleEval((m) => {
+    Object.defineProperty(m, "responseBody", {
+      configurable: true,
+      get(this: LiveControllerHost) {
+        return mod.superMethod(this, "responseBody")!();
+      },
+      set: responseBody,
+    });
+  });
+  mod.defineMethod("sendStream", sendStream);
+  mod.defineMethod("newControllerThread", newControllerThread);
+  mod.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
+  mod.defineMethod("logError", logError);
+}) as Module & { ClassMethods: Module };
+Live.ClassMethods = ClassMethods;

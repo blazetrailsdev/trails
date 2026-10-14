@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
-import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { MockRequest, bodyToString } from "@blazetrails/rack";
-import { env, getFs, getOsAsync, getPath, setEnv } from "@blazetrails/ruby-compat";
-import defineSchema from "./__fixtures__/boot-app/db/schema.js";
+import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails, _resetTrailsEnv } from "./rails.js";
 
@@ -15,9 +13,9 @@ describe("a booted app's models are warm before user code runs", () => {
     const fs = getFs();
     const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}boot-app-`);
     const database = `${dir}/development.sqlite3`;
-    const adapter = new BetterSQLite3Adapter({ database });
-    await defineSchema(adapter);
-    await adapter.disconnectBang();
+    await Base.establishConnection({ adapter: "sqlite3", database });
+    await rbFLoad(new URL("./__fixtures__/boot-app/db/schema.ts", import.meta.url).pathname);
+    await Base.removeConnection();
 
     savedEnv = env.TRAILS_ENV;
     savedUrl = env.DATABASE_URL;

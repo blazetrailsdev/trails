@@ -1,15 +1,25 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
+import { queryConstraints } from "./persistence.js";
+import type { CallbackChain } from "@blazetrails/activesupport";
 import { Company as CanonicalCompany, Firm, Client } from "./test-helpers/models/company.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import {
+  aroundSaveCollectionAssociation,
+  build,
+  computePrimaryKey,
+  is_recordChanged,
+} from "./autosave-association.js";
+import { MissingAttributeError } from "@blazetrails/activemodel";
+import { Prisoner } from "./test-helpers/models/ship.js";
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
   const association = record.association(name) as any;
@@ -245,8 +255,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(author.isNewRecord()).toBe(true);
     expect(post.errors.size).toBe(0);
   });
-
-  it("belongs_to autosave with PK longer than FK skips trailing PK positions", async () => {
+  it("belongs_to autosave with PK longer than FK raises on the unpaired PK position", async () => {
     class Parent extends Base {
       declare name: string | null;
 
@@ -277,9 +286,43 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const parent = new Parent({ name: "P" });
     const child = new Child({ name: "c" });
     cacheAssoc(child, "parent", parent);
-    await child.save();
-    expect(parent.isNewRecord()).toBe(false);
-    expect(child.author_id).toBe(parent.id);
+    await expect(child.save()).rejects.toThrow(MissingAttributeError);
+  });
+
+  it("around_save_collection_association restores new_record_before_save once the block settles", async () => {
+    const host = { _newRecordBeforeSave: false, isNewRecord: () => true } as any;
+    let during: boolean | undefined;
+    await aroundSaveCollectionAssociation.call(host, async () => {
+      await Promise.resolve();
+      during = host._newRecordBeforeSave;
+    });
+    expect(during).toBe(true);
+    expect(host._newRecordBeforeSave).toBe(false);
+
+    await expect(
+      aroundSaveCollectionAssociation.call(host, async () => {
+        await Promise.resolve();
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    expect(host._newRecordBeforeSave).toBe(false);
+  });
+
+  it("_record_changed? sees a composite foreign key change through association_foreign_key_changed?", () => {
+    const reflection = {
+      isThroughReflection: () => false,
+      foreignKey: () => ["shop_id", "order_id"],
+      inverseOf: () => null,
+    };
+    const values: Record<string, unknown> = { shop_id: 1, order_id: 2 };
+    const record = {
+      isNewRecord: () => false,
+      _hasAttribute: (key: string) => key in values,
+      _readAttribute: (key: string) => values[key],
+      isWillSaveChangeToAttribute: () => false,
+    };
+    expect(is_recordChanged(reflection, record, [1, 2])).toBe(false);
+    expect(is_recordChanged(reflection, record, [1, 3])).toBe(true);
   });
 });
 
@@ -396,5 +439,178 @@ describe("TestAutosaveAssociationOnAHasOneAssociation marked_for_destruction?", 
 
     await pirate.save();
     expect(await Ship.where({ id: ship.id }).count()).toBe(0);
+  });
+});
+
+describe("AutosaveAssociation::AssociationBuilderExtension.build", () => {
+  const callbacks = (model: typeof Base) =>
+    Object.values<CallbackChain>((model as any).__callbacks).flatMap((chain) => chain.entries);
+
+  it("leaves the reflection's validate option unwritten", () => {
+    const reflection = Prisoner.reflectOnAssociation("ship")!;
+
+    expect("validate" in reflection.options).toBe(false);
+    expect(reflection.isValidate()).toBe(true);
+  });
+
+  it("adds the autosave callbacks to the model", () => {
+    class Convict extends Base {
+      static {
+        this._tableName = "prisoners";
+      }
+    }
+    const before = callbacks(Convict).length;
+
+    build(Convict, Prisoner.reflectOnAssociation("ship"));
+
+    expect(callbacks(Convict).length).toBeGreaterThan(before);
+  });
+
+  it("runs from the extensions loop, ahead of the builder's own touch callbacks", () => {
+    class Convict extends Base {
+      static {
+        this._tableName = "prisoners";
+      }
+    }
+    const beforeSave = vi.spyOn(Convict, "beforeSave");
+    const afterCreate = vi.spyOn(Convict, "afterCreate");
+
+    Convict.belongsTo("ship", {
+      autosave: true,
+      touch: true,
+      className: "ShipWithoutNestedAttributes",
+    });
+
+    expect(beforeSave.mock.invocationCallOrder[0]).toBeLessThan(
+      afterCreate.mock.invocationCallOrder[0],
+    );
+  });
+});
+
+describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
+  fixtures([], { useTransactionalTests: true });
+  it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    class QcOwner extends Base {
+      declare tree_id: number | null;
+      declare name: string | null;
+
+      static {
+        this._tableName = "nodes";
+        this.attribute("tree_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        queryConstraints.call(this, "tree_id", "id");
+        this.hasOne("qcChild", {
+          className: "QcChild",
+          foreignKey: ["tree_id", "parent_id"],
+          autosave: true,
+        });
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface QcOwner {
+      get qcChild(): QcChild | null | Promise<QcChild | null>;
+      set qcChild(value: QcChild | null);
+    }
+    class QcChild extends Base {
+      declare tree_id: number | null;
+      declare parent_id: number | null;
+      declare name: string | null;
+
+      static {
+        this._tableName = "nodes";
+        this.attribute("tree_id", "integer");
+        this.attribute("parent_id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("QcOwner", QcOwner);
+    registerModel("QcChild", QcChild);
+    const owner = new QcOwner({ tree_id: 5, id: 11, name: "Corp" });
+    const child = new QcChild({ name: "Doc" });
+    owner.association("qcChild").setTarget(child);
+    const saved = await owner.save();
+    expect(saved).toBe(true);
+    expect(child.isNewRecord()).toBe(false);
+    expect(child.tree_id).toBe(5);
+    expect(child.parent_id).toBe(11);
+  });
+});
+
+describe("computePrimaryKey", () => {
+  function makeRecord(opts: {
+    primaryKey?: string | string[];
+    queryConstraintsList?: string[];
+    hasQueryConstraints?: boolean;
+  }) {
+    return {
+      constructor: {
+        primaryKey: opts.primaryKey ?? "id",
+        _primaryKey: opts.primaryKey ?? "id",
+        isCompositePrimaryKey: () => Array.isArray(opts.primaryKey),
+        _queryConstraintsList: opts.queryConstraintsList ?? null,
+        _hasQueryConstraints: opts.hasQueryConstraints ?? false,
+      },
+    };
+  }
+
+  it("returns explicit reflection primaryKey option as-is", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey({ options: { primaryKey: "custom_id" } }, record);
+    expect(result).toBe("custom_id");
+  });
+
+  it("returns class-level queryConstraintsList when reflection has queryConstraints option", () => {
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["tenant_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey({ options: { queryConstraints: true } }, record);
+    expect(result).toEqual(["tenant_id", "id"]);
+  });
+
+  it("returns queryConstraintsList when record class has_query_constraints? and no FK option", () => {
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toEqual(["shop_id", "id"]);
+  });
+
+  it("does not use queryConstraintsList when reflection has explicit foreignKey option", () => {
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey(
+      {
+        options: { foreignKey: "order_id" },
+      },
+      record,
+    );
+    expect(result).toBe("id");
+  });
+
+  it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
+    const record = makeRecord({ primaryKey: ["shop_id", "id"] });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toBe("id");
+  });
+
+  it("returns full composite PK when CPK has no 'id' column", () => {
+    const record = makeRecord({ primaryKey: ["shop_id", "status"] });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toEqual(["shop_id", "status"]);
+  });
+
+  it("returns class primary key for non-composite, non-constrained record", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toBe("id");
   });
 });

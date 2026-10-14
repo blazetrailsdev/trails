@@ -1,12 +1,9 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 
 export class With extends Unary {
-  constructor(children: Node[]) {
-    super(children);
-  }
-
   get children(): Array<{ toCte(): Node }> {
     return this.expr as Array<{ toCte(): Node }>;
   }
@@ -14,5 +11,5 @@ export class With extends Unary {
 
 export class WithRecursive extends With {}
 
-Nodes.With = With;
-Nodes.WithRecursive = WithRecursive;
+rbModConstSet(Nodes, "With", With);
+rbModConstSet(Nodes, "WithRecursive", WithRecursive);

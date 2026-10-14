@@ -283,9 +283,9 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
           log("");
           log(" Status   Migration ID    Migration Name");
           log("--------------------------------------------------");
-          for (const s of statuses) {
-            const statusStr = s.status === "up" ? "  up  " : " down ";
-            log(`${statusStr}   ${s.version.padEnd(16)}${s.name}`);
+          for (const [status, version, name] of statuses) {
+            const statusStr = status === "up" ? "  up  " : " down ";
+            log(`${statusStr}   ${version.padEnd(16)}${name}`);
           }
           log("");
         });

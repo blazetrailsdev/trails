@@ -1,4 +1,4 @@
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { rbFPublicSend, rbObjDup, regexpEscape } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
@@ -72,6 +72,13 @@ export class Inflections {
     this.uncountables = new Uncountables();
     this.humans = [];
     this.acronyms = new Map();
+    this.defineAcronymRegexPatterns();
+  }
+
+  initializeDup(orig: Inflections): void {
+    for (const scope of ["plurals", "singulars", "uncountables", "humans", "acronyms"]) {
+      Object.assign(this, { [scope]: rbObjDup(rbFPublicSend(orig, scope)) });
+    }
     this.defineAcronymRegexPatterns();
   }
 

@@ -244,9 +244,9 @@ export function preloadLinkTag(
   });
   const extname = File.extname(source).toLowerCase().replaceAll(".", "");
   const type = deleteKey(options, "type") as string | false | null | undefined;
-  const mimeType = rtest(type) ? (type as string) : Template.Types.get(extname)?.toString();
+  const mimeType = rtest(type) ? type : Template.Types.get(extname)?.toString();
   const as = deleteKey(options, "as") as string | false | null | undefined;
-  const asType = rtest(as) ? (as as string) : resolveLinkAs.call(this, extname, mimeType);
+  const asType = rtest(as) ? as : resolveLinkAs.call(this, extname, mimeType);
   let crossorigin = deleteKey(options, "crossorigin");
   if (crossorigin === true || (isBlank(crossorigin) && asType === "font")) {
     crossorigin = "anonymous";

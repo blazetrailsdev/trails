@@ -1,8 +1,9 @@
+import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base, Migration, Migrator, registerModel } from "../../index.js";
 import type { MigrationProxy } from "../../migration.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -118,7 +119,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       assertPredicate(column, (c: PgColumn) => c.isArray());
       expect(column.default).toBe("{}");
 
-      const schema = await dumpTableSchema(adapter, "uuid_data_type");
+      const schema = await dumpTableSchema("uuid_data_type");
       expect(schema).toMatch(/t\.uuid\("thingy", \{ default: \[\], array: true \}\);?$/m);
     });
 
@@ -223,7 +224,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(adapter, "uuid_data_type");
+      const output = await dumpTableSchema("uuid_data_type");
       expect(output).toMatch(/t\.uuid\("guid"/);
     });
 
@@ -316,7 +317,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids");
+      const schema = await dumpTableSchema("pg_uuids");
       expect(schema).toMatch(
         /\bcreateTable\("pg_uuids", \{ id: "uuid", default: \(\) => "uuid_generate_v1\(\)"/,
       );
@@ -324,7 +325,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key with custom default", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids_2");
+      const schema = await dumpTableSchema("pg_uuids_2");
       expect(schema).toMatch(
         /\bcreateTable\("pg_uuids_2", \{ id: "uuid", default: \(\) => "my_uuid_generator\(\)"/,
       );
@@ -334,7 +335,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key default", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids_3");
+      const schema = await dumpTableSchema("pg_uuids_3");
       // eslint-disable-next-line blazetrails/no-conditional-in-test -- uuid_test.rb:289 branches on supports_pgcrypto_uuid? and parity:test counts both arms
       if (supportsPgcryptoUuid) {
         expect(schema).toMatch(
@@ -370,7 +371,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           pool.internalMetadata,
         ).migrate();
 
-        const schema = await dumpTableSchema(adapter, "pg_uuids_4");
+        const schema = await dumpTableSchema("pg_uuids_4");
         expect(schema).toMatch(
           /\bcreateTable\("pg_uuids_4", \{ id: "uuid", default: \(\) => "uuid_generate_v4\(\)"/,
         );
@@ -405,7 +406,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key with default override via nil", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids");
+      const schema = await dumpTableSchema("pg_uuids");
       expect(schema).toMatch(/\bcreateTable\("pg_uuids", \{ id: "uuid", default: null/);
     });
 
@@ -432,7 +433,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           pool.internalMetadata,
         ).migrate();
 
-        const schema = await dumpTableSchema(adapter, "pg_uuids_4");
+        const schema = await dumpTableSchema("pg_uuids_4");
         expect(schema).toMatch(/\bcreateTable\("pg_uuids_4", \{ id: "uuid", default: null/);
       } finally {
         await dropTable("pg_uuids_4");
@@ -499,21 +500,21 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
+    const PostgresqlUUIDHasManyThroughDisableJoinsTest = new Module();
+    registerConstant(
+      "PostgresqlUUIDHasManyThroughDisableJoinsTest",
+      PostgresqlUUIDHasManyThroughDisableJoinsTest,
+    );
+
     class UuidForum extends Base {
       static {
+        rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidForum", this);
         this.tableName = "pg_uuid_forums";
-        this.hasMany(
-          "uuidPosts",
-          function (this: any) {
-            return this.order("title DESC");
-          },
-          {
-            className: "UuidPostDj",
-          },
-        );
-        this.hasMany("uuidComments", { className: "UuidCommentDj", through: "uuidPosts" });
+        this.hasMany("uuidPosts", function (this: any) {
+          return this.order("title DESC");
+        });
+        this.hasMany("uuidComments", { through: "uuidPosts" });
         this.hasMany("uuidCommentsWithoutJoins", {
-          className: "UuidCommentDj",
           through: "uuidPosts",
           source: "uuidComments",
           disableJoins: true,
@@ -522,27 +523,25 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
     class UuidPost extends Base {
       static {
+        rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidPost", this);
         this.tableName = "pg_uuid_posts";
-        this.belongsTo("uuidForum", { className: "UuidForumDj" });
-        this.hasMany("uuidComments", { className: "UuidCommentDj" });
+        this.belongsTo("uuidForum");
+        this.hasMany("uuidComments");
       }
     }
     class UuidComment extends Base {
       static {
+        rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidComment", this);
         this.tableName = "pg_uuid_comments";
-        this.belongsTo("uuidPost", { className: "UuidPostDj" });
-        this.hasOne("uuidForum", { className: "UuidForumDj", through: "uuidPost" });
+        this.belongsTo("uuidPost");
+        this.hasOne("uuidForum", { through: "uuidPost" });
         this.hasOne("uuidForumWithoutJoins", {
-          className: "UuidForumDj",
           through: "uuidPost",
           source: "uuidForum",
           disableJoins: true,
         });
       }
     }
-    registerModel("UuidForumDj", UuidForum);
-    registerModel("UuidPostDj", UuidPost);
-    registerModel("UuidCommentDj", UuidComment);
 
     beforeEach(async () => {
       await adapter.transaction(async () => {

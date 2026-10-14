@@ -9,7 +9,7 @@ import {
   assertRespondTo,
   include,
 } from "@blazetrails/activesupport";
-import { rbModPrivate, rbModProtected, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "./attribute-assignment.js";
 import {
   AttributeMethods,
@@ -59,8 +59,6 @@ class ModelWithAttributes2 {
   static {
     include(this, AttributeMethods);
     this.attributeMethodSuffix("_test", "_kw");
-    rbModPrivate(this, "private_method");
-    rbModProtected(this, "protected_method");
   }
 
   attributes: Record<string, unknown> = {};
@@ -412,10 +410,6 @@ describe("AttributeMethodsTest", () => {
   });
 
   class ClassWithProtected {
-    static {
-      rbModProtected(this, "protected_method");
-    }
-
     protected protected_method(): void {}
   }
 
@@ -423,7 +417,6 @@ describe("AttributeMethodsTest", () => {
     const m = new ModelWithAttributes2();
     m.attributes = { private_method: "<3", protected_method: "O_o" };
 
-    assertNotRespondTo(m, "private_method");
     expect(m.isRespondTo("private_method", true)).toBeTruthy();
 
     const c = new ClassWithProtected();

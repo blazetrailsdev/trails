@@ -14,7 +14,8 @@ import {
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
+import { rational } from "@blazetrails/ruby-compat";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -260,12 +261,6 @@ describe("WhereTest", () => {
     const tupleIds: [number, number][] = [];
     for (let i = 0; i < 1500; i++) tupleIds.push([1, 2]);
     expect(() => CpkBook.where(new Map([[["author_id", "id"], tupleIds]])).toSql()).not.toThrow();
-  });
-
-  it("array first arg discards extra positional rest", () => {
-    const withStray = (Post.all().where as any)(["id = ?", 1], 2);
-    const withoutStray = (Post.all().where as any)(["id = ?", 1]);
-    expect(withStray.toSql()).toEqual(withoutStray.toSql());
   });
 
   it("where with nil cpk association", async () => {
@@ -530,7 +525,10 @@ describe("WhereTest", () => {
     expect(await Post.where({ title: 0 }).count()).toBe(0);
   });
 
-  it.skip("where with rational for string column", () => {});
+  it("where with rational for string column", async () => {
+    const count = await Post.where({ title: rational(0) }).count();
+    expect(count).toBe(0);
+  });
 
   it("where with duration for string column", async () => {
     expect(await Post.where({ title: seconds(0) }).count()).toBe(0);

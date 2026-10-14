@@ -1,9 +1,5 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: ConnectionAdapters, pp, RuntimeRegistry, Type. */
-
 export { Base } from "./base.js";
 export type { PrimaryKeyScalar, PrimaryKeyValue } from "./base.js";
-export { pp } from "./pretty-print.js";
-export type { PrettyPrinter, PPSink } from "./pretty-print.js";
 export { Result, IndexedRow } from "./result.js";
 export { FutureResult } from "./future-result.js";
 export { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
@@ -50,13 +46,7 @@ export type {
 } from "./connection-adapters/abstract/schema-definitions.js";
 export { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 export { Schema } from "./schema.js";
-export {
-  Associations,
-  registerModel,
-  modelRegistry,
-  collectionProxyFor,
-  isAssociationCached,
-} from "./associations.js";
+export { Associations, registerModel } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";
 export { AssociationRelation } from "./association-relation.js";
@@ -81,7 +71,6 @@ _Notifications.subscribe("sql.active_record", (event) => {
 });
 export {
   transaction,
-  currentTransaction,
   beforeCommittedBang,
   committedBang,
   rolledbackBang,
@@ -89,7 +78,7 @@ export {
   isTriggerTransactionalCallbacks,
 } from "./transactions.js";
 export type { EnumMacroOptions } from "./enum.js";
-export { registerSubclass, findStiClass } from "./inheritance.js";
+export { findStiClass } from "./inheritance.js";
 export { LockingType } from "./locking/optimistic.js";
 export {
   storedAttributes,
@@ -114,7 +103,6 @@ export {
 export * as RuntimeRegistry from "./runtime-registry.js";
 export { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
-export type { SchemaSource, IndexInfo } from "./schema-dumper.js";
 export type { Column } from "./connection-adapters/column.js";
 export {
   ActiveRecordError,
@@ -224,7 +212,6 @@ export {
 export { REJECT_ALL_BLANK_PROC, TooManyRecords } from "./nested-attributes.js";
 export { composedOf } from "./aggregations.js";
 export { ColumnNotSerializableError } from "./attribute-methods/serialization.js";
-export { delegatedType } from "./delegated-type.js";
 export { DatabaseConfig } from "./database-configurations/database-config.js";
 export type { DatabaseConfigOptions } from "./database-configurations/database-config.js";
 export { HashConfig } from "./database-configurations/hash-config.js";
@@ -232,6 +219,8 @@ export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 export * from "./active-record.js";
+export { VERSION, gemVersion } from "./gem-version.js";
+export { version } from "./version.js";
 export { ActiveRecord } from "./namespaces.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";

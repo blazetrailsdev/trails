@@ -13,7 +13,7 @@ export async function withSecondAdapter<T>(
     adapter: "postgresql",
     pool: 1,
   });
-  await dbConfig.adapterClass();
+  dbConfig.validateBang();
   const poolConfig = new PoolConfig(
     new ConnectionDescriptor("primary"),
     dbConfig,

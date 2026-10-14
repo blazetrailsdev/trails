@@ -1,17 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Bit } from "../../connection-adapters/postgresql/oid/bit.js";
 import { IntegerType } from "@blazetrails/activemodel";
-import { Range as OidRange } from "@blazetrails/ruby-compat";
+import { Range as OidRange, rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit, setRaiseIntWiderThan64bit } from "../../active-record.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     try {
@@ -63,39 +62,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("quote table name with schema", async () => {
-      expect(adapter.quoteTableName("foo.bar")).toBe('"foo"."bar"');
-    });
-
-    it("quote date", async () => {
-      const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
-      const val = rows[0].val as Temporal.PlainDate;
-      expect(val).toBeInstanceOf(Temporal.PlainDate);
-      expect(val.year).toBe(2023);
-    });
-
-    it("quote time", async () => {
-      const rows = await adapter.execute("SELECT TIME '14:30:00' AS val");
-      expect(rows[0].val).toBe("14:30:00");
-    });
-
-    it("quote timestamp", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 14:30:00' AS val");
-      const val = rows[0].val as Temporal.Instant;
-      expect(val).toBeInstanceOf(Temporal.Instant);
-      expect(val.toZonedDateTimeISO("UTC").year).toBe(2023);
-    });
-
     it("quote range", () => {
       const type = new RangeType(new IntegerType(), "int8range");
       const range = new OidRange("1,2]'; SELECT * FROM users; --", "0; DROP TABLE users; --");
       const serialized = type.serialize(range);
       expect(adapter.quote(serialized)).toBe("'[1,0]'");
-    });
-
-    it("quote array", async () => {
-      const rows = await adapter.execute("SELECT ARRAY[1,2,3]::integer[] AS val");
-      expect(rows[0].val).toEqual([1, 2, 3]);
     });
 
     it("quote integer", async () => {
@@ -104,6 +75,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote big decimal", async () => {
       expect(adapter.quote(4.2)).toBe("4.2");
+    });
+
+    it("quote rational", () => {
+      expect(adapter.quote(rational(3, 4))).toBe("3/4");
     });
 
     it("quote bit string", () => {

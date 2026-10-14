@@ -1,8 +1,8 @@
-import { include } from "@blazetrails/ruby-compat";
+import { include, rbDeclareIvar, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { HasOneAssociation } from "./has-one-association.js";
-import { ThroughAssociation, sourceReflection } from "./through-association.js";
+import { ThroughAssociation } from "./through-association.js";
 
 export class HasOneThroughAssociation extends HasOneAssociation {
   /** @internal */
@@ -19,6 +19,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   declare ensureMutable: () => void;
   /** @internal */
   declare ensureNotNested: () => void;
+  declare sourceReflection: () => unknown;
 
   /** @internal */
   protected override loadTargetForBuild(): Promise<unknown> {
@@ -31,7 +32,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   /** @internal */
   protected override async detachDisplacedTarget(): Promise<void> {}
 
-  protected override setNewRecord(record: Base): void | Promise<void> {
+  protected override setNewRecord(record: Base): Base | null | Promise<Base | null> {
     return this.replace(record, false);
   }
 
@@ -45,18 +46,13 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return false;
   }
 
-  sourceReflection(): unknown {
-    return sourceReflection(this);
-  }
-
-  protected override replace(record: Base | null, save = true): void | Promise<void> {
+  /** @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
+  protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     const created = this.createThroughRecord(record, save);
-    if (created) {
-      return created.then(() => {
-        this.target = record;
-      });
+    if (created instanceof Promise) {
+      return created.then(() => (this.target = record));
     }
-    this.target = record;
+    return (this.target = record);
   }
 }
 
@@ -114,5 +110,7 @@ Object.assign(HasOneThroughAssociation.prototype, {
   createThroughRecord,
 });
 include(HasOneThroughAssociation, ThroughAssociation);
+rbDeclareIvar(HasOneThroughAssociation, "@through_reflection", "_throughReflection");
+rbDeclareIvar(HasOneThroughAssociation, "@through_association", "_throughAssociation");
 
-Associations.HasOneThroughAssociation = HasOneThroughAssociation;
+rbModConstSet(Associations, "HasOneThroughAssociation", HasOneThroughAssociation);

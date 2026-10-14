@@ -7,7 +7,7 @@ import * as Timestamp from "../timestamp.js";
 describe("including Dirty after Timestamp", () => {
   it("raises 'You cannot include Dirty after Timestamp'", () => {
     class Model {}
-    include(Model, Timestamp.InstanceMethods);
+    include(Model, Timestamp.Timestamp);
     expect(() => include(Model, Dirty)).toThrow("You cannot include Dirty after Timestamp");
   });
 

@@ -1,6 +1,7 @@
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ActiveRecordError } from "./errors.js";
-import { first } from "@blazetrails/ruby-compat";
+import { first, format, toI } from "@blazetrails/ruby-compat";
+import { toI as stringToI } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";
 
@@ -36,17 +37,18 @@ export class SchemaMigration {
     return `${base.tableNamePrefix}${base.schemaMigrationsTableName}${base.tableNameSuffix}`;
   }
 
-  async createTable(): Promise<void> {
-    await this._pool.withConnection(async (connection) => {
-      if (await connection.tableExists(this.tableName)) return;
-      await connection.createTable(this.tableName, { id: false }, (t) => {
-        t.string(this.primaryKey, connection.internalStringOptionsForPrimaryKey());
-      });
+  async createTable(): Promise<unknown> {
+    return await this._pool.withConnection(async (connection) => {
+      if (!(await connection.tableExists(this.tableName))) {
+        return await connection.createTable(this.tableName, { id: false }, async (t) => {
+          t.string(this.primaryKey, await connection.internalStringOptionsForPrimaryKey());
+        });
+      }
     });
   }
 
-  async dropTable(): Promise<void> {
-    await this._pool.withConnection((connection) =>
+  async dropTable(): Promise<unknown> {
+    return await this._pool.withConnection((connection) =>
       connection.dropTable(this.tableName, { ifExists: true }),
     );
   }
@@ -100,21 +102,17 @@ export class SchemaMigration {
     );
   }
 
-  static normalizeMigrationNumber(number: string | number): string {
-    const n = parseInt(String(number), 10);
-    return String(isNaN(n) ? 0 : n).padStart(3, "0");
+  normalizeMigrationNumber(number: string | number): string {
+    return format("%.3d", toI(number));
   }
 
   async normalizedVersions(): Promise<string[]> {
     const vers = await this.versions();
-    return vers.map((v) => SchemaMigration.normalizeMigrationNumber(v));
+    return vers.map((v) => this.normalizeMigrationNumber(v));
   }
 
   async integerVersions(): Promise<number[]> {
     const vers = await this.versions();
-    return vers.map((v) => {
-      const n = parseInt(v, 10);
-      return isNaN(n) ? 0 : n;
-    });
+    return vers.map((v) => stringToI(v));
   }
 }

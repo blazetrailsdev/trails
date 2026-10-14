@@ -1,28 +1,15 @@
-import { Base64, File } from "@blazetrails/ruby-compat";
+import { Base64, File, rbFBinding } from "@blazetrails/ruby-compat";
 
-import { FixtureSet } from "../fixtures.js";
+import { ActiveRecord } from "../namespaces.js";
 
 export class RenderContext {
   static createSubclass(): new () => {
-    getBinding(): Record<string, unknown>;
+    getBinding(): object;
     binary(path: string): string;
   } {
-    return class extends FixtureSet.contextClass {
-      getBinding(): Record<string, unknown> {
-        const binding: Record<string, unknown> = {};
-        for (
-          let proto: object | null = Object.getPrototypeOf(this) as object | null;
-          proto !== null && proto !== Object.prototype;
-          proto = Object.getPrototypeOf(proto) as object | null
-        ) {
-          for (const name of Object.getOwnPropertyNames(proto)) {
-            if (name === "constructor") continue;
-            if (Object.prototype.hasOwnProperty.call(binding, name)) continue;
-            const value = (this as unknown as Record<string, unknown>)[name];
-            binding[name] = typeof value === "function" ? value.bind(this) : value;
-          }
-        }
-        return binding;
+    return class extends ActiveRecord.FixtureSet.contextClass {
+      getBinding(): this {
+        return rbFBinding(this);
       }
 
       binary(path: string): string {

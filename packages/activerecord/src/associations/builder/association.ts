@@ -1,8 +1,13 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError, kernelThrow, type Module } from "@blazetrails/ruby-compat";
-import { assertValidKeys } from "@blazetrails/activesupport";
-import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
-import { _Reflection } from "../../reflection-slot.js";
+import {
+  NotImplementedError,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  type Module,
+} from "@blazetrails/ruby-compat";
+import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
+import { ConfigurationError } from "../../errors.js";
+import { ActiveRecord } from "../../namespaces.js";
 
 /** @internal */
 export interface AssociationInstanceHost {
@@ -25,31 +30,12 @@ export interface AssociationProxyLike {
 }
 
 type ExtensionModule = {
-  validOptions?: () => string[];
-  build?: (model: any, reflection: any) => void;
+  validOptions: () => string[];
+  build: (model: any, reflection: any) => void;
 };
 
 export class Association {
-  private static _extensions: ExtensionModule[] = [];
-
-  static get extensions(): ExtensionModule[] {
-    if (!Object.prototype.hasOwnProperty.call(this, "_extensions")) {
-      this._extensions = [...(Object.getPrototypeOf(this)._extensions ?? [])];
-    }
-    return this._extensions;
-  }
-
-  static set extensions(value: ExtensionModule[]) {
-    this._extensions = value;
-  }
-
-  get extensions(): ExtensionModule[] {
-    return (this.constructor as typeof Association).extensions;
-  }
-
-  set extensions(value: ExtensionModule[]) {
-    (this.constructor as typeof Association).extensions = value;
-  }
+  static extensions: ExtensionModule[] = [];
 
   static readonly VALID_OPTIONS: readonly string[] = [
     "className",
@@ -80,10 +66,7 @@ export class Association {
       scope = null;
     }
 
-    if (
-      typeof model.isDangerousAttributeMethod === "function" &&
-      model.isDangerousAttributeMethod(name)
-    ) {
+    if (model.isDangerousAttributeMethod(name)) {
       throw new ArgumentError(
         `You tried to define an association named ${name} on the model ${model.name}, but ` +
           `this will conflict with a method ${name} already defined by Active Record. ` +
@@ -113,21 +96,12 @@ export class Association {
     this.validateOptions(options);
 
     const extension = this.defineExtensions(model, name, block);
-    if (extension) {
-      options.extend = [
-        ...(options.extend
-          ? Array.isArray(options.extend)
-            ? options.extend
-            : [options.extend]
-          : []),
-        extension,
-      ];
-    }
+    if (extension) options.extend = [...kernelArray(options.extend), extension];
 
     scope = this.buildScope(scope);
 
     const macro = this.macro();
-    return _Reflection!.create(macro as any, name, scope, options, model);
+    return ActiveRecord.Reflection.create(macro as any, name, scope, options, model);
   }
 
   static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {
@@ -146,10 +120,7 @@ export class Association {
   }
 
   static validOptions(_options: Record<string, unknown>): string[] {
-    const extensionOpts = this.extensions.flatMap((ext) =>
-      typeof ext.validOptions === "function" ? ext.validOptions() : [],
-    );
-    return [...this.VALID_OPTIONS, ...extensionOpts];
+    return [...this.VALID_OPTIONS, ...Association.extensions.flatMap((ext) => ext.validOptions())];
   }
 
   static validateOptions(options: Record<string, unknown>): void {
@@ -161,17 +132,15 @@ export class Association {
   }
 
   static defineCallbacks(model: any, reflection: any): void {
-    const dependent = reflection.options?.dependent;
+    const dependent = reflection.options.dependent;
     if (dependent) {
       this.checkDependentOptions(dependent, model);
       this.addDestroyCallbacks(model, reflection);
       this.addAfterCommitJobsCallback(model, dependent);
     }
 
-    for (const extension of this.extensions) {
-      if (typeof extension.build === "function") {
-        extension.build(model, reflection);
-      }
+    for (const extension of Association.extensions) {
+      extension.build(model, reflection);
     }
   }
 
@@ -216,10 +185,10 @@ export class Association {
   }
 
   static checkDependentOptions(dependent: string, model: any): void {
-    if (dependent === "destroyAsync" && !model.destroyAssociationAsyncJob()) {
-      throw new ConfigurationError(
-        "A valid destroyAssociationAsyncJob is required to use `dependent: destroyAsync` on associations",
-      );
+    if (dependent === "destroyAsync" && !model.destroyAssociationAsyncJob) {
+      const errMessage =
+        "A valid destroy_association_async_job is required to use `dependent: :destroyAsync` on associations";
+      throw new ConfigurationError(errMessage);
     }
     const validOptions = this.validDependentOptions();
     if (!validOptions.includes(dependent)) {
@@ -230,19 +199,33 @@ export class Association {
   }
 
   static addDestroyCallbacks(model: any, reflection: any): void {
-    const name = reflection.name ?? reflection;
-    model.beforeDestroy(async (record: any) => {
-      try {
-        await record.association(name).handleDependency();
-      } catch (e) {
-        if (e instanceof RecordNotDestroyed) {
-          record._associationDestroyException = e;
-          kernelThrow(":abort");
-        }
-        throw e;
-      }
-    });
+    const name = reflection.name;
+    model.beforeDestroy((o: any) => o.association(name).handleDependency());
   }
 
-  static addAfterCommitJobsCallback(_model: any, _dependent: string): void {}
+  static addAfterCommitJobsCallback(model: any, dependent: string): void {
+    if (dependent === "destroyAsync") {
+      const mixin: Module = model.generatedAssociationMethods();
+
+      if (!mixin.isMethodDefined("_afterCommitJobs")) {
+        model.afterCommit(function (this: any) {
+          for (const [jobClass, jobArguments] of this._afterCommitJobs) {
+            jobClass.performLater(jobArguments);
+          }
+        });
+
+        mixin.moduleEval((m) => {
+          Object.defineProperty(m, "_afterCommitJobs", {
+            get(this: any) {
+              return (
+                rbObjIvarGet(this, "@_after_commit_jobs") ??
+                rbObjIvarSet(this, "@_after_commit_jobs", [])
+              );
+            },
+            configurable: true,
+          });
+        });
+      }
+    }
+  }
 }

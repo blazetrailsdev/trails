@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { LogSubscriber } from "./log-subscriber.js";
+import { Attribute, BinaryType, IntegerType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { setVerboseQueryLogs } from "./active-record.js";
 
@@ -77,15 +78,15 @@ class MockLogger extends Logger {
 }
 
 class TestDebugLogSubscriber extends LogSubscriber {
-  debugs: string[] = [];
+  debugs: (string | null)[] = [];
 
   override get logger(): Logger | null {
     return (this.constructor as typeof LogSubscriber).logger;
   }
 
-  protected override debugSql(message: string): boolean {
-    this.debugs.push(message);
-    return super.debugSql(message);
+  protected override debug(progname: string | null = null, block?: () => string): undefined {
+    this.debugs.push(progname);
+    return super.debug(progname, block);
   }
 }
 
@@ -345,7 +346,7 @@ describe("LogSubscriberTest", () => {
       makeEvent({
         sql: "SELECT * FROM developers WHERE id IN (?, ?, ?)",
         name: "Developer Load",
-        binds: [{ name: "id" }, { name: "id" }, { name: "id" }],
+        binds: [1, 2, 3].map((id) => Attribute.withCastValue("id", id, new IntegerType())),
         type_casted_binds: [1, 2, 3],
       }),
     );
@@ -359,14 +360,7 @@ describe("LogSubscriberTest", () => {
       makeEvent({
         sql: "INSERT INTO binaries (data) VALUES (?)",
         name: "Binary Create",
-        binds: [
-          {
-            name: "data",
-            type: { binary: () => true },
-            value: "some binary data",
-            valueForDatabase: "some binary data",
-          },
-        ],
+        binds: [Attribute.withCastValue("data", "some binary data", new BinaryType())],
         type_casted_binds: ["some binary data"],
       }),
     );
@@ -378,14 +372,7 @@ describe("LogSubscriberTest", () => {
       makeEvent({
         sql: "INSERT INTO binaries (data) VALUES (?)",
         name: "Binary Create",
-        binds: [
-          {
-            name: "data",
-            type: { binary: () => true },
-            value: '{"a":1}',
-            valueForDatabase: '{"a":1}',
-          },
-        ],
+        binds: [Attribute.withCastValue("data", '{"a":1}', new BinaryType())],
         type_casted_binds: ['{"a":1}'],
       }),
     );

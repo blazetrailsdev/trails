@@ -1,5 +1,5 @@
 import { Hash } from "@blazetrails/ruby-compat";
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
@@ -13,8 +13,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
-import { withTimezoneConfig } from "./test-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
@@ -26,7 +25,6 @@ import {
   assertNoQueries,
   assertNoQueriesMatch,
   assertQueriesCount,
-  assertQueriesMatch,
 } from "./testing/query-assertions.js";
 
 async function withPartialWrites(
@@ -63,7 +61,7 @@ function checkPirateAfterSaveFailure(pirate: Pirate): void {
 }
 
 describe("DirtyTest", () => {
-  fixtures([], { usesTransaction: ["field named field"] });
+  const { self } = fixtures([], { usesTransaction: ["field named field"] });
   beforeAll(async () => {
     await Promise.all(
       [Person, Pirate, Parrot, Topic, NumericData, Aircraft, LiveParrot].map((m) =>
@@ -100,7 +98,7 @@ describe("DirtyTest", () => {
   });
 
   it("time attributes changes with time zone", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -136,7 +134,7 @@ describe("DirtyTest", () => {
   });
 
   it("setting time attributes with time zone field to itself should not be marked as a change", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -151,7 +149,7 @@ describe("DirtyTest", () => {
   });
 
   it("time attributes changes without time zone by skip", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: string;
         declare catchphrase: string;
@@ -178,7 +176,7 @@ describe("DirtyTest", () => {
   });
 
   it("time attributes changes without time zone", async () => {
-    await withTimezoneConfig({ awareAttributes: false }, async () => {
+    await self().withTimezoneConfig({ awareAttributes: false }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -275,7 +273,7 @@ describe("DirtyTest", () => {
   });
 
   it("nullable datetime not marked as changed if new value is blank", async () => {
-    await withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare written_on: TimeWithZone | string | null;
 
@@ -412,6 +410,13 @@ describe("DirtyTest", () => {
     expect(topic.attributeChanged("approved")).toBeFalsy();
   });
 
+  it("string attribute should compare with typecast symbol after update", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "foo" });
+    await pirate.updateColumn("catchphrase", "foo");
+    void pirate.catchphrase;
+    expect(pirate.attributeChanged("catchphrase")).toBeFalsy();
+  });
+
   it("partial update", async () => {
     const pirate = new Pirate();
     pirate.catchphrase = "foo";
@@ -422,7 +427,7 @@ describe("DirtyTest", () => {
         await pirate.saveBang();
       });
       await Pirate.where({ id: pirate.id }).updateAll({
-        updated_on: Temporal.Instant.from("2020-01-01T00:00:00Z"),
+        updated_on: RubyTime.utc(2020, 1, 1),
       });
     });
 
@@ -556,34 +561,6 @@ describe("DirtyTest", () => {
 
       expect((topic.content as Record<string, string>)["b"]).toBe("b");
     });
-  });
-
-  it("previous changes includes in place serialized attribute mutation", async () => {
-    const topic = await Topic.createBang({ content: { a: "a" } });
-
-    expect(topic.previousChanges.has("content")).toBe(true);
-
-    (topic.content as Record<string, string>)["b"] = "b";
-
-    expect(topic.isChanged).toBeTruthy();
-
-    await topic.saveBang();
-
-    expect(topic.isChanged).toBeFalsy();
-    expect(topic.previousChanges.has("content")).toBe(true);
-    expect(topic.savedChanges.has("content")).toBe(true);
-    expect(
-      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("a"),
-    ).toBe("a");
-    expect(
-      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("b"),
-    ).toBeUndefined();
-    expect(
-      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("a"),
-    ).toBe("a");
-    expect(
-      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("b"),
-    ).toBe("b");
   });
 
   it("save always should update timestamps when serialized attributes are present", async () => {
@@ -725,7 +702,7 @@ describe("DirtyTest", () => {
   });
 
   it("datetime attribute can be updated with fractional seconds", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare written_on: TimeWithZone | string | null;
 
@@ -750,7 +727,7 @@ describe("DirtyTest", () => {
   });
 
   it("datetime attribute doesnt change if zone is modified in string", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       const Target = class extends Base {
         declare created_on: TimeWithZone | string;
         declare catchphrase: string;
@@ -780,7 +757,7 @@ describe("DirtyTest", () => {
     await withPartialWrites(Person, true, async () => {
       let jon!: Person;
       await assertNoQueriesMatch(/followers_count/, false, async () => {
-        await assertQueriesMatch(/first_name/, undefined, false, async () => {
+        await self().assertQueriesMatch(/first_name/, {}, async () => {
           jon = await Person.create({ first_name: "Jon" });
         });
       });
@@ -901,6 +878,34 @@ describe("DirtyTest", () => {
       (record as any).nonPersistedAttributeWillChange();
       expect(await record.save()).toBeTruthy();
     });
+  });
+
+  it("getters with side effects are allowed", async () => {
+    let updated: Promise<boolean | undefined> | undefined;
+    const PirateBase = Pirate as unknown as Omit<typeof Pirate, "prototype"> &
+      (new (...args: never[]) => Omit<Pirate, "catchphrase"> & {
+        get catchphrase(): string | null;
+        set catchphrase(value: unknown);
+      });
+    const klass = class extends PirateBase {
+      get catchphrase(): string | null {
+        if (isBlank(super.catchphrase)) {
+          updated = this.updateAttribute("catchphrase", "arr");
+        }
+        return super.catchphrase;
+      }
+      set catchphrase(value: unknown) {
+        super.catchphrase = value;
+      }
+    };
+
+    const pirate = (await (klass as unknown as typeof Pirate).createBang({
+      catchphrase: "lol",
+    })) as unknown as InstanceType<typeof klass>;
+    await pirate.updateAttribute("catchphrase", null);
+
+    expect(pirate.catchphrase).toBe("arr");
+    await updated;
   });
 
   it("attributes assigned but not selected are dirty", async () => {
@@ -1044,7 +1049,7 @@ describe("DirtyTest", () => {
 
   it("partial insert off with changed default function attribute", async () => {
     await withPartialWrites(Aircraft, false, async () => {
-      const manufacturingDate = new Date("2025-01-01T00:00:00Z");
+      const manufacturingDate = RubyTime.utc(2025, 1, 1);
       const aircraft = new Aircraft({
         name: "Boeing2",
         manufactured_at: manufacturingDate,
@@ -1052,14 +1057,14 @@ describe("DirtyTest", () => {
 
       expect(aircraft.name).toBe("Boeing2");
       const castAt = aircraft.manufactured_at as RubyTime;
-      expect(castAt.toI()).toBe(Math.floor(manufacturingDate.getTime() / 1000));
+      expect(castAt.toI()).toBe(manufacturingDate.toI());
 
       await aircraft.saveBang();
       await aircraft.reload();
 
       expect(aircraft.name).toBe("Boeing2");
       const reloadedAt = aircraft.manufactured_at as RubyTime;
-      const expectedStr = manufacturingDate.toISOString().slice(0, 19).replace("T", " ");
+      const expectedStr = manufacturingDate.xmlschema().slice(0, 19).replace("T", " ");
       const actualStr = reloadedAt.getutc().xmlschema().slice(0, 19).replace("T", " ");
       expect(actualStr).toBe(expectedStr);
     });

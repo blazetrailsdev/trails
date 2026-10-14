@@ -1,29 +1,29 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
-import { modelRegistry } from "../associations.js";
-import { demodulize } from "@blazetrails/activesupport";
-import { baseClass } from "../inheritance.js";
+import type { AssociationReflection, ThroughReflection } from "../reflection.js";
+import { presence } from "@blazetrails/activesupport";
 import { BelongsToAssociation } from "./belongs-to-association.js";
 
 export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   override get klass(): typeof Base {
-    const type = this.readForeignType();
-    if (!type) return undefined as any;
-    return (this.owner.constructor as typeof Base).polymorphicClassFor(type);
+    const type = this.owner.readAttribute(this.reflection.foreignType!) as string | null;
+    return (presence(type) &&
+      (this.owner.constructor as typeof Base).polymorphicClassFor(type!)) as typeof Base;
   }
 
-  override isTargetChanged(): boolean {
+  override isTargetChanged(): boolean | undefined {
     return super.isTargetChanged() || this.owner.attributeChanged(this.reflection.foreignType!);
   }
 
-  override isTargetPreviouslyChanged(): boolean {
+  override isTargetPreviouslyChanged(): boolean | undefined {
     return (
       super.isTargetPreviouslyChanged() ||
       this.owner.attributePreviouslyChanged(this.reflection.foreignType!)
     );
   }
 
-  override isSavedChangeToTarget(): boolean {
+  override isSavedChangeToTarget(): boolean | undefined {
     return (
       super.isSavedChangeToTarget() ||
       this.owner.isSavedChangeToAttribute(this.reflection.foreignType!)
@@ -34,77 +34,33 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   protected override raiseOnTypeMismatchBang(_record: Base): void {}
 
   protected override staleState(): unknown {
-    const fkState = super.staleState();
-    if (fkState != null) {
-      return JSON.stringify([fkState, this.readForeignType()]);
+    const foreignKey = super.staleState();
+    if (foreignKey != null) {
+      return [foreignKey, this.owner.readAttribute(this.reflection.foreignType!)];
     }
-    return undefined;
   }
 
   protected override replaceKeys(
     record: Base | null,
     { force = false }: { force?: boolean } = {},
   ): void {
-    const typeCol = this.reflection.foreignType!;
-    const typeName = record ? this.polymorphicTypeName(record) : null;
-    const currentType =
-      typeof (this.owner as any)._readAttribute === "function"
-        ? (this.owner as any)._readAttribute(typeCol)
-        : (this.owner as any)[typeCol];
-    if (force || currentType !== typeName) {
-      if (typeof (this.owner as any)._writeAttribute === "function") {
-        (this.owner as any)._writeAttribute(typeCol, typeName);
-      } else {
-        (this.owner as any)[typeCol] = typeName;
-      }
-    }
     super.replaceKeys(record, { force });
+
+    const targetType = record ? (record.constructor as typeof Base).polymorphicName() : null;
+
+    if (force || this.owner._readAttribute(this.reflection.foreignType!) !== targetType) {
+      this.owner.set(this.reflection.foreignType!, targetType);
+    }
   }
 
   /** @missingRailsName class — PERMANENT */
-  protected override inverseReflectionFor(record: Base): unknown {
-    const refl = this.reflection as unknown as {
-      polymorphicInverseOf?: (klass: typeof Base) => unknown;
-    };
-    if (typeof refl.polymorphicInverseOf === "function") {
-      return refl.polymorphicInverseOf(record.constructor as typeof Base);
-    }
-    return null;
-  }
-
-  private polymorphicTypeName(record: Base): string {
-    const recordCtor = record.constructor as typeof Base;
-    if (Object.prototype.hasOwnProperty.call(recordCtor, "polymorphicName")) {
-      return recordCtor.polymorphicName();
-    }
-    const ctor = baseClass.call(record.constructor as typeof Base) as typeof Base & {
-      name: string;
-      _registryKeys?: string[];
-    };
-    const matching = (ctor._registryKeys ?? []).filter((k) => modelRegistry.get(k) === ctor);
-    let name: string;
-    if (matching.length > 0) {
-      const existing = this.readForeignType();
-      if (existing && matching.includes(existing)) return existing;
-      name = matching.reduce((best, k) =>
-        (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,
-      );
-    } else {
-      name = ctor.name;
-    }
-    const storeFull = (record.constructor as typeof Base & { storeFullClassName?: boolean })
-      .storeFullClassName;
-    return storeFull === false ? demodulize(name) : name;
-  }
-
-  private readForeignType(): string | null {
-    const ft = this.reflection.foreignType!;
-    const value =
-      typeof (this.owner as any)._readAttribute === "function"
-        ? (this.owner as any)._readAttribute(ft)
-        : (this.owner as any)[ft];
-    return (value as string) ?? null;
+  protected override inverseReflectionFor(
+    record: Base,
+  ): AssociationReflection | ThroughReflection | null {
+    return (this.reflection as AssociationReflection).polymorphicInverseOf(
+      record.constructor as typeof Base,
+    );
   }
 }
 
-Associations.BelongsToPolymorphicAssociation = BelongsToPolymorphicAssociation;
+rbModConstSet(Associations, "BelongsToPolymorphicAssociation", BelongsToPolymorphicAssociation);

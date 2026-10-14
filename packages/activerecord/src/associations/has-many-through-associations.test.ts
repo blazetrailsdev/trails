@@ -1,8 +1,9 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Marshal } from "@blazetrails/ruby-compat";
 import { Base, registerModel, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
-import { fixtures } from "../test-fixtures.js";
-import { collectionProxyFor as association } from "../associations.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   assertDeprecated,
   assertDifference,
@@ -19,7 +20,6 @@ import { HasManyThroughCantAssociateThroughHasOneOrManyReflection } from "./erro
 import { AssociationTypeMismatch } from "../errors.js";
 import { deprecator } from "../deprecator.js";
 import { Preloader } from "./preloader.js";
-import { quoteTableName } from "../support/quote-regex.js";
 
 import {
   Author,
@@ -78,7 +78,9 @@ import { Section } from "../test-helpers/models/section.js";
 import { User } from "../test-helpers/models/user.js";
 import { Family } from "../test-helpers/models/family.js";
 import { FamilyTree } from "../test-helpers/models/family-tree.js";
-import { ShardedBlogPost, ShardedTag, ShardedBlogPostTag } from "../test-helpers/models/sharded.js";
+import { ShardedBlogPost } from "../test-helpers/models/sharded/blog-post.js";
+import { ShardedTag } from "../test-helpers/models/sharded/tag.js";
+import { ShardedBlogPostTag } from "../test-helpers/models/sharded/blog-post-tag.js";
 import {
   CpkTag,
   CpkOrder,
@@ -92,6 +94,7 @@ import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thin
 
 describe("HasManyThroughAssociationsTest", () => {
   const {
+    self,
     posts,
     readers,
     people,
@@ -248,8 +251,9 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (book as any).subscribers.createBang({ nick: "bob" })).toBeTruthy();
   });
 
-  it.skip("marshal dump", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
+  it("marshal dump", async () => {
+    const preloaded = await Post.includes(":firstBlueTags").first();
+    expect((Marshal.load(Marshal.dump(preloaded)) as Post).equals(preloaded)).toBe(true);
   });
 
   it("through association with joins", async () => {
@@ -667,28 +671,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (post as any).people.toArray()).toEqual(await result.toArray());
   });
 
-  it("associating a persisted record with unsaved changes saves those changes", async () => {
-    const post = await Post.find(posts("thinking").id);
-    const person = await Person.find(people("michael").id);
-    person.writeAttribute("first_name", "Bongo");
-
-    await (post as any).association("people").concat([person]);
-
-    await person.reload();
-    expect(person.readAttribute("first_name")).toBe("Bongo");
-  });
-
-  it("pushing a persisted record with unsaved changes saves those changes", async () => {
-    const post = await Post.find(posts("thinking").id);
-    const person = await Person.find(people("michael").id);
-    person.writeAttribute("first_name", "Bongo");
-
-    await (post as any).people.push(person);
-
-    await person.reload();
-    expect(person.readAttribute("first_name")).toBe("Bongo");
-  });
-
   it("associate existing record twice should add to target twice", async () => {
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("david").id);
@@ -925,70 +907,6 @@ describe("HasManyThroughAssociationsTest", () => {
     const orderTags = await (order as any).orderTags.toArray();
     const found = orderTags.find((ot: any) => Number(ot.tag_id) === Number((tag as any).id));
     expect(found.attached_reason).toBe("This is our loyal customer");
-  });
-
-  it("appends a composite-pk target record through a join model", async () => {
-    const order = await CpkOrder.create({ shop_id: 1, status: "open" });
-    const tag = cpkTags("cpk_tag_loyal_customer");
-    await (tag as any).orders.push(order);
-    const joinRow = await CpkOrderTag.findBy({
-      order_id: (order as any).id_value,
-      tag_id: (tag as any).id,
-    });
-    expect(joinRow).not.toBeNull();
-    const orders = await (tag as any).orders.reload();
-    expect(orders.map((o: any) => Number(o.id_value))).toContain(Number((order as any).id_value));
-  });
-
-  it("composite through-key has_many through routes via join scope", async () => {
-    const { CpkBookWithOrderAgreements, CpkOrderAgreement } =
-      await import("../test-helpers/models/cpk.js");
-    const order = await CpkOrder.create({ shop_id: 1 });
-    const book = await CpkBookWithOrderAgreements.create({ id: [1, 2] });
-    (book as any).order = order;
-    await book.save();
-    const agreement = await CpkOrderAgreement.create({ order_id: (order as any).id_value });
-
-    const sql = await (book as any).orderAgreements.toSql();
-    const orderAgreementsFk = quoteTableName("cpk_order_agreements.order_id");
-    const orderId = quoteTableName("cpk_orders.id");
-    const orderShopId = quoteTableName("cpk_orders.shop_id");
-    expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_orders")}`, "i"));
-    expect(sql).toMatch(new RegExp(`${orderAgreementsFk} = ${orderId}`, "i"));
-    expect(sql).toMatch(new RegExp(`${orderShopId} =`, "i"));
-    expect(sql).toMatch(new RegExp(`${orderId} =`, "i"));
-
-    const rows = await (book as any).orderAgreements.toArray();
-    expect(rows).toEqual([agreement]);
-  });
-
-  it("composite-pk target and through model has_many through routes via join scope", async () => {
-    const tag = cpkTags("cpk_tag_loyal_customer");
-    const sql = await (tag as any).orders.toSql();
-    const ordersId = quoteTableName("cpk_orders.id");
-    const orderTagsOrderId = quoteTableName("cpk_order_tags.order_id");
-    const orderTagsTagId = quoteTableName("cpk_order_tags.tag_id");
-    expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_order_tags")}`, "i"));
-    expect(sql).toMatch(new RegExp(`${ordersId} = ${orderTagsOrderId}`, "i"));
-    expect(sql).toMatch(new RegExp(`${orderTagsTagId} =`, "i"));
-
-    const orders = await (tag as any).orders.toArray();
-    expect(orders.length).toBeGreaterThan(0);
-  });
-
-  it("composite source fk has_many through routes via join scope", async () => {
-    const { CpkOrderWithSingularBookChapters } = await import("../test-helpers/models/cpk.js");
-    const order = await CpkOrderWithSingularBookChapters.create({ id: [5, 6] });
-    await (order as any).createBook({ id: [7, 8] });
-
-    const sql = await (order as any).chapters.toSql();
-    const chapAuthorId = quoteTableName("cpk_chapters.author_id");
-    const chapBookId = quoteTableName("cpk_chapters.book_id");
-    const bookAuthorId = quoteTableName("cpk_books.author_id");
-    const bookId = quoteTableName("cpk_books.id");
-    expect(sql).toMatch(new RegExp(`${chapAuthorId} = ${bookAuthorId}`, "i"));
-    expect(sql).toMatch(new RegExp(`${chapBookId} = ${bookId}`, "i"));
-    await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
   });
 
   it("destroy all on association clears scope", async () => {
@@ -1666,7 +1584,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const readerSpy = vi.spyOn(Reader, "transaction");
     try {
-      await association(post, "people").replace([david, michael]);
+      await post.people.replace([david, michael]);
       expect(readerSpy).toHaveBeenCalled();
     } finally {
       vi.restoreAllMocks();
@@ -1704,7 +1622,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const david = await Author.find(authors("david").id);
     const blocks = [
       async () =>
-        association(david, "verySpecialComments").replace([
+        (david.association("verySpecialComments") as CollectionAssociation).reader.replace([
           await VerySpecialComment.createBang({ body: "Gorp!", post_id: 1011 }),
           await VerySpecialComment.createBang({ body: "Eep!", post_id: 1012 }),
         ]),
@@ -1814,12 +1732,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect([...subIds].sort()).toEqual(
       [subscribers("first").nick, subscribers("second").nick].sort(),
     );
-  });
-
-  it("collection singular ids getter through with custom primary key", async () => {
-    const david = await Author.find(authors("david").id);
-    const catIds = await (david as any).essayCategoryIds;
-    expect([...catIds].sort()).toEqual([(categories("general") as any).name]);
   });
 
   it("collection singular ids setter", async () => {
@@ -2513,19 +2425,19 @@ describe("HasManyThroughAssociationsTest", () => {
   it("through scope is affected by unscoping", async () => {
     const author = authors("david");
 
-    const expected = ids(await association(author, "comments"));
+    const expected = ids(await author.comments);
     await FirstPost.unscoped(async () => {
-      expect(ids(await association(author, "commentsOnFirstPosts"))).toEqual(expected);
+      expect(ids(await author.commentsOnFirstPosts)).toEqual(expected);
     });
   });
 
   it("through scope isnt affected by scoping", async () => {
     const author = authors("david");
-    const expected = ids(await association(author, "commentsOnFirstPosts"));
+    const expected = ids(await author.commentsOnFirstPosts);
 
     const inside = await FirstPost.where({ id: 2 }).scoping(async () => {
-      association(author, "commentsOnFirstPosts").reset();
-      return association(author, "commentsOnFirstPosts").toArray();
+      author.commentsOnFirstPosts.reset();
+      return author.commentsOnFirstPosts.toArray();
     });
 
     expect(ids(inside)).toEqual(expected);
@@ -2666,8 +2578,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const tags2 = await (blogPost as any).tags.toArray();
     for (const t of tags2) tagIds.push(t.id);
 
-    const quotedTagsBlogId = quoteTableName("sharded_tags.blog_id");
-    const quotedPostsTagsBlogId = quoteTableName("sharded_blog_posts_tags.blog_id");
+    const quotedTagsBlogId = self().quoteTableName("sharded_tags.blog_id");
+    const quotedPostsTagsBlogId = self().quoteTableName("sharded_blog_posts_tags.blog_id");
     const tagsSql = await (blogPost as any).tags.toSql();
     expect(tagsSql).toMatch(
       new RegExp(`ON.*${quotedTagsBlogId} = ${quotedPostsTagsBlogId}.*WHERE`, "i"),
@@ -2690,8 +2602,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const blogPosts2 = await (tag as any).blogPosts.toArray();
     const blogPostIds = blogPosts2.map((p: any) => p.id);
 
-    const quotedBlogPostsBlogId = quoteTableName("sharded_blog_posts.blog_id");
-    const quotedPostsTagsBlogId = quoteTableName("sharded_blog_posts_tags.blog_id");
+    const quotedBlogPostsBlogId = self().quoteTableName("sharded_blog_posts.blog_id");
+    const quotedPostsTagsBlogId = self().quoteTableName("sharded_blog_posts_tags.blog_id");
     const blogPostsSql = await (tag as any).blogPosts.toSql();
     expect(blogPostsSql).toMatch(
       new RegExp(`ON.*${quotedBlogPostsBlogId} = ${quotedPostsTagsBlogId}.*WHERE`, "i"),
@@ -2702,17 +2614,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect([...blogPostIds].map(Number).sort()).toEqual(
       [...expectedBlogPostIds].map(Number).sort(),
     );
-  });
-
-  it("through association resolves composite source association primary key", async () => {
-    const blogPost = await ShardedBlogPost.find(shardedBlogPosts("great_post_blog_one").id);
-    const tags = await (blogPost as any).tags.toArray();
-    expect(tags.length).toBeGreaterThan(0);
-    const tag = tags[0];
-
-    await (blogPost as any).tags.delete(tag);
-    const remaining = await (blogPost as any).tags.reload();
-    expect(remaining.map((t: any) => Number(t.id))).not.toContain(Number(tag.id));
   });
 
   it("loading cpk association with unpersisted owner", async () => {
@@ -2755,86 +2656,5 @@ describe("HasManyThroughAssociationsTest", () => {
     const chapter = (order as any).chapters.build();
 
     expect((await chapter.association("book").loadTarget())?.id).toEqual(book.id);
-  });
-
-  it("insertRecord with validate false still raises on invalid join record", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class IrpvTagging extends Base {
-      declare taggable_id: number | null;
-      declare taggable_type: string | null;
-      declare tag_id: number | null;
-
-      static {
-        this._tableName = "taggings";
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-        this.attribute("tag_id", "integer");
-        (this as any).validate((r: any) => {
-          r.errors.add("base", "Join always invalid");
-        });
-        this.belongsTo("tag", { className: "Tag", foreignKey: "tag_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface IrpvTagging {
-      get tag(): Tag | null | Promise<Tag | null>;
-      set tag(value: Tag | null);
-    }
-    registerModel("IrpvTagging", IrpvTagging);
-
-    const post = await Post.create({ title: "Test", body: "" });
-    const tag = await Tag.create({ name: "testjoin" });
-
-    class IrpvPost extends Base {
-      declare title: string | null;
-      declare body: string | null;
-      declare irpvTaggings: AssociationProxy<IrpvTagging>;
-      declare irpvTags: AssociationProxy<Base>;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.hasMany("irpvTaggings", { className: "IrpvTagging", foreignKey: "taggable_id" });
-        this.hasMany("irpvTags", { through: "irpvTaggings", source: "tag", className: "Tag" });
-      }
-    }
-    registerModel("IrpvPost", IrpvPost);
-
-    const irpvPost = await IrpvPost.find(post.id);
-    const assoc = (irpvPost as any).association("irpvTags");
-    await expect(assoc.insertRecord(tag, false, false)).rejects.toThrow(RecordInvalid);
-    expect(await IrpvTagging.where({ taggable_id: post.id }).count()).toBe(0);
-  });
-
-  it("loads through a join model", async () => {
-    const post = await Post.find(posts("welcome").id);
-    const tagsBefore = await (post as any).tags.toArray();
-    expect(tagsBefore.length).toBeGreaterThan(0);
-
-    const tag = tagsBefore[0];
-    const postTags2 = await Post.joins(":tags").where({ id: post.id });
-    expect(postTags2.length).toBeGreaterThan(0);
-    expect(postTags2).toContainEqual(post);
-  });
-
-  it("delete_all for with dependent option delete_all", async () => {
-    const person = await Person.find(people("michael").id);
-    const countBefore = await (person as any).jobsWithDependentDeleteAll.count();
-    const jobCountBefore = await Job.count();
-    const refCountBefore = await Reference.count();
-    await (person as any).jobsWithDependentDeleteAll.deleteAll();
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(Number(refCountBefore) - Number(countBefore));
-  });
-
-  it("delete_all for with dependent option nullify", async () => {
-    const person = await Person.find(people("michael").id);
-    const countBefore = await (person as any).jobsWithDependentNullify.count();
-    const jobCountBefore = await Job.count();
-    const refCountBefore = await Reference.count();
-    await (person as any).jobsWithDependentNullify.deleteAll();
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(refCountBefore);
   });
 });

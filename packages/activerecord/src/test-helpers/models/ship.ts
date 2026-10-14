@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { isEmpty, kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
@@ -35,7 +35,7 @@ export class Ship extends Base {
     this.acceptsNestedAttributesFor("parts", { allowDestroy: true });
     this.acceptsNestedAttributesFor("pirate", {
       allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+      rejectIf: isEmpty,
     });
     this.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true });
 
@@ -76,6 +76,7 @@ export class ShipWithoutNestedAttributes extends Base {
     this.validates("name", { presence: true, if: () => true });
   }
 }
+registerModel(ShipWithoutNestedAttributes);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Prisoner extends Base {
@@ -89,6 +90,7 @@ export class Prisoner extends Base {
     });
   }
 }
+registerModel(Prisoner);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Prisoner {
   get ship(): ShipWithoutNestedAttributes | null | Promise<ShipWithoutNestedAttributes | null>;
@@ -103,6 +105,7 @@ export class FamousShip extends Base {
     this.validates("name", { presence: true, on: "conference" });
   }
 }
+registerModel(FamousShip);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FamousShip {
   get famousPirate(): FamousPirate | null | Promise<FamousPirate | null>;

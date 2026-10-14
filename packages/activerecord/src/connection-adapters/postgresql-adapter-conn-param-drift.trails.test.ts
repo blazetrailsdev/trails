@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFile } from "fs/promises";
 import { createRequire } from "module";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { PG } from "../pg/pg.js";
+import { UrlConfig } from "../database-configurations/url-config.js";
 
 const require = createRequire(import.meta.url);
 
@@ -40,11 +42,12 @@ async function deriveDriverKeywords(): Promise<Set<string>> {
 }
 
 function allowlistKeywords(): Set<string> {
-  return (
-    PostgreSQLAdapter as unknown as {
-      VALID_CONN_PARAM_KEYS: ReadonlySet<string>;
-    }
-  ).VALID_CONN_PARAM_KEYS as Set<string>;
+  return new Set(Object.keys(PG.Connection.conndefaultsHash()));
+}
+
+function railsSpelling(keyword: string): string {
+  if (keyword === "database") return "dbname";
+  return keyword.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
 }
 
 function sorted(keys: Iterable<string>): string[] {
@@ -61,7 +64,9 @@ describe("PostgreSQLAdapter conn-param allowlist drift guard (trails)", () => {
   });
 
   it("accepts every keyword the installed pg driver reads, and no extras", async () => {
-    expect(sorted(allowlistKeywords()), RECHECK_HINT).toEqual(sorted(await deriveDriverKeywords()));
+    expect(sorted(allowlistKeywords()), RECHECK_HINT).toEqual(
+      sorted([...(await deriveDriverKeywords())].map(railsSpelling)),
+    );
   });
 
   it("still derives the pg@9-deprecated Promise and connection keywords from pg@8", async () => {
@@ -70,8 +75,27 @@ describe("PostgreSQLAdapter conn-param allowlist drift guard (trails)", () => {
     for (const key of PG9_DEPRECATED_KEYWORDS) {
       expect(
         allowlist.has(key) && !driverKeys.has(key),
-        `pg no longer reads "${key}": drop it from VALID_CONN_PARAM_KEYS (removed in pg@9)`,
+        `pg no longer reads "${key}": drop it from PG.Connection.conndefaultsHash (removed in pg@9)`,
       ).toBe(false);
     }
+  });
+
+  it("keeps a URL query's driver keywords and drops keys pg does not read", () => {
+    const config = new UrlConfig(
+      "default_env",
+      "primary",
+      "postgres://localhost/foo?application_name=trails&statement_timeout=5000&reaping_frequency=2",
+    );
+    const connParams = (
+      new PostgreSQLAdapter(config.configurationHash) as unknown as {
+        _connectionParameters: Record<string, unknown>;
+      }
+    )._connectionParameters;
+    expect(connParams).toEqual({
+      host: "localhost",
+      dbname: "foo",
+      applicationName: "trails",
+      statementTimeout: "5000",
+    });
   });
 });

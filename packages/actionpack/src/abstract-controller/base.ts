@@ -1,5 +1,6 @@
-import { Configurable, include, mattrAccessor, underscore } from "@blazetrails/activesupport";
+import { Configurable, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
+import { rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
   if (!proto) return [];
@@ -22,22 +23,6 @@ function allPublicMethodNames(proto: object | null | undefined): string[] {
   return [...out];
 }
 
-import {
-  afterAction,
-  aroundAction,
-  beforeAction,
-  prependAfterAction,
-  prependAroundAction,
-  prependBeforeAction,
-  skipAfterAction,
-  skipAroundAction,
-  skipBeforeAction,
-  _defineActionCallbacks,
-  _insertCallbacks,
-  _normalizeCallbackOption,
-  _normalizeCallbackOptions,
-  processAction as _runProcessActionCallbacks,
-} from "./callbacks.js";
 export type {
   ActionCallback,
   AroundCallback,
@@ -50,11 +35,11 @@ export class ActionNotFound extends Error {
   readonly action: string | null;
 
   constructor(
-    message: string,
+    message: string | null = null,
     controller: AbstractController | null = null,
     action: string | null = null,
   ) {
-    super(message);
+    super(message ?? "AbstractController::ActionNotFound");
     this.name = "AbstractController::ActionNotFound";
     this.controller = controller;
     this.action = action;
@@ -86,29 +71,24 @@ export class AbstractController {
     this._actionName = value;
   }
 
-  declare static raiseOnMissingCallbackActions: boolean;
+  protected _responseBody: string | Buffer | true | null = null;
 
-  protected _responseBody: string | Buffer | null = null;
-
-  get responseBody(): string | Buffer | null {
+  get responseBody(): string | Buffer | true | null {
     return this._responseBody;
   }
   set responseBody(value: string | Buffer | null) {
     this._responseBody = value;
   }
 
-  protected _performed: boolean = false;
-
   private static readonly _internalMethods: ReadonlySet<string> = new Set([
     "constructor",
     "processAction",
-    "availableActions",
     "actionMissing",
     "dispatch",
     "head",
     "setHeader",
     "getHeader",
-    "toRackResponse",
+    "toA",
     "render",
     "renderToString",
     "redirectTo",
@@ -122,7 +102,6 @@ export class AbstractController {
     "sendData",
     "verifyAuthenticityToken",
     "formAuthenticityToken",
-    "markPerformed",
     "inspect",
     "controllerPath",
     "controllerName",
@@ -153,6 +132,10 @@ export class AbstractController {
     (this as unknown as { _abstract: boolean })._abstract = true;
   }
 
+  static {
+    this.abstractBang();
+  }
+
   /** @internal */
   protected static _controllerPath?: string;
 
@@ -160,7 +143,7 @@ export class AbstractController {
     if (Object.prototype.hasOwnProperty.call(this, "_controllerPath")) {
       return (this as unknown as { _controllerPath: string })._controllerPath;
     }
-    const name = this.name;
+    const name = rbModName(this);
     if (!name) return ((this as unknown as { _controllerPath: string })._controllerPath = "");
     const SUFFIX = "Controller";
     const stripped = name.endsWith(SUFFIX) ? name.slice(0, -SUFFIX.length) : name;
@@ -206,61 +189,24 @@ export class AbstractController {
       !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
       !this._actionMethodCache
     ) {
-      const internal = AbstractController._internalMethods;
-      const methods: string[] = [];
-      let current: object | null = this.prototype;
-      while (current && current !== AbstractController.prototype && current !== Object.prototype) {
-        for (const name of Object.getOwnPropertyNames(current)) {
-          if (name.startsWith("_") || internal.has(name)) continue;
-          const descriptor = Object.getOwnPropertyDescriptor(current, name);
-          if (descriptor && typeof descriptor.value === "function") {
-            methods.push(name);
-          }
-        }
-        current = Object.getPrototypeOf(current);
-      }
+      const internalMethods = new Set(this.internalMethods());
+      const methods = allPublicMethodNames(this.prototype).filter(
+        (name) => !internalMethods.has(name),
+      );
+      methods.push(...ownPublicMethodNames(this.prototype));
       this._actionMethodCache = new Set(methods);
     }
     return [...this._actionMethodCache];
   }
 
   /** @internal */
-  static _normalizeCallbackOptions = _normalizeCallbackOptions;
-  /** @internal */
-  static _normalizeCallbackOption = _normalizeCallbackOption;
-  /** @internal */
-  static _insertCallbacks = _insertCallbacks;
-
-  static beforeAction = beforeAction;
-  static prependBeforeAction = prependBeforeAction;
-  static appendBeforeAction = beforeAction;
-  static afterAction = afterAction;
-  static prependAfterAction = prependAfterAction;
-  static appendAfterAction = afterAction;
-  static aroundAction = aroundAction;
-  static prependAroundAction = prependAroundAction;
-  static appendAroundAction = aroundAction;
-  static skipBeforeAction = skipBeforeAction;
-  static skipAfterAction = skipAfterAction;
-  static skipAroundAction = skipAroundAction;
-
-  /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    this._performed = false;
-    await _runProcessActionCallbacks(this, action, () => this._dispatchAction(action, ...args));
+    await this.sendAction(action, ...args);
   }
 
   /** @internal */
-  async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
-    const method = (this as any)[action];
-    if (typeof method !== "function") {
-      throw new ActionNotFound(
-        `The action '${action}' could not be found for ${this.constructor.name}`,
-        this,
-        action,
-      );
-    }
-    await method.apply(this, args);
+  sendAction(method: string, ...args: unknown[]): unknown {
+    return rbFSend(this, method, ...args);
   }
 
   async process(action: string, ...args: unknown[]): Promise<void> {
@@ -280,15 +226,25 @@ export class AbstractController {
     await this.processAction(actionName, ...args);
   }
 
+  controllerPath(): string {
+    return (this.constructor as typeof AbstractController).controllerPath();
+  }
+
+  actionMethods(): string[] {
+    return (this.constructor as typeof AbstractController).actionMethods();
+  }
+
   isAvailableAction(actionName: string): boolean {
     return this._findActionName(actionName) !== undefined;
   }
 
+  inspect(): string {
+    return `#<${this.constructor.name}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
+  }
+
   /** @internal */
   isActionMethod(name: string): boolean {
-    const cls = this.constructor as typeof AbstractController;
-    cls.actionMethods();
-    return cls._actionMethodCache!.has(name);
+    return (this.constructor as typeof AbstractController).actionMethods().includes(name);
   }
 
   /** @internal */
@@ -318,19 +274,8 @@ export class AbstractController {
   }
 
   get performed(): boolean {
-    return this._performed || this._responseBody !== null;
-  }
-
-  protected markPerformed(): void {
-    this._performed = true;
-  }
-
-  availableActions(): string[] {
-    return (this.constructor as typeof AbstractController).actionMethods();
+    return this.responseBody != null;
   }
 }
 
 include(AbstractController, Configurable);
-mattrAccessor.call(AbstractController, "raiseOnMissingCallbackActions", { default: false });
-
-_defineActionCallbacks(AbstractController.prototype);

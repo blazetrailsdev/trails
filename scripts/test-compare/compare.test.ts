@@ -5,10 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
   aliasKey,
   arClosureResult,
+  CROSS_PACKAGE_TEST_FILES,
   assertionKindMismatch,
   compareFileResults,
   isAssertionCountMismatch,
   main,
+  matchesInterpolatedPath,
   PKG_SRC_DIRS,
   misplacedLocation,
   normalize,
@@ -154,6 +156,15 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("strips activejob's test/cases directory, which names no lib/active_job directory", () => {
+    expect(rubyToConventionTs("cases/queue_naming_test.rb", "activejob")).toBe(
+      "queue-naming.test.ts",
+    );
+    expect(rubyToConventionTs("serializers/time_with_zone_serializer_test.rb", "activejob")).toBe(
+      "serializers/time-with-zone-serializer.test.ts",
+    );
+  });
+
   it("strips the spec_ prefix rack-style gem suites carry", () => {
     expect(rubyToConventionTs("spec_auth_basic.rb", "rack")).toBe("auth-basic.test.ts");
     expect(rubyToConventionTs("spec_body_proxy.rb", "rack")).toBe("body-proxy.test.ts");
@@ -176,6 +187,17 @@ describe("rubyToConventionTs", () => {
       "uploaded-file.test.ts",
     );
     expect(rubyToConventionTs("rack/test/utils_spec.rb", "rack-test")).toBe("utils.test.ts");
+  });
+
+  it("strips thor's _spec suffix and keeps its lib-relative spec path", () => {
+    expect(rubyToConventionTs("actions/create_file_spec.rb", "thor")).toBe(
+      "actions/create-file.test.ts",
+    );
+    expect(rubyToConventionTs("parser/options_spec.rb", "thor")).toBe("parser/options.test.ts");
+    expect(rubyToConventionTs("thor_spec.rb", "thor")).toBe("thor.test.ts");
+    expect(rubyToConventionTs("line_editor/basic_spec.rb", "thor")).toBe(
+      "line-editor/basic.test.ts",
+    );
   });
 
   it("strips rack-session's leading session_ segment, which mirrors its lib/rack/session root", () => {
@@ -386,6 +408,62 @@ describe("main cross-file credit", () => {
   });
 });
 
+describe("main --extra", () => {
+  const run = async (flags: string[]) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const pkg = "activesupport";
+    const tc = (ancestors: string[], description: string) => ({ ancestors, description });
+    const manifest = (source: string, toFile: (rb: string) => string, time: unknown[]) => ({
+      source,
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            { file: toFile("core_ext/time_ext_test.rb"), testCases: time },
+            { file: toFile("core_ext/date_ext_test.rb"), testCases: [tc(["D"], "yesterday")] },
+          ],
+        },
+      },
+    });
+    const ruby = manifest("ruby", (rb) => rb, [tc(["T"], "last quarter")]);
+    const conv = (rb: string) => `${PKG_SRC_DIRS[pkg]}${rubyToConventionTs(rb, pkg)}`;
+    const ts = manifest("typescript", conv, [tc(["T"], "last quarter"), tc(["T", "z"], "Offset")]);
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify(ts));
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (...parts: unknown[]) => void lines.push(parts.join(" "));
+    try {
+      main(["--package", pkg, ...flags], dir);
+    } finally {
+      console.log = log;
+    }
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { files: ConventionFileResult[] }[] };
+    await fs.rm(dir, { recursive: true });
+    return {
+      files: results[0].files,
+      lines: lines.filter((l) => /^ {2}(core_ext| {4}\+)/.test(l)),
+    };
+  };
+
+  it("lists each unconsumed TS test by describe path and name, composing with --sort-extra and --min-extra=N", async () => {
+    const { files } = await run(["--extra", "--json"]);
+    const extras = Object.fromEntries(files.map((f) => [f.rubyFile, f.extraTests]));
+    expect(extras).toEqual({
+      "core_ext/time_ext_test.rb": ["T > z > Offset"],
+      "core_ext/date_ext_test.rb": [],
+    });
+    expect((await run(["--json"])).files.every((f) => f.extraTests === undefined)).toBe(true);
+    const { lines } = await run(["--extra", "--sort-extra", "--min-extra=1"]);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("core_ext/time_ext_test.rb");
+    expect(lines[1]).toBe("      + T > z > Offset");
+    expect((await run([])).lines).toHaveLength(2);
+  });
+});
+
 describe("main erb description credit", () => {
   it("credits a tse-spelled description against its erb-spelled Rails original", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
@@ -437,5 +515,140 @@ describe("main erb description credit", () => {
     const tracker = results[0].files.find((f) => f.rubyFile === rubyFile)!;
     expect([tracker.matched, tracker.missing, tracker.extra]).toEqual([1, 0, 0]);
     await fs.rm(dir, { recursive: true });
+  });
+});
+
+describe("main cross-package and parked-stub credit", () => {
+  const tc = (ancestors: string[], description: string, pending = false) => ({
+    ancestors,
+    description,
+    pending,
+  });
+  async function compare(
+    rubyFile: string,
+    tsPackages: Record<string, unknown>,
+    rubyCases: object,
+    pkg = "activemodel",
+  ) {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const ruby = {
+      packages: { [pkg]: { files: [{ file: rubyFile, testCases: rubyCases }] } },
+    };
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify({ packages: tsPackages }));
+    main(["--package", pkg, "--json"], dir);
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { files: ConventionFileResult[] }[] };
+    await fs.rm(dir, { recursive: true });
+    return results[0].files[0];
+  }
+
+  it("credits a railtie test against the trailties file CROSS_PACKAGE_TEST_FILES names", async () => {
+    const name = "i18n customize full message defaults to false";
+    const hosted = CROSS_PACKAGE_TEST_FILES["activemodel:railtie_test.rb"];
+    const result = await compare(
+      "railtie_test.rb",
+      {
+        activemodel: { files: [] },
+        [hosted.package]: {
+          files: [
+            {
+              file: `${PKG_SRC_DIRS[hosted.package]}${hosted.tsFile}`,
+              testCases: [tc(["RailtieTest"], name), tc(["RailtieTest"], "a trails-only case")],
+            },
+          ],
+        },
+      },
+      [tc(["RailtieTest"], name)],
+    );
+    expect(result.conventionTsPackage).toBe("trailties");
+    expect([result.tsFileExists, result.matched, result.missing, result.extra]).toEqual([
+      true,
+      1,
+      0,
+      1,
+    ]);
+  });
+
+  it("does not count a pending stub for an unported case as extra", async () => {
+    const name = "load async instrumentation is thread safe";
+    const stubs = [tc(["LoadAsyncTest"], name, true), tc(["OtherTest"], name, true)];
+    const result = await compare(
+      "relation/load_async_test.rb",
+      {
+        activerecord: {
+          files: [
+            { file: `${PKG_SRC_DIRS.activerecord}relation/load-async.test.ts`, testCases: stubs },
+          ],
+        },
+      },
+      [tc(["LoadAsyncTest"], name)],
+      "activerecord",
+    );
+    expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 1]);
+  });
+
+  it("consumes a pending stub for an unported case Rails defines in a module", async () => {
+    const name = "rollback when thread killed";
+    const result = await compare(
+      "transactions_test.rb",
+      {
+        activerecord: {
+          files: [
+            {
+              file: `${PKG_SRC_DIRS.activerecord}transactions.test.ts`,
+              testCases: [tc(["TransactionTest"], name, true)],
+            },
+          ],
+        },
+      },
+      [tc([], name)],
+      "activerecord",
+    );
+    expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 0]);
+  });
+});
+
+describe("matchesInterpolatedPath", () => {
+  const pattern = ["#write_float32", "with <expr>", "encodes <expr> as float32"];
+
+  it("matches a statically expanded describe and it under an extra outer describe", () => {
+    expect(
+      matchesInterpolatedPath(
+        pattern,
+        "messagepack::packer > #write_float32 > with small floats > encodes 3.14 as float32",
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a dynamic TS title compared with its interpolation dropped", () => {
+    expect(
+      matchesInterpolatedPath(pattern, "#write_float32 > with big floats > encodes as float32"),
+    ).toBe(true);
+  });
+
+  it("refuses a sibling context, a shorter path and a different description", () => {
+    expect(
+      matchesInterpolatedPath(pattern, "#write_float32 > with non numeric > raises argument error"),
+    ).toBe(false);
+    expect(matchesInterpolatedPath(pattern, "with small floats > encodes 3.14 as float32")).toBe(
+      false,
+    );
+    expect(
+      matchesInterpolatedPath(
+        pattern,
+        "#write_float64 > with small floats > encodes 3.14 as float32",
+      ),
+    ).toBe(false);
+  });
+
+  it("matches nothing through a segment that is only an interpolation", () => {
+    expect(matchesInterpolatedPath(["FooTest", "<expr>"], "footest > anything")).toBe(false);
+  });
+
+  it("reads regex metacharacters in a name literally", () => {
+    expect(matchesInterpolatedPath(["a.b (<expr>)"], "a.b (1)")).toBe(true);
+    expect(matchesInterpolatedPath(["a.b (<expr>)"], "axb (1)")).toBe(false);
   });
 });

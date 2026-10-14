@@ -1,15 +1,17 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
-import { buildQuoted } from "./casted.js";
+import type { Attribute } from "../attributes/attribute.js";
 import { Attribute as AMAttribute, defaultValue } from "@blazetrails/activemodel";
+import type { ArelNode } from "../arel.js";
 
 export class HomogeneousIn extends Node {
-  readonly attribute: Node;
+  readonly attribute: ArelNode & Pick<Attribute, "quotedArray" | "typeCaster">;
   readonly values: unknown[];
   readonly type: "in" | "notin";
 
-  constructor(values: unknown[], attribute: Node, type: "in" | "notin") {
+  constructor(values: unknown[], attribute: HomogeneousIn["attribute"], type: "in" | "notin") {
     super();
     this.values = values;
     this.attribute = attribute;
@@ -37,57 +39,44 @@ export class HomogeneousIn extends Node {
     return new HomogeneousIn(this.values, this.attribute, this.type === "in" ? "notin" : "in");
   }
 
-  get left(): Node {
+  get left(): ArelNode {
     return this.attribute;
   }
 
-  get right(): Node[] {
-    const attr = this.attribute as Node & { quotedArray?: (vs: unknown[]) => Node[] };
-    if (typeof attr.quotedArray === "function") {
-      return attr.quotedArray(this.values);
-    }
-    return this.values.map((v) => buildQuoted(v, this.attribute));
+  get right(): ReturnType<Attribute["quotedArray"]> {
+    return this.attribute.quotedArray(this.values);
   }
 
   get castedValues(): unknown[] {
-    const attr = this.attribute as unknown as {
-      typeCaster?: {
-        serialize?: (v: unknown) => unknown;
-        isSerializable?: (v: unknown) => boolean;
-      };
+    const type = this.attribute.typeCaster as {
+      serialize(value: unknown): unknown;
+      isSerializable(value: unknown): boolean;
     };
-    const caster = attr?.typeCaster;
-    if (!caster) return this.values;
-    const result: unknown[] = [];
-    for (const raw of this.values) {
-      if (typeof caster.isSerializable === "function" && !caster.isSerializable(raw)) continue;
-      if (typeof caster.serialize === "function") {
-        const cast = caster.serialize(raw);
-        if (cast != null) result.push(cast);
-      } else {
-        result.push(raw);
-      }
-    }
-    return result;
+
+    const castedValues = this.values.map((rawValue) =>
+      type.isSerializable(rawValue) ? type.serialize(rawValue) : null,
+    );
+
+    return castedValues.filter((value) => value != null);
   }
 
   get procForBinds(): (value: unknown) => unknown {
     return (value: unknown) =>
       AMAttribute.withCastValue(
-        (this.attribute as unknown as { name?: string }).name ?? "",
+        (this.attribute as unknown as { name: string | null }).name,
         value,
         defaultValue(),
       );
   }
 
-  fetchAttribute(block: (attr: Node) => boolean): boolean | undefined {
+  fetchAttribute(block: (attr: HomogeneousIn["attribute"]) => boolean): boolean | undefined {
     if (this.attribute) return block(this.attribute);
     return undefined;
   }
 
-  protected ivars(): [Node, unknown[], HomogeneousIn["type"]] {
+  protected ivars(): [ArelNode, unknown[], HomogeneousIn["type"]] {
     return [this.attribute, this.values, this.type];
   }
 }
 
-Nodes.HomogeneousIn = HomogeneousIn;
+rbModConstSet(Nodes, "HomogeneousIn", HomogeneousIn);

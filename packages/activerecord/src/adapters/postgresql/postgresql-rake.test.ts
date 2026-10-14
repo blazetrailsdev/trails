@@ -353,7 +353,7 @@ describeIfPostgresqlAdapter("PostgreSQLDBCollationTest", () => {
 });
 
 describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
-  let spawnSync: MockInstance<ChildProcessAdapter["spawnSync"]>;
+  let system: MockInstance<NonNullable<ChildProcessAdapter["system"]>>;
   let filename: string;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
   let previousDumpSchemas: ReturnType<typeof dumpSchemas>;
@@ -367,9 +367,9 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     previousFlags = DatabaseTasks.structureDumpFlags;
     previousDumpSchemas = dumpSchemas();
     const childProcess = await getChildProcessAsync();
-    spawnSync = vi
-      .spyOn(childProcess, "spawnSync")
-      .mockReturnValue({ status: 0 } as ReturnType<typeof childProcess.spawnSync>);
+    system = vi
+      .spyOn(childProcess as Required<ChildProcessAdapter>, "system")
+      .mockResolvedValue({ pid: 1, status: 0, signal: null });
   });
 
   afterEach(() => {
@@ -381,7 +381,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   });
 
   it("structure dump", async () => {
-    spawnSync.mockRestore();
+    system.mockRestore();
     expect(File.read(filename)).toEqual("");
 
     const config = new HashConfig("default_env", "primary", {
@@ -429,10 +429,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
       filename,
     );
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
+      expect.objectContaining(expectedEnv),
       [...expectedArgs, filename, "my-app-db"],
-      expect.objectContaining({ env: expect.objectContaining(expectedEnv) }),
+      {},
     );
   });
 
@@ -456,10 +457,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
       filename,
     );
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
+      expect.objectContaining(expectedEnv),
       [...expectedArgs, filename, "my-app-db"],
-      expect.objectContaining({ env: expect.objectContaining(expectedEnv) }),
+      {},
     );
   });
 
@@ -468,10 +470,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, filename, "--noop", "my-app-db"],
       expect.anything(),
+      [...expectedArgs, filename, "--noop", "my-app-db"],
+      {},
     );
   });
 
@@ -480,10 +483,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, filename, "my-app-db"],
       expect.anything(),
+      [...expectedArgs, filename, "my-app-db"],
+      {},
     );
   });
 
@@ -492,10 +496,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, filename, "--noop", "my-app-db"],
       expect.anything(),
+      [...expectedArgs, filename, "--noop", "my-app-db"],
+      {},
     );
   });
 
@@ -511,10 +516,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, filename, "-T", "prefix_foo", "-T", "ignored_foo", "my-app-db"],
       expect.anything(),
+      [...expectedArgs, filename, "-T", "prefix_foo", "-T", "ignored_foo", "my-app-db"],
+      {},
     );
   });
 
@@ -528,10 +534,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
       filename,
     );
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, filename, "--schema=foo", "--schema=bar", "my-app-db"],
       expect.anything(),
+      [...expectedArgs, filename, "--schema=foo", "--schema=bar", "my-app-db"],
+      {},
     );
   });
 
@@ -547,10 +554,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
       filename,
     );
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, filename, "my-app-db"],
       expect.anything(),
+      [...expectedArgs, filename, "my-app-db"],
+      {},
     );
   });
 
@@ -559,16 +567,17 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, filename, "--schema=foo", "--schema=bar", "my-app-db"],
       expect.anything(),
+      [...expectedArgs, filename, "--schema=foo", "--schema=bar", "my-app-db"],
+      {},
     );
   });
 
   it("structure dump execution fails", async () => {
     const failing = "awesome-file.sql";
-    spawnSync.mockReturnValue({ status: 1 } as never);
+    system.mockResolvedValue({ pid: 1, status: 1, signal: null });
 
     let message = "";
     await expect(
@@ -578,17 +587,18 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
       }),
     ).rejects.toThrow(Error);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "pg_dump",
-      [...expectedArgs, failing, "my-app-db"],
       expect.anything(),
+      [...expectedArgs, failing, "my-app-db"],
+      {},
     );
     expect(message).toMatch("failed to execute:");
   });
 });
 
 describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
-  let spawnSync: MockInstance<ChildProcessAdapter["spawnSync"]>;
+  let system: MockInstance<NonNullable<ChildProcessAdapter["system"]>>;
   let previousFlags: typeof DatabaseTasks.structureLoadFlags;
   let expectedArgs: string[];
 
@@ -598,9 +608,9 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
     expectedArgs = ["--set", "ON_ERROR_STOP=1", "--quiet", "--no-psqlrc", "--output", nullDevice];
     previousFlags = DatabaseTasks.structureLoadFlags;
     const childProcess = await getChildProcessAsync();
-    spawnSync = vi
-      .spyOn(childProcess, "spawnSync")
-      .mockReturnValue({ status: 0 } as ReturnType<typeof childProcess.spawnSync>);
+    system = vi
+      .spyOn(childProcess as Required<ChildProcessAdapter>, "system")
+      .mockResolvedValue({ pid: 1, status: 0, signal: null });
   });
 
   afterEach(() => {
@@ -613,10 +623,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "psql",
-      [...expectedArgs, "--file", filename, "my-app-db"],
       expect.anything(),
+      [...expectedArgs, "--file", filename, "my-app-db"],
+      {},
     );
   });
 
@@ -626,10 +637,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "psql",
-      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
       expect.anything(),
+      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
+      {},
     );
   });
 
@@ -655,10 +667,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
       filename,
     );
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "psql",
+      expect.objectContaining(expectedEnv),
       [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
-      expect.objectContaining({ env: expect.objectContaining(expectedEnv) }),
+      {},
     );
   });
 
@@ -684,10 +697,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
       filename,
     );
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "psql",
+      expect.objectContaining(expectedEnv),
       [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
-      expect.objectContaining({ env: expect.objectContaining(expectedEnv) }),
+      {},
     );
   });
 
@@ -697,10 +711,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "psql",
-      [...expectedArgs, "--file", filename, "my-app-db"],
       expect.anything(),
+      [...expectedArgs, "--file", filename, "my-app-db"],
+      {},
     );
   });
 
@@ -710,10 +725,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "psql",
-      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
       expect.anything(),
+      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
+      {},
     );
   });
 
@@ -722,10 +738,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
 
     await DatabaseTasks.structureLoad(configuration(), filename);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "psql",
-      [...expectedArgs, "--file", filename, "my-app-db"],
       expect.anything(),
+      [...expectedArgs, "--file", filename, "my-app-db"],
+      {},
     );
   });
 });

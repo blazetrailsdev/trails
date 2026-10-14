@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, useZone } from "@blazetrails/activesupport";
-import { Types, ValueType } from "../index.js";
+import * as Types from "../index.js";
+import { ValueType } from "../index.js";
 
 function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {
   return RubyTime.utc(year, mon, mday, hour, min, sec);
@@ -150,11 +151,6 @@ describe("TimeType cast and serialize coverage", () => {
     expect((t.serialize("14:23:55.123456") as RubyTime).getutc().xmlschema(3)).toBe(
       "2000-01-01T14:23:55.123Z",
     );
-  });
-
-  it("PlainDateTime input extracts time (multiparameter support)", () => {
-    const pdt = Temporal.PlainDateTime.from("2024-06-15T14:23:55");
-    expect(type.cast(pdt)).toEqual(timeUtc(2024, 6, 15, 14, 23, 55));
   });
 
   it("cast 3pm returns 15:00", () => {

@@ -102,7 +102,12 @@ import {
   scopedSkipMirrorName,
   snakeToCamel,
 } from "@blazetrails/parity/conventions";
-import { TS_PARENT_ALIASES, resolveModuleName } from "./compare.js";
+import {
+  TS_PARENT_ALIASES,
+  buildEntitiesByName,
+  resolveEntityByDeclaringFile,
+  resolveModuleName,
+} from "./compare.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { manifestIsStale } from "./build-freshness.js";
@@ -203,6 +208,21 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *     `extend`s it answers `run_callbacks` / `set_callback` / `skip_callback` /
  *     `reset_callbacks`. `ActiveModel::Validations`' `included` block extends it
  *     (validations.rb:42), which is how `ActiveModel::Model` gets them.
+ *   - `ActiveModel::Type::SerializeCastValue.included(klass)` runs
+ *     `klass.include DefaultImplementation` unless the class already defines
+ *     `serialize_cast_value` (type/serialize_cast_value.rb:21-23), which is how
+ *     `Type::Value` (type/value.rb:10) answers it.
+ *   - `ActiveSupport::DescendantsTracker#descendants` reads `self.subclasses`
+ *     (descendants_tracker.rb:107-110): the extender's own `Class#subclasses`,
+ *     which `core_ext/class/subclasses.rb:23` prepends
+ *     `ReloadedClassesFiltering` (descendants_tracker.rb:58-66) onto `Class` to
+ *     filter. JS has no `Class` to prepend onto, so the extender carries the
+ *     module itself (`extend(Base, ReloadedClassesFiltering)`, base.rb:286),
+ *     and the edge crosses a package boundary wherever the extender does.
+ *   - `ActiveSupport::Testing::SetupAndTeardown.prepended(klass)` runs
+ *     `klass.include ActiveSupport::Callbacks` and `klass.extend ClassMethods`
+ *     (testing/setup_and_teardown.rb:21-25), which is how `ActiveSupport::TestCase`
+ *     answers `setup` / `teardown` and the callbacks class methods.
  */
 /**
  * Mixins every Ruby object answers because Active Support includes them into
@@ -218,6 +238,33 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
   "ActiveModel::Callbacks": {
     includes: ["ActiveSupport::Callbacks"],
   },
+  "ActiveModel::Type::SerializeCastValue": {
+    includes: ["ActiveModel::Type::SerializeCastValue::DefaultImplementation"],
+  },
+  "ActiveSupport::DescendantsTracker": {
+    includes: ["ActiveSupport::DescendantsTracker::ReloadedClassesFiltering"],
+  },
+  "ActiveSupport::Testing::SetupAndTeardown": {
+    includes: [
+      "ActiveSupport::Callbacks",
+      "ActiveSupport::Testing::SetupAndTeardown::ClassMethods",
+    ],
+  },
+};
+
+/**
+ * Modules a host `prepend`s in its own body. The Ruby extractor records
+ * `include` / `extend` only, so a prepended module never lands in the host's
+ * `includes` and nothing walks it — or the mixins its `self.prepended` hook
+ * injects (`HOOK_INJECTED_MIXINS`).
+ *
+ *   - `ActiveSupport::TestCase` prepends `Testing::SetupAndTeardown`
+ *     (test_case.rb:145).
+ */
+const LEXICAL_PREPENDS: Record<string, { includes: string[] }> = {
+  "ActiveSupport::TestCase": {
+    includes: ["ActiveSupport::Testing::SetupAndTeardown"],
+  },
 };
 
 /**
@@ -231,12 +278,6 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  * `addRubyName`). The justification is a source-unported *lexical* include
  * rather than a railtie `on_load` injection.
  *
- *   - `ActiveRecord::Railtie` re-exports `Railties::ControllerRuntime`
- *     (railtie.rb:267 — `on_load(:action_controller) { include … }`); the port
- *     lives in `trailties/controller-runtime.ts`. Its source (vendored at
- *     `activerecord/lib/active_record/railties/controller_runtime.rb`, matched
- *     by the `railties/controller_runtime.rb` UNPORTED_FILES pattern) is
- *     unported (Railties / ActionController integration not ported yet).
  *   - The association error classes `include DidYouMean::Correctable`
  *     (associations/errors.rb:18,47,88); `Correctable#detailed_message` is
  *     ported inline as `detailedMessage` in `associations/errors.ts`.
@@ -272,6 +313,9 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  * `def` on each of them and already resolves through the normal module walk,
  * spelled `compare` by MIRROR_CANDIDATE_OVERRIDES.
  *
+ * `Singleton` (stdlib `singleton.rb`) supplies `instance` to the including
+ * class: `ActiveModel::NullMutationTracker` (`attribute_mutation_tracker.rb:157`).
+ *
  * Values are `Enumerable.instance_methods(false)` / `Comparable
  * .instance_methods(false)` (Ruby 3.4). An ActiveSupport core_ext reopening of
  * the same module (`index_by`, `compact_blank` in `core_ext/enumerable.rb`) is
@@ -280,6 +324,7 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  */
 const CORE_MIXIN_METHODS: Record<string, string[]> = {
   Comparable: ["<", "<=", "==", ">", ">=", "between?", "clamp"],
+  Singleton: ["instance"],
   Enumerable: [
     "all?",
     "any?",
@@ -373,7 +418,6 @@ const CORE_MIXIN_OPERATOR_SPELLINGS: Record<string, string[]> = {
 };
 
 const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
-  "ActiveRecord::Railtie": ["process_action", "cleanup_view_runtime", "append_info_to_payload"],
   "ActiveRecord::AssociationNotFoundError": ["detailed_message"],
 };
 
@@ -452,6 +496,20 @@ function rubyMethodCandidates(rubyName: string): string[] | null {
   if (!rubyName.endsWith("?")) return base;
   const literal = snakeToCamel(rubyName.slice(0, -1)) + "?";
   return [...base, literal];
+}
+
+/**
+ * A TS namespace binding that declares nothing of its own: a namespace
+ * re-export or a `declare namespace` holding only types.
+ */
+function isBareNamespaceBinding(m: ClassInfo): boolean {
+  return (
+    m.declaredAsNamespace === true &&
+    m.isInterface !== true &&
+    m.reExportedFrom === undefined &&
+    m.instanceMethods.length === 0 &&
+    m.classMethods.length === 0
+  );
 }
 
 /**
@@ -851,6 +909,12 @@ interface PackageTotals {
    */
   totalInterfaceExempt: number;
   /**
+   * Moved names dropped as an override on a class with no Rails counterpart
+   * (`collectOverrideOnlyNames`). Reported for the same reason as the
+   * interface count: the allowance has no per-declaration tag to count.
+   */
+  totalOverrideExempt: number;
+  /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
    * maps onto. Broken out so a consumer can tell how much of a package's
    * extra surface comes from that population (it was unmeasured before this
@@ -944,6 +1008,15 @@ type-only shape Ruby leaves to duck typing, so no Ruby counterpart is possible,
 and its MEMBERS are exempt with it. An interface name that does appear in Rails
 stays scored (as moved), members included — that is the drift case a blanket
 exemption would hide.
+
+A class whose name appears nowhere in Rails cannot hold a misplaced port, so a
+member it overrides from the class it \`extends\` is not counted as moved and
+needs no tag. An override on a class Rails does name stays scored.
+
+A namespace binding with no members of its own (\`export * as Collectors from\`,
+a types-only \`declare namespace\`) named after a Rails module of the package is
+not counted as moved: Rails reopens the module in every file under it, so it
+has no defining \`.rb\`. A binding that declares members stays scored.
 
 Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
@@ -1310,6 +1383,77 @@ export function collectInterfaceMemberOnlyNames(
 }
 
 /**
+ * Member names a file contributes ONLY as a class's override of a member that
+ * class inherits through its `extends` clause — mapped to the overriding
+ * classes.
+ *
+ * RFC 0120, decided here: a class with no Rails counterpart at all cannot hold
+ * a misplaced port, so its override of an inherited member is not `moved`. It
+ * sits on the only class that can declare it. `DeferredIdsIn extends Nodes.In`
+ * (`relation/predicate-builder/deferred-distinct-pk-in.ts`) overrides `invert`
+ * and declares a `constructor`; both were charged to activerecord as moved
+ * surface crediting `Arel::Nodes::Binary#invert` (`arel/nodes/binary.rb`) and
+ * an unrelated `#initialize`. No route retires that row: the override cannot be
+ * deleted, and a `@noRailsEquivalent` receipt asserts the name is not Rails',
+ * which is false.
+ *
+ * The exemption is deliberately NOT unconditional on overrides. It rides on the
+ * overriding CLASS's verdict, which the scorer applies: an override on a class
+ * named after something Rails declares may be a real port sitting in the wrong
+ * file (`postgresql/schema-statements-class.ts`, ~80 names of
+ * `PostgreSQL::SchemaStatements`), so its members stay scored.
+ *
+ * `inherits` answers for an ancestor only where Rails agrees: the ancestor
+ * declares the member in the TS file mirroring a `.rb` that declares it too.
+ * An ancestor that itself carries the name as extra surface — a relocated port,
+ * a short-name coincidence — lends nothing, so an override of it stays scored.
+ *
+ * A name anything else in the file also contributes — a member no ancestor
+ * declares, an interface member, a top-level function, any declaration name —
+ * is excluded, on the same reasoning as `collectInterfaceOnlyNames`: the extra
+ * set is a flat Set of bare names, so one name carries one verdict.
+ *
+ * The scorer applies it AFTER the tag check, like the interface exemption:
+ * ruby-compat's package contract puts a receipt on every member, an override's
+ * `constructor` included, and that receipt must keep matching. `inherits` walks
+ * the `extends` chain across package boundaries; a dep's `superclassFile` is
+ * relative to its own src dir, so only that package's entities are candidates
+ * for it.
+ */
+export function collectOverrideOnlyNames(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+  fileConstants: string[] | undefined,
+  inherits: (klass: ClassInfo, name: string) => boolean,
+): Map<string, string[]> {
+  const overrides = new Map<string, string[]>();
+  const others = new Set<string>();
+  for (const { name, owner, interfaceMemberOf } of walkTsFileSurface(
+    file,
+    classes,
+    modules,
+    fileFunctions,
+    fileConstants,
+  )) {
+    const klass =
+      owner === null || interfaceMemberOf !== null
+        ? undefined
+        : classes.find((c) => c.file === file && c.name === owner);
+    if (klass === undefined || !inherits(klass, name)) {
+      others.add(name);
+      continue;
+    }
+    const owners = overrides.get(name);
+    if (owners === undefined) overrides.set(name, [klass.name]);
+    else if (!owners.includes(klass.name)) owners.push(klass.name);
+  }
+  for (const name of others) overrides.delete(name);
+  return overrides;
+}
+
+/**
  * Pre-fold `Foo::ClassMethods` submodules (the `ActiveSupport::Concern`
  * idiom) into `Foo.classMethods`, mirroring compare.ts's pre-pass. This
  * pre-fold lives in compare.ts at the consumer level (not in the Ruby
@@ -1350,6 +1494,9 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * which is also how the symbol import resolves at every site in the repo,
  * since the binding is imported under that bare name.
  *
+ * `[initialize]` is the third: a MODULE's `def initialize`, reached through the
+ * includer's `super` (`initializeIncludedModules`), credited off the manifest.
+ *
  * The string-named `included` / `extended` / `inherited` methods are a
  * different thing and stay drift: `SKIP_GROUPS` in `scripts/parity/conventions.ts`
  * marks them `tsMirrorIsDrift`, and a bracketed name never collides with a
@@ -1358,6 +1505,7 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
 export const CONCERN_HOOK_MEMBERS = {
   included: "[included]",
   extended: "[extended]",
+  initialize: "[initialize]",
 } as const;
 
 /** `included do ... end` — activemodel/lib/active_model/api.rb:65. */
@@ -1385,6 +1533,15 @@ export function concernHookNames(rubySource: string): Set<string> {
   }
   if (SELF_EXTENDED_RE.test(rubySource)) names.add(CONCERN_HOOK_MEMBERS.extended);
   return names;
+}
+
+/** The `.rb` files in which a MODULE defines `initialize` (type/serialize_cast_value.rb:41-44). */
+export function moduleInitializeFiles(pkg: PackageInfo): Set<string> {
+  const files = new Set<string>();
+  for (const mod of Object.values(pkg.modules)) {
+    if (mod.file && mod.instanceMethods.some((m) => m.name === "initialize")) files.add(mod.file);
+  }
+  return files;
 }
 
 /** Key into the `concernHooks` map: one entry per (package, Ruby file). */
@@ -1418,6 +1575,7 @@ export async function loadConcernHooks(
     if (filterPkg !== null && pkg !== filterPkg) continue;
     const libDir = libPaths[pkg];
     if (libDir === undefined) continue;
+    const initializeFiles = moduleInitializeFiles(rubyPkg);
     for (const rubyFile of rubyFilesOf(rubyPkg)) {
       let source: string;
       try {
@@ -1426,6 +1584,7 @@ export async function loadConcernHooks(
         continue;
       }
       const names = concernHookNames(source);
+      if (initializeFiles.has(rubyFile)) names.add(CONCERN_HOOK_MEMBERS.initialize);
       if (names.size > 0) hooks.set(concernHookKey(pkg, rubyFile), names);
     }
   }
@@ -1477,6 +1636,7 @@ function collectAllowedNames(
   moduleFqnByShort: Map<string, string[]>,
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
+  crossPackageClasses: Record<string, ClassInfo>,
   fileConstantNames: string[],
   rubyFile: string,
   fileHashKeyNames: string[] = [],
@@ -1632,6 +1792,36 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target, methodFile);
   };
 
+  const addDelegated = (
+    ownerFqn: string,
+    owner: ClassInfo,
+    target: Set<string>,
+    seen: Set<string>,
+  ): void => {
+    if (seen.has(ownerFqn)) return;
+    seen.add(ownerFqn);
+    addMethods(
+      owner.instanceMethods.filter((m) => m.visibility !== "private"),
+      ownerFqn,
+      undefined,
+      target,
+    );
+    const mixins = [
+      ...(owner.includes ?? []),
+      ...(owner.prepends ?? []),
+      ...(AMBIENT_RAILTIE_MIXINS[ownerFqn]?.includes ?? []),
+      ...(HOOK_INJECTED_MIXINS[ownerFqn]?.includes ?? []),
+      ...(LEXICAL_PREPENDS[ownerFqn]?.includes ?? []),
+    ];
+    for (const inc of mixins) {
+      const mod = resolveDelegatedClass(inc, ownerFqn, crossPackageModules);
+      if (mod !== undefined) addDelegated(mod, crossPackageModules[mod], target, seen);
+    }
+    if (!owner.superclass) return;
+    const sup = resolveDelegatedClass(owner.superclass, ownerFqn, crossPackageClasses);
+    if (sup !== undefined) addDelegated(sup, crossPackageClasses[sup], target, seen);
+  };
+
   for (const { fqn, info, nameOnly, methodFile, nestedIn } of entities) {
     // The entity's own short name: since declaration names are TS surface
     // (`collectTsFileNames`), the Ruby constant they port has to be allowed
@@ -1671,13 +1861,54 @@ function collectAllowedNames(
     for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? [])
       walkMixin(inc, fqn, target, methodFile);
 
+    for (const inc of LEXICAL_PREPENDS[fqn]?.includes ?? [])
+      walkMixin(inc, fqn, target, methodFile);
+
     for (const inc of OBJECT_AMBIENT_MIXINS) walkMixin(inc, fqn, target);
 
     for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
 
     for (const name of info.forwardedMethods ?? []) addRubyName(name, target);
+
+    if (info.delegateClass === true && info.superclass) {
+      const delegated = resolveDelegatedClass(info.superclass, fqn, crossPackageClasses);
+      if (delegated !== undefined)
+        addDelegated(delegated, crossPackageClasses[delegated], target, new Set<string>());
+    }
   }
   return allowed;
+}
+
+/**
+ * The class a `DelegateClass(X)` superclass names, resolved the way Ruby binds
+ * `X` from inside `contextFqn`: each enclosing namespace outward, then the top
+ * level. A name that reaches its class through a constant alias Ruby follows
+ * and the manifest does not record (`Type::Value` inside `ActiveRecord::Locking`
+ * is `ActiveRecord::Type::Value = ActiveModel::Type::Value`,
+ * `activerecord/lib/active_record/type.rb`) resolves to the one class whose FQN
+ * ends in the written name; an ambiguous or unknown name resolves to nothing.
+ * The delegated class's mixins and superclass chain are resolved the same way:
+ * `DelegateClass` forwards `superclass.public_instance_methods` and
+ * `protected_instance_methods`, inherited ones included
+ * (`vendor/ruby/v3.3.11/lib/delegate.rb:397-400`), and never a class method.
+ */
+function resolveDelegatedClass(
+  name: string,
+  contextFqn: string,
+  classes: Record<string, ClassInfo>,
+): string | undefined {
+  const written = name.replace(/^::/, "");
+  if (!name.startsWith("::")) {
+    const parts = contextFqn.split("::");
+    for (let i = parts.length; i > 0; i--) {
+      const candidate = `${parts.slice(0, i).join("::")}::${written}`;
+      if (candidate in classes) return candidate;
+    }
+  }
+  if (written in classes) return written;
+  if (name.startsWith("::")) return undefined;
+  const aliased = Object.keys(classes).filter((fqn) => fqn.endsWith(`::${written}`));
+  return aliased.length === 1 ? aliased[0] : undefined;
 }
 
 /**
@@ -1778,16 +2009,19 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOw
 export function buildCrossPackageModules(ruby: ApiManifest): {
   modules: Record<string, ClassInfo>;
   pkgByFqn: Record<string, string>;
+  classes: Record<string, ClassInfo>;
 } {
   const modules: Record<string, ClassInfo> = {};
   const pkgByFqn: Record<string, string> = {};
+  const classes: Record<string, ClassInfo> = {};
   for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
+    Object.assign(classes, pkg.classes);
     for (const [fqn, info] of Object.entries(pkg.modules)) {
       modules[fqn] = info;
       pkgByFqn[fqn] = pkgName;
     }
   }
-  return { modules, pkgByFqn };
+  return { modules, pkgByFqn, classes };
 }
 
 /**
@@ -1911,7 +2145,10 @@ export interface InlinedFromFinding {
  * AND the module's own twin to declare no body for it at all. `this`-typed
  * functions assigned to the host class keep their body in the mixin's file, and
  * an `Included<>` interface sits in that same file beside them, so both stay
- * clear.
+ * clear. Nor does a `_name` body that ports the includer's own Ruby `_name`
+ * method, which a module's `name` also offers as its underscored candidate:
+ * `Relation#_create` (relation.rb:1357-1359) beside
+ * `Delegation::ClassMethods#create` (relation/delegation.rb:135-137).
  */
 export function inlinedModuleMembers(
   pkg: string,
@@ -1927,6 +2164,12 @@ export function inlinedModuleMembers(
     const hostTs = rubyFileToTs(host.file, pkg);
     const hostBodies = bodiedByTsFile.get(hostTs);
     if (hostBodies === undefined) continue;
+    const hostDefinesInitialize = host.instanceMethods.some((im) => im.name === "initialize");
+    const hostOwnSpellings = new Set(
+      [...host.instanceMethods, ...host.classMethods].flatMap((hm) =>
+        hm.name.startsWith("_") ? (rubyMethodCandidates(hm.name) ?? []) : [],
+      ),
+    );
     for (const incName of host.includes ?? []) {
       const fqn = resolveModuleName(incName, hostFqn, moduleFqnByShort);
       const mod = rubyModules[fqn];
@@ -1938,7 +2181,15 @@ export function inlinedModuleMembers(
         if (m.file !== undefined && m.file !== mod.file) continue;
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
-        const tsName = candidates.find((c) => hostBodies.has(c) && moduleBodies?.has(c) !== true);
+        if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
+        if (m.name.endsWith("?") && candidates.some((c) => moduleBodies?.has(c) === true)) continue;
+        const tsName = candidates.find(
+          (c) =>
+            !(c === "constructor" && m.name === "new" && hostDefinesInitialize) &&
+            !(c !== candidates[0] && hostOwnSpellings.has(c)) &&
+            hostBodies.has(c) &&
+            moduleBodies?.has(c) !== true,
+        );
         if (tsName === undefined) continue;
         const key = `${hostTs}#${tsName}`;
         if (seen.has(key)) continue;
@@ -1972,6 +2223,7 @@ function buildPackageReport(
   globalRubyCandidates: Map<string, RubyOwner[]>,
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
+  crossPackageClasses: Record<string, ClassInfo>,
   novelOnly: boolean,
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
@@ -1989,6 +2241,7 @@ function buildPackageReport(
     totalMoved: 0,
     totalAllowlisted: 0,
     totalInterfaceExempt: 0,
+    totalOverrideExempt: 0,
     noCounterpartFiles: 0,
     noCounterpartExtras: 0,
     noCounterpartNovel: 0,
@@ -2133,8 +2386,65 @@ function buildPackageReport(
     }
   }
 
+  const foreignEntities = new Set<ClassInfo>();
+  const entityPackages = new Map<ClassInfo, string>();
+  const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities, entityPackages);
+  const superclassOf = (klass: ClassInfo): ClassInfo | null => {
+    const short = klass.superclass?.split(/::|\./).pop();
+    if (!short) return null;
+    const ownerPkg = entityPackages.get(klass);
+    const candidates = (entitiesByName.get(short) ?? []).filter(
+      (c) => !foreignEntities.has(klass) || entityPackages.get(c) === ownerPkg,
+    );
+    return resolveEntityByDeclaringFile(
+      candidates,
+      klass.file ?? "",
+      klass.superclassFile,
+      undefined,
+      (c) => !foreignEntities.has(klass) && foreignEntities.has(c),
+      (c) => entityPackages.get(c),
+    );
+  };
+  const railsDeclarationSites = new Map<string, Set<string>>();
+  const railsDeclaresIn = (ownerPkg: string, tsFile: string, name: string): boolean => {
+    let sites = railsDeclarationSites.get(ownerPkg);
+    if (sites === undefined) {
+      sites = new Set<string>();
+      const rp = ruby.packages[ownerPkg] ?? emptyRubyPackage();
+      for (const e of [...Object.values(rp.classes), ...Object.values(rp.modules)]) {
+        for (const m of [...e.instanceMethods, ...e.classMethods]) {
+          const file = m.file ?? e.file;
+          if (!file) continue;
+          const mirror = rubyFileToTs(file, ownerPkg);
+          for (const c of rubyMethodCandidates(m.name) ?? []) sites.add(`${mirror}\0${c}`);
+        }
+      }
+      railsDeclarationSites.set(ownerPkg, sites);
+    }
+    return sites.has(`${tsFile}\0${name}`);
+  };
+  const inheritsMember = (klass: ClassInfo, name: string): boolean => {
+    const visited = new Set<ClassInfo>([klass]);
+    for (let cursor = superclassOf(klass); cursor !== null; cursor = superclassOf(cursor)) {
+      if (visited.has(cursor)) return false;
+      visited.add(cursor);
+      if (
+        [...cursor.instanceMethods, ...cursor.classMethods].some((m) => m.name === name) &&
+        railsDeclaresIn(entityPackages.get(cursor) ?? pkg, cursor.file ?? "", name)
+      )
+        return true;
+    }
+    return false;
+  };
+
   const rubyFileByTsFile = new Map<string, string>();
   for (const rf of rubyFileNames) rubyFileByTsFile.set(rubyFileToTs(rf, pkg), rf);
+
+  const rubyModuleConstants = new Set<string>();
+  for (const fqn of Object.keys(rubyPkg.modules)) {
+    const short = fqn.split("::").pop();
+    if (short) for (const c of rubyConstantCandidates(short)) rubyModuleConstants.add(c);
+  }
 
   const tsDeclFileByName = new Map<string, string>();
   for (const c of [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)]) {
@@ -2172,6 +2482,7 @@ function buildPackageReport(
       moduleFqnByShort,
       crossPackageModules,
       crossPackagePkgByFqn,
+      crossPackageClasses,
       Object.keys(rubyPkg.fileConstants?.[sourceRuby] ?? {}),
       sourceRuby,
       rubyPkg.fileHashKeys?.[sourceRuby] ?? [],
@@ -2223,6 +2534,14 @@ function buildPackageReport(
       fileFns,
       fileConsts,
     );
+    const overrideOnly = collectOverrideOnlyNames(
+      expectedTs,
+      classes,
+      modules,
+      fileFns,
+      fileConsts,
+      inheritsMember,
+    );
 
     const scopedAllowed = new Map<string, Set<string>>();
     const allowed =
@@ -2235,6 +2554,7 @@ function buildPackageReport(
             moduleFqnByShort,
             crossPackageModules,
             crossPackagePkgByFqn,
+            crossPackageClasses,
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
             rubyFile,
             rubyPkg.fileHashKeys?.[rubyFile] ?? [],
@@ -2294,9 +2614,28 @@ function buildPackageReport(
       if (c.file === expectedTs && c.synthesizedFileModule === true) allowed.add(c.name);
     }
 
+    // A namespace BINDING with no members of its own — `export * as Collectors
+    // from "./collectors/index.js"`, or the type-only `declare namespace Nodes`
+    // merged onto the `Arel::Nodes` Autoload object — spells a Ruby namespace
+    // module. Rails reopens that module in every file under it (`module
+    // Collectors` at collectors/bind.rb:4, plain_string.rb:4, composite.rb:4),
+    // so it has no defining `.rb` to relocate the binding to: the extractor
+    // stamps it with whichever reopening it read first, and the binding scored
+    // `moved` against that one arbitrary file. Deliberately narrow: the name
+    // must be a module of this package, and a binding that declares members,
+    // or merges with a class or interface of the same name, stays scored.
+    for (const m of modules) {
+      if (m.file !== expectedTs || !isBareNamespaceBinding(m)) continue;
+      if (classes.some((c) => c.name === m.name)) continue;
+      if (rubyModuleConstants.has(m.name)) allowed.add(m.name);
+    }
+
     const scored: ExtraName[] = [];
     let allowlistedCount = 0;
     let interfaceExemptCount = 0;
+    let overrideExemptCount = 0;
+    const trailsOnly = (klass: string): boolean =>
+      !allowed.has(klass) && !scopedAllows(klass) && !globalRubyCandidates.has(klass);
     for (const name of tsNames) {
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
       // A tag on a name the scorer already allows covers no extra — it asserts
@@ -2314,6 +2653,10 @@ function buildPackageReport(
       }
       const owners = globalRubyCandidates.get(name);
       const kind: ExtraKind = owners ? "moved" : "novel";
+      if (kind === "moved" && overrideOnly.get(name)?.every(trailsOnly) === true) {
+        overrideExemptCount++;
+        continue;
+      }
       // Exempt by kind — see `collectInterfaceOnlyNames`. Deliberately AFTER
       // the tag check: an interface tagged to cover its MEMBERS keeps matching
       // its own name, so the tag doesn't go stale and the inheritance in
@@ -2370,6 +2713,7 @@ function buildPackageReport(
     }
     result.totalAllowlisted += allowlistedCount;
     result.totalInterfaceExempt += interfaceExemptCount;
+    result.totalOverrideExempt += overrideExemptCount;
     if (extras.length === 0) continue;
 
     // Sort novel before moved, then alphabetical — novel is the higher-signal
@@ -2521,6 +2865,11 @@ function printHumanReport(report: Report, topN: number, maxDetail: number, verbo
     `${p.dim}  Excluded by kind: ${interfaceExempt} novel \`interface\` declaration name(s) and member(s) — type-only shapes Ruby ` +
       `leaves to duck typing. An interface name Rails DOES use stays scored as moved.${p.reset}`,
   );
+  const overrideExempt = report.packages.reduce((n, pkg) => n + pkg.totalOverrideExempt, 0);
+  console.log(
+    `${p.dim}  Excluded as overrides: ${overrideExempt} moved name(s) a class with no Rails counterpart overrides from the ` +
+      `class it \`extends\`. An override on a class Rails DOES name stays scored as moved.${p.reset}`,
+  );
   console.log(
     `\n${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
       `${report.tagged.matched} matched` +
@@ -2623,8 +2972,11 @@ export function buildReport(
   const matchedTagKeys = new Set<string>();
   const redundantTagKeys = new Set<string>();
   const globalRubyCandidates = buildGlobalRubyCandidates(ruby);
-  const { modules: crossPackageModules, pkgByFqn: crossPackagePkgByFqn } =
-    buildCrossPackageModules(ruby);
+  const {
+    modules: crossPackageModules,
+    pkgByFqn: crossPackagePkgByFqn,
+    classes: crossPackageClasses,
+  } = buildCrossPackageModules(ruby);
 
   const packages: PackageTotals[] = [];
   const fileTagRejections: FileTagRejection[] = [];
@@ -2642,6 +2994,7 @@ export function buildReport(
         globalRubyCandidates,
         crossPackageModules,
         crossPackagePkgByFqn,
+        crossPackageClasses,
         opts.novelOnly,
         tagKeys,
         matchedTagKeys,

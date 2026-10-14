@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -44,13 +44,15 @@ describe("DbTasksTest", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 
   it("db:create loads config and calls DatabaseTasks.create for current env", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     const code = await run(["db:create"], dir);
     expect(code).toBe(0);
     expect(createAll).toHaveBeenCalledOnce();
@@ -65,7 +67,7 @@ describe("DbTasksTest", () => {
 
   it("db:drop loads config and calls DatabaseTasks.drop for current env", async () => {
     const dir = await makeFakeProject();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     const code = await run(["db:drop"], dir);
     expect(code).toBe(0);
     expect(dropAll).toHaveBeenCalledOnce();

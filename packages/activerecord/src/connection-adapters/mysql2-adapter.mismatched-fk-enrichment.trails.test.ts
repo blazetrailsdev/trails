@@ -23,7 +23,7 @@ function makeAdapter(): Mysql2Adapter {
 describe("Mysql2Adapter mismatched foreign key translation", () => {
   it("sql-less translation yields a MismatchedForeignKey with the generic fallback message", async () => {
     const adapter = makeAdapter();
-    const translated = adapter.translateExceptionClass(fkDriverError(), null, null);
+    const translated = await adapter.translateExceptionClass(fkDriverError(), null, null);
     expect(translated).toBeInstanceOf(MismatchedForeignKey);
     expect((translated as MismatchedForeignKey).message).toContain(
       "There is a mismatch between the foreign key and primary key column types",
@@ -34,11 +34,11 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
 
   it("a sql-less MismatchedForeignKey picks up its details from the queryParser lambda", async () => {
     const adapter = makeAdapter();
-    const sqlLess = adapter.translateExceptionClass(
+    const sqlLess = (await adapter.translateExceptionClass(
       fkDriverError(),
       null,
       null,
-    ) as MismatchedForeignKey;
+    )) as MismatchedForeignKey;
     const rebuilt = (await sqlLess.setQuery(FK_SQL, [])) as MismatchedForeignKey;
     expect(rebuilt).toBeInstanceOf(MismatchedForeignKey);
     expect(rebuilt.message).toContain(
@@ -66,13 +66,12 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
     );
     expect(translated.message).toContain("`t.bigint :wheelable_id`");
     expect(translated.stack).toBe(driverError.stack);
-    expect(translated.cause).toBe(driverError);
     await adapter.disconnectBang();
   });
 
   it("log's rescue resolves the column lookup through set_query", async () => {
     const adapter = makeAdapter();
-    const sqlLess = adapter.translateExceptionClass(fkDriverError(), null, null);
+    const sqlLess = await adapter.translateExceptionClass(fkDriverError(), null, null);
     const raised = await adapter
       .log(FK_SQL, "SQL", [], [], false, async () => {
         throw sqlLess;

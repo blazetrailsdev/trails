@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import type { NodeOrValue } from "./binary.js";
 import { Function } from "./function.js";
@@ -6,8 +7,8 @@ import { Function } from "./function.js";
 export class NamedFunction extends Function {
   name: string;
 
-  constructor(name: string, expr: NodeOrValue[], aliaz?: string) {
-    super(expr, aliaz ?? null);
+  constructor(name: string, expr: NodeOrValue[], aliaz: string | null = null) {
+    super(expr, aliaz);
     this.name = name;
   }
 
@@ -20,4 +21,4 @@ export class NamedFunction extends Function {
   }
 }
 
-Nodes.NamedFunction = NamedFunction;
+rbModConstSet(Nodes, "NamedFunction", NamedFunction);

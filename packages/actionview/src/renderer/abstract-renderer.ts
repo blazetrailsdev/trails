@@ -6,7 +6,7 @@ import {
   rbObjRespondTo,
   symbolToS,
 } from "@blazetrails/ruby-compat";
-import { htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
+import { dasherize, htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -24,14 +24,14 @@ export interface RenderableTemplate {
     buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | Promise<string | SafeBuffer>;
+  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer>;
   render(
     view: ViewContext,
     locals: Record<string, unknown>,
     buffer: unknown,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null>;
+  ): string | SafeBuffer | Uint8Array | null | Promise<string | SafeBuffer | null>;
 }
 
 export interface ViewContext {
@@ -49,7 +49,7 @@ export interface RenderOptions {
   body?: string;
   plain?: string;
   html?: unknown;
-  file?: string;
+  file?: string | { toPath(): string };
   renderable?: { renderIn(context: ViewContext): string };
   layout?:
     | string
@@ -171,7 +171,10 @@ export function raiseInvalidOptionAs(as: unknown): never {
   );
 }
 
-/** @internal */
+/**
+ * @inventedArm dasherize — PERMANENT
+ * @internal
+ */
 export function partialPath(this: ObjectRenderingHost, object: unknown, view: ViewContext): string {
   const contextPrefix = this.contextPrefix;
   if (rbObjRespondTo(object, "toModel")) object = (object as { toModel(): unknown }).toModel();
@@ -179,6 +182,10 @@ export function partialPath(this: ObjectRenderingHost, object: unknown, view: Vi
   let path: string;
   if (rbObjRespondTo(object, "toPartialPath")) {
     path = (object as { toPartialPath(): string }).toPartialPath();
+    const directoryEnd = path.lastIndexOf("/");
+    if (directoryEnd >= 0) {
+      path = dasherize(path.slice(0, directoryEnd)) + path.slice(directoryEnd);
+    }
   } else {
     throw new ArgumentError(
       `'${rbInspect(object)}' is not an ActiveModel-compatible object. It must implement #to_partial_path.`,

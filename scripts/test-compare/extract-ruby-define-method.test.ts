@@ -8,7 +8,7 @@ const HERE = __dirname;
 const RUBY_SCRIPT = path.join(HERE, "extract-ruby-tests.rb");
 
 interface Extracted {
-  cases: Array<{ description: string; style: string; line: number }>;
+  cases: Array<{ description: string; style: string; line: number; assertionCount: number }>;
   unexpandedLoops: string[];
 }
 
@@ -31,7 +31,9 @@ function extract(body: string, wrap: [string, string] = BARE_CLASS): Extracted {
       ex = TestExtractor.new
       ex.process_file(File.join(${JSON.stringify(dir)}, ${JSON.stringify(rel)}), ${JSON.stringify(dir)})
       cases = ex.test_files.flat_map { |f| f[:testCases] }
-        .map { |tc| { description: tc[:description], style: tc[:style], line: tc[:line] } }
+        .map { |tc|
+          { description: tc[:description], style: tc[:style], line: tc[:line], assertionCount: tc[:assertionCount] }
+        }
       puts JSON.generate({ cases: cases, unexpandedLoops: ex.unexpanded_loops })
     `;
     return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
@@ -315,6 +317,34 @@ describe("Ruby extractor define_method loop expansion", () => {
     expect(unexpandedLoops).toEqual(["cases/foo_test.rb:11"]);
   });
 
+  it("expands a name that picks between a literal and the element on kind_of?", () => {
+    const { cases, unexpandedLoops } = extract(`
+  [ :all, [] ].each do |scope|
+    ActiveSupport::Inflector.inflections do |inflect|
+      define_method("test_clear_inflections_with_#{scope.kind_of?(Array) ? "no_arguments" : scope}") do
+        inflect.clear(*scope)
+      end
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "clear inflections with all",
+      "clear inflections with no arguments",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("reports a ternary name whose condition is not a kind_of? test on the element", () => {
+    const { cases, unexpandedLoops } = extract(`
+  [ :all, [] ].each do |scope|
+    define_method("test_clear_#{scope.empty? ? "no_arguments" : scope}") do
+    end
+  end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toHaveLength(1);
+  });
+
   it("neither expands nor reports a loop that generates ordinary helpers", () => {
     const { cases, unexpandedLoops } = extract(`
   (1..3).each do |i|
@@ -338,6 +368,80 @@ describe("Ruby extractor define_method loop expansion", () => {
   end
 `);
     expect(cases.map((c) => [c.description, c.style])).toEqual([["ordinary", "def_test"]]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+});
+
+describe("Ruby extractor class_eval heredoc loop expansion", () => {
+  it("expands a %w loop whose body class_evals a heredoc defining a test", () => {
+    const { cases, unexpandedLoops } = extract(`
+  %w( references includes
+      preload ).each do |method|
+    class_eval <<~RUBY
+      def test_no_arguments_to_#{method}_raise_errors
+        error = assert_raises(ArgumentError) { Topic.#{method}() }
+        assert_equal "The method .#{method}() must contain arguments.", error.message
+      end
+    RUBY
+  end
+`);
+    expect(cases).toEqual(
+      ["references", "includes", "preload"].map((method) => ({
+        description: `no arguments to ${method} raise errors`,
+        style: "def_test",
+        line: 6,
+        assertionCount: 2,
+      })),
+    );
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("expands a parenthesised class_eval holding several defs and escaped quotes", () => {
+    const { cases, unexpandedLoops } = extract(`
+  %w{upcase downcase}.each do |method|
+    class_eval(<<-EOTESTS, __FILE__, __LINE__ + 1)
+      def test_#{method}_bang_should_return_self
+        assert_equal 1, proxy.public_send("#{method}!"), \\"#{method} failed\\"
+      end
+
+      def test_#{method}_bang_should_change
+        assert_not_equal 1, 2
+      end
+    EOTESTS
+  end
+`);
+    expect(cases.map((c) => [c.description, c.line])).toEqual([
+      ["upcase bang should return self", 5],
+      ["upcase bang should change", 9],
+      ["downcase bang should return self", 5],
+      ["downcase bang should change", 9],
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("reports a class_eval loop whose receiver is not a literal array", () => {
+    const { cases, unexpandedLoops } = extract(`
+  METHODS.call.each do |method|
+    class_eval <<~RUBY
+      def test_#{method}_works
+        assert true
+      end
+    RUBY
+  end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3"]);
+  });
+
+  it("leaves a class_eval loop that defines no test to the ordinary walk", () => {
+    const { cases, unexpandedLoops } = extract(`
+  %w(a b).each do |name|
+    class_eval <<~RUBY
+      def #{name}_helper; end
+    RUBY
+  end
+`);
+    expect(cases).toEqual([]);
     expect(unexpandedLoops).toEqual([]);
   });
 });

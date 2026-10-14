@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Errno, SystemCallError } from "./errno.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+import { RangeError } from "./range-error.js";
+import { TypeError } from "./type-error.js";
 import { RUBY_PLATFORM } from "./ruby-platform.js";
 import {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   argv,
+  rbArgv,
+  rbProgname,
   env,
   getProcessAdapter,
   onSignal,
@@ -14,6 +20,8 @@ import {
   stdin,
   stdout,
   abort,
+  exec,
+  exit,
   SystemExit,
   type ProcessAdapter,
   type WriteStream,
@@ -80,6 +88,37 @@ describe("processAdapter", () => {
     __INTERNAL_resetProcessAdapter_TEST_ONLY();
   });
 
+  describe("Kernel#exec", () => {
+    it("hands exe_path and its args to the adapter and does not return", () => {
+      const calls: (readonly string[])[] = [];
+      registerProcessAdapter(
+        makeFakeAdapter({
+          exec: (argv) => {
+            calls.push(argv);
+            throw new SystemExit(0);
+          },
+        }),
+      );
+      expect(() => exec("/usr/bin/sqlite3", "-header", "db.sqlite3")).toThrow(SystemExit);
+      expect(calls).toEqual([["/usr/bin/sqlite3", "-header", "db.sqlite3"]]);
+    });
+
+    it("raises NotImplementedError on an adapter that cannot exec", () => {
+      registerProcessAdapter(makeFakeAdapter());
+      expect(() => exec("/usr/bin/sqlite3")).toThrow(NotImplementedError);
+      expect(() => exec("/usr/bin/sqlite3")).toThrow(
+        "exec() function is unimplemented on this machine",
+      );
+    });
+
+    it("raises the SystemCallError of a command the Node adapter cannot run", () => {
+      expect(() => exec("/nonexistent-dir/no-such-client", "a")).toThrow(Errno.ENOENT);
+      expect(() => exec("/nonexistent-dir/no-such-client", "a")).toThrow(
+        "No such file or directory - /nonexistent-dir/no-such-client",
+      );
+    });
+  });
+
   describe("env snapshot", () => {
     it("populates env from the registered adapter", () => {
       registerProcessAdapter(makeFakeAdapter());
@@ -108,6 +147,17 @@ describe("processAdapter", () => {
     it("populates argv from the registered adapter", () => {
       registerProcessAdapter(makeFakeAdapter());
       expect(argv).toEqual(["fake-node", "fake-script"]);
+    });
+
+    it("derives $PROGRAM_NAME and ARGV from the snapshot", () => {
+      registerProcessAdapter(
+        makeFakeAdapter({ argvSnapshot: () => ["fake-node", "bin/fake script", "new", "--api"] }),
+      );
+      expect(rbProgname()).toBe("bin/fake script");
+      expect(rbArgv()).toEqual(["new", "--api"]);
+      registerProcessAdapter(makeFakeAdapter({ argvSnapshot: () => [] }));
+      expect(rbProgname()).toBe("");
+      expect(rbArgv()).toEqual([]);
     });
 
     it("array indexing works", () => {
@@ -187,6 +237,181 @@ describe("processAdapter", () => {
       });
       registerProcessAdapter(adapter);
       await expect(stdin.read()).rejects.toThrow(/stdin boom/);
+    });
+  });
+
+  describe("stdin.gets / stdin.noecho", () => {
+    function registerFakeStdin(chunks: (string | null)[], isTTY = false, restores = true) {
+      const modes: string[] = [];
+      let mode = "echo";
+      const adapter = makeFakeAdapter();
+      const tty = (): void => {
+        if (!isTTY) throw new Errno.ENOTTY();
+      };
+      Object.defineProperty(adapter, "stdin", {
+        value: {
+          isTTY,
+          getattr: () => {
+            tty();
+            return mode;
+          },
+          setattr: (t: string) => {
+            if (!restores) throw new SystemCallError("Input/output error");
+            mode = t;
+            modes.push(t);
+          },
+          setNoecho: () => {
+            tty();
+            mode = "-echo";
+            modes.push(mode);
+          },
+          read: () => Promise.resolve(chunks.length > 0 ? chunks.shift()! : null),
+        },
+        configurable: true,
+      });
+      registerProcessAdapter(adapter);
+      return modes;
+    }
+
+    it("gets answers each line with its newline and keeps the rest for the next call", async () => {
+      registerFakeStdin(["yes\nno", "\nmaybe\n"]);
+      await expect(stdin.gets()).resolves.toBe("yes\n");
+      await expect(stdin.gets()).resolves.toBe("no\n");
+      await expect(stdin.gets()).resolves.toBe("maybe\n");
+    });
+
+    it("gets answers an unterminated last line, then null at EOF", async () => {
+      registerFakeStdin(["last"]);
+      await expect(stdin.gets()).resolves.toBe("last");
+      await expect(stdin.gets()).resolves.toBeNull();
+    });
+
+    it("gets answers an empty line as a newline, distinct from null at EOF", async () => {
+      registerFakeStdin(["\n"]);
+      await expect(stdin.gets()).resolves.toBe("\n");
+      await expect(stdin.gets()).resolves.toBeNull();
+    });
+
+    it("gets with chomp drops the separator and a CR before a newline", async () => {
+      registerFakeStdin(["a\r\nb\n"]);
+      await expect(stdin.gets({ chomp: true })).resolves.toBe("a");
+      await expect(stdin.gets({ chomp: true })).resolves.toBe("b");
+    });
+
+    it("gets in paragraph mode swallows the newlines around each paragraph", async () => {
+      registerFakeStdin(["\n\npara1\nx\n", "\n\npara2\n"]);
+      await expect(stdin.gets("")).resolves.toBe("para1\nx\n\n");
+      await expect(stdin.gets("")).resolves.toBe("para2\n");
+      await expect(stdin.gets("")).resolves.toBeNull();
+    });
+
+    it("gets takes a lone Integer as a byte limit that never splits a character", async () => {
+      registerFakeStdin(["abcdef\n"]);
+      await expect(stdin.gets(3)).resolves.toBe("abc");
+      await expect(stdin.gets(0)).resolves.toBe("");
+      await expect(stdin.gets("e", 10)).resolves.toBe("de");
+      await expect(stdin.gets(null)).resolves.toBe("f\n");
+      registerFakeStdin(["héllo\n"]);
+      await expect(stdin.gets(2)).resolves.toBe("hé");
+    });
+
+    it("gets with a custom separator and with nil", async () => {
+      registerFakeStdin(["abXY", "cd"]);
+      await expect(stdin.gets("XY", { chomp: true })).resolves.toBe("ab");
+      await expect(stdin.gets(null, { chomp: true })).resolves.toBe("cd");
+      await expect(stdin.gets(null)).resolves.toBeNull();
+    });
+
+    it("gets advances lineno for each line not cut by the limit", async () => {
+      registerFakeStdin(["ab\ncd\n"]);
+      const start = stdin.lineno;
+      await stdin.gets(1);
+      await stdin.gets();
+      await stdin.gets();
+      await stdin.gets();
+      expect(stdin.lineno - start).toBe(2);
+    });
+
+    it("gets converts its limit and separator as Ruby does", async () => {
+      registerFakeStdin(["abc\n"]);
+      await expect(stdin.gets(true as never)).rejects.toThrow(
+        new TypeError("no implicit conversion of true into Integer"),
+      );
+      await expect(stdin.gets(NaN)).rejects.toThrow("float NaN out of range of integer");
+      await expect(stdin.gets(1 as never, 2)).rejects.toThrow(
+        new TypeError("no implicit conversion of Integer into String"),
+      );
+      await expect(stdin.gets(1e100)).rejects.toThrow(
+        new RangeError("float 1e+100 out of range of integer"),
+      );
+      await expect(stdin.gets(1.9)).resolves.toBe("a");
+      await expect(stdin.gets({ toInt: () => 2 } as never)).resolves.toBe("bc");
+      await expect(stdin.gets((2n ** 64n) as never)).rejects.toThrow(
+        new RangeError("bignum too big to convert into `long'"),
+      );
+      await expect(stdin.gets(1n as never)).resolves.toBe("\n");
+    });
+
+    it("read answers what gets buffered past a line first", async () => {
+      registerFakeStdin(["a\nb"]);
+      await stdin.gets();
+      await expect(stdin.read()).resolves.toBe("b");
+    });
+
+    it("noecho turns only echo off for an async block and restores it after it settles", async () => {
+      const modes = registerFakeStdin(["secret\n"], true);
+      const answer = stdin.noecho((io) => io.gets());
+      expect(modes).toEqual(["-echo"]);
+      await expect(answer).resolves.toBe("secret\n");
+      expect(modes).toEqual(["-echo", "echo"]);
+    });
+
+    it("noecho restores the saved mode when the block rejects", async () => {
+      const modes = registerFakeStdin([], true);
+      await expect(
+        stdin.noecho(async () => {
+          await Promise.resolve();
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+      expect(modes).toEqual(["-echo", "echo"]);
+    });
+
+    it("noecho raises when the saved mode cannot be restored, after the block completes", async () => {
+      registerFakeStdin(["x\n"], true, false);
+      await expect(stdin.noecho((io) => io.gets())).rejects.toThrow(
+        new SystemCallError("Input/output error"),
+      );
+    });
+
+    it("noecho raises ENOTTY off a terminal", () => {
+      registerFakeStdin([], false);
+      let error: unknown;
+      try {
+        stdin.noecho(() => null);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(Errno.ENOTTY);
+      expect(error).toBeInstanceOf(SystemCallError);
+      expect(error).toMatchObject({ message: "Inappropriate ioctl for device", errno: 25 });
+    });
+  });
+
+  describe("Kernel#exit", () => {
+    it("maps true to EXIT_SUCCESS and false to EXIT_FAILURE", () => {
+      const adapter = makeFakeAdapter();
+      const codes: (number | undefined)[] = [];
+      adapter.exit = (code) => {
+        codes.push(code);
+        throw new Error("fake exit");
+      };
+      registerProcessAdapter(adapter);
+      expect(() => exit(true)).toThrow("fake exit");
+      expect(() => exit(false)).toThrow("fake exit");
+      expect(() => exit(3)).toThrow("fake exit");
+      expect(() => exit()).toThrow("fake exit");
+      expect(codes).toEqual([0, 1, 3, undefined]);
     });
   });
 

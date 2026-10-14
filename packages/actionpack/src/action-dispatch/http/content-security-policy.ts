@@ -92,6 +92,12 @@ export class ContentSecurityPolicy {
     if (init) init(this);
   }
 
+  initializeCopy(other: ContentSecurityPolicy): void {
+    this.directives = new Map(
+      Array.from(other.directives.entries()).map(([k, v]) => [k, v === true ? true : [...v]]),
+    );
+  }
+
   defaultSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("default-src", sources);
   }
@@ -319,14 +325,6 @@ export class ContentSecurityPolicy {
     return nonceDirectives.includes(directive);
   }
 
-  dup(): ContentSecurityPolicy {
-    const copy = new ContentSecurityPolicy();
-    for (const [k, v] of this.directives) {
-      copy.directives.set(k, v === true ? true : [...v]);
-    }
-    return copy;
-  }
-
   getDirectives(): Map<DirectiveName, DirectiveValue> {
     return new Map(this.directives);
   }
@@ -399,10 +397,6 @@ export class Request {
 
   /** @internal */
   generateContentSecurityPolicyNonce(): string {
-    const generator = this.contentSecurityPolicyNonceGenerator;
-    if (!generator) {
-      throw new Error("No content_security_policy_nonce_generator configured for this request");
-    }
-    return generator(this);
+    return this.contentSecurityPolicyNonceGenerator!(this);
   }
 }

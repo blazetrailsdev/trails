@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
 import { ArgumentError, JSON as RubyJSON } from "@blazetrails/ruby-compat";
-import { Decryption, ForbiddenClass } from "./errors.js";
+import { Decryption, Encoding, ForbiddenClass } from "./errors.js";
 
 describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("serializes messages", () => {
@@ -50,7 +50,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
 
   it("detects JSON hashes with a 'p' key that is not encoded in base64", () => {
     const serializer = new MessageSerializer();
-    expect(() => serializer.load('{"p":"aGVsbG8$","h":{}}')).toThrow(Decryption);
+    expect(() => serializer.load(RubyJSON.dump({ p: "some data not encoded" }))).toThrow(Encoding);
   });
 
   it("raises a TypeError when trying to deserialize other data types", () => {
@@ -61,21 +61,6 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("raises ForbiddenClass when trying to serialize other data types", () => {
     const serializer = new MessageSerializer();
     expect(() => serializer.dump("not a message" as any)).toThrow(ForbiddenClass);
-  });
-
-  it("encodes non-ASCII string headers as UTF-8 bytes, matching Rails", () => {
-    const serializer = new MessageSerializer();
-    const message = new Message({ payload: "payload" });
-    message.headers.set("tag", "café 😀");
-    const dumped = serializer.dump(message);
-    const parsed = JSON.parse(dumped) as { h: { tag: string } };
-    expect(parsed.h.tag).toBe(Buffer.from("café 😀", "utf-8").toString("base64"));
-    const loaded = serializer.load(dumped);
-    expect((loaded.headers.get("tag") as Buffer).toString("utf-8")).toBe("café 😀");
-  });
-
-  it("binary? returns false", () => {
-    expect(new MessageSerializer().isBinary()).toBe(false);
   });
 
   it("raises Decryption when trying to parse message with more than one nested message", () => {

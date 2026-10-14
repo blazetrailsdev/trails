@@ -34,4 +34,33 @@ describe("UrlConfig", () => {
     expect(mysql2.database).toBe("bar");
     expect(mysql2.configurationHash.database).toBe("bar");
   });
+
+  it("answers the pool readers from an underscored URL query", () => {
+    const config = new UrlConfig(
+      "default_env",
+      "primary",
+      "postgres://localhost/foo?reaping_frequency=2&idle_timeout=7&checkout_timeout=9&min_threads=1&max_threads=4",
+    );
+    expect(config.reapingFrequency).toBe(2);
+    expect(config.idleTimeout).toBe(7);
+    expect(config.checkoutTimeout).toBe(9);
+    expect(config.minThreads).toBe(1);
+    expect(config.maxThreads).toBe(4);
+    expect(config.maxQueue).toBe(16);
+  });
+
+  it("derives database from a parseable URL when configuration.database is unset", () => {
+    const cfg = new UrlConfig("test", "primary", "postgres://h/mydb");
+    expect(cfg.database).toBe("mydb");
+  });
+
+  it("treats a bare filesystem path as the database name", () => {
+    const cfg = new UrlConfig("test", "primary", "test/db/primary.sqlite3");
+    expect(cfg.database).toBe("test/db/primary.sqlite3");
+  });
+
+  it("overrides config database with a scheme-less bare name", () => {
+    const cfg = new UrlConfig("test", "primary", "foo-bar", { database: "not_foo" });
+    expect(cfg.database).toBe("foo-bar");
+  });
 });

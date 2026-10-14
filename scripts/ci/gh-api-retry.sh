@@ -37,12 +37,31 @@ readonly RATE_LIMIT_RE='rate limit|abuse detection|please wait a few minutes'
 # GitHub asks callers to back off at least a minute on secondary limits, so
 # rate-limit retries use their own (much longer) schedule than 5xx retries.
 # They also get their own, smaller attempt cap: Preflight runs under
-# `timeout-minutes: 10` and makes three of these calls, so a full 4-attempt
+# `timeout-minutes: 10` and makes four of these calls that can hit a rate limit
+# (one merge-conflict read plus the three attribution reads; the merge-conflict
+# step may repeat its read, but only on answers that SUCCEEDED), so a 4-attempt
 # schedule at 60s could exhaust the job budget and leave a bare "cancelled" —
 # the same uninformative signal this script exists to prevent. Two waits per
-# call bounds the worst case at ~6 min across all three.
+# call bounds the worst case at ~8 min across all four, which still fits.
+# That figure assumes ONE call per check. A caller that polls must not poll
+# THROUGH this script: wrapping it in a 6-attempt loop multiplies the budget by
+# six (~12 min against a persistent rate limit, past the job timeout, which
+# surfaces as the bare "cancelled" this script exists to prevent). So
+# check-merge-conflict.sh polls only while GitHub answers "not computed yet",
+# and stops at the first unreadable answer — the retries that matter already
+# happened in here.
 readonly RATE_LIMIT_DELAY=60
 readonly RATE_LIMIT_MAX_ATTEMPTS=3
+
+# A caller that treats an API failure as "no verdict" and carries on (see
+# GH_API_RETRY_SOFT in check-merge-conflict.sh) must not leave an `::error::`
+# annotation behind: GitHub renders one on the run whatever the exit status, so
+# the run would read as failed on a check that deliberately passed.
+if [ -n "${GH_API_RETRY_SOFT:-}" ]; then
+  readonly ANNOTATION="::warning"
+else
+  readonly ANNOTATION="::error"
+fi
 
 stderrFile=$(mktemp)
 trap 'rm -f "$stderrFile"' EXIT
@@ -63,7 +82,7 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     delay=$((attempt * 5))
     maxAttempts=$MAX_ATTEMPTS
   else
-    echo "::error::\`gh api\` failed with a non-transient error (see above). This is an API/permissions failure, NOT a Claude attribution violation — the attribution scan never ran." >&2
+    echo "$ANNOTATION::\`gh api\` failed with a non-transient error (see above). This is an API/permissions failure, NOT a finding from the check that called this script — that check never ran." >&2
     exit 1
   fi
 
@@ -74,5 +93,5 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   sleep "$delay"
 done
 
-echo "::error::GitHub API still failing ($kind) after $maxAttempts attempts (see errors above). This is an infrastructure failure, NOT a Claude attribution violation — the attribution scan never ran. Re-run this job." >&2
+echo "$ANNOTATION::GitHub API still failing ($kind) after $maxAttempts attempts (see errors above). This is an infrastructure failure, NOT a finding from the check that called this script — that check never ran. Re-run this job." >&2
 exit 1

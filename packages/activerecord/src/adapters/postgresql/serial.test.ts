@@ -1,15 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { Column } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.disconnectBang();
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
   });
 
   const columnNamed = async (table: string, name: string): Promise<Column> => {
@@ -48,12 +49,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_serials");
+      const output = await dumpTableSchema("postgresql_serials");
       expect(output).toMatch(/t\.serial\("seq", \{\s*null: false\s*\}\)/);
     });
 
     it("schema dump with not serial", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_serials");
+      const output = await dumpTableSchema("postgresql_serials");
       expect(output).toMatch(
         /t\.integer\("serials_id", \{[^}]*default: \(\) => "nextval\('postgresql_serials_id_seq'::regclass\)"/,
       );
@@ -89,12 +90,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_big_serials");
+      const output = await dumpTableSchema("postgresql_big_serials");
       expect(output).toMatch(/t\.bigserial\("seq", \{\s*null: false\s*\}\)/);
     });
 
     it("schema dump with not bigserial", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_big_serials");
+      const output = await dumpTableSchema("postgresql_big_serials");
       expect(output).toMatch(
         /t\.bigint\("serials_id", \{[^}]*default: \(\) => "nextval\('postgresql_big_serials_id_seq'::regclass\)"/,
       );
@@ -125,7 +126,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with collided sequence name", async () => {
-      const output = await dumpTableSchema(adapter, "foo");
+      const output = await dumpTableSchema("foo");
       expect(output).toMatch(/t\.serial\("bar_id", \{\s*null: false\s*\}\)/);
       expect(output).toMatch(/t\.bigserial\("bar_baz_id", \{\s*null: false\s*\}\)/);
     });
@@ -159,7 +160,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with long table name", async () => {
-      const output = await dumpTableSchema(adapter, tableName);
+      const output = await dumpTableSchema(tableName);
       expect(output).toMatch(new RegExp(`createTable\\("${tableName}", \\{\\s*force: "cascade"`));
       expect(output).toMatch(/t\.serial\("seq", \{\s*null: false\s*\}\)/);
       expect(output).toMatch(/t\.bigserial\("bigseq", \{\s*null: false\s*\}\)/);

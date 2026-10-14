@@ -1,3 +1,4 @@
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ordinalize } from "../../inflector.js";
 import { ArgumentError } from "../../time-zone-config.js";
@@ -31,6 +32,8 @@ export function toFs(date: Temporal.PlainDate, format: string = "default"): stri
 }
 
 export { toFs as toFormattedS };
+
+Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { toFs, toFormattedS: toFs });
 
 export function readableInspect(date: Temporal.PlainDate): string {
   return new RubyDate(date).strftime("%a, %d %b %Y");

@@ -22,6 +22,20 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["two expects"]).toBe(2);
   });
 
+  it("counts a receiver-form x.expect(...) as the Ruby extractor does", () => {
+    const src = `
+      it("receiver expect", () => {
+        const name = params.expect({ person: "name" }).expect("name");
+        params.expectBang("id");
+        assertEqual("David", name);
+        expect(name).toBe("David");
+      });
+    `;
+    const info = extractTestsFromSource(src, "packages/actionpack/src/x.test.ts");
+    expect(info.testCases[0].assertionCount).toBe(4);
+    expect(info.testCases[0].assertionKinds).toEqual(["expect", "expect", "assertEqual", "toBe"]);
+  });
+
   it("counts a helper declared inside the test body once, not per call site", () => {
     const src = `
       it("inline lambda", () => {
@@ -113,6 +127,18 @@ describe("TS extractor assertion-count collection", () => {
     // assertQueriesCount + inner expect + assertDifference = 3. The prefix rule
     // counts custom Rails helpers symmetrically with the Ruby side.
     expect(tsAssertionCounts(src)["helpers"]).toBe(3);
+  });
+
+  it("counts an assert helper called on the test object by its bare name", () => {
+    const src = `
+      it("on the test object", ({ testCase }) => {
+        self().assertQueriesMatch(/SELECT/, {}, () => {});
+        testCase.assertColumn(Post, "title");
+        self().captureSql({}, () => {});
+        other().assertColumn(Post, "title");
+      });
+    `;
+    expect(tsAssertionCounts(src)["on the test object"]).toBe(2);
   });
 
   it("counts trails expect* assertion helpers (twins of Rails assert_* helpers)", () => {

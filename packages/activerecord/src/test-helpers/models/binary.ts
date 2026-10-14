@@ -1,4 +1,5 @@
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Binary extends Base {
   declare blob_data: Uint8Array;
@@ -6,3 +7,4 @@ export class Binary extends Base {
   declare name: string;
   declare short_data: Uint8Array | null;
 }
+registerModel(Binary);

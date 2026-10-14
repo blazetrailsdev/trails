@@ -1,9 +1,12 @@
 import { describe, it, expect, afterEach, onTestFinished, vi } from "vitest";
-import { ActionView, controllerConstants, type Journey } from "@blazetrails/actionpack";
+import {
+  ActionController,
+  ActionView,
+  controllerConstants,
+  type Journey,
+} from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
-import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
-import { env, getFs, getOsAsync, getPath, setEnv } from "@blazetrails/ruby-compat";
-import defineSchema from "../__fixtures__/boot-app/db/schema.js";
+import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { createProgram } from "../cli.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
@@ -30,7 +33,7 @@ describe("UnusedRoutesCommand", () => {
   });
 
   it("RouteInfo is not unused when the controller defines the action", async () => {
-    class PostsController {
+    class PostsController extends ActionController.Metal {
       index(): void {}
     }
     controllerConstants.set("posts", PostsController as never);
@@ -38,15 +41,29 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(false);
   });
 
+  it("RouteInfo resolves the action through the controller's action methods", async () => {
+    class PostsController extends ActionController.Metal {
+      showHTML(): void {}
+      sekrit_data(): void {}
+    }
+    controllerConstants.set("posts", PostsController as never);
+    for (const action of ["showHTML", "sekrit_data"]) {
+      const info = new RouteInfo(route({ controller: "posts", action }));
+      expect(await info.unused()).toBe(false);
+    }
+    const info = new RouteInfo(route({ controller: "posts", action: "show_html" }));
+    expect(await info.unused()).toBe(true);
+  });
+
   it("RouteInfo is unused when the action and its template are both missing", async () => {
-    class PostsController {}
+    class PostsController extends ActionController.Metal {}
     controllerConstants.set("posts", PostsController as never);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(true);
   });
 
   it("RouteInfo is not unused when a template covers the missing action", async () => {
-    class PostsController {
+    class PostsController extends ActionController.Metal {
       static viewPaths(): ActionView.PathSet {
         return new ActionView.PathSet([
           new ActionView.FileSystemResolver(
@@ -60,13 +77,60 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(false);
   });
 
+  it("RouteInfo finds a camelCase action's template under its kebab-case file name", async () => {
+    class PostsController extends ActionController.Metal {
+      static viewPaths(): ActionView.PathSet {
+        return new ActionView.PathSet([
+          new ActionView.FileSystemResolver(
+            new URL("./__fixtures__/views", import.meta.url).pathname,
+          ),
+        ]);
+      }
+    }
+    controllerConstants.set("posts", PostsController as never);
+
+    const covered = new RouteInfo(route({ controller: "posts", action: "recentPosts" }));
+    const uncovered = new RouteInfo(route({ controller: "posts", action: "oldPosts" }));
+
+    expect(await covered.unused()).toBe(false);
+    expect(await uncovered.unused()).toBe(true);
+  });
+
+  it("RouteInfo finds a multi-word controller's template in its kebab-case view directory", async () => {
+    class StoryPagesController extends ActionController.Metal {
+      static viewPaths(): ActionView.PathSet {
+        return new ActionView.PathSet([
+          new ActionView.FileSystemResolver(
+            new URL("./__fixtures__/views", import.meta.url).pathname,
+          ),
+        ]);
+      }
+    }
+    controllerConstants.set("admin/story_pages", StoryPagesController as never);
+
+    const covered = new RouteInfo(route({ controller: "admin/story_pages", action: "index" }));
+    const uncovered = new RouteInfo(route({ controller: "admin/story_pages", action: "show" }));
+
+    expect(await covered.unused()).toBe(false);
+    expect(await uncovered.unused()).toBe(true);
+  });
+
+  it("RouteInfo does not count an inherited non-action method as the route's action", async () => {
+    class PostsController extends ActionController.Metal {}
+    controllerConstants.set("posts", PostsController as never);
+
+    const info = new RouteInfo(route({ controller: "posts", action: "process" }));
+
+    expect(await info.unused()).toBe(true);
+  });
+
   it("lists a booted app's unused routes before anything has drawn them", async () => {
     const fs = getFs();
     const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}boot-app-`);
     const database = `${dir}/development.sqlite3`;
-    const adapter = new BetterSQLite3Adapter({ database });
-    await defineSchema(adapter);
-    await adapter.disconnectBang();
+    await Base.establishConnection({ adapter: "sqlite3", database });
+    await rbFLoad(new URL("../__fixtures__/boot-app/db/schema.ts", import.meta.url).pathname);
+    await Base.removeConnection();
     const savedEnv = env.TRAILS_ENV;
     const savedUrl = env.DATABASE_URL;
     setEnv("TRAILS_ENV", "development");

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+import { Base } from "./base.js";
 import { StringType, ValueType } from "@blazetrails/activemodel";
 import { NormalizedValueType } from "./normalization.js";
 
@@ -26,8 +27,8 @@ describe("STI subclass normalizes", () => {
     expect(Company.typeForAttribute("name")!.cast("  acme  ")).toBe("  acme  ");
     expect(OtherCompany.typeForAttribute("name")!.cast("  acme  ")).toBe("  acme  ");
 
-    expect(NormalizedCompany.new({ name: "  acme  " }).name).toBe("ACME");
-    expect(Company.new({ name: "  acme  " }).name).toBe("  acme  ");
+    expect(new NormalizedCompany({ name: "  acme  " }).name).toBe("ACME");
+    expect(new Company({ name: "  acme  " }).name).toBe("  acme  ");
   });
 
   it("keeps the subclass decoration across a schema reset and re-reflection", async () => {
@@ -107,5 +108,24 @@ describe("NormalizedValueType inspect", () => {
     expect(inspected).toContain("@normalize_nil=false");
     expect(inspected).toContain("@normalizer=");
     expect(type.inspect()).toBe(inspected);
+  });
+});
+
+describe("normalizes on Base", () => {
+  fixtures([]);
+
+  it("normalizes attributes before persistence", async () => {
+    class NormalizedUser extends Base {
+      declare name: string;
+      static _tableName = "aircraft";
+      static {
+        this.normalizes("name", {
+          with: (name: unknown) => (typeof name === "string" ? name.trim().toLowerCase() : name),
+        });
+      }
+    }
+
+    const user = await NormalizedUser.create({ name: "  ALICE  " });
+    expect(user.name).toBe("alice");
   });
 });

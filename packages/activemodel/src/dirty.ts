@@ -1,9 +1,5 @@
-import {
-  HashWithIndifferentAccess,
-  included,
-  kernelArray,
-  prepend,
-} from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, included, kernelArray } from "@blazetrails/activesupport";
+import { include, Module, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { Hash } from "@blazetrails/ruby-compat";
 
 import { AttributeSet } from "./attribute-set.js";
@@ -33,7 +29,7 @@ export class Dirty {
     base.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: false });
     base.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
     base.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
-    prepend(base.prototype, { initInternals, initializeDup });
+    include(base, SuperMethods);
   }
 
   declare _attributes: AttributeSet;
@@ -61,16 +57,19 @@ export class Dirty {
     return this.mutationsFromDatabase.changedAttributeNames();
   }
 
-  attributeChanged(attrName: string, options?: DirtyOptions): boolean {
-    return this.mutationsFromDatabase.isChanged(attrName, options);
+  attributeChanged(attrName: string | string[], options?: DirtyOptions): boolean | undefined {
+    return this.mutationsFromDatabase.isChanged(rbObjAsString(attrName), options);
   }
 
   attributeWas(attrName: string): unknown {
     return this.mutationsFromDatabase.originalValue(attrName);
   }
 
-  attributePreviouslyChanged(attrName: string, options?: DirtyOptions): boolean {
-    return this.mutationsBeforeLastSave.isChanged(attrName, options);
+  attributePreviouslyChanged(
+    attrName: string | string[],
+    options?: DirtyOptions,
+  ): boolean | undefined {
+    return this.mutationsBeforeLastSave.isChanged(rbObjAsString(attrName), options);
   }
 
   attributePreviouslyWas(attrName: string): unknown {
@@ -103,7 +102,7 @@ export class Dirty {
     return this.mutationsBeforeLastSave.changes();
   }
 
-  attributeChangedInPlace(attrName: string): boolean {
+  attributeChangedInPlace(attrName: string): boolean | undefined {
     return this.mutationsFromDatabase.changedInPlace(attrName);
   }
 
@@ -159,21 +158,16 @@ export class Dirty {
   }
 }
 
-export function initializeDup(
-  this: DirtyDupHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeDup(this: DirtyDupHost, other: unknown): void {
+  SuperMethods.superMethod(this, "initializeDup")!(other);
   this._mutationsFromDatabase = null;
 }
 
 export function initAttributes(
   this: { constructor: { _defaultAttributes?: () => AttributeSet } },
-  super_: (other: unknown) => AttributeSet,
   other: unknown,
 ): AttributeSet {
-  const attrs = super_(other);
+  const attrs = SuperMethods.superMethod(this, "initAttributes")!(other) as AttributeSet;
   const klass = this.constructor;
   if ((other as { isPersisted(): boolean }).isPersisted() && klass._defaultAttributes) {
     return klass
@@ -192,23 +186,26 @@ export interface DirtyDupHost extends DirtyInternalsHost {
   _attributes: AttributeSet;
 }
 
-export function asJson(
-  this: unknown,
-  super_: (options: Record<string, unknown>) => unknown,
-  options: Record<string, unknown> = {},
-): unknown {
+export function asJson(this: object, options: Record<string, unknown> = {}): unknown {
   const except = [
     ...kernelArray(options["except"]),
     "_mutationsFromDatabase",
     "_mutationsBeforeLastSave",
   ];
   options = { ...options, except };
-  return super_(options);
+  return SuperMethods.superMethod(this, "asJson")!(options);
 }
 
 /** @internal */
-export function initInternals(this: DirtyInternalsHost, super_: () => void): void {
-  super_();
+export function initInternals(this: DirtyInternalsHost): void {
+  SuperMethods.superMethod(this, "initInternals")!();
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initializeDup", initializeDup);
+  mod.defineMethod("initAttributes", initAttributes);
+  mod.defineMethod("asJson", asJson);
+  mod.defineMethod("initInternals", initInternals);
+});

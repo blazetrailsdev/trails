@@ -1,27 +1,23 @@
-import { kernelThrow, rbEqual, toI } from "@blazetrails/ruby-compat";
+import type { PermittedAttributes } from "@blazetrails/activemodel";
+import {
+  fetch,
+  first,
+  include,
+  isEmpty,
+  kernelThrow,
+  rbEqual,
+  toI,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
-import { NoMethodError } from "@blazetrails/activemodel";
 import type { AssociationDefinition } from "../associations.js";
-import {
-  _builtAssociationScope,
-  _inlineOwnerKey,
-  _inlinePolymorphicKeys,
-  _ownerChainReflection,
-  associationInstanceGet,
-  _scopeForAssociation,
-} from "../associations.js";
-import { strictLoadingViolationBang } from "../core.js";
-import {
-  AssociationNotFoundError,
-  CompositePrimaryKeyMismatchError,
-  DeleteRestrictionError,
-} from "./errors.js";
+
+import { DeleteRestrictionError } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
-import type { Association } from "./association.js";
-import { ForeignAssociation, foreignKeyPresent } from "./foreign-association.js";
+import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
-import { eachSlice, min, selectBang, underscore } from "@blazetrails/activesupport";
+import { eachSlice, min, selectBang } from "@blazetrails/activesupport";
 
 export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
@@ -32,6 +28,9 @@ export class HasManyAssociation extends CollectionAssociation {
   declare updateCounter: (difference: number, reflection?: AssociationDefinition) => Promise<void>;
   /** @internal */
   declare deleteCount: (method: string, scope: any) => Promise<number>;
+  declare nullifiedOwnerAttributes: () => Record<string, null>;
+  /** @internal */
+  declare setOwnerAttributes: (record: Base) => void;
 
   protected override difference(a: Base[], b: Base[]): Base[] {
     return a.filter((record) => !b.some((r) => rbEqual(r, record)));
@@ -47,15 +46,8 @@ export class HasManyAssociation extends CollectionAssociation {
     return result;
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT
-   * @missingRailsCall first — PERMANENT
-   */
   async handleDependency(): Promise<void> {
-    const dependent = this.reflection.options.dependent;
-    if (!dependent) return;
-
-    switch (dependent) {
+    switch (this.options.dependent) {
       case "restrictWithException": {
         if (!(await this.isEmpty())) {
           throw new DeleteRestrictionError(this.reflection.name);
@@ -93,8 +85,8 @@ export class HasManyAssociation extends CollectionAssociation {
           (t as any).destroyedByAssociation = this.reflection;
         }
 
-        if (this.target.length > 0) {
-          const associationClass = this.target[0].constructor as typeof Base;
+        if (!isEmpty(this.target)) {
+          const associationClass = first(this.target)!.constructor as typeof Base;
           let primaryKeyColumn: string | string[];
           let ids: unknown[];
           if (queryConstraintsList.call(associationClass as any)) {
@@ -107,21 +99,17 @@ export class HasManyAssociation extends CollectionAssociation {
             ids = this.target.map((assoc) => (assoc as any)[primaryKeyColumn as string]);
           }
 
-          const idsBatches = eachSlice(
+          for (const idsBatch of eachSlice(
             ids,
             (this.owner.constructor as typeof Base).destroyAssociationAsyncBatchSize ?? ids.length,
-          );
-          for (const idsBatch of idsBatches) {
+          )) {
             this.enqueueDestroyAssociation({
               ownerModelName: this.owner.constructor.name,
               ownerId: (this.owner as any).id,
               associationClass: String(this.reflection.klass.name),
               associationIds: idsBatch,
               associationPrimaryKeyColumn: primaryKeyColumn,
-              ensuringOwnerWasMethod:
-                "ensuringOwnerWas" in this.reflection.options
-                  ? (this.reflection.options as any).ensuringOwnerWas
-                  : null,
+              ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),
             });
           }
         }
@@ -143,21 +131,6 @@ export class HasManyAssociation extends CollectionAssociation {
     return super.insertRecord(record, validate, raise, block);
   }
 
-  protected override async findTarget(): Promise<Base[]> {
-    const records = await findTarget(
-      this.owner,
-      this.reflection.name,
-      this.reflection,
-      this.isViolatesStrictLoading(),
-    );
-    for (const record of records) this.setStrictLoading(record);
-    return records;
-  }
-
-  protected override computeNullifiedOwnerAttributes(): Record<string, null> {
-    return nullifiedOwnerAttributes(this);
-  }
-
   /** @internal */
   protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
     const count = await this.deleteCount(method ?? "", (this as any).scope());
@@ -166,31 +139,24 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   /** @internal */
-  protected override async deleteRecords(records: Base[], method: string): Promise<number> {
+  protected override async deleteRecords(records: Base[], method: string): Promise<unknown> {
     if (method === "destroy") {
-      for (const record of records) await (record as any).destroyBang();
-      if (!this.reflection.isInverseUpdatesCounterCache?.()) {
-        await this.updateCounter(-records.length);
+      for (const record of records) await record.destroyBang();
+      if (!this.reflection.isInverseUpdatesCounterCache()) {
+        return this.updateCounter(-records.length);
       }
-      return records.length;
+    } else {
+      const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
+      const values = records.map((r) => queryConstraints.map((col) => r._readAttribute(col)));
+      const scope = this.scope().where(new Map([[queryConstraints, values]]));
+      return this.updateCounter(-(await this.deleteCount(method, scope)));
     }
-    const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
-    const values = records.map((r) =>
-      queryConstraints.map((col) => (r as any)._readAttribute(col)),
-    );
-    const baseScope = (this as any).scope?.();
-    if (!baseScope) return 0;
-    const scope =
-      queryConstraints.length === 1
-        ? baseScope.where({ [queryConstraints[0]]: values.map((tuple) => tuple[0]) })
-        : baseScope.where(new Map([[queryConstraints, values]]));
-    method = method === "delete" ? "deleteAll" : method;
-    const count = await this.deleteCount(method, scope);
-    if (count > 0) await this.updateCounter(-count);
-    return count;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected override concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
     const concatenated = super.concatRecords(records, raise);
     return isThenable(concatenated)
@@ -200,7 +166,7 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /** @internal */
   protected override async _createRecord(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[],
     raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | Base[] | null> {
@@ -279,12 +245,7 @@ function updateCounterInMemory(this: HasManyAssociation, difference: number): vo
 /** @internal */
 function deleteCount(this: HasManyAssociation, method: string, scope: any): Promise<number> {
   if (method === "deleteAll") return scope.deleteAll?.() ?? Promise.resolve(0);
-  const nullAttrs = (
-    this as unknown as {
-      computeNullifiedOwnerAttributes(): Record<string, null>;
-    }
-  ).computeNullifiedOwnerAttributes();
-  return scope.updateAll?.(nullAttrs) ?? Promise.resolve(0);
+  return scope.updateAll?.(this.nullifiedOwnerAttributes()) ?? Promise.resolve(0);
 }
 
 /** @internal */
@@ -307,155 +268,6 @@ function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] 
   return a.filter((r) => b.includes(r));
 }
 
-/** @internal */
-function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, null> {
-  const ctor = assoc.owner.constructor as {
-    name: string;
-    _reflectOnAssociation?: (n: string) => {
-      foreignKey?: () => string | string[];
-      foreignType?: string;
-    } | null;
-  };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? null;
-  let foreignKey: string | string[] | undefined = refl?.foreignKey?.();
-  const typeCol: string | null = refl?.foreignType ?? null;
-  if (foreignKey == null) {
-    const fks = (assoc as unknown as { foreignKeyColumns?: () => string[] }).foreignKeyColumns?.();
-    if (fks?.length) foreignKey = fks;
-  }
-  if (foreignKey == null) {
-    const opts = assoc.reflection.options as { foreignKey?: string | string[]; as?: string };
-    foreignKey =
-      opts.foreignKey ?? (opts.as ? `${underscore(opts.as)}_id` : `${underscore(ctor.name)}_id`);
-  }
-  const polyType = typeCol ?? deriveAsTypeCol(assoc);
-  return ForeignAssociation.nullifiedOwnerAttributes({
-    foreignKey: () => foreignKey,
-    type: polyType,
-  });
-}
-
-function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): string | null {
-  const asName = assoc.reflection.options.as;
-  return asName ? `${underscore(asName)}_type` : null;
-}
-
-/** @internal */
-async function findTarget(
-  record: Base,
-  assocName: string,
-  assocDef: AssociationDefinition,
-  violatesStrictLoading = false,
-): Promise<Base[]> {
-  const options = assocDef.options;
-  const holder = associationInstanceGet.call(record, assocName) as Association | null;
-  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-    return (holder.target ?? []) as Base[];
-  }
-
-  if (violatesStrictLoading) {
-    const ctor = record.constructor as typeof Base;
-    const reflection = ctor._reflectOnAssociation?.(assocName);
-    if (!reflection) throw new AssociationNotFoundError(record, assocName);
-    strictLoadingViolationBang({ owner: ctor, reflection });
-  }
-
-  const ctor = record.constructor as typeof Base;
-
-  const rel = scope(record, assocName, assocDef);
-  if (rel === null) return [];
-
-  const association = record.association(assocName);
-  return (
-    await rel.load((child: Base) => {
-      association.setInverseInstance(child);
-    })
-  ).toArray();
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-4
- */
-export function scope(
-  record: Base,
-  assocName: string,
-  assocDef: AssociationDefinition,
-): any | null {
-  const options = assocDef.options;
-  const ctor = record.constructor as typeof Base;
-  const primaryKey = options.primaryKey ?? ctor.primaryKey;
-
-  const targetModel = record.association(assocName).klass;
-
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (options.through && !reflection) return null;
-
-  if (!reflection) throw new NoMethodError(`undefined method 'foreign_key' for nil`);
-  const foreignKey: string | string[] = reflection.foreignKey();
-
-  const reflForOwnerFk = _ownerChainReflection(reflection);
-  const fkCheckPks = reflForOwnerFk
-    ? Array.isArray(reflForOwnerFk.joinForeignKey)
-      ? reflForOwnerFk.joinForeignKey
-      : [reflForOwnerFk.joinForeignKey]
-    : Array.isArray(primaryKey)
-      ? primaryKey
-      : [primaryKey];
-  for (const pk of fkCheckPks) {
-    const v = record._readAttribute(pk);
-    if (v === null || v === undefined) return null;
-  }
-
-  let rel: any;
-  if (reflection) {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation = _scopeForAssociation(targetModel);
-    rel = baseRelation.merge(built);
-  } else {
-    if (options.as) {
-      const typeCol = `${underscore(options.as)}_type`;
-      let fkCols: string[];
-      let ownerKeyCols: string[];
-      if (Array.isArray(foreignKey)) {
-        const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-        fkCols = foreignKey;
-        ownerKeyCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
-      } else {
-        ({ fkCols, ownerKeyCols } = _inlinePolymorphicKeys(ctor, options, primaryKey, foreignKey));
-      }
-      const conditions: Record<string, unknown> = { [typeCol]: ctor.polymorphicName() };
-      for (let i = 0; i < fkCols.length; i++) {
-        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
-      }
-      rel = _scopeForAssociation(targetModel).where(conditions);
-    } else if (Array.isArray(foreignKey)) {
-      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
-      if (pkCols.length !== foreignKey.length) {
-        throw new CompositePrimaryKeyMismatchError({
-          activeRecord: ctor.name,
-          name: assocName,
-          associationPrimaryKey: () => pkCols,
-          foreignKey: () => foreignKey,
-        });
-      }
-      const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < foreignKey.length; i++) {
-        conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
-      }
-      rel = _scopeForAssociation(targetModel).where(conditions);
-    } else {
-      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      rel = _scopeForAssociation(targetModel).where({
-        [foreignKey]: record._readAttribute(ownerKey as string),
-      });
-    }
-    if (assocDef.scope) rel = assocDef.scope.call(rel, record) || rel;
-  }
-  return rel;
-}
-
 Object.assign(HasManyAssociation.prototype, {
   updateCounterInMemory,
   updateCounterIfSuccess,
@@ -463,6 +275,6 @@ Object.assign(HasManyAssociation.prototype, {
   deleteCount,
 });
 
-Object.assign(HasManyAssociation.prototype, { foreignKeyPresent });
+include(HasManyAssociation, ForeignAssociation);
 
-Associations.HasManyAssociation = HasManyAssociation;
+rbModConstSet(Associations, "HasManyAssociation", HasManyAssociation);

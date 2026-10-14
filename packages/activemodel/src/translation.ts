@@ -1,4 +1,5 @@
 import { humanize, isPresent } from "@blazetrails/activesupport";
+import { toS } from "@blazetrails/ruby-compat";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";
@@ -61,6 +62,7 @@ export function humanAttributeName(
   attribute: string,
   options: HumanAttributeNameOptions = {},
 ): string {
+  attribute = toS(attribute);
   let namespace = "";
   let defaults: unknown[];
 

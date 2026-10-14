@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { timeAgoInWords, distanceOfTimeInWords } from "@blazetrails/actionview";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("DateHelperTest", () => {
   const { topics } = fixtures(["topics"]);

@@ -1,52 +1,40 @@
 import { Encryption } from "../namespaces.js";
-import { prepend } from "@blazetrails/activesupport";
-import { Contexts } from "./contexts.js";
+import { Module } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
+import { UniquenessValidator } from "../validations/uniqueness.js";
 
 export class ExtendedDeterministicUniquenessValidator {
-  private static _installed = false;
-
-  /** @missingRailsArgs prepend — PERMANENT */
-  static installSupport({
-    UniquenessValidator,
-    EncryptedUniquenessValidator,
-  }: {
-    UniquenessValidator: { prototype: { validateEach: (...args: any[]) => unknown } };
-    EncryptedUniquenessValidator: EncryptedUniquenessValidatorModule;
-  }): void {
-    if (this._installed) return;
-
-    if (typeof UniquenessValidator.prototype.validateEach !== "function") {
-      throw new Error(
-        "ExtendedDeterministicUniquenessValidator: UniquenessValidator.prototype.validateEach is not callable",
-      );
-    }
-
-    this._installed = true;
-
-    prepend(UniquenessValidator.prototype, EncryptedUniquenessValidator);
+  static installSupport(): void {
+    prepend(UniquenessValidator, EncryptedUniquenessValidator);
   }
 }
 
-type EncryptedUniquenessValidatorModule = typeof EncryptedUniquenessValidator;
+export const EncryptedUniquenessValidator: Module = new Module((mod) => {
+  mod.defineMethod(
+    "validateEach",
+    async function (this: object, record: any, attribute: string, value: unknown): Promise<void> {
+      await EncryptedUniquenessValidator.superMethod(this, "validateEach")!(
+        record,
+        attribute,
+        value,
+      );
 
-export const EncryptedUniquenessValidator = {
-  async validateEach(
-    super_: (record: any, attribute: string, value: unknown) => unknown,
-    record: any,
-    attribute: string,
-    value: unknown,
-  ): Promise<void> {
-    await super_(record, attribute, value);
-
-    const klass = record.constructor;
-    if (klass.deterministicEncryptedAttributes()?.has(attribute)) {
-      const encryptedType = klass.typeForAttribute(attribute);
-      for (const type of encryptedType.previousTypes) {
-        const encryptedValue = type.serialize(value);
-        await Contexts.withoutEncryption(() => super_(record, attribute, encryptedValue));
+      const klass = record.constructor;
+      if (klass.deterministicEncryptedAttributes()?.includes(attribute)) {
+        const encryptedType = klass.typeForAttribute(attribute);
+        for (const type of encryptedType.previousTypes) {
+          const encryptedValue = type.serialize(value);
+          await Encryption.withoutEncryption(() =>
+            EncryptedUniquenessValidator.superMethod(this, "validateEach")!(
+              record,
+              attribute,
+              encryptedValue,
+            ),
+          );
+        }
       }
-    }
-  },
-};
+    },
+  );
+});
 
 Encryption.ExtendedDeterministicUniquenessValidator = ExtendedDeterministicUniquenessValidator;

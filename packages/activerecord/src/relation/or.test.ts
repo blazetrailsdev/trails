@@ -3,7 +3,7 @@ import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { registerModel } from "../index.js";
 import { adapterType } from "../test-adapter.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";

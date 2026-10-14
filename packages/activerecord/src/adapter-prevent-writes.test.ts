@@ -5,7 +5,7 @@ import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js"
 import { ReadOnlyError, StatementInvalid } from "./errors.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 let connection: AbstractAdapter;
 

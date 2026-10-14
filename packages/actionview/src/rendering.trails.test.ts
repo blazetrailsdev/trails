@@ -15,8 +15,8 @@ include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
   it("includes RoutingUrlFor through routes.url_helpers' UrlFor included hook", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/other", { to: "foo#other" });
+    routes.draw(function () {
+      this.get("/other", { to: "foo#other" });
     });
     class FooController extends ActionController.Base {
       async other(): Promise<void> {

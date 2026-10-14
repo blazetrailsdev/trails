@@ -1,10 +1,10 @@
-import { DelegateClass, merge } from "@blazetrails/ruby-compat";
+import { DelegateClass, type Hash, merge, Module, rtest, union } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
-import { ValueType } from "@blazetrails/activemodel";
+import { type AttributeSet, ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
-import { incrementBang as persistenceIncrementBang } from "../persistence.js";
+import type { incrementBang as persistenceIncrementBang } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
 import { Locking } from "../namespaces.js";
@@ -44,11 +44,11 @@ export interface Optimistic {
   readonly lockOptimistically: boolean;
 }
 
-export const Optimistic = {
+export const Optimistic = Object.assign(new Module(), {
   [included](base: object): void {
     classAttribute.call(base, "lockOptimistically", { instanceWriter: false, default: true });
   },
-};
+});
 
 interface LockingRecord {
   constructor: { lockingEnabled: boolean; lockingColumn: string };
@@ -62,10 +62,10 @@ export function lockingEnabled(this: LockingRecord): boolean {
 }
 
 interface LockingHost {
-  _lockingColumn: string;
+  lockingColumn: string;
   lockOptimistically?: boolean;
   _updateRecord?(
-    values: Record<string, unknown>,
+    values: Hash<string, unknown>,
     constraints: Record<string, unknown>,
   ): Promise<number>;
 }
@@ -74,10 +74,7 @@ export async function incrementBang(
   this: LockingRecord & { lockingEnabled(): boolean },
   ...args: Parameters<typeof persistenceIncrementBang>
 ): Promise<unknown> {
-  const result = await (persistenceIncrementBang as (...a: unknown[]) => Promise<unknown>).apply(
-    this,
-    args,
-  );
+  const result = await Optimistic.superMethod(this, "incrementBang")!(...args);
   if (this.lockingEnabled()) {
     const lockingColumn = this.constructor.lockingColumn;
     this.writeAttribute(lockingColumn, Number(this.readAttribute(lockingColumn)) + 1);
@@ -92,7 +89,9 @@ export function resetLockingColumn(this: LockingHost): void {
 
 export class ClassMethods {
   static get lockingColumn(): string {
-    return (this as any)._lockingColumn ?? DEFAULT_LOCKING_COLUMN;
+    return Object.hasOwn(this, "_lockingColumn")
+      ? (this as any)._lockingColumn
+      : DEFAULT_LOCKING_COLUMN;
   }
 
   static set lockingColumn(column: string) {
@@ -120,16 +119,7 @@ export async function updateCounters(
 
 type InstanceLockingHost = {
   constructor: typeof Base & LockingHost;
-  _attributes: {
-    getAttribute(name: string): {
-      value: unknown;
-      valueBeforeTypeCast: unknown;
-      type: unknown;
-      valueForDatabase: unknown;
-      originalValueForDatabase(): unknown;
-    };
-    set(name: string, attribute: unknown): void;
-  };
+  _attributes: AttributeSet;
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
@@ -144,8 +134,7 @@ export function _createRecord(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    const col = ctor.lockingColumn;
-    if (!attributeNames.includes(col)) attributeNames = [...attributeNames, col];
+    attributeNames = union(attributeNames, [ctor.lockingColumn]);
   }
   return superFn(attributeNames);
 }
@@ -174,16 +163,16 @@ export async function _updateRow(
   const ctor = this.constructor;
   if (!ctor.lockingEnabled) return superFn(attributeNames, attemptedAction);
 
-  const col = ctor.lockingColumn;
-  const lockAttributeWas = this._attributes.getAttribute(col);
-
-  const updateConstraints = (this as any)._queryConstraintsHash();
-
-  attributeNames = [...attributeNames, col];
-
-  this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
-
+  const lockingColumn = ctor.lockingColumn;
+  const lockAttributeWas = this._attributes.getAttribute(lockingColumn);
   try {
+    const updateConstraints = (this as any)._queryConstraintsHash();
+
+    if (Object.isFrozen(attributeNames)) attributeNames = [...attributeNames];
+    attributeNames.push(lockingColumn);
+
+    this.writeAttribute(lockingColumn, (Number(this.readAttribute(lockingColumn)) || 0) + 1);
+
     const affectedRows = await (ctor as any)._updateRecord(
       attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
@@ -193,22 +182,21 @@ export async function _updateRow(
 
     return affectedRows;
   } catch (e) {
-    this._attributes.set(col, lockAttributeWas);
+    this._attributes.set(lockingColumn, lockAttributeWas);
     throw e;
   }
 }
 
 /** @internal */
-export function destroyRow(
+export async function destroyRow(
   this: InstanceLockingHost,
   superFn: () => number | Promise<number>,
-): number | Promise<number> {
-  const ctor = this.constructor;
-  if (!ctor.lockingEnabled) return superFn();
-  return Promise.resolve(superFn()).then((affected) => {
-    if (affected !== 1) throw new StaleObjectError(this, "destroy");
-    return affected;
-  });
+): Promise<number> {
+  const affectedRows = await superFn();
+  if (this.constructor.lockingEnabled && affectedRows !== 1) {
+    throw new StaleObjectError(this, "destroy");
+  }
+  return affectedRows;
 }
 
 /** @internal */
@@ -227,14 +215,16 @@ export function _clearLockingColumn(this: InstanceLockingHost): void {
   this.clearAttributeChange(lockingColumn);
 }
 
-export function initializeDup(
-  this: InstanceLockingHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeDup(this: InstanceLockingHost, other: unknown): void {
+  Optimistic.superMethod(this, "initializeDup")!(other);
   if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
 }
+
+Optimistic.defineMethod("lockingEnabled", lockingEnabled);
+Optimistic.defineMethod("incrementBang", incrementBang);
+Optimistic.defineMethod("_lockValueForDatabase", _lockValueForDatabase);
+Optimistic.defineMethod("_clearLockingColumn", _clearLockingColumn);
+Optimistic.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function _queryConstraintsHash(
@@ -248,19 +238,17 @@ export function _queryConstraintsHash(
 }
 
 /** @internal */
-export function hookAttributeType(this: LockingHost, name: string, castType: ValueType): ValueType {
-  if (this.lockOptimistically !== false && name === this._lockingColumn) {
-    return new LockingType(castType);
+export function hookAttributeType(
+  this: LockingHost,
+  superFn: (name: string, castType: ValueType) => ValueType,
+  name: string,
+  castType: ValueType,
+): ValueType {
+  if (rtest(this.lockOptimistically) && name === this.lockingColumn) {
+    castType = new LockingType(castType);
   }
-  return castType;
-}
 
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
-  lockingEnabled,
-  incrementBang,
-  _lockValueForDatabase,
-  _clearLockingColumn,
-};
+  return superFn(name, castType);
+}
 
 Locking.Optimistic = Optimistic;

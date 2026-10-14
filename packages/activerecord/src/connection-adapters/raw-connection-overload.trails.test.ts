@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { AbstractAdapter } from "./abstract-adapter.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { deprecator } from "../deprecator.js";
@@ -23,27 +22,6 @@ function captureDeprecations<T>(fn: () => T): { result: T; messages: string[] } 
 }
 
 describe("deprecated raw-connection initialize overload", () => {
-  describe("AbstractAdapter._isDeprecatedRawConnectionArg", () => {
-    const detect = (
-      AbstractAdapter as unknown as { _isDeprecatedRawConnectionArg(arg: unknown): boolean }
-    )._isDeprecatedRawConnectionArg;
-
-    it("treats a pre-opened driver connection (class instance) as a raw connection", () => {
-      expect(detect(new FakeRawConnection())).toBe(true);
-    });
-
-    it("does not treat a plain config hash as a raw connection", () => {
-      expect(detect({ database: "blog" })).toBe(false);
-      expect(detect(Object.create(null) as object)).toBe(false);
-    });
-
-    it("does not treat a connection string or array as a raw connection", () => {
-      expect(detect("postgres://localhost/blog")).toBe(false);
-      expect(detect(["postgres://localhost/blog"])).toBe(false);
-      expect(detect(null)).toBe(false);
-    });
-  });
-
   describe("PostgreSQLAdapter", () => {
     it("constructs an adapter from the legacy raw-connection signature", () => {
       const raw = new FakeRawConnection();
@@ -54,17 +32,9 @@ describe("deprecated raw-connection initialize overload", () => {
       ).toBe(raw);
     });
 
-    it("emits a deprecation warning for the legacy raw-connection signature", () => {
+    it("does not warn for the legacy raw-connection signature", () => {
       const { messages } = captureDeprecations(
         () => new PostgreSQLAdapter(new FakeRawConnection() as never),
-      );
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toMatch(/pre-opened raw connection is.*deprecated/i);
-    });
-
-    it("does not warn for the modern connection-string signature", () => {
-      const { messages } = captureDeprecations(
-        () => new PostgreSQLAdapter("postgres://localhost/blog"),
       );
       expect(messages).toEqual([]);
     });
@@ -77,7 +47,9 @@ describe("deprecated raw-connection initialize overload", () => {
     it("honors prepared_statements from the deprecated config", () => {
       const { result: adapter } = captureDeprecations(
         () =>
-          new PostgreSQLAdapter(new FakeRawConnection() as never, { preparedStatements: false }),
+          new PostgreSQLAdapter(new FakeRawConnection() as never, null, null, {
+            preparedStatements: false,
+          }),
       );
       expect(adapter.preparedStatements).toBe(false);
     });
@@ -112,37 +84,39 @@ describe("deprecated raw-connection initialize overload", () => {
       ).toBe(raw);
     });
 
-    it("emits a deprecation warning for the legacy raw-connection signature", () => {
-      const { messages } = captureDeprecations(
-        () => new Mysql2Adapter(new FakeRawConnection() as never),
-      );
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toMatch(/pre-opened raw connection is.*deprecated/i);
-    });
-
-    it("does not warn for the modern connection-string signature", () => {
-      const { messages } = captureDeprecations(() => new Mysql2Adapter("mysql2://localhost/blog"));
-      expect(messages).toEqual([]);
-    });
-
     it("does not warn for the modern config-hash signature", () => {
-      const { messages } = captureDeprecations(
-        () => new Mysql2Adapter({ database: "blog", _fakeConnection: true }),
-      );
+      const { messages } = captureDeprecations(() => new Mysql2Adapter({ database: "blog" }));
       expect(messages).toEqual([]);
     });
 
     it("honors prepared_statements from the deprecated config", () => {
       const { result: adapter } = captureDeprecations(
-        () => new Mysql2Adapter(new FakeRawConnection() as never, { preparedStatements: false }),
+        () =>
+          new Mysql2Adapter(new FakeRawConnection() as never, null, null, {
+            preparedStatements: false,
+          }),
       );
       expect(adapter.preparedStatements).toBe(false);
+    });
+
+    it("leaves the caller's hash alone on every config arm, as symbolize_keys copies", () => {
+      const config = { database: "blog" };
+      new Mysql2Adapter(config);
+      expect(config).not.toHaveProperty("flags");
+
+      const deprecatedConfig = { database: "blog" };
+      new Mysql2Adapter(new FakeRawConnection() as never, null, null, deprecatedConfig);
+      expect(deprecatedConfig).not.toHaveProperty("flags");
+
+      const deprecatedConnectionOptions = { database: "blog" };
+      new Mysql2Adapter(new FakeRawConnection() as never, null, deprecatedConnectionOptions);
+      expect(deprecatedConnectionOptions).not.toHaveProperty("flags");
     });
 
     it("raises ArgumentError when a config hash is passed with extra arguments", () => {
       expect(
         // @ts-expect-error — the overload signatures forbid a second arg for the
-        () => new Mysql2Adapter({ database: "blog", _fakeConnection: true }, { database: "blog" }),
+        () => new Mysql2Adapter({ database: "blog" }, { database: "blog" }),
       ).toThrow(ArgumentError);
     });
   });
@@ -167,12 +141,12 @@ describe("config-hash constructor retains foreignKeys in _config", () => {
   });
 
   it("Mysql2Adapter honors foreignKeys:false and defaults to true", () => {
-    const disabled = new Mysql2Adapter({ foreignKeys: false, _fakeConnection: true } as never);
+    const disabled = new Mysql2Adapter({ foreignKeys: false } as never);
     expect(disabled.supportsForeignKeys()).toBe(true);
     expect(guards(disabled).isForeignKeysEnabled()).toBe(false);
     expect(guards(disabled).useForeignKeys()).toBe(false);
 
-    const enabled = new Mysql2Adapter({ _fakeConnection: true } as never);
+    const enabled = new Mysql2Adapter({});
     expect(guards(enabled).isForeignKeysEnabled()).toBe(true);
     expect(guards(enabled).useForeignKeys()).toBe(true);
   });

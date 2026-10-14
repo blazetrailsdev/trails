@@ -1,6 +1,7 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Join } from "./binary.js";
 
 export class FullOuterJoin extends Join {}
 
-Nodes.FullOuterJoin = FullOuterJoin;
+rbModConstSet(Nodes, "FullOuterJoin", FullOuterJoin);

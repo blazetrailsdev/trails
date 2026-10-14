@@ -6,7 +6,7 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
-import { rbObjClass } from "./object.js";
+import { rbObjClassname } from "./object.js";
 import { Rational } from "./rational.js";
 import { rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
@@ -140,7 +140,7 @@ export class Complex {
   coerce(other: unknown): [unknown, unknown] {
     if (other instanceof Complex) return [other, this];
     if (kRealP(other)) return [new Complex(other, 0), this];
-    throw new TypeError(`${rbObjClass(other)} can't be coerced into Complex`);
+    throw new TypeError(`${rbObjClassname(other)} can't be coerced into Complex`);
   }
 }
 

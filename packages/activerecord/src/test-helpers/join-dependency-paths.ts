@@ -1,6 +1,11 @@
 import type { Table, Nodes } from "@blazetrails/arel";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import type { JoinPart } from "../associations/join-dependency/join-part.js";
+import { AliasTracker } from "../associations/alias-tracker.js";
+
+export function aliasTrackerFor(jd: JoinDependency): AliasTracker {
+  return AliasTracker.create(jd.baseKlass.connectionPool(), jd.baseKlass.tableName!, []);
+}
 
 function reflectionName(node: JoinPart): string {
   return String((node as { reflection?: { name?: unknown } }).reflection?.name ?? "");

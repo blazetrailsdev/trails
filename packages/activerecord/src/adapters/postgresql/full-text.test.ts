@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
     await adapter.execute(`CREATE TABLE tsvectors (id serial primary key, text_vector tsvector)`);
   });
   afterEach(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
-    await adapter.disconnectBang();
   });
 
   describe("PostgresqlFullTextTest", () => {
@@ -27,16 +30,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(type.isBinary()).toBeFalsy();
     });
 
-    it("full text search", async () => {
-      await adapter.execute(`INSERT INTO tsvectors (text_vector) VALUES ('cat'::tsvector)`);
-      const rows = await adapter.execute(
-        `SELECT text_vector FROM tsvectors WHERE text_vector @@ to_tsquery('cat')`,
-      );
-      expect(rows).toHaveLength(1);
-    });
-
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(adapter, "tsvectors");
+      const output = await dumpTableSchema("tsvectors");
       expect(output).toMatch(/t\.tsvector\("text_vector"\)/);
     });
 

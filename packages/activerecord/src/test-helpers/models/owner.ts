@@ -5,6 +5,7 @@ import type { Person } from "./person.js";
 import type { Pet } from "./pet.js";
 import type { Toy } from "./toy.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Owner extends Base {
@@ -21,7 +22,7 @@ export class Owner extends Base {
   private _blocks?: Array<(owner: Owner) => void | Promise<void>>;
 
   static {
-    this._primaryKey = "owner_id";
+    this.primaryKey = "owner_id";
     this.hasMany("pets", function (this: any) {
       return this.order("pets.name desc");
     });
@@ -61,6 +62,7 @@ export class Owner extends Base {
     this._blocks = [];
   }
 }
+registerModel(Owner);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Owner {
   get lastPet(): Pet | null | Promise<Pet | null>;
@@ -74,3 +76,4 @@ export class InvalidOwner extends Owner {
     });
   }
 }
+registerModel(InvalidOwner);

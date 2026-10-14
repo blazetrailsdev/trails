@@ -210,6 +210,14 @@ function classNameOf(classBody) {
   return null;
 }
 
+function qualifiedClassNameOf(classBody, name) {
+  let node = classBody.parent?.parent;
+  if (node?.type === "ExportNamedDeclaration") node = node.parent;
+  if (node?.type !== "TSModuleBlock") return null;
+  const id = node.parent?.id;
+  return id?.type === "Identifier" ? `${id.name}.${name}` : null;
+}
+
 function isOrderableClassMember(node) {
   if (node.type !== "MethodDefinition") return false;
   if (node.key?.type !== "Identifier") return false;
@@ -609,8 +617,11 @@ const rule = {
           ancestor = ancestor.parent;
         }
         if (nested) return;
-        const name = classNameOf(node);
+        const bare = classNameOf(node);
+        const qualified = bare ? qualifiedClassNameOf(node, bare) : null;
+        const name = qualified && (classOrders[qualified]?.length ?? 0) > 0 ? qualified : bare;
         if (name) allClassNames.add(name);
+        if (qualified) allClassNames.add(qualified);
         const orderable = node.body.filter(isOrderableClassMember);
         if (orderable.length < 2) return;
         // Every declared member, orderable or not — see computeTargetOrder.

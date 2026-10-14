@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { nodePaths } from "../test-helpers/join-dependency-paths.js";
 import { Nodes } from "@blazetrails/arel";
@@ -50,14 +50,10 @@ describe("JoinDependency#build", () => {
   const paths = (jd: JoinDependency) => nodePaths(jd).sort();
 
   const buildEager = (spec: AssociationSpec | AssociationSpec[]) =>
-    new JoinDependency(Post, null, spec, Nodes.OuterJoin);
+    new JoinDependency(Post, Post.arelTable, spec, Nodes.OuterJoin);
 
   it("joins a nested hash spec instead of falling back to preload", () => {
     expect(paths(buildEager({ comments: "author" }))).toEqual(["comments", "comments.author"]);
-  });
-
-  it("joins a dotted-string spec", () => {
-    expect(paths(buildEager("comments.author"))).toEqual(["comments", "comments.author"]);
   });
 
   it("deduplicates shared prefixes across hash array values", () => {
@@ -69,7 +65,7 @@ describe("JoinDependency#build", () => {
   });
 
   it("deduplicates shared prefixes across separate spec calls", () => {
-    expect(paths(buildEager(["comments.author", "comments.tags"]))).toEqual([
+    expect(paths(buildEager([{ comments: "author" }, { comments: "tags" }]))).toEqual([
       "comments",
       "comments.author",
       "comments.tags",

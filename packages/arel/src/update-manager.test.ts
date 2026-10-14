@@ -35,7 +35,7 @@ describe("UpdateManagerTest", () => {
       updateManager.group(["posts.id"]);
       updateManager.having("count(posts.id) >= 2");
 
-      expect(updateManager.ast.havings).toEqual([new Nodes.SqlLiteral("count(posts.id) >= 2")]);
+      expect(updateManager.ast.havings).toEqual(["count(posts.id) >= 2"]);
     });
   });
 
@@ -54,7 +54,7 @@ describe("UpdateManagerTest", () => {
       const groupAst = updateManager.ast.groups[0] as Nodes.Group;
       expect(groupAst).toBeInstanceOf(Nodes.Group);
       expect(String(groupAst.expr)).toEqual("posts.id");
-      expect(updateManager.ast.havings).toEqual([new Nodes.SqlLiteral("count(posts.id) >= 2")]);
+      expect(updateManager.ast.havings).toEqual(["count(posts.id) >= 2"]);
     });
 
     it("adds columns to the AST when group value is a Symbol", () => {
@@ -71,7 +71,7 @@ describe("UpdateManagerTest", () => {
       const groupAst = updateManager.ast.groups[0] as Nodes.Group;
       expect(groupAst).toBeInstanceOf(Nodes.Group);
       expect(String(groupAst.expr)).toEqual("posts.id");
-      expect(updateManager.ast.havings).toEqual([new Nodes.SqlLiteral("count(posts.id) >= 2")]);
+      expect(updateManager.ast.havings).toEqual(["count(posts.id) >= 2"]);
     });
   });
 

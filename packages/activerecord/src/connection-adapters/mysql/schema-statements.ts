@@ -1,5 +1,7 @@
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { hashDelete, last, rbRegMatchP, toH, toI, toS } from "@blazetrails/ruby-compat";
+import { StatementInvalid } from "../../errors.js";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { TypeMetadata } from "./type-metadata.js";
@@ -7,17 +9,32 @@ import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./schema-definitions.js";
-import type { ColumnType, ColumnOptions } from "../abstract/schema-definitions.js";
+import type {
+  ColumnType,
+  ColumnOptions,
+  RemoveForeignKeyOptions,
+} from "../abstract/schema-definitions.js";
+import type { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { Column } from "./column.js";
 import type { ValueType } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./schema-dumper.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
-import { quoteColumnName } from "./quoting.js";
 import type { TableDefinitionOf } from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
+
+type IndexOptions = {
+  lengths?: Record<string, number>;
+  orders?: Record<string, string>;
+  type?: string;
+  using?: string;
+  comment?: string | null;
+  expressions?: Record<string, string>;
+};
+
+type IndexArgs = [table: string, name: string, unique: boolean, columns: string[] | string];
 
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
@@ -59,114 +76,99 @@ export class SchemaStatements extends BaseSchemaStatements {
     return sql;
   }
 
-  /** @missingRailsCall order:constructor,quoteColumnName — PERMANENT */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
-    let rows: Array<Record<string, unknown>>;
     try {
-      rows = (
-        await this.internalExecQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`, "SCHEMA")
-      ).toArray();
-    } catch (e) {
-      const message = `${(e as { message?: string })?.message ?? ""} ${
-        (e as { cause?: { message?: string } })?.cause?.message ?? ""
-      }`;
-      if (/Table '.+' doesn't exist/.test(message)) return [];
-      throw e;
-    }
+      const indexes: [string, string, boolean, string[], IndexOptions][] = [];
+      let currentIndex: unknown = null;
+      for (const row of await this.internalExecQuery(
+        `SHOW KEYS FROM ${this.quoteTableName(tableName)}`,
+        "SCHEMA",
+      )) {
+        if (currentIndex !== row["Key_name"]) {
+          if (row["Key_name"] === "PRIMARY") continue;
+          currentIndex = row["Key_name"];
 
-    const byIndex = new Map<
-      string,
-      {
-        table: string;
-        columns: string[];
-        unique: boolean;
-        using?: string;
-        type?: string;
-        comment?: string;
-        lengths: Record<string, number>;
-        orders: Record<string, string>;
-        expressions: Record<string, string>;
-      }
-    >();
-    let currentIndex: string | null = null;
-    for (const r of rows) {
-      const keyName = String((r.Key_name ?? r.KEY_NAME) as string);
-      if (currentIndex !== keyName) {
-        if (keyName === "PRIMARY") continue;
-        currentIndex = keyName;
+          const mysqlIndexType = (row["Index_type"] as string).toLowerCase();
+          let indexType: string | undefined;
+          let indexUsing: string | undefined;
+          switch (mysqlIndexType) {
+            case "fulltext":
+            case "spatial":
+              indexType = mysqlIndexType;
+              break;
+            case "btree":
+            case "hash":
+              indexUsing = mysqlIndexType;
+              break;
+          }
 
-        const idxType = String((r.Index_type ?? r.INDEX_TYPE ?? "BTREE") as string).toLowerCase();
-        let using: string | undefined;
-        let type: string | undefined;
-        if (idxType === "fulltext" || idxType === "spatial") {
-          type = idxType;
-        } else if (idxType === "btree" || idxType === "hash") {
-          using = idxType;
+          indexes.push([
+            row["Table"] as string,
+            row["Key_name"] as string,
+            toI(row["Non_unique"]) === 0,
+            [],
+            {
+              lengths: {},
+              orders: {},
+              type: indexType,
+              using: indexUsing,
+              comment: presence(row["Index_comment"] as string | null),
+            },
+          ]);
         }
-        const nonUnique = Number(r.Non_unique ?? r.NON_UNIQUE ?? 0);
-        const rawComment = r.Index_comment ?? r.INDEX_COMMENT;
-        const comment =
-          rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
-        byIndex.set(keyName, {
-          table: String((r.Table ?? r.TABLE) as string),
-          columns: [],
-          unique: nonUnique === 0,
-          using,
-          type,
-          comment,
-          lengths: {},
-          orders: {},
-          expressions: {},
-        });
+
+        let expression = row["Expression"] as string | null | undefined;
+        if (expression != null) {
+          expression = expression.replaceAll("\\'", "'");
+          if (!expression.startsWith("(")) expression = `(${expression})`;
+          last(indexes)![3].push(expression);
+          last(indexes)![4].expressions ||= {};
+          last(indexes)![4].expressions![expression] = expression;
+          if (row["Collation"] === "D") last(indexes)![4].orders![expression] = "desc";
+        } else {
+          last(indexes)![3].push(row["Column_name"] as string);
+          if (row["Sub_part"] != null) {
+            last(indexes)![4].lengths![row["Column_name"] as string] = toI(
+              row["Sub_part"],
+            ) as number;
+          }
+          if (row["Collation"] === "D") {
+            last(indexes)![4].orders![row["Column_name"] as string] = "desc";
+          }
+        }
       }
 
-      const entry = byIndex.get(currentIndex)!;
-      const desc = String((r.Collation ?? r.COLLATION) as string) === "D";
-      const rawExpr = r.Expression ?? r.EXPRESSION;
-      if (rawExpr != null) {
-        let expr = String(rawExpr).replace(/\\'/g, "'");
-        if (!expr.startsWith("(")) expr = `(${expr})`;
-        entry.columns.push(expr);
-        entry.expressions[expr] = expr;
-        if (desc) entry.orders[expr] = "desc";
+      const definitions: IndexDefinition[] = [];
+      for (const index of indexes) {
+        const options = index.pop() as IndexOptions;
+
+        const expressions = hashDelete(options, "expressions") as IndexOptions["expressions"];
+        if (expressions != null) {
+          const orders = hashDelete(options, "orders") as IndexOptions["orders"];
+          const lengths = hashDelete(options, "lengths") as IndexOptions["lengths"];
+
+          const columns = toH<string, string>(
+            index[3].map((name) => [name, expressions[name] ?? this.quoteColumnName(name)]),
+          );
+
+          (index as unknown[])[3] = Array.from(
+            (
+              await this.addOptionsForIndexColumns(columns, { order: orders, length: lengths })
+            ).values(),
+          ).join(", ");
+        }
+
+        definitions.push(new IndexDefinition(...(index as unknown as IndexArgs), options));
+      }
+      return definitions;
+    } catch (e) {
+      if (!(e instanceof StatementInvalid)) throw e;
+      if (rbRegMatchP(/Table '.+' doesn't exist/, e.message)) {
+        return [];
       } else {
-        const column = String((r.Column_name ?? r.COLUMN_NAME) as string);
-        entry.columns.push(column);
-        const subPart = r.Sub_part ?? r.SUB_PART;
-        if (subPart != null) entry.lengths[column] = Number(subPart);
-        if (desc) entry.orders[column] = "desc";
+        throw e;
       }
     }
-    const indexes: IndexDefinition[] = [];
-    for (const [
-      name,
-      { table, columns: indexColumns, unique, using, type, comment, lengths, orders, expressions },
-    ] of byIndex.entries()) {
-      if (Object.keys(expressions).length > 0) {
-        const columns = new Map<string, string>(
-          indexColumns.map((name) => [name, expressions[name] ?? quoteColumnName(name)]),
-        );
-        await this.addOptionsForIndexColumns(columns, { order: orders, length: lengths });
-        indexes.push(
-          new IndexDefinition(table, name, unique, Array.from(columns.values()).join(", "), {
-            using,
-            type,
-            comment,
-          }),
-        );
-        continue;
-      }
-      indexes.push(
-        new IndexDefinition(table, name, unique, indexColumns, {
-          lengths,
-          orders,
-          using,
-          type,
-          comment,
-        }),
-      );
-    }
-    return indexes;
   }
 
   override get schemaCreation(): MysqlSchemaCreation {
@@ -181,16 +183,22 @@ export class SchemaStatements extends BaseSchemaStatements {
     tableName: string,
     options?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void> {
-    const definer = typeof options === "function" ? options : fn;
-    const kwargs: CreateTableOptions = typeof options === "function" || !options ? {} : options;
-    if (kwargs.options === undefined) {
-      const rowFormat = await defaultRowFormat.call(this as unknown as RowFormatHost);
-      if (rowFormat != null) {
-        return super.createTable(tableName, { ...kwargs, options: rowFormat }, definer);
-      }
+  ): Promise<unknown> {
+    if (typeof options === "function") {
+      fn = options;
+      options = undefined;
     }
-    return super.createTable(tableName, kwargs, definer);
+    return super.createTable(
+      tableName,
+      {
+        ...options,
+        options:
+          options?.options ??
+          (await defaultRowFormat.call(this as unknown as RowFormatHost)) ??
+          undefined,
+      },
+      fn,
+    );
   }
 
   override async removeColumn(
@@ -199,10 +207,36 @@ export class SchemaStatements extends BaseSchemaStatements {
     type?: string,
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
-    if (await this.foreignKeyExists(tableName, { column: columnName })) {
-      await this.removeForeignKey(tableName, { column: columnName });
+    if (await this.foreignKeyExists(tableName, undefined, { column: columnName })) {
+      await this.removeForeignKey(tableName, undefined, { column: columnName });
     }
     return super.removeColumn(tableName, columnName, type, options);
+  }
+
+  override async removeForeignKey(
+    fromTable: string,
+    toTable: string | null = null,
+    options: RemoveForeignKeyOptions = {},
+  ): Promise<void> {
+    options = { ...options };
+    if (options.onUpdate === "restrict") delete options.onUpdate;
+    if (options.onDelete === "restrict") delete options.onDelete;
+    return super.removeForeignKey(fromTable, toTable, options);
+  }
+
+  override async internalStringOptionsForPrimaryKey(): Promise<Record<string, unknown>> {
+    const options = await super.internalStringOptionsForPrimaryKey();
+    if (
+      !(await isRowFormatDynamicByDefault.call(this as unknown as RowFormatHost)) &&
+      CHARSETS_OF_4BYTES_MAXLEN.includes(
+        (await (this as unknown as AbstractMysqlAdapter).charset()) as string,
+      )
+    ) {
+      options.collation = (
+        (await (this as unknown as AbstractMysqlAdapter).collation()) as string
+      ).replace(/^[^_]+/, "utf8");
+    }
+    return options;
   }
 
   /** @internal */
@@ -247,6 +281,8 @@ export class SchemaStatements extends BaseSchemaStatements {
 interface QuotedScopeHost {
   quote(value: unknown): string;
 }
+
+const CHARSETS_OF_4BYTES_MAXLEN = ["utf8mb4", "utf16", "utf16le", "utf32"];
 
 /** @internal */
 export interface RowFormatHost {
@@ -330,11 +366,10 @@ export async function newColumnFromField(
     [def, defFn] = [null, def];
   }
 
-  return new Column(fieldName, def, meta, field["Null"] === "YES", {
-    defaultFunction: defFn ?? undefined,
+  return new Column(fieldName, def, meta, field["Null"] === "YES", defFn, {
     collation: field["Collation"] ?? null,
     comment: presence(field["Comment"] as string | undefined) ?? null,
-  }).deduplicate();
+  });
 }
 
 /** @internal */
@@ -363,10 +398,10 @@ export function extractForeignKeyAction(
 /** @internal */
 export function dataSourceSql(
   this: QuotedScopeHost,
-  name?: string | null,
-  options: { type?: string } = {},
+  name: string | null = null,
+  { type }: { type?: string } = {},
 ): string {
-  const scope = quotedScope.call(this, name, options);
+  const scope = quotedScope.call(this, name, { type });
   let sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = ${scope.schema}`;
   if (scope.name) {
     sql += ` AND table_name = ${scope.name}`;
@@ -396,14 +431,9 @@ export function quotedScope(
 export function extractSchemaQualifiedName(
   string: string | null | undefined,
 ): [string | null, string | null] {
-  const parts = (string ?? "").match(/[^`.\s]+|`[^`]*`/g) ?? [];
-  if (parts.length >= 2) {
-    return [parts[0]!.replace(/^`|`$/g, ""), parts[1].replace(/^`|`$/g, "")];
-  }
-  if (parts.length === 1) {
-    return [null, parts[0].replace(/^`|`$/g, "")];
-  }
-  return [null, null];
+  let [schema, name]: Array<string | null> = toS(string).match(/[^`.\s]+|`[^`]*`/g) ?? [];
+  if (name == null) [schema, name] = [null, schema ?? null];
+  return [schema, name];
 }
 
 /** @internal */

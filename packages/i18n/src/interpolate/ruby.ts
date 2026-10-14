@@ -1,4 +1,4 @@
-import { sprintf } from "@blazetrails/ruby-compat";
+import { sprintf, toS } from "@blazetrails/ruby-compat";
 import { ArgumentError, ReservedInterpolationKey } from "../exceptions.js";
 import { config, reservedKeysPattern, toSym } from "../i18n.js";
 
@@ -29,7 +29,6 @@ export function interpolate(string: string, values: unknown): string {
   return interpolateHash(string, values as Record<string, unknown>);
 }
 
-/** @missingRailsCall call — PERMANENT */
 export function interpolateHash(string: string, values: Record<string, unknown>): string {
   const pattern = unionPattern(config().interpolationPatterns);
   let interpolated = false;
@@ -46,7 +45,7 @@ export function interpolateHash(string: string, values: Record<string, unknown>)
           ? values[key.slice(1)]
           : config().missingInterpolationArgumentHandler(key, values, string);
       if (typeof value === "function") value = (value as (v: unknown) => unknown)(values);
-      return format ? sprintf(`%${format}`, value) : String(value);
+      return format ? sprintf(`%${format}`, value) : toS(value);
     },
   );
 

@@ -1,20 +1,23 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Notifications, type NotificationEvent as Event } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Request } from "../../http/request.js";
-import type { Mapper } from "../../routing/mapper.js";
+import type { DrawCallback } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import { RoutedRackApp } from "../../../test-helpers/abstract-unit.js";
 
 describe("RoutingInstrumentationTest", () => {
-  let t: IntegrationTest;
+  class RoutingInstrumentationTest extends IntegrationTest {}
+  registerConstant("RoutingInstrumentationTest", RoutingInstrumentationTest);
 
-  beforeEach(() => {
-    t = new IntegrationTest();
+  let t: RoutingInstrumentationTest;
+  beforeEach(({ testCase }) => {
+    t = testCase as RoutingInstrumentationTest;
   });
 
   it("redirect is instrumented", async () => {
-    draw((r) => {
-      r.get("redirect", { to: r.redirect("/login") });
+    draw(function () {
+      this.get("redirect", { to: this.redirect("/login") });
     });
 
     const event = await subscribed("redirect.action_dispatch", () => t.get("/redirect"));
@@ -24,7 +27,7 @@ describe("RoutingInstrumentationTest", () => {
     expect(event!.payload.request).toBeInstanceOf(Request);
   });
 
-  function draw(block: (r: Mapper) => void): void {
+  function draw(block: DrawCallback): void {
     IntegrationTest.stubControllers((routes) => {
       routes.defaultUrlOptions = { host: "www.example.com" };
       routes.draw(block);

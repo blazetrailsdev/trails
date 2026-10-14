@@ -32,7 +32,7 @@ export class Message {
       payload !== undefined &&
       payload !== null &&
       typeof payload !== "string" &&
-      !Buffer.isBuffer(payload)
+      !(payload instanceof Uint8Array)
     ) {
       throw new ForbiddenClass(`Payloads must be either nil or strings, not ${typeof payload}`);
     }

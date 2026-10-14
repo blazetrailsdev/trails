@@ -1,4 +1,5 @@
-import { Autoload, extend, registerConstant, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Attribute } from "./attribute.js";
 import type { Error } from "./error.js";
 import type {
@@ -7,8 +8,9 @@ import type {
   StrictValidationFailed,
   UnknownAttributeError,
 } from "./errors.js";
+import type { NestedError } from "./nested-error.js";
 import type { JSON } from "./serializers/json.js";
-import type { ValidationError } from "./validations.js";
+import type { ValidationError, Validations } from "./validations.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -24,15 +26,18 @@ export const ActiveModel = { name: "ActiveModel", loadPath } as AutoloadModule &
   Attribute: typeof Attribute;
   Errors: typeof Errors;
   Error: typeof Error;
+  NestedError: typeof NestedError;
   RangeError: typeof RangeError;
   StrictValidationFailed: typeof StrictValidationFailed;
   UnknownAttributeError: typeof UnknownAttributeError;
   ValidationError: typeof ValidationError;
+  Validations: typeof Validations;
   Serializers: typeof Serializers;
 };
 registerConstant("ActiveModel", ActiveModel);
 extend(ActiveModel, Autoload);
 ActiveModel.autoload("Attribute");
+ActiveModel.autoload("Validations");
 ActiveModel.eagerAutoload(() => {
   ActiveModel.autoload("Errors");
   ActiveModel.autoload("Error");

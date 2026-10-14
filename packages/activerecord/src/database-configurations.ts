@@ -1,5 +1,14 @@
-import { hasKey, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
-import { getEnv } from "@blazetrails/activesupport";
+import {
+  TypeError,
+  compact,
+  groupBy,
+  isSymbol,
+  rbEqual,
+  rbInspect,
+  symbolToS,
+  toS,
+} from "@blazetrails/ruby-compat";
+import { type EnvironmentInquirer, getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
   DatabaseConfig,
@@ -28,25 +37,6 @@ type DbConfigHandler = (
   config: DatabaseConfigOptions,
 ) => HashConfig | null | undefined;
 
-let _configurations: DatabaseConfigurations | undefined;
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE reads the configurations slot ActiveRecord::Base.configurations names directly (core.rb:77).
- */
-export function configurationsStore(): DatabaseConfigurations {
-  _configurations ??= new DatabaseConfigurations({});
-  return _configurations;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE writes that same configurations slot (core.rb:71); Ruby assigns through the Base accessor.
- */
-export function setConfigurationsStore(configs: DatabaseConfigurations): void {
-  _configurations = configs;
-}
-
 function isHash(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -60,12 +50,8 @@ export class DatabaseConfigurations {
 
   private _configurations: HashConfig[];
 
-  constructor(configurations: RawConfigurations | HashConfig[] = {}) {
-    if (Array.isArray(configurations)) {
-      this._configurations = configurations;
-    } else {
-      this._configurations = this.buildConfigs(configurations);
-    }
+  constructor(configurations: RawConfigurations | HashConfig[] | DatabaseConfigurations = {}) {
+    this._configurations = this.buildConfigs(configurations);
   }
 
   get empty(): boolean {
@@ -85,52 +71,52 @@ export class DatabaseConfigurations {
   }
 
   configsFor(options: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name: string;
     configKey?: string;
     includeHidden?: boolean;
   }): HashConfig | undefined;
   configsFor(options?: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name?: undefined;
     configKey?: string;
     includeHidden?: boolean;
   }): HashConfig[];
   configsFor(
     options: {
-      envName?: string;
+      envName?: string | EnvironmentInquirer;
       name?: string;
       configKey?: string;
       includeHidden?: boolean;
     } = {},
   ): HashConfig[] | HashConfig | undefined {
-    const envName = options.envName ?? (options.name ? this.defaultEnv() : undefined);
+    let { envName } = options;
+    const { name, configKey, includeHidden = false } = options;
+    if (name != null) envName ??= this.defaultEnv();
     let configs = this.envWithConfigs(envName);
 
-    if (!options.includeHidden) {
-      configs = configs.filter((c) => {
-        if (c.configurationHash._hidden === true) return false;
-        if (c instanceof HashConfig) return c.databaseTasks();
-        return true;
-      });
+    if (!includeHidden) {
+      configs = configs.filter((dbConfig) => dbConfig.databaseTasks());
     }
-    if (options.configKey) {
-      configs = configs.filter((c) => hasKey(c.configurationHash, options.configKey!));
+
+    if (configKey != null) {
+      configs = configs.filter((dbConfig) => Object.hasOwn(dbConfig.configurationHash, configKey));
     }
-    if (options.name) {
-      const nameStr = String(options.name);
-      return configs.find((c) => c.name === nameStr);
+
+    if (name != null) {
+      return configs.find((dbConfig) => dbConfig.name === toS(name));
+    } else {
+      return configs;
     }
-    return configs;
   }
 
   findDbConfig(env: string): HashConfig | undefined {
-    env = isSymbol(env) ? symbolToS(env) : String(env);
-    const matching = this._configurations.find(
-      (c) => c.forCurrentEnv && (c.envName === env || c.name === env),
+    env = toS(env);
+    return (
+      this.configurations.find(
+        (dbConfig) => dbConfig.forCurrentEnv && (dbConfig.envName === env || dbConfig.name === env),
+      ) || this.configurations.find((dbConfig) => dbConfig.envName === env)
     );
-    if (matching) return matching;
-    return this._configurations.find((c) => c.envName === env);
   }
 
   isPrimary(name: string): boolean {
@@ -139,7 +125,7 @@ export class DatabaseConfigurations {
     return !!firstConfig && name === firstConfig.name;
   }
 
-  resolve(config: unknown): HashConfig {
+  resolve(config: unknown): HashConfig | null {
     if (config instanceof DatabaseConfig) return config as HashConfig;
     if (isSymbol(config)) {
       return this.resolveSymbolConnection(config);
@@ -156,16 +142,16 @@ export class DatabaseConfigurations {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall call — PERMANENT
-   */
+  /** @internal */
   private defaultEnv(): string {
     return String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
   }
 
-  /** @missingRailsName compact — PERMANENT */
-  private buildConfigs(configs: RawConfigurations | HashConfig[]): HashConfig[] {
+  /** @internal */
+  private buildConfigs(
+    configs: RawConfigurations | HashConfig[] | DatabaseConfigurations,
+  ): HashConfig[] {
+    if (configs instanceof DatabaseConfigurations) return configs.configurations;
     if (Array.isArray(configs)) return configs;
 
     const dbConfigs: (HashConfig | null)[] = Object.entries(configs).flatMap(([envName, config]) =>
@@ -182,15 +168,12 @@ export class DatabaseConfigurations {
       dbConfigs.push(this.environmentUrlConfig(this.defaultEnv(), "primary", {}));
     }
 
-    return this.mergeDbEnvironmentVariables(
-      this.defaultEnv(),
-      dbConfigs.filter((c) => c != null),
-    );
+    return this.mergeDbEnvironmentVariables(this.defaultEnv(), compact(dbConfigs));
   }
 
   /** @internal */
-  private envWithConfigs(env?: string): HashConfig[] {
-    if (env) return this._configurations.filter((c) => c.envName === env);
+  private envWithConfigs(env?: string | EnvironmentInquirer): HashConfig[] {
+    if (env != null) return this._configurations.filter((c) => rbEqual(c.envName, env));
     return this._configurations;
   }
 
@@ -198,7 +181,7 @@ export class DatabaseConfigurations {
   private walkConfigs(
     envName: string,
     config: Record<string, DatabaseConfigOptions>,
-  ): HashConfig[] {
+  ): (HashConfig | null)[] {
     return Object.entries(config).map(([name, subConfig]) =>
       this.buildDbConfigFromRawConfig(envName, name, subConfig),
     );
@@ -217,14 +200,16 @@ export class DatabaseConfigurations {
   /** @internal */
   private buildConfigurationSentence(): string {
     const configs = this.configsFor({ includeHidden: true });
-    const byEnv = new Map<string, string[]>();
-    for (const cfg of configs) {
-      const names = byEnv.get(cfg.envName) ?? [];
-      names.push(cfg.name);
-      byEnv.set(cfg.envName, names);
-    }
-    return Array.from(byEnv.entries())
-      .map(([env, names]) => (names.length > 1 ? `${env}: ${names.join(", ")}` : env))
+
+    return [...groupBy(configs, (dbConfig) => dbConfig.envName)]
+      .map(([env, config]) => {
+        const names = config.map((dbConfig) => dbConfig.name);
+        if (names.length > 1) {
+          return `${env}: ${names.join(", ")}`;
+        } else {
+          return env;
+        }
+      })
       .join("\n");
   }
 
@@ -233,7 +218,7 @@ export class DatabaseConfigurations {
     envName: string,
     name: string,
     config: string | DatabaseConfigOptions,
-  ): HashConfig {
+  ): HashConfig | null {
     if (typeof config === "string") return this.buildDbConfigFromString(envName, name, config);
     if (typeof config === "object" && config !== null && !Array.isArray(config))
       return this.buildDbConfigFromHash(envName, name, { ...config });
@@ -259,7 +244,7 @@ export class DatabaseConfigurations {
     envName: string,
     name: string,
     config: DatabaseConfigOptions,
-  ): HashConfig {
+  ): HashConfig | null {
     const url = config.url;
     const configWithoutUrl = { ...config };
     delete configWithoutUrl.url;
@@ -268,7 +253,8 @@ export class DatabaseConfigurations {
       const result = handler(envName, name, url, configWithoutUrl);
       if (result) return result;
     }
-    throw new InvalidConfigurationError(`No db config handler matched for ${envName}/${name}`);
+
+    return null;
   }
 
   /** @internal */

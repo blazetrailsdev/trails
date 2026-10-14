@@ -20,6 +20,7 @@ function fakeResponse(
   const body = opts.body ?? "";
   return {
     status,
+    isRedirection: status >= 300 && status <= 399,
     location,
     body,
     getHeader: (key) => (key.toLowerCase() === "location" ? location : undefined),

@@ -1,7 +1,8 @@
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { Toy } from "./test-helpers/models/toy.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("timestamp reload_schema_from_cache", () => {
   fixtures(["toys", "books"]);
@@ -56,7 +57,7 @@ describe("timestamp reload_schema_from_cache", () => {
       }
     }
     const book = (await BookTouchingOnlyUpdatedOn.first())!;
-    await book.updateColumn("updated_at", new Date("2001-01-01T00:00:00Z"));
+    await book.updateColumn("updated_at", RubyTime.utc(2001, 1, 1));
     await book.reload();
     const updatedAt = book.readAttribute("updated_at");
     await book.touch();

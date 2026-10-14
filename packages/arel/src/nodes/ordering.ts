@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Unary } from "./unary.js";
 import type { Ascending } from "./ascending.js";
 import type { Descending } from "./descending.js";
@@ -27,6 +28,6 @@ export class NullsLast extends Unary {
   }
 }
 
-Nodes.Ordering = Ordering;
-Nodes.NullsFirst = NullsFirst;
-Nodes.NullsLast = NullsLast;
+rbModConstSet(Nodes, "Ordering", Ordering);
+rbModConstSet(Nodes, "NullsFirst", NullsFirst);
+rbModConstSet(Nodes, "NullsLast", NullsLast);

@@ -1,3 +1,4 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { ViewContext, RenderOptions } from "./abstract-renderer.js";
@@ -132,12 +133,7 @@ function collectionFromOptions(options: RenderOptions): readonly unknown[] | und
 
 /** @internal */
 function collectionFromObject(object: unknown): readonly unknown[] | undefined {
-  if (
-    object !== null &&
-    object !== undefined &&
-    typeof (object as { toAry?: unknown }).toAry === "function"
-  ) {
-    return (object as { toAry(): readonly unknown[] }).toAry();
-  }
+  if (Array.isArray(object)) return object;
+  if (rbObjRespondTo(object, "toAry")) return (object as { toAry(): readonly unknown[] }).toAry();
   return undefined;
 }

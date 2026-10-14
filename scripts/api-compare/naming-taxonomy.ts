@@ -17,6 +17,7 @@
  */
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { RUBY_COMPAT_EXPORTS } from "../parity/ruby-compat.js";
+import { IDENTIFIER_STRING, RECEIVER_DROPPING_CONVERSIONS } from "./call-args.js";
 
 export type NamingClass =
   | "js-reserved-word"
@@ -24,6 +25,7 @@ export type NamingClass =
   | "conventions-rename"
   | "module-mixin-receiver"
   | "ivar-underscore"
+  | "ivar-method-collision"
   | "module-mixin-call"
   | "block-idiom"
   | "ivar-reflection"
@@ -51,7 +53,7 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "Ruby construct spelled as the JS builtin doing the same work (`inject`/`reduce`, " +
       "`last`/`at(-1)`), or as the ruby-compat export RUBY_COMPAT_EXPORTS names its port " +
       "(`Float(x)`/`kernelFloat(x)`, `Regexp.escape`/`regexpEscape`), or as the one export " +
-      "RUBY_COMPAT_CHAIN_EXPORTS names for a Ruby call chain (`x.class.name`/`rbObjClass(x)`). " +
+      "RUBY_COMPAT_CHAIN_EXPORTS names for a Ruby call chain (`x.class.name`/`rbObjClassname(x)`). " +
       "Same call; only the language's name for it differs.",
   },
   {
@@ -68,6 +70,16 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "Ruby reads an ivar bare (`@direction` at migration.rb:1422) where trails spells the same " +
       "ivar `this._direction`; the leading underscore is the settled repo-wide spelling for a " +
       "Ruby ivar, so the two sides already match.",
+  },
+  {
+    name: "ivar-method-collision",
+    permanent: true,
+    reason:
+      "Ruby holds an ivar and a `_`-prefixed method of one name — `@value_for_database` beside " +
+      "`_value_for_database` (attribute.rb:55-60, :165). The settled ivar spelling " +
+      "`_valueForDatabase` is that method's name, and a JS class cannot hold a field and a " +
+      "method of one name, so the ivar takes a second underscore (`__valueForDatabase`, declared " +
+      "through `rbDeclareIvar`). Scoped to the cited Ruby ivars (IVAR_METHOD_COLLISION_RUBY_REFS).",
   },
   {
     name: "module-mixin-call",
@@ -151,6 +163,17 @@ export const IVAR_REFLECTION_ACCESSORS = new Set([
  */
 export const BLOCK_IDIOM_RUBY_REFS = new Set(["instance_exec", "instanceExec", "modelClass"]);
 
+/**
+ * Ruby ivars whose class also defines a method of the ivar's `_`-prefixed
+ * name, so trails' `_` ivar spelling is taken and the field carries a second
+ * underscore. Kept as an explicit, cited list: a `__` field on its own proves
+ * no collision, and the safe direction for a permanent class is to under-match.
+ *
+ *   - `value_for_database` — `@value_for_database` beside `_value_for_database`,
+ *                            attribute.rb:55-60 and :165
+ */
+export const IVAR_METHOD_COLLISION_RUBY_REFS = new Set(["value_for_database", "valueForDatabase"]);
+
 /** Identifiers a TS parameter or local cannot be named (`arguments`/`eval` are unusable in strict mode). */
 export const JS_RESERVED_WORDS = new Set(
   (
@@ -217,21 +240,21 @@ const RUBY_COMPAT_EXPORT_BY_REF = new Map(
  * Ruby call chains ONE ruby-compat export stands for, keyed by the chain's
  * outermost callee — the only link the recorder keeps — and valued by the
  * export. `first.class.name` (core_ext/array/conversions.rb:191) records as
- * `ref:name`; `rbObjClass` (ruby-compat/src/object.ts) answers the class NAME,
+ * `ref:name`; `rbObjClassname` (ruby-compat/src/object.ts) answers the class NAME,
  * not the class, because a JS `number` is the seat for both `Integer` and
  * `Float` and only the value can say which, so `first.constructor.name` would
  * answer `Number` where Ruby answers `Integer`. The key alone would admit any
- * `.name`; the export on the TS side is what narrows it, since `rbObjClass`
+ * `.name`; the export on the TS side is what narrows it, since `rbObjClassname`
  * cannot be read as the port of any other `name`.
  */
 export const RUBY_COMPAT_CHAIN_EXPORTS: Record<string, string> = {
-  name: "rbObjClass",
+  name: "rbObjClassname",
 };
 
 /**
  * A ruby-compat export in the spelling the recorder gives a TS `ref:`: it runs
  * the TS identifier through {@link snakeToCamel} too, whose token renames turn
- * an `rb` prefix into `js` (`rbObjClass` records as `jsObjClass`).
+ * an `rb` prefix into `js` (`rbObjClassname` records as `jsObjClassname`).
  */
 function recordedExport(tsExport: string): string {
   return snakeToCamel(tsExport);
@@ -240,6 +263,57 @@ function recordedExport(tsExport: string): string {
 /** The bare identifier behind a recorded `ref:` argument, or undefined. */
 export function refName(arg: string): string | undefined {
   return arg.startsWith("ref:") ? arg.slice("ref:".length) : undefined;
+}
+
+/** Split a `kwargs{…}` body into its top-level `key=value` entries. */
+function kwargEntries(descriptor: string): Map<string, string> {
+  const entries = new Map<string, string>();
+  const body = descriptor.slice("kwargs{".length, -1);
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i <= body.length; i++) {
+    const c = body[i];
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (i === body.length || (c === "," && depth === 0)) {
+      const pair = body.slice(start, i);
+      const eq = pair.indexOf("=");
+      if (eq !== -1) entries.set(snakeToCamel(pair.slice(0, eq)), pair.slice(eq + 1));
+      start = i + 1;
+    }
+  }
+  return entries;
+}
+
+/**
+ * Every (ruby, ts) identifier pair two argument lists differ on: a `ref:`
+ * against a `ref:` at the same position, or under the same key of two
+ * `kwargs{…}` at the same position.
+ *
+ * A `to_s` / `to_sym` against any identifier is not one: call-args.ts'
+ * `refKeysEqual` already holds the two equal, so the pair only reaches here
+ * riding a row some OTHER argument opened (sqlite3_adapter.rb:128-129,
+ * `@config.merge(database: @config[:database].to_s, …)`).
+ */
+export function differingRefPairs(rubyArgs: string[], tsArgs: string[]): [string, string][] {
+  const pairs: [string, string][] = [];
+  for (let i = 0; i < Math.max(rubyArgs.length, tsArgs.length); i++) {
+    const rubyArg = rubyArgs[i] ?? "";
+    const tsArg = tsArgs[i] ?? "";
+    if (rubyArg.startsWith("kwargs{") && tsArg.startsWith("kwargs{")) {
+      const ts = kwargEntries(tsArg);
+      for (const [key, rubyValue] of kwargEntries(rubyArg)) {
+        pairs.push(...differingRefPairs([rubyValue], [ts.get(key) ?? ""]));
+      }
+      continue;
+    }
+    const r = refName(rubyArg);
+    const t = refName(tsArg);
+    if (r === undefined || t === undefined || r === t) continue;
+    if (RECEIVER_DROPPING_CONVERSIONS.has(r) && IDENTIFIER_STRING.test(t)) continue;
+    pairs.push([r, t]);
+  }
+  return pairs;
 }
 
 /**
@@ -316,6 +390,9 @@ export function classifyPair(
     return "implicit-to-s";
   }
   if (!rubyRef.startsWith("@") && tsRef === `_${snakeToCamel(rubyRef)}`) return "ivar-underscore";
+  if (IVAR_METHOD_COLLISION_RUBY_REFS.has(rubyRef) && tsRef === `__${snakeToCamel(rubyRef)}`) {
+    return "ivar-method-collision";
+  }
   if (tsRef === "call" && isThisTypedFunction(rubyRef, thisTypedFunctions)) {
     return "module-mixin-call";
   }
@@ -343,10 +420,7 @@ export function classifyRow(
   thisTypedFunctions?: ReadonlySet<string>,
 ): NamingClass {
   const seen: NamingClass[] = [];
-  for (let i = 0; i < Math.max(rubyArgs.length, tsArgs.length); i++) {
-    const r = refName(rubyArgs[i] ?? "");
-    const t = refName(tsArgs[i] ?? "");
-    if (r === undefined || t === undefined || r === t) continue;
+  for (const [r, t] of differingRefPairs(rubyArgs, tsArgs)) {
     seen.push(classifyPair(r, t, thisTypedFunctions));
   }
   if (seen.length === 0) return "burndown";

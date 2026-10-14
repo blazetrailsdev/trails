@@ -1,11 +1,14 @@
-import type { ValueType } from "@blazetrails/activemodel";
-import type mysql from "mysql2/promise";
 import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
+import { anybits, Module, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone } from "@blazetrails/activesupport";
+import {
+  Mysql2,
+  type Mysql2Client,
+  type Mysql2Result,
+  type Mysql2Statement,
+} from "../../mysql2/client.js";
 import { defaultTimezone } from "../../active-record.js";
 import { ExplainRegistry } from "../../explain-registry.js";
 
@@ -16,53 +19,19 @@ export interface DatabaseStatementsHost {
 }
 
 /** @internal */
-export interface Mysql2FieldDescriptor {
-  name: string;
-  type?: number;
-  columnType?: number;
-  decimals?: number;
-}
-
-/** @internal */
-export interface Mysql2RawResult {
-  rows: unknown[][] | null;
-  fields: Mysql2FieldDescriptor[];
-  affectedRows: number;
-  insertId?: number;
-  _arStmtToClose?: { close(): void };
-}
-
-/** @internal */
-const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
-  0: "decimal",
-  246: "decimal",
-  4: "float",
-  5: "double",
-  1: "tinyint",
-  2: "smallint",
-  9: "mediumint",
-  3: "int",
-  8: "bigint",
-  13: "year",
-};
-
-/** @internal */
 interface PerformQueryHost {
-  _databaseTimezone?: "utc" | "local";
-  _affectedRowsBeforeWarnings?: number;
-  _lastId?: number;
-  _statements?: StatementPool | null;
-  handleWarnings?(sql: string): void | Promise<void>;
-  verified?(): void;
-  _trackPrepared?(conn: unknown, sql: string): void;
-  quotedDate(value: unknown): string;
-  _config?: { readTimeout?: number };
+  _affectedRowsBeforeWarnings: number | null;
+  _statements: StatementPool<Mysql2Statement>;
+  isMultiStatementsEnabled(): boolean;
+  active(): Promise<boolean>;
+  handleWarnings(sql: string): Promise<void>;
+  verifiedBang(): void;
 }
 
 /** @internal */
 interface LastInsertedIdHost {
-  _lastId?: number;
-  supportsInsertReturning(): Promise<boolean>;
+  _rawConnection: Mysql2Client | null;
+  supportsInsertReturning(): boolean;
 }
 
 /** @internal */
@@ -70,25 +39,25 @@ interface MultiStatementsHost {
   _config?: { flags?: string[] | number };
 }
 
-const MULTI_STATEMENTS_BIT = 0x10000;
-
 /** @internal */
 interface SelectAllHost {
   preparedStatements?: boolean;
   unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T;
 }
 
-export function selectAll(
-  this: SelectAllHost,
-  super_: (...args: unknown[]) => unknown,
-  ...args: unknown[]
-): unknown {
+export function selectAll(this: SelectAllHost, ...args: unknown[]): unknown {
   if (ExplainRegistry.isCollect() && this.preparedStatements) {
-    return this.unpreparedStatement(() => super_(...args));
+    return this.unpreparedStatement(() =>
+      DatabaseStatements.superMethod(this, "selectAll")!(...args),
+    );
   } else {
-    return super_(...args);
+    return DatabaseStatements.superMethod(this, "selectAll")!(...args);
   }
 }
+
+export const DatabaseStatements = new Module((mod) => {
+  mod.defineMethod("selectAll", selectAll);
+});
 
 /** @internal */
 interface ExecuteBatchHost extends MaxAllowedPacketHost {
@@ -114,15 +83,7 @@ export async function executeBatch(
     materializeTransactions = true,
   }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
-  const host = this as unknown as MultiStatementsHost;
-  const flags = host._config?.flags;
-  const multiStatements =
-    isMultiStatementsEnabled.call(host) ||
-    (Array.isArray(flags) ? !flags.includes("-MULTI_STATEMENTS") : flags == null);
-  const totalSql = multiStatements
-    ? await combineMultiStatements.call(this, statements)
-    : statements;
-  for (const statement of totalSql) {
+  for (const statement of await combineMultiStatements.call(this, statements)) {
     await this.rawExecute(
       statement,
       name,
@@ -138,130 +99,99 @@ export async function executeBatch(
 
 /** @internal */
 export async function lastInsertedId(this: LastInsertedIdHost, result: Result): Promise<unknown> {
-  if (await this.supportsInsertReturning()) {
+  if (this.supportsInsertReturning()) {
     return abstractLastInsertedId(result);
   }
-  return this._lastId;
+  return this._rawConnection?.lastId;
 }
 
 /** @internal */
 export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
   const flags = this._config?.flags;
-  if (Array.isArray(flags)) return flags.includes("MULTI_STATEMENTS");
-  if (typeof flags === "number") return (flags & MULTI_STATEMENTS_BIT) !== 0;
-  return false;
+
+  if (Array.isArray(flags)) {
+    return flags.includes("MULTI_STATEMENTS");
+  } else {
+    return anybits(flags as number, Mysql2.Client.MULTI_STATEMENTS);
+  }
 }
 
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
-  rawConnection: mysql.PoolConnection | mysql.Connection,
+  rawConnection: Mysql2Client,
   sql: string,
-  binds: unknown[],
+  binds: unknown[] | null,
   typeCastedBinds: unknown[],
   {
     prepare,
     notificationPayload,
+    batch = false,
   }: {
     prepare: boolean;
-    notificationPayload?: Record<string, unknown>;
+    notificationPayload: Record<string, unknown>;
     batch?: boolean;
   },
-): Promise<Mysql2RawResult> {
-  this._databaseTimezone = defaultTimezone();
-
-  const hasBinds = binds != null && binds.length > 0;
-
-  if (prepare) this._trackPrepared?.(rawConnection, sql);
-
-  const driverBinds = typeCastedBinds.map((value) =>
-    value instanceof TimeWithZone ||
-    value instanceof RubyTime ||
-    value instanceof Temporal.PlainDate
-      ? this.quotedDate(value)
-      : value,
-  );
-
-  const readTimeout = this._config?.readTimeout;
-  const timeoutOption = readTimeout != null ? { timeout: readTimeout * 1000 } : {};
-  let rawResult: unknown;
-  let rawFields: mysql.FieldPacket[] | undefined;
-  let stmtToClose: { close(): void } | undefined;
-  if (!hasBinds) {
-    [rawResult, rawFields] = (await rawConnection.query({
-      sql,
-      rowsAsArray: true,
-      ...timeoutOption,
-    } as any)) as [unknown, mysql.FieldPacket[]];
-  } else if (prepare) {
-    try {
-      [rawResult, rawFields] = (await rawConnection.execute(
-        { sql, rowsAsArray: true, ...timeoutOption } as any,
-        driverBinds as any[],
-      )) as [unknown, mysql.FieldPacket[]];
-    } catch (err) {
-      this._statements?.delete(sql);
-      throw err;
+): Promise<Mysql2Result | null> {
+  let resetMultiStatement: true | undefined;
+  try {
+    if (batch && !this.isMultiStatementsEnabled()) {
+      await rawConnection.setServerOption(Mysql2.Client.OPTION_MULTI_STATEMENTS_ON);
+      resetMultiStatement = true;
     }
-  } else {
-    const stmt = { sql, rowsAsArray: true, ...timeoutOption };
-    try {
-      [rawResult, rawFields] = (await rawConnection.execute(stmt as any, driverBinds as any[])) as [
-        unknown,
-        mysql.FieldPacket[],
-      ];
-      if (Array.isArray(rawResult)) {
-        stmtToClose = { close: () => void rawConnection.unprepare(stmt as any) };
-      } else {
-        rawConnection.unprepare(stmt as any);
+
+    rawConnection.queryOptions.databaseTimezone = defaultTimezone();
+
+    let result: Mysql2Result | null = null;
+    if (binds == null || binds.length === 0) {
+      result = await rawConnection.query(sql);
+      this._affectedRowsBeforeWarnings = result?.size ?? rawConnection.affectedRows;
+    } else if (prepare) {
+      const stmt =
+        this._statements.get(sql) ?? this._statements.set(sql, rawConnection.prepare(sql));
+      try {
+        result = await stmt.execute(...typeCastedBinds);
+        this._affectedRowsBeforeWarnings = stmt.affectedRows;
+      } catch (e) {
+        if (!(e instanceof Mysql2.Error)) throw e;
+        this._statements.delete(sql);
+        throw e;
       }
-    } catch (err) {
-      rawConnection.unprepare(stmt as any);
-      throw err;
+    } else {
+      const stmt = rawConnection.prepare(sql);
+      try {
+        result = await stmt.execute(...typeCastedBinds);
+        this._affectedRowsBeforeWarnings = stmt.affectedRows;
+        if (result != null) {
+          rbObjIvarSet(result, "@_ar_stmt_to_close", stmt);
+        } else {
+          stmt.close();
+        }
+      } catch (e) {
+        if (!(e instanceof Mysql2.Error)) throw e;
+        stmt.close();
+        throw e;
+      }
+    }
+
+    notificationPayload["affected_rows"] = this._affectedRowsBeforeWarnings;
+    notificationPayload["row_count"] = result?.size ?? 0;
+
+    rawConnection.abandonResultsBang();
+
+    this.verifiedBang();
+    await this.handleWarnings(sql);
+    return result;
+  } finally {
+    if (resetMultiStatement && (await this.active())) {
+      await rawConnection.setServerOption(Mysql2.Client.OPTION_MULTI_STATEMENTS_OFF);
     }
   }
-
-  let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
-  let fields = rawFields;
-  if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
-    result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
-    fields = rawFields[0] as mysql.FieldPacket[];
-  } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
-    result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
-  }
-  let rows: unknown[][] | null = null;
-  let fieldList: Mysql2FieldDescriptor[] = [];
-  let affectedRows = 0;
-  let insertId: number | undefined;
-  if (Array.isArray(result)) {
-    rows = result as unknown[][];
-    fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
-    affectedRows = rows.length;
-  } else {
-    affectedRows = result.affectedRows ?? 0;
-    insertId = result.insertId;
-  }
-
-  this._affectedRowsBeforeWarnings = affectedRows;
-  if (insertId !== undefined) this._lastId = insertId;
-
-  if (notificationPayload) {
-    notificationPayload["affected_rows"] = this._affectedRowsBeforeWarnings;
-    notificationPayload["row_count"] = rows?.length ?? 0;
-  }
-
-  this.verified?.();
-  await this.handleWarnings?.(sql);
-
-  return { rows, fields: fieldList, affectedRows, insertId, _arStmtToClose: stmtToClose };
 }
 
 /** @internal */
-export function castResult(
-  this: { lookupCastType(sqlType: string): ValueType },
-  rawResult: Mysql2RawResult,
-): Result {
-  if (rawResult.rows == null) return Result.empty();
+export function castResult(rawResult: Mysql2Result | null): Result {
+  if (rawResult == null) return Result.empty();
 
   const fields = rawResult.fields;
 
@@ -269,26 +199,7 @@ export function castResult(
   if (fields.length === 0) {
     result = Result.empty();
   } else {
-    let columnTypes: Record<string | number, ValueType> | null = null;
-    for (let i = 0; i < fields.length; i++) {
-      const f = fields[i];
-      const code = f.columnType ?? f.type;
-      if (code == null) continue;
-      let sqlType = MYSQL_NUMERIC_FIELD_SQL_TYPE[code];
-      if (sqlType == null) continue;
-      if (sqlType === "decimal" && typeof f.decimals === "number" && f.decimals > 0) {
-        sqlType = `decimal(65,${f.decimals})`;
-      }
-      const type = this.lookupCastType(sqlType);
-      columnTypes ??= {};
-      columnTypes[i] = type;
-      if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
-    }
-    result = new Result(
-      fields.map((f) => f.name),
-      rawResult.rows,
-      columnTypes,
-    );
+    result = new Result(fields, rawResult.toA());
   }
 
   freeRawResult(rawResult);
@@ -297,13 +208,18 @@ export function castResult(
 }
 
 /** @internal */
-export function affectedRows(this: PerformQueryHost, rawResult: Mysql2RawResult): number {
-  if (rawResult) freeRawResult(rawResult);
-  return this._affectedRowsBeforeWarnings ?? 0;
+export function affectedRows(
+  this: { _affectedRowsBeforeWarnings: number | null },
+  rawResult: Mysql2Result | null,
+): number | null {
+  if (rawResult != null) freeRawResult(rawResult);
+
+  return this._affectedRowsBeforeWarnings;
 }
 
 /** @internal */
-export function freeRawResult(rawResult: Mysql2RawResult): void {
-  const stmt = rawResult._arStmtToClose;
-  if (stmt) stmt.close();
+export function freeRawResult(rawResult: Mysql2Result): void {
+  rawResult.free();
+  const stmt = rbObjIvarGet(rawResult, "@_ar_stmt_to_close") as Mysql2Statement | null;
+  if (stmt != null) stmt.close();
 }

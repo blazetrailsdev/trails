@@ -25,7 +25,7 @@
  *     are listed here.
  *
  * `--gate` exits non-zero on any entry in any population; CI runs it for
- * activerecord, whose populations are burnt down. Requires
+ * activerecord and activemodel, whose populations are burnt down. Requires
  * `pnpm parity:api --calls` to have written the artifacts.
  */
 import * as fsp from "fs/promises";

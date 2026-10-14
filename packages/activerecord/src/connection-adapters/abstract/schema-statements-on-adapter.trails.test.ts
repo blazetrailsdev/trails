@@ -1,10 +1,12 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
+import { Mysql2Adapter } from "../mysql2-adapter.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { NotImplementedError } from "../../errors.js";
 import { ambientConnection, withRocketTables } from "../../support/rocket-tables.js";
 import { adapterType } from "../../test-adapter.js";
@@ -37,7 +39,7 @@ class SqliteCapturingAdapter extends AbstractAdapter {
     return this.allSql.at(-1) ?? "";
   }
   override indexes(tableName: string) {
-    return sqliteIndexes(this as never, tableName);
+    return sqliteIndexes.call(this as never, tableName);
   }
   execute(sql: string) {
     this.allSql.push(sql);
@@ -69,6 +71,50 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await sqlite.dropTable();
     await sqlite.dropTable({ ifExists: true });
     expect(sqlite.allSql).toEqual([]);
+  });
+
+  it("schema statements answer what Rails' do: execute's result, or the table names", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const execute = adapter.execute.bind(adapter);
+    (adapter as { execute: unknown }).execute = async (sql: string) => {
+      await execute(sql);
+      return { sql };
+    };
+
+    const created = await adapter.createTable("things", (t) => {
+      t.string("name");
+    });
+    expect(created).toEqual({ sql: expect.stringMatching(/^CREATE TABLE "things"/) });
+    expect(await adapter.addIndex("things", "name")).toEqual({
+      sql: expect.stringMatching(/^CREATE INDEX "index_things_on_name"/),
+    });
+    expect(await adapter.addColumn("things", "quantity", "integer")).toEqual({
+      sql: expect.stringMatching(/^ALTER TABLE "things" ADD "quantity"/),
+    });
+    expect(await adapter.removeIndex("things", "name", { ifExists: true })).toBeDefined();
+    expect(await adapter.removeIndex("things", "name", { ifExists: true })).toBeUndefined();
+    expect(await adapter.dropTable("things")).toEqual(["things"]);
+  });
+
+  it("create_database and recreate_database answer the CREATE DATABASE result", async () => {
+    const mysql = new Mysql2Adapter({ host: "localhost" });
+    Object.assign(mysql, { execute: async (sql: string) => sql, reconnectBang: async () => {} });
+    const latin1 = "CREATE DATABASE `luca` DEFAULT CHARACTER SET `latin1`";
+    expect(await mysql.createDatabase("luca", { charset: "latin1" })).toBe(latin1);
+    expect(await mysql.recreateDatabase("luca", { charset: "latin1" })).toBe(latin1);
+
+    const pg = new PostgreSQLAdapter({} as never);
+    Object.assign(pg, { execute: async (sql: string) => sql });
+    const utf8 = `CREATE DATABASE "matt" ENCODING = 'utf8'`;
+    expect(await pg.createDatabase("matt")).toBe(utf8);
+    expect(await pg.recreateDatabase("matt")).toBe(utf8);
+  });
+
+  it("PostgreSQL begin_db_transaction and commit_db_transaction answer internal_execute's result", async () => {
+    const pg = new PostgreSQLAdapter({} as never);
+    Object.assign(pg, { internalExecute: async (sql: string) => sql });
+    expect(await pg.beginDbTransaction()).toBe("BEGIN");
+    expect(await pg.commitDbTransaction()).toBe("COMMIT");
   });
 
   it("indexes() raises NotImplementedError on an adapter that does not override it", async () => {
@@ -115,7 +161,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await adapter.createTable("things", (t) => {
       t.string("name");
     });
-    await adapter.changeTable("things", undefined, async (t) => {
+    await adapter.changeTable("things", {}, async (t) => {
       await t.column("quantity", "integer");
     });
     expect((await adapter.columns("things")).map((c) => c.name)).toContain("quantity");
@@ -175,7 +221,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       new NotImplementedError("foreign_keys is not implemented"),
     );
     await expect(
-      stub.removeForeignKey("products", { name: "fk_products_user_id" }),
+      stub.removeForeignKey("products", undefined, { name: "fk_products_user_id" }),
     ).rejects.toThrow(new NotImplementedError("foreign_keys is not implemented"));
   });
 
@@ -247,7 +293,11 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     }
     const stub = new FkStub({});
     await expect(
-      stub.removeForeignKey("products", { name: "wrong_name", toTable: "other", ifExists: true }),
+      stub.removeForeignKey("products", undefined, {
+        name: "wrong_name",
+        toTable: "other",
+        ifExists: true,
+      }),
     ).rejects.toThrow(/no foreign key/i);
   });
 
@@ -276,7 +326,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     const stub = new NoFkAdapter({});
     expect((stub as any).useForeignKeys()).toBe(false);
     await expect(
-      stub.removeForeignKey("articles", { name: "fk_whatever" }),
+      stub.removeForeignKey("articles", undefined, { name: "fk_whatever" }),
     ).resolves.toBeUndefined();
     expect(executed).toBe(false);
   });
@@ -302,7 +352,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect((stub as any).useForeignKeys()).toBe(false);
     await stub.addForeignKey("articles", "authors", { column: "author_id" });
     await expect(
-      stub.removeForeignKey("articles", { name: "fk_whatever" }),
+      stub.removeForeignKey("articles", undefined, { name: "fk_whatever" }),
     ).resolves.toBeUndefined();
     expect(executed).toBe(false);
   });

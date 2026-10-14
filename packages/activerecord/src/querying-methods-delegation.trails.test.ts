@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Topic } from "./test-helpers/models/topic.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 fixtures({ topics: [Topic, {}] });
 

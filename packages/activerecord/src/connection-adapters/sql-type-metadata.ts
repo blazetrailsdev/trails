@@ -1,14 +1,30 @@
-import { deduplicate } from "./deduplicable.js";
-import { rbHash } from "@blazetrails/ruby-compat";
-import type { Deduplicable } from "./deduplicable.js";
+import { Deduplicable } from "./deduplicable.js";
+import type { ClassMethods } from "./deduplicable.js";
+import {
+  include,
+  type Included,
+  rbHash,
+  registerConstant,
+  strUminus,
+} from "@blazetrails/ruby-compat";
 
-export class SqlTypeMetadata implements Deduplicable {
-  readonly sqlType: string | null;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Deduplicable` (`sql_type_metadata.rb:7`); the class/interface merge is how a mixin surfaces on the type side.
+export interface SqlTypeMetadata extends Included<typeof Deduplicable> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class SqlTypeMetadata {
+  declare static registry: typeof ClassMethods.registry;
+
+  sqlType: string | null;
   readonly type: string | undefined;
   readonly limit: number | null;
   readonly precision: number | null;
   readonly scale: number | null;
 
+  /**
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15
+   * @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor
+   */
   constructor(
     options: {
       sqlType?: string | null;
@@ -23,6 +39,7 @@ export class SqlTypeMetadata implements Deduplicable {
     this.limit = options.limit ?? null;
     this.precision = options.precision ?? null;
     this.scale = options.scale ?? null;
+    if (new.target === SqlTypeMetadata) return this.deduplicate();
   }
 
   equals(other: unknown): boolean {
@@ -34,6 +51,10 @@ export class SqlTypeMetadata implements Deduplicable {
       this.precision === other.precision &&
       this.scale === other.scale
     );
+  }
+
+  eql(other: unknown): boolean {
+    return this.equals(other);
   }
 
   hash(): number {
@@ -49,10 +70,11 @@ export class SqlTypeMetadata implements Deduplicable {
 
   /** @internal */
   deduplicated(): this {
-    return Object.freeze(this);
-  }
-
-  deduplicate(): this {
-    return deduplicate(this);
+    this.sqlType = strUminus(this.sqlType!);
+    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
   }
 }
+
+include(SqlTypeMetadata, Deduplicable);
+
+registerConstant("ActiveRecord::ConnectionAdapters::SqlTypeMetadata", SqlTypeMetadata);

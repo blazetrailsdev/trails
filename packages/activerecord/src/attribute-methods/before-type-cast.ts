@@ -1,4 +1,5 @@
 import { included } from "@blazetrails/activesupport";
+import type { Hash } from "@blazetrails/ruby-compat";
 import { AttributeMethods } from "../namespaces.js";
 
 interface BeforeTypeCastIncludeHost {
@@ -14,7 +15,7 @@ export const BeforeTypeCast = {
 
 interface BeforeTypeCastRecord extends AttributeOwner {
   _attributes: AttributeOwner["_attributes"] & {
-    valuesBeforeTypeCast(): Record<string, unknown>;
+    valuesBeforeTypeCast(): Record<string, unknown> | Hash<string, unknown>;
   };
 }
 
@@ -29,13 +30,15 @@ export function readAttributeBeforeTypeCast(
   return attributeBeforeTypeCast.call(record, name) ?? null;
 }
 
-export function attributesBeforeTypeCast(this: BeforeTypeCastRecord): Record<string, unknown> {
+export function attributesBeforeTypeCast(
+  this: BeforeTypeCastRecord,
+): Record<string, unknown> | Hash<string, unknown> {
   return this._attributes.valuesBeforeTypeCast();
 }
 
 interface DatabaseRecord extends AttributeOwner {
   _attributes: AttributeOwner["_attributes"] & {
-    valuesForDatabase(): Record<string, unknown>;
+    valuesForDatabase(): Record<string, unknown> | Hash<string, unknown>;
   };
 }
 
@@ -45,7 +48,9 @@ export function readAttributeForDatabase(record: DatabaseRecord, attrName: strin
   return attributeForDatabase.call(record, name);
 }
 
-export function attributesForDatabase(record: DatabaseRecord): Record<string, unknown> {
+export function attributesForDatabase(
+  record: DatabaseRecord,
+): Record<string, unknown> | Hash<string, unknown> {
   return record._attributes.valuesForDatabase();
 }
 

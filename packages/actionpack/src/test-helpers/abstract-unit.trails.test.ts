@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { include, type Included } from "@blazetrails/activesupport";
 import { URI } from "@blazetrails/ruby-compat";
 
-import { helper, type HelpersClassMethods } from "../abstract-controller/helpers.js";
 import { Base } from "../action-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -16,7 +15,6 @@ import {
   AccountsController,
   CommentsController,
   CookieAssertions,
-  FIXTURE_LOAD_PATH,
   HeadersAssertions,
   ResourcesController,
   RoutingTestHelpers,
@@ -26,15 +24,14 @@ import { GamesHelper } from "./fixtures/helpers/fun/games-helper.js";
 
 class FixtureLoadPathController extends Base {
   async helloWorldWithLayout(): Promise<void> {
-    await this.render({ template: "test/hello_world", layout: "layouts/standard" });
+    await this.render({ template: "test/hello-world", layout: "layouts/standard" });
   }
 
   async renderHelloWorld(): Promise<void> {
     await this.render({ inline: "hello: <%= stratego() %>" });
   }
 }
-FixtureLoadPathController.prependViewPath(FIXTURE_LOAD_PATH);
-helper(FixtureLoadPathController as unknown as HelpersClassMethods, GamesHelper);
+FixtureLoadPathController.helper(GamesHelper);
 
 async function dispatch(action: string): Promise<unknown> {
   const controller = new FixtureLoadPathController();
@@ -70,9 +67,9 @@ describe("RoutingTestHelpers", () => {
 
   it("make_set captures the dispatched controller and verbs return the body", async () => {
     tc.routes = tc.makeSet(false);
-    tc.routes.draw((r) => {
+    tc.routes.draw(function () {
       deprecator().silence(() => {
-        r.get(":controller(/:action(/:id))");
+        this.get(":controller(/:action(/:id))");
       });
     });
 
@@ -92,8 +89,8 @@ describe("RoutingTestHelpers", () => {
 
   it("request_path_params raises RoutingError when no route matches", async () => {
     tc.routes = tc.makeSet(false);
-    tc.routes.draw((r) => {
-      r.get("/posts", { to: "posts#index" });
+    tc.routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
 
     await expect(tc.requestPathParams("/nowhere")).rejects.toThrow(
@@ -103,9 +100,9 @@ describe("RoutingTestHelpers", () => {
 
   it("a strict set dispatches to the routed controller class", async () => {
     tc.routes = tc.makeSet();
-    tc.routes.draw((r) => {
-      r.resources("comments");
-      r.resources("accounts");
+    tc.routes.draw(function () {
+      this.resources("comments");
+      this.resources("accounts");
     });
 
     await tc.get(URI.parse("http://test.host/comments/1"));
@@ -117,8 +114,8 @@ describe("RoutingTestHelpers", () => {
 
   it("url_for generates an only-path url through use_route", () => {
     const set = tc.makeSet(false);
-    set.draw((r) => {
-      r.get("/admin/users", { to: "admin/users#index", as: "admin_users" });
+    set.draw(function () {
+      this.get("/admin/users", { to: "admin/users#index", as: "admin_users" });
     });
 
     expect(tc.urlFor(set, { useRoute: "admin_users" })).toBe("/admin/users");

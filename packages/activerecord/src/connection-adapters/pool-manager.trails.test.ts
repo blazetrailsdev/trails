@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Enumerator } from "@blazetrails/ruby-compat";
 import { PoolManager } from "./pool-manager.js";
 import { PoolConfig } from "./pool-config.js";
 import { ConnectionDescriptor } from "./abstract/connection-handler.js";
@@ -101,7 +102,7 @@ describe("PoolManager", () => {
       manager.setPoolConfig("writing", "default", c1);
       manager.setPoolConfig("reading", "default", c2);
       const collected: PoolConfig[] = [];
-      manager.eachPoolConfig((pc) => collected.push(pc));
+      manager.eachPoolConfig(null, (pc) => collected.push(pc));
       expect(collected).toEqual(expect.arrayContaining([c1, c2]));
       expect(collected).toHaveLength(2);
     });
@@ -121,6 +122,14 @@ describe("PoolManager", () => {
       manager.eachPoolConfig("unknown", (pc) => collected.push(pc));
       expect(collected).toEqual([]);
     });
+
+    it("answers the role's pool configs when no block is given", () => {
+      const c1 = makePoolConfig("primary");
+      manager.setPoolConfig("writing", "default", c1);
+      const enumerator = manager.eachPoolConfig("writing");
+      expect(enumerator).toBeInstanceOf(Enumerator);
+      expect([...(enumerator as Enumerator<PoolConfig>)]).toEqual([c1]);
+    });
   });
 
   describe("removePoolConfig", () => {
@@ -133,7 +142,8 @@ describe("PoolManager", () => {
     });
 
     it("returns undefined for missing entries", () => {
-      expect(manager.removePoolConfig("writing", "default")).toBeUndefined();
+      expect(manager.removePoolConfig("writing", "default")).toBeNull();
+      expect(manager.roleNames).toEqual(["writing"]);
     });
   });
 
@@ -147,7 +157,7 @@ describe("PoolManager", () => {
     });
 
     it("returns undefined for unknown role", () => {
-      expect(manager.removeRole("unknown")).toBeUndefined();
+      expect(manager.removeRole("unknown")).toBeNull();
     });
 
     it("returns the removed shard map when the role existed", () => {

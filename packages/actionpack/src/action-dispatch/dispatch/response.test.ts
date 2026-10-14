@@ -33,7 +33,7 @@ describe("ResponseTest", () => {
 
   it("response code", () => {
     const res = new Response(200);
-    expect(res.code).toBe(200);
+    expect(res.code).toBe("200");
     expect(res.statusCode).toBe(200);
   });
 
@@ -76,7 +76,7 @@ describe("ResponseTest", () => {
 
   it("empty content type returns nil", () => {
     const res = new Response();
-    expect(res.contentType).toBeUndefined();
+    expect(res.contentType).toBeNull();
   });
 
   it("setting content type header impacts content type method", () => {
@@ -121,7 +121,7 @@ describe("ResponseTest", () => {
       expires: new Date(Date.UTC(2005, 9, 10, 5)),
     });
     res.deleteCookie("login");
-    expect(res.cookies).toEqual({ user_name: "david", login: "" });
+    expect(res.cookies).toStrictEqual({ user_name: "david", login: undefined });
   });
 
   it("read ETag and Cache-Control", () => {
@@ -277,7 +277,7 @@ describe("ResponseTest", () => {
     const res = new Response();
     res.setCookie("token", "val");
     res.deleteCookie("token");
-    expect(res.cookies.token).toBe("");
+    expect(res.cookies.token).toBeUndefined();
   });
 
   it("Response.create with no body", () => {
@@ -311,7 +311,7 @@ describe("ResponseTest", () => {
     expect(new Response(400).message).toBe("Bad Request");
     expect(new Response(401).message).toBe("Unauthorized");
     expect(new Response(403).message).toBe("Forbidden");
-    expect(new Response(422).message).toBe("Unprocessable Entity");
+    expect(new Response(422).message).toBe("Unprocessable Content");
     expect(new Response(503).message).toBe("Service Unavailable");
   });
 
@@ -338,10 +338,10 @@ describe("ResponseTest", () => {
   });
 
   it("redirection predicate", () => {
-    expect(new Response(301).redirection).toBe(true);
-    expect(new Response(302).redirection).toBe(true);
-    expect(new Response(200).redirection).toBe(false);
-    expect(new Response(400).redirection).toBe(false);
+    expect(new Response(301).isRedirection).toBe(true);
+    expect(new Response(302).isRedirection).toBe(true);
+    expect(new Response(200).isRedirection).toBe(false);
+    expect(new Response(400).isRedirection).toBe(false);
   });
 
   it("clientError predicate", () => {
@@ -552,10 +552,9 @@ describe("Response Cache::Response wiring", () => {
   });
 
   it("cacheControl returns a parsed directive hash", () => {
-    const res = new Response();
-    res.setHeader("Cache-Control", "max-age=600, public, foo=bar");
+    const res = new Response(200, { "Cache-Control": "max-age=600, public, foo=bar" });
     const hash = res.cacheControl;
-    expect(hash["max_age"]).toBe("600");
+    expect(hash["maxAge"]).toBe("600");
     expect(hash["public"]).toBe(true);
     expect(hash.extras).toEqual(["foo=bar"]);
   });
@@ -563,7 +562,7 @@ describe("Response Cache::Response wiring", () => {
   it("mergeAndNormalizeCacheControl writes back the combined directive set", () => {
     const res = new Response();
     res._cacheControl = "no-cache";
-    res.mergeAndNormalizeCacheControlBang({ public: true, max_age: 30 });
+    res.mergeAndNormalizeCacheControlBang({ public: true, maxAge: 30 });
     const cc = res._cacheControl;
     expect(cc).toContain("max-age=30");
     expect(cc).toContain("public");

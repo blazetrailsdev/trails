@@ -1,21 +1,22 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
+import type { ArelNode } from "../arel.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectStatement extends NodeExpression {
   cores: SelectCore[];
-  orders: Node[];
+  orders: ArelNode[];
   limit: Node | null;
   offset: Node | null;
   lock: Node | null;
   with: Node | null;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.cores = [new SelectCore(relation)];
     this.orders = [];
@@ -42,11 +43,9 @@ export class SelectStatement extends NodeExpression {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.cores = this.cores.map((x) => x.clone());
-    copy.orders = this.orders.map((x) => cloneSlot(x));
-    return copy;
+  initializeCopy(_other: SelectStatement): void {
+    this.cores = this.cores.map((x) => rbObjClone(x));
+    this.orders = this.orders.map((x) => rbObjClone(x));
   }
 }
 
@@ -54,4 +53,4 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface SelectStatement extends _AliasPredication {}
 
-Nodes.SelectStatement = SelectStatement;
+rbModConstSet(Nodes, "SelectStatement", SelectStatement);

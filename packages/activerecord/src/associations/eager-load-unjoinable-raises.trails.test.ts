@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
@@ -42,7 +42,7 @@ describe("eager_load with an unresolvable association", () => {
 
   it("raises EagerLoadPolymorphicError on the exists? path", async () => {
     await expect(Tagging.all().eagerLoad(":taggable").isExists()).rejects.toThrow(
-      /Cannot eagerly load the polymorphic association :taggable\./,
+      /Cannot eagerly load the polymorphic association :taggable$/,
     );
   });
 

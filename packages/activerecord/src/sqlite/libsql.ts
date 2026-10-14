@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "libsql";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";
@@ -58,7 +58,15 @@ class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
   private boundParams: SqliteBinds | undefined;
 
   bindParams(binds: SqliteBinds): void {
-    this.boundParams = binds;
+    this.boundParams = Array.isArray(binds)
+      ? binds.map((value: unknown) =>
+          value instanceof Number
+            ? value.valueOf()
+            : typeof value === "number" && Number.isInteger(value)
+              ? BigInt(value)
+              : (value as SqliteBindValue),
+        )
+      : binds;
   }
 
   step(): null {
@@ -124,6 +132,11 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
     return this.raw.open;
   }
 
+  filename(dbName = "main"): string | null {
+    const list = this.pragma("database_list") as { name: string; file: string }[];
+    return list.find(({ name }) => name === dbName)?.file ?? null;
+  }
+
   exec(sql: string): void {
     try {
       this.raw.exec(sql);
@@ -154,6 +167,11 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
     } finally {
       stmt.close();
     }
+  }
+
+  rollback(): true {
+    this.execute("rollback transaction");
+    return true;
   }
 
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
@@ -226,7 +244,6 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,
   };
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   try {
     return new Database(sharedCacheDatabase(config), opts);
   } catch (e) {
@@ -247,8 +264,7 @@ function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
   if (config.authToken !== undefined) {
     (opts as LibsqlReplicaOptions).authToken = config.authToken;
   }
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
-  return new Database(config.remoteUrl!, opts);
+  return new Database(config.database, opts);
 }
 
 const remoteCapabilities: SqliteDriverCapabilities = {
@@ -293,7 +309,6 @@ export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOpti
   };
   if (config.syncUrl !== undefined) opts.syncUrl = config.syncUrl;
   if (config.authToken !== undefined) opts.authToken = config.authToken;
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   if (opts.syncPeriod !== undefined) {
     if (
       typeof opts.syncPeriod !== "number" ||
@@ -347,10 +362,6 @@ export const libsqlDriver: SqliteDriver = {
 
   open(config: SqliteOpenConfig): Promise<SqliteConnection> {
     return Promise.resolve(new LibsqlConnection(openDatabase(config)));
-  },
-
-  openSync(config: SqliteOpenConfig): SyncSqliteConnection {
-    return new LibsqlConnection(openDatabase(config));
   },
 
   databaseExists(config: SqliteOpenConfig): boolean {

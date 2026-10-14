@@ -1,12 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Deprecation } from "../deprecation.js";
-import { NameError, rbEqual } from "@blazetrails/ruby-compat";
+import { NameError, rbEqual, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import {
   DeprecatedConstantProxy,
   DeprecatedInstanceVariableProxy,
   DeprecatedObjectProxy,
 } from "./proxy-wrappers.js";
-import { registerConstant, unregisterConstant } from "../inflector.js";
 import { assertDeprecated } from "../testing/deprecation.js";
 
 class Record {
@@ -31,9 +30,9 @@ class Owner {
 describe("DeprecatedInstanceVariableProxy#warn", () => {
   const deprecator = new Deprecation();
   const proxy = (): Record =>
-    DeprecatedInstanceVariableProxy.new(new Owner(), "targetRecord", "@record", {
+    new DeprecatedInstanceVariableProxy(new Owner(), "targetRecord", "@record", {
       deprecator,
-    }) as Record;
+    }) as unknown as Record;
 
   it("renders a predicate as its Ruby name", async () => {
     const result = await assertDeprecated(
@@ -66,19 +65,19 @@ describe("DeprecationProxy#method_missing ==", () => {
   const deprecator = new Deprecation();
 
   it("sends == to a String target of DeprecatedObjectProxy", async () => {
-    const proxy = DeprecatedObjectProxy.new("foo", ":bomb:", deprecator);
+    const proxy = new DeprecatedObjectProxy("foo", ":bomb:", deprecator);
     expect(await assertDeprecated(/:bomb:/, deprecator, () => rbEqual(proxy, "foo"))).toBe(true);
     expect(await assertDeprecated(/:bomb:/, deprecator, () => rbEqual(proxy, "bar"))).toBe(false);
   });
 
   it("sends == to an Integer target of DeprecatedInstanceVariableProxy", async () => {
     const owner = { count: 1 };
-    const proxy = DeprecatedInstanceVariableProxy.new(owner, "count", "@count", { deprecator });
+    const proxy = new DeprecatedInstanceVariableProxy(owner, "count", "@count", { deprecator });
     expect(await assertDeprecated("@count.==", deprecator, () => rbEqual(proxy, 1))).toBe(true);
   });
 
   it("is not reached from String#== on the target side, as rb_str_equal's to_str probe misses", () => {
-    const proxy = DeprecatedObjectProxy.new("foo", ":bomb:", deprecator);
+    const proxy = new DeprecatedObjectProxy("foo", ":bomb:", deprecator);
     expect(rbEqual("foo", proxy)).toBe(false);
   });
 });
@@ -98,7 +97,11 @@ describe("DeprecatedConstantProxy#const_missing", () => {
   afterAll(() => unregisterConstant("Undeprecated::Target", Target));
 
   it("resolves a child constant against the target itself, as target.const_get does", async () => {
-    const proxy = DeprecatedConstantProxy.new("Old", "Undeprecated::Target", deprecator) as {
+    const proxy = new DeprecatedConstantProxy(
+      "Old",
+      "Undeprecated::Target",
+      deprecator,
+    ) as unknown as {
       CHILD: unknown;
       INHERITED: unknown;
       MISSING: unknown;

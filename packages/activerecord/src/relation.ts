@@ -1,26 +1,38 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, hexdigest, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
+import { isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
+import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
-  extend,
+  hashDelete,
   isModuleIncluded,
   type Module,
   Range,
+  rbEnsure,
+  rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { fetch, isEmpty } from "@blazetrails/ruby-compat";
-import type { TokenDefinition } from "./token-for.js";
-import { first } from "@blazetrails/ruby-compat";
+import {
+  Enumerable,
+  isEmpty,
+  rbDefineAllocFunc,
+  rbModConstSet,
+  rbObjClone,
+  toS,
+  type Each,
+} from "@blazetrails/ruby-compat";
+import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
+import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
+import { ARRAY_METHOD_TABLE, fetch, first } from "@blazetrails/ruby-compat";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import * as Arel from "@blazetrails/arel";
-import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
+import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { ActiveRecordError, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
-import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
-import { compact, max, min } from "@blazetrails/ruby-compat";
+import { ActiveRecordError, RecordNotUnique } from "./errors.js";
+import { compact, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import type { SerializeOptions } from "@blazetrails/activemodel";
+import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
-import { applyThenable, stripThenable } from "./relation/thenable.js";
+import { applyThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
   wrap,
@@ -29,6 +41,7 @@ import {
   extractOptionsBang,
   groupBy,
   indexBy,
+  many,
 } from "@blazetrails/activesupport";
 
 export { Range };
@@ -44,7 +57,6 @@ import {
 import * as _qm from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import {
-  relationClassFor,
   ClassSpecificRelation,
   create as _delegationCreate,
   Delegation,
@@ -52,6 +64,7 @@ import {
   type ToXmlOptions,
 } from "./relation/delegation.js";
 import { ActiveRecord, Associations } from "./namespaces.js";
+import { Preloader } from "./associations/preloader.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
 import { Result } from "./result.js";
 import { FutureResult, Complete } from "./future-result.js";
@@ -73,13 +86,14 @@ import {
 import { Explain } from "./explain.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { PrettyPrinter } from "./pretty-print.js";
+import type { PP } from "@blazetrails/ruby-compat";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import {
   DeferredIdsIn,
   DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
-import { AliasCounts, AliasTracker } from "./associations/alias-tracker.js";
+import { AliasTracker } from "./associations/alias-tracker.js";
+import type { Hash } from "@blazetrails/ruby-compat";
 
 export type LoadedRelation<R> = Omit<R, "then">;
 
@@ -90,14 +104,14 @@ export type FindEachOptions = {
   batchSize?: number;
   errorOnIgnore?: boolean;
   cursor?: string | string[];
-  order?: "asc" | "desc" | ("asc" | "desc")[];
+  order?: ":asc" | ":desc" | (":asc" | ":desc")[];
 };
 
 export type InBatchesOptions = {
   of?: number;
   start?: unknown;
   finish?: unknown;
-  order?: "asc" | "desc" | ("asc" | "desc")[];
+  order?: ":asc" | ":desc" | (":asc" | ":desc")[];
   cursor?: string | string[];
   errorOnIgnore?: boolean;
   load?: boolean;
@@ -131,12 +145,6 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   );
 }
 
-/** @internal */
-const StrictLoadingScope = {
-  isEmptyScope: true,
-  strictLoadingValue: true,
-} as const;
-
 export type ValueMethod =
   | (typeof Relation.MULTI_VALUE_METHODS)[number]
   | (typeof Relation.SINGLE_VALUE_METHODS)[number]
@@ -146,9 +154,9 @@ export type ValuesHash = {
   includes?: AssociationSpec[];
   eagerLoad?: AssociationSpec[];
   preload?: AssociationSpec[];
-  select?: (string | Nodes.Node)[];
+  select?: (string | ArelNode)[];
   group?: string[];
-  order?: Array<string | Nodes.Node>;
+  order?: Array<string | ArelNode>;
   joins?: (AssociationSpec | string | Nodes.Join)[];
   leftOuterJoins?: AssociationSpec[];
   references?: string[];
@@ -176,13 +184,12 @@ declare const relationNameBrand: unique symbol;
 
 export type RelationName = string | { readonly [relationNameBrand]: never };
 
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export class ExplainProxy<T extends Base> {
-  private readonly _relation: Relation<T>;
+  private readonly _relation: Relation<T, boolean>;
   private readonly _options: ExplainOption[];
 
-  constructor(relation: Relation<T>, options: ExplainOption[]) {
+  constructor(relation: Relation<T, boolean>, options: ExplainOption[]) {
     this._relation = relation;
     this._options = options;
   }
@@ -193,11 +200,11 @@ export class ExplainProxy<T extends Base> {
     );
   }
 
-  average(columnName: string | Nodes.Node): Promise<string> {
+  average(columnName: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.average(columnName as never));
   }
 
-  count(columnName?: string | Nodes.Node): Promise<string> {
+  count(columnName?: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.count(columnName as never));
   }
 
@@ -209,19 +216,19 @@ export class ExplainProxy<T extends Base> {
     return this.execExplain(() => this._relation.last(limit as never));
   }
 
-  maximum(columnName: string | Nodes.Node): Promise<string> {
+  maximum(columnName: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.maximum(columnName as never));
   }
 
-  minimum(columnName: string | Nodes.Node): Promise<string> {
+  minimum(columnName: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.minimum(columnName as never));
   }
 
-  pluck(...columnNames: (string | Nodes.Node)[]): Promise<string> {
+  pluck(...columnNames: (string | ArelNode)[]): Promise<string> {
     return this.execExplain(() => this._relation.pluck(...(columnNames as never[])));
   }
 
-  sum(identityOrColumn?: string | Nodes.Node): Promise<string> {
+  sum(identityOrColumn?: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.sum(identityOrColumn as never));
   }
 
@@ -231,35 +238,15 @@ export class ExplainProxy<T extends Base> {
   }
 }
 
-export interface ExplainProxy<T extends Base> {
-  then<TResult1 = string, TResult2 = never>(
-    onfulfilled?: ((value: string) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
-  ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent PERMANENT */
-  catch<TResult = never>(
-    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
-  ): Promise<string | TResult>;
-  /** @noRailsEquivalent PERMANENT */
-  finally(onfinally?: (() => void) | null): Promise<string>;
-}
-/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
-
 const ENUMERABLE_DELEGATES = {
-  detect: <T>(records: T[], fn: (record: T, index: number, all: T[]) => unknown): T | undefined =>
-    records.find(fn),
+  detect: fetch<<T>(records: T[], ifNone: undefined, fn: (record: T) => unknown) => T | undefined>(
+    ARRAY_METHOD_TABLE,
+    "detect",
+  ),
 
-  reject: <T>(records: T[], fn: (record: T) => boolean): T[] => records.filter((r) => !fn(r)),
+  reject: fetch<<T>(records: T[], fn: (record: T) => boolean) => T[]>(ARRAY_METHOD_TABLE, "reject"),
 
-  sortBy: <T>(records: T[], key: (record: T) => any): T[] =>
-    records
-      .map((record, index) => ({ record, index, sortKey: key(record) }))
-      .sort((a, b) => {
-        if (a.sortKey < b.sortKey) return -1;
-        if (a.sortKey > b.sortKey) return 1;
-        return a.index - b.index;
-      })
-      .map((entry) => entry.record),
+  sortBy: fetch<<T>(records: T[], key: (record: T) => any) => T[]>(ARRAY_METHOD_TABLE, "sortBy"),
 
   groupBy,
 
@@ -268,11 +255,43 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Relation<T extends Base> {
-  /** @internal */
-  static _railsClassName = "ActiveRecord::Relation";
+const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
+  get(target: any, prop: string | symbol, receiver: any) {
+    if (prop === Symbol.iterator && !target._isRecordsSynchronous) return undefined;
+    const value = Reflect.get(target, prop, receiver);
+    if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
+      return value;
+    }
+    if (/^(0|[1-9]\d*)$/.test(prop)) {
+      return target._isRecordsSynchronous
+        ? (target.target ?? target._records)[Number(prop)]
+        : target.records().then((records: any[]) => records[Number(prop)]);
+    }
+    const enumerable = ENUMERABLE_METHODS[prop];
+    if (enumerable) {
+      return (...args: any[]) => {
+        const records = target.each(() => {});
+        return records instanceof Promise
+          ? records.then((records: any[]) => enumerable([...records], args))
+          : enumerable([...records], args);
+      };
+    }
+    if (target.respondToMissing(prop, false)) {
+      return (...args: any[]) => target.methodMissing(prop, ...args);
+    }
+    return value;
+  },
+  has(target: any, prop: string | symbol) {
+    if (prop === Symbol.iterator && !target._isRecordsSynchronous) return false;
+    if (Reflect.has(target, prop)) return true;
+    if (typeof prop === "symbol") return false;
+    if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
+    return target.respondToMissing(prop, false);
+  },
+};
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Relation<T extends Base, G extends boolean = false> {
   static create = _delegationCreate;
 
   static readonly MULTI_VALUE_METHODS = [
@@ -321,8 +340,6 @@ export class Relation<T extends Base> {
   _withIsRecursive = false;
   private _isNone = false;
   skipPreloadingValue = false;
-  /** @internal */
-  _arel?: SelectManager;
   private _loaded = false;
   private _delegateToModel = false;
   private _recordsStore: T[] = [];
@@ -333,79 +350,69 @@ export class Relation<T extends Base> {
   protected set _records(records: T[]) {
     this._recordsStore = records;
   }
-  protected _take?: T | null;
-  protected _offsets?: Map<number, T | null>;
+  protected _offsets?: Record<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
+  /** @internal */
+  _loadResult?: Promise<T[]>;
   private _loadToken = 0;
 
   private _joinDependency: JoinDependency | null = null;
+  /** @internal */
+  _fromLimitedIds: [from: object, ids: unknown[]] | null = null;
 
-  private _table: Table | null = null;
+  private _table: Table;
 
+  /** @inventedArm if — PERMANENT */
   constructor(
     model: typeof Base,
-    table?: Table | Nodes.TableAlias,
-    predicateBuilder?: PredicateBuilder,
-    values: ValuesHash = {},
+    {
+      table = null,
+      predicateBuilder = null,
+      values = {},
+    }: {
+      table?: Table | Nodes.TableAlias | null;
+      predicateBuilder?: PredicateBuilder | null;
+      values?: ValuesHash;
+    } = {},
   ) {
     if (table) {
-      predicateBuilder ??= model.predicateBuilder.with(new TableMetadata(model, table as Table));
+      predicateBuilder ||= model.predicateBuilder.with(new TableMetadata(model, table as Table));
+    } else {
+      table = model.arelTable;
+      predicateBuilder ||= model.predicateBuilder;
     }
+
     this._model = model;
-    if (table) {
-      this._table = table as Table;
-    }
+    this._table = table as Table;
     this._values = values;
-    if (predicateBuilder) {
-      this._predicateBuilder = predicateBuilder;
-    }
+    this._predicateBuilder = predicateBuilder;
     if (isModuleIncluded(new.target, ClassSpecificRelation)) {
-      return new Proxy(this, {
-        get(target: any, prop: string | symbol, receiver: any) {
-          const value = Reflect.get(target, prop, receiver);
-          if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
-            return value;
-          }
-          if (/^(0|[1-9]\d*)$/.test(prop)) {
-            return (target.target ?? target._records)[Number(prop)];
-          }
-          const enumerable = ENUMERABLE_METHODS[prop];
-          if (enumerable) {
-            return (...args: any[]) =>
-              target.isLoaded
-                ? enumerable([...(target.target ?? target._records)], args)
-                : target.records().then((records: T[]) => enumerable([...records], args));
-          }
-          if (target.respondToMissing(prop, false)) {
-            return (...args: any[]) => target.methodMissing(prop, ...args);
-          }
-          return value;
-        },
-        has(target: any, prop: string | symbol) {
-          if (Reflect.has(target, prop)) return true;
-          if (typeof prop === "symbol") return false;
-          if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
-          return target.respondToMissing(prop, false);
-        },
-      });
+      return new Proxy(this, CLASS_SPECIFIC_RELATION_HANDLER);
     }
   }
 
   inspect(): string | Promise<string> {
-    const inspectEntries = (subject: T[]): string => {
-      const entries = subject.map((record) => record.inspect());
+    const subject = this.isLoaded
+      ? this.isScheduled || this._loadResult
+        ? this.records()
+        : this._records
+      : this.annotate("loading for inspect");
+    const inspectEntries = (records: T[]): string => {
+      const entries = take(records, min(compact([this.limitValue, 11])) as number).map((record) =>
+        record.inspect(),
+      );
       if (entries.length === 11) entries[10] = "...";
-      return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
+      return `#<${(this.constructor as typeof Relation).name} [${entries.join(", ")}]>`;
     };
-    if (this.isLoaded && !this.isScheduled) {
-      return inspectEntries(this._records.slice(0, min(compact([this.limitValue, 11])) as number));
-    }
-    return this.annotate("loading for inspect")
-      .take(min(compact([this.limitValue, 11])) as number)
-      .then(inspectEntries);
+    if (Array.isArray(subject)) return inspectEntries(subject);
+    return (
+      subject instanceof Promise
+        ? subject
+        : subject.take(min(compact([this.limitValue, 11])) as number)
+    ).then(inspectEntries);
   }
 
-  async prettyPrint(pp: PrettyPrinter): Promise<void> {
+  async prettyPrint(pp: PP): Promise<void> {
     const subject = this.isLoaded ? await this.records() : this.annotate("loading for pp");
     const entries = (
       Array.isArray(subject)
@@ -424,16 +431,13 @@ export class Relation<T extends Base> {
     return this.lockValue;
   }
 
-  unscoped(): Relation<T> {
-    return this._model.unscoped() as unknown as Relation<T>;
-  }
-
   get isLoaded(): boolean {
     return this._loaded;
   }
 
   reset(): this {
     this._arel = undefined;
+    this._fromLimitedIds = null;
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
@@ -445,6 +449,7 @@ export class Relation<T extends Base> {
     this._loadToken += 1;
     if (this._futureResult instanceof FutureResult) this._futureResult.cancel();
     this._futureResult = undefined;
+    this._loadResult = undefined;
     return this;
   }
 
@@ -459,16 +464,33 @@ export class Relation<T extends Base> {
     return this._records;
   }
 
+  get _isRecordsSynchronous(): boolean {
+    return this.isLoaded && !this.isScheduled && !this._loadResult;
+  }
+
   /**
-   * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   * @missingRailsCall load — PERMANENT
+   * @inventedArm synchronize — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock
+   * @inventedArm if — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock
    */
-  loadAsync(): Relation<T> {
+  loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
+      if (!c.isAsyncEnabled()) {
+        const token = this._loadToken;
+        void c.lock
+          .synchronize(() => {
+            if (this._loadResult) return;
+            const loaded = this.load();
+            this._loaded = true;
+            return loaded;
+          })
+          .catch(() => {
+            if (token === this._loadToken) this._loaded = false;
+          });
+        return;
+      }
+
       if (!this.isLoaded) {
-        const result = this.execMainQuery(
-          c.asyncEnabled?.() === true && !c.currentTransaction().joinable,
-        );
+        const result = this.execMainQuery(!c.currentTransaction().joinable);
         if (result instanceof Result) {
           this.loadRecords(this.instantiateRecords(result));
         } else {
@@ -482,9 +504,9 @@ export class Relation<T extends Base> {
   }
 
   build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(attributes?: Record<string, unknown> | PermittedAttributes, block?: (r: T) => void): T;
   build(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     if (Array.isArray(attributes)) {
@@ -502,9 +524,12 @@ export class Relation<T extends Base> {
   }
 
   async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async create(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async create(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async create(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     if (Array.isArray(attributes)) {
@@ -519,9 +544,12 @@ export class Relation<T extends Base> {
   }
 
   async createBang(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async createBang(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async createBang(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async createBang(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     if (Array.isArray(attributes)) {
@@ -535,54 +563,58 @@ export class Relation<T extends Base> {
     return await this.scoping(() => this._createBang(attributes, restoring));
   }
 
+  /** @noRailsEquivalent CONVERGEABLE relation-to-yaml-is-an-awaited-member-not-object-to-yaml */
+  async toYaml(): Promise<string> {
+    await this.load();
+    return YAML.toYaml(this);
+  }
+
+  encodeWith(coder: { representSeq(tag: string | null, list: unknown[]): void }): void {
+    coder.representSeq(null, this._records);
+  }
+
   async size(): Promise<number> {
     if (this.isLoaded) return (await this.records()).length;
     return this.count(":all") as Promise<number>;
   }
 
   async isEmpty(): Promise<boolean> {
-    if (this.isLoaded) return (await this.records()).length === 0;
-    return !(await this.isExists());
+    if (this.isNullRelation()) return true;
+
+    if (this.isLoaded) {
+      return (await this.records()).length === 0;
+    } else {
+      return !(await this.isExists());
+    }
   }
 
-  async isAny(args?: EnumerablePattern<T>): Promise<boolean> {
+  async isAny(...args: EnumerablePattern<T>[]): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (args !== undefined) {
-      const matches = (record: T): boolean =>
-        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (args as new (...args: never[]) => Base)
-          : (args as (record: T) => boolean)(record);
-      return (await this.toArray()).some(matches);
-    }
+
+    if (isPresent(args))
+      return Enumerable.isAny.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+        this,
+        ...args,
+      );
     return !(await this.isEmpty());
   }
 
   async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (predicate !== undefined) {
-      let count = 0;
-      for (const record of await this.toArray()) {
-        if (predicate(record) && ++count === 2) break;
-      }
-      return count > 1;
-    }
-    if (this.isLoaded) return (await this.records()).length > 1;
+
+    if (predicate !== undefined) return many(await this.toArray(), predicate);
+    if (this.isLoaded) return many(await this.records());
     return (await this.limitedCount()) > 1;
   }
 
-  async isOne(args?: EnumerablePattern<T>): Promise<boolean> {
+  async isOne(...args: EnumerablePattern<T>[]): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (args !== undefined) {
-      const matches = (record: T): boolean =>
-        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (args as new (...args: never[]) => Base)
-          : (args as (record: T) => boolean)(record);
-      let count = 0;
-      for (const record of await this.toArray()) {
-        if (matches(record) && ++count === 2) break;
-      }
-      return count === 1;
-    }
+
+    if (isPresent(args))
+      return Enumerable.isOne.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+        this,
+        ...args,
+      );
     if (this.isLoaded) return (await this.records()).length === 1;
     return (await this.limitedCount()) === 1;
   }
@@ -591,13 +623,8 @@ export class Relation<T extends Base> {
     return isBlank(await this.records());
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  async presence(): Promise<LoadedRelation<Relation<T>> | null> {
-    return (await isPresent(this)) ? stripThenable(this as Relation<T>) : null;
-  }
-
-  async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
-    return ENUMERABLE_DELEGATES.detect(await this.toArray(), fn);
+  async detect(fn: (record: T) => unknown): Promise<T | undefined> {
+    return ENUMERABLE_DELEGATES.detect(await this.toArray(), undefined, fn);
   }
 
   async reject(fn: (record: T) => boolean): Promise<T[]> {
@@ -625,13 +652,24 @@ export class Relation<T extends Base> {
   }
 
   async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
-    if (this.isNullRelation()) return stripThenable(this);
+    if (this._loadResult) await this._loadResult;
     if (!this.isLoaded || this.isScheduled) {
       const token = this._loadToken;
-      const records = await this.withConnection(() => this.execQueries(block));
+      const loadResult = this.withConnection(() => this.execQueries(block));
+      this._loadResult = loadResult;
+      let records: T[];
+      try {
+        records = await loadResult;
+      } finally {
+        if (this._loadResult === loadResult) this._loadResult = undefined;
+      }
       if (token === this._loadToken) this.loadRecords(records);
     }
     return stripThenable(this);
+  }
+
+  toAry(): T[] | null {
+    return this._isRecordsSynchronous ? Array.from(this as Iterable<T>) : null;
   }
 
   async toArray(): Promise<T[]> {
@@ -679,7 +717,7 @@ export class Relation<T extends Base> {
     });
   }
 
-  /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
+  /** @missingRailsCall with_connection — CONVERGEABLE relation-layer-with-connection-receipts-are-not-the-tosql-sites */
   private execMainQuery(async = false): Result | Promise<Result> | FutureResult | Complete {
     if (this._isNone) {
       if (async) {
@@ -712,29 +750,25 @@ export class Relation<T extends Base> {
     }) as Result | Promise<Result> | FutureResult | Complete;
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private referencesEagerLoadedTables(): boolean {
-    const joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
+    let joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
       join instanceof Nodes.StringJoin
-        ? this.tablesInString(join.left as Nodes.Node)
+        ? this.tablesInString(join.left as Nodes.SqlLiteral)
         : [(join.left as unknown as { name: string }).name],
     );
 
     joinedTables.push(String(this.table.name));
 
-    const downcased = joinedTables.map((name) => name.toLowerCase());
+    joinedTables = joinedTables.map((name) => name.toLowerCase());
 
-    return this.referencesValues.some((ref) => {
-      const string = typeof ref === "string" && ref.startsWith(":") ? ref.slice(1) : String(ref);
-      return !downcased.includes(string);
-    });
+    return !isEmpty(
+      this.referencesValues.map((ref) => toS(ref)).filter((ref) => !joinedTables.includes(ref)),
+    );
   }
 
-  private tablesInString(string: Nodes.Node | string | null | undefined): string[] {
-    if (string instanceof Nodes.SqlLiteral) string = string.value;
-    else if (string instanceof Nodes.Node) string = string.toSql();
-    if (!string) return [];
-    const matches = string.match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];
+  private tablesInString(string: Nodes.SqlLiteral | string): string[] {
+    if (isBlank(string)) return [];
+    const matches = string.toString().match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];
     return matches.map((s) => s.toLowerCase()).filter((s) => s !== "raw_sql_");
   }
 
@@ -777,13 +811,13 @@ export class Relation<T extends Base> {
 
     return this.model.withConnection(async (c) => {
       const arel = this.isEagerLoading
-        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        ? (await this.applyJoinDependency()).arel()
         : this.buildArel(c);
       arel.source.left = this.table;
-      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
+      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as ArelNode[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.primaryKey;
-      const key = this.model.compositePrimaryKey
+      const key = this.model.isCompositePrimaryKey()
         ? (primaryKey as string[]).map((pk) => this.table.get(pk))
         : this.table.get((primaryKey as string | null) ?? null);
       const stmt = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
@@ -815,13 +849,13 @@ export class Relation<T extends Base> {
 
     return this.model.withConnection(async (c) => {
       const arel = this.isEagerLoading
-        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        ? (await this.applyJoinDependency()).arel()
         : this.buildArel(c);
       arel.source.left = this.table;
-      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
+      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as ArelNode[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.model.primaryKey;
-      const key = this.model.compositePrimaryKey
+      const key = this.model.isCompositePrimaryKey()
         ? (primaryKey as string[]).map((pk) => this.table.get(pk))
         : this.table.get((primaryKey as string | null) ?? null);
       const stmt = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
@@ -835,7 +869,7 @@ export class Relation<T extends Base> {
   async touchAll(...names: TouchAllArgs): Promise<number> {
     const { time } = extractOptionsBang(names as unknown[]) as TouchAllOptions;
 
-    return this.updateAll(this.model.touchAttributesWithTime(...(names as string[]), time));
+    return this.updateAll(await this.model.touchAttributesWithTime(...(names as string[]), time));
   }
 
   async findOrCreateBy(
@@ -964,58 +998,6 @@ export class Relation<T extends Base> {
     return this.whereClause.toH(relationTableName);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  applyJoinDependency<R>(
-    { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean },
-    block: (relation: Relation<T>, joinDependency: JoinDependency) => R | Promise<R>,
-  ): R | Promise<R> {
-    const joinDependency = QueryMethods.constructJoinDependency.call(
-      this as any,
-      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
-      Nodes.OuterJoin,
-    ) as unknown as JoinDependency;
-    const relation = this.except("includes", "eagerLoad", "preload");
-    QueryMethods.joinsBang.call(relation as any, joinDependency as any);
-
-    if (
-      eagerLoading &&
-      this.hasLimitOrOffset &&
-      !(
-        this.usingLimitableReflections(joinDependency.reflections as never) &&
-        this.usingLimitableReflections(
-          (
-            QueryMethods.constructJoinDependency.call(
-              this as any,
-              _qm.selectAssociationList
-                .call(this as any, this.joinsValues, null)
-                .concat(
-                  _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
-                ) as AssociationSpec[],
-              null,
-            ) as unknown as JoinDependency
-          ).reflections as never,
-        )
-      )
-    ) {
-      return Promise.resolve(
-        this.skipQueryCacheIfNecessary(() =>
-          this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) =>
-            (
-              c as unknown as {
-                distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
-              }
-            ).distinctRelationForPrimaryKey(relation),
-          ),
-        ),
-      ).then(() => block(relation, joinDependency));
-    }
-
-    return block(relation, joinDependency);
-  }
-
   /** @internal */
   _isDeferredDistinctPkSubquery(): boolean {
     if (this.groupValues.length > 0) return false;
@@ -1055,21 +1037,41 @@ export class Relation<T extends Base> {
 
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void> | void {
+    if (this.isNullRelation()) return;
     const predicates = this.whereClause.predicates;
+    const from: unknown = this.fromClause.value;
+    const deferredFrom = from instanceof Relation && from._isDeferredDistinctPkSubquery();
     if (
+      !deferredFrom &&
       !predicates.some((node) => node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn)
     ) {
       return;
     }
     return (async () => {
+      if (deferredFrom) {
+        this._arel = undefined;
+        this._fromLimitedIds = [from, await from._materializeDistinctPkIds()];
+      }
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
         if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
-          const attribute = node.left as Arel.Attribute;
           const ids: unknown[] = [];
           for (const rel of node.innerRelations) {
             ids.push(...(await rel.ids()));
           }
+          if (node.left instanceof Nodes.Grouping) {
+            const key = (node.left.expr as Arel.Attribute[]).map((attribute) => attribute.name);
+            const clause = new WhereClause(
+              this.predicateBuilder.buildFromHash(new Map([[key, ids]])),
+            );
+            const built = (node instanceof DeferredIdsNotIn ? clause.invert() : clause).predicates;
+            const at = predicates.indexOf(node);
+            if (at === -1) continue;
+            predicates.splice(at, 1, ...built);
+            i = at + built.length - 1;
+            continue;
+          }
+          const attribute = node.left as Arel.Attribute;
           const built = this.predicateBuilder.build(attribute, ids);
           predicates[i] = node instanceof DeferredIdsNotIn ? built.invert() : built;
         }
@@ -1080,17 +1082,16 @@ export class Relation<T extends Base> {
   /**
    * @missingRailsCall apply_join_dependency — PERMANENT
    * @missingRailsCall with_connection — PERMANENT
-   * @missingRailsArgs to_sql — PERMANENT
    */
   toSql(): string {
     return this._model.connectionPool().withConnectionSync(
       (conn: DatabaseAdapter) =>
         conn.unpreparedStatement(() => {
           if (this.isEagerLoading) {
-            const manager = this._buildEagerOperandManager();
-            if (manager !== null) return conn.toSql(manager);
+            return conn.toSql(this._buildEagerOperandManager());
+          } else {
+            return conn.toSql(this.arel());
           }
-          return conn.toSql(this.arel());
         }) as string,
     );
   }
@@ -1107,14 +1108,32 @@ export class Relation<T extends Base> {
     return this._model._loadFromSql(rows, block as never) as T[];
   }
 
-  private _applyEagerJoinDependency(
-    jd: JoinDependency,
-    basePk: string | string[],
-    limitedIds?: unknown[],
-  ): Relation<T> {
+  /** @internal */
+  _applyEagerJoinDependency(options?: {
+    eagerLoading?: boolean;
+    limitedIds?: unknown[];
+  }): Relation<T, G>;
+  /** @internal */
+  _applyEagerJoinDependency<R>(
+    options: { eagerLoading?: boolean; limitedIds?: unknown[] },
+    block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R,
+  ): R;
+  _applyEagerJoinDependency<R>(
+    {
+      eagerLoading = this.groupValues.length === 0,
+      limitedIds,
+    }: { eagerLoading?: boolean; limitedIds?: unknown[] } = {},
+    block?: (relation: Relation<T, G>, joinDependency: JoinDependency) => R,
+  ): R | Relation<T, G> {
+    const jd = QueryMethods.constructJoinDependency.call(
+      this as any,
+      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
+      Nodes.OuterJoin,
+    );
     let rel = this.except("includes", "eagerLoad", "preload");
     QueryMethods.joinsBang.call(rel as any, jd as any);
     if (
+      eagerLoading &&
       this.hasLimitOrOffset &&
       !(
         this.usingLimitableReflections(jd.reflections as never) &&
@@ -1131,6 +1150,7 @@ export class Relation<T extends Base> {
         )
       )
     ) {
+      const basePk: string | string[] = (this._model as any).primaryKey ?? "id";
       if (Array.isArray(basePk)) {
         const tuples = limitedIds as unknown[][] | undefined;
         basePk.forEach((column, i) => {
@@ -1147,7 +1167,11 @@ export class Relation<T extends Base> {
       rel.limitValue = null;
       rel.offsetValue = null;
     }
-    return rel;
+    if (block) {
+      return block(rel, jd);
+    } else {
+      return rel;
+    }
   }
 
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
@@ -1171,7 +1195,7 @@ export class Relation<T extends Base> {
     jd: JoinDependency,
     basePk: string | string[],
     distinctSelectSql?: string,
-  ): Relation<T> {
+  ): Relation<T, G> {
     const relation = this.except("includes", "eagerLoad", "preload");
     QueryMethods.joinsBang.call(relation as any, jd as any);
     const values =
@@ -1208,63 +1232,59 @@ export class Relation<T extends Base> {
     const adapter = c as unknown as {
       columnsForDistinct?: (
         cols: string | string[],
-        orders: (string | Nodes.Node)[],
+        orders: (string | ArelNode)[],
       ) => string | string[];
     };
     const orders = this.orderValues.map((clause) => {
-      if (clause instanceof Nodes.Node) return clause;
+      if (Arel.arelNode(clause)) return clause;
       const raw = Array.isArray(clause) ? `${clause[0]} ${clause[1]}` : clause;
       const bare = raw
         .trim()
         .replace(/\s+(?:ASC|DESC)\b.*$/i, "")
         .trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(bare)) return new Nodes.SqlLiteral(raw);
-      return this.arelColumn(bare, () => new Nodes.SqlLiteral(raw)) as Nodes.Node;
+      return this.arelColumn(bare, () => new Nodes.SqlLiteral(raw)) as ArelNode;
     });
     const values = adapter.columnsForDistinct ? adapter.columnsForDistinct(pkSql, orders) : pkSql;
     return Array.isArray(values) ? values.join(", ") : values;
   }
 
-  private _buildEagerOperandManager(): SelectManager | null {
-    const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-    if (allEager.length === 0) return null;
-
-    const basePk = (this._model as any).primaryKey ?? "id";
-
-    const jd = QueryMethods.constructJoinDependency.call(
-      this as any,
-      allEager as any,
-      Nodes.OuterJoin,
-    );
-    if (jd.reflections.length === 0) return null;
-
-    const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
-    jd.applyColumnAliases(eagerRelation);
-    return eagerRelation.arel();
+  private _buildEagerOperandManager(): SelectManager {
+    return this._applyEagerJoinDependency({}, (eagerRelation, jd) => {
+      jd.applyColumnAliases(eagerRelation);
+      return eagerRelation.arel();
+    });
   }
+
+  static StrictLoadingScope = class StrictLoadingScope {
+    static get isEmptyScope(): boolean {
+      return true;
+    }
+
+    static get strictLoadingValue(): boolean {
+      return true;
+    }
+  };
 
   async preloadAssociations(records: T[]): Promise<void> {
     const preload: AssociationSpec[] = [
       ...this.preloadValues,
       ...(this.isEagerLoading ? [] : this.includesValues),
     ];
-    if (preload.length === 0) return;
-    const { Preloader } = await import("./associations/preloader.js");
-    const scope = this.strictLoadingValue ? StrictLoadingScope : undefined;
+    const scope = this.strictLoadingValue ? Relation.StrictLoadingScope : undefined;
     for (const associations of preload) {
-      const preloader = Preloader.new({
+      await Preloader.new({
         records: records as unknown as import("./base.js").Base[],
         associations: [associations],
         scope,
-      });
-      await preloader.call();
+      }).call();
     }
   }
 
   new(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
-  new(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  new(attrs?: Record<string, unknown> | PermittedAttributes, block?: (r: T) => void): T;
   new(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     if (Array.isArray(attrs)) return this.build(attrs, block);
@@ -1278,18 +1298,15 @@ export class Relation<T extends Base> {
     if (arguments.length === 0) {
       throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
     }
-    if (arguments.length === 1) {
-      attributes = id as Record<string, unknown>;
-      id = ":all";
-    }
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
     if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.update(attributes!);
+        await record.update(attributes);
       }
       return records;
     } else {
-      return (await this.model.update(id, attributes!)) as T;
+      return (await this.model.update(id, attributes)) as T;
     }
   }
 
@@ -1300,18 +1317,15 @@ export class Relation<T extends Base> {
     if (arguments.length === 0) {
       throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
     }
-    if (arguments.length === 1) {
-      attributes = id as Record<string, unknown>;
-      id = ":all";
-    }
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
     if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.updateBang(attributes!);
+        await record.updateBang(attributes);
       }
       return records;
     } else {
-      return (await this.model.updateBang(id, attributes!)) as T;
+      return (await this.model.updateBang(id, attributes)) as T;
     }
   }
 
@@ -1353,52 +1367,37 @@ export class Relation<T extends Base> {
       number | { time?: Temporal.Instant } | CounterCacheTouchOption | undefined
     >,
   ): Promise<number> {
-    const touchFromCounters = (counters as Record<string, unknown>).touch;
-    const normalCounters: Record<string, number> = {};
-    for (const [k, v] of Object.entries(counters)) {
-      if (k !== "touch") normalCounters[k] = v as number;
-    }
+    const touch = hashDelete(counters, "touch") as CounterCacheTouchOption | null;
 
     const updates: Record<string, unknown> = {};
-
-    for (const [counterName, value] of Object.entries(normalCounters)) {
+    for (const [counterName, value] of Object.entries(counters)) {
       const attr = this.table.get(counterName);
-      updates[String(attr.name)] = this._incrementAttribute(attr, value);
+      updates[String(attr.name)] = this._incrementAttribute(attr, value as number);
     }
 
-    const touch = touchFromCounters as CounterCacheTouchOption | undefined;
-    if (touch) {
-      const names = wrap(touch !== true ? touch : undefined) as Array<string | { time?: RubyTime }>;
+    if (rtest(touch)) {
+      let names: CounterCacheTouchOption | undefined;
+      if (touch !== true) names = touch as CounterCacheTouchOption;
+      names = wrap(names) as Array<string | { time?: RubyTime }>;
       const options = extractOptionsBang(names) as TouchAllOptions;
-      const touchUpdates = this.model.touchAttributesWithTime(...(names as string[]), options.time);
-      for (const [col, t] of Object.entries(touchUpdates)) {
-        updates[col] = new Nodes.Quoted(t);
-      }
+      const touchUpdates = await this.model.touchAttributesWithTime(
+        ...(names as string[]),
+        options.time,
+      );
+      if (!isEmpty(touchUpdates)) Object.assign(updates, touchUpdates);
     }
 
     return this.updateAll(updates);
   }
 
   async delete(idOrArray: unknown): Promise<number> {
-    if (idOrArray == null) return 0;
-    if (Array.isArray(idOrArray) && idOrArray.length === 0) return 0;
+    if (idOrArray == null || (Array.isArray(idOrArray) && idOrArray.length === 0)) return 0;
 
-    const primaryKey = this.model.primaryKey;
-    if (Array.isArray(primaryKey)) {
-      const idArr = Array.isArray(idOrArray) ? idOrArray : [idOrArray];
-      if (idArr.length !== primaryKey.length) return 0;
-      const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < primaryKey.length; i++) {
-        conditions[primaryKey[i]] = idArr[i];
-      }
-      return this.where(conditions).deleteAll();
-    }
-
-    return this.where({ [primaryKey]: idOrArray }).deleteAll();
+    return this.where(new Map([[this.model.primaryKey, idOrArray]])).deleteAll();
   }
 
   async destroy(id: unknown): Promise<T | T[]> {
-    const multipleIds = this.model.compositePrimaryKey
+    const multipleIds = this.model.isCompositePrimaryKey()
       ? Array.isArray((id as unknown[])[0])
       : Array.isArray(id);
 
@@ -1442,7 +1441,7 @@ export class Relation<T extends Base> {
   }
 
   get table(): Table {
-    return this._table ?? this._model.arelTable;
+    return this._table;
   }
 
   get model(): typeof Base {
@@ -1453,44 +1452,25 @@ export class Relation<T extends Base> {
     return this._model;
   }
 
-  get name(): RelationName {
-    return this.model.name;
-  }
-
   get loaded(): boolean {
     return this._loaded;
   }
 
-  async isNone(args?: EnumerablePattern<T>): Promise<boolean> {
+  async isNone(...args: EnumerablePattern<T>[]): Promise<boolean> {
     if (this.isNullRelation()) return true;
-    if (args !== undefined) {
-      const matches = (record: T): boolean =>
-        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (args as new (...args: never[]) => Base)
-          : (args as (record: T) => boolean)(record);
-      return !(await this.toArray()).some(matches);
-    }
+
+    if (isPresent(args))
+      return Enumerable.isNone.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+        this,
+        ...args,
+      );
     return this.isEmpty();
   }
 
-  private _predicateBuilder: PredicateBuilder | null = null;
+  private _predicateBuilder: PredicateBuilder;
 
   get predicateBuilder(): PredicateBuilder {
-    if (this._predicateBuilder) {
-      return this._predicateBuilder;
-    }
-    let pb: PredicateBuilder;
-    const modelPbAccessor = (this.model as any).predicateBuilder;
-    const modelPb =
-      typeof modelPbAccessor === "function" ? modelPbAccessor.call(this.model) : modelPbAccessor;
-    const metadata = new TableMetadata(this.model, this.table);
-    if (modelPb && typeof modelPb.with === "function") {
-      pb = modelPb.with(metadata);
-    } else {
-      pb = new PredicateBuilder(metadata);
-    }
-    this._predicateBuilder = pb;
-    return pb;
+    return this._predicateBuilder;
   }
 
   get isScheduled(): boolean {
@@ -1499,9 +1479,9 @@ export class Relation<T extends Base> {
 
   get isEagerLoading(): boolean {
     return (this._shouldEagerLoad ||=
-      this.eagerLoadValues.length > 0 ||
-      (this.includesValues.length > 0 &&
-        (this.joinedIncludesValues.length > 0 || this.referencesEagerLoadedTables())));
+      any(this.eagerLoadValues) ||
+      (any(this.includesValues) &&
+        (any(this.joinedIncludesValues) || this.referencesEagerLoadedTables())));
   }
 
   get joinedIncludesValues(): AssociationSpec[] {
@@ -1526,7 +1506,7 @@ export class Relation<T extends Base> {
     return this.limitValue !== null || this.offsetValue !== null;
   }
 
-  aliasTracker(joins: Nodes.Node[] = [], aliases?: AliasCounts): AliasTracker {
+  aliasTracker(joins: Nodes.Node[] = [], aliases?: Hash<string, number>): AliasTracker {
     return AliasTracker.create(
       this.model.connectionPool(),
       String(this.table.name),
@@ -1557,16 +1537,12 @@ export class Relation<T extends Base> {
 
   scoping<R>(callback: () => R): R;
   scoping<R>(options: { allQueries?: boolean | null }, callback: () => R): R;
-  scoping<R>(
-    optionsOrCallback: { allQueries?: boolean | null } | (() => R),
-    maybeCallback?: () => R,
-  ): R {
-    const callback = (
-      typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback
-    ) as () => R;
-    const allQueries =
-      typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
-
+  scoping<R>(options: { allQueries?: boolean | null } | (() => R) = {}, block?: () => R): R {
+    if (typeof options === "function") {
+      block = options;
+      options = {};
+    }
+    const { allQueries = null } = options;
     const registry = this.model.scopeRegistry();
 
     if (this.isGlobalScope(registry) && allQueries === false) {
@@ -1574,65 +1550,30 @@ export class Relation<T extends Base> {
         "Scoping is set to apply to all queries and cannot be unset in a nested block.",
       );
     } else if (this.isAlreadyInScope(registry)) {
-      return callback();
+      return block!();
     } else {
-      return this._scoping(this as any, registry, allQueries, callback);
+      return this._scoping(this as any, registry, allQueries, block!);
     }
-  }
-
-  async findSigned(token: string, options?: { purpose?: string }): Promise<T | null> {
-    return this.scoping(() => (this.model as any).findSigned(token, options)) as Promise<T | null>;
-  }
-
-  async findSignedBang(token: string, options?: { purpose?: string }): Promise<T> {
-    return this.scoping(() => (this.model as any).findSignedBang(token, options)) as Promise<T>;
-  }
-
-  /** @missingRailsArgs fetch — PERMANENT */
-  async findByTokenFor(purpose: string, token: string): Promise<T | null> {
-    const primaryKey = this.model.primaryKey as string | string[] | null;
-    if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this);
-    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
-      token,
-      (id) => {
-        if (Array.isArray(primaryKey)) {
-          if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
-          return this.findBy(
-            Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
-          ) as Promise<Base | null>;
-        }
-        return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
-      },
-    );
-    return record as T | null;
-  }
-
-  /** @missingRailsArgs fetch — PERMANENT */
-  async findByTokenForBang(purpose: string, token: string): Promise<T> {
-    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
-      token,
-      (id) => this.find(id) as Promise<Base>,
-    );
-    if (!record) throw new InvalidSignature();
-    return record as T;
   }
 
   private _shouldEagerLoad: boolean | undefined;
 
-  private _cacheKeys: Map<string, Promise<string>> | undefined;
-  private _cacheVersions: Map<string, Promise<string | null>> | undefined;
+  private _cacheKeys: Record<string, Promise<string>> | undefined;
+  private _cacheVersions: Record<string, Promise<string>> | undefined;
 
   async cacheKey(timestampColumn = "updated_at"): Promise<string> {
-    this._cacheKeys ??= new Map();
-    if (!this._cacheKeys.has(timestampColumn)) {
-      this._cacheKeys.set(timestampColumn, this.model.collectionCacheKey(this, timestampColumn));
-    }
-    return this._cacheKeys.get(timestampColumn)!;
+    this._cacheKeys ||= {};
+    return (this._cacheKeys[timestampColumn] ||= this.model.collectionCacheKey(
+      this,
+      timestampColumn,
+    ));
   }
 
   /** @internal */
   async computeCacheKey(timestampColumn = "updated_at"): Promise<string> {
-    const key = `${this.model.modelName.cacheKey}/query-${hexdigest(this.toSql())}`;
+    const querySignature = Digest.hexdigest(this.toSql());
+    const key = `${this.model.modelName.cacheKey}/query-${querySignature}`;
+
     if (this.model.collectionCacheVersioning) {
       return key;
     }
@@ -1641,26 +1582,19 @@ export class Relation<T extends Base> {
   }
 
   async cacheVersion(timestampColumn = "updated_at"): Promise<string | null> {
-    if (!this.model.collectionCacheVersioning) return null;
-    this._cacheVersions ??= new Map();
-    if (!this._cacheVersions.has(timestampColumn)) {
-      this._cacheVersions.set(
-        timestampColumn,
-        this.computeCacheVersion(timestampColumn) as Promise<string | null>,
-      );
+    if (this.model.collectionCacheVersioning) {
+      this._cacheVersions ||= {};
+      return (this._cacheVersions[timestampColumn] ||= this.computeCacheVersion(timestampColumn));
     }
-    return this._cacheVersions.get(timestampColumn)!;
+    return null;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs max — PERMANENT
-   */
-  async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
+  /** @internal */
+  async computeCacheVersion(timestampColumn: string): Promise<string> {
     timestampColumn = String(timestampColumn);
 
-    let size: unknown = 0;
-    let timestamp: unknown = null;
+    let size: unknown;
+    let timestamp: unknown;
 
     if (this.isLoaded) {
       const records = await this.records();
@@ -1675,18 +1609,11 @@ export class Relation<T extends Base> {
         );
       }
     } else {
-      let collection: Relation<T> = this;
-      if (this.isEagerLoading) {
-        await this.applyJoinDependency({}, (relation) => {
-          collection = relation;
-        });
-      }
+      const collection = this.isEagerLoading ? await this.applyJoinDependency() : this;
 
       await this.withConnection(async (c) => {
         const column = c.visitor.compile(this.table.get(timestampColumn));
-        const selectValues = `COUNT(*) AS ${(
-          this.model.adapterClass() as unknown as { quoteColumnName(name: string): string }
-        ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
+        const selectValues = `COUNT(*) AS ${this.model.adapterClass().quoteColumnName("size")}, MAX(%s) AS timestamp`;
 
         let arel: unknown;
         if (collection.hasLimitOrOffset) {
@@ -1720,7 +1647,7 @@ export class Relation<T extends Base> {
     }
 
     if (timestamp != null) {
-      return `${size}-${toFs(timestamp as Temporal.Instant, this.model.cacheTimestampFormat)}`;
+      return `${size}-${(timestamp as RubyTime).utc().toFs(this.model.cacheTimestampFormat)}`;
     }
     return `${size}`;
   }
@@ -1733,26 +1660,21 @@ export class Relation<T extends Base> {
     return this.cacheKey();
   }
 
-  initializeCopy(other: Relation<T>): void {
-    this._table = other._table;
-    this._values = { ...other._values };
-    this._withIsRecursive = other._withIsRecursive;
-    this._isNone = other._isNone;
-    for (const mod of [...other.extendingValues].reverse()) extend(this, mod);
-    this.skipPreloadingValue = other.skipPreloadingValue;
+  initializeCopy(other: Relation<T, G>): this {
+    this._values = { ...this._values };
+    this.reset();
+    this._fromLimitedIds = other._fromLimitedIds;
+    return this;
   }
 
-  clone(): Relation<T> {
-    const ctor = relationClassFor.call(Relation, this._model as unknown as typeof Base);
-    const rel = new ctor(this._model) as Relation<T>;
-    rel.initializeCopy(this);
-    return rel;
+  clone(): Relation<T, G> {
+    return rbObjClone(this);
   }
 
   _execScope(...args: unknown[]): unknown {
     this._delegateToModel = true;
     const registry = this.model.scopeRegistry();
-    const body = args.pop() as (this: Relation<T>, ...rest: unknown[]) => unknown;
+    const body = args.pop() as (this: Relation<T, G>, ...rest: unknown[]) => unknown;
     try {
       return this._scoping(null, registry, false, () => body.call(this, ...args) || this);
     } finally {
@@ -1779,74 +1701,71 @@ export class Relation<T extends Base> {
     const currentScope = (modelClass as any).currentScope(true);
     return (record: T) => {
       (modelClass as any).setCurrentScope(currentScope ?? null);
-      return block?.(record);
+      if (block) return block(record);
     };
   }
 
-  protected _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
+  protected _new(
+    attributes: Record<string, unknown> | PermittedAttributes,
+    block?: (record: T) => void,
+  ): T {
     return new (this.model as any)(attributes, block) as T;
   }
 
-  protected _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {
+  protected _create(
+    attributes: Record<string, unknown> | PermittedAttributes,
+    block?: (record: T) => void,
+  ): Promise<T> {
     return (this.model as any).create(attributes, block);
   }
 
   protected _createBang(
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
     return (this.model as any).createBang(attributes, block);
   }
 
-  private _scoping<R>(scope: any, registry: any, allQueries: boolean | null, fn: () => R): R {
-    const previous = registry.currentScope(this.model, true);
-    registry.setCurrentScope(this.model, scope);
+  private _scoping<R>(
+    scope: any,
+    registry: any,
+    allQueries: boolean | null = false,
+    block: () => R,
+  ): R {
+    let previous: any;
     let previousGlobal: any;
-    if (allQueries) {
-      previousGlobal = registry.globalCurrentScope(this.model, true);
-      registry.setGlobalCurrentScope(this.model, scope);
-    }
-    const ensure = () => {
-      registry.setCurrentScope(this.model, previous);
-      if (allQueries) {
-        registry.setGlobalCurrentScope(this.model, previousGlobal);
-      }
-    };
-    let result: R;
-    try {
-      result = fn();
-    } catch (error) {
-      ensure();
-      throw error;
-    }
-    if (result instanceof Promise) {
-      return result.then(
-        (value: unknown) => {
-          ensure();
-          return value;
-        },
-        (error: unknown) => {
-          ensure();
-          throw error;
-        },
-      ) as R;
-    }
-    ensure();
-    return result;
+    return rbEnsure(
+      () => {
+        previous = registry.currentScope(this.model, true);
+        registry.setCurrentScope(this.model, scope);
+
+        if (allQueries) {
+          previousGlobal = registry.globalCurrentScope(this.model, true);
+          registry.setGlobalCurrentScope(this.model, scope);
+        }
+        return block();
+      },
+      () => {
+        registry.setCurrentScope(this.model, previous);
+        if (allQueries) {
+          registry.setGlobalCurrentScope(this.model, previousGlobal);
+        }
+      },
+    );
   }
 
   private _substituteValues(values: [string, unknown][]): [any, any][] {
     return values.map(([name, value]) => {
       const attr = this.table.get(name);
-      if (
-        value instanceof Nodes.Node ||
-        value instanceof Nodes.SqlLiteral ||
-        value instanceof Arel.Attribute
-      ) {
-        return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
+      if (Arel.arelNode(value)) {
+        if (value instanceof Nodes.SqlLiteral) {
+          value = new Nodes.Grouping(value);
+        }
+      } else {
+        const type = this.model.typeForAttribute(String(attr.name));
+        value = this.predicateBuilder.buildBindAttribute(String(attr.name), type!.cast(value));
       }
-      const type = this.model.typeForAttribute(String(attr.name));
-      return [attr, this.predicateBuilder.buildBindAttribute(String(attr.name), type!.cast(value))];
+      return [attr, value];
     });
   }
 
@@ -1867,13 +1786,15 @@ export class Relation<T extends Base> {
   }
 }
 
-ActiveRecord.Relation = Relation;
+rbModConstSet(ActiveRecord, "Relation", Relation);
+rbModConstSet(Relation, "WhereClause", WhereClause);
+rbModConstSet(Relation, "QueryAttribute", QueryAttribute);
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface RelationScopes<T extends Base> {}
 /* eslint-enable @typescript-eslint/no-empty-object-type */
 
-export interface Relation<T extends Base> extends RelationScopes<T> {
+export interface Relation<T extends Base, G extends boolean = false> extends RelationScopes<T> {
   isNullRelation(): boolean;
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
@@ -1885,16 +1806,18 @@ export interface Relation<T extends Base> extends RelationScopes<T> {
   ): Promise<T[] | TResult>;
   /** @noRailsEquivalent PERMANENT */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
+  /** @internal */
+  _take?: T | null;
 }
 
-export interface Relation<T extends Base> {
+export interface Relation<T extends Base, G extends boolean = false> {
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
-  selectValues: (string | Nodes.Node)[];
-  groupValues: Array<string | Nodes.Node>;
-  orderValues: Array<string | Nodes.Node>;
-  joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  selectValues: (string | ArelNode)[];
+  groupValues: Array<string | ArelNode>;
+  orderValues: Array<string | ArelNode>;
+  joinsValues: (AssociationSpec | string | Nodes.Join | JoinDependency)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
   extendingValues: object[];
@@ -1916,15 +1839,23 @@ export interface Relation<T extends Base> {
   whereClause: WhereClause;
   havingClause: WhereClause;
   fromClause: FromClause;
+  /** @internal */
+  _arel?: SelectManager;
 }
 
-export interface Relation<T extends Base>
-  extends Included<typeof QueryMethods>, Included<typeof Explain>, CalculationMethods {
+export interface Relation<T extends Base, G extends boolean = false>
+  extends
+    Included<typeof QueryMethods>,
+    Included<typeof Explain>,
+    Included<SignedIdRelationMethods<T>>,
+    Included<TokenForRelationMethods<T>>,
+    CalculationMethods<G> {
   find(block: (record: T) => unknown): Promise<T | null>;
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
   findBy(arg: Record<string, unknown>): Promise<T | null>;
+  findBy(arg: Map<unknown, unknown>): Promise<T | null>;
   findByBang(arg: Record<string, unknown>): Promise<T>;
   findSoleBy(...conditions: unknown[]): Promise<T>;
   first(): Promise<T | null>;
@@ -1961,40 +1892,46 @@ export interface Relation<T extends Base>
     key?: string | string[],
     notFoundIds?: unknown[],
   ): never;
-  unscope(...args: UnscopeArg[]): Relation<T>;
-  lock(locks?: string | boolean | null): Relation<T>;
-  none(): Relation<T>;
-  readonly(value?: boolean): Relation<T>;
-  strictLoading(value?: boolean): Relation<T>;
-  createWith(value: Record<string, unknown> | null): Relation<T>;
-  from(value: string | Relation<any> | Nodes.Node, subqueryName?: string): Relation<T>;
-  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T> & M;
+  unscope<A extends UnscopeArg[]>(
+    ...args: A
+  ): Relation<T, UnscopeArg extends A[number] ? boolean : ":group" extends A[number] ? false : G>;
+  lock(locks?: string | boolean | null): Relation<T, G>;
+  none(): Relation<T, G>;
+  readonly(value?: boolean): Relation<T, G>;
+  strictLoading(value?: boolean): Relation<T, G>;
+  createWith(value: Record<string, unknown> | Map<string, unknown> | null): Relation<T, G>;
+  from(value: string | Relation<any, boolean> | ArelNode, subqueryName?: string): Relation<T, G>;
+  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T, G> & M;
   extending<M extends Record<string, (...args: any[]) => any>>(
     mod: M | undefined,
-  ): Relation<T> & Partial<M>;
-  extending(...modules: Module[]): Relation<T>;
-  extending(fn: (rel: Relation<T>) => void): Relation<T>;
-  extending(): Relation<T>;
-  optimizerHints(...args: string[]): Relation<T>;
-  annotate(...args: string[]): Relation<T>;
-  includes(...args: AssociationSpec[]): Relation<T>;
-  all(): Relation<T>;
-  eagerLoad(...args: AssociationSpec[]): Relation<T>;
-  preload(...args: AssociationSpec[]): Relation<T>;
+  ): Relation<T, G> & Partial<M>;
+  extending(...modules: Module[]): Relation<T, G>;
+  extending(block: (mod: Module) => void): Relation<T, G>;
+  extending(): Relation<T, G>;
+  optimizerHints(...args: string[]): Relation<T, G>;
+  annotate(...args: string[]): Relation<T, G>;
+  includes(...args: AssociationSpec[]): Relation<T, G>;
+  all(): Relation<T, G>;
+  eagerLoad(...args: AssociationSpec[]): Relation<T, G>;
+  preload(...args: AssociationSpec[]): Relation<T, G>;
   extractAssociated(association: string): Promise<Base[]>;
-  references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T>;
+  references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T, G>;
   with(
-    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
-  ): Relation<T>;
+    ...args: Array<
+      Record<string, Relation<any, boolean> | string | Array<Relation<any, boolean> | string>>
+    >
+  ): Relation<T, G>;
   withRecursive(
-    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
-  ): Relation<T>;
-  joins(...nodes: Nodes.Join[]): Relation<T>;
-  joins(specArray: JoinSpec[]): Relation<T>;
-  joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
-  joins(...args: Array<JoinSpec>): Relation<T>;
-  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T>;
-  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T>;
+    ...args: Array<
+      Record<string, Relation<any, boolean> | string | Array<Relation<any, boolean> | string>>
+    >
+  ): Relation<T, G>;
+  joins(...nodes: Nodes.Join[]): Relation<T, G>;
+  joins(specArray: JoinSpec[]): Relation<T, G>;
+  joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T, G>;
+  joins(...args: Array<JoinSpec>): Relation<T, G>;
+  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T, G>;
+  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T, G>;
   arel(aliases?: AliasTracker): SelectManager;
   /** @internal */
   assertModifiableBang(): void;
@@ -2010,50 +1947,65 @@ export interface Relation<T extends Base>
   /** @internal */
   arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[];
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
+  select(...fields: (string | ArelNode | Record<string, unknown>)[]): Relation<T, G>;
   reselect(
-    ...args: (string | Nodes.Node | Record<string, unknown> | readonly (string | Nodes.Node)[])[]
-  ): Relation<T>;
-  group(...args: (string | Nodes.Node)[]): Relation<T>;
-  regroup(...args: string[]): Relation<T>;
-  order(...args: OrderArg[]): Relation<T>;
-  inOrderOf(column: string | Nodes.Node, values: unknown[], filter?: boolean): Relation<T>;
-  reorder(...args: OrderArg[]): Relation<T>;
-  where(): WhereChain<Relation<T>>;
-  where(args: undefined): WhereChain<Relation<T>>;
-  where(args: Record<string, unknown> | null): Relation<T>;
-  where(args: Map<unknown, unknown>): Relation<T>;
-  where(sql: string, ...binds: unknown[]): Relation<T>;
-  where(args: Nodes.Node): Relation<T>;
-  where(args: unknown[]): Relation<T>;
-  rewhere(conditions: Record<string, unknown> | null): Relation<T>;
-  invertWhere(): Relation<T>;
-  structurallyCompatible(other: Relation<T>): boolean;
-  and(other: Relation<T>): Relation<T>;
-  or(other: Relation<T>): Relation<T>;
-  excluding(...records: unknown[]): Relation<T>;
-  without(...records: unknown[]): Relation<T>;
-  having(condition: string, ...binds: unknown[]): Relation<T>;
-  having(condition: Record<string, unknown>): Relation<T>;
-  having(condition: Nodes.Node): Relation<T>;
+    ...args: (string | ArelNode | Record<string, unknown> | readonly (string | ArelNode)[])[]
+  ): Relation<T, G>;
+  group(...args: (string | ArelNode)[]): Relation<T, true>;
+  regroup(...args: string[]): Relation<T, true>;
+  order(...args: OrderArg[]): Relation<T, G>;
+  inOrderOf(column: string | ArelNode, values: unknown[], filter?: boolean): Relation<T, G>;
+  reorder(...args: OrderArg[]): Relation<T, G>;
+  where(): WhereChain<Relation<T, G>>;
+  where(args: undefined): WhereChain<Relation<T, G>>;
+  where(args: Record<string, unknown> | null): Relation<T, G>;
+  where(args: Map<unknown, unknown>): Relation<T, G>;
+  where(sql: string | Nodes.SqlLiteral, ...binds: unknown[]): Relation<T, G>;
+  where(args: Nodes.Node | Nodes.SqlLiteral): Relation<T, G>;
+  where(args: unknown[]): Relation<T, G>;
+  rewhere(conditions: Record<string, unknown> | Map<string, unknown> | null): Relation<T, G>;
+  invertWhere(): Relation<T, G>;
+  isStructurallyCompatible(other: Relation<T, boolean>): boolean;
+  and(other: Relation<T, boolean>): Relation<T, G>;
+  or(other: Relation<T, boolean>): Relation<T, G>;
+  excluding(...records: unknown[]): Relation<T, G>;
+  without(...records: unknown[]): Relation<T, G>;
+  having(condition: string | Nodes.SqlLiteral, ...binds: unknown[]): Relation<T, G>;
+  having(condition: Record<string, unknown>): Relation<T, G>;
+  having(condition: Nodes.Node): Relation<T, G>;
   having(
-    condition: string | Record<string, unknown> | Nodes.Node,
+    condition: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
     ...binds: unknown[]
-  ): Relation<T>;
-  limit(value: number | string | null): Relation<T>;
-  offset(value: number | string | null): Relation<T>;
-  distinct(value?: boolean): Relation<T>;
-  reverseOrder(): Relation<T>;
-  spawn(): Relation<T>;
-  merge<U extends Base>(other: Relation<U>): Relation<T>;
-  merge(other: Partial<Record<ValueMethod, unknown>>): Relation<T>;
-  mergeBang(other: any): Relation<T>;
-  except(...skips: Array<ExceptSkip>): Relation<T>;
-  only(...onlies: Array<ExceptSkip>): Relation<T>;
+  ): Relation<T, G>;
+  limit(value: number | string | null): Relation<T, G>;
+  offset(value: number | string | null): Relation<T, G>;
+  distinct(value?: boolean): Relation<T, G>;
+  reverseOrder(): Relation<T, G>;
+  spawn(): Relation<T, G>;
+  merge<U extends Base, H extends boolean>(
+    other: Relation<U, H>,
+  ): Relation<T, [G] extends [true] ? true : [H] extends [true] ? true : G | H>;
+  merge(other: Partial<Record<ValueMethod, unknown>>): Relation<T, G>;
+  mergeBang(other: any): Relation<T, G>;
+  except<A extends ExceptSkip[]>(
+    ...skips: A
+  ): Relation<T, string extends A[number] ? boolean : "group" extends A[number] ? false : G>;
+  only<A extends ExceptSkip[]>(
+    ...onlies: A
+  ): Relation<T, string extends A[number] ? boolean : "group" extends A[number] ? G : false>;
   /** @internal */
-  relationWith(values: Record<string, unknown>): Relation<T>;
+  relationWith(values: Record<string, unknown>): Relation<T, G>;
   /** @internal */
-  constructRelationForExists(conditions: unknown): Relation<T>;
+  constructRelationForExists(conditions: unknown): Relation<T, G>;
+  /** @internal */
+  applyJoinDependency(options?: {
+    eagerLoading?: boolean;
+  }): Omit<Relation<T, G>, "then"> | Promise<Omit<Relation<T, G>, "then">>;
+  /** @internal */
+  applyJoinDependency<R>(
+    options: { eagerLoading?: boolean },
+    block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R | Promise<R>,
+  ): R | Promise<R>;
   /** @internal */
   usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
   /** @internal */
@@ -2077,23 +2029,28 @@ export interface Relation<T extends Base>
   /** @internal */
   findLast(limit?: number): Promise<T | T[] | null>;
   /** @internal */
-  orderedRelation(): Relation<T>;
+  orderedRelation(): Relation<T, G>;
   /** @internal */
   _orderColumns(): string[];
-  /** @internal */
-  actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void;
   findEach(opts: FindEachOptions, block: (record: T) => void | Promise<void>): Promise<null>;
   findEach(opts?: FindEachOptions): AsyncGenerator<T> & { size(): Promise<number> };
   findInBatches(opts: FindEachOptions, block: (batch: T[]) => void | Promise<void>): Promise<null>;
   findInBatches(opts?: FindEachOptions): AsyncGenerator<T[]> & { size(): Promise<number> };
   inBatches(
     opts: InBatchesOptions,
-    block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+    block: (relation: LoadedRelation<Relation<T, G>>) => void | Promise<void>,
   ): Promise<null>;
-  inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T>>>;
+  inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T, G>>>;
 }
 
-export interface Relation<T extends Base> {
+export interface Relation<T extends Base, G extends boolean = false> {
+  [Symbol.iterator](): IterableIterator<T>;
+  map<R>(block: (record: T) => R): R[] | Promise<R[]>;
+  findAll(block: (record: T) => unknown): T[] | Promise<T[]>;
+  drop(n: number): T[] | Promise<T[]>;
+}
+
+export interface Relation<T extends Base, G extends boolean = false> {
   length(): Promise<number>;
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
@@ -2122,6 +2079,7 @@ export interface Relation<T extends Base> {
   get connection(): DatabaseAdapter;
   get primaryKey(): string | string[];
   get tableName(): string;
+  get name(): RelationName;
   withConnection<R>(
     fn: (conn: DatabaseAdapter) => R | Promise<R>,
     options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
@@ -2131,37 +2089,28 @@ export interface Relation<T extends Base> {
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined>;
   sanitizeSqlLike(value: string, escapeChar?: string): string;
+  unscoped(): Relation<T>;
 }
 
-const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
-  partition: (records, [fn]) => {
-    const matched: unknown[] = [];
-    const unmatched: unknown[] = [];
-    records.forEach((record, index) => (fn(record, index) ? matched : unmatched).push(record));
-    return [matched, unmatched];
-  },
-  isAll: (records, [fn]) => records.every(fn ?? ((record) => record != null && record !== false)),
-  eachCons: (records, [n, fn]) => {
-    const slices = eachCons(records, n);
-    if (fn === undefined) return slices;
-    slices.forEach(fn);
-    return records;
-  },
-  eachWithIndex: (records, [fn]) => {
-    records.forEach(fn);
-    return records;
-  },
-  toSet: (records) => new Set(records),
+const arrayMethod = (name: string) => {
+  const method = fetch<(records: any[], ...args: any[]) => unknown>(ARRAY_METHOD_TABLE, name);
+  return (records: any[], args: any[]) => method(records, ...args);
 };
-ENUMERABLE_METHODS.collect = (records, args) => records.map(...(args as [any]));
-ENUMERABLE_METHODS.findAll = (records, args) => records.filter(...(args as [any]));
+
+const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
+  partition: arrayMethod("partition"),
+  isAll: arrayMethod("isAll"),
+  eachCons: arrayMethod("eachCons"),
+  eachWithIndex: arrayMethod("eachWithIndex"),
+  toSet: arrayMethod("toSet"),
+  collect: arrayMethod("collect"),
+};
 for (const name of [
   "forEach",
   "at",
   "indexOf",
   "lastIndexOf",
   "concat",
-  "map",
   "filter",
   "some",
   "every",
@@ -2172,6 +2121,7 @@ for (const name of [
   ENUMERABLE_METHODS[name] = (records, args) => (records as any)[name](...args);
 }
 
+include(Relation, Enumerable);
 include(Relation, Delegation);
 include(Relation, Explain);
 include(Relation, Batches);
@@ -2179,6 +2129,8 @@ include(Relation, QueryMethods);
 include(Relation, SpawnMethods);
 include(Relation, Calculations);
 include(Relation, FinderMethods);
+include(Relation, SignedIdRelationMethods);
+include(Relation, TokenForRelationMethods);
 
 for (const name of ["updateAll", "deleteAll"] as const) {
   const body = Relation.prototype[name] as (this: Relation<any>, ...args: any[]) => Promise<number>;
@@ -2194,8 +2146,6 @@ for (const name of ["updateAll", "deleteAll"] as const) {
 
 applyThenable(Relation.prototype);
 
-applyThenable(ExplainProxy.prototype, "inspect");
-
 /** @internal */
 async function computeCacheKey(
   rel: Relation<Base>,
@@ -2205,9 +2155,13 @@ async function computeCacheKey(
 }
 
 /** @internal */
-async function computeCacheVersion(
-  rel: Relation<Base>,
-  timestampColumn = "updated_at",
-): Promise<string> {
+async function computeCacheVersion(rel: Relation<Base>, timestampColumn: string): Promise<string> {
   return rel.computeCacheVersion(timestampColumn);
 }
+
+rbDefineAllocFunc(Relation, (klass) => {
+  const relation = Object.create(klass.prototype);
+  return isModuleIncluded(klass, ClassSpecificRelation)
+    ? new Proxy(relation, CLASS_SPECIFIC_RELATION_HANDLER)
+    : relation;
+});

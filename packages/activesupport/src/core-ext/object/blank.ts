@@ -1,5 +1,7 @@
 import { Temporal } from "@blazetrails/date";
+import { STRING_METHOD_TABLE, rbDefineMethod } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
+import { stripThenable } from "../../strip-thenable.js";
 
 const BLANK_RE = /^\s*$/;
 
@@ -69,6 +71,14 @@ export class String {
   }
 }
 
+declare module "@blazetrails/ruby-compat" {
+  interface StringInstance {
+    isBlank(): boolean;
+  }
+}
+
+STRING_METHOD_TABLE.isBlank = rbDefineMethod(0, (self) => String.isBlank(self.string));
+
 export class Time {
   static isBlank(_value: TimeValue): false {
     return false;
@@ -85,6 +95,7 @@ export function isBlank(value: unknown): boolean {
   if (Array.isArray(value)) return value.length === 0;
   if (typeof value === "symbol") return Symbol.isBlank(value);
   if (typeof value === "string") return String.isBlank(value);
+  if (value instanceof Uint8Array) return String.isBlank(new TextDecoder().decode(value));
   if (typeof value === "number" || typeof value === "bigint") return false;
   // boundary: a JS `Date` is one of the `TimeValue`s this arm answers for.
   if (
@@ -125,10 +136,16 @@ export function isPresent(value: unknown): boolean | Promise<boolean> {
 
 export function presence<T extends { isBlank(): Promise<boolean> }>(
   value: T,
-): Promise<T | undefined>;
-export function presence<T>(value: T): T | undefined;
-export function presence<T>(value: T): T | undefined | Promise<T | undefined> {
+): Promise<(T extends PromiseLike<unknown> ? Omit<T, "then"> : T) | null>;
+export function presence<T>(value: T): T | null;
+export function presence<T>(value: T): T | null | Promise<unknown> {
   const present = isPresent(value as unknown) as boolean | Promise<boolean>;
-  if (typeof present !== "boolean") return present.then((p) => (p ? value : undefined));
-  return present ? value : undefined;
+  if (typeof present !== "boolean") {
+    return present.then((p) => {
+      if (!p) return null;
+      if (typeof (value as { then?: unknown }).then !== "function") return value;
+      return stripThenable(value as object);
+    });
+  }
+  return present ? value : null;
 }

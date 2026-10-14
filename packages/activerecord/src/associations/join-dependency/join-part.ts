@@ -1,11 +1,15 @@
+import { Enumerable, type Hash } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";
+import type { JoinAssociation } from "./join-association.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
-  readonly children: JoinPart[] = [];
+  readonly children: JoinAssociation[] = [];
 
-  constructor(baseKlass: typeof Base, children?: JoinPart[]) {
+  constructor(baseKlass: typeof Base, children?: JoinAssociation[]) {
     this.baseKlass = baseKlass;
     if (children) this.children.push(...children);
   }
@@ -24,31 +28,19 @@ export abstract class JoinPart {
     return this.baseKlass.primaryKey as string;
   }
 
-  attributeTypes(): Record<string, unknown> {
-    return (this.baseKlass as { attributeTypes(): Record<string, unknown> }).attributeTypes();
+  attributeTypes(): Record<string, unknown> | Hash<string, unknown> {
+    return (
+      this.baseKlass as { attributeTypes(): Record<string, unknown> | Hash<string, unknown> }
+    ).attributeTypes();
   }
 
   isMatch(other: JoinPart): boolean {
     return this.constructor === other.constructor;
   }
 
-  each(fn: (part: JoinPart) => void): void {
-    fn(this);
-    for (const child of this.children) {
-      child.each(fn);
-    }
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  *[Symbol.iterator](): IterableIterator<JoinPart> {
-    yield this;
-    for (const child of this.children) {
-      yield* child;
-    }
-  }
-
-  drop(n: number): JoinPart[] {
-    return [...this].slice(n);
+  each(block: (part: JoinPart) => void): void {
+    block(this);
+    for (const child of this.children) child.each(block);
   }
 
   eachChildren(fn: (parent: JoinPart, child: JoinPart) => void): void {
@@ -85,3 +77,11 @@ export abstract class JoinPart {
     return this.baseKlass.instantiate(this.extractRecord(row, aliases), columnTypes, block);
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface JoinPart {
+  [Symbol.iterator](): IterableIterator<JoinPart>;
+  drop(n: number): JoinPart[];
+}
+
+include(JoinPart, Enumerable);

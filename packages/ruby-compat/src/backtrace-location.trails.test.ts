@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { Location, excBacktraceLocations } from "./backtrace-location.js";
+import {
+  Location,
+  excBacktrace,
+  excBacktraceLocations,
+  excSetBacktrace,
+} from "./backtrace-location.js";
 
 describe("Thread::Backtrace::Location", () => {
   it("reads the label, lineno and column of a V8 frame", () => {
@@ -50,5 +55,25 @@ describe("Exception#backtrace_locations", () => {
     const exc = new Error("x");
     exc.stack = undefined;
     expect(excBacktraceLocations(exc)).toBeNull();
+  });
+});
+
+describe("Exception#backtrace", () => {
+  it("answers one String per frame, or nil with no backtrace", () => {
+    const exc = new Error("x");
+    exc.stack = "Error: x\n    at foo (/a/b.ts:3:5)\n    at /a/c.ts:7:1";
+    expect(excBacktrace(exc)).toEqual(excBacktraceLocations(exc)!.map(String));
+    expect(excBacktrace(exc)).toHaveLength(2);
+    exc.stack = undefined;
+    expect(excBacktrace(exc)).toBeNull();
+  });
+});
+
+describe("Exception#set_backtrace", () => {
+  it("replaces the frames and keeps the message line", () => {
+    const exc = new Error("boom");
+    excSetBacktrace(exc, ["at foo (a.js:1:2)", "at bar (b.js:3:4)"]);
+    expect(exc.stack).toBe("Error: boom\n    at foo (a.js:1:2)\n    at bar (b.js:3:4)");
+    expect(excBacktraceLocations(exc)!.map((loc) => loc.label)).toEqual(["foo", "bar"]);
   });
 });

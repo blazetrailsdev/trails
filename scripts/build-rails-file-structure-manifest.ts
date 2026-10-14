@@ -24,7 +24,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { rubyMethodToTs, rubyFileToTs } from "@blazetrails/parity/conventions";
+import {
+  rubyMethodToTs,
+  rubyFileToTs,
+  scopedSkipMirrorName,
+} from "@blazetrails/parity/conventions";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 import { mergeBySourceLine } from "./api-compare/source-order.js";
 import {
@@ -32,7 +36,11 @@ import {
   unusedOperatorSpellings,
 } from "./api-compare/operator-order-spelling.js";
 import { resolveMixinParent } from "./rails-file-structure-mixins.js";
-import { lastSegment, resolveLastSegmentCollision } from "./rails-file-structure-collisions.js";
+import {
+  lastSegment,
+  qualifyByParent,
+  resolveLastSegmentCollision,
+} from "./rails-file-structure-collisions.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 import { PACKAGE_DIRS } from "./api-compare/config.js";
 
@@ -107,13 +115,11 @@ const manifest: Manifest = { files: {} };
 // toward method-existence coverage — every object inherits them). But when a
 // Rails class *overrides* one it is a real definition with a real source
 // POSITION and a real TS spelling, so method-ORDER must place it. Without this,
-// `rubyMethodToTs("nil?")` returns null and the rule treats the override (e.g.
-// `Casted#nil?` at casted.rb:15, which sits BETWEEN value_before_type_cast and
-// value_for_database) as an unmapped TS-only helper and shoves it past the
-// mapped block — actively degrading fidelity. Map the common overridables to
-// the candidates rubyMethodToTs would produce if they weren't skipped.
+// `rubyMethodToTs("initialize_clone")` returns null and the rule treats the
+// override as an unmapped TS-only helper and shoves it past the mapped block —
+// actively degrading fidelity. Map the common overridables to the candidates
+// rubyMethodToTs would produce if they weren't skipped.
 const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
-  "nil?": ["isNil", "nil"],
   hash: ["hash"],
   "eql?": ["isEql", "eql"],
   initialize_dup: ["initializeDup"],
@@ -149,9 +155,14 @@ const pushMethod = (
   seen: Set<string>,
   name: string,
   isStatic: boolean,
-  operatorCandidates?: string[],
+  operatorCandidates: string[] | undefined,
+  rubyFile: string,
 ) => {
-  const candidates = rubyMethodToTs(name) ?? ORDER_ONLY_CANDIDATES[name] ?? operatorCandidates;
+  const candidates =
+    rubyMethodToTs(name) ??
+    scopedSkipMirrorName(name, rubyFile) ??
+    ORDER_ONLY_CANDIDATES[name] ??
+    operatorCandidates;
   if (!candidates || candidates.length === 0) return;
   for (const ts of candidates) {
     const entry = isStatic ? `static ${ts}` : ts;
@@ -170,24 +181,27 @@ interface Bucket {
   seen: Set<string>;
 }
 
-// Reviewed `<pkg>/<file>::<Segment>` rows for collisions resolveLastSegmentCollision
-// cannot decide; without a row such a collision fails the build below.
-const EXPECTED_UNRESOLVED_COLLISIONS: string[] = ["thor/error.rb::SpellChecker"];
+// Reviewed `<pkg>/<file>::<Segment>` rows for collisions neither
+// resolveLastSegmentCollision nor qualifyByParent can decide; without a row
+// such a collision fails the build below.
+const EXPECTED_UNRESOLVED_COLLISIONS: string[] = [];
 
 const unresolvedCollisions: string[] = [];
 const usedExpectedCollisions = new Set<string>();
 
-const resolveCollision = (pkg: string, collKey: string, fqns: Set<string>): string | undefined => {
+const resolveCollision = (pkg: string, collKey: string, fqns: Set<string>): Map<string, string> => {
   const winner = resolveLastSegmentCollision(fqns);
-  if (winner) return winner;
+  if (winner) return new Map([[winner, lastSegment(winner)]]);
+  const qualified = qualifyByParent(fqns);
+  if (qualified) return qualified;
   const [file, seg] = collKey.split("\0");
   const row = `${pkg}/${file}::${seg}`;
   if (EXPECTED_UNRESOLVED_COLLISIONS.includes(row)) {
     usedExpectedCollisions.add(row);
-    return undefined;
+    return new Map();
   }
   unresolvedCollisions.push(`${row} shared by ${[...fqns].join(", ")}`);
-  return undefined;
+  return new Map();
 };
 
 for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
@@ -273,7 +287,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, host.fqn);
         const opCandidates = operatorSpelling(host.fqn, m.name, m.isStatic);
-        pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates);
+        pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates, file);
       }
     }
   };
@@ -300,7 +314,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
           const b = bucketFor(file, mixin.parentFqn);
           const isStatic = mixin.extendsSingleton || m.isStatic;
           const opCandidates = operatorSpelling(mixin.parentFqn, m.name, isStatic);
-          pushMethod(b.names, b.seen, m.name, isStatic, opCandidates);
+          pushMethod(b.names, b.seen, m.name, isStatic, opCandidates, file);
         }
         continue;
       }
@@ -312,22 +326,25 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         tagStatic(host.instanceMethods, false),
         tagStatic(host.classMethods, true),
       )) {
-        const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
-        pushMethod(b.names, b.seen, m.name, false, operatorSpelling(host.fqn, m.name));
+        const file = m.file ?? host.file;
+        const b = bucketFor(file, FUNCTIONS_KEY);
+        pushMethod(b.names, b.seen, m.name, false, operatorSpelling(host.fqn, m.name), file);
       }
     }
   };
   visitClasses(rubyPkg.classes ?? {});
   visitModules(rubyPkg.modules ?? {});
 
-  // (bucketFile\0className) → the one fqn that owns that manifest key.
-  const winnerByKey = new Map<string, string>();
+  // (bucketFile\0fqn) → the manifest class key that fqn owns.
+  const keyByFqn = new Map<string, string>();
   for (const [collKey, fqns] of classFqnsByKey) {
-    const winner = resolveCollision(pkg, collKey, fqns);
-    if (winner) winnerByKey.set(collKey, winner);
+    const [bucketFile] = collKey.split("\0");
+    for (const [fqn, key] of resolveCollision(pkg, collKey, fqns)) {
+      keyByFqn.set(`${bucketFile}\0${fqn}`, key);
+    }
   }
-  const owns = (rubyFile: string, fqn: string): boolean =>
-    winnerByKey.get(`${rubyFile}\0${lastSegment(fqn)}`) === fqn;
+  const keyOf = (rubyFile: string, fqn: string): string | undefined =>
+    keyByFqn.get(`${rubyFile}\0${fqn}`);
 
   const orderFor = (rubyFile: string): FileOrder => {
     const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
@@ -343,9 +360,8 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     const order = orderFor(rubyFile);
     const have = new Set(order.declarations);
     for (const fqn of fqns) {
-      if (!owns(rubyFile, fqn)) continue;
-      const n = lastSegment(fqn);
-      if (have.has(n)) continue;
+      const n = keyOf(rubyFile, fqn);
+      if (n === undefined || n.includes(".") || have.has(n)) continue;
       have.add(n);
       order.declarations.push(n);
     }
@@ -355,13 +371,11 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     const order = orderFor(rubyFile);
     for (const [key, bucket] of byKey) {
       // A losing fqn is dropped rather than blended into the winner's order.
-      if (key !== FUNCTIONS_KEY && !owns(rubyFile, key as string)) continue;
+      const classKey = key === FUNCTIONS_KEY ? undefined : keyOf(rubyFile, key as string);
+      if (key !== FUNCTIONS_KEY && classKey === undefined) continue;
       // Multiple Ruby files may map to the same TS file (rare); append novel
       // names in encounter order, existing order wins for dupes.
-      const target =
-        key === FUNCTIONS_KEY
-          ? order.functions
-          : (order.classes[lastSegment(key as string)] ??= []);
+      const target = classKey === undefined ? order.functions : (order.classes[classKey] ??= []);
       const have = new Set(target);
       for (const n of bucket.names) if (!have.has(n)) target.push(n);
     }

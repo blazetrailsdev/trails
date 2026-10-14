@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { Nodes, Table } from "@blazetrails/arel";
 
@@ -29,7 +30,7 @@ describe("JoinBase.table", () => {
   });
 
   it("is accessible via joinRoot on JoinDependency", () => {
-    const jd = new JoinDependency(Post, null, null, Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, [], Nodes.OuterJoin);
     expect(jd.joinRoot.table).toBeInstanceOf(Table);
     expect(jd.joinRoot.table.name).toBe(Post.tableName);
   });
@@ -58,9 +59,9 @@ describe("joinType propagation in joinConstraints", () => {
   });
 
   it("emits InnerJoin when joinType is InnerJoin", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.InnerJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.InnerJoin);
 
-    const joins = jd.joinConstraints([]);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(joins.length).toBeGreaterThan(0);
     for (const join of joins) {
       expect(join).toBeInstanceOf(Nodes.InnerJoin);
@@ -68,9 +69,9 @@ describe("joinType propagation in joinConstraints", () => {
   });
 
   it("emits OuterJoin when joinType is OuterJoin", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
 
-    const joins = jd.joinConstraints([]);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(joins.length).toBeGreaterThan(0);
     for (const join of joins) {
       expect(join).toBeInstanceOf(Nodes.OuterJoin);

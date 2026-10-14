@@ -10,9 +10,10 @@ import { OPERATORS } from "@blazetrails/parity/conventions";
 describe("operatorSpelling", () => {
   it("resolves `[]` to the class-specific spelling per fqn", () => {
     expect(operatorSpelling("Arel::Table", "[]")).toEqual(["get"]);
+    expect(operatorSpelling("Arel::Nodes::TableAlias", "[]")).toEqual(["get"]);
     expect(operatorSpelling("ActiveModel::AttributeSet", "[]")).toEqual(["getAttribute"]);
     expect(operatorSpelling("ActiveModel::Errors", "[]")).toEqual(["get"]);
-    expect(operatorSpelling("ActiveModel::LazyAttributeHash", "[]")).toEqual(["getAttribute"]);
+    expect(operatorSpelling("ActiveModel::LazyAttributeHash", "[]")).toEqual(["get"]);
   });
 
   it("resolves the AttributeSet `[]=` port", () => {
@@ -31,6 +32,11 @@ describe("operatorSpelling", () => {
 
   it("resolves `<=>` to the comparison port", () => {
     expect(operatorSpelling("ActiveModel::Name", "<=>")).toEqual(["compare"]);
+  });
+
+  it("resolves ActiveModel::Name's `=~` / `!~` to the match-operator ports", () => {
+    expect(operatorSpelling("ActiveModel::Name", "=~")).toEqual(["matchOperator"]);
+    expect(operatorSpelling("ActiveModel::Name", "!~")).toEqual(["notMatchOperator"]);
   });
 
   it("resolves `[]` / `[]=` pairs to distinct accessor spellings", () => {

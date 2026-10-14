@@ -1,5 +1,6 @@
 import { RuleTester } from "eslint";
-import rule from "./no-standalone-associations.mjs";
+import { expect } from "vitest";
+import rule, { macroOfCall, mayContainMacroCall } from "./no-standalone-associations.mjs";
 
 // Point the rule at a non-existent exclude baseline so the committed list
 // never grandfathers these synthetic fixtures. The baseline suite at the
@@ -285,4 +286,48 @@ describe("with a baseline exclude file", () => {
 
 afterAll(() => {
   fs.rmSync(tmpBaseline, { force: true });
+});
+
+describe("mayContainMacroCall", () => {
+  const macroCalls = async (code) => {
+    const { parseForESLint } = (await import("typescript-eslint")).parser;
+    const found = [];
+    const walk = (node) => {
+      if (!node || typeof node.type !== "string") return;
+      if (node.type === "CallExpression" && macroOfCall(node.callee)) found.push(node);
+      for (const [key, child] of Object.entries(node)) {
+        if (key === "parent") continue;
+        for (const c of Array.isArray(child) ? child : [child]) walk(c);
+      }
+    };
+    walk(parseForESLint(code, { ecmaVersion: 2022, sourceType: "module" }).ast);
+    return found;
+  };
+
+  it("admits every source holding a call macroOfCall matches", async () => {
+    for (const code of [
+      "Associations.hasMany.call(P, 'cs', {});",
+      "Associations.belongsTo.call(P, 'c');",
+      "\\u0041ssociations.hasOne.call(P, 'c');",
+      "Associations.\\u0068asAndBelongsToMany.call(P, 'cs');",
+    ]) {
+      expect(await macroCalls(code)).toHaveLength(1);
+      expect(mayContainMacroCall(code)).toBe(true);
+    }
+  });
+
+  it("rejects a source that neither spells Associations nor escapes an identifier", () => {
+    expect(mayContainMacroCall("foo.hasMany.call(P, 'cs');")).toBe(false);
+  });
+
+  it("macroOfCall matches only a callee rooted at the identifier Associations", async () => {
+    for (const code of [
+      "const A = Associations; A.hasMany.call(P, 'cs');",
+      "ns.Associations.hasMany.call(P, 'cs');",
+      "Associations['hasMany'].call(P, 'cs');",
+      "Assoc.hasMany.call(P, 'cs');",
+    ]) {
+      expect(await macroCalls(code)).toHaveLength(0);
+    }
+  });
 });

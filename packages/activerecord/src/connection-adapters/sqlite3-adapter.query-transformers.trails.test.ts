@@ -1,7 +1,7 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { describeIfSqlite } from "../support/describe-if-sqlite.js";
 import type { SQLite3Adapter } from "./sqlite3-adapter.js";
 import type { QueryTransformer } from "../query-transformers.js";

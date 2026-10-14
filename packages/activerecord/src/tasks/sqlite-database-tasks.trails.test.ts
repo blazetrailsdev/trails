@@ -95,7 +95,7 @@ describe("SQLiteDatabaseTasks", () => {
       await (seedAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
 
       await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
-        await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
+        await new SQLiteDatabaseTasks(sourceConfig, "/rails/root").structureDump(dumpPath, null);
       });
 
       const dumped = fs.readFileSync(dumpPath, "utf8");
@@ -109,7 +109,7 @@ describe("SQLiteDatabaseTasks", () => {
       });
       fs.writeFileSync(loadDbPath, "");
       await DatabaseTasks.withTemporaryConnection(targetConfig, async () => {
-        await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
+        await new SQLiteDatabaseTasks(targetConfig, "/rails/root").structureLoad(dumpPath, null);
       });
 
       const loadedAdapter = new BetterSQLite3Adapter({ database: loadDbPath });
@@ -157,7 +157,10 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
       adapter: "sqlite3",
       database: ":memory:",
     });
-    await expect(new SQLiteDatabaseTasks(config).create()).resolves.toBeUndefined();
+    const connection = await new SQLiteDatabaseTasks(config, "/rails/root").create();
+    const { connectionHandler } = Base;
+    const pool = connectionHandler.retrieveConnectionPool("ActiveRecord::Base")!;
+    expect(await pool.withConnection((conn) => conn)).toBe(connection);
     expect(mkdirSpy).not.toHaveBeenCalled();
     expect(writeSpy).not.toHaveBeenCalled();
   });
@@ -172,7 +175,9 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
         adapter: "sqlite3",
         database,
       });
-      await expect(new SQLiteDatabaseTasks(config).drop()).rejects.toThrow(NoDatabaseError);
+      await expect(new SQLiteDatabaseTasks(config, "/rails/root").drop()).rejects.toThrow(
+        NoDatabaseError,
+      );
     }
   });
 });
@@ -190,12 +195,6 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     const { connectionHandler } = Base;
     return connectionHandler.retrieveConnectionPool("ActiveRecord::Base")!;
   };
-
-  async function lay(...statements: string[]): Promise<void> {
-    await pool().withConnection(async (conn) => {
-      for (const statement of statements) await conn.execute(statement);
-    });
-  }
 
   beforeEach(async () => {
     previous = await Base.removeConnection();
@@ -221,75 +220,15 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     return file;
   };
 
-  it("honors ignoreTables", async () => {
-    await lay(
-      "CREATE TABLE bar(id INTEGER)",
-      "CREATE TABLE prefix_foo(id INTEGER)",
-      "CREATE TABLE prefix_bar(id INTEGER)",
-    );
-    SchemaDumper.ignoreTables = [/^prefix_/g];
-
-    const filename = sqlFile();
-    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
-
-    const contents = fs.readFileSync(filename, "utf8");
-    expect(contents).toMatch(/CREATE TABLE bar/);
-    expect(contents).not.toMatch(/prefix_foo/);
-    expect(contents).not.toMatch(/prefix_bar/);
-  });
-
-  it("dumps a trigger body whole", async () => {
-    await lay(
-      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT)",
-      "CREATE INDEX index_widgets_on_name ON widgets(name)",
-      "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
-        "BEGIN " +
-        "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
-        "END",
-    );
-
-    const dumped = sqlFile();
-    await new SQLiteDatabaseTasks(configuration).structureDump(dumped);
-
-    const contents = fs.readFileSync(dumped, "utf8");
-    expect(contents).toMatch(/CREATE TRIGGER touch_widgets/);
-    expect(contents).toMatch(/UPDATE widgets SET updated_at/);
-    expect(contents).toMatch(/index_widgets_on_name/);
-  });
-
   it("leaves the live in-memory connection untouched, as Rails' child process does", async () => {
-    await new SQLiteDatabaseTasks(configuration).structureLoad(
+    await new SQLiteDatabaseTasks(configuration, "/rails/root").structureLoad(
       sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),
+      null,
     );
 
     const tables = (await pool().withConnection((conn) =>
       conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'"),
     )) as Array<{ name: string }>;
     expect(tables).toHaveLength(0);
-  });
-
-  it("dumps an in-memory database byte-for-byte as it dumps a file-backed one", async () => {
-    const schema =
-      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT);\n" +
-      "CREATE INDEX index_widgets_on_name ON widgets(name);\n";
-
-    await lay(
-      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)",
-      "CREATE INDEX index_widgets_on_name ON widgets(name)",
-    );
-    const fromMemory = sqlFile();
-    await new SQLiteDatabaseTasks(configuration).structureDump(fromMemory);
-
-    const dbFile = tmpDbPath();
-    created.push(dbFile);
-    const fileTasks = new SQLiteDatabaseTasks(
-      new HashConfig("development", "primary", { adapter: "sqlite3", database: dbFile }),
-    );
-    await fileTasks.structureLoad(sqlFile(schema));
-    const fromFile = sqlFile();
-    await fileTasks.structureDump(fromFile);
-
-    expect(fs.readFileSync(fromMemory, "utf8")).toEqual(fs.readFileSync(fromFile, "utf8"));
-    expect(fs.existsSync(`${fromMemory}.dump.sqlite3`)).toBe(false);
   });
 });

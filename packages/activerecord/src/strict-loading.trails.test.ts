@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";

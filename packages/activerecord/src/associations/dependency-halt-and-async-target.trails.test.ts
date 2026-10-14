@@ -11,6 +11,7 @@ function restrictWithErrorHost(extra: Record<string, unknown>) {
   };
   return {
     reflection: { name: "account", options: { dependent: "restrictWithError" } },
+    options: { dependent: "restrictWithError" },
     owner,
     ...extra,
   };

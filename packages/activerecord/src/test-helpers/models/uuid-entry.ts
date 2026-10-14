@@ -1,4 +1,5 @@
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class UuidEntry extends Base {
   static {
@@ -9,3 +10,4 @@ export class UuidEntry extends Base {
     });
   }
 }
+registerModel(UuidEntry);

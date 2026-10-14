@@ -1,3 +1,4 @@
+import { Time } from "@blazetrails/date";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   mkdirSync,
@@ -167,20 +168,19 @@ describe("FileStoreTest", () => {
   });
 
   it("cleanup removes all expired entries", () => {
-    const time = Date.now();
+    const time = Time.now();
     store.write("foo", "bar", { expiresIn: 10 });
     store.write("baz", "qux");
     store.write("quux", "corge", { expiresIn: 20 });
-    vi.useFakeTimers();
+    const now = vi.spyOn(Time, "now").mockReturnValue(time.plus(15));
     try {
-      vi.setSystemTime(time + 15_000);
       store.cleanup();
       assertNot(store.exist("foo"));
       assert(store.exist("baz"));
       assert(store.exist("quux"));
       expect(readdirSync(cacheDir).length).toEqual(2);
     } finally {
-      vi.useRealTimers();
+      now.mockRestore();
     }
   });
 

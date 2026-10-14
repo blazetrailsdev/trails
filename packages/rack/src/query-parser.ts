@@ -1,4 +1,4 @@
-import { ArgumentError, include, rbObjClass } from "@blazetrails/ruby-compat";
+import { ArgumentError, include, rbObjClassname } from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {
@@ -17,7 +17,7 @@ export class InvalidParameterError extends ArgumentError {
 include(InvalidParameterError, BadRequest);
 
 export class QueryLimitError extends RangeError {
-  constructor(message: string) {
+  constructor(message: string = "Rack::QueryParser::QueryLimitError") {
     super(message);
     this.name = "QueryLimitError";
   }
@@ -193,7 +193,7 @@ export class QueryParser {
   }
 
   private _normalizeParams(params: any, name: string | null, v: unknown, depth: number): any {
-    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError("param depth limit exceeded");
+    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError();
 
     let k: string;
     let after: string;
@@ -233,7 +233,7 @@ export class QueryParser {
       params[k] ??= [];
       if (!Array.isArray(params[k])) {
         throw new ParameterTypeError(
-          `expected Array (got ${rbObjClass(params[k])}) for param \`${k}'`,
+          `expected Array (got ${rbObjClassname(params[k])}) for param \`${k}'`,
         );
       }
       params[k].push(v);
@@ -253,7 +253,7 @@ export class QueryParser {
       params[k] ??= [];
       if (!Array.isArray(params[k])) {
         throw new ParameterTypeError(
-          `expected Array (got ${rbObjClass(params[k])}) for param \`${k}'`,
+          `expected Array (got ${rbObjClassname(params[k])}) for param \`${k}'`,
         );
       }
       const last = params[k][params[k].length - 1];
@@ -266,7 +266,7 @@ export class QueryParser {
       params[k] ??= this.makeParams();
       if (!this.isParamsHashType(params[k])) {
         throw new ParameterTypeError(
-          `expected Hash (got ${rbObjClass(params[k])}) for param \`${k}'`,
+          `expected Hash (got ${rbObjClassname(params[k])}) for param \`${k}'`,
         );
       }
       params[k] = this._normalizeParams(params[k], after, v, depth + 1);

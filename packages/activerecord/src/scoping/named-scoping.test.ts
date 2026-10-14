@@ -1,3 +1,4 @@
+import { Enumerable } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -9,12 +10,8 @@ import {
 } from "@blazetrails/activesupport";
 import "../index.js";
 import { registerModel } from "../index.js";
-import {
-  assertNoQueries,
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "../testing/query-assertions.js";
-import { fixtures } from "../test-fixtures.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { adapterType } from "../test-adapter.js";
 import { Temporal } from "@blazetrails/date";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -37,7 +34,7 @@ const ids = (rows: any[]) => rows.map((r) => r.id);
 const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => Number(a) - Number(b));
 
 describe("NamedScopingTest", () => {
-  const { topics, posts, authors } = fixtures([
+  const { self, topics, posts, authors } = fixtures([
     "topics",
     "posts",
     "authors",
@@ -77,7 +74,7 @@ describe("NamedScopingTest", () => {
 
     expect(ids(await Topic.base())).toEqual(ids(await Topic.all()));
     expect((await Topic.base().first())!.id).toBe((await Topic.first())!.id);
-    expect((await Topic.count()) as number).toBe(await Topic.base().count());
+    expect(await Topic.count()).toBe(await Topic.base().count());
     expect(await Topic.average("replies_count")).toEqual(
       await Topic.base().average("replies_count"),
     );
@@ -472,7 +469,15 @@ describe("NamedScopingTest", () => {
     expect(chainedGot).toEqual(chainedExpected);
   });
 
-  it.skip("find all should behave like select", () => {});
+  it("find all should behave like select", async () => {
+    const toA = await Topic.base();
+    expect((await Topic.base()).filter((t) => t.approved)).toEqual(
+      Enumerable.findAll.call(
+        { each: (block) => toA.forEach(block) },
+        (t) => (t as Topic).approved,
+      ),
+    );
+  });
 
   it("rand should select a random object from proxy", async () => {
     const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
@@ -489,7 +494,7 @@ describe("NamedScopingTest", () => {
   it("size should use count when results are not loaded", async () => {
     const t = Topic.base();
     await assertQueriesCount(1, false, async () => {
-      await assertQueriesMatch(/COUNT/i, undefined, false, () => t.size());
+      await self().assertQueriesMatch(/COUNT/i, {}, () => t.size());
     });
   });
 
@@ -699,7 +704,7 @@ describe("NamedScopingTest", () => {
     Topic.scope("includingAnnotateInScope", function (this: any) {
       return this.annotate("from-scope");
     });
-    await assertQueriesMatch(/\/\* from-scope \*\//, undefined, false, async () => {
+    await self().assertQueriesMatch(/\/\* from-scope \*\//, {}, async () => {
       expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
         sortedIds(await Topic.all()),
       );

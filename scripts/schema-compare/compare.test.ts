@@ -586,6 +586,11 @@ describe("against the vendored schema.rb", () => {
     expect(optionRegressions(compareSchemas(TEST_SCHEMA, railsTables))).toEqual([]);
   });
 
+  it("carries no column-option divergences", () => {
+    const findings = compareSchemas(TEST_SCHEMA, railsTables);
+    expect(verdicts(findings.filter((f) => f.verdict === "OPTION"))).toEqual([]);
+  });
+
   it("holds the invention baseline at or below its committed size", async () => {
     // Ratchet: this number may fall as debt is paid off, never rise.
     const baseline = await readBaseline();

@@ -62,8 +62,47 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     return rubyField(fixtures, "calls");
   }
 
+  it("records the opener of a string default that is not double-quoted", () => {
+    const r = rubyField(
+      {
+        "quoted.rb": [
+          "class Foo",
+          "  def like(double = \"\\\\\", single = '\\s', percent = %q(a\\)b), upper = %Q(\\s), plain = 'x')",
+          "  end",
+          "",
+          "  def here(raw = <<~'EOS', cooked = <<~EOS, sym = :\"a\\n\", after = '\\d')",
+          "    a\\nb",
+          "  EOS",
+          "    c\\nd",
+          "  EOS",
+          "  end",
+          "end",
+          "",
+        ].join("\n"),
+      },
+      "params",
+    ) as unknown as Record<string, { name: string; literal: { opener?: string } }[]>;
+    const openers = (key: string) => r[key].map((p) => [p.name, p.literal.opener]);
+    expect(openers("Foo#like")).toEqual([
+      ["double", undefined],
+      ["single", "'"],
+      ["percent", "%q("],
+      ["upper", undefined],
+      ["plain", undefined],
+    ]);
+    expect(openers("Foo#here")).toEqual([
+      ["raw", "<<~'EOS'"],
+      ["cooked", undefined],
+      ["sym", undefined],
+      ["after", "'"],
+    ]);
+  });
+
   // Class fqn -> the module names recorded as `includes` on it.
-  function rubyIncludes(fixtures: Record<string, string>): Record<string, string[]> {
+  function rubyIncludes(
+    fixtures: Record<string, string>,
+    edge = "includes",
+  ): Record<string, string[]> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "includes-rb-"));
     try {
       for (const [rel, src] of Object.entries(fixtures)) {
@@ -80,7 +119,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
           ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
         end
         out = {}
-        ex.classes.each { |fqn, info| out[fqn] = info[:includes] }
+        ex.classes.merge(ex.modules).each { |fqn, info| out[fqn] = normalize_class_info(info)[${JSON.stringify(edge)}.to_sym] }
         puts JSON.generate(out)
       `;
       return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
@@ -121,6 +160,108 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       `,
     });
     expect(includes["ActiveRecord::Base"]).toEqual(["ActiveRecord::Core"]);
+  });
+
+  it("records a prepend edge on a class and on a module, absolute names kept as include keeps them", () => {
+    const fixtures = {
+      "connection_pool.rb": `
+        module ActiveRecord
+          module ConnectionAdapters
+            module QueryCache
+              prepend(Dirties)
+            end
+            class ConnectionPool
+              prepend QueryCache::ConnectionPoolConfiguration
+              prepend ::MonitorMixin
+              include ::MonitorMixin
+            end
+          end
+        end
+      `,
+    };
+    const prepends = rubyIncludes(fixtures, "prepends");
+    expect(prepends["ActiveRecord::ConnectionAdapters::ConnectionPool"]).toEqual([
+      "QueryCache::ConnectionPoolConfiguration",
+      "::MonitorMixin",
+    ]);
+    expect(rubyIncludes(fixtures)["ActiveRecord::ConnectionAdapters::ConnectionPool"]).toEqual([
+      "::MonitorMixin",
+    ]);
+    expect(prepends["ActiveRecord::ConnectionAdapters::QueryCache"]).toEqual(["Dirties"]);
+  });
+
+  it("records include, prepend and extend statements in source order, arguments as written", () => {
+    const order = rubyIncludes(
+      {
+        "base.rb": `
+          module ActiveRecord
+            class Base
+              include ActiveModel::API
+              extend ConnectionHandling
+              include Core, Persistence
+              prepend Suppressor
+              extend Querying
+            end
+            class Relation
+            end
+          end
+        `,
+      },
+      "mixinOrder",
+    );
+    expect(order["ActiveRecord::Base"]).toEqual([
+      { kind: "include", names: ["ActiveModel::API"] },
+      { kind: "extend", names: ["ConnectionHandling"] },
+      { kind: "include", names: ["Core", "Persistence"] },
+      { kind: "prepend", names: ["Suppressor"] },
+      { kind: "extend", names: ["Querying"] },
+    ]);
+    expect(order["ActiveRecord::Relation"]).toBeNull();
+  });
+
+  it("unrolls an include loop over a constant list of modules", () => {
+    const includes = rubyIncludes({
+      "api.rb": `
+        module ActionController
+          class API
+            MODULES = [
+              AbstractController::Rendering,
+              UrlFor,
+              ParamsWrapper
+            ]
+
+            MODULES.each do |mod|
+              include mod
+            end
+          end
+        end
+      `,
+    });
+    expect(includes["ActionController::API"]).toEqual([
+      "AbstractController::Rendering",
+      "UrlFor",
+      "ParamsWrapper",
+    ]);
+  });
+
+  it("unrolls a brace-block include loop and leaves a loop with another body alone", () => {
+    const includes = rubyIncludes({
+      "api.rb": `
+        module ActionController
+          class API
+            MODULES = [UrlFor, Redirecting]
+            OTHERS = [Rescue]
+
+            MODULES.each { |mod| include mod }
+            OTHERS.each do |mod|
+              puts mod
+              include mod
+            end
+          end
+        end
+      `,
+    });
+    expect(includes["ActionController::API"]).toEqual(["UrlFor", "Redirecting"]);
   });
 
   function rubySkeletons(fixtures: Record<string, string>): Record<string, string[] | undefined> {
@@ -175,6 +316,94 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     ).toEqual(["if", "throw:ArgumentError"]);
   });
 
+  it("marks a when listing several values with its arity, and a lone value not at all", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def build_quoted(other, attribute = nil)
+            case other
+            when Arel::Nodes::Node, Arel::Table, Arel::Nodes::SqlLiteral
+              other
+            when Arel::Attributes::Attribute
+              attribute
+            end
+          end
+        end
+      `,
+    });
+    expect(s["Foo#build_quoted"]).toEqual(["if", "when:3", "if"]);
+  });
+
+  it("marks `String === x || Symbol === x` on one operand as one String test", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def order(x)
+            String === x || Symbol === x ? lit(x) : x
+          end
+
+          def partition(x)
+            ::String === x || ::Symbol === x ? lit(x) : x
+          end
+
+          def mixed(x, y)
+            String === x || Symbol === y
+          end
+        end
+      `,
+    });
+    expect(s["Foo#order"]).toEqual(["if", "or:string-symbol", "ref:lit"]);
+    expect(s["Foo#partition"]).toEqual(["if", "or:string-symbol", "ref:lit"]);
+    expect(s["Foo#mixed"]).toEqual(["or"]);
+  });
+
+  it("counts a safe-navigation assignment as the conditional write it is", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def discard
+            @raw&.automatic_close = false
+            @raw&.close
+            @other.automatic_close = false
+          end
+        end
+      `,
+    });
+    expect(s["Foo#discard"]!.filter((t) => t === "if")).toEqual(["if"]);
+  });
+
+  it("reads the arms of a String handed to class_eval / module_eval", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def self.add_jobs(mixin)
+            mixin.class_eval <<-CODE, __FILE__, __LINE__ + 1
+              def _after_commit_jobs
+                raise Boom unless ready
+                @_after_commit_jobs ||= []
+              end
+            CODE
+          end
+
+          def self.paren
+            module_eval("def a; b && c; end")
+          end
+
+          def self.interpolated(name)
+            class_eval <<-CODE
+              def #{"#"}{name}
+                @x ||= []
+              end
+            CODE
+          end
+        end
+      `,
+    });
+    expect(s["Foo#add_jobs"]).toEqual(["ref:class_eval", "if", "throw:Boom", "or"]);
+    expect(s["Foo#paren"]).toEqual(["ref:module_eval", "and"]);
+    expect(s["Foo#interpolated"]).toEqual(["ref:class_eval"]);
+  });
+
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
     const s = rubySkeletons({
       "foo.rb": `
@@ -210,6 +439,30 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#build"]).toEqual(["ref:cached", "or", "new:Thing"]);
   });
 
+  it("tokens an `||` whose right side exits as an arm", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def merge
+            reflection = lookup || return
+            preload(reflection)
+          end
+
+          def each_option
+            items.each { |item| option = pick(item) || next }
+          end
+
+          def fallback
+            lookup || default
+          end
+        end
+      `,
+    });
+    expect(s["Foo#merge"]).toEqual(["ref:lookup", "if", "ref:preload"]);
+    expect(s["Foo#each_option"]).toEqual(["ref:items", "ref:each", "ref:pick", "if"]);
+    expect(s["Foo#fallback"]).toEqual(["ref:lookup", "or", "ref:default"]);
+  });
+
   it("carries the raised class on the throw token, however the raise is spelled", () => {
     const s = rubySkeletons({
       "foo.rb": `
@@ -240,6 +493,31 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#a"]).toEqual(["throw"]);
     expect(s["Foo#b"]).toEqual(["throw"]);
     expect(s["Foo#c"]).toEqual(["throw"]);
+  });
+
+  it("tokens Kernel#fail as the throw raise is, class and all", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def a(cmd); fail run_cmd_error(cmd) unless system(cmd); end
+          def b; fail NotImplementedError; end
+        end
+      `,
+    });
+    expect(s["Foo#a"]).toEqual(["if", "ref:system", "throw", "ref:run_cmd_error"]);
+    expect(s["Foo#b"]).toEqual(["throw:NotImplementedError"]);
+  });
+
+  it("reads fail as a call in a file that defines a fail of its own", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def get(env); return fail(405, "Method Not Allowed") unless ok?(env); end
+          def fail(status, body); [status, {}, [body]]; end
+        end
+      `,
+    });
+    expect(s["Foo#get"]).toEqual(["if", "ref:ok?", "ref:fail"]);
   });
 
   it("emits a short-circuit token for a logical op-assign, as the ??= port does", () => {
@@ -520,6 +798,44 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     // argument the TS side defers, or as a `for` body.
     expect(c["Foo#block_body"]).toEqual(["each", "save"]);
     expect(c["Foo#lambda_arg"]).toEqual(["scope", "where"]);
+  });
+
+  it("records the line an initialize / new def closes on, and no other def's", () => {
+    const ends = rubyField(
+      {
+        "foo.rb": `class Foo
+  def initialize(attributes = nil,
+                 options = {}) # reaches the end
+    sql = <<~SQL
+      select 1
+    end
+    SQL
+    def helper; end
+    assign_attributes(attributes) if attributes
+    super()
+  end # trailing
+
+  def save
+    true
+  end
+end
+class Bar
+  def initialize; end
+end
+class Baz
+  def initialize(x) = @x =
+    x
+end
+`,
+      },
+      "endLine",
+    );
+    expect(ends).toMatchObject({
+      "Foo#initialize": 11,
+      "Bar#initialize": 18,
+      "Baz#initialize": 22,
+    });
+    expect(ends["Foo#save"]).toBeNull();
   });
 
   it('records super(args) and bare super as a "super" call', () => {
@@ -807,6 +1123,29 @@ describe(
       expect(c["Raiser#f"].calls).toEqual(["ok?", "raise", "build", "new"]);
     });
 
+    it("drops new and wrap at an ActiveRecord::Promise receiver, keeping any other new", () => {
+      const c = rubyWeakCalls({
+        "promised.rb": `
+        class Promised
+          def f
+            return Promise::Complete.new(build) if done?
+            Wrapper.new(result)
+          end
+
+          def g
+            async ? Promise.wrap([]) : ActiveRecord::Promise.new(future, nil)
+          end
+        end
+      `,
+      });
+      // The native JS promise is the port of ActiveRecord::Promise (CLAUDE.md
+      // § "\`ActiveRecord::Promise\` is the native promise"), so the port writes
+      // the value and names no callee. \`Wrapper.new\` still records.
+      expect(c["Promised#f"].calls).toEqual(["done?", "build", "result", "new"]);
+      expect(c["Promised#g"].calls ?? []).not.toContain("new");
+      expect(c["Promised#g"].calls ?? []).not.toContain("wrap");
+    });
+
     it("drops new entirely when Proc is the only receiver", () => {
       const c = rubyWeakCalls({
         "quux.rb": `
@@ -874,6 +1213,27 @@ describe(
       });
       expect(c["Qux#d"].filter((n) => n === "new")).toEqual(["new"]);
       expect(c["Qux#d"]).toContain("run");
+    });
+
+    it("drops the Promise.new / Promise::Complete.new / Promise.wrap sites", () => {
+      const c = rubyCallSiteNames({
+        "promised.rb": `
+        class Promised
+          def f
+            return Promise::Complete.new(build) if done?
+            Wrapper.new(result)
+          end
+
+          def g
+            async ? Promise.wrap([]) : ActiveRecord::Promise.new(future, nil)
+          end
+        end
+      `,
+      });
+      expect(c["Promised#f"].filter((n) => n === "new")).toEqual(["new"]);
+      expect(c["Promised#f"]).toContain("build");
+      expect(c["Promised#g"]).not.toContain("new");
+      expect(c["Promised#g"]).not.toContain("wrap");
     });
 
     it("drops the new site entirely when Proc is the only receiver", () => {
@@ -1277,6 +1637,29 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
     expect(r["ActiveRecord::Relation#aka"].params).toEqual(["top_level"]);
   });
 
+  it("resolves a DelegateClass(X) superclass to X", () => {
+    const r = aliasParams({
+      "delegate_sup.rb": `
+        module ActiveModel
+          module Type
+            class Value
+              def target(value); end
+            end
+          end
+        end
+
+        module ActiveRecord
+          module Type
+            class Serialized < DelegateClass(ActiveModel::Type::Value)
+              alias :aka :target
+            end
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Type::Serialized#aka"].params).toEqual(["value"]);
+  });
+
   it("prefers a same-bucket definition over an inherited one", () => {
     const r = aliasParams({
       "shadow.rb": `
@@ -1404,6 +1787,21 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
       notes: "delegate",
     });
     expect(r["Pkg::Querying#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
+  });
+
+  it("reads a quoted symbol with no interpolation as a delegated name", () => {
+    const r = aliasParams({
+      "d.rb": `
+        module Pkg
+          class Name
+            delegate :=~, :"!~", :"a#{b}", to: :name
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Name#=~"]).toMatchObject({ notes: "delegate" });
+    expect(r["Pkg::Name#!~"]).toMatchObject({ notes: "delegate" });
+    expect(Object.keys(r)).toEqual(["Pkg::Name#=~", "Pkg::Name#!~"]);
   });
 
   // Forwardable's `def_delegators :@errors, :each, …` (activemodel errors.rb:103)
@@ -1719,7 +2117,9 @@ describe(
     const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
     // Returns a map of "<fqn>#<method>" -> the method's expanded option_keys.
-    function optionKeys(fixtures: Record<string, string>): Record<string, string[] | undefined> {
+    function optionKeys(
+      fixtures: Record<string, string>,
+    ): Record<string, string[] | null | undefined> {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), "optkeys-rb-"));
       try {
         for (const [rel, src] of Object.entries(fixtures)) {
@@ -1771,6 +2171,51 @@ describe(
       `,
       });
       expect(r["Bar::Rel#build"]).toEqual(["top_a", "top_b"]);
+    });
+
+    it("reads the keys of a values_at and of a compound assignment", () => {
+      const r = optionKeys({
+        "reads.rb": `
+        class Rel
+          def add_enum_value(type_name, value, **options)
+            before, after = options.values_at(:before, :after)
+            options[:if_not_exists]
+          end
+
+          def change_column(table_name, **options)
+            options[:precision] ||= nil
+            options[:_skip] = true
+            options[:null] = false
+          end
+        end
+      `,
+      });
+      expect(r["Rel#add_enum_value"]).toEqual(["after", "before", "if_not_exists"]);
+      expect(r["Rel#change_column"]).toEqual(["precision"]);
+    });
+
+    it("follows a local copied from the options hash", () => {
+      const r = optionKeys({
+        "copies.rb": `
+        class Mapper
+          def map_match(paths, options)
+            route_options = options.dup
+            get_to_from_path(route_options[:action])
+            trimmed = options.except(:via).merge(on: nil)
+            trimmed[:anchor]
+            other = paths.dup
+            other[:not_a_key]
+            merged = defaults.merge(options)
+            merged[:merged]
+            blocked = options.merge(a) { |k| k }
+            blocked[:blocked]
+            route_options = paths.first
+            route_options[:reassigned]
+          end
+        end
+      `,
+      });
+      expect(r["Mapper#map_match"]).toEqual(["action", "anchor", "blocked", "merged"]);
     });
   },
 );
@@ -1879,6 +2324,19 @@ describe(
       expect(urlHelpers.notes).toBe("define_method");
       // The block's params are the generated method's params.
       expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
+    });
+
+    it("hosts a `CONST = Class.new do … end` body on the anonymous class", () => {
+      const m = metaMethods(`
+      class TestRequest
+        ENCODER = Class.new do
+          def should_multipart?(params); end
+        end.new
+        def assign_parameters; end
+      end
+    `);
+      expect(m["TestRequest"].map((x) => x.name)).toEqual(["assign_parameters"]);
+      expect(m["TestRequest::ENCODER"].map((x) => x.name)).toEqual(["should_multipart?"]);
     });
 
     it("synthesizes the accessors and initialize a Struct.new superclass generates", () => {
@@ -2099,6 +2557,29 @@ describe(
         "create_table",
         "add_column",
       ]);
+    });
+
+    it("resolves a bare loop constant to the enclosing class's own before a same-named one", () => {
+      const m = metaMethods(`
+      class Thor
+        class Argument
+          VALID_TYPES = [:numeric, :string]
+        end
+
+        class Option < Argument
+          VALID_TYPES = [:boolean, :numeric, :string]
+
+          VALID_TYPES.each do |type|
+            class_eval <<-RUBY, __FILE__, __LINE__ + 1
+              def #{type}?
+                self.type == #{type.inspect}
+              end
+            RUBY
+          end
+        end
+      end
+    `);
+      expect(m["Thor::Option"].map((x) => x.name)).toEqual(["boolean?", "numeric?", "string?"]);
     });
 
     // The class_eval-with-a-string-template half of RFC 0126: the template is
@@ -2494,6 +2975,23 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
     ]);
   });
 
+  it("flags a product of literals and refs with its factors", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def backoff(counter)
+            sleep 0.1 * counter
+            wait(counter * jitter(counter))
+          end
+        end
+      `,
+    });
+    const flagsOf = (name: string) => c["Foo#backoff"]?.find((s) => s.name === name)?.flags;
+    expect(argsOf(c["Foo#backoff"], "sleep")).toEqual(["binop:*"]);
+    expect(flagsOf("sleep")).toContain("product=num:0.1*id:counter");
+    expect(flagsOf("wait")?.some((flag) => flag.startsWith("product="))).toBe(false);
+  });
+
   it("records keyword arguments as keys plus value descriptors", () => {
     const c = rubyCallArgs({
       "foo.rb": `
@@ -2529,6 +3027,33 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
     expect(argsOf(c["Foo#m"], "to_sentence")).toEqual([
       "kwargs{last_word_connector=str:%2C or ,sep=str:a%3Db%7Bc%7Dd}",
     ]);
+  });
+
+  it("carries a backslash-bearing string argument's opener for decoding", () => {
+    const c = rubyCallArgs({
+      "foo.rb": String.raw`
+        class Foo
+          def m
+            a("\\")
+            b("\\n")
+            c('\n')
+            d("\e[0m")
+            e(%q(x\)y))
+            f(:'a\nb')
+            g(:"a\\nb")
+            h(%s(a\nb))
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "a")).toEqual([String.raw`rstr::\\`]);
+    expect(argsOf(c["Foo#m"], "b")).toEqual([String.raw`rstr::\\n`]);
+    expect(argsOf(c["Foo#m"], "c")).toEqual([String.raw`rstr:':\n`]);
+    expect(argsOf(c["Foo#m"], "d")).toEqual([String.raw`rstr::\e[0m`]);
+    expect(argsOf(c["Foo#m"], "e")).toEqual([String.raw`rstr:%25q(:x\)y`]);
+    expect(argsOf(c["Foo#m"], "f")).toEqual([String.raw`rsym:':a\nb`]);
+    expect(argsOf(c["Foo#m"], "g")).toEqual([String.raw`rsym::a\\nb`]);
+    expect(argsOf(c["Foo#m"], "h")).toEqual([String.raw`rsym:%25s(:a\nb`]);
   });
 
   it("recurses into a nested keyword hash", () => {
@@ -2970,6 +3495,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
   // Returns a map of "<fqn>#<method>" -> callReceivers.
   function rubyCallReceivers(
     fixtures: Record<string, string>,
+    field = "callReceivers",
   ): Record<string, Record<string, string[]> | undefined> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "recv-rb-"));
     try {
@@ -2989,7 +3515,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         out = {}
         ex.classes.each do |fqn, info|
           (info[:instanceMethods] + info[:classMethods]).each do |m|
-            out["#{fqn}##{m[:name]}"] = m[:callReceivers]
+            out["#{fqn}##{m[:name]}"] = m[:${field}]
           end
         end
         puts JSON.generate(out)
@@ -3023,6 +3549,60 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("names an argument-less Hash.new / Array.new a literal and String.new(x) a conversion", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core.rb": `
+        class Core
+          def literal
+            Hash.new.tap { |attrs| attrs }
+            Array.new()
+          end
+
+          def concurrent
+            Concurrent::Array.new
+          end
+
+          def concurrent_map
+            Concurrent::Map.new
+          end
+
+          def concurrent_sized(x)
+            Concurrent::Array.new(x)
+          end
+
+          def defaulted
+            Hash.new(0)
+          end
+
+          def blocked
+            Hash.new { |h, k| h[k] = [] }
+          end
+
+          def other
+            Foo.new
+          end
+
+          def conversion(order)
+            String.new(order)
+          end
+
+          def empty_string
+            String.new
+          end
+        end
+      `,
+    });
+    expect(c["Core#literal"]).toEqual({ new: ["literal-new"], tap: ["expr"] });
+    expect(c["Core#concurrent"]).toEqual({ new: ["literal-new"] });
+    expect(c["Core#concurrent_map"]).toEqual({ new: ["const"] });
+    expect(c["Core#concurrent_sized"]).toEqual({ new: ["const"] });
+    expect(c["Core#defaulted"]).toEqual({ new: ["const"] });
+    expect(c["Core#blocked"]).toEqual({ new: ["const"] });
+    expect(c["Core#other"]).toEqual({ new: ["const"] });
+    expect(c["Core#conversion"]).toEqual({ new: ["string-new"] });
+    expect(c["Core#empty_string"]).toEqual({ new: ["const"] });
+  });
+
   it("proves a Hash local from a hash-literal default, a `**` param and an assignment", () => {
     const c = rubyCallReceivers({
       "lib/active_support/options.rb": `
@@ -3053,7 +3633,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Reassigned#call"]).toEqual({ fetch: ["local"] });
   });
 
-  it("proves a Hash ivar only when every assignment in the file is a plain to_hash assignment", () => {
+  it("proves a Hash ivar only when every assignment in the file is a plain Hash-literal or to_hash assignment", () => {
     const c = rubyCallReceivers({
       "lib/active_record/row.rb": `
         class Row
@@ -3062,9 +3642,11 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             @seen = fixture.to_hash
             @items = compute
             @cache ||= {}
+            @cascade_for = {}
           end
 
           def call(name)
+            @cascade_for.key?(name)
             @cache.fetch(name)
             @row.delete(name)
             @seen.include?(name)
@@ -3077,7 +3659,439 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         end
       `,
     });
-    expect(c["Row#call"]).toEqual({ fetch: ["ivar"], delete: ["hash"], "include?": ["ivar"] });
+    expect(c["Row#call"]).toEqual({
+      "key?": ["hash"],
+      fetch: ["ivar"],
+      delete: ["hash"],
+      "include?": ["ivar"],
+    });
+  });
+
+  it("proves an Array ivar only when every assignment in the class is an Array literal", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/stack.rb": `
+        class Stack
+          def initialize
+            @stack = []
+            @queue = Array(seed)
+            @records = []
+            @target = []
+            @pair, @other = [], []
+          end
+
+          def call
+            @stack.last
+            @queue.size
+            @records.first
+            @target.first
+            @pair.size
+          end
+
+          def load(relation)
+            @records = relation
+            @target ||= []
+          end
+        end
+      `,
+    });
+    expect(c["Stack#call"]).toEqual({
+      last: ["array"],
+      size: ["array", "ivar"],
+      first: ["ivar"],
+    });
+  });
+
+  it("leaves an Array-literal ivar unproven when anything outside the class's own instance bodies may write it", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/writers.rb": `
+        class Writers
+          attr_writer :written
+          attr_accessor :accessed
+
+          def initialize
+            @written = []
+            @accessed = []
+            @singleton = []
+            @class_level = []
+            @set = []
+            @plain = []
+          end
+
+          def self.reset
+            @class_level = []
+          end
+
+          class << self
+            def build
+              @singleton = []
+            end
+          end
+
+          def call
+            @written.size
+            @accessed.size
+            @singleton.size
+            @class_level.size
+            @set.size
+            @plain.last
+          end
+
+          def restore(value)
+            instance_variable_set(:@set, value)
+          end
+        end
+
+        class SelfWriter
+          def initialize
+            @stack = []
+          end
+
+          def call(name, value)
+            @stack.last
+            self.instance_variable_set :@stack, value
+          end
+        end
+
+        class ClassLevel
+          @registry = []
+
+          def call
+            @registry.last
+          end
+        end
+
+        class Parent
+          def initialize
+            @items = []
+          end
+
+          def call
+            @items.last
+          end
+        end
+
+        class Child < Parent
+          def reload(relation)
+            @items = relation
+          end
+        end
+
+      `,
+      "lib/active_record/dynamic_writer.rb": `
+        class DynamicWriter
+          def initialize
+            @stack = []
+          end
+
+          def call(name, value)
+            @stack.last
+            instance_variable_set(name, value)
+          end
+        end
+      `,
+      "lib/active_record/dynamic_child.rb": `
+        class DynamicParent
+          def initialize
+            @stack = []
+          end
+
+          def call
+            @stack.last
+          end
+        end
+
+        class DynamicChild < DynamicParent
+          def restore(name, value)
+            instance_variable_set(name, value)
+          end
+        end
+      `,
+    });
+    expect(c["Writers#call"]).toEqual({ size: ["ivar"], last: ["array"] });
+    expect(c["DynamicWriter#call"]).toEqual({ last: ["ivar"] });
+    expect(c["SelfWriter#call"]).toEqual({ last: ["ivar"] });
+    expect(c["ClassLevel#call"]).toEqual({ last: ["ivar"] });
+    expect(c["Parent#call"]).toEqual({ last: ["ivar"] });
+    expect(c["DynamicParent#call"]).toEqual({ last: ["ivar"] });
+  });
+
+  it("names the receiver each non-Array size or length site ends in", () => {
+    const c = rubyCallReceivers(
+      {
+        "lib/active_record/named.rb": `
+          class Named
+            def call(cursor, c, result, ids)
+              Array(cursor).size
+              cursor.size
+              c.select_rows(sql).size
+              result.columns.length
+              Array.wrap(ids).size
+              predicates.size
+              (a || b).size
+            end
+          end
+        `,
+      },
+      "callReceiverNames",
+    );
+    expect(c["Named#call"]).toEqual({
+      size: ["a|b", "cursor", "predicates", "select_rows", "wrap"],
+      length: ["columns"],
+    });
+  });
+
+  it("names the receiver of each Hash call a native form ports", () => {
+    const fixture = {
+      "lib/active_record/hashes.rb": `
+        class Hashes
+          def call(options, other)
+            options.key?(:a)
+            @options.has_key?(:a)
+            options[:html].include?(:a)
+            { a: 1 }.member?(:a)
+            options.delete(:a)
+            options[:html].delete(:b)
+            @options.merge!(other)
+            options.update(other)
+            DEFAULTS.merge(options)
+            merge(other)
+            @options.each_pair { |k, v| k }
+            options.fetch(:a, 1)
+          end
+
+          def blocks(options, other)
+            options.delete(:a) { 1 }
+            options.merge(other) { |_k, a, _b| a }
+            options.merge!(other) do |_k, a, _b| a end
+            options.update(other) { |_k, a, _b| a }
+          end
+
+          def passed(options, other, &block)
+            options.merge(other, &block)
+            options.delete(:a, &block)
+            options.update(other)
+          end
+
+          def used(options)
+            value = options.delete(:a)
+            use(options.delete(:b))
+            options.delete(:c)
+          end
+
+          def void(options)
+            options.delete(:a)
+            options.delete :b
+            options
+          end
+
+          def modified(options, flag)
+            options.delete(:a) if flag
+            options.delete(:b) unless flag rescue nil
+            for key in keys
+              options.delete(key)
+              key
+            end
+            options
+          end
+
+          def modified_last(options, flag)
+            options.delete(:a) if flag
+          end
+
+          def branched(args, flag)
+            if args.last.is_a?(Hash)
+              args.last.delete(:a)
+            elsif flag
+              args.first.delete(:b)
+            end
+            super
+          end
+
+          def branched_last(options)
+            if options
+              options.delete(:a)
+            end
+          end
+
+          def class_variable(name)
+            @@responses.key?(name)
+          end
+
+          def iterated(options, names)
+            names.each do |name|
+              options.delete(name)
+            end
+            names.each_pair { |key, value|
+              if value
+                options[key] = value
+              else
+                options.delete(key)
+              end
+            }
+          end
+
+          def iterated_modifier(options, names, flag)
+            names.each { |name| options.delete(name) if flag }
+          end
+
+          def iterated_case(options, names)
+            names.each do |name|
+              case name
+              when :a then options.delete(:a)
+              else
+                begin
+                  options.delete(name)
+                end
+              end
+            end
+          end
+
+          def mapped(options, names)
+            names.map { |name| options.delete(name) }
+          end
+
+          def each(options)
+            each { |name| options.delete(name) }
+          end
+        end
+      `,
+    };
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#blocks"]).toEqual({
+      delete: ["?"],
+      merge: ["?"],
+      "merge!": ["?"],
+      update: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#passed"]).toEqual({
+      delete: ["?"],
+      merge: ["?"],
+      update: ["options"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#used"]).toEqual({
+      delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#void"]).toEqual({
+      delete: ["options"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#modified"]).toEqual({
+      delete: ["options"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#modified_last"]).toEqual({
+      delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched"]).toEqual({
+      delete: ["first", "last"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched_last"]).toEqual({
+      delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#class_variable"]).toEqual({
+      "key?": ["@@responses"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#iterated"]).toEqual({
+      delete: ["options"],
+      each_pair: ["names"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#iterated_modifier"]).toEqual({
+      delete: ["options"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#iterated_case"]).toEqual({
+      delete: ["options"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#mapped"]).toEqual({
+      delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#each"]).toEqual({
+      delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#call"]).toEqual({
+      "key?": ["options"],
+      "has_key?": ["@options"],
+      "include?": ["html"],
+      "member?": ["?"],
+      delete: ["html", "options"],
+      "merge!": ["@options"],
+      update: ["options"],
+      merge: ["DEFAULTS"],
+      each_pair: ["@options"],
+    });
+    expect(rubyCallReceivers(fixture)["Hashes#call"]).toMatchObject({
+      "member?": ["hash"],
+      merge: ["const", "self"],
+      each_pair: ["ivar"],
+    });
+  });
+
+  it("records Hash#[] and Hash#[]= as no call, a ref:get token and an opaque argument", () => {
+    const fixture = {
+      "lib/active_record/arefs.rb": `
+        class Arefs
+          def call(h, k, v)
+            use(h[k])
+            h[k] = v
+          end
+        end
+      `,
+    };
+    expect(rubyCallReceivers(fixture, "calls")["Arefs#call"]).toEqual(["use"]);
+    expect(rubyCallReceivers(fixture, "skeleton")["Arefs#call"]).toEqual(["ref:use", "ref:get"]);
+    expect(
+      (rubyCallReceivers(fixture, "callArgs")["Arefs#call"] as unknown as { args: string[] }[])[0]
+        .args,
+    ).toEqual(["?"]);
+  });
+
+  it("names a Proc#call receiver that is a constant path, an || of names or a Symbol-keyed read", () => {
+    const c = rubyCallReceivers(
+      {
+        "lib/active_record/procs.rb": `
+          class Procs
+            def path
+              ActiveRecord::ConnectionHandling::DEFAULT_ENV.call.to_s
+            end
+
+            def top
+              ::DEFAULT_ENV.call
+            end
+
+            def either(callable = nil, &block)
+              (callable || block).call Params.new
+            end
+
+            def keyed(options)
+              options[:on_skip].call(scope)
+            end
+
+            def unnamed(options, key)
+              options[key].call(scope)
+              (callable || [1]).call
+              (callable && block).call
+            end
+          end
+        `,
+      },
+      "callReceiverNames",
+    );
+    expect(c["Procs#path"]).toEqual({ call: ["DEFAULT_ENV"] });
+    expect(c["Procs#top"]).toEqual({ call: ["DEFAULT_ENV"] });
+    expect(c["Procs#either"]).toEqual({ call: ["callable|block"] });
+    expect(c["Procs#keyed"]).toEqual({ call: ["on_skip"] });
+    expect(c["Procs#unnamed"]).toEqual({ call: ["?"] });
+  });
+
+  it("proves a Kernel#Array call receiver an Array", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/batches.rb": `
+        class Batches
+          def call(start, cursor)
+            Array(start).size
+            Array(cursor).last
+            cursor.Array(start).first
+          end
+        end
+      `,
+    });
+    expect(c["Batches#call"]).toEqual({ size: ["array"], last: ["array"], first: ["expr"] });
   });
 
   it("proves a Hash ivar only within the class that assigns it", () => {
@@ -3773,6 +4787,44 @@ describe("Ruby extractor Concern included-block class methods", () => {
       expect(out.current_role).toBe(true);
       expect(out.after_save).toBe(true);
       expect(out.outside).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Ruby extractor base.class_attribute in self.extended", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  it("credits a class_attribute sent to the base an extended hook receives", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "extended-rb-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "enum.rb"),
+        `
+          module ActiveRecord
+            module Enum
+              def self.extended(base)
+                base.class_attribute(:defined_enums, instance_writer: false, default: {})
+              end
+              def self.other(base)
+                base.class_attribute(:not_a_hook)
+              end
+            end
+          end
+        `,
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "enum.rb"), ${JSON.stringify(dir)})
+        puts JSON.generate(ex.modules["ActiveRecord::Enum"][:classMethods].map { |m| m[:name] })
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(out).toContain("defined_enums");
+      expect(out).toContain("defined_enums?");
+      expect(out).not.toContain("not_a_hook");
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

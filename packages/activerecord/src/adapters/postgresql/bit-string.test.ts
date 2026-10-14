@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base, StatementInvalid } from "../../index.js";
 import { assert, assertNotPredicate } from "@blazetrails/activesupport";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -69,7 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(connection, "postgresql_bit_strings");
+      const output = await dumpTableSchema("postgresql_bit_strings");
       expect(output).toMatch(/t\.bit\("a_bit",\s*\{\s*limit: 8,\s*default: "00000011"\s*\}\);?$/m);
       expect(output).toMatch(
         /t\.bitVarying\("a_bit_varying",\s*\{\s*limit: 4,\s*default: "0011"\s*\}\);?$/m,

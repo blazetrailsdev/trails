@@ -1,9 +1,16 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Collectors } from "../namespaces.js";
+
 export class Bind {
   private binds: unknown[];
   retryable?: boolean;
 
   constructor() {
     this.binds = [];
+  }
+
+  append(_str: string): this {
+    return this;
   }
 
   addBind(bind: unknown, _block: (index: number) => string): this {
@@ -24,8 +31,6 @@ export class Bind {
   get value(): unknown[] {
     return this.binds;
   }
-
-  append(_str: string): this {
-    return this;
-  }
 }
+
+rbModConstSet(Collectors, "Bind", Bind);

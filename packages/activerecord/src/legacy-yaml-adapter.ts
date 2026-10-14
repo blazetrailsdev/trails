@@ -1,9 +1,9 @@
-import { Coder } from "@blazetrails/activesupport/yaml";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 
 export const LegacyYamlAdapter = {
   convert<T>(coder: T): T {
-    if (!(coder instanceof Coder)) return coder;
+    if (!(coder instanceof Psych.Coder)) return coder;
 
     switch (coder["active_record_yaml_version"]) {
       case 1:

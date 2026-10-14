@@ -2,7 +2,7 @@ import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { MigrationGenerator } from "../generators/migration-generator.js";
 import { Generators } from "../generators.js";
-import { bootApplicationBang, loadGenerators } from "../command/actions.js";
+import { Actions } from "../command/actions.js";
 import { APP_PATH } from "../app-path.js";
 
 export function generateCommand(): Command {
@@ -17,8 +17,8 @@ export function generateCommand(): Command {
     .argument("[columns...]", "Columns as name:type pairs")
     .action(async (name: string, columns: string[]) => {
       if (APP_PATH != null) {
-        await bootApplicationBang();
-        await loadGenerators();
+        await Actions.bootApplicationBang();
+        await Actions.loadGenerators();
       }
       const gen = new MigrationGenerator({ cwd: Dir.pwd(), output: console.log });
       await gen.run(name, columns);
@@ -26,8 +26,8 @@ export function generateCommand(): Command {
 
   const help = async (): Promise<void> => {
     if (APP_PATH != null) {
-      await bootApplicationBang();
-      await loadGenerators();
+      await Actions.bootApplicationBang();
+      await Actions.loadGenerators();
     }
     await Generators.help("generate", console.log);
   };
@@ -41,8 +41,8 @@ export function generateCommand(): Command {
       if (!generator) return help();
 
       if (APP_PATH != null) {
-        await bootApplicationBang();
-        await loadGenerators();
+        await Actions.bootApplicationBang();
+        await Actions.loadGenerators();
       }
 
       await Generators.invoke(generator, args, {

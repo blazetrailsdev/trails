@@ -16,11 +16,31 @@ import {
   SubMinuteOffsetZonedDateTime,
   timeToDf,
 } from "./date.js";
-import { Rational, kernelInteger, rbObjRespondTo, stringInspect } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  TEMPORAL_METHOD_TABLE,
+  isRubyTzUptodate,
+  kernelInteger,
+  rbCTime,
+  rbDefineAllocFunc,
+  rbHash,
+  rbObjDup,
+  rbObjRespondTo,
+  registerConstant,
+  setRubyTzUptodate,
+  stringInspect,
+} from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
+function updateTz(): void {
+  if (isRubyTzUptodate()) return;
+  setRubyTzUptodate(true);
+  localTimeZoneId = null;
+}
+
 function nowTimeZoneId(): string {
+  updateTz();
   return (localTimeZoneId ??= Temporal.Now.timeZoneId());
 }
 
@@ -30,6 +50,7 @@ function systemEpochNs(): bigint {
 
 /** @noRailsEquivalent PERMANENT */
 export function resetLocalTimeZoneId(timeZoneId: string | null = null): string | null {
+  updateTz();
   const oldTimeZoneId = localTimeZoneId;
   localTimeZoneId = timeZoneId;
   return oldTimeZoneId;
@@ -397,7 +418,7 @@ function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   return abbr == null ? "" : String(abbr);
 }
 
-export class Time {
+export class Time extends rbCTime {
   #plainMemo: Temporal.PlainDateTime | null;
   /** @internal */
   #zoned: Temporal.ZonedDateTime | null;
@@ -589,7 +610,7 @@ export class Time {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    usec?: number | Rational,
+    usec?: number | bigint | Rational | null,
   ): Time {
     return new Time(
       year,
@@ -597,7 +618,7 @@ export class Time {
       day,
       hour,
       min,
-      usec === undefined
+      usec == null
         ? sec
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
             numExact(usec).quo(1_000_000),
@@ -615,7 +636,7 @@ export class Time {
           hour?: number | string | null,
           min?: number | string | null,
           sec?: number | string | Rational | null,
-          usec?: number | Rational,
+          usec?: number | bigint | Rational | null,
         ]
       | [
           sec: number | string | Rational | null,
@@ -641,7 +662,7 @@ export class Time {
       day ?? 1,
       hour ?? 0,
       min ?? 0,
-      usec === undefined
+      usec == null
         ? (sec ?? 0)
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
             numExact(usec).quo(1_000_000),
@@ -1238,6 +1259,7 @@ export class Time {
     zone: string | number | Rational | Timezone | null = null,
     options: TimeNewOptions = {},
   ) {
+    super();
     if (seatedTime !== null) {
       const seat = seatedTime;
       seatedTime = null;
@@ -1271,17 +1293,19 @@ export class Time {
     validateVtmRange("hour", hour, 0, 24);
     validateVtmRange("min", min, 0, hour === 24 ? 0 : 59);
     validateVtmRange("sec", wholeSec, 0, hour === 24 ? 0 : 60);
-    const plain = new Temporal.PlainDateTime(
+    const overflowDays = Math.max(day - Time.#monthDays(year, month), 0);
+    const inMonth = new Temporal.PlainDateTime(
       year,
       month,
-      1,
+      day - overflowDays,
       hour === 24 ? 23 : hour,
       min,
       wholeSec === 60 ? 59 : wholeSec,
       Math.floor(nsec / 1_000_000),
       Math.floor(nsec / 1_000) % 1_000,
       nsec % 1_000,
-    ).add({ days: day - 1 });
+    );
+    const plain = overflowDays === 0 ? inMonth : inMonth.add({ days: overflowDays });
     this.#zoned = null;
     this.#plainMemo =
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
@@ -1309,13 +1333,15 @@ export class Time {
         ? utcOffset
         : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
           1_000_000_000;
-    this.#instant =
-      this.#timeZoneId == null
-        ? this.#plain
-            .toZonedDateTime("UTC")
-            .toInstant()
-            .subtract({ nanoseconds: Math.round(this.#utcOffset * 1_000_000_000) })
-        : this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+    if (this.#timeZoneId == null) {
+      const instant = this.#plain.toZonedDateTime("UTC").toInstant();
+      this.#instant =
+        this.#utcOffset === 0
+          ? instant
+          : instant.subtract({ nanoseconds: Math.round(this.#utcOffset * 1_000_000_000) });
+    } else {
+      this.#instant = this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+    }
   }
 
   get year(): number {
@@ -1513,12 +1539,36 @@ export class Time {
     return n > 0n ? 1 : -1;
   }
 
+  /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`), whose `MEMCPY` copies the whole `time_object`. */
+  initializeCopy(time: Time): this {
+    if ((this as Time) === time) return this;
+    this.#plainMemo = time.#plainMemo;
+    this.#zoned = time.#zoned;
+    this.#instant = time.#instant;
+    this.#timeZoneId = time.#timeZoneId;
+    this.#tzmodeUtc = time.#tzmodeUtc;
+    this.#localZone = time.#localZone;
+    this.#utcOffsetMemo = time.#utcOffsetMemo;
+    this.#subnano = time.#subnano;
+    this.#zoneObject = time.#zoneObject;
+    this.#isdstMemo = time.#isdstMemo;
+    return this;
+  }
+
   eql(other: unknown): boolean {
     if (!(other instanceof Time)) return false;
     return (
       this.#instant.epochNanoseconds === other.#instant.epochNanoseconds &&
       this.#subnano.cmp(other.#subnano) === 0
     );
+  }
+
+  /**
+   * Mirrors: `time_hash` (`vendor/ruby/v3.3.11/time.c:4036`), which hashes
+   * `timew`, the instant `time_eql` compares.
+   */
+  hash(): number {
+    return rbHash([this.#instant.epochNanoseconds, this.#subnano]);
   }
 
   isUtc(): boolean {
@@ -1583,28 +1633,20 @@ export class Time {
     }
 
     this.#zoned = this.#instant.toZonedDateTimeISO("UTC");
-    this.#plainMemo = null;
+    if (this.#utcOffsetMemo !== 0) this.#plainMemo = null;
     this.#utcOffsetMemo = null;
     this.#timeZoneId = "UTC";
     this.#localZone = false;
+    this.#zoneObject = null;
+    this.#isdstMemo = null;
 
     this.#tzmodeUtc = true;
     return this;
   }
 
+  /** `time_getgmtime` (`vendor/ruby/v3.3.11/time.c:4291`). */
   getutc(): Time {
-    const plain = this.#plain.add({ seconds: -this.#utcOffset });
-    return new Time(
-      plain.year,
-      plain.month,
-      plain.day,
-      plain.hour,
-      plain.minute,
-      new Rational(plain.second, 1).add(
-        new Rational(this.nsec, 1).add(this.#subnano).quo(1_000_000_000),
-      ),
-      "UTC",
-    );
+    return rbObjDup(this).utc();
   }
 
   getlocal(utcOffset: number | string | object | null = null): Time {
@@ -1664,3 +1706,35 @@ export class Time {
 Time.rfc822 = Time.rfc2822;
 Time.iso8601 = Time.xmlschema;
 Time.prototype.iso8601 = Time.prototype.xmlschema;
+
+rbDefineAllocFunc(Time, (klass) => {
+  seatedTime = {
+    zoned: null,
+    plain: null,
+    utcOffset: null,
+    instant: Temporal.Instant.fromEpochNanoseconds(0n),
+    timeZoneId: null,
+    tzmodeUtc: false,
+    localZone: false,
+    subnano: new Rational(0, 1),
+  };
+  return new klass(0);
+});
+
+for (const seat of ["Temporal.Instant", "Date"]) {
+  Object.assign((TEMPORAL_METHOD_TABLE[seat] ??= {}), {
+    isUtc: () => false,
+    getutc: (self: Temporal.Instant | globalThis.Date) =>
+      (self instanceof Temporal.Instant
+        ? self
+        : Temporal.Instant.fromEpochMilliseconds(self.getTime())
+      ).toZonedDateTimeISO("UTC"),
+    getlocal: (self: Temporal.Instant | globalThis.Date) =>
+      (self instanceof Temporal.Instant
+        ? self
+        : Temporal.Instant.fromEpochMilliseconds(self.getTime())
+      ).toZonedDateTimeISO(nowTimeZoneId()),
+  });
+}
+
+registerConstant("Time", Time);

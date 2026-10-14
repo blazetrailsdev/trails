@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { User } from "./test-helpers/models/user.js";
 
@@ -95,7 +95,7 @@ describe("sanitizeSql", () => {
       }
     }
     const result = SubPost.sanitizeSqlForOrder(["field(id, ?)", [1, 2]]);
-    expect((result as { value?: string }).value).toBe("id, 1, 2");
+    expect(String(result)).toBe("id, 1, 2");
     expect(disallowCalled).toBe(true);
   });
 
@@ -110,7 +110,7 @@ describe("sanitizeSql", () => {
     }
     const result = SubPost.sanitizeSqlForOrder([arelSql("field(id, ?)"), [1, 3, 2]]);
     expect(sanitizeCalled).toBe(true);
-    expect((result as { value?: string }).value).toBe("field(id, 1,3,2)");
+    expect(String(result)).toBe("field(id, 1,3,2)");
   });
 
   it("sanitizeSqlForOrder returns the full array unchanged when the first element has no bind", () => {
@@ -123,6 +123,23 @@ describe("sanitizeSql", () => {
     expect(Post.sanitizeSqlForOrder("id asc")).toBe("id asc");
     expect(Post.sanitizeSqlForAssignment({ title: "hi" }, "posts")).toContain("= 'hi'");
     expect(() => Post.disallowRawSqlBang(["DROP TABLE users"])).toThrow(/Dangerous query method/);
+  });
+
+  it("disallow_raw_sql! inspects each offending argument and keeps Rails' guidance", () => {
+    expect(() =>
+      Post.disallowRawSqlBang(["title", "DROP TABLE users", arelSql("1"), "a; b"]),
+    ).toThrow(
+      'called with non-attribute argument(s): "DROP TABLE users", "a; b".' +
+        "This method should not be called with user-provided values",
+    );
+    expect(() => Post.disallowRawSqlBang(["a; b"], { permit: /^a; b$/ })).not.toThrow();
+  });
+
+  it("sanitize_sql_like doubles the escape character before escaping the wildcards", () => {
+    expect(Post.sanitizeSqlLike("100%\\_", "\\")).toBe("100\\%\\\\\\_");
+    expect(Post.sanitizeSqlLike("a!b%", "!")).toBe("a!!b!%");
+    expect(Post.sanitizeSqlLike("a$b_", "$")).toBe("a$$b$_");
+    expect(Post.sanitizeSqlLike("50%_off", "%")).toBe("50%%%_off");
   });
 
   describe("private helpers (replace_bind_variables, quote_bound_value, etc)", () => {

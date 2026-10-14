@@ -1,7 +1,14 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone, registerConstant } from "@blazetrails/activesupport";
-import { ArgumentError, Range, rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Range,
+  rbEqual,
+  rbFSend,
+  rbInspect,
+  rbObjRespondTo,
+  registerConstant,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
   cast(value: unknown): unknown;
@@ -31,7 +38,7 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 
   override typeCastForSchema(value: unknown): string {
-    return inspect(value).replace(/Infinity/g, "::Float::INFINITY");
+    return rbInspect(value).replace(/Infinity/g, "::Float::INFINITY");
   }
 
   castValue(value: unknown): Range<unknown> | null {
@@ -77,24 +84,19 @@ export class RangeType extends ValueType<Range<unknown>> {
     return this.isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
   }
 
-  /** @missingRailsCall split — PERMANENT */
   private extractBounds(value: string): {
     from: unknown;
     to: unknown;
     excludeStart: boolean;
     excludeEnd: boolean;
   } {
-    const fromTo = value.slice(1, -1);
-    const separator = fromTo.indexOf(",");
-    const from = separator === -1 ? fromTo : fromTo.slice(0, separator);
-    const to = separator === -1 ? undefined : fromTo.slice(separator + 1);
-
+    const [from, to] = stringSplit(value.slice(1, -1), ",", 2);
     return {
       from:
         from === "" || from === "-infinity"
           ? this.infinity({ negative: true })
           : this.unquote(from),
-      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to as string),
+      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to),
       excludeStart: value.startsWith("("),
       excludeEnd: value.endsWith(")"),
     };
@@ -133,26 +135,9 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 
   /** @internal */
-  private isInfinity(value: unknown): boolean {
-    if (!rbObjRespondTo(value, "isInfinite")) return value === Infinity || value === -Infinity;
-    const result = (value as { isInfinite(): unknown }).isInfinite();
-    return result != null && result !== false;
+  private isInfinity(value: unknown): 1 | -1 | null | false {
+    return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
   }
-}
-
-function inspect(value: unknown): string {
-  if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  if (value instanceof TimeWithZone) return value.inspect();
-  if (value instanceof RubyTime) return value.toS();
-  if (value instanceof Temporal.Instant) return value.toString();
-  if (value instanceof Temporal.PlainDateTime) return value.toString();
-  if (value instanceof Temporal.PlainDate) return value.toString();
-  if (value instanceof Temporal.PlainTime) return value.toString();
-  // boundary: explicit Date rejection so legacy callers get a clear error.
-  if (value instanceof Date)
-    throw new TypeError("Range inspect: JS Date is not accepted — use a Temporal type");
-  return String(value);
 }
 
 registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range", RangeType);

@@ -3,6 +3,7 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Entry } from "./entry.js";
 import type { Recipient } from "./recipient.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Message extends Base {
@@ -15,6 +16,7 @@ export class Message extends Base {
     this.hasMany("recipients");
   }
 }
+registerModel(Message);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Message {
   get entry(): Entry | null | Promise<Entry | null>;

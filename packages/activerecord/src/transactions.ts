@@ -7,52 +7,36 @@ import {
   type CallbackObject,
 } from "@blazetrails/activemodel";
 import {
-  IsolatedExecutionState,
-  defineCallbacks,
   extractOptionsBang,
   included,
   kernelArray,
-  peekCallbackChain as asPeekCallbackChain,
-  runCallbacks,
+  type CallbackChain,
+  type Callbacks,
+  type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
+import { mergeBang, Module, rtest } from "@blazetrails/ruby-compat";
+import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
 
-import {
-  CURRENT_TRANSACTION_KEY,
-  Transaction,
-} from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
 import { runAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
 type TransactionAction = "create" | "update" | "destroy";
 
-export function currentTransaction(): Transaction | null {
-  return IsolatedExecutionState.get<Transaction | null>(CURRENT_TRANSACTION_KEY) ?? null;
-}
-
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: PublicTransaction) => Promise<T>,
-  options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  options: { isolation?: string; requiresNew?: boolean; joinable?: boolean } = {},
 ): Promise<T | undefined> {
-  if (options) {
-    for (const key of Object.keys(options)) {
-      if (key !== "isolation" && key !== "requiresNew" && key !== "joinable") {
-        throw new ArgumentError(`unknown keyword: :${key}`);
-      }
-    }
-  }
-
-  return modelClass.withConnection(async (connection) => {
-    const result = await dbTransaction.call(connection as any, fn as (tx?: unknown) => Promise<T>, {
-      requiresNew: options?.requiresNew,
-      isolation: options?.isolation,
-      joinable: options?.joinable,
-    });
-    return result as T | undefined;
+  return modelClass.withConnection((connection) => {
+    return dbTransaction.call(
+      connection as any,
+      fn as (tx?: unknown) => Promise<T>,
+      options,
+    ) as Promise<T | undefined>;
   });
 }
 
@@ -73,13 +57,16 @@ type CallbackOptions = {
   prepend?: boolean;
 };
 
-export const InstanceMethods = {
+export const Transactions = Object.assign(new Module(), {
   [included](base: typeof Model): void {
-    for (const name of ["commit", "rollback", "before_commit"]) {
-      defineCallbacks(base.prototype, name, { scope: ["kind", "name"] });
-    }
+    (base as typeof Model & Extended<typeof Callbacks.ClassMethods>).defineCallbacks(
+      "commit",
+      "rollback",
+      "before_commit",
+      { scope: ["kind", "name"] },
+    );
   },
-};
+});
 
 export function beforeCommit<T extends typeof Base>(
   this: T,
@@ -158,7 +145,7 @@ export function setCallback<T extends typeof Model>(
   const rest = filterList;
   const options = { ...extracted } as Record<string, unknown>;
 
-  if ((name === "commit" || name === "rollback") && options.on !== undefined) {
+  if ((name === "commit" || name === "rollback") && rtest(options.on)) {
     const fireOn = kernelArray(options.on) as string[];
     assertValidTransactionAction(fireOn);
     options.if = [
@@ -176,9 +163,8 @@ export function setCallback<T extends typeof Model>(
   );
 }
 
-export async function beforeCommittedBang(record: Base): Promise<void> {
-  const ctor = record.constructor as typeof Base;
-  await runCallbacks(record, "before_commit");
+export async function beforeCommittedBang(this: Base): Promise<void> {
+  await this._runBeforeCommitCallbacks();
 }
 
 export async function committedBang(
@@ -190,8 +176,7 @@ export async function committedBang(
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       r._committedAlreadyCalled = true;
-      const ctor = this.constructor as typeof Base;
-      await runCallbacks(this, "commit");
+      await this._runCommitCallbacks();
     }
   } finally {
     r._committedAlreadyCalled = false;
@@ -209,8 +194,7 @@ export async function rolledbackBang(
 ): Promise<void> {
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
-      const ctor = this.constructor as typeof Base;
-      await runCallbacks(this, "rollback");
+      await this._runRollbackCallbacks();
     }
   } finally {
     restoreTransactionRecordState.call(this, forceRestoreState);
@@ -223,24 +207,18 @@ export async function rolledbackBang(
   }
 }
 
-/**
- * @internal
- * @missingRailsArgs frozen? — PERMANENT
- */
+/** @internal */
 export function rememberTransactionRecordState(this: Base): void {
   const r = this as any;
-  if (!r._startTransactionState) {
-    const snapshotAttrs = r._attributes.deepDup();
-    r._startTransactionState = {
-      newRecord: r._newRecord,
-      destroyed: r._destroyed,
-      frozen: Object.isFrozen(r._attributes),
-      id: this.id,
-      previouslyNewRecord: r._previouslyNewRecord,
-      attributes: snapshotAttrs,
-      level: 0,
-    };
-  }
+  r._startTransactionState ||= {
+    id: this.id,
+    newRecord: r._newRecord,
+    previouslyNewRecord: r._previouslyNewRecord,
+    destroyed: r._destroyed,
+    attributes: r._attributes,
+    frozen: this.isFrozen(),
+    level: 0,
+  };
   r._startTransactionState.level += 1;
 
   if (r._committedAlreadyCalled) {
@@ -261,14 +239,14 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
       r._destroyed = restoreState.destroyed;
       r._attributes = (restoreState.attributes as AttributeSet).map((attr) => {
         const value = r._attributes.fetchValue(attr.name);
-        if (attr.value !== value) attr = attr.withValueFromUser(value);
+        if (attr.value() !== value) attr = attr.withValueFromUser(value);
         return attr;
       });
       r._mutationsFromDatabase = null;
       r._mutationsBeforeLastSave = null;
       const ctor = this.constructor as typeof Base;
       const primaryKey = ctor.primaryKey;
-      if (ctor.compositePrimaryKey) {
+      if (ctor.isCompositePrimaryKey()) {
         const cols = primaryKey as string[];
         const savedId = restoreState.id as unknown[];
         if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {
@@ -287,12 +265,25 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
   }
 }
 
-export function touch(
-  this: Base,
-  args: unknown[],
-  superFn: () => Promise<boolean>,
-): Promise<boolean> {
-  return withTransactionReturningStatus.call(this, superFn) as Promise<boolean>;
+export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
+}
+
+export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  await (this.constructor as typeof Base).ensureSchemaLoaded();
+  return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
+}
+
+export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  await (this.constructor as typeof Base).ensureSchemaLoaded();
+  return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
+}
+
+export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
+  return withTransactionReturningStatus.call(
+    this,
+    () => Transactions.superMethod(this, "touch")!(...names) as Promise<boolean>,
+  ) as Promise<boolean>;
 }
 
 export async function withTransactionReturningStatus<T>(
@@ -302,7 +293,6 @@ export async function withTransactionReturningStatus<T>(
   const modelClass = this.constructor as typeof Base;
 
   const r = this as any;
-  r._transactionAction = undefined;
 
   let status: T;
 
@@ -357,8 +347,8 @@ export function _triggerDestroyCallback(this: Base): boolean | null {
 }
 
 /** @internal */
-export function initInternals(this: Base, super_: () => void): void {
-  super_();
+export function initInternals(this: Base): void {
+  Transactions.superMethod(this, "initInternals")!();
   const r = this as any;
   r._startTransactionState = null;
   r._committedAlreadyCalled = null;
@@ -402,14 +392,14 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
 
 /** @internal */
 export function hasTransactionalCallbacks(this: Base): boolean {
-  const proto = (this.constructor as any).prototype;
-  const rollback = asPeekCallbackChain(proto, "rollback");
-  const commit = asPeekCallbackChain(proto, "commit");
-  const beforeCommitChain = asPeekCallbackChain(proto, "before_commit");
+  const self = this as unknown as Record<
+    "_rollbackCallbacks" | "_commitCallbacks" | "_beforeCommitCallbacks",
+    CallbackChain
+  >;
   return (
-    !(rollback == null || rollback.isEmpty) ||
-    !(commit == null || commit.isEmpty) ||
-    !(beforeCommitChain == null || beforeCommitChain.isEmpty)
+    !self._rollbackCallbacks.isEmpty ||
+    !self._commitCallbacks.isEmpty ||
+    !self._beforeCommitCallbacks.isEmpty
   );
 }
 
@@ -424,27 +414,20 @@ function prependOption(): Record<string, unknown> {
 
 const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 
-/**
- * @internal
- * @missingRailsCall merge! — PERMANENT
- */
+/** @internal */
 export function setOptionsForCallbacksBang(
   args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
 ): void {
-  const options: Record<string, unknown> = {
-    ...extractOptionsBang(args),
-    ...enforcedOptions,
-  };
+  const options = mergeBang<unknown>(extractOptionsBang(args), enforcedOptions);
   args.push(options);
 
-  if (options.on !== undefined) {
-    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
+  if (rtest(options.on)) {
+    const fireOn = kernelArray(options.on) as string[];
     assertValidTransactionAction(fireOn);
-    const existingIf = options.if;
     options.if = [
       (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
-      ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+      ...kernelArray(options.if),
     ];
   }
 }
@@ -458,3 +441,7 @@ function assertValidTransactionAction(actions: string[]): void {
     );
   }
 }
+
+Transactions.defineMethod("beforeCommittedBang", beforeCommittedBang);
+Transactions.defineMethod("touch", touch);
+Transactions.defineMethod("initInternals", initInternals);

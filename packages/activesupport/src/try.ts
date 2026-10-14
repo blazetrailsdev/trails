@@ -1,3 +1,5 @@
+import { rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+
 export function tryCall<T extends object>(
   obj: T | null | undefined,
   method: string,
@@ -8,6 +10,7 @@ export function tryCall<T extends object>(
   if (typeof val === "function") return val.apply(obj, args);
   if (val !== undefined && args.length === 0) return val;
   if (args.length === 0 && typeof obj === "object" && method in obj) return val;
+  if (rbObjRespondTo(obj, method)) return rbFPublicSend(obj, method, ...args);
   return undefined;
 }
 

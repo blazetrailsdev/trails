@@ -248,15 +248,15 @@ export function generateModels(
       staticLines.push(`    this._tableName = ${JSON.stringify(cls.tableName)};`);
     }
     if (Array.isArray(cls.primaryKey) && cls.primaryKey.length > 1) {
-      staticLines.push(`    this._primaryKey = ${JSON.stringify(cls.primaryKey)};`);
+      staticLines.push(`    this.primaryKey = ${JSON.stringify(cls.primaryKey)};`);
     } else if (typeof cls.primaryKey === "string" && cls.primaryKey !== "id") {
-      staticLines.push(`    this._primaryKey = ${JSON.stringify(cls.primaryKey)};`);
+      staticLines.push(`    this.primaryKey = ${JSON.stringify(cls.primaryKey)};`);
     } else if (
       Array.isArray(cls.primaryKey) &&
       cls.primaryKey.length === 1 &&
       cls.primaryKey[0] !== "id"
     ) {
-      staticLines.push(`    this._primaryKey = ${JSON.stringify(cls.primaryKey[0])};`);
+      staticLines.push(`    this.primaryKey = ${JSON.stringify(cls.primaryKey[0])};`);
     }
 
     for (const c of cls.leadingComments) {

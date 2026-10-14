@@ -281,13 +281,13 @@ describe("DurationTest", () => {
   });
 
   it("fractional weeks", () => {
-    expect(Duration.weeks(1.5).value).toEqual(86400 * 7 * 1.5);
-    expect(Duration.weeks(1.7).value).toEqual(86400 * 7 * 1.7);
+    expect(Number(Duration.weeks(1.5).value)).toEqual(86400 * 7 * 1.5);
+    expect(Number(Duration.weeks(1.7).value)).toEqual(86400 * 7 * 1.7);
   });
 
   it("fractional days", () => {
-    expect(Duration.days(1.5).value).toEqual(86400 * 1.5);
-    expect(Duration.days(1.7).value).toEqual(86400 * 1.7);
+    expect(Number(Duration.days(1.5).value)).toEqual(86400 * 1.5);
+    expect(Number(Duration.days(1.7).value)).toEqual(86400 * 1.7);
   });
 
   it("since and ago", () => {

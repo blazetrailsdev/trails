@@ -3,7 +3,7 @@ import { StringIO } from "@blazetrails/ruby-compat";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
@@ -67,7 +67,7 @@ describeIfSqlite("SQLite3CollationTest", () => {
   });
 
   it("schema dump includes collation", async () => {
-    const output = (await SchemaDumper.dump(adapter, new StringIO())).string();
+    const output = (await SchemaDumper.dump(Base.connectionPool(), new StringIO())).string();
     expect(output).toMatch(/t\.string\("string_nocase",[^)]*collation: "NOCASE"/);
     expect(output).toMatch(/t\.text\("text_rtrim",[^)]*collation: "RTRIM"/);
   });

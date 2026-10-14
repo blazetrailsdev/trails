@@ -3,6 +3,10 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { defaultValue } from "./type.js";
+import { ConnectionNotEstablished } from "./errors.js";
+import { Column } from "./connection-adapters/column.js";
+import { SchemaCache } from "./connection-adapters/schema-cache.js";
+import { lookupCastTypeFromColumn } from "./connection-adapters/postgresql/quoting.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 class UuidType extends ValueType {
@@ -27,10 +31,11 @@ function makeAdapter(
     columnsHash: async () => hash,
     primaryKeys: async () => null,
     getCachedColumnsHash: () => hash,
+    getCachedPrimaryKeys: () => undefined,
+    getCachedDataSourceExists: () => undefined,
     isCached: () => true,
   };
   return adapterDouble({
-    internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return typeByColumn[column.sqlType] ?? defaultValue();
@@ -86,7 +91,9 @@ describe("loadSchemaFromAdapter", () => {
 
   it("reflects on a concrete subclass of an abstract parent", async () => {
     class ApplicationRecord extends Base {
-      static override _abstractClass = true;
+      static {
+        this.abstractClass = true;
+      }
     }
     class Post extends ApplicationRecord {
       static override tableName = "posts";
@@ -100,6 +107,38 @@ describe("loadSchemaFromAdapter", () => {
     expect(Object.keys((Post as typeof Base).columnsHash())).toContain("guid");
   });
 
+  it("loads columns on a later loadSchema once the table exists", async () => {
+    let exists = false;
+    let warms = 0;
+    const hash = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    const cache = {
+      dataSourceExists: async () => {
+        warms += 1;
+        return exists;
+      },
+      columnsHash: async () => hash,
+      primaryKeys: async () => null,
+      getCachedColumnsHash: () => (exists ? hash : undefined),
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => undefined,
+      isCached: () => exists,
+    };
+    const adapter = adapterDouble({
+      schemaCache: cache,
+      lookupCastTypeFromColumn: () => new UuidType(),
+    });
+    await establishConnectionTo(Model, adapter as never);
+
+    await Promise.all([Model.loadSchema(), Model.loadSchema()]);
+    expect(warms).toBe(1);
+    expect((Model as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBeFalsy();
+
+    exists = true;
+    await Model.loadSchema();
+    expect((Model as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBe(true);
+    expect(Object.keys(Model.columnsHash())).toContain("guid");
+  });
+
   it("is a no-op when data source does not exist (explicit false)", async () => {
     const cache = {
       dataSourceExists: async () => false,
@@ -107,7 +146,6 @@ describe("loadSchemaFromAdapter", () => {
       primaryKeys: async () => null,
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
@@ -124,9 +162,10 @@ describe("loadSchemaFromAdapter", () => {
       columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
       primaryKeys: async () => null,
       getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => undefined,
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
@@ -144,9 +183,10 @@ describe("loadSchemaFromAdapter", () => {
       columnsHash: async () => mysteryHash,
       primaryKeys: async () => null,
       getCachedColumnsHash: () => mysteryHash,
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => undefined,
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => defaultValue(),
     });
@@ -269,7 +309,6 @@ describe("loadSchemaFromAdapter integration details", () => {
       primaryKeys: async () => null,
     };
     const firstAdapter = {
-      internalSchemaCache: firstCache,
       schemaCache: firstCache,
       lookupCastTypeFromColumn: () => new UuidType(),
     };
@@ -288,6 +327,53 @@ describe("loadSchemaFromAdapter integration details", () => {
 
     expect(Object.hasOwn(host, "_schemaLoaded")).toBe(false);
     expect(Object.hasOwn(host, "_columnsHash")).toBe(false);
+  });
+});
+
+describe("a schema cache loaded from a dump", () => {
+  function dumpLoadedCache(): SchemaCache {
+    const dumped = new SchemaCache();
+    dumped.setColumns("posts", [new Column("guid", null)]);
+    (dumped as unknown as { _primaryKeys: Map<string, string> })._primaryKeys.set("posts", "guid");
+    const cache = new SchemaCache();
+    cache.marshalLoad(dumped.marshalDump());
+    return cache;
+  }
+
+  it("raises the connection error when the type map is unset and verify! fails", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const adapter = adapterDouble({
+      typeMap: null,
+      lookupCastTypeFromColumn,
+      async verifyBang(): Promise<void> {
+        throw new ConnectionNotEstablished("connection refused");
+      },
+    });
+    await establishConnectionTo(Post, adapter as never);
+    Post.connectionPool().schemaReflection.loadedCache = dumpLoadedCache();
+
+    await expect(Post.loadSchema()).rejects.toThrow(ConnectionNotEstablished);
+  });
+
+  it("verifies before load_schema! so the lookup reads the warmed type map", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const adapter = adapterDouble({
+      typeMap: null as { lookup(): ValueType } | null,
+      lookupCastTypeFromColumn,
+      async verifyBang(): Promise<void> {
+        this.typeMap = { lookup: () => new UuidType() };
+      },
+    });
+    await establishConnectionTo(Post, adapter as never);
+    Post.connectionPool().schemaReflection.loadedCache = dumpLoadedCache();
+
+    await Post.loadSchema();
+
+    expect(Post.typeForAttribute("guid")!.type()).toBe("uuid");
   });
 });
 

@@ -12,9 +12,41 @@ import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
-import { assertNil } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertNil,
+  assertNotEqual,
+  assertNothingRaised,
+  assertRespondTo,
+  include,
+} from "@blazetrails/activesupport";
+import { rbObjAsString } from "@blazetrails/ruby-compat";
+import { Metal } from "../metal.js";
+import { TestCase } from "../test-case.js";
+import { Flash as ControllerFlash } from "../metal/flash.js";
 
 class TestController extends Base {
+  static {
+    this.beforeAction("haltAndRedir", { only: "filterHaltingAction" });
+  }
+
+  flashCopy!: Record<string, unknown>;
+
+  stdAction(): void {
+    this.flashCopy = { ...this.flash.toHash() };
+    this.head("ok");
+  }
+
+  filterHaltingAction(): void {
+    this.flashCopy = { ...this.flash.toHash() };
+  }
+
+  haltAndRedir(): void {
+    this.flash.set("foo", "bar");
+    this.redirectTo({ action: "stdAction" });
+    this.flashCopy = { ...this.flash.toHash() };
+  }
+
   async redirectWithAlert(): Promise<void> {
     this.redirectTo("/nowhere", { alert: "Beware the nowheres!" });
   }
@@ -28,7 +60,7 @@ class TestController extends Base {
   }
 
   async redirectWithFooFlash(): Promise<void> {
-    this.redirectTo("/wonderland", { foo: "for great justice" });
+    this.redirectTo<"foo">("/wonderland", { foo: "for great justice" });
   }
 }
 
@@ -73,7 +105,7 @@ describe("FlashTest", () => {
   it("flash after reset session", () => {
     const flash = new FlashHash({ notice: "old" });
     flash.clear();
-    expect(flash.empty).toBe(true);
+    expect(flash.isEmpty()).toBe(true);
   });
 
   it("does not set the session if the flash is empty", () => {
@@ -118,28 +150,43 @@ describe("FlashTest", () => {
 
   it("from session value nil returns empty", () => {
     const flash = FlashHash.fromSessionValue(null);
-    expect(flash.empty).toBe(true);
+    expect(flash.isEmpty()).toBe(true);
   });
 
-  it.skip("sweep after halted action chain", () => {});
+  it("sweep after halted action chain", async ({ task }) => {
+    const tc = new TestCase(task.name);
+    tc.controller = new TestController();
+    await tc.beforeSetup();
+    const flashCopy = () => (tc.controller as TestController).flashCopy;
+
+    await tc.get("stdAction");
+    assertNil(flashCopy()["foo"]);
+    await tc.get("filterHaltingAction");
+    assertEqual("bar", flashCopy()["foo"]);
+    await tc.get("stdAction");
+    assertEqual("bar", flashCopy()["foo"]);
+    await tc.get("stdAction");
+    assertNil(flashCopy()["foo"]);
+  });
 
   it("redirect to with adding flash types", async () => {
-    const testControllerWithFlashTypeFoo = class extends TestController {};
+    const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
     const controller = await get("redirectWithFooFlash", testControllerWithFlashTypeFoo);
     expect(controller.flash.get("foo")).toBe("for great justice");
   });
 
   it("additional flash types are not listed in actions set", () => {
-    const testControllerWithFlashTypeFoo = class extends TestController {};
+    const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
     expect(testControllerWithFlashTypeFoo.actionMethods()).not.toContain("foo");
   });
 
   it("add flash type to subclasses", () => {
-    const testControllerWithFlashTypeFoo = class extends TestController {};
+    const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
-    const subclassControllerWithNoFlashType = class extends testControllerWithFlashTypeFoo {};
+    const subclassControllerWithNoFlashType = (() =>
+      class extends testControllerWithFlashTypeFoo {})();
     expect(subclassControllerWithNoFlashType._flashTypes).toContain("foo");
   });
 
@@ -152,6 +199,22 @@ describe("FlashTest", () => {
 class FlashIntegrationTestController extends Base {
   static {
     this.addFlashTypes("bar");
+  }
+
+  setFlash(): void {
+    this.flash.set("that", "hello");
+    this.head("ok");
+  }
+
+  async useFlash(): Promise<void> {
+    await this.render({ inline: `flash: ${rbObjAsString(this.flash.get("that"))}` });
+  }
+
+  async setFlashOptionally(): Promise<void> {
+    this.flash.now("notice", this.params.get("flash"));
+    if (await this.isStale(null, { etag: "abe" })) {
+      await this.render({ inline: "maybe flash" });
+    }
   }
 
   async setBar(): Promise<void> {
@@ -179,9 +242,12 @@ class FlashIntegrationTestSession extends IntegrationTest {
 }
 
 async function withTestRouteSet(block: (t: IntegrationTest) => Promise<void>): Promise<void> {
-  const t = new FlashIntegrationTestSession();
-  t.routes.draw((r) => {
-    r.get("/set_bar", { to: "flash_integration_test#setBar" });
+  const t = new FlashIntegrationTestSession(expect.getState().currentTestName!);
+  t.routes.draw(function () {
+    this.get("/set_flash", { to: "flash_integration_test#setFlash" });
+    this.get("/use_flash", { to: "flash_integration_test#useFlash" });
+    this.get("/set_bar", { to: "flash_integration_test#setBar" });
+    this.get("/set_flash_optionally", { to: "flash_integration_test#setFlashOptionally" });
   });
   t.app = IntegrationTest.buildApp(t.routes, (middleware) => {
     middleware.use(CookieStore as MiddlewareFactory, { key: SessionKey });
@@ -193,9 +259,26 @@ async function withTestRouteSet(block: (t: IntegrationTest) => Promise<void>): P
 }
 
 describe("FlashIntegrationTest", () => {
-  it.skip("flash", () => {});
+  it("flash", async () => {
+    await withTestRouteSet(async (t) => {
+      await t.get("/set_flash");
+      t.assertResponse("success");
+      assertEqual("hello", t.request.flash!.get("that"));
 
-  it.skip("just using flash does not stream a cookie back", () => {});
+      await t.get("/use_flash");
+      t.assertResponse("success");
+      assertEqual("flash: hello", t.response.body);
+    });
+  });
+
+  it("just using flash does not stream a cookie back", async () => {
+    await withTestRouteSet(async (t) => {
+      await t.get("/use_flash");
+      t.assertResponse("success");
+      assertNil(t.response.headers.get("Set-Cookie"));
+      assertEqual("flash: ", t.response.body);
+    });
+  });
 
   it("setting flash does not raise in following requests", () => {
     const flash = new FlashHash();
@@ -220,11 +303,39 @@ describe("FlashIntegrationTest", () => {
     });
   });
 
-  it.skip("flash factored into etag", () => {});
+  it("flash factored into etag", async () => {
+    await withTestRouteSet(async (t) => {
+      await t.get("/set_flash_optionally");
+      const noFlashEtag = t.response.etag;
+
+      await t.get("/set_flash_optionally", { params: { flash: "hello!" } });
+      const helloFlashEtag = t.response.etag;
+
+      assertNotEqual(noFlashEtag, helloFlashEtag);
+
+      await t.get("/set_flash_optionally", { params: { flash: "hello!" } });
+      const anotherHelloFlashEtag = t.response.etag;
+
+      assertEqual(anotherHelloFlashEtag, helloFlashEtag);
+
+      await t.get("/set_flash_optionally", { params: { flash: "goodbye!" } });
+      const goodbyeFlashEtag = t.response.etag;
+
+      assertNotEqual(anotherHelloFlashEtag, goodbyeFlashEtag);
+    });
+  });
 
   it("flash usable in metal without helper", () => {
-    const controller = new Base();
-    expect("alert" in controller).toBe(true);
-    expect("notice" in controller).toBe(true);
+    let controllerClass: typeof Metal | null = null;
+
+    assertNothingRaised(() => {
+      controllerClass = (() => class extends Metal {})();
+      include(controllerClass, ControllerFlash);
+    });
+
+    const controller = new controllerClass!();
+
+    assertRespondTo(controller, "alert");
+    assertRespondTo(controller, "notice");
   });
 });

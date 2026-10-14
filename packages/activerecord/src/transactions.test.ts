@@ -1,12 +1,19 @@
-import { kernelThrow, FrozenError, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
+import {
+  kernelCatch,
+  kernelThrow,
+  FrozenError,
+  RuntimeError,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
 import { afterAllTransactionsCommit } from "./active-record.js";
+import { deprecator } from "./deprecator.js";
 
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./support/supports.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Movie } from "./test-helpers/models/movie.js";
@@ -14,13 +21,13 @@ import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/
 import { Author } from "./test-helpers/models/author.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Base } from "./base.js";
-import { assertQueriesMatch, assertNoQueries } from "./testing/query-assertions.js";
-import { captureSql } from "./testing/sql-capture.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { StatementInvalid, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertCalled,
   assertNoDifference,
+  assertNotDeprecated,
   assertNotCalled,
   assertNothingRaised,
   assertRaises,
@@ -157,8 +164,18 @@ describe("TransactionTest", () => {
     expect(called).toBe(1);
   });
 
-  it.skip("after current transaction commit multidb nested transactions", () => {
-    // PERMANENT-SKIP: requires ARUnit2Model secondary DB connection
+  it("after current transaction commit multidb nested transactions", async () => {
+    let called = 0;
+    await ARUnit2Model.transaction(async () => {
+      await Topic.transaction(async () => {
+        await afterAllTransactionsCommit(() => {
+          called += 1;
+        });
+        expect(called).toBe(0);
+      });
+      expect(called).toBe(0);
+    });
+    expect(called).toBe(1);
   });
 
   it("transaction after commit callback", async () => {
@@ -349,7 +366,7 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes then retry save on new record", async () => {
-    const topic = Topic.new({ title: "Ruby on Rails" }) as any;
+    const topic = new Topic({ title: "Ruby on Rails" }) as any;
 
     await transaction(Base, async () => {
       await topic.save();
@@ -366,7 +383,7 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes then retry save on new record with autosave association", async () => {
-    const author = Author.new({ name: "DHH" }) as any;
+    const author = new Author({ name: "DHH" }) as any;
     const book = (await Book.createBang({})) as any;
     await author.books.push(book);
 
@@ -411,7 +428,7 @@ describe("TransactionTest", () => {
   });
 
   it("add to null transaction", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
     await expect(topic.addToTransaction()).resolves.not.toThrow();
   });
 
@@ -446,8 +463,24 @@ describe("TransactionTest", () => {
     }
   });
 
-  it.skip("deprecation on ruby timeout outside inner transaction", () => {
-    // PERMANENT-SKIP: Ruby catch/throw semantics — `catch`/`throw timeout` is
+  it("deprecation on ruby timeout outside inner transaction", async () => {
+    await assertNotDeprecated(deprecator(), async () => {
+      await kernelCatch(async (timeout) => {
+        await Topic.transaction(async () => {
+          await Topic.transaction(
+            async () => {
+              first.approved = true;
+              await first.saveBang();
+            },
+            { requiresNew: true },
+          );
+
+          kernelThrow(timeout);
+        });
+      });
+    });
+
+    expect((await Topic.find(1)).approved, "First should have been approved").toBeTruthy();
   });
 
   it("break from transaction commits", async () => {
@@ -465,8 +498,20 @@ describe("TransactionTest", () => {
     expect(((await Topic.find(2)) as any).approved).toBeTruthy();
   });
 
-  it.skip("throw from transaction commits", () => {
-    // PERMANENT-SKIP: Ruby-only — catch/throw is non-exceptional control flow
+  it("throw from transaction commits", async () => {
+    await kernelCatch(":not_an_error", async () => {
+      await first.transaction(async () => {
+        expect(first.approved).toBeFalsy();
+        await first.updateBang({ approved: true });
+
+        kernelThrow(":not_an_error");
+
+        expect(first.approved).toBeTruthy();
+        await first.updateBang({ approved: false });
+      });
+    });
+    expect((await Topic.find(1)).approved, "First should have been approved").toBeTruthy();
+    expect((await Topic.find(2)).approved, "Second should have been approved").toBeTruthy();
   });
 
   async function _testReturnFromTransaction71Behavior() {
@@ -567,7 +612,7 @@ describe("TransactionTest", () => {
   });
 
   it("raising exception in nested transaction restore state in save", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
     topic.afterSaveForTransaction = () => {
       throw new RuntimeError("Make the transaction rollback");
     };
@@ -660,7 +705,7 @@ describe("TransactionTest", () => {
     };
     registerModel(CallbackRollbackTopic as any);
 
-    const newTopic = CallbackRollbackTopic.new({
+    const newTopic = new CallbackRollbackTopic({
       title: "A new topic",
       author_name: "Ben",
       author_email_address: "ben@example.com",
@@ -691,7 +736,7 @@ describe("TransactionTest", () => {
   it("callback rollback in create with record invalid exception", async () => {
     class RecordInvalidTopic extends Topic {}
     (RecordInvalidTopic.prototype as any).afterCreateForTransaction = function () {
-      throw new RecordInvalid(Author.new() as any);
+      throw new RecordInvalid(new Author() as any);
     };
     registerModel(RecordInvalidTopic as any);
 
@@ -727,8 +772,8 @@ describe("TransactionTest", () => {
   });
 
   it("nested transaction with new transaction applies parent state on rollback", async () => {
-    const topicOne = Topic.new({ title: "A new topic" }) as any;
-    const topicTwo = Topic.new({ title: "Another new topic" }) as any;
+    const topicOne = new Topic({ title: "A new topic" }) as any;
+    const topicTwo = new Topic({ title: "Another new topic" }) as any;
 
     await Topic.transaction(async () => {
       await topicOne.save();
@@ -748,8 +793,8 @@ describe("TransactionTest", () => {
   });
 
   it("nested transaction without new transaction applies parent state on rollback", async () => {
-    const topicOne = Topic.new({ title: "A new topic" }) as any;
-    const topicTwo = Topic.new({ title: "Another new topic" }) as any;
+    const topicOne = new Topic({ title: "A new topic" }) as any;
+    const topicTwo = new Topic({ title: "Another new topic" }) as any;
 
     await Topic.transaction(async () => {
       await topicOne.save();
@@ -766,9 +811,9 @@ describe("TransactionTest", () => {
   });
 
   it("double nested transaction applies parent state on rollback", async () => {
-    const topicOne = Topic.new({ title: "A new topic" }) as any;
-    const topicTwo = Topic.new({ title: "Another new topic" }) as any;
-    const topicThree = Topic.new({ title: "Another new topic of course" }) as any;
+    const topicOne = new Topic({ title: "A new topic" }) as any;
+    const topicTwo = new Topic({ title: "Another new topic" }) as any;
+    const topicThree = new Topic({ title: "Another new topic of course" }) as any;
 
     await Topic.transaction(async () => {
       await topicOne.save();
@@ -971,7 +1016,7 @@ describe("TransactionTest", () => {
   });
 
   it("rollback when saving a frozen record", async () => {
-    const topic = Topic.new({ title: "test" }) as any;
+    const topic = new Topic({ title: "test" }) as any;
     topic.freeze();
     const e = await assertRaises([FrozenError], {}, async () => {
       await topic.save();
@@ -994,9 +1039,9 @@ describe("TransactionTest", () => {
     };
     registerModel(topicWithoutCallbacks as any);
 
-    const topic1 = Topic.new({ title: "test_1" }) as any;
-    const topic2 = Topic.new({ title: "test_2" }) as any;
-    const topic3 = topicWithoutCallbacks.new({ title: "test_3" }) as any;
+    const topic1 = new Topic({ title: "test_1" }) as any;
+    const topic2 = new Topic({ title: "test_2" }) as any;
+    const topic3 = new topicWithoutCallbacks({ title: "test_3" }) as any;
 
     await Topic.transaction(async () => {
       expect(await topic1.save()).toBeTruthy();
@@ -1042,7 +1087,7 @@ describe("TransactionTest", () => {
   });
 
   it("restore new record after double save", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1055,7 +1100,7 @@ describe("TransactionTest", () => {
   });
 
   it("dont restore new record in subsequent transaction", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1101,7 +1146,7 @@ describe("TransactionTest", () => {
   it("rollback on composite key model", async () => {
     try {
       await CpkBook.createBang({ id: [1, 3], title: "Charlotte's Web" });
-      const bookTwoUnpersisted = CpkBook.new({ id: [1, 3] }) as any;
+      const bookTwoUnpersisted = new CpkBook({ id: [1, 3] }) as any;
 
       await expect(
         CpkBook.transaction(async () => {
@@ -1114,7 +1159,7 @@ describe("TransactionTest", () => {
   });
 
   it("restore id after rollback", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1125,7 +1170,7 @@ describe("TransactionTest", () => {
   });
 
   it("restore custom primary key after rollback", async () => {
-    const movie = Movie.new({ name: "foo" }) as any;
+    const movie = new Movie({ name: "foo" }) as any;
 
     await Movie.transaction(async () => {
       await movie.saveBang();
@@ -1160,7 +1205,7 @@ describe("TransactionTest", () => {
   });
 
   it("read attribute after rollback", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1171,7 +1216,7 @@ describe("TransactionTest", () => {
   });
 
   it("read attribute with custom primary key after rollback", async () => {
-    const movie = Movie.new({ name: "foo" }) as any;
+    const movie = new Movie({ name: "foo" }) as any;
 
     await Movie.transaction(async () => {
       await movie.saveBang();
@@ -1390,7 +1435,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
 });
 
 describe("TransactionTest", () => {
-  fixtures(["topics"], {
+  const { self } = fixtures(["topics"], {
     usesTransaction: [
       "savepoints name",
       "releasing named savepoints",
@@ -1465,7 +1510,7 @@ describe("TransactionTest", () => {
   });
 
   it("unprepared statement materializes transaction", async () => {
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await Topic.where("1=1").first();
       });
@@ -1473,28 +1518,24 @@ describe("TransactionTest", () => {
   });
 
   it("nested transactions skip excess savepoints", async () => {
-    const actualQueries = await captureSql(
-      async () => {
-        await Topic.transaction(
-          async () => {
-            await Topic.transaction(
-              async () => {
-                await Topic.deleteAll();
-                await Topic.transaction(
-                  async () =>
-                    Topic.transaction(async () => Topic.deleteAll(), { requiresNew: true }),
-                  { requiresNew: true },
-                );
-              },
-              { requiresNew: true },
-            );
-            await Topic.deleteAll();
-          },
-          { requiresNew: true },
-        );
-      },
-      { includeSchema: true },
-    );
+    const actualQueries = await self().captureSql({ includeSchema: true }, async () => {
+      await Topic.transaction(
+        async () => {
+          await Topic.transaction(
+            async () => {
+              await Topic.deleteAll();
+              await Topic.transaction(
+                async () => Topic.transaction(async () => Topic.deleteAll(), { requiresNew: true }),
+                { requiresNew: true },
+              );
+            },
+            { requiresNew: true },
+          );
+          await Topic.deleteAll();
+        },
+        { requiresNew: true },
+      );
+    });
 
     const expectedQueries = [
       /BEGIN/i,
@@ -1513,27 +1554,24 @@ describe("TransactionTest", () => {
     const connection = await (Topic as any).leaseConnection();
     await connection.disableLazyTransactionsBang();
 
-    const actualQueries = await captureSql(
-      async () => {
-        await Topic.transaction(
-          async () => {
-            await Topic.transaction(
-              async () => {
-                await Topic.deleteAll();
-                await Topic.transaction(
-                  async () => Topic.transaction(async () => {}, { requiresNew: true }),
-                  { requiresNew: true },
-                );
-              },
-              { requiresNew: true },
-            );
-            await Topic.deleteAll();
-          },
-          { requiresNew: true },
-        );
-      },
-      { includeSchema: true },
-    );
+    const actualQueries = await self().captureSql({ includeSchema: true }, async () => {
+      await Topic.transaction(
+        async () => {
+          await Topic.transaction(
+            async () => {
+              await Topic.deleteAll();
+              await Topic.transaction(
+                async () => Topic.transaction(async () => {}, { requiresNew: true }),
+                { requiresNew: true },
+              );
+            },
+            { requiresNew: true },
+          );
+          await Topic.deleteAll();
+        },
+        { requiresNew: true },
+      );
+    });
 
     const expectedQueries = [/BEGIN/i, /DELETE/i, /^SAVEPOINT/i, /^RELEASE/i, /DELETE/i, /COMMIT/i];
     expect(actualQueries.length).toBe(expectedQueries.length);
@@ -1545,7 +1583,7 @@ describe("TransactionTest", () => {
     ctx.skip(!conn.preparedStatements);
     await Topic.first();
 
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await Topic.first();
       });
@@ -1572,7 +1610,7 @@ describe("TransactionTest", () => {
 
   it("accessing raw connection materializes transaction", async () => {
     const connection = await (Topic as any).leaseConnection();
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await connection.rawConnection();
       });
@@ -1582,7 +1620,7 @@ describe("TransactionTest", () => {
   it("accessing raw connection disables lazy transactions", async () => {
     const connection = await (Topic as any).leaseConnection();
     await connection.rawConnection();
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {});
     });
   });
@@ -1598,7 +1636,7 @@ describe("TransactionTest", () => {
 
   it("transactions can be manually materialized", async () => {
     const connection = await (Topic as any).leaseConnection();
-    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+    await self().assertQueriesMatch(/BEGIN|COMMIT/i, { includeSchema: true }, async () => {
       await Topic.transaction(async () => {
         await connection.materializeTransactions();
       });
@@ -1619,13 +1657,13 @@ describe("TransactionTest", () => {
       class K extends Base {
         static {
           this._tableName = "transaction_without_primary_keys";
-          this._primaryKey = null as any;
+          this.primaryKey = null as any;
           this.attribute("thing_id", "integer");
           this.afterCommit(() => {});
         }
       }
       await assertNoDifference(
-        () => K.count() as Promise<number>,
+        () => K.count(),
         null,
         async () => {
           await K.transaction(async () => {
@@ -1676,7 +1714,7 @@ describe("TransactionTest", () => {
 
   it.skipIf(adapterType !== "sqlite")("sqlite default transaction mode is immediate", async () => {
     const connection = await (Topic as any).leaseConnection();
-    await assertQueriesMatch(/BEGIN IMMEDIATE TRANSACTION/i, undefined, false, async () => {
+    await self().assertQueriesMatch(/BEGIN IMMEDIATE TRANSACTION/i, {}, async () => {
       await Topic.transaction(async () => {
         await connection.materializeTransactions();
       });

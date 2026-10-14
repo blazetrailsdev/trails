@@ -1,18 +1,21 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { describe, expect, test } from "vitest";
-import { extractOptionsBang, underscore } from "@blazetrails/activesupport";
+import { dasherize, extractOptionsBang, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { ActionController, Request, Response } from "@blazetrails/actionpack";
+import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
 import { MissingTemplate } from "../../template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "../../template/handlers.js";
 import { DetailsKey } from "../../lookup-context.js";
+
+registerConstant("ControllerNameSpace", { name: "ControllerNameSpace" });
 
 class LayoutTest extends ActionController.Base {
   static override controllerPath(): string {
     return "views";
   }
   static override _impliedLayoutName = function (this: { name: string }): string {
-    return underscore(this.name).replace(/_controller$/, "");
+    return dasherize(underscore(this.name).replace(/_controller$/, ""));
   };
 
   async hello(): Promise<void> {}
@@ -22,11 +25,11 @@ class LayoutTest extends ActionController.Base {
 LayoutTest.viewPaths(
   new FixtureResolver({
     "layouts/item.tse": "item.erb <%= yield %>",
-    "layouts/layout_test.tse": "layout_test.erb <%= yield %>",
-    "layouts/multiple_extensions.html.tse": "multiple_extensions.html.erb <%= yield %>\n",
-    "layouts/controller_name_space/nested.tse": "controller_name_space/nested.erb <%= yield %>",
+    "layouts/layout-test.tse": "layout_test.erb <%= yield %>",
+    "layouts/multiple-extensions.html.tse": "multiple_extensions.html.erb <%= yield %>\n",
+    "layouts/controller-name-space/nested.tse": "controller_name_space/nested.erb <%= yield %>",
     "layouts/symlinked/symlinked_layout.tse": "This is my layout\n\n<%= yield %>\n\nEnd.\n",
-    "layouts/third_party_template_library.mab": "layouts/third_party_template_library.mab",
+    "layouts/third-party-template-library.mab": "layouts/third_party_template_library.mab",
     "views/hello.tse": "hello.erb",
     "views/goodbye.tse": "goodbye.erb",
   }),
@@ -63,13 +66,17 @@ Object.defineProperty(NestedController, "name", { value: "ControllerNameSpace::N
 
 class MultipleExtensions extends LayoutTest {}
 
+const SharedTestRoutes = new RouteSet();
+SharedTestRoutes.draw(function () {
+  this.get(":controller(/:action)");
+});
 let testCase: InstanceType<typeof ActionController.TestCase>;
 const assertResponse = (type: number | string): void => testCase.assertResponse(type);
 
 async function get(controller: LayoutTest, action: string): Promise<string> {
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "www.nextangle.com" };
   await controller.dispatch(action, new Request(env), new Response());
-  return controller.responseBody!;
+  return controller.responseBody as string;
 }
 
 describe("LayoutAutoDiscoveryTest", () => {
@@ -81,12 +88,15 @@ describe("LayoutAutoDiscoveryTest", () => {
     expect(await get(new ItemController(), "hello")).toBe("item.erb hello.erb");
   });
 
-  test("third party template library auto discovers layout", async () => {
+  test("third party template library auto discovers layout", async ({ task }) => {
     await withTemplateHandler("mab", mab, async () => {
-      testCase = new ActionController.TestCase(ThirdPartyTemplateLibraryController);
+      testCase = new ActionController.TestCase(task.name);
+      testCase.controller = new ThirdPartyTemplateLibraryController();
+      await testCase.beforeSetup();
+      testCase.routes = SharedTestRoutes;
       await testCase.get("hello");
       assertResponse("success");
-      expect(testCase.responseBody).toBe("layouts/third_party_template_library.mab");
+      expect(testCase.response.body).toBe("layouts/third_party_template_library.mab");
     });
   });
 
@@ -108,7 +118,7 @@ class DefaultLayoutController extends LayoutTest {}
 class StreamingLayoutController extends LayoutTest {
   override render(...args: unknown[]): void | Promise<void> {
     const options = extractOptionsBang(args);
-    return super.render(...args, { ...options, stream: true });
+    return super.render(...(args as [string]), { ...options, stream: true });
   }
 }
 
@@ -161,7 +171,7 @@ class ExceptLayoutController extends LayoutTest {
 
 class SetsLayoutInRenderController extends LayoutTest {
   override async hello(): Promise<void> {
-    await this.render({ layout: "third_party_template_library" });
+    await this.render({ layout: "third-party-template-library" });
   }
 }
 
@@ -248,8 +258,11 @@ class LayoutStatusIsRendered extends LayoutTest {
 }
 
 describe("LayoutStatusIsRenderedTest", () => {
-  test("layout status is rendered", async () => {
-    testCase = new ActionController.TestCase(LayoutStatusIsRendered);
+  test("layout status is rendered", async ({ task }) => {
+    testCase = new ActionController.TestCase(task.name);
+    testCase.controller = new LayoutStatusIsRendered();
+    await testCase.beforeSetup();
+    testCase.routes = SharedTestRoutes;
     await testCase.get("hello");
     assertResponse(401);
   });
@@ -262,10 +275,13 @@ class LayoutSymlinkedTest extends LayoutTest {
 }
 
 describe("LayoutSymlinkedIsRenderedTest", () => {
-  test("symlinked layout is rendered", async () => {
-    testCase = new ActionController.TestCase(LayoutSymlinkedTest);
+  test("symlinked layout is rendered", async ({ task }) => {
+    testCase = new ActionController.TestCase(task.name);
+    testCase.controller = new LayoutSymlinkedTest();
+    await testCase.beforeSetup();
+    testCase.routes = SharedTestRoutes;
     await testCase.get("hello");
     assertResponse(200);
-    expect(testCase.responseBody).toContain("This is my layout");
+    expect(testCase.response.body).toContain("This is my layout");
   });
 });

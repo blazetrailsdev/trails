@@ -48,6 +48,10 @@ type Accessors = {
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
 export class DetailsKey {
+  eql(other: unknown): boolean {
+    return this === other;
+  }
+
   /** @internal */
   static _detailsKeys = new Map<string, Requested>();
   /** @internal */
@@ -286,11 +290,11 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   }
 
   appendViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
-    this._viewPaths = this.buildViewPaths([...this._viewPaths.toArray(), ...paths]);
+    this._viewPaths = this.buildViewPaths([...this._viewPaths.toAry(), ...paths]);
   }
 
   prependViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
-    this._viewPaths = this.buildViewPaths([...paths, ...this._viewPaths.toArray()]);
+    this._viewPaths = this.buildViewPaths([...paths, ...this._viewPaths.toAry()]);
   }
 
   find(

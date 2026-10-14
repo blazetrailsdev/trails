@@ -1,10 +1,12 @@
 import { Nodes, Visitors } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Table } from "../table.js";
 import { Node } from "../nodes/node.js";
 import "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 import { sql } from "../arel.js";
+import type { ArelNode } from "../arel.js";
 
 export class MySQL extends ToSql {
   protected override visitArelNodesBin(o: Nodes.Bin, collector: SQLString): SQLString {
@@ -100,38 +102,36 @@ export class MySQL extends ToSql {
     return collector;
   }
 
-  protected override prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
+  protected override prepareUpdateStatement<
+    T extends Nodes.UpdateStatement | Nodes.DeleteStatement,
+  >(o: T): T {
     if (
       o.offset ||
       this.hasGroupByAndHaving(o) ||
       (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
     ) {
       return super.prepareUpdateStatement(o);
+    } else {
+      return o;
     }
-    return o;
   }
 
-  protected override prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (
-      o.offset ||
-      this.hasGroupByAndHaving(o) ||
-      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
-    ) {
-      return super.prepareDeleteStatement(o);
-    }
-    return o;
+  protected override prepareDeleteStatement<
+    T extends Nodes.UpdateStatement | Nodes.DeleteStatement,
+  >(o: T): T {
+    return this.prepareUpdateStatement(o);
   }
 
   protected override buildSubselect(
-    key: Node | Node[],
+    key: ArelNode | ArelNode[],
     o: {
-      relation: Node | Table | null;
-      wheres: Node[];
-      groups: Node[];
-      havings: Node[];
+      relation: ArelNode | Table | null;
+      wheres: ArelNode[];
+      groups: ArelNode[];
+      havings: ArelNode[];
       limit: Node | null;
       offset: Node | null;
-      orders: Node[];
+      orders: ArelNode[];
     },
   ): Nodes.SelectStatement {
     const subselect = super.buildSubselect(key, o);
@@ -151,4 +151,4 @@ export class MySQL extends ToSql {
   }
 }
 
-Visitors.MySQL = MySQL;
+rbModConstSet(Visitors, "MySQL", MySQL);

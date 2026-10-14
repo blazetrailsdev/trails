@@ -1,6 +1,6 @@
 import { Migration } from "../../../migration.js";
 
-export class GiveMeBigNumbers extends Migration {
+export class GiveMeBigNumbers extends Migration.Current {
   async up(): Promise<void> {
     await this.createTable("big_numbers", (table) => {
       table.column("bank_balance", "decimal", { precision: 10, scale: 2 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { Hash } from "@blazetrails/ruby-compat";
 import {
   Table,
   star,
@@ -201,8 +202,8 @@ describe("the to_sql visitor", () => {
         visited = true;
         return "";
       }
-      static {
-        this.dispatchCache().set(Table, "hello");
+      protected override get dispatch() {
+        return new Hash<object, string>().set(Table, "hello");
       }
     }
     const viz = new HelloVisitor();
@@ -339,7 +340,7 @@ describe("the to_sql visitor", () => {
     it("handles table aliases", () => {
       const manager = new Table("foo").project(star()).from(new Nodes.SqlLiteral("expr1"));
       const expr1 = new Table("bar").project(star()).as("expr1");
-      manager.withRecursive(expr1);
+      manager.with(":recursive", expr1);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(manager.ast);
       expect(sql).toBe('WITH RECURSIVE expr1 AS (SELECT * FROM "bar") SELECT * FROM expr1');
     });
@@ -556,20 +557,23 @@ describe("the to_sql visitor", () => {
   });
 
   it("should mark collector as non-retryable if SQL literal is not retryable", () => {
-    const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
-      lit,
-      new Collectors.SQLString(),
+    const node = new Nodes.As(
+      new Nodes.SqlLiteral("`product.id`"),
+      new Nodes.SqlLiteral("`product.id`", { retryable: true }),
     );
+    const collector = new Collectors.SQLString();
+    collector.retryable = true;
+    new Visitors.ToSql(fakeRecordConnection).accept(node, collector);
+
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting SQL literal", () => {
-    const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
-      lit,
-      new Collectors.SQLString(),
-    );
+    const node = new Nodes.SqlLiteral("COUNT(*)");
+    const collector = new Collectors.SQLString();
+    collector.retryable = true;
+    new Visitors.ToSql(fakeRecordConnection).accept(node, collector);
+
     expect(collector.retryable).toBe(false);
   });
 
@@ -592,7 +596,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should mark collector as non-retryable when visiting insert statement node", () => {
-    const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
+    const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]])!.ast;
     const collector = new Visitors.ToSql(fakeRecordConnection).accept(
       stmt,
       new Collectors.SQLString(),

@@ -1,11 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
-import { typeRegistry } from "./type/registry.js";
+import { registry } from "./type.js";
 import { Builder, LazyAttributeHash } from "./attribute-set/builder.js";
 import { IntegerType } from "./type/integer.js";
 import { StringType } from "./type/string.js";
-import { FrozenError, KeyError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  FrozenError,
+  Hash,
+  KeyError,
+  NoMethodError,
+  block,
+  hashAref,
+} from "@blazetrails/ruby-compat";
+
+const typeRegistry = registry();
 
 describe("AttributeSetTest", () => {
   it("freeze freezes the attributes hash", () => {
@@ -56,8 +65,8 @@ describe("AttributeSetTest", () => {
     const builder = new Builder({ foo: new IntegerType(), bar: new StringType() });
     const attributes = builder.buildFromDatabase({ foo: 1, bar: "a" });
     const types = attributes.castTypes();
-    expect(types.foo).toBeInstanceOf(IntegerType);
-    expect(types.bar).toBeInstanceOf(StringType);
+    expect(hashAref(types, "foo")).toBeInstanceOf(IntegerType);
+    expect(hashAref(types, "bar")).toBeInstanceOf(StringType);
   });
 
   it("#key? returns true for initialized attributes", () => {
@@ -96,7 +105,23 @@ describe("AttributeSetTest", () => {
   it("fetch uses the given block for an unknown name", () => {
     const set = new AttributeSet({});
     const fallback = Attribute.null("wibble");
-    expect(set.fetch("wibble", () => fallback)).toBe(fallback);
+    expect(
+      set.fetch(
+        "wibble",
+        block(() => fallback),
+      ),
+    ).toBe(fallback);
+  });
+
+  it("fetch returns an explicitly passed undefined default for an unknown name", () => {
+    const set = new AttributeSet({});
+    expect(set.fetch("wibble", undefined)).toBeUndefined();
+  });
+
+  it("fetch returns a function passed as a default without calling it", () => {
+    const set = new AttributeSet({});
+    const fallback = () => Attribute.null("wibble");
+    expect(set.fetch<() => Attribute>("wibble", fallback)).toBe(fallback);
   });
 
   it("fetch returns the given default value for an unknown name", () => {
@@ -123,7 +148,7 @@ describe("AttributeSetTest", () => {
       bar: Attribute.fromDatabase("bar", 2, intType),
     });
     const seen: unknown[] = [];
-    set.eachValue((attr) => seen.push(attr.value));
+    set.eachValue((attr) => seen.push(attr.value()));
     expect(seen).toEqual([1, 2]);
   });
 
@@ -136,8 +161,8 @@ describe("AttributeSetTest", () => {
   it("treats an Object.prototype name as an ordinary absent attribute", () => {
     const set = new AttributeSet({});
     expect(set.isKey("toString")).toBe(false);
-    expect(set.getAttribute("toString").value).toBeNull();
-    expect(set.getAttribute("constructor").value).toBeNull();
+    expect(set.getAttribute("toString").value()).toBeNull();
+    expect(set.getAttribute("constructor").value()).toBeNull();
   });
 
   it("stores __proto__ as an ordinary key", () => {
@@ -169,6 +194,9 @@ describe("AttributeSet#reverseMergeBang", () => {
   it("raises FrozenError on a frozen store", () => {
     const set = new AttributeSet({ foo: Attribute.fromDatabase("foo", 1, integer) }).freeze();
     expect(() => set.reverseMergeBang(new AttributeSet({}))).toThrow(FrozenError);
+    expect(() => new AttributeSet({}).freeze().reverseMergeBang(new AttributeSet({}))).toThrow(
+      FrozenError,
+    );
   });
 });
 
@@ -184,7 +212,12 @@ describe("AttributeSet over a LazyAttributeHash store", () => {
   it("fetch sends fetch to the LazyAttributeHash", () => {
     const set = new AttributeSet(new LazyAttributeHash(types, {}));
     const fallback = Attribute.null("wibble");
-    expect(set.fetch("wibble", () => fallback)).toBe(fallback);
+    expect(
+      set.fetch(
+        "wibble",
+        block(() => fallback),
+      ),
+    ).toBe(fallback);
     expect(set.fetch("wibble", fallback)).toBe(fallback);
     expect(() => set.fetch("wibble")).toThrow(KeyError);
     expect(set.fetch("name").isInitialized()).toBe(false);
@@ -212,5 +245,21 @@ describe("AttributeSet over a LazyAttributeHash store", () => {
     const clone = Object.assign(Object.create(AttributeSet.prototype) as AttributeSet, set);
     clone.initializeClone(set);
     expect(() => clone.writeFromDatabase("foo", 2)).toThrow(FrozenError);
+  });
+
+  it("a Hash-held set, as Marshal.load answers one, transforms into a Hash", () => {
+    const hash = new Hash<string, Attribute>();
+    hash.set("foo", Attribute.fromDatabase("foo", "1", typeRegistry.lookup("integer")));
+    const attributes = new AttributeSet(hash);
+
+    const types = attributes.castTypes();
+    expect(types).toBeInstanceOf(Hash);
+    expect(hashAref(types, "foo")).toBeInstanceOf(IntegerType);
+    expect(hashAref(attributes.valuesBeforeTypeCast(), "foo")).toBe("1");
+    expect(hashAref(attributes.valuesForDatabase(), "foo")).toBe(1);
+    expect(attributes.fetch("foo").value()).toBe(1);
+    const seen: string[] = [];
+    attributes.eachValue((attr) => seen.push(attr.name!));
+    expect(seen).toEqual(["foo"]);
   });
 });

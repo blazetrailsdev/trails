@@ -20,7 +20,7 @@ describe("SQLite3Adapter schema introspection", () => {
 
   afterEach(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS widgets`).catch(() => undefined);
-    await adapter.execute(`DROP TABLE IF EXISTS memberships`).catch(() => undefined);
+    await adapter.execute(`DROP TABLE IF EXISTS gadgets`).catch(() => undefined);
     await adapter.execute(`DROP TABLE IF EXISTS temp_widgets`).catch(() => undefined);
     await pool.disconnect();
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -28,13 +28,13 @@ describe("SQLite3Adapter schema introspection", () => {
 
   it("shares one frozen Column instance between structurally identical columns", async () => {
     await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, label TEXT)");
-    await adapter.execute("CREATE TABLE memberships (id INTEGER PRIMARY KEY, label TEXT)");
+    await adapter.execute("CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT)");
 
     const widgetLabel = (await adapter.columns("widgets")).find((c) => c.name === "label");
-    const membershipLabel = (await adapter.columns("memberships")).find((c) => c.name === "label");
+    const gadgetLabel = (await adapter.columns("gadgets")).find((c) => c.name === "label");
 
     expect(widgetLabel).toBeDefined();
-    expect(membershipLabel).toBe(widgetLabel);
+    expect(gadgetLabel).toBe(widgetLabel);
     expect(Object.isFrozen(widgetLabel)).toBe(true);
   });
 
@@ -50,9 +50,9 @@ describe("SQLite3Adapter schema introspection", () => {
 
   it("primaryKey returns null for composite primary keys", async () => {
     await adapter.execute(
-      "CREATE TABLE memberships (user_id INTEGER, group_id INTEGER, PRIMARY KEY (user_id, group_id))",
+      "CREATE TABLE gadgets (user_id INTEGER, group_id INTEGER, PRIMARY KEY (user_id, group_id))",
     );
-    expect(await adapter.primaryKey("memberships")).toEqual(["user_id", "group_id"]);
+    expect(await adapter.primaryKey("gadgets")).toEqual(["user_id", "group_id"]);
   });
 
   it("columns returns Column metadata keyed by name", async () => {

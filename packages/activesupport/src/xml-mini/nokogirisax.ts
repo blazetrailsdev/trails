@@ -55,7 +55,6 @@ export class HashBuilder {
   hash: XmlHash = {};
   private _hashStack: XmlHash[] = [];
 
-  /** @missingRailsCall last — PERMANENT */
   get currentHash(): XmlHash {
     return this._hashStack[this._hashStack.length - 1];
   }

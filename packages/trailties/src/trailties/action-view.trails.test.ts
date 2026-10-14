@@ -222,8 +222,8 @@ describe("action_view.setup_action_pack", () => {
     runLoadHooks("action_controller", ActionController.Base);
 
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/:controller/:action");
+    routes.draw(function () {
+      this.get("/:controller/:action");
     });
     const view = Object.assign(Object.create(RoutingUrlFor.prototype) as RoutingUrlFor, {
       _routes: routes,

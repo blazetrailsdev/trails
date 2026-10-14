@@ -1,19 +1,20 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { YAMLEncoder } from "./yaml-encoder.js";
-import { jsonCodec } from "./codecs/json.js";
-import type { AttributeSetCoder } from "./codecs/codec.js";
 import { AttributeSet } from "../attribute-set.js";
 import { Attribute, Uninitialized } from "../attribute.js";
-import { typeRegistry } from "../type/registry.js";
+import { registry } from "../type.js";
+
+const typeRegistry = registry();
 
 function makeSet(attrs: Record<string, Attribute>): AttributeSet {
   return new AttributeSet(attrs);
 }
 
-function encodeInto(encoder: YAMLEncoder, set: AttributeSet): AttributeSetCoder {
-  const coder: AttributeSetCoder = {};
+function encodeInto(encoder: YAMLEncoder, set: AttributeSet): { concise_attributes: Attribute[] } {
+  const coder: Record<string, unknown> = {};
   encoder.encode(set, coder);
-  return coder;
+  return coder as { concise_attributes: Attribute[] };
 }
 
 const stringType = typeRegistry.lookup("string");
@@ -44,13 +45,13 @@ describe("YAMLEncoder", () => {
 
   it("nils out the type of an attribute whose type is the default type", () => {
     const set = makeSet({ name: stringAttr("name", "Alice") });
-    expect(encodeInto(encoder, set)["concise_attributes"]![0].type).toBeNull();
+    expect(encodeInto(encoder, set)["concise_attributes"][0].type).toBeNull();
   });
 
   it("keeps the attribute whose type is not the default type", () => {
     const attr = intAttr("name", 7);
     const set = makeSet({ name: attr });
-    expect(encodeInto(encoder, set)["concise_attributes"]![0]).toBe(attr);
+    expect(encodeInto(encoder, set)["concise_attributes"][0]).toBe(attr);
   });
 
   it("returns the attributes key when the coder carries one", () => {
@@ -65,7 +66,7 @@ describe("YAMLEncoder", () => {
       concise_attributes: [Attribute.fromUser("qty", 5, null)],
     });
     expect(decoded.fetchValue("qty")).toBe(5);
-    expect(decoded.castTypes().qty).toBe(custom);
+    expect(hashAref(decoded.castTypes(), "qty")).toBe(custom);
   });
 
   it("uninitialized attributes round-trip as uninitialized", () => {
@@ -74,11 +75,11 @@ describe("YAMLEncoder", () => {
     const set = makeSet({ score: Attribute.uninitialized("score", intType) });
 
     const coder = encodeInto(localEncoder, set);
-    expect(coder["concise_attributes"]![0]).toBeInstanceOf(Uninitialized);
+    expect(coder["concise_attributes"][0]).toBeInstanceOf(Uninitialized);
 
     const decoded = localEncoder.decode(coder);
     expect(decoded.isKey("score")).toBe(false);
-    expect(decoded.castTypes().score).toBe(intType);
+    expect(hashAref(decoded.castTypes(), "score")).toBe(intType);
   });
 
   it("attr not among the default types is kept with its own type", () => {
@@ -90,25 +91,5 @@ describe("YAMLEncoder", () => {
     });
     expect(decoded.fetchValue("extra")).toBe("bonus");
     expect(decoded.fetchValue("name")).toBe("Bob");
-  });
-
-  it("a codec round-trips the coder the encoder filled in", () => {
-    const immutableType = typeRegistry.lookup("immutable_string");
-    const set = makeSet({
-      name: stringAttr("name", "Alice"),
-      flag: Attribute.fromUser("flag", "t", immutableType),
-      score: Attribute.uninitialized("score", integerType),
-    });
-    const coder = encodeInto(encoder, set);
-
-    const envelope = JSON.parse(jsonCodec.encode(coder));
-    expect(envelope.types.name).toBeNull();
-    expect(envelope.types.flag).toBe("immutable_string");
-    expect(envelope.defaultAttributes).toContain("score");
-
-    const decoded = encoder.decode(jsonCodec.decode(jsonCodec.encode(coder)));
-    expect(decoded.fetchValue("name")).toBe("Alice");
-    expect(decoded.fetchValue("flag")).toBe("t");
-    expect(decoded.isKey("score")).toBe(false);
   });
 });

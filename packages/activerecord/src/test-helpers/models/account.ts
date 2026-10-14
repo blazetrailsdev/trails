@@ -3,6 +3,7 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Account extends Base {
@@ -68,6 +69,7 @@ export class Account extends Base {
     return "Sir, yes sir!";
   }
 }
+registerModel(Account);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Account {
   get firm(): Company | null | Promise<Company | null>;
@@ -77,3 +79,4 @@ export interface Account {
 }
 
 export class SubAccount extends Account {}
+registerModel(SubAccount);

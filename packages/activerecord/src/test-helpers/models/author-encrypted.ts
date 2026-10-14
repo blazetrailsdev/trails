@@ -1,5 +1,6 @@
 import { Base } from "../../base.js";
 import { Scheme } from "../../encryption/scheme.js";
+import { registerModel } from "../../associations.js";
 
 export class EncryptedAuthor extends Base {
   static _tableName = "authors";
@@ -9,6 +10,7 @@ export class EncryptedAuthor extends Base {
     this.encrypts("name", { previousSchemes: [new Scheme({ deterministic: true })] });
   }
 }
+registerModel(EncryptedAuthor);
 
 export class EncryptedAuthorWithKey extends Base {
   static _tableName = "authors";
@@ -17,3 +19,4 @@ export class EncryptedAuthorWithKey extends Base {
     this.encrypts("name", { key: "some secret key!" });
   }
 }
+registerModel(EncryptedAuthorWithKey);

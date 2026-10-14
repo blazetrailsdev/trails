@@ -1,5 +1,6 @@
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class LockWithoutDefault extends Base {
   declare title: string;
@@ -15,3 +16,4 @@ export class LockWithoutDefault extends Base {
     this.attribute("updated_at", "datetime");
   }
 }
+registerModel(LockWithoutDefault);

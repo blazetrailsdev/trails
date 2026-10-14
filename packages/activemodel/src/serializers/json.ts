@@ -17,15 +17,18 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
+import { first } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
+
+interface AttributesWriter {
+  setAttributes(newAttributes: unknown): Promise<void> | void;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class JSON {
   static includeRootInJson: boolean | string = false;
 
   declare static modelName: ModelName;
-
-  declare readonly attributes: Record<string, unknown>;
 
   static [included](base: object): void {
     extend(base as { prototype: object }, Naming);
@@ -34,24 +37,33 @@ export class JSON {
 
   asJson(options?: SerializeOptions & { root?: boolean | string }): Record<string, unknown> {
     const ctor = this.constructor as typeof JSON;
-    const rootOpt =
+    let root =
       options && Object.prototype.hasOwnProperty.call(options, "root")
         ? options.root
         : ctor.includeRootInJson;
+
     return asJsonThenable(
       () => this.serializableHash(options),
-      rootOpt,
-      () => ctor.modelName.element,
+      (hash) => {
+        if (root != null && root !== false) {
+          if (root === true) root = ctor.modelName.element;
+          return { [root]: hash };
+        } else {
+          return hash;
+        }
+      },
       options ?? {},
     );
   }
 
-  fromJson(json: string, ...includeRoot: [includeRoot?: boolean | string | null]): this {
-    const ctor = this.constructor as typeof JSON;
-    const root = includeRoot.length > 0 ? includeRoot[0] : ctor.includeRootInJson;
+  fromJson(
+    this: this & AttributesWriter,
+    json: string,
+    includeRoot: boolean | string | null = (this.constructor as typeof JSON).includeRootInJson,
+  ): this {
     let hash = ActiveSupportJSON.decode(json);
-    if (root !== false && root != null) {
-      hash = Object.values(hash as object)[0];
+    if (includeRoot !== false && includeRoot != null) {
+      hash = first(Object.values(hash as object));
     }
     void this.setAttributes(hash);
     return this;
@@ -79,8 +91,6 @@ JSON.prototype.serializableAddIncludes = serializableAddIncludes;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface JSON {
-  setAttributes(newAttributes: unknown): Promise<void> | void;
-
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
 

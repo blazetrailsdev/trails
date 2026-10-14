@@ -1,6 +1,7 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { RecordNotFound, registerModel } from "./index.js";
+import { UnknownPrimaryKey } from "./errors.js";
 import { User } from "./test-helpers/models/user.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { Room } from "./test-helpers/models/room.js";
@@ -8,7 +9,7 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 
 class TokenUser extends User {
@@ -165,7 +166,9 @@ describe("TokenForTest", () => {
 
   it("finds record with a custom primary key", async () => {
     class CustomPk extends TokenUser {
-      static _primaryKey = "auth_token";
+      static {
+        this.primaryKey = "auth_token";
+      }
     }
     const customPkUser = await CustomPk.find((user as any).auth_token);
     const customPkLookupToken = (customPkUser as any).generateTokenFor("lookup");
@@ -190,6 +193,8 @@ describe("TokenForTest", () => {
       }
     }
 
-    await expect(NoPk.findByTokenFor("parley", "this token will not be checked")).rejects.toThrow();
+    await expect(NoPk.findByTokenFor("parley", "this token will not be checked")).rejects.toThrow(
+      UnknownPrimaryKey,
+    );
   });
 });

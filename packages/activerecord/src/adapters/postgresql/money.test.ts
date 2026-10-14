@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
@@ -50,8 +50,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("default", async () => {
       expect((PostgresqlMoney.columnDefaults["depth"] as BigDecimal).toString("F")).toBe("150.55");
-      expect(((PostgresqlMoney.new() as any).depth as BigDecimal).toString("F")).toBe("150.55");
-      expect((PostgresqlMoney.new() as any).depthBeforeTypeCast).toBe("150.55");
+      expect(((new PostgresqlMoney() as any).depth as BigDecimal).toString("F")).toBe("150.55");
+      expect((new PostgresqlMoney() as any).depthBeforeTypeCast).toBe("150.55");
     });
 
     it("money values", async () => {
@@ -110,7 +110,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(connection, "postgresql_moneys");
+      const output = await dumpTableSchema("postgresql_moneys");
       expect(output).toMatch(/t\.money\s*\("wealth",\s*\{\s*scale:\s*2\s*\}/);
       expect(output).toMatch(
         /t\.money\s*\("depth",\s*\{[^}]*scale:\s*2[^}]*default:\s*"150\.55"[^}]*\}/,

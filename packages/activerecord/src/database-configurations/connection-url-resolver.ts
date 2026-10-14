@@ -1,162 +1,98 @@
 import type { DatabaseConfigOptions } from "./database-config.js";
+import {
+  camelize,
+  compactBlankObj as compactBlank,
+  isBlank,
+  reverseMerge,
+  transformKeys,
+} from "@blazetrails/activesupport";
+import {
+  type Generic,
+  merge,
+  RFC2396Parser,
+  RuntimeError,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 import { protocolAdapters } from "../active-record.js";
 
 export class ConnectionUrlResolver {
-  private readonly _adapter: string | null;
-  private readonly _parsed: URL | null;
-  private readonly _opaque: string | null;
-  private readonly _query: string | null;
-  private readonly _emptyAuthority: boolean;
+  private uri: Generic;
+  private adapter: string | null;
+  private query: string | null | undefined;
+  private _uriParser?: RFC2396Parser;
 
-  /** @missingRailsCall split — PERMANENT */
   constructor(url: string) {
-    if (!url || url.trim() === "") {
-      throw new Error("Database URL cannot be empty");
-    }
+    if (isBlank(url)) throw new RuntimeError("Database URL cannot be empty");
+    this.uri = this.uriParser.parse(url);
+    this.adapter = this.resolvedAdapter();
 
-    const schemeMatch = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):(\/\/)?(.*)$/);
-    if (!schemeMatch) {
-      if (/^[^/?#]*:/.test(url)) {
-        throw new Error(`Invalid database URL: ${redactUrl(url)}`);
-      }
-      this._adapter = null;
-      this._opaque = null;
-      this._emptyAuthority = true;
-      this._parsed = new URL(`http://placeholder/${url.replace(/^\//, "")}`);
-      this._query = this._parsed.search ? this._parsed.search.slice(1) : null;
-      return;
-    }
-
-    const scheme = schemeMatch[1].toLowerCase().replace(/-/g, "_");
-    const hasAuthority = !!schemeMatch[2];
-    const rest = schemeMatch[3];
-
-    let adapter = scheme;
-    if (protocolAdapters().get(adapter) != null) {
-      adapter = protocolAdapters().get(adapter) as string;
-    }
-    this._adapter = adapter;
-
-    if (hasAuthority) {
-      const emptyAuthority = rest.startsWith("/");
-      const normalized = emptyAuthority ? `http://placeholder${rest}` : `http://${rest}`;
-      try {
-        this._parsed = new URL(normalized);
-        this._emptyAuthority = emptyAuthority;
-        this._opaque = null;
-        this._query = this._parsed.search ? this._parsed.search.slice(1) : null;
-      } catch {
-        throw new Error(`Invalid database URL: ${redactUrl(url)}`);
-      }
-    } else if (rest.startsWith("/")) {
-      this._emptyAuthority = true;
-      this._opaque = null;
-      this._parsed = new URL(`http://placeholder${rest}`);
-      this._query = this._parsed.search ? this._parsed.search.slice(1) : null;
+    if (this.uri.opaque != null) {
+      [this.uri.opaque, this.query] = stringSplit(this.uri.opaque, "?", 2);
     } else {
-      this._emptyAuthority = false;
-      const queryIdx = rest.indexOf("?");
-      if (queryIdx >= 0) {
-        this._opaque = rest.slice(0, queryIdx);
-        this._query = rest.slice(queryIdx + 1);
-      } else {
-        this._opaque = rest;
-        this._query = null;
-      }
-      this._parsed = null;
+      this.query = this.uri.query;
     }
   }
 
   toHash(): DatabaseConfigOptions {
-    const config: Record<string, unknown> = this.rawConfig();
-
-    for (const key of Object.keys(config)) {
-      const val = config[key];
-      if (val === null || val === undefined || val === "") {
-        delete config[key];
-      }
-    }
-
-    for (const key of Object.keys(config)) {
-      const val = config[key];
-      if (typeof val === "string") {
-        try {
-          config[key] = decodeURIComponent(val);
-        } catch {}
-      }
-    }
-
+    const config: Record<string, unknown> = compactBlank(this.rawConfig());
+    Object.entries(config).map(([key, value]) => {
+      if (typeof value === "string") config[key] = this.uriParser.unescape(value);
+    });
     return config as DatabaseConfigOptions;
   }
 
   /** @internal */
-  private get uri(): URL | null {
-    return this._parsed;
+  private get uriParser(): RFC2396Parser {
+    return (this._uriParser ??= new RFC2396Parser());
   }
 
-  /** @internal */
-  private get uriParser(): { unescape(s: string): string } {
-    return { unescape: decodeURIComponent };
-  }
-
-  /** @internal */
-  private get resolvedAdapter(): string | null {
-    return this._adapter;
-  }
-
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm camelize — PERMANENT
+   */
   private queryHash(): Record<string, string> {
-    return Object.fromEntries(
-      (this._query ?? "")
-        .split("&")
-        .map((pair): [string, string] => {
-          const eqIdx = pair.indexOf("=");
-          return eqIdx === -1 ? [pair, ""] : [pair.slice(0, eqIdx), pair.slice(eqIdx + 1)];
-        })
-        .filter(([key]) => key !== ""),
-    );
+    return transformKeys(
+      Object.fromEntries(
+        stringSplit(this.query ?? "", "&").map((pair) => stringSplit(pair, "=", 2)),
+      ),
+      (key) => camelize(key, false),
+    ) as Record<string, string>;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   private rawConfig(): Record<string, unknown> {
-    if (this._opaque !== null) {
-      return {
-        ...this.queryHash(),
-        adapter: this._adapter,
-        database: this._opaque,
-      };
+    if (this.uri.opaque != null) {
+      return merge(this.queryHash(), {
+        adapter: this.adapter,
+        database: this.uri.opaque,
+      });
+    } else {
+      return reverseMerge(this.queryHash(), {
+        adapter: this.adapter,
+        username: this.uri.user,
+        password: this.uri.password,
+        port: this.uri.port,
+        database: this.databaseFromPath(),
+        host: this.uri.hostname,
+      });
     }
-
-    const parsed = this._parsed!;
-    const hostname = this._emptyAuthority ? "" : parsed.hostname;
-    return {
-      adapter: this._adapter,
-      username: parsed.username || undefined,
-      password: parsed.password || undefined,
-      port: parsed.port ? Number(parsed.port) : undefined,
-      database: this.databaseFromPath(),
-      host: hostname ? hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
-      ...this.queryHash(),
-    };
   }
 
-  /**
-   * @internal
-   * @missingRailsCall path — PERMANENT
-   */
-  private databaseFromPath(): string | undefined {
-    const path = this._parsed?.pathname;
-    if (!path) return undefined;
-    if (this._adapter === "sqlite3") {
-      return path;
+  /** @internal */
+  private resolvedAdapter(): string | null {
+    let adapter = this.uri.scheme && this.uri.scheme.replace(/-/g, "_");
+    if (adapter != null && protocolAdapters().get(adapter) != null) {
+      adapter = protocolAdapters().get(adapter) as string;
     }
-    return path.startsWith("/") ? path.slice(1) : path;
+    return adapter;
   }
-}
 
-function redactUrl(url: string): string {
-  return url.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@/]+@/, "$1***@");
+  /** @internal */
+  private databaseFromPath(): string | null {
+    if (this.adapter === "sqlite3") {
+      return this.uri.path;
+    } else {
+      return this.uri.path!.replace(/^\//, "");
+    }
+  }
 }

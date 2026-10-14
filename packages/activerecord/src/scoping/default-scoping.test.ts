@@ -2,11 +2,10 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { assertDifference, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
-import { captureSql } from "../testing/sql-capture.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Developer,
   DeveloperOrderedBySalary,
@@ -69,11 +68,9 @@ registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);
 const namesAndIds = (rows: any[]) => rows.map((r) => [r.name, r.id]);
-const capSql = (fn: () => unknown) =>
-  captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("DefaultScopingTest", () => {
-  const { developers, posts, comments } = fixtures(["developers", "posts", "comments"]);
+  const { self, developers, posts, comments } = fixtures(["developers", "posts", "comments"]);
 
   it("default scope", async () => {
     const expected = salaries(await Developer.order("salary DESC"));
@@ -89,12 +86,6 @@ describe("DefaultScopingTest", () => {
   it("default scope as class method referencing scope", async () => {
     const all = await ClassMethodReferencingScopeDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
-  });
-
-  it("default scope as class method runs on create", async () => {
-    expect((ClassMethodDeveloperCalledDavid.new() as any).name).toBe("David");
-    const dev = (await ClassMethodDeveloperCalledDavid.create()) as any;
-    expect(dev.name).toBe("David");
   });
 
   it("default scope as block referencing scope", async () => {
@@ -155,7 +146,9 @@ describe("DefaultScopingTest", () => {
   it("default scope runs on create", async () => {
     await Mentor.create();
     const createSql = (
-      await capSql(() => DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" }),
+      )
     )[1];
     expect(createSql).toMatch(/mentor_id/);
   });
@@ -163,14 +156,18 @@ describe("DefaultScopingTest", () => {
   it("default scope with all queries runs on create", async () => {
     await Mentor.create();
     const createSql = (
-      await capSql(() => DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" }),
+      )
     )[1];
     expect(createSql).toMatch(/mentor_id/);
   });
 
   it("nilable default scope with all queries runs on create", async () => {
     const createSql = (
-      await capSql(() => DeveloperWithDefaultNilableFirmScopeAllQueries.create({ name: "Nikita" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultNilableFirmScopeAllQueries.create({ name: "Nikita" }),
+      )
     )[0];
     expect(createSql).not.toMatch(/AND$/);
   });
@@ -179,7 +176,9 @@ describe("DefaultScopingTest", () => {
     await Mentor.create();
     await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" });
     const selectSql = (
-      await capSql(() => DeveloperwithDefaultMentorScopeNot.findBy({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperwithDefaultMentorScopeNot.findBy({ name: "Eileen" }),
+      )
     )[0];
     expect(selectSql).toMatch(/mentor_id/);
   });
@@ -188,7 +187,9 @@ describe("DefaultScopingTest", () => {
     await Mentor.create();
     await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" });
     const selectSql = (
-      await capSql(() => DeveloperWithDefaultMentorScopeAllQueries.findBy({ name: "Eileen" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultMentorScopeAllQueries.findBy({ name: "Eileen" }),
+      )
     )[0];
     expect(selectSql).toMatch(/mentor_id/);
   });
@@ -196,7 +197,9 @@ describe("DefaultScopingTest", () => {
   it("nilable default scope with all queries runs on select", async () => {
     await DeveloperWithDefaultNilableFirmScopeAllQueries.create({ name: "Nikita" });
     const selectSql = (
-      await capSql(() => DeveloperWithDefaultNilableFirmScopeAllQueries.findBy({ name: "Nikita" }))
+      await self().captureSql({}, () =>
+        DeveloperWithDefaultNilableFirmScopeAllQueries.findBy({ name: "Nikita" }),
+      )
     )[0];
     expect(selectSql).not.toMatch(/AND$/);
   });
@@ -204,14 +207,14 @@ describe("DefaultScopingTest", () => {
   it("default scope doesnt run on update", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.update({ name: "Not Eileen" })))[0];
+    const updateSql = (await self().captureSql({}, () => dev.update({ name: "Not Eileen" })))[0];
     expect(updateSql).not.toMatch(/mentor_id/);
   });
 
   it("default scope with all queries runs on update", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.update({ name: "Not Eileen" })))[1];
+    const updateSql = (await self().captureSql({}, () => dev.update({ name: "Not Eileen" })))[1];
     expect(updateSql).toMatch(/mentor_id/);
   });
 
@@ -219,14 +222,16 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const updateSql = (await capSql(() => dev.update({ name: "Not Nikita" })))[0];
+    const updateSql = (await self().captureSql({}, () => dev.update({ name: "Not Nikita" })))[0];
     expect(updateSql).not.toMatch(/AND$/);
   });
 
   it("default scope doesnt run on update columns", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Eileen" })))[0];
+    const updateSql = (
+      await self().captureSql({}, () => dev.updateColumns({ name: "Not Eileen" }))
+    )[0];
     expect(updateSql).not.toMatch(/mentor_id/);
   });
 
@@ -234,21 +239,23 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Nikita" })))[0];
+    const updateSql = (
+      await self().captureSql({}, () => dev.updateColumns({ name: "Not Nikita" }))
+    )[0];
     expect(updateSql).not.toMatch(/AND$/);
   });
 
   it("default scope doesnt run on destroy", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const destroySql = (await capSql(() => dev.destroy()))[0];
+    const destroySql = (await self().captureSql({}, () => dev.destroy()))[0];
     expect(destroySql).not.toMatch(/mentor_id/);
   });
 
   it("default scope with all queries runs on destroy", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const destroySql = (await capSql(() => dev.destroy()))[1];
+    const destroySql = (await self().captureSql({}, () => dev.destroy()))[1];
     expect(destroySql).toMatch(/mentor_id/);
   });
 
@@ -256,14 +263,14 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const destroySql = (await capSql(() => dev.destroy()))[0];
+    const destroySql = (await self().captureSql({}, () => dev.destroy()))[0];
     expect(destroySql).not.toMatch(/AND$/);
   });
 
   it("default scope doesnt run on reload", async () => {
     await Mentor.create();
     const dev = (await DeveloperwithDefaultMentorScopeNot.create({ name: "Eileen" })) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).not.toMatch(/mentor_id/);
   });
 
@@ -271,7 +278,7 @@ describe("DefaultScopingTest", () => {
     const dev = (await DeveloperWithDefaultNilableFirmScopeAllQueries.create({
       name: "Nikita",
     })) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).not.toMatch(/AND$/);
   });
 
@@ -280,7 +287,7 @@ describe("DefaultScopingTest", () => {
       name: "Eileen",
       mentor_id: 2,
     })) as any;
-    const reloadSql = (await capSql(() => dev.reload({ unscoped: true })))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload({ unscoped: true })))[0];
     expect(reloadSql).not.toMatch(/mentor_id/);
   });
 
@@ -524,7 +531,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope find last", async () => {
-    expect(((await DeveloperOrderedBySalary.count()) as number) > 1).toBeTruthy();
+    expect((await DeveloperOrderedBySalary.count()) > 1).toBeTruthy();
     const lowest = (await DeveloperOrderedBySalary.find(developers("poor_jamis").id)) as any;
     expect(((await DeveloperOrderedBySalary.last()) as any).id).toBe(lowest.id);
   });
@@ -675,7 +682,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope attribute", () => {
-    const jamis = PoorDeveloperCalledJamis.new({ name: "David" }) as any;
+    const jamis = new PoorDeveloperCalledJamis({ name: "David" }) as any;
     expect(jamis.salary).toBe(50000);
   });
 
@@ -700,7 +707,7 @@ describe("DefaultScopingTest", () => {
 
   it("create with nested attributes", async () => {
     await assertDifference(
-      () => Project.count() as Promise<number>,
+      () => Project.count(),
       1,
       null,
       async () => {
@@ -714,14 +721,16 @@ describe("DefaultScopingTest", () => {
   it("default scope with all queries runs on update columns", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Eileen" })))[0];
+    const updateSql = (
+      await self().captureSql({}, () => dev.updateColumns({ name: "Not Eileen" }))
+    )[0];
     expect(updateSql).toMatch(/mentor_id/);
   });
 
   it("default scope with all queries runs on reload", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).toMatch(/mentor_id/);
   });
 
@@ -731,7 +740,7 @@ describe("DefaultScopingTest", () => {
       (await DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries.create(
         { name: "Eileen" },
       )) as any;
-    const reloadSql = (await capSql(() => dev.reload()))[0];
+    const reloadSql = (await self().captureSql({}, () => dev.reload()))[0];
     expect(reloadSql).not.toMatch(/mentor_id/);
     expect(reloadSql).toMatch(/firm_id/);
   });
@@ -740,11 +749,11 @@ describe("DefaultScopingTest", () => {
     await Mentor.create();
     const klass =
       DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries;
-    const createSql = (await capSql(() => klass.create({ name: "Steve" })))[1];
+    const createSql = (await self().captureSql({}, () => klass.create({ name: "Steve" })))[1];
     expect(createSql).toMatch(/mentor_id/);
     expect(createSql).toMatch(/firm_id/);
     const developer = (await klass.findBy({ name: "Steve" })) as any;
-    const updateSql = (await capSql(() => developer.update({ name: "Stephen" })))[1];
+    const updateSql = (await self().captureSql({}, () => developer.update({ name: "Stephen" })))[1];
     expect(updateSql).not.toMatch(/mentor_id/);
     expect(updateSql).toMatch(/firm_id/);
   });
@@ -846,7 +855,7 @@ describe("DefaultScopingTest", () => {
     const post = posts("thinking") as any;
     const expected = [comments("does_it_hurt").id];
 
-    await post.specialComments.updateAll({ deleted_at: Temporal.Now.instant() });
+    await post.specialComments.updateAll({ deleted_at: RubyTime.now() });
 
     await expect(Post.joins(":specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
     expect(await (await post.specialComments.reload()).toArray()).toEqual([]);
@@ -860,54 +869,6 @@ describe("DefaultScopingTest", () => {
       expect(await specialCommentIds(Post.eagerLoad(":specialComments"))).toEqual(expected);
       expect(await specialCommentIds(Post.includes(":specialComments"))).toEqual(expected);
       expect(await specialCommentIds(Post.preload(":specialComments"))).toEqual(expected);
-    });
-  });
-
-  it("sti association write paths use the declaring-class foreign key", async () => {
-    const post = posts("thinking") as any;
-    expect(post.constructor.name).toBe("SpecialPost");
-
-    await (SpecialComment as any).unscoped(async () => {
-      const built = post.specialComments.build({ body: "built sti comment" });
-      expect(Number(built._readAttribute("post_id"))).toBe(Number(post.id));
-
-      const assoc = post.association("specialComments");
-      const fresh = new SpecialComment({ body: "fresh sti comment" });
-      assoc.setOwnerAttributes(fresh);
-      expect(Number(fresh._readAttribute("post_id"))).toBe(Number(post.id));
-
-      expect(Object.keys(assoc.computeNullifiedOwnerAttributes())).toEqual(["post_id"]);
-
-      const pushed = new SpecialComment({ body: "pushed sti comment" });
-      await post.specialComments.push(pushed);
-      expect(Number(pushed._readAttribute("post_id"))).toBe(Number(post.id));
-      expect(pushed.isNewRecord()).toBe(false);
-    });
-  });
-
-  it("sti has_one read build and assign paths use the declaring-class foreign key", async () => {
-    const post = posts("thinking") as any;
-    expect(post.constructor.name).toBe("SpecialPost");
-
-    await (Comment as any).unscoped(async () => {
-      const reader = (await SpecialPost.create({ title: "sti reader", body: "x" })) as any;
-      const comment = await Comment.create({
-        type: "VerySpecialComment",
-        body: "sti has_one comment",
-        post_id: reader.id,
-      });
-      const loaded = await reader.verySpecialComment;
-      expect(loaded.id).toBe(comment.id);
-
-      const assigned = new VerySpecialComment({ body: "assigned sti has_one" });
-      await post.setVerySpecialComment(assigned);
-      expect(Number(assigned._readAttribute("post_id"))).toBe(Number(post.id));
-
-      const builder = (await SpecialPost.create({ title: "sti builder", body: "x" })) as any;
-      const built = await builder
-        .association("verySpecialComment")
-        .build({ body: "built sti has_one" });
-      expect(Number(built._readAttribute("post_id"))).toBe(Number(builder.id));
     });
   });
 

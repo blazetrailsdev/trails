@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { Bit } from "../../connection-adapters/postgresql/oid/bit.js";
 
@@ -42,7 +42,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const type = new Bit();
       expect(type.castValue("0101")).toBe("0101");
       expect(type.castValue("0xFF")).toBe("11111111");
-      expect(type.castValue(null)).toBeNull();
+      expect(type.cast(null)).toBeNull();
+      expect(type.castValue(12)).toBe("12");
     });
 
     it("bit string invalid", async () => {

@@ -8,10 +8,9 @@ import {
   ImmutableStringType,
   StringType,
   ValueType,
-  typeRegistry,
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 
@@ -79,12 +78,12 @@ _registry.register("string", StringType, { override: false });
 _registry.register("text", Text, { override: false });
 _registry.register("time", Time, { override: false });
 
-export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
-  if (r !== undefined) {
-    _registry = r;
-    _defaultValue = undefined;
-  }
+export function registry(): AdapterSpecificRegistry {
   return _registry;
+}
+
+export function setRegistry(registry: AdapterSpecificRegistry): void {
+  _registry = registry;
 }
 
 export function register(
@@ -129,9 +128,3 @@ export function adapterNameFrom(model: AdapterNameSource): string {
 export function currentAdapterName(): string {
   return adapterNameFrom(ActiveRecord.Base);
 }
-
-typeRegistry.register("date", Date); // boundary: AR Type::Date class, not JS Date
-typeRegistry.register("datetime", DateTime);
-typeRegistry.register("time", Time);
-typeRegistry.register("text", Text);
-typeRegistry.register("json", Json);

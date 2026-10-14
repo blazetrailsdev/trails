@@ -15,6 +15,10 @@ describe("b", () => {
     expect([...b("café")].every((c) => c.charCodeAt(0) < 0x100)).toBe(true);
   });
 
+  it("answers the byte form of a String held as its bytes", () => {
+    expect(b(new Uint8Array([0x63, 0xc3, 0xa9, 0xff]))).toBe("c\xc3\xa9\xff");
+  });
+
   it("is the identity on 7-bit ASCII", () => {
     expect(b("Content-Disposition")).toBe("Content-Disposition");
   });

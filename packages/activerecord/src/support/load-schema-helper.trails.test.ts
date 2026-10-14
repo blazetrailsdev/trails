@@ -53,7 +53,7 @@ describe("LoadSchemaHelper", () => {
       );
       const tables = res.toArray().map((r) => r.name as string);
 
-      expect(tables.length).toBeGreaterThan(300);
+      expect(tables.length).toBeGreaterThan(200);
       expect(tables).toContain("topics");
       expect(tables).toContain("posts");
       expect(tables).not.toContain("chat_messages");

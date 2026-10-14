@@ -11,4 +11,12 @@ describe("ValidatesTest (trails)", () => {
     expect(Model._parseValidatesOptions({ in: [1] })).toEqual({ in: [1] });
     expect(Model._parseValidatesOptions(/x/)).toEqual({ with: /x/ });
   });
+
+  it("hands whatever constant the key names to validates_with, as validates.rb:121 does", () => {
+    class Person extends Model {
+      static NotAValidator = "a string";
+    }
+
+    expect(() => Person.validates("name", { notA: true })).toThrow(TypeError);
+  });
 });

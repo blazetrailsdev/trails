@@ -1,35 +1,40 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Developer } from "./developer.js";
-import type { Firm } from "./company.js";
-import type { Project } from "./project.js";
-import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
-import { Module, Range } from "@blazetrails/ruby-compat";
-import { registerConstant } from "@blazetrails/activesupport";
+import { Module, Range, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
+import { registerModel } from "../../associations.js";
 
 registerConstant("MyApplication", new Module());
-registerConstant("MyApplication::Business", new Module());
-registerConstant(
-  "MyApplication::Business::Prefixed",
-  Object.assign(new Module(), { tableNamePrefix: "prefixed_" }),
-);
-registerConstant("MyApplication::Business::Prefixed::Nested", new Module());
-registerConstant(
-  "MyApplication::Business::Suffixed",
-  Object.assign(new Module(), { tableNameSuffix: "_suffixed" }),
-);
-registerConstant("MyApplication::Business::Suffixed::Nested", new Module());
-registerConstant("MyApplication::Billing", new Module());
-registerConstant("MyApplication::Billing::Nested", new Module());
+const Business = new Module();
+registerConstant("MyApplication::Business", Business);
+const Prefixed = Object.assign(new Module(), { tableNamePrefix: "prefixed_" });
+registerConstant("MyApplication::Business::Prefixed", Prefixed);
+const PrefixedNested = new Module();
+registerConstant("MyApplication::Business::Prefixed::Nested", PrefixedNested);
+const Suffixed = Object.assign(new Module(), { tableNameSuffix: "_suffixed" });
+registerConstant("MyApplication::Business::Suffixed", Suffixed);
+const SuffixedNested = new Module();
+registerConstant("MyApplication::Business::Suffixed::Nested", SuffixedNested);
+const Billing = new Module();
+registerConstant("MyApplication::Billing", Billing);
+const BillingNested = new Module();
+registerConstant("MyApplication::Billing::Nested", BillingNested);
 
 export class MyAppBusinessCompany extends Base {
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Company";
+  static {
+    registerModel(rbModConstSet(Business, "Company", this));
+  }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBusinessFirm extends MyAppBusinessCompany {
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Firm";
+  declare clients: AssociationProxy<MyAppBusinessClient>;
+  declare clientsSortedDesc: AssociationProxy<MyAppBusinessClient>;
+  declare clientsOfFirm: AssociationProxy<MyAppBusinessClient>;
+  declare clientsLikeMs: AssociationProxy<MyAppBusinessClient>;
+
+  static {
+    registerModel(rbModConstSet(Business, "Firm", this));
+  }
 
   static {
     this.hasMany(
@@ -37,69 +42,73 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
       function (this: any) {
         return this.order("id");
       },
-      {
-        foreignKey: "firm_id",
-        dependent: "destroy",
-      },
+      { dependent: "destroy" },
     );
     this.hasMany(
       "clientsSortedDesc",
       function (this: any) {
         return this.order("id DESC");
       },
-      {
-        className: "Client",
-        foreignKey: "firm_id",
-      },
+      { className: "Client" },
     );
     this.hasMany(
       "clientsOfFirm",
       function (this: any) {
         return this.order("id");
       },
-      {
-        foreignKey: "client_of",
-        className: "Client",
-      },
+      { foreignKey: "client_of", className: "Client" },
     );
     this.hasMany(
       "clientsLikeMs",
       function (this: any) {
         return this.where("name = 'Microsoft'").order("id");
       },
-      {
-        className: "Client",
-        foreignKey: "firm_id",
-      },
+      { className: "Client" },
     );
     this.hasOne("account", {
       className: "MyApplication::Billing::Account",
-      foreignKey: "firm_id",
       dependent: "destroy",
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface MyAppBusinessFirm {
+  get account(): MyAppBillingAccount | null | Promise<MyAppBillingAccount | null>;
+  set account(value: MyAppBillingAccount | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBusinessClient extends MyAppBusinessCompany {
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Client";
+  static {
+    registerModel(rbModConstSet(Business, "Client", this));
+  }
 
   static {
     this.belongsTo("firm", { foreignKey: "client_of" });
     this.belongsTo("firmWithOtherName", { className: "Firm", foreignKey: "client_of" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface MyAppBusinessClient {
+  get firm(): MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
+  set firm(value: MyAppBusinessFirm | null);
+  get firmWithOtherName(): MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
+  set firmWithOtherName(value: MyAppBusinessFirm | null);
+}
 
 export class MyAppBusinessClientContact extends Base {
-  static moduleName = "MyApplication::Business::Client";
-  static _demodulizedName = "Contact";
+  static {
+    registerModel(rbModConstSet(MyAppBusinessClient, "Contact", this));
+  }
 }
 
 export class MyAppBusinessDeveloper extends Base {
-  declare projects: AssociationProxy<Project>;
+  declare projects: AssociationProxy<MyAppBusinessProject>;
+  declare name: string;
 
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Developer";
+  static {
+    registerModel(rbModConstSet(Business, "Developer", this));
+  }
 
   static {
     this.hasAndBelongsToMany("projects");
@@ -108,10 +117,11 @@ export class MyAppBusinessDeveloper extends Base {
 }
 
 export class MyAppBusinessProject extends Base {
-  declare developers: AssociationProxy<Developer>;
+  declare developers: AssociationProxy<MyAppBusinessDeveloper>;
 
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Project";
+  static {
+    registerModel(rbModConstSet(Business, "Project", this));
+  }
 
   static {
     this.hasAndBelongsToMany("developers");
@@ -119,13 +129,15 @@ export class MyAppBusinessProject extends Base {
 }
 
 export class MyAppBusinessPrefixedCompany extends Base {
-  static moduleName = "MyApplication::Business::Prefixed";
-  static _demodulizedName = "Company";
+  static {
+    registerModel(rbModConstSet(Prefixed, "Company", this));
+  }
 }
 
 export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
-  static moduleName = "MyApplication::Business::Prefixed";
-  static _demodulizedName = "Firm";
+  static {
+    registerModel(rbModConstSet(Prefixed, "Firm", this));
+  }
 
   static {
     this._tableName = "companies";
@@ -133,18 +145,21 @@ export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
 }
 
 export class MyAppBusinessPrefixedNestedCompany extends Base {
-  static moduleName = "MyApplication::Business::Prefixed::Nested";
-  static _demodulizedName = "Company";
+  static {
+    registerModel(rbModConstSet(PrefixedNested, "Company", this));
+  }
 }
 
 export class MyAppBusinessSuffixedCompany extends Base {
-  static moduleName = "MyApplication::Business::Suffixed";
-  static _demodulizedName = "Company";
+  static {
+    registerModel(rbModConstSet(Suffixed, "Company", this));
+  }
 }
 
 export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
-  static moduleName = "MyApplication::Business::Suffixed";
-  static _demodulizedName = "Firm";
+  static {
+    registerModel(rbModConstSet(Suffixed, "Firm", this));
+  }
 
   static {
     this._tableName = "companies";
@@ -152,13 +167,15 @@ export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
 }
 
 export class MyAppBusinessSuffixedNestedCompany extends Base {
-  static moduleName = "MyApplication::Business::Suffixed::Nested";
-  static _demodulizedName = "Company";
+  static {
+    registerModel(rbModConstSet(SuffixedNested, "Company", this));
+  }
 }
 
 export class MyAppBillingFirm extends Base {
-  static moduleName = "MyApplication::Billing";
-  static _demodulizedName = "Firm";
+  static {
+    registerModel(rbModConstSet(Billing, "Firm", this));
+  }
 
   static {
     this._tableName = "companies";
@@ -166,8 +183,9 @@ export class MyAppBillingFirm extends Base {
 }
 
 export class MyAppBillingNestedFirm extends Base {
-  static moduleName = "MyApplication::Billing::Nested";
-  static _demodulizedName = "Firm";
+  static {
+    registerModel(rbModConstSet(BillingNested, "Firm", this));
+  }
 
   static {
     this._tableName = "companies";
@@ -176,8 +194,9 @@ export class MyAppBillingNestedFirm extends Base {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBillingAccount extends Base {
-  static moduleName = "MyApplication::Billing";
-  static _demodulizedName = "Account";
+  static {
+    registerModel(rbModConstSet(Billing, "Account", this));
+  }
 
   static {
     const opts = { foreignKey: "firm_id" };
@@ -224,26 +243,6 @@ export interface MyAppBillingAccount {
   set firm(value: MyAppBusinessFirm | null);
   get qualifiedBillingFirm(): MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
   set qualifiedBillingFirm(value: MyAppBillingFirm | null);
-  get unqualifiedBillingFirm(): Firm | null | Promise<Firm | null>;
-  set unqualifiedBillingFirm(value: Firm | null);
-}
-
-for (const klass of [
-  MyAppBusinessCompany,
-  MyAppBusinessFirm,
-  MyAppBusinessClient,
-  MyAppBusinessClientContact,
-  MyAppBusinessDeveloper,
-  MyAppBusinessProject,
-  MyAppBusinessPrefixedCompany,
-  MyAppBusinessPrefixedFirm,
-  MyAppBusinessPrefixedNestedCompany,
-  MyAppBusinessSuffixedCompany,
-  MyAppBusinessSuffixedFirm,
-  MyAppBusinessSuffixedNestedCompany,
-  MyAppBillingFirm,
-  MyAppBillingNestedFirm,
-  MyAppBillingAccount,
-]) {
-  registerModel(klass);
+  get unqualifiedBillingFirm(): MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
+  set unqualifiedBillingFirm(value: MyAppBillingFirm | null);
 }

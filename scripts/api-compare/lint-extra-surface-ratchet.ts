@@ -15,10 +15,9 @@
  *     deleting the name. A rowless package is pinned the same way in `total`
  *     too;
  *   - STRANDED — a mark row for a rowless package, which carries none by
- *     construction.
- *
- * A mark left ABOVE the current measurement is reported, not failed: the mark
- * only shrinks, so narrow it in the same PR that converged the surface with
+ *     construction;
+ *   - STALE — a mark left ABOVE the current measurement. The mark only
+ *     shrinks, so narrow it in the same PR that converged the surface with
  *
  *   pnpm parity:api:extra:tighten
  *
@@ -42,7 +41,10 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import type { ApiManifest } from "@blazetrails/parity/types";
 import { buildReport, loadConcernHooks } from "./extra-surface.js";
+import { staleMarkFailure } from "./param-name-mark.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import {
+  GATED_PACKAGES,
   MARK_PATH,
   ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
@@ -62,19 +64,31 @@ async function readManifest(name: string): Promise<ApiManifest> {
   return JSON.parse(await fs.readFile(path.join(OUTPUT_DIR, name), "utf-8")) as ApiManifest;
 }
 
-async function main(tighten: boolean): Promise<number> {
+async function main(tighten: boolean, scope: string | null): Promise<number> {
   const ruby = await readManifest("rails-api.json");
   const ts = await readManifest("ts-api.json");
+  if (scope !== null) {
+    if (!(GATED_PACKAGES as readonly string[]).includes(scope)) {
+      console.error(`\nextra-surface gate: ${scope} is not a gated package.\n`);
+      return 1;
+    }
+    const mismatch = scopeMismatch("extra-surface gate", Object.keys(ts.packages), scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const inScope = (name: string): boolean => scope === null || name === scope;
   const report = buildReport(ruby, ts, {
-    filterPkg: null,
+    filterPkg: scope,
     excludeGlobs: [],
     novelOnly: false,
     topN: 0,
-    concernHooks: await loadConcernHooks(ruby, null),
+    concernHooks: await loadConcernHooks(ruby, scope),
   });
-  const current = measure(report.packages);
+  const current = scopedMarks(measure(report.packages), scope);
 
-  const absent = unmeasuredPackages(current);
+  const absent = unmeasuredPackages(current).filter(inScope);
   if (absent.length > 0) {
     console.error(
       `\nextra-surface gate: ${absent.length} gated package(s) not measured: ${absent.join(", ")}.\n` +
@@ -85,9 +99,9 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  const marks = await loadMarks();
+  const marks = scopedMarks(await loadMarks(), scope);
 
-  const unmarked = unmarkedPackages(marks);
+  const unmarked = unmarkedPackages(marks).filter(inScope);
   if (unmarked.length > 0) {
     console.error(
       `\nextra-surface gate: ${unmarked.length} gated package(s) carry no committed mark: ${unmarked.join(", ")}.\n` +
@@ -174,18 +188,19 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  for (const v of stale) {
-    console.log(
-      `extra-surface gate: ${v.package} ${v.dimension} mark ${v.mark} is above the ` +
-        `current ${v.current} — narrow it with \`pnpm parity:api:extra:tighten\`.`,
-    );
+  const staleFailure = staleMarkFailure("extra-surface gate", "parity:api:extra:tighten", stale);
+  if (staleFailure !== null) {
+    console.error(staleFailure);
+    return 1;
   }
   const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
   const rowless = new Set<string>(ROWLESS_PACKAGES);
   const summary = Object.entries(current)
     .map(([name, m]) =>
       rowless.has(name)
-        ? `${name} novel ${m.novel}/0, total ${m.total}/0 (rowless)`
+        ? `${name} novel ${m.novel}/0, total ${m.total}/0` +
+          (m.inlinedFrom === undefined ? "" : `, inlined-from ${m.inlinedFrom}/0`) +
+          " (rowless)"
         : `${name} novel ${m.novel}/${taggedOnly.has(name) ? "0 (pinned)" : marks[name].novel}` +
           `, total ${m.total}/${marks[name].total}` +
           (m.inlinedFrom === undefined
@@ -201,7 +216,8 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  const code = await main(process.argv.slice(2).includes("--tighten"));
+  const argv = process.argv.slice(2);
+  const code = await main(argv.includes("--tighten"), scopeOf(argv));
   process.exit(code);
 }
 

@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { IntegerType, DecimalType, BooleanType, StringType } from "@blazetrails/activemodel";
 import { Column } from "../column.js";
+import { AbstractAdapter } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 type Meta = ConstructorParameters<typeof SqlTypeMetadata>[0];
@@ -14,12 +14,17 @@ function col(
   meta: Meta,
   options: { null?: boolean; defaultFunction?: string | null } = {},
 ): Column {
-  return new Column(name, null, new SqlTypeMetadata(meta), options.null ?? true, {
-    defaultFunction: options.defaultFunction ?? null,
-  });
+  return new Column(
+    name,
+    null,
+    new SqlTypeMetadata(meta),
+    options.null ?? true,
+    options.defaultFunction ?? null,
+  );
 }
 
-const emptySource: SchemaSource = {
+const emptySource: any = {
+  supportsVirtualColumns: async () => false,
   tables: async () => [],
   columns: async () => [],
   indexes: async () => [],
@@ -130,8 +135,11 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
 });
 
 describe("SchemaDumper raises on a column whose type is not a valid native type", () => {
+  const connection = (source: object) =>
+    Object.assign(Object.create(AbstractAdapter.prototype), source) as AbstractAdapter;
   const source = {
     tables: async () => ["widgets"],
+    supportsForeignKeys: () => false,
     columns: (_t: string) => [
       col("id", { type: "integer", sqlType: "integer" }),
       col("kind", { sqlType: "composite_type" }),
@@ -142,7 +150,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
   };
 
   it("emits the Could-not-dump comment instead of a fabricated t.column line", async () => {
-    const output = (await SchemaDumper.dump(source as any, new StringIO())).string();
+    const output = (await connection(source).createSchemaDumper({}).dump(new StringIO())).string();
     expect(output).toContain(`# Could not dump table "widgets" because of following StandardError`);
     expect(output).toContain(`#   Unknown type 'composite_type' for column 'kind'`);
     expect(output).not.toContain("createTable");
@@ -152,15 +160,19 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
   it("still dumps the table normally when every column type is a valid native type", async () => {
     const validSource = {
       tables: async () => ["widgets"],
+      supportsForeignKeys: () => false,
       columns: (_t: string) => [
         col("id", { type: "integer", sqlType: "integer" }),
         col("name", { type: "string", sqlType: "varchar(255)", limit: 255 }),
       ],
       indexes: (_t: string) => [],
       isValidType: (type: string | null | undefined) => type === "integer" || type === "string",
+      nativeDatabaseTypes: () => ({ integer: { name: "integer" }, string: { name: "varchar" } }),
       primaryKey: async () => "id",
     };
-    const output = (await SchemaDumper.dump(validSource as any, new StringIO())).string();
+    const output = (
+      await connection(validSource).createSchemaDumper({}).dump(new StringIO())
+    ).string();
     expect(output).not.toContain("# Could not dump table");
     expect(output).toContain(`await ctx.createTable("widgets"`);
     expect(output).toContain(`t.string("name"`);

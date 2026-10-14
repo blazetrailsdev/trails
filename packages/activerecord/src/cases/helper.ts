@@ -3,27 +3,34 @@ import "../associations/collection-proxy.js";
 import "../association-relation.js";
 import "../associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
+import { Timeout } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import "./test-case.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { I18n } from "@blazetrails/activemodel";
 import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
-import { registerFakeAdapter } from "../support/fake-adapter.js";
+import { register } from "../connection-adapters.js";
 import { Encryption } from "../encryption.js";
 import { ExtendedDeterministicQueries } from "../encryption/extended-deterministic-queries.js";
-import {
-  ExtendedDeterministicUniquenessValidator,
-  EncryptedUniquenessValidator,
-} from "../encryption/extended-deterministic-uniqueness-validator.js";
-import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
-import { Relation } from "../relation.js";
+import { ExtendedDeterministicUniquenessValidator } from "../encryption/extended-deterministic-uniqueness-validator.js";
 import { setPermanentConnectionCheckout } from "../active-record.js";
-import { UniquenessValidator } from "../validations.js";
 import {
   setBelongsToRequiredValidatesForeignKey,
   setRaiseOnAssignToAttrReadonly,
 } from "../active-record.js";
 
-registerFakeAdapter();
+register(
+  "abstract",
+  "ActiveRecord::ConnectionAdapters::AbstractAdapter",
+  "active_record/connection_adapters/abstract_adapter",
+);
+register(
+  "fake",
+  "FakeActiveRecordAdapter",
+  new URL("../support/fake-adapter.js", import.meta.url).href,
+);
 
 expect.addEqualityTesters([
   function recordEquals(a: unknown, b: unknown): boolean | undefined {
@@ -55,17 +62,17 @@ Encryption.configure({
 });
 
 Encryption.config.extendQueries = true;
-ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
-ExtendedDeterministicUniquenessValidator.installSupport({
-  UniquenessValidator,
-  EncryptedUniquenessValidator,
-});
+ExtendedDeterministicQueries.installSupport();
+ExtendedDeterministicUniquenessValidator.installSupport();
+
+const CLEAN_UP_KEPT_OWNERS = ["ActiveRecord::Base", "ARUnit2Model", "Contact", "ContactSti"];
 
 function writingPoolCensus(): Map<string, Map<string, number>> {
   const census = new Map<string, Map<string, number>>();
   for (const pool of Base.connectionHandler.connectionPoolList("writing")) {
     if (pool.dbConfig?.adapter === "fake") continue;
     const name = String(pool.connectionDescriptor?.name);
+    if (pool.shard !== Base.defaultShard && CLEAN_UP_KEPT_OWNERS.includes(name)) continue;
     const signature = `${pool.dbConfig?.adapter}:${pool.dbConfig?.database}`;
     let bySignature = census.get(name);
     if (!bySignature) {
@@ -132,4 +139,20 @@ export async function inTimeZone(
     setZone(oldZone);
     Base.timeZoneAwareAttributes = oldAware;
   }
+}
+
+export async function waitForAsyncQuery(
+  connection?: AbstractAdapter,
+  { timeout = 5 }: { timeout?: number } = {},
+): Promise<void> {
+  connection ??= await Base.leaseConnection();
+  if (!connection.isAsyncEnabled()) return;
+
+  const executor = (connection.pool as ConnectionPool).asyncExecutor!;
+  for (let i = 0; i < timeout * 100; i++) {
+    if (!(executor.scheduledTaskCount > executor.completedTaskCount)) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  throw new Timeout.Error(`The async executor wasn't drained after ${timeout} seconds`);
 }

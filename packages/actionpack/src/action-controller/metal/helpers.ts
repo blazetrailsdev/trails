@@ -1,9 +1,19 @@
 import {
-  allHelpersFromPath,
-  modulesForHelpers as abstractModulesForHelpers,
+  classAttribute,
+  Concern,
+  extend,
+  include,
+  Module,
+  type InheritableOptions,
+} from "@blazetrails/activesupport";
+import { Base as ActionViewBase } from "@blazetrails/actionview";
+import { aryDelete, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import {
+  Helpers as AbstractHelpers,
+  Resolution,
+  type HelperMethodNameList,
   type HelperMethodsModule,
-  type HelperResolver,
-  type ResolutionOptions,
+  type HelpersClass,
 } from "../../abstract-controller/helpers.js";
 
 let _helpersPath: string[] = [];
@@ -16,44 +26,75 @@ export function setHelpersPath(paths: string[]): void {
   _helpersPath = paths;
 }
 
-let _applicationHelpers: string[] = [];
-let _applicationHelperConstants = new Map<string, HelperMethodsModule>();
-
-/** @noRailsEquivalent PERMANENT */
-export function setApplicationHelpers(
-  names: string[],
-  constants: Map<string, HelperMethodsModule>,
-): void {
-  _applicationHelpers = names;
-  _applicationHelperConstants = constants;
+export function helperAttr(this: HelpersClass, ...attrs: HelperMethodNameList[]): void {
+  ((attrs as readonly unknown[]).flat(Infinity) as string[]).forEach((attr) =>
+    this.helperMethod(attr, `${attr}=`),
+  );
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function applicationHelperResolver(): HelperResolver {
-  return (name) => _applicationHelperConstants.get(name);
-}
+type ConfigReceiver = { config(): InheritableOptions };
 
-/** @noRailsEquivalent PERMANENT */
-export async function loadApplicationHelperNames(): Promise<string[]> {
-  _applicationHelpers = await allHelpersFromPath(_helpersPath);
-  return _applicationHelpers;
+type HelpersClassHost = HelpersClass & {
+  helpersPath: string | string[];
+  allHelpersFromPath: (typeof Resolution)["allHelpersFromPath"];
+  allApplicationHelpers(): string[];
+};
+
+export function modulesForHelpers(
+  this: HelpersClassHost,
+  args: Array<HelperMethodsModule | string | Array<unknown>>,
+): HelperMethodsModule[] {
+  if (aryDelete(args, ":all") != null) {
+    args = [...args, ...this.allApplicationHelpers()];
+  }
+  return ClassMethods.superMethod(this, "modulesForHelpers")!(args) as HelperMethodsModule[];
 }
 
 /** @internal */
-function allApplicationHelpers(): string[] {
-  return _applicationHelpers;
+function allApplicationHelpers(this: HelpersClassHost): string[] {
+  return this.allHelpersFromPath(this.helpersPath);
 }
 
-export function modulesForHelpers(
-  args: ReadonlyArray<HelperMethodsModule | string | symbol | Array<unknown>>,
-  options: ResolutionOptions = { resolve: applicationHelperResolver() },
-): HelperMethodsModule[] {
-  const rest = (args as readonly unknown[]).filter(
-    (arg) => !(arg === "all" || (typeof arg === "symbol" && arg.description === "all")),
-  );
-  const argsWithAll = rest.length === args.length ? rest : [...rest, ...allApplicationHelpers()];
-  return abstractModulesForHelpers(
-    argsWithAll as ReadonlyArray<HelperMethodsModule | string | symbol | Array<unknown>>,
-    options,
-  );
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("helperAttr", helperAttr);
+
+  mod.defineMethod("helpers", function (this: HelpersClass): ActionViewBase {
+    return ((rbObjIvarGet(this, "@helper_proxy") as ActionViewBase | null) ||
+      rbObjIvarSet(
+        this,
+        "@helper_proxy",
+        (() => {
+          const proxy = ActionViewBase.empty();
+          proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
+          return extend(proxy, this._helpers);
+        })(),
+      )) as ActionViewBase;
+  });
+
+  mod.defineMethod("modulesForHelpers", modulesForHelpers);
+  mod.defineMethod("allApplicationHelpers", allApplicationHelpers);
+});
+
+export function helpers(this: {
+  _helperProxy?: ActionViewBase | null;
+  viewContext(): ActionViewBase;
+}): ActionViewBase {
+  return (this._helperProxy ??= this.viewContext());
 }
+
+export const Helpers = new Module((mod) => {
+  extend(mod, Concern);
+
+  include(mod, AbstractHelpers);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      classAttribute.call(this, "helpersPath", { default: [] });
+      classAttribute.call(this, "includeAllHelpers", { default: true });
+    },
+  );
+
+  mod.defineMethod("helpers", helpers);
+}) as Module<{ helpers: typeof helpers }> & { ClassMethods: typeof ClassMethods };
+Helpers.ClassMethods = ClassMethods;

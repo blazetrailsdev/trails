@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
 import { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
 import { LibSQLRemoteAdapter } from "./connection-adapters/libsql-remote-adapter.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File, registerConstant } from "@blazetrails/ruby-compat";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
@@ -12,26 +12,22 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { SqliteConnection, SqliteDriver } from "./sqlite-adapter.js";
-import { register, resolve } from "./connection-adapters.js";
+import { load, register } from "./connection-adapters.js";
 
 let registeredTestAdapters = 0;
 async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string> {
   const adapter = `sqlite3_test_${(registeredTestAdapters += 1)}`;
-  register(
-    adapter,
-    "SQLite3TestAdapter",
-    "./connection-adapters/sqlite3-test-adapter.js",
-    async () =>
-      function () {
-        return build();
-      } as unknown as new () => DatabaseAdapter,
-  );
-  await resolve(adapter);
+  const className = `SQLite3TestAdapter${registeredTestAdapters}`;
+  registerConstant(className, function () {
+    return build();
+  });
+  register(adapter, className);
+  await load(adapter);
   return adapter;
 }
 
-const openVia = async (config: Parameters<SqliteDriver["open"]>[0]): Promise<SqliteConnection> =>
-  betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
+const openVia = (config: Parameters<SqliteDriver["open"]>[0]): Promise<SqliteConnection> =>
+  betterSqlite3Driver.open(config);
 const asyncDriver = (open: SqliteDriver["open"]): SqliteDriver => ({
   name: "async-stub",
   capabilities: { ...betterSqlite3Driver.capabilities, inProcessSync: false },
@@ -107,7 +103,7 @@ describe("SQLite adapter driver binding", () => {
     await adapter.disconnectBang();
   });
 
-  it("forwards driver-specific open config (timeout, driverOptions) to open()", async () => {
+  it("forwards driver-specific open config (driverOptions) to open() and applies the busy timeout in configureConnection", async () => {
     let seen: Record<string, unknown> | undefined;
     const driver = asyncDriver((config) => {
       seen = config as unknown as Record<string, unknown>;
@@ -119,7 +115,7 @@ describe("SQLite adapter driver binding", () => {
       timeout: 1234,
       driverOptions: { foo: "bar" },
     }).connectBang();
-    expect(seen?.timeout).toBe(1234);
+    expect(await adapter.selectValue("PRAGMA busy_timeout")).toBe(1234);
     expect(seen?.driverOptions).toEqual({ foo: "bar" });
     await adapter.disconnectBang();
   });
@@ -468,7 +464,7 @@ describe("SQLite adapter driver binding", () => {
     expect(isClosed()).toBe(true);
   });
 
-  it("pool drainPendingCloses drains a checkout-failure swap discard", async () => {
+  it("pool drains a checkout-failure swap discard", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     let failCheckout = false;
     const pool = new ConnectionPool(
@@ -492,10 +488,11 @@ describe("SQLite adapter driver binding", () => {
     pool.checkin(conn as unknown as DatabaseAdapter);
 
     failCheckout = true;
-    await expect(pool.checkout()).rejects.toThrow(/checkout boom/);
+    const rejection = expect(pool.checkout()).rejects.toThrow(/checkout boom/);
     expect(isClosed()).toBe(false);
     release();
-    await vi.waitFor(() => expect(isClosed()).toBe(true));
+    await rejection;
+    expect(isClosed()).toBe(true);
   });
 
   it("sync-driver teardown seams stay synchronous (whenClosed no-ops)", async () => {
@@ -576,19 +573,19 @@ describe("SQLite adapter driver binding", () => {
       database: ":memory:",
       driver: asyncPragmaDriver,
     }).connectBang();
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
     await adapter.disconnectBang();
   });
 
   it("encoding falls back to UTF-8 before a deferred async-only open completes", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: asyncPragmaDriver });
     expect(await adapter.active()).toBe(false);
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
   });
 
   it("encoding returns the database encoding for a sync driver", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: betterSqlite3Driver });
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
     await adapter.disconnectBang();
   });
 
@@ -608,13 +605,13 @@ describe("SQLite adapter driver binding", () => {
       }) as unknown as SqliteConnection;
     });
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: utf16Driver });
-    expect(await adapter.encoding).toBe("UTF-16le");
+    expect(await adapter.encoding()).toBe("UTF-16le");
     await adapter.disconnectBang();
   });
 
   it("isOpen and raw degrade gracefully before a deferred async-only open", () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: asyncOnlyDriver });
-    expect(adapter.isActive()).toBe(false);
+    expect(adapter.isActive()).toBeFalsy();
   });
 });
 
@@ -631,13 +628,33 @@ describe("SQLite3Adapter connection parameters", () => {
     const conn = await BetterSQLite3Adapter.newClient(params);
     expect(conn.isOpen()).toBe(true);
     await conn.close();
-    expect(() => SQLite3Adapter.newClient(params)).toThrow(/No SQLite driver configured/);
+    await expect(SQLite3Adapter.newClient(params)).rejects.toThrow(/No SQLite driver configured/);
   });
 
   it("does not expand or mkdir a libsql remote URL as a local path", () => {
     const adapter = new LibSQLRemoteAdapter({ database: "libsql://trails-remote-probe.invalid" });
-    expect(adapter._connectionParameters.remoteUrl).toBe("libsql://trails-remote-probe.invalid");
-    expect(adapter._connectionParameters.database).toBe(":memory:");
+    expect(adapter._connectionParameters.database).toBe("libsql://trails-remote-probe.invalid");
+    expect(adapter.supportsConcurrentConnections()).toBe(true);
+    expect(adapter._memoryDatabase).toBe(false);
+    expect(adapter._previousReadUncommitted).toBeNull();
     expect(File.isDirectory("libsql:")).toBe(false);
+  });
+
+  it("runs SQLite's dialect over AbstractAdapter without SQLite3Adapter's initializer", async () => {
+    const adapter = new LibSQLRemoteAdapter({ database: ":memory:", driver: betterSqlite3Driver });
+    expect(adapter).not.toBeInstanceOf(SQLite3Adapter);
+    expect(adapter.adapterName).toBe("SQLite");
+    expect(LibSQLRemoteAdapter.quoteColumnName("a")).toBe('"a"');
+    try {
+      await adapter.execute("CREATE TABLE t (id integer primary key, name varchar)");
+      await adapter.transaction(async () => {
+        await adapter.execute("INSERT INTO t (name) VALUES ('x')");
+      });
+      expect(await adapter.selectValue("SELECT name FROM t")).toBe("x");
+      expect(await adapter.primaryKeys("t")).toEqual(["id"]);
+      expect((await adapter.columns("t")).map((column) => column.name)).toEqual(["id", "name"]);
+    } finally {
+      await adapter.disconnectBang();
+    }
   });
 });

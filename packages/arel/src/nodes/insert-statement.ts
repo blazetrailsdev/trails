@@ -1,18 +1,19 @@
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 export type InsertSelectSource = Node | { ast: Node; toSql: () => string } | null;
 
 export class InsertStatement extends Node {
-  relation: Node | Table | null;
-  columns: Node[];
-  values: Node | null;
+  relation: ArelNode | Table | null;
+  columns: ArelNode[];
+  values: ArelNode | null;
   select: InsertSelectSource;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.relation = relation;
     this.columns = [];
@@ -35,13 +36,11 @@ export class InsertStatement extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.columns = [...this.columns];
-    if (this.values) copy.values = cloneSlot(this.values);
-    if (this.select) copy.select = cloneSlot(this.select);
-    return copy;
+  initializeCopy(_other: InsertStatement): void {
+    this.columns = rbObjClone(this.columns);
+    if (this.values != null) this.values = rbObjClone(this.values);
+    if (this.select != null) this.select = rbObjClone(this.select);
   }
 }
 
-Nodes.InsertStatement = InsertStatement;
+rbModConstSet(Nodes, "InsertStatement", InsertStatement);

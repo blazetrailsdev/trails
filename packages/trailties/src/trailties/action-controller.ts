@@ -16,11 +16,15 @@ import {
   except,
   File,
   getPath,
+  Module,
   rbFSend,
+  rbObjIsKindOf,
   rbObjRespondTo,
+  registerConstant,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import type { Root } from "../paths.js";
+import type { ActiveSupportConfig } from "./active-support.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionControllerConfig {
@@ -54,6 +58,7 @@ interface TrailtieApp {
   config: {
     helpersPaths: string[];
     paths(): Root;
+    activeSupport: ActiveSupportConfig;
     assetHost: string | null;
     relativeUrlRoot: string | null;
   };
@@ -89,8 +94,7 @@ export class Trailtie extends BaseTrailtie {
         const helpersPaths = (app as TrailtieApp).config.helpersPaths;
         ActionController.setHelpersPath(helpersPaths);
 
-        const names = await ActionController.loadApplicationHelperNames();
-        ActionController.setApplicationHelpers(names, await helperConstants(helpersPaths));
+        for (const [name, mod] of await helperConstants(helpersPaths)) registerConstant(name, mod);
 
         onLoad("action_controller", (base: unknown) => {
           (base as ActionController.HelpersPathControllerClass).helpersPath =
@@ -118,7 +122,7 @@ export class Trailtie extends BaseTrailtie {
         AbstractController.withRoutesHelpers(routes)(base);
 
         if (options.wrapParametersByDefault && rbObjRespondTo(base, "wrapParameters")) {
-          (base as unknown as typeof ActionController.Base).wrapParameters({ format: ["json"] });
+          (base as unknown as typeof ActionController.Base).wrapParameters({ format: [":json"] });
         }
 
         const filteredOptions = except(
@@ -151,6 +155,14 @@ export class Trailtie extends BaseTrailtie {
         }
       });
     });
+
+    this.initializer("action_controller.test_case", (app) => {
+      onLoad("action_controller_test_case", () => {
+        ActionController.TestCase.executorAroundEachRequest = (
+          app as TrailtieApp
+        ).config.activeSupport.executorAroundTestCase;
+      });
+    });
   }
 }
 
@@ -171,13 +183,18 @@ async function helperConstants(
       }
       if (!/[-_]helper\.[cm]?[tj]s$/.test(entry) || /\.(test|d)\./.test(entry)) continue;
 
-      const stem = entry.replace(/\.[cm]?[tj]s$/, "").replace(/[-_]helper$/, "");
+      const stem = entry
+        .replace(/\.[cm]?[tj]s$/, "")
+        .replace(/[-_]helper$/, "")
+        .replaceAll("-", "_");
       const name = `${camelize([...namespace, stem].join("/"))}Helper`;
       const mod = (await import(path.pathToFileURL!(full).href)) as Record<string, unknown>;
 
       const exported = mod[demodulize(name)];
-      if (exported && typeof exported === "object") {
-        constants.set(name, exported as AbstractController.HelperMethodsModule);
+      if (rbObjIsKindOf(exported, Module)) {
+        constants.set(name, exported as Module);
+      } else if (exported && typeof exported === "object") {
+        constants.set(name, new Module().include(exported));
       }
     }
   };

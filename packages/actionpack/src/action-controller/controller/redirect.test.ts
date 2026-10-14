@@ -1,392 +1,775 @@
-import { describe, it, expect } from "vitest";
-import { Base, DoubleRenderError } from "../base.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
-import { redirectTo, redirectBack } from "../../action-dispatch/redirect.js";
+import { beforeEach, describe, it } from "vitest";
+import { Conversion, Naming } from "@blazetrails/activemodel";
+import {
+  assertEqual,
+  assertRaise,
+  assertRaises,
+  extend,
+  include,
+  isPresent,
+  Notifications,
+} from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  Module,
+  rbModConstSet,
+  rbObjSingletonClass,
+  registerConstant,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
+import "../../test-helpers/abstract-unit.js";
+import { Base } from "../base.js";
+import { ActionControllerError } from "../metal/exceptions.js";
+import { UnsafeRedirectError } from "../metal/redirecting.js";
+import { Parameters, UnfilteredParameters } from "../metal/strong-parameters.js";
+import { TestCase } from "../test-case.js";
+import { deprecator } from "../../action-dispatch/deprecator.js";
+import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
+import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 
-function makeRequest(opts: Record<string, string> = {}): Request {
-  return new Request({
-    REQUEST_METHOD: opts.method ?? "GET",
-    PATH_INFO: opts.path ?? "/",
-    HTTP_HOST: opts.host ?? "localhost",
-    ...opts,
-  });
+class Workshop {
+  declare toModel: ToModel["toModel"];
+
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  static OUT_OF_SCOPE_BLOCK = function (this: unknown): string {
+    if (!(this instanceof RedirectController)) {
+      throw new Error("Not executed in controller's context");
+    }
+    return this.request.originalUrl;
+  };
+
+  constructor(public id: number | null) {}
+
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+
+  toString(): string {
+    return String(this.id ?? "");
+  }
 }
-function makeResponse(): Response {
-  return new Response();
+
+class RedirectController extends Base {
+  declare url: string;
+
+  override get status(): number {
+    throw new RuntimeError("Should not be called!");
+  }
+  override set status(value: number | string) {
+    super.status = value;
+  }
+  override get location(): string | undefined {
+    throw new RuntimeError("Should not be called!");
+  }
+  override set location(value: string) {
+    super.location = value;
+  }
+
+  simpleRedirect() {
+    this.redirectTo({ action: "hello_world" });
+  }
+
+  redirectWithStatus() {
+    this.redirectTo({ action: "hello_world", status: 301 });
+  }
+
+  redirectWithStatusHash() {
+    this.redirectTo({ action: "hello_world" }, { status: 301 });
+  }
+
+  redirectWithProtocol() {
+    this.redirectTo({ action: "hello_world", protocol: "https" });
+  }
+
+  urlRedirectWithStatus() {
+    this.redirectTo("http://www.example.com", { status: "moved_permanently" });
+  }
+
+  urlRedirectWithStatusHash() {
+    this.redirectTo("http://www.example.com", { status: 301 });
+  }
+
+  relativeUrlRedirectWithStatus() {
+    this.redirectTo("/things/stuff", { status: "found" });
+  }
+
+  relativeUrlRedirectWithStatusHash() {
+    this.redirectTo("/things/stuff", { status: 301 });
+  }
+
+  redirectBackWithStatus() {
+    this.redirectBackOrTo("/things/stuff", { status: 307 });
+  }
+
+  redirectBackWithStatusAndFallbackLocationToAnotherHost() {
+    this.redirectBackOrTo("http://www.rubyonrails.org/", { status: 307 });
+  }
+
+  safeRedirectBackWithStatus() {
+    this.redirectBackOrTo("/things/stuff", { status: 307, allowOtherHost: false });
+  }
+
+  safeRedirectBackWithStatusAndFallbackLocationToAnotherHost() {
+    this.redirectBackOrTo("http://www.rubyonrails.org/", { status: 307, allowOtherHost: false });
+  }
+
+  safeRedirectToRoot() {
+    this.redirectTo(this.urlFrom("/"));
+  }
+
+  unsafeRedirect() {
+    this.redirectTo("http://www.rubyonrails.org/");
+  }
+
+  unsafeRedirectBack() {
+    this.redirectBackOrTo("http://www.rubyonrails.org/");
+  }
+
+  unsafeRedirectMalformed() {
+    this.redirectTo("http:///www.rubyonrails.org/");
+  }
+
+  unsafeRedirectProtocolRelativeDoubleSlash() {
+    this.redirectTo("//www.rubyonrails.org/");
+  }
+
+  unsafeRedirectProtocolRelativeTripleSlash() {
+    this.redirectTo("///www.rubyonrails.org/");
+  }
+
+  unsafeRedirectWithIllegalHttpHeaderValueCharacter() {
+    this.redirectTo("javascript:alert(document.domain)\b", { allowOtherHost: true });
+  }
+
+  onlyPathRedirect() {
+    this.redirectTo({ action: "other_host", onlyPath: true });
+  }
+
+  safeRedirectWithFallback() {
+    this.redirectTo(this.urlFrom(this.params.get("redirect_url") as string) || "/fallback");
+  }
+
+  redirectBackWithExplicitFallbackKwarg() {
+    this.redirectBack({ fallbackLocation: "/things/stuff", status: 307 });
+  }
+
+  hostRedirect() {
+    this.redirectTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
+  }
+
+  moduleRedirect() {
+    this.redirectTo({ controller: "module_test/module_redirect", action: "hello_world" });
+  }
+
+  redirectToUrl() {
+    this.redirectTo("http://www.rubyonrails.org/");
+  }
+
+  redirectToUrlWithStringlike() {
+    const stringlike = {};
+
+    Object.assign(rbObjSingletonClass(stringlike).prototype, {
+      toStr() {
+        return "http://www.rubyonrails.org/";
+      },
+    });
+
+    this.redirectTo(stringlike);
+  }
+
+  redirectToUrlWithUnescapedQueryString() {
+    this.redirectTo("http://example.com/query?status=new");
+  }
+
+  redirectToUrlWithComplexScheme() {
+    this.redirectTo("x-test+scheme.complex:redirect");
+  }
+
+  redirectToUrlWithNetworkPathReference() {
+    this.redirectTo("//www.rubyonrails.org/");
+  }
+
+  redirectToExistingRecord() {
+    this.redirectTo(new Workshop(5));
+  }
+
+  redirectToNewRecord() {
+    this.redirectTo(new Workshop(null));
+  }
+
+  redirectToNil() {
+    this.redirectTo(null);
+  }
+
+  redirectToPolymorphic() {
+    this.redirectTo([":internal", new Workshop(5)]);
+  }
+
+  redirectToPolymorphicStringArgs() {
+    this.redirectTo(["internal", new Workshop(5)]);
+  }
+
+  redirectToParams() {
+    this.redirectTo(new Parameters({ status: 200, protocol: "javascript", f: "%0Aeval(name)" }));
+  }
+
+  redirectToWithBlock() {
+    this.redirectTo(() => "http://www.rubyonrails.org/");
+  }
+
+  redirectToWithBlockAndAssigns() {
+    this.url = "http://www.rubyonrails.org/";
+    this.redirectTo(function (this: RedirectController) {
+      return this.url;
+    });
+  }
+
+  redirectToWithBlockAndOptions() {
+    this.redirectTo(() => ({ action: "hello_world" }));
+  }
+
+  redirectToOutOfScopeBlock() {
+    this.redirectTo(Workshop.OUT_OF_SCOPE_BLOCK);
+  }
+
+  redirectWithHeaderBreak() {
+    this.redirectTo("/lol\r\nwat");
+  }
+
+  redirectWithNullBytes() {
+    this.redirectTo("\0/lol\r\nwat");
+  }
+
+  async redirectToExternalWithRescue() {
+    try {
+      this.redirectTo("http://www.rubyonrails.org/", { allowOtherHost: false });
+    } catch (e) {
+      if (!(e instanceof UnsafeRedirectError)) throw e;
+      await this.render({ plain: "caught error" });
+    }
+  }
+
+  rescueErrors(e: unknown) {
+    throw e;
+  }
+
+  protected dashboardUrl(id: unknown, message: unknown) {
+    return this.urlFor({ action: "dashboard", params: { id, message } });
+  }
+}
+
+async function withRaiseOnOpenRedirects(block: () => Promise<void>): Promise<void> {
+  const oldRaiseOnOpenRedirects = Base.raiseOnOpenRedirects;
+  Base.raiseOnOpenRedirects = true;
+  try {
+    await block();
+  } finally {
+    Base.raiseOnOpenRedirects = oldRaiseOnOpenRedirects;
+  }
 }
 
 describe("RedirectTest", () => {
-  it("redirect_to with path", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectTo("/posts");
-      }
+  class RedirectTest extends TestCase {
+    static {
+      this.tests(RedirectController);
     }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(302);
-    expect(c.headers.get("location")).toBe("http://localhost/posts");
+  }
+
+  let tc: RedirectTest;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
+  const assertRedirectedTo: OmitThisParameter<TestCase["assertRedirectedTo"]> = (...args) =>
+    tc.assertRedirectedTo(...args);
+
+  beforeEach(async ({ task }) => {
+    tc = new RedirectTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
   });
 
-  it("redirect_to with full URL", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectTo("https://example.com/other");
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("https://example.com/other");
+  it("simple redirect", async () => {
+    await tc.get("simpleRedirect");
+    assertResponse("redirect");
+    assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
-  it("redirect_to with 301", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectTo("/new", { status: 301 });
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(301);
+  it("redirect with header break", async () => {
+    await tc.get("redirectWithHeaderBreak");
+    assertResponse("redirect");
+    assertEqual("http://test.host/lolwat", tc.redirectToUrl());
   });
 
-  it("redirect_to with see_other", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectTo("/done", { status: "see_other" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(303);
+  it("redirect with null bytes", async () => {
+    await tc.get("redirectWithNullBytes");
+    assertResponse("redirect");
+    assertEqual("http://test.host/lolwat", tc.redirectToUrl());
   });
 
-  it("redirect_to marks as performed", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectTo("/target");
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.performed).toBe(true);
+  it("redirect with no status", async () => {
+    await tc.get("simpleRedirect");
+    assertResponse(302);
+    assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
-  it("redirect_back uses referer", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectBack({ fallbackLocation: "/fallback" });
-      }
-    }
-    const c = new C();
-    const req = new Request({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      HTTP_HOST: "localhost",
-      HTTP_REFERER: "/previous-page",
+  it("redirect with status", async () => {
+    await tc.get("redirectWithStatus");
+    assertResponse(301);
+    assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
+  });
+
+  it("redirect with status hash", async () => {
+    await tc.get("redirectWithStatusHash");
+    assertResponse(301);
+    assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
+  });
+
+  it("redirect with protocol", async () => {
+    await tc.get("redirectWithProtocol");
+    assertResponse(302);
+    assertEqual("https://test.host/redirect/hello_world", tc.redirectToUrl());
+  });
+
+  it("url redirect with status", async () => {
+    await tc.get("urlRedirectWithStatus");
+    assertResponse(301);
+    assertEqual("http://www.example.com", tc.redirectToUrl());
+  });
+
+  it("url redirect with status hash", async () => {
+    await tc.get("urlRedirectWithStatusHash");
+    assertResponse(301);
+    assertEqual("http://www.example.com", tc.redirectToUrl());
+  });
+
+  it("relative url redirect with status", async () => {
+    await tc.get("relativeUrlRedirectWithStatus");
+    assertResponse(302);
+    assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
+  });
+
+  it("relative url redirect with status hash", async () => {
+    await tc.get("relativeUrlRedirectWithStatusHash");
+    assertResponse(301);
+    assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
+  });
+
+  it("relative url redirect host with port", async () => {
+    tc.request.host = "test.host:1234";
+    await tc.get("relativeUrlRedirectWithStatus");
+    assertResponse(302);
+    assertEqual("http://test.host:1234/things/stuff", tc.redirectToUrl());
+  });
+
+  it("simple redirect using options", async () => {
+    await tc.get("hostRedirect");
+    assertResponse("redirect");
+    assertRedirectedTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
+  });
+
+  it("module redirect", async () => {
+    await tc.get("moduleRedirect");
+    assertResponse("redirect");
+    assertRedirectedTo("http://test.host/module_test/module_redirect/hello_world");
+  });
+
+  it("module redirect using options", async () => {
+    await tc.get("moduleRedirect");
+    assertResponse("redirect");
+    assertRedirectedTo({ controller: "module_test/module_redirect", action: "hello_world" });
+  });
+
+  it("redirect to url", async () => {
+    await tc.get("redirectToUrl");
+    assertResponse("redirect");
+    assertRedirectedTo("http://www.rubyonrails.org/");
+  });
+
+  it("redirect to url with stringlike", async () => {
+    await tc.get("redirectToUrlWithStringlike");
+    assertResponse("redirect");
+    assertRedirectedTo("http://www.rubyonrails.org/");
+  });
+
+  it("redirect to url with unescaped query string", async () => {
+    await tc.get("redirectToUrlWithUnescapedQueryString");
+    assertResponse("redirect");
+    assertRedirectedTo("http://example.com/query?status=new");
+  });
+
+  it("redirect to url with complex scheme", async () => {
+    await tc.get("redirectToUrlWithComplexScheme");
+    assertResponse("redirect");
+    assertEqual("x-test+scheme.complex:redirect", tc.redirectToUrl());
+  });
+
+  it("redirect to url with network path reference", async () => {
+    await tc.get("redirectToUrlWithNetworkPathReference");
+    assertResponse("redirect");
+    assertEqual("//www.rubyonrails.org/", tc.redirectToUrl());
+  });
+
+  it("redirect back", async () => {
+    const referer = "http://www.example.com/coming/from";
+    tc.request.env["HTTP_REFERER"] = referer;
+
+    await tc.get("redirectBackWithStatus");
+
+    assertResponse(307);
+    assertEqual(referer, tc.redirectToUrl());
+  });
+
+  it("redirect back with no referer", async () => {
+    await tc.get("redirectBackWithStatus");
+
+    assertResponse(307);
+    assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
+  });
+
+  it("redirect back with no referer redirects to another host", async () => {
+    await tc.get("redirectBackWithStatusAndFallbackLocationToAnotherHost");
+
+    assertResponse(307);
+    assertEqual("http://www.rubyonrails.org/", tc.redirectToUrl());
+  });
+
+  it("safe redirect back from other host", async () => {
+    tc.request.env["HTTP_REFERER"] = "http://another.host/coming/from";
+    await tc.get("safeRedirectBackWithStatus");
+
+    assertResponse(307);
+    assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
+  });
+
+  it("safe redirect back from the same host", async () => {
+    const referer = "http://test.host/coming/from";
+    tc.request.env["HTTP_REFERER"] = referer;
+    await tc.get("safeRedirectBackWithStatus");
+
+    assertResponse(307);
+    assertEqual(referer, tc.redirectToUrl());
+  });
+
+  it("safe redirect back with no referer", async () => {
+    await tc.get("safeRedirectBackWithStatus");
+
+    assertResponse(307);
+    assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
+  });
+
+  it("safe redirect back with no referer redirects to another host", async () => {
+    await tc.get("safeRedirectBackWithStatusAndFallbackLocationToAnotherHost");
+
+    assertResponse(307);
+    assertEqual("http://www.rubyonrails.org/", tc.redirectToUrl());
+  });
+
+  it("safe redirect to root", async () => {
+    await tc.get("safeRedirectToRoot");
+
+    assertEqual("http://test.host/", tc.redirectToUrl());
+  });
+
+  it("redirect back with explicit fallback kwarg", async () => {
+    const referer = "http://www.example.com/coming/from";
+    tc.request.env["HTTP_REFERER"] = referer;
+
+    await tc.get("redirectBackWithExplicitFallbackKwarg");
+
+    assertResponse(307);
+    assertEqual(referer, tc.redirectToUrl());
+  });
+
+  it("redirect to record", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("workshops");
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      await tc.get("redirectToExistingRecord");
+      assertEqual("http://test.host/workshops/5", tc.redirectToUrl());
+      assertRedirectedTo(new Workshop(5));
+
+      await tc.get("redirectToNewRecord");
+      assertEqual("http://test.host/workshops", tc.redirectToUrl());
+      assertRedirectedTo(new Workshop(null));
     });
-    await c.dispatch("index", req, makeResponse());
-    expect(c.headers.get("location")).toBe("http://localhost/previous-page");
   });
 
-  it("redirect_back uses fallback when no referer", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectBack({ fallbackLocation: "/home" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("http://localhost/home");
+  it("polymorphic redirect", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("internal", () => {
+          this.resources("workshops");
+        });
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      await tc.get("redirectToPolymorphic");
+      assertEqual("http://test.host/internal/workshops/5", tc.redirectToUrl());
+      assertRedirectedTo([":internal", new Workshop(5)]);
+    });
   });
 
-  it("redirect_back with custom status", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectBack({ fallbackLocation: "/", status: 303 });
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(303);
+  it("polymorphic redirect with string args", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("internal", () => {
+          this.resources("workshops");
+        });
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      const error = await assertRaises([ArgumentError], {}, async () => {
+        await tc.get("redirectToPolymorphicStringArgs");
+      });
+      assertEqual("Please use symbols for polymorphic route arguments.", error.message);
+    });
   });
 
-  it("redirect then redirect throws", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectTo("/a");
-        this.redirectTo("/b");
-      }
-    }
-    const c = new C();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
-      DoubleRenderError,
-    );
+  it("redirect to nil", async () => {
+    const error = await assertRaise([ActionControllerError], {}, async () => {
+      await tc.get("redirectToNil");
+    });
+    assertEqual("Cannot redirect to nil!", error.message);
   });
 
-  it("redirect in before_action prevents action", async () => {
-    const log: string[] = [];
-    class C extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    C.beforeAction((controller) => {
-      (controller as Base).redirectTo("/login");
+  it("redirect to params", async () => {
+    const error = await assertRaise([UnfilteredParameters], {}, async () => {
+      await tc.get("redirectToParams");
+    });
+    assertEqual("unable to convert unpermitted parameters to hash", error.message);
+  });
+
+  it("redirect to with block", async () => {
+    await tc.get("redirectToWithBlock");
+    assertResponse("redirect");
+    assertRedirectedTo("http://www.rubyonrails.org/");
+  });
+
+  it("redirect to with block and assigns", async () => {
+    await tc.get("redirectToWithBlockAndAssigns");
+    assertResponse("redirect");
+    assertRedirectedTo("http://www.rubyonrails.org/");
+  });
+
+  it("redirect to out of scope block", async () => {
+    await tc.get("redirectToOutOfScopeBlock");
+    assertResponse("redirect");
+    assertRedirectedTo("http://test.host/redirect/redirectToOutOfScopeBlock");
+  });
+
+  it("redirect to with block and accepted options", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      await tc.get("redirectToWithBlockAndOptions");
+
+      assertResponse("redirect");
+      assertRedirectedTo("http://test.host/redirect/hello_world");
+    });
+  });
+
+  it("unsafe redirect", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      const error = await assertRaise([UnsafeRedirectError], {}, async () => {
+        await tc.get("unsafeRedirect");
+      });
+
+      assertEqual(
+        'Unsafe redirect to "http://www.rubyonrails.org/", pass allow_other_host: true to redirect anyway.',
+        error.message,
+      );
+    });
+  });
+
+  it("unsafe redirect back", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      const error = await assertRaise([UnsafeRedirectError], {}, async () => {
+        await tc.get("unsafeRedirectBack");
+      });
+
+      assertEqual(
+        'Unsafe redirect to "http://www.rubyonrails.org/", pass allow_other_host: true to redirect anyway.',
+        error.message,
+      );
+    });
+  });
+
+  it("unsafe redirect with malformed url", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      const error = await assertRaise([UnsafeRedirectError], {}, async () => {
+        await tc.get("unsafeRedirectMalformed");
+      });
+
+      assertEqual(
+        'Unsafe redirect to "http:///www.rubyonrails.org/", pass allow_other_host: true to redirect anyway.',
+        error.message,
+      );
+    });
+  });
+
+  it("unsafe redirect with protocol relative double slash url", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      const error = await assertRaise([UnsafeRedirectError], {}, async () => {
+        await tc.get("unsafeRedirectProtocolRelativeDoubleSlash");
+      });
+
+      assertEqual(
+        'Unsafe redirect to "//www.rubyonrails.org/", pass allow_other_host: true to redirect anyway.',
+        error.message,
+      );
+    });
+  });
+
+  it("unsafe redirect with protocol relative triple slash url", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      const error = await assertRaise([UnsafeRedirectError], {}, async () => {
+        await tc.get("unsafeRedirectProtocolRelativeTripleSlash");
+      });
+
+      assertEqual(
+        'Unsafe redirect to "///www.rubyonrails.org/", pass allow_other_host: true to redirect anyway.',
+        error.message,
+      );
+    });
+  });
+
+  it("unsafe redirect with illegal http header value character", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      const error = await assertRaise([UnsafeRedirectError], {}, async () => {
+        await tc.get("unsafeRedirectWithIllegalHttpHeaderValueCharacter");
+      });
+
+      const msg =
+        "The redirect URL javascript:alert(document.domain)\b contains one or more illegal HTTP header field character. " +
+        "Set of legal characters defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2.6";
+
+      assertEqual(msg, error.message);
+    });
+  });
+
+  it("only path redirect", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      await tc.get("onlyPathRedirect");
+      assertResponse("redirect");
+      assertRedirectedTo("/redirect/other_host");
+    });
+  });
+
+  it("url from", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      await tc.get("safeRedirectWithFallback", {
+        params: { redirect_url: "http://test.host/app" },
+      });
+      assertResponse("redirect");
+      assertRedirectedTo("http://test.host/app");
+    });
+  });
+
+  it("url from fallback", async () => {
+    await withRaiseOnOpenRedirects(async () => {
+      await tc.get("safeRedirectWithFallback", {
+        params: { redirect_url: "http://www.rubyonrails.org/" },
+      });
+      assertResponse("redirect");
+      assertRedirectedTo("http://test.host/fallback");
+
+      await tc.get("safeRedirectWithFallback", { params: { redirect_url: "" } });
+      assertResponse("redirect");
+      assertRedirectedTo("http://test.host/fallback");
+    });
+  });
+
+  it("redirect to instrumentation", async () => {
+    let payload: Record<string, unknown> | null = null;
+
+    const subscriber = (event: { payload: Record<string, unknown> }) => {
+      payload = event.payload;
+    };
+
+    await Notifications.subscribed(subscriber, "redirect_to.action_controller", async () => {
+      await tc.get("simpleRedirect");
     });
 
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("http://localhost/login");
-    expect(log).toEqual([]);
-  });
-
-  it("simple redirect", () => {
-    const result = redirectTo("http://example.com/posts");
-    expect(result.status).toBe(302);
-    expect(result.location).toBe("http://example.com/posts");
-    expect(result.body).toContain("redirected");
-  });
-
-  it("redirect with header break", () => {
-    expect(() => redirectTo("http://example.com\r\ninjection")).toThrow(/header break/);
-  });
-
-  it("redirect with null bytes", () => {
-    expect(() => redirectTo("http://example.com\0evil")).toThrow(/null bytes/);
-  });
-
-  it("redirect with no status", () => {
-    const result = redirectTo("/posts");
-    expect(result.status).toBe(302);
-  });
-
-  it("redirect with status", () => {
-    const result = redirectTo("/posts", { status: 301 });
-    expect(result.status).toBe(301);
-  });
-
-  it("redirect with status hash", () => {
-    const result = redirectTo("/posts", { status: 307 });
-    expect(result.status).toBe(307);
-  });
-
-  it("redirect with protocol", () => {
-    const result = redirectTo("https://example.com/posts");
-    expect(result.location).toBe("https://example.com/posts");
-  });
-
-  it("url redirect with status", () => {
-    const result = redirectTo("http://example.com/", { status: 301 });
-    expect(result.status).toBe(301);
-    expect(result.location).toBe("http://example.com/");
-  });
-
-  it("url redirect with status hash", () => {
-    const result = redirectTo("http://example.com/", { status: 303 });
-    expect(result.status).toBe(303);
-  });
-
-  it("relative url redirect with status", () => {
-    const result = redirectTo("/relative/path", { status: 301 });
-    expect(result.status).toBe(301);
-    expect(result.location).toBe("/relative/path");
-  });
-
-  it("relative url redirect with status hash", () => {
-    const result = redirectTo("/foo", { status: 307 });
-    expect(result.status).toBe(307);
-  });
-
-  it("relative url redirect host with port", () => {
-    const result = redirectTo("http://example.com:3000/foo");
-    expect(result.location).toBe("http://example.com:3000/foo");
-  });
-
-  it("simple redirect using options", () => {
-    const result = redirectTo("/dashboard", { status: 302 });
-    expect(result.status).toBe(302);
-    expect(result.location).toBe("/dashboard");
-  });
-
-  it("module redirect", () => {
-    const result = redirectTo("/admin/dashboard");
-    expect(result.location).toBe("/admin/dashboard");
-  });
-
-  it("module redirect using options", () => {
-    const result = redirectTo("/admin/dashboard", { status: 301 });
-    expect(result.status).toBe(301);
-  });
-
-  it("redirect to url", () => {
-    const result = redirectTo("http://www.example.com");
-    expect(result.location).toBe("http://www.example.com");
-  });
-
-  it("redirect to url with unescaped query string", () => {
-    const result = redirectTo("http://example.com?a=1&b=2");
-    expect(result.location).toBe("http://example.com?a=1&b=2");
-  });
-
-  it("redirect to url with complex scheme", () => {
-    const result = redirectTo("data:text/html,test");
-    expect(result.location).toBe("data:text/html,test");
-  });
-
-  it("redirect to url with network path reference", () => {
-    const result = redirectTo("//cdn.example.com/file.js");
-    expect(result.location).toBe("//cdn.example.com/file.js");
-  });
-
-  it("redirect back", () => {
-    const result = redirectBack({
-      referer: "http://example.com/prev",
-      fallbackLocation: "/",
-    });
-    expect(result.location).toBe("http://example.com/prev");
-  });
-
-  it("redirect back with no referer", () => {
-    const result = redirectBack({
-      fallbackLocation: "/",
-    });
-    expect(result.location).toBe("/");
-  });
-
-  it("redirect back with no referer redirects to another host", () => {
-    const result = redirectBack({
-      fallbackLocation: "http://other.com/",
-    });
-    expect(result.location).toBe("http://other.com/");
-  });
-
-  it("safe redirect back from other host", () => {
-    const result = redirectBack({
-      referer: "http://evil.com/attack",
-      fallbackLocation: "/",
-      allowOtherHost: false,
-      currentHost: "example.com",
-    });
-    expect(result.location).toBe("/");
-  });
-
-  it("safe redirect back from the same host", () => {
-    const result = redirectBack({
-      referer: "http://example.com/prev",
-      fallbackLocation: "/",
-      allowOtherHost: false,
-      currentHost: "example.com",
-    });
-    expect(result.location).toBe("http://example.com/prev");
-  });
-
-  it("safe redirect back with no referer", () => {
-    const result = redirectBack({
-      fallbackLocation: "/fallback",
-      allowOtherHost: false,
-      currentHost: "example.com",
-    });
-    expect(result.location).toBe("/fallback");
-  });
-
-  it("safe redirect back with no referer redirects to another host", () => {
-    const result = redirectBack({
-      fallbackLocation: "http://other.com/",
-      allowOtherHost: false,
-      currentHost: "example.com",
-    });
-    expect(result.location).toBe("http://other.com/");
-  });
-
-  it("safe redirect to root", () => {
-    const result = redirectTo("/");
-    expect(result.location).toBe("/");
-    expect(result.status).toBe(302);
-  });
-
-  it("redirect back with explicit fallback kwarg", () => {
-    const result = redirectBack({
-      fallbackLocation: "/dashboard",
-    });
-    expect(result.location).toBe("/dashboard");
-  });
-
-  it("redirect body contains escaped html", () => {
-    const result = redirectTo("/test<script>");
-    expect(result.body).not.toContain("<script>");
-    expect(result.body).toContain("&lt;script&gt;");
-  });
-
-  it("redirect to url with stringlike", () => {
-    const url = new URL("http://example.com/path");
-    const result = redirectTo(url);
-    expect(result.location).toBe("http://example.com/path");
-  });
-
-  it("redirect to nil", () => {
-    expect(() => redirectTo(null)).toThrow("Cannot redirect to nil!");
-  });
-
-  it("redirect to params", () => {
-    const result = redirectTo("/posts?page=2");
-    expect(result.location).toBe("/posts?page=2");
-  });
-
-  it("unsafe redirect", () => {
-    const result = redirectTo("http://evil.com/attack");
-    expect(result.location).toBe("http://evil.com/attack");
-  });
-
-  it("unsafe redirect back", () => {
-    const result = redirectBack({
-      referer: "http://evil.com/attack",
-      fallbackLocation: "/",
-      allowOtherHost: true,
-    });
-    expect(result.location).toBe("http://evil.com/attack");
-  });
-
-  it("only path redirect", () => {
-    const result = redirectTo("/only/this/path");
-    expect(result.location).toBe("/only/this/path");
-    expect(result.status).toBe(302);
+    assertEqual(tc.request, payload!.request);
+    assertEqual(302, payload!.status);
+    assertEqual("http://test.host/redirect/hello_world", payload!.location);
   });
 
   it("redirect to external with rescue", async () => {
-    class C extends Base {
-      async action() {
-        this.redirectTo("http://external.com");
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("http://external.com");
-    expect(c.status).toBe(302);
+    await tc.get("redirectToExternalWithRescue");
+    assertResponse("ok");
   });
 });
 
+const ModuleTest = new Module() as Module & { ModuleRedirectController: typeof RedirectController };
+registerConstant("ModuleTest", ModuleTest);
+rbModConstSet(
+  ModuleTest,
+  "ModuleRedirectController",
+  class ModuleRedirectController extends RedirectController {
+    override moduleRedirect() {
+      this.redirectTo({ controller: "/redirect", action: "hello_world" });
+    }
+  },
+);
+
 describe("ModuleRedirectTest", () => {
-  it("simple redirect", () => {
-    const result = redirectTo("/module/dashboard");
-    expect(result.location).toBe("/module/dashboard");
-    expect(result.status).toBe(302);
+  class ModuleRedirectTest extends TestCase {
+    static {
+      this.tests(ModuleTest.ModuleRedirectController);
+    }
+  }
+
+  let tc: ModuleRedirectTest;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
+  const assertRedirectedTo: OmitThisParameter<TestCase["assertRedirectedTo"]> = (...args) =>
+    tc.assertRedirectedTo(...args);
+
+  beforeEach(async ({ task }) => {
+    tc = new ModuleRedirectTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
   });
 
-  it("simple redirect using options", () => {
-    const result = redirectTo("/module/dashboard", { status: 301 });
-    expect(result.status).toBe(301);
+  it("simple redirect", async () => {
+    await tc.get("simpleRedirect");
+    assertResponse("redirect");
+    assertEqual("http://test.host/module_test/module_redirect/hello_world", tc.redirectToUrl());
   });
 
-  it("module redirect", () => {
-    const result = redirectTo("/admin/module/dashboard");
-    expect(result.location).toBe("/admin/module/dashboard");
+  it("simple redirect using options", async () => {
+    await tc.get("hostRedirect");
+    assertResponse("redirect");
+    assertRedirectedTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
   });
 
-  it("module redirect using options", () => {
-    const result = redirectTo("/admin/module/dashboard", { status: 307 });
-    expect(result.status).toBe(307);
+  it("module redirect", async () => {
+    await tc.get("moduleRedirect");
+    assertResponse("redirect");
+    assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
+  });
+
+  it("module redirect using options", async () => {
+    await tc.get("moduleRedirect");
+    assertResponse("redirect");
+    assertRedirectedTo({ controller: "/redirect", action: "hello_world" });
   });
 });

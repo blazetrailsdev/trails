@@ -1,17 +1,41 @@
 import {
+  eachPair,
   extend,
   fetch,
-  hasKey,
+  first,
+  flatten,
+  Hash,
+  isEmpty,
   isModuleIncluded,
+  isSymbol,
+  merge,
+  Module,
+  rbBlockGivenP,
+  partition,
+  rbFPublicSend,
+  rbFSend,
   rbInspect,
-  rbObjClass,
+  rbObjAsString,
+  rbObjClassname,
   rbObjRespondTo,
   RuntimeError,
+  strCount,
+  symbolToS,
   toI,
+  toS,
   transformValues,
+  union,
+  uniq,
+  TypeError,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
-import { Nodes, Predications, SelectManager, Table as ArelTable } from "@blazetrails/arel";
+import {
+  Nodes,
+  Predications,
+  SelectManager,
+  Table as ArelTable,
+  type ArelNode,
+} from "@blazetrails/arel";
 import {
   ArgumentError,
   Attribute,
@@ -22,9 +46,7 @@ import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js
 import { ActiveRecord } from "../namespaces.js";
 import { defaultValue } from "../type.js";
 import {
-  ActiveRecordError,
   IrreversibleOrderError,
-  NotImplementedError,
   PreparedStatementInvalid,
   UnmodifiableRelation,
 } from "../errors.js";
@@ -33,18 +55,19 @@ import { FromClause } from "./from-clause.js";
 import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
-import type { AliasCounts, AliasTracker } from "../associations/alias-tracker.js";
+import type { AliasTracker } from "../associations/alias-tracker.js";
 import {
   any,
   actsLike,
   compactBlank,
   defineModule,
+  filterMap,
   foreignKey,
   included,
+  indexWith,
   isBlank,
   kernelArray,
-  rbEqual,
-  rbHash,
+  transformKeys,
   wrap,
 } from "@blazetrails/activesupport";
 
@@ -68,21 +91,20 @@ export class WhereChain<R = any> {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      const reflectionName = `:${reflection.name}`;
       if (
-        !scope.joinsValues.includes(reflectionName) &&
-        !scope.leftOuterJoinsValues.includes(reflectionName)
+        !(
+          scope.joinsValues.includes(`:${reflection.name}`) ||
+          scope.leftOuterJoinsValues.includes(`:${reflection.name}`)
+        )
       ) {
-        joinsBang.call(scope, isRubySymbol(association) ? association : `:${association}`);
+        joinsBang.call(scope, association);
       }
 
       const associationConditions = Object.fromEntries(
-        wrap(reflection.associationPrimaryKey()).map((pk) => [pk, null]),
+        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
       );
       if (reflection.options.className) {
-        this.not({
-          [isRubySymbol(association) ? association : `:${association}`]: associationConditions,
-        });
+        this.not({ [association]: associationConditions });
       } else {
         this.not({ [reflection.tableName]: associationConditions });
       }
@@ -95,14 +117,12 @@ export class WhereChain<R = any> {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      leftOuterJoinsBang.call(scope, isRubySymbol(association) ? association : `:${association}`);
+      leftOuterJoinsBang.call(scope, association);
       const associationConditions = Object.fromEntries(
-        wrap(reflection.associationPrimaryKey()).map((pk) => [pk, null]),
+        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
       );
       if (reflection.options.className) {
-        whereBang.call(scope, {
-          [isRubySymbol(association) ? association : `:${association}`]: associationConditions,
-        });
+        whereBang.call(scope, { [association]: associationConditions });
       } else {
         whereBang.call(scope, { [reflection.tableName]: associationConditions });
       }
@@ -113,10 +133,10 @@ export class WhereChain<R = any> {
 
   private scopeAssociationReflection(association: string): WhereChainReflection {
     const model = (this._scope as unknown as QueryMethodsHost).model as any;
-    const reflection = model?._reflectOnAssociation?.(association);
+    const reflection = model._reflectOnAssociation(association);
     if (!reflection) {
       throw new ArgumentError(
-        `An association named \`:${association}\` does not exist on the model \`${model?.name}\`.`,
+        `An association named \`:${toS(association)}\` does not exist on the model \`${model.name}\`.`,
       );
     }
     return reflection;
@@ -151,30 +171,33 @@ export const FROZEN_EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
 export const FROZEN_EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
 
-type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
+type OrderDirection = ":asc" | ":desc" | ":ASC" | ":DESC" | "asc" | "desc" | "ASC" | "DESC";
 
 export type OrderArg =
   | string
   | Record<string, OrderDirection | Record<string, OrderDirection>>
-  | Nodes.Node
+  | ArelNode
   | string[]
-  | [Nodes.Node, ...unknown[]]
-  | Map<Nodes.Node | string, OrderDirection>
+  | [ArelNode, ...unknown[]]
+  | Map<ArelNode | string, OrderDirection>
   | null;
 
 interface QueryMethodsHost {
   primaryKey: string | string[];
   _values: Record<string, unknown>;
+  _arel?: SelectManager;
   whereClause: WhereClause;
   havingClause: WhereClause;
   fromClause: FromClause;
+  /** @internal */
+  _fromLimitedIds: [from: object, ids: unknown[]] | null;
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
   selectValues: any[];
-  groupValues: Array<string | Nodes.Node>;
-  orderValues: Array<string | Nodes.Node>;
-  joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  groupValues: Array<string | ArelNode>;
+  orderValues: Array<string | ArelNode>;
+  joinsValues: (AssociationSpec | string | Nodes.Join | JoinDependency)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
   extendingValues: object[];
@@ -194,9 +217,10 @@ interface QueryMethodsHost {
   createWithValue: Record<string, unknown>;
   skipQueryCacheValue: boolean | null;
   _isNone: boolean;
-  aliasTracker(joins?: Nodes.Node[], aliases?: AliasCounts): AliasTracker;
+  aliasTracker(joins?: Nodes.Node[], aliases?: Hash<string, number>): AliasTracker;
   clone(): any;
   spawn(): any;
+  except(...skips: ExceptSkip[]): any;
   /** @internal */
   buildArel(connection: unknown, aliases?: AliasTracker): any;
   skipPreloadingValue: boolean;
@@ -206,21 +230,13 @@ interface QueryMethodsHost {
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
 }
 
-function unionAppend<T>(target: readonly T[], incoming: readonly T[]): T[] {
-  const union = [...target];
-  for (const spec of incoming) {
-    if (!union.some((seen) => structuralUnionEq(seen, spec))) union.push(spec);
-  }
-  return union;
-}
-
 function includes(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":includes", args);
   return includesBang.apply(this.spawn(), args);
 }
 
 function includesBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  this.includesValues = unionAppend(this.includesValues, args);
+  this.includesValues = union(this.includesValues, args);
   return this;
 }
 
@@ -234,7 +250,7 @@ function eagerLoad(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 }
 
 function eagerLoadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  this.eagerLoadValues = unionAppend(this.eagerLoadValues, args);
+  this.eagerLoadValues = union(this.eagerLoadValues, args);
   return this;
 }
 
@@ -244,7 +260,7 @@ function preload(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 }
 
 function preloadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  this.preloadValues = unionAppend(this.preloadValues, args);
+  this.preloadValues = union(this.preloadValues, args);
   return this;
 }
 
@@ -269,7 +285,7 @@ function referencesBang(
 }
 
 function referenceName(reference: string | Nodes.SqlLiteral): string {
-  return reference instanceof Nodes.SqlLiteral ? reference.value : reference;
+  return reference instanceof Nodes.SqlLiteral ? reference.toString() : reference;
 }
 
 function unionReferences(
@@ -299,7 +315,7 @@ function withCte(this: QueryMethodsHost, ...args: any[]): any {
 
 function withBang(this: QueryMethodsHost, ...args: unknown[]): any {
   const processed = processWithArgs.call(this, args);
-  this.withValues = unionAppend(this.withValues, processed);
+  this.withValues = union(this.withValues, processed);
   return this;
 }
 
@@ -310,7 +326,7 @@ function withRecursive(this: QueryMethodsHost, ...args: any[]): any {
 
 function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
   const processed = processWithArgs.call(this, args);
-  this.withValues = unionAppend(this.withValues, processed);
+  this.withValues = union(this.withValues, processed);
   this._withIsRecursive = true;
   return this;
 }
@@ -341,80 +357,23 @@ function reselect(this: QueryMethodsHost, ...args: any[]): any {
 }
 
 function reselectBang(this: QueryMethodsHost, ...args: any[]): any {
-  this.selectValues = args.map((c: any) => {
-    if (c instanceof Nodes.Node) return c;
-    if (typeof c === "object" && c !== null && "value" in c)
-      return new Nodes.SqlLiteral((c as { value: string }).value);
-    return String(c);
-  });
+  this.selectValues = args;
   return this;
 }
 
 function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
-  const flat = fields.flat(Infinity);
-  const normalized = flat.map((c: any) => {
-    if (c instanceof Nodes.Node) return c;
-    if (typeof c === "function") return c;
-    if (typeof c === "object" && c !== null && "value" in c)
-      return new Nodes.SqlLiteral((c as { value: string }).value);
-    return String(c);
-  });
-  const seenStrings = new Set<string>();
-  const seenNodeHashes = new Map<number, Nodes.Node[]>();
-  const nodeIsDuplicate = (node: Nodes.Node): boolean => {
-    const h = rbHash(node);
-    const bucket = seenNodeHashes.get(h);
-    if (!bucket) return false;
-    return bucket.some((n) => rbEqual(n, node));
-  };
-  const addNodeToSeen = (node: Nodes.Node): void => {
-    const h = rbHash(node);
-    const bucket = seenNodeHashes.get(h);
-    if (bucket) bucket.push(node);
-    else seenNodeHashes.set(h, [node]);
-  };
-  const seenThunks = new Set<unknown>();
-  for (const existing of this.selectValues) {
-    if (typeof existing === "string") seenStrings.add(existing);
-    else if (existing instanceof Nodes.Node) addNodeToSeen(existing);
-    else if (typeof existing === "function") seenThunks.add(existing);
-    else seenStrings.add((existing as { value: string }).value);
-  }
-  for (const col of normalized) {
-    if (typeof col === "string") {
-      if (!seenStrings.has(col)) {
-        this.selectValues = [...this.selectValues, col];
-        seenStrings.add(col);
-      }
-    } else if (col instanceof Nodes.Node) {
-      if (!nodeIsDuplicate(col)) {
-        this.selectValues = [...this.selectValues, col];
-        addNodeToSeen(col);
-      }
-    } else if (typeof col === "function") {
-      if (!seenThunks.has(col)) {
-        this.selectValues = [...this.selectValues, col];
-        seenThunks.add(col);
-      }
-    } else {
-      const key = (col as { value: string }).value;
-      if (!seenStrings.has(key)) {
-        this.selectValues = [...this.selectValues, col];
-        seenStrings.add(key);
-      }
-    }
-  }
+  this.selectValues = union(this.selectValues, fields);
   return this;
 }
 
-function group(this: QueryMethodsHost, ...args: (string | Nodes.Node)[]): any {
+function group(this: QueryMethodsHost, ...args: (string | ArelNode)[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":group", args as unknown[]);
   return groupBang.apply(this.spawn(), args);
 }
 
 function groupBang(
   this: QueryMethodsHost,
-  ...args: (string | import("@blazetrails/arel").Nodes.Node)[]
+  ...args: (string | import("@blazetrails/arel").ArelNode)[]
 ): any {
   this.groupValues = [...this.groupValues, ...(args as string[])];
   return this;
@@ -427,7 +386,7 @@ function regroup(this: QueryMethodsHost, ...args: string[]): any {
 
 function regroupBang(
   this: QueryMethodsHost,
-  ...args: (string | import("@blazetrails/arel").Nodes.Node)[]
+  ...args: (string | import("@blazetrails/arel").ArelNode)[]
 ): any {
   this.groupValues = [...(args as string[])];
   return this;
@@ -442,23 +401,18 @@ function order(this: QueryMethodsHost, ...args: OrderArg[]): any {
 
 function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   if (args.length > 0) preprocessOrderArgs.call(this, args as unknown[]);
-  this.orderValues = dedupeOrderClauses([
-    ...this.orderValues,
-    ...(args as unknown[]),
-  ]) as typeof this.orderValues;
+  this.orderValues = union(this.orderValues, args as unknown[]) as typeof this.orderValues;
   return this;
 }
 
 function inOrderOf(
   this: QueryMethodsHost,
-  column: string | Nodes.Node,
+  column: string | ArelNode,
   values: unknown[],
   filter = true,
 ): any {
   (this.model as any).disallowRawSqlBang([column], {
-    permit: (
-      this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
-    ).columnNameWithOrderMatcher(),
+    permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
   if (values.length === 0) return noneBang.call(this.spawn());
 
@@ -499,43 +453,11 @@ function reorder(this: QueryMethodsHost, ...args: OrderArg[]): any {
 
 function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   preprocessOrderArgs.call(this, args as unknown[]);
+  args = uniq(args);
   this.reorderingValue = true;
-  this.orderValues = dedupeOrderClauses(args as unknown[]) as typeof this.orderValues;
+  this.orderValues = args as typeof this.orderValues;
   return this;
 }
-let orderClauseIdentity = 0;
-const orderClauseIdentities = new WeakMap<object, number>();
-
-function orderClauseKey(clause: unknown): string {
-  if (typeof clause === "string") return `s:${clause}`;
-  if (clause instanceof Nodes.SqlLiteral) return `s:${String((clause as any).value ?? "")}`;
-  if (clause instanceof Arel.Attribute) {
-    return `a:${String((clause as any).relation?.name)}.${(clause as any).name}`;
-  }
-  if (clause instanceof Nodes.Node && "expr" in (clause as any)) {
-    return `${clause.constructor.name}(${orderClauseKey((clause as any).expr)})`;
-  }
-  if (clause !== null && typeof clause === "object") {
-    let id = orderClauseIdentities.get(clause);
-    if (id === undefined) {
-      id = ++orderClauseIdentity;
-      orderClauseIdentities.set(clause, id);
-    }
-    return `o:${id}`;
-  }
-  return `v:${String(clause)}`;
-}
-
-function dedupeOrderClauses<T>(clauses: T[]): T[] {
-  const seen = new Set<string>();
-  return clauses.filter((c) => {
-    const key = orderClauseKey(c);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 export type UnscopeType =
   | "where"
   | "select"
@@ -625,7 +547,7 @@ function unscopeBang(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
       }
       assertModifiableBang.call(this);
       delete this._values[name];
-    } else if (rbObjClass(scope) === "Hash") {
+    } else if (rbObjClassname(scope) === "Hash") {
       for (const [key, targetValue] of Object.entries(scope as object)) {
         if (key !== ":where") {
           throw new ArgumentError("Hash arguments in .unscope(*args) must have :where as the key.");
@@ -649,11 +571,8 @@ function joins(this: QueryMethodsHost, ...args: JoinSpec[]): any {
   return joinsBang.apply(this.spawn(), args as (string | Nodes.Join)[]);
 }
 
-function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): any {
-  for (const arg of args) {
-    if (!this.joinsValues.some((seen) => structuralUnionEq(seen, arg)))
-      this.joinsValues = [...this.joinsValues, arg];
-  }
+function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join | JoinDependency)[]): any {
+  this.joinsValues = union(this.joinsValues, args);
   return this;
 }
 
@@ -668,10 +587,7 @@ function leftJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 }
 
 function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  for (const arg of args) {
-    if (!this.leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, arg)))
-      this.leftOuterJoinsValues = [...this.leftOuterJoinsValues, arg];
-  }
+  this.leftOuterJoinsValues = union(this.leftOuterJoinsValues, args);
   return this;
 }
 
@@ -684,45 +600,37 @@ export function buildWhereClause(
   opts = sanitizeForbiddenAttributes(opts as Record<string, unknown>);
 
   if (Array.isArray(opts)) {
-    const [head, ...tail] = opts as unknown[];
-    return buildWhereClause.call(this, head, tail);
+    [opts, ...rest] = opts as unknown[];
   }
 
-  let parts: (Nodes.Node | string)[];
-  if (typeof opts === "string") {
-    if (rest.length === 0) {
-      parts = [Arel.sql(opts)];
-    } else if (isPlainObject(rest[0]) && /:\w+/.test(opts)) {
-      parts = [buildNamedBoundSqlLiteral.call(this, opts, rest[0])];
-    } else if (opts.includes("?")) {
-      parts = [buildBoundSqlLiteral.call(this, opts, rest)];
+  let parts: (Nodes.Node | Nodes.SqlLiteral | string)[];
+  if (typeof opts === "string" || opts instanceof Nodes.SqlLiteral) {
+    opts = opts.toString();
+    if (isEmpty(rest)) {
+      parts = [Arel.sql(opts as string)];
+    } else if (isPlainObject(rest[0]) && /:\w+/.test(opts as string)) {
+      parts = [buildNamedBoundSqlLiteral.call(this, opts as string, rest[0])];
+    } else if ((opts as string).includes("?")) {
+      parts = [buildBoundSqlLiteral.call(this, opts as string, rest)];
     } else {
-      parts = [this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])!];
+      parts = [
+        this.model.sanitizeSql(isEmpty(rest) ? (opts as string) : [opts as string, ...rest])!,
+      ];
     }
   } else if (isHash(opts)) {
-    const mc = this.model;
-    const aliases: Record<string, string> = mc?.attributeAliases ?? {};
-    const transformed: Record<string, unknown> | Map<unknown, unknown> =
-      opts instanceof Map ? new Map() : {};
-    for (const [rawKey, value] of toA(opts) as [unknown, unknown][]) {
-      let key: string | string[];
-      if (Array.isArray(rawKey)) {
-        key = rawKey.map((k) => {
-          const s = String(k);
-          const name = isRubySymbol(s) ? symbolToName(s) : s;
-          return aliases[name] ?? name;
-        });
+    opts = transformKeys(opts as Record<string, unknown>, (key: string | string[]) => {
+      if (Array.isArray(key)) {
+        return key.map((k) => this.model.attributeAliases[toS(k)] || toS(k)) as never;
       } else {
-        const s = String(rawKey);
-        const name = isRubySymbol(s) ? symbolToName(s) : s;
-        key = aliases[name] ?? name;
+        key = toS(key);
+        return this.model.attributeAliases[key] || key;
       }
-      if (transformed instanceof Map) transformed.set(key, value);
-      else transformed[key as string] = value;
-    }
-    opts = transformed;
+    });
     const references = PredicateBuilder.references(opts as Record<string, unknown>);
-    if (references.length > 0) referencesBang.call(this, ...references);
+    if (!isEmpty(references)) {
+      this.referencesValues = unionReferences(this.referencesValues, references);
+    }
+
     parts = this.predicateBuilder.buildFromHash(
       opts as Record<string, unknown>,
       (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName),
@@ -730,7 +638,7 @@ export function buildWhereClause(
   } else if (opts instanceof Nodes.Node) {
     parts = [opts];
   } else {
-    throw new ArgumentError(`Unsupported argument type: ${String(opts)} (${typeof opts})`);
+    throw new ArgumentError(`Unsupported argument type: ${String(opts)} (${rbObjClassname(opts)})`);
   }
 
   return new WhereClause(parts);
@@ -743,6 +651,7 @@ function where(
     | Map<unknown, unknown>
     | string
     | Nodes.Node
+    | Nodes.SqlLiteral
     | string[]
     | unknown[]
     | null,
@@ -754,7 +663,7 @@ function where(
   }
   return whereBang.call(
     this.spawn(),
-    conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
+    conditionsOrSql as Record<string, unknown> | string | ArelNode | null,
     ...rest,
   );
 }
@@ -765,7 +674,10 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   return this;
 }
 
-function rewhere(this: QueryMethodsHost, conditions: Record<string, unknown> | null): any {
+function rewhere(
+  this: QueryMethodsHost,
+  conditions: Record<string, unknown> | Map<string, unknown> | null,
+): any {
   if (conditions == null) return unscope.call(this, ":where");
   conditions = sanitizeForbiddenAttributes(conditions);
   const rel = this.spawn();
@@ -791,27 +703,6 @@ function invertWhere(this: QueryMethodsHost): any {
 function invertWhereBang(this: QueryMethodsHost): any {
   this.whereClause = this.whereClause.invert();
   return this;
-}
-
-function uniqArray(arr: unknown[]): unknown[] {
-  const out: unknown[] = [];
-  for (const el of arr) {
-    if (!out.some((seen) => deepEqual(seen, el))) out.push(el);
-  }
-  return out;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
- */
-export function structuralUnionEq(a: unknown, b: unknown): boolean {
-  if (
-    a instanceof ActiveRecord.Associations.JoinDependency ||
-    b instanceof ActiveRecord.Associations.JoinDependency
-  )
-    return a === b;
-  return deepEqual(a, b);
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {
@@ -899,8 +790,8 @@ export function structurallyIncompatibleValuesFor(
     let v2 = values[method];
     if (Array.isArray(v1)) {
       if (!Array.isArray(v2)) return false;
-      v1 = uniqArray(v1);
-      v2 = uniqArray(v2);
+      v1 = uniq(v1);
+      v2 = uniq(v2);
     }
     return !deepEqual(v1, v2);
   });
@@ -947,7 +838,7 @@ function assertStructurallyCompatible(
   }
 }
 
-function structurallyCompatible(this: QueryMethodsHost, other: any): boolean {
+function isStructurallyCompatible(this: QueryMethodsHost, other: any): boolean {
   return structurallyIncompatibleValuesFor.call(this, other).length === 0;
 }
 
@@ -981,7 +872,7 @@ function orBang(this: QueryMethodsHost, other: any): any {
 
 function having(
   this: QueryMethodsHost,
-  opts: string | Record<string, unknown> | Nodes.Node,
+  opts: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
   ...rest: unknown[]
 ): any {
   if (opts == null || isBlank(opts)) return this;
@@ -990,7 +881,7 @@ function having(
 
 function havingBang(
   this: QueryMethodsHost,
-  opts: string | Record<string, unknown> | Nodes.Node,
+  opts: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
   ...rest: unknown[]
 ): any {
   this.havingClause = this.havingClause.plus(buildWhereClause.call(this, opts, rest));
@@ -1062,14 +953,20 @@ function strictLoadingBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function createWith(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
+function createWith(
+  this: QueryMethodsHost,
+  value: Record<string, unknown> | Map<string, unknown> | null,
+): any {
   return createWithBang.call(this.spawn(), value);
 }
 
-function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
+function createWithBang(
+  this: QueryMethodsHost,
+  value: Record<string, unknown> | Map<string, unknown> | null,
+): any {
   if (value) {
     value = sanitizeForbiddenAttributes(value);
-    this.createWithValue = { ...this.createWithValue, ...value };
+    this.createWithValue = merge(this.createWithValue, value);
   } else {
     this.createWithValue = {};
   }
@@ -1094,26 +991,27 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function extending(this: QueryMethodsHost, ...modules: Array<object | ((rel: any) => void)>): any {
-  if (modules.some((mod) => mod != null && (mod as unknown) !== false)) {
-    return extendingBang.call(this.spawn(), ...modules);
+function extending(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extending(this: QueryMethodsHost, ...modules: object[]): any;
+function extending(this: QueryMethodsHost, ...modules: object[]): any {
+  const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
+  if (any(modules) || block) {
+    return extendingBang.call(this.spawn(), ...modules, ...(block ? [block] : []));
   } else {
     return this;
   }
 }
 
-function extendingBang(
-  this: QueryMethodsHost,
-  ...modules: Array<object | ((rel: any) => void)>
-): any {
-  for (const mod of modules) {
-    if (typeof mod === "function") {
-      mod(this);
-    } else {
-      this.extendingValues = [...this.extendingValues, mod];
-    }
-  }
-  for (const mod of [...this.extendingValues].reverse()) extend(this, mod);
+function extendingBang(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extendingBang(this: QueryMethodsHost, ...modules: object[]): any;
+function extendingBang(this: QueryMethodsHost, ...modules: object[]): any {
+  const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
+  if (block) modules.push(new Module(block as (mod: Module) => void));
+  modules.splice(0, modules.length, ...(flatten(modules) as object[]));
+
+  this.extendingValues = [...this.extendingValues, ...modules];
+  if (any(this.extendingValues)) extend(this, ...this.extendingValues);
+
   return this;
 }
 
@@ -1123,7 +1021,7 @@ function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
-  this.optimizerHintsValues = [...new Set([...this.optimizerHintsValues, ...args])];
+  this.optimizerHintsValues = union(this.optimizerHintsValues, args);
   return this;
 }
 
@@ -1161,7 +1059,7 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
   if (name === undefined) return this;
   const values = this._values[name];
   if (Array.isArray(values) && values.length > 0) {
-    this._values[name] = [...new Set(values)];
+    this._values[name] = uniq(values);
   }
   return this;
 }
@@ -1187,7 +1085,7 @@ function excludingWithCallee(callee: "excluding" | "without") {
     const flatMappedIds: unknown[] = [];
     const deferredRelations: any[] = [];
     for (const relation of relations) {
-      if (!relation.isLoaded || relation.isScheduled) {
+      if (!relation.isLoaded || relation.isScheduled || relation._loadResult) {
         deferredRelations.push(relation);
         continue;
       }
@@ -1223,8 +1121,12 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   const literalIds = literalRecords.map((r) =>
     r instanceof ActiveRecord.Base ? (r as any).id : r,
   );
-  const inlineSubquery = (this.predicateBuilder.build(attribute, deferredRelations[0]) as Nodes.In)
-    .right as Nodes.Node;
+  const inlineSubquery = (
+    this.predicateBuilder.build(
+      attribute,
+      this.model.unscoped().merge(deferredRelations[0]),
+    ) as Nodes.In
+  ).right as ArelNode;
   this.whereClause = this.whereClause.plus(
     new WhereClause([
       new DeferredIdsNotIn(attribute, inlineSubquery, [
@@ -1236,9 +1138,9 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   return this;
 }
 
-/** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
+/** @missingRailsCall with_connection — CONVERGEABLE relation-layer-with-connection-receipts-are-not-the-tosql-sites */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
-  return ((this as any)._arel ??= this.model
+  return (this._arel ??= this.model
     .connectionPool()
     .withConnectionSync((c) => this.buildArel(c, aliases)));
 }
@@ -1252,7 +1154,7 @@ export function constructJoinDependency(
     this.model,
     this.table,
     associations,
-    (joinType ?? null) as typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
+    joinType as typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   );
 }
 
@@ -1271,7 +1173,7 @@ export function async(this: QueryMethodsHost): QueryMethodsHost {
 
 /** @internal */
 export function assertModifiableBang(this: QueryMethodsHost): void {
-  if ((this as any)._loaded || (this as any)._arel) {
+  if ((this as any)._loaded || this._arel) {
     throw new UnmodifiableRelation();
   }
 }
@@ -1284,18 +1186,15 @@ export function checkIfMethodHasArgumentsBang(
   message?: string,
   block?: (args: unknown[]) => void,
 ): void {
-  if (!args || args.length === 0) {
+  if (isBlank(args)) {
     throw new ArgumentError(
       message ?? `The method .${methodName.slice(1)}() must contain arguments.`,
     );
   } else {
-    block?.(args);
+    if (block) block(args);
 
-    const flat = args.flat(Infinity);
-    args.length = 0;
-    for (const a of flat) {
-      if (!isBlank(a)) args.push(a);
-    }
+    args.splice(0, args.length, ...flatten(args));
+    args.splice(0, args.length, ...compactBlank(args));
   }
 }
 
@@ -1312,31 +1211,21 @@ function toA(value: unknown[] | Map<unknown, unknown> | Record<string, unknown>)
   return Object.entries(value);
 }
 
-const VALID_DIRECTIONS = new Set(["asc", "desc"]);
+const VALID_DIRECTIONS = new Set([":asc", ":desc", ":ASC", ":DESC", "asc", "desc", "ASC", "DESC"]);
 
 /** @internal */
 export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
-    if (arg instanceof Map) {
-      for (const [, value] of arg) {
-        if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
-          throw new ArgumentError(
-            `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
-          );
-        }
-      }
-      continue;
-    }
-    if (!isPlainObject(arg)) continue;
-    for (const [, value] of Object.entries(arg)) {
-      if (isPlainObject(value)) {
+    if (!isHash(arg)) continue;
+    eachPair(arg as Record<string, unknown>, (_key, value) => {
+      if (isHash(value)) {
         validateOrderArgs.call(this, [value]);
-      } else if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
+      } else if (!VALID_DIRECTIONS.has(value as string)) {
         throw new ArgumentError(
-          `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
+          `Direction "${value}" is invalid. Valid directions are: ${rbInspect([...VALID_DIRECTIONS])}`,
         );
       }
-    }
+    });
   }
 }
 
@@ -1347,15 +1236,9 @@ export function processWithArgs(
 ): Record<string, unknown>[] {
   return args.flatMap((arg) => {
     if (!isPlainObject(arg)) {
-      const desc =
-        arg === null
-          ? "null"
-          : Array.isArray(arg)
-            ? "Array"
-            : typeof arg !== "object"
-              ? `${String(arg)} (${typeof arg})`
-              : ((arg as any).constructor?.name ?? "object");
-      throw new ArgumentError(`Unsupported argument type: ${desc}. Expected a plain object/hash.`);
+      throw new ArgumentError(
+        `Unsupported argument type: ${rbObjAsString(arg)} ${rbObjClassname(arg)}`,
+      );
     }
     return Object.entries(arg).map(([k, v]) => ({ [k]: v }));
   });
@@ -1390,8 +1273,11 @@ export function buildNamedBoundSqlLiteral(
 
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, null, boundValues);
-  } catch (e: any) {
-    throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
+  } catch (error) {
+    if (error instanceof Arel.BindError) {
+      throw new PreparedStatementInvalid(error.message, { cause: error });
+    }
+    throw error;
   }
 }
 
@@ -1419,61 +1305,43 @@ export function buildBoundSqlLiteral(
 
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, boundValues, null);
-  } catch (e: any) {
-    throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
+  } catch (error) {
+    if (error instanceof Arel.BindError) {
+      throw new PreparedStatementInvalid(error.message, { cause: error });
+    }
+    throw error;
   }
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function buildSubquery(
   this: QueryMethodsHost,
   subqueryAlias: string | Nodes.SqlLiteral,
   selectValue: unknown,
 ): SelectManager {
-  const relation =
-    typeof (this as any).except === "function" ? (this as any).except("optimizerHints") : this;
-  if (typeof relation.arel !== "function") {
-    throw new ActiveRecordError("Cannot build subquery: relation does not support arel()");
-  }
-  const subquery = relation.arel().as(subqueryAlias);
-  const sm = new SelectManager(subquery);
-  sm.project(selectValue as any);
-  const hints: string[] = (this as any).optimizerHintsValues ?? [];
-  if (hints.length > 0) sm.optimizerHints(...hints);
-  return sm;
+  const subquery = this.except("optimizerHints").arel().as(subqueryAlias);
+
+  const arel = new SelectManager(subquery).project(selectValue as any);
+  if (!isEmpty(this.optimizerHintsValues)) arel.optimizerHints(...this.optimizerHintsValues);
+  return arel;
 }
 
-/**
- * @internal
- * @missingRailsCall new — PERMANENT
- */
+/** @internal */
 export function isDoesNotSupportReverse(order: string | Nodes.SqlLiteral): boolean {
-  const plain = String(order);
-  if (
-    plain.includes(",") &&
-    plain.split(",").find((section) => section.split("(").length !== section.split(")").length) !==
-      undefined
-  ) {
-    return true;
-  }
-  return /\bnulls\s+(?:first|last)\b/i.test(plain);
+  if (typeof order !== "string") order = String(order);
+  return (
+    (order.includes(",") &&
+      order.split(",").find((section) => strCount(section, ["("]) !== strCount(section, [")"])) !==
+        undefined) ||
+    /\bnulls\s+(?:first|last)\b/i.test(order)
+  );
 }
 
 /** @internal */
 export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
   if (orderQuery.length === 0) {
-    const pk = (this as any)._model?.primaryKey;
-    if (pk) {
-      const arelTable: any = this.table;
-      return [
-        arelTable
-          ? new Nodes.Descending(arelTable.get(pk))
-          : new Nodes.Descending(new Nodes.SqlLiteral(pk)),
-      ];
-    }
+    const primaryKey = this.model.primaryKey as string;
+    if (primaryKey) return [this.table.get(primaryKey).desc()];
     throw new IrreversibleOrderError(
       "Relation has no current order and table has no primary key to be used as default order",
     );
@@ -1492,9 +1360,11 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
         .split(",")
         .map((s) => {
           s = s.trim();
-          if (/\sasc$/i.test(s)) return s.replace(/\sasc$/i, " DESC");
-          if (/\sdesc$/i.test(s)) return s.replace(/\sdesc$/i, " ASC");
-          return `${s} DESC`;
+          return (
+            (/\sasc$/i.test(s) && s.replace(/\sasc$/i, " DESC")) ||
+            (/\sdesc$/i.test(s) && s.replace(/\sdesc$/i, " ASC")) ||
+            `${s} DESC`
+          );
         });
     }
     return [o];
@@ -1503,8 +1373,8 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
 
 /** @internal */
 export function extractTableNameFrom(string: string): string | null {
-  const match = string.match(/^\W?(\w+)\W?\./);
-  return match ? match[1] : null;
+  const match = toS(string).match(/^\W?(\w+)\W?\./);
+  return match && match[1];
 }
 
 function isRubySymbol(value: unknown): value is string {
@@ -1521,106 +1391,93 @@ function symbolToName(s: string): string {
 
 /** @internal */
 export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
-  const refs: string[] = [];
-  for (const arg of orderArgs) {
-    if (Array.isArray(arg)) {
-      refs.push(...columnReferences(arg).map((ref) => ref.value));
-    } else if (typeof arg === "string") {
-      const term = isRubySymbol(arg) ? symbolToName(arg) : arg;
-      const t = extractTableNameFrom(term);
-      if (t) refs.push(t);
-    } else if (arg instanceof Arel.Attribute) {
-      refs.push(String(arg.relation.name));
-    } else if (arg instanceof Nodes.Ordering) {
-      const expr = (arg as any).expr;
-      if (expr instanceof Arel.Attribute) {
-        refs.push(String(expr.relation.name));
+  return filterMap(
+    orderArgs.flatMap((arg) => {
+      if (typeof arg === "string") {
+        return extractTableNameFrom(arg);
+      } else if (isHash(arg)) {
+        return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
+          if (isHash(value)) {
+            return toS(key);
+          } else {
+            return typeof key === "string" ? extractTableNameFrom(key) : null;
+          }
+        });
+      } else if (arg instanceof Arel.Attribute) {
+        return arg.relation.name;
+      } else if (arg instanceof Nodes.Ordering) {
+        return arg.expr instanceof Arel.Attribute ? arg.expr.relation.name : null;
+      } else {
+        return null;
       }
-    } else if (arg instanceof Map) {
-      for (const [key, value] of arg) {
-        if (isPlainObject(value)) {
-          refs.push(String(key));
-        } else if (typeof key === "string") {
-          const t = extractTableNameFrom(isRubySymbol(key) ? symbolToName(key) : key);
-          if (t) refs.push(t);
-        }
-      }
-    } else if (isPlainObject(arg)) {
-      for (const [key, value] of Object.entries(arg)) {
-        if (isPlainObject(value)) {
-          refs.push(key);
-        } else {
-          const t = extractTableNameFrom(String(key));
-          if (t) refs.push(t);
-        }
-      }
-    }
-  }
-  return refs.map((ref) => Arel.sql(ref, { retryable: true }));
+    }),
+    (ref) => (ref != null ? Arel.sql(ref as string, { retryable: true }) : null),
+  );
 }
 
 /** @internal */
 export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
-  for (let i = 0; i < orderArgs.length; i++) {
-    orderArgs[i] = (this.model as any)?.sanitizeSqlForOrder?.(orderArgs[i]) ?? orderArgs[i];
-  }
+  orderArgs.splice(
+    0,
+    orderArgs.length,
+    ...orderArgs.map((arg) => this.model.sanitizeSqlForOrder(arg as string | ArelNode)),
+  );
   return orderArgs;
-}
-
-function orderedNode(node: unknown, dir: unknown): unknown {
-  return String(dir).toLowerCase() === "desc"
-    ? new Nodes.Descending(node)
-    : new Nodes.Ascending(node);
 }
 
 /** @internal */
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
-  this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | Nodes.Node)[], {
-    permit: (
-      this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
-    ).columnNameWithOrderMatcher(),
+  this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | ArelNode)[], {
+    permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
+
   validateOrderArgs.call(this, orderArgs);
-  const refs = columnReferences(orderArgs);
-  if (refs.length > 0) {
-    (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], refs);
+
+  const references = columnReferences(orderArgs);
+  if (!isEmpty(references)) {
+    this.referencesValues = unionReferences(this.referencesValues, references);
   }
-  const mapped: unknown[] = [];
-  for (const arg of orderArgs) {
-    if (isRubySymbol(arg)) {
-      mapped.push(new Nodes.Ascending(orderColumn.call(this, symbolToName(arg))));
-    } else if (arg instanceof Map) {
-      for (const [key, value] of arg) {
-        mapped.push(
-          key instanceof Nodes.Node
-            ? orderedNode(key, value)
-            : orderedNode(orderColumn.call(this, String(key)), value),
-        );
-      }
-    } else if (isPlainObject(arg)) {
-      for (const rawKey of Object.keys(arg)) {
-        const key = isRubySymbol(rawKey) ? symbolToName(rawKey) : rawKey;
-        const value = (arg as Record<PropertyKey, unknown>)[rawKey];
-        if (isPlainObject(value)) {
-          for (const [field, dir] of Object.entries(value)) {
-            mapped.push(orderedNode(orderColumn.call(this, [key, field].join(".")), dir));
-          }
+
+  orderArgs.splice(
+    0,
+    orderArgs.length,
+    ...flatten(
+      orderArgs.map((arg) => {
+        if (isSymbol(arg)) {
+          return (orderColumn.call(this, symbolToS(arg)) as Nodes.SqlLiteral).asc();
+        } else if (isHash(arg)) {
+          return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
+            if (isHash(value)) {
+              return (toA(value) as [unknown, unknown][]).map(([field, dir]) =>
+                rbFPublicSend(
+                  orderColumn.call(this, [toS(key), toS(field)].join(".")),
+                  rbFSend(dir, "downcase"),
+                ),
+              );
+            } else {
+              if (
+                key instanceof Nodes.SqlLiteral ||
+                key instanceof Nodes.Node ||
+                key instanceof Arel.Attribute
+              ) {
+                return rbFPublicSend(key, rbFSend(value, "downcase"));
+              } else {
+                return rbFPublicSend(orderColumn.call(this, toS(key)), rbFSend(value, "downcase"));
+              }
+            }
+          });
         } else {
-          mapped.push(orderedNode(orderColumn.call(this, key), value));
+          return arg;
         }
-      }
-    } else {
-      mapped.push(arg);
-    }
-  }
-  orderArgs.length = 0;
-  orderArgs.push(...mapped);
+      }),
+    ),
+  );
 }
 
 /** @internal */
-export function buildOrder(this: QueryMethodsHost, arel: any): void {
+export function buildOrder(this: QueryMethodsHost, arel: any): unknown {
   const orders = compactBlank(((this as any).orderValues ?? []) as unknown[]);
-  if (orders.length > 0) arel.order?.(...orders);
+  if (orders.length > 0) return arel.order?.(...orders);
 }
 
 /** @internal */
@@ -1707,7 +1564,7 @@ export const QueryMethodsPublicInstanceMethods = {
   rewhere,
   invertWhere,
   invertWhereBang,
-  structurallyCompatible,
+  isStructurallyCompatible,
   and,
   andBang,
   or,
@@ -1852,32 +1709,32 @@ function escapeRegex(s: string): string {
 
 /** @internal */
 export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
-  const table: any = this.table;
-  if (!table) return false;
-  const modelClass: any = this.model;
-  const name = escapeRegex(table.name);
-  const quotedTableName = modelClass.adapterClass().quoteTableName(table.name);
-  const quoted = escapeRegex(quotedTableName);
-  const fromStr = typeof (from as any)?.toSql === "function" ? (from as any).toSql() : String(from);
-  return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${name}\\b|${quoted})(?!\\.)`, "i").test(fromStr);
+  const tableName = escapeRegex(this.table.name as string);
+  const quotedTableName = escapeRegex(
+    this.model.adapterClass().quoteTableName(this.table.name as string),
+  );
+  return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${tableName}\\b|${quotedTableName})(?!\\.)`, "i").test(
+    rbObjAsString(from),
+  );
 }
 
 /** @internal */
 export function arelColumn(
   this: QueryMethodsHost,
-  field: string | number | Nodes.Node | null,
+  field: string | number | ArelNode | null,
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
   const isSymbol = isRubySymbol(field);
-  field = isSymbol ? symbolToName(field as string) : field == null ? "" : String(field);
-  field = (modelClass?.attributeAliases?.[field] as string | undefined) ?? field;
+  if (isSymbol) field = symbolToName(field as string);
+
+  field = (modelClass.attributeAliases[field as string] as string | undefined) || toS(field);
 
   const fromClause = (this as any).fromClause;
   const from = fromClause?.name || fromClause?.value;
 
   if (
-    hasKey(modelClass?.columnsHash?.() ?? {}, field) &&
+    Object.hasOwn(modelClass.columnsHash(), field) &&
     (!from || isTableNameMatches.call(this, from))
   ) {
     const table: any = this.table;
@@ -1913,22 +1770,17 @@ export function arelColumnWithTable(
   this: QueryMethodsHost,
   tableName: string,
   columnName: string,
-): unknown {
+): Arel.Attribute | Nodes.SqlLiteral {
   (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], [
     Arel.sql(tableName, { retryable: true }),
   ]);
-  const isSymbol = isRubySymbol(columnName);
-  if (isSymbol) columnName = symbolToName(columnName);
-  const modelClass: any = this.model;
-  if (isSymbol || !/\W/.test(columnName)) {
-    const builder = (this as any).predicateBuilder;
-    return (
-      builder?.resolveArelAttribute?.(tableName, columnName, (name: string) =>
-        lookupTableKlassFromJoinDependencies.call(this, name),
-      ) ?? new ArelTable(tableName).get(columnName)
+  if (isRubySymbol(columnName) || !/\W/.test(columnName)) {
+    return this.predicateBuilder.resolveArelAttribute(tableName, columnName, (name: string) =>
+      lookupTableKlassFromJoinDependencies.call(this, name),
     );
+  } else {
+    return Arel.sql(`${this.model.adapterClass().quoteTableName(tableName)}.${columnName}`);
   }
-  return Arel.sql(`${modelClass.adapterClass().quoteTableName(tableName)}.${columnName}`);
 }
 
 /** @internal */
@@ -1945,23 +1797,20 @@ export function arelColumnsFromHash(
     if (Array.isArray(columns)) {
       return columns.map((col) => arelColumnWithTable.call(this, tbl, col));
     }
-    throw new TypeError(`Expected Symbol, String or Array, got: ${typeof columns}`);
+    throw new TypeError(`Expected Symbol, String or Array, got: ${rbObjClassname(columns)}`);
   });
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   return arelColumn.call(this, field, (attrName: string) => {
-    if (attrName === "count" && ((this as any).groupValues ?? []).length > 0) {
-      const table: any = this.table;
-      return table.get(attrName);
+    if (attrName === "count" && !isEmpty(this.groupValues)) {
+      return this.table.get(attrName);
+    } else {
+      return Arel.sql(this.model.adapterClass().quoteTableName(attrName), {
+        retryable: true,
+      });
     }
-    return Arel.sql((this.model as any).adapterClass().quoteTableName(attrName), {
-      retryable: true,
-    });
   });
 }
 
@@ -1973,95 +1822,56 @@ export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): un
   });
 }
 
-function nodeAs(attr: unknown, quotedAlias: string): unknown {
-  if (typeof (attr as any)?.as === "function") return (attr as any).as(quotedAlias);
-  const attrSql = typeof (attr as any)?.toSql === "function" ? (attr as any).toSql() : String(attr);
-  return Arel.sql(`${attrSql} AS ${quotedAlias}`);
-}
-
 /** @internal */
 export function arelColumnAliasesFromHash(
   this: QueryMethodsHost,
   fields: Record<string, unknown>,
 ): unknown[] {
-  return Object.keys(fields).flatMap((key) => {
-    const columnsAliases = fields[key];
-    const tableName = isRubySymbol(key) ? symbolToName(key) : key;
-    const modelClass: any = this.model;
-    const quoteAlias = (a: unknown): string =>
-      modelClass.adapterClass().quoteColumnName(isRubySymbol(a) ? symbolToName(a) : String(a));
+  return Object.entries(fields).flatMap<unknown>(([key, columnsAliases]) => {
+    const tableName = isSymbol(key) ? symbolToS(key) : key;
     if (isPlainObject(columnsAliases)) {
-      return Object.keys(columnsAliases as object).map((col) => {
-        const alias = (columnsAliases as any)[col];
-        const attr = arelColumnWithTable.call(this, tableName, col);
-        return nodeAs(attr instanceof Nodes.Node ? attr : Arel.sql(String(col)), quoteAlias(alias));
-      });
-    }
-    if (Array.isArray(columnsAliases)) {
-      return (columnsAliases as string[]).map((col) =>
-        arelColumnWithTable.call(this, tableName, col),
+      return Object.entries(columnsAliases).map(([column, columnAlias]) =>
+        arelColumnWithTable
+          .call(this, tableName, column)
+          .as(this.model.adapterClass().quoteColumnName(toS(columnAlias))),
       );
+    } else if (Array.isArray(columnsAliases)) {
+      return columnsAliases.map((column) => arelColumnWithTable.call(this, tableName, column));
+    } else if (typeof columnsAliases === "string") {
+      return (arelColumn.call(this, key) as Arel.Attribute | Nodes.SqlLiteral).as(
+        this.model.adapterClass().quoteColumnName(toS(columnsAliases)),
+      );
+    } else {
+      return null;
     }
-    if (typeof columnsAliases === "string") {
-      return [nodeAs(arelColumn.call(this, key), quoteAlias(columnsAliases))];
-    }
-    return [];
   });
 }
 
 /** @internal */
 export function buildFrom(this: QueryMethodsHost): unknown {
-  const fromClause = (this as any).fromClause;
-  const opts = fromClause?.value;
-  let name = fromClause?.name;
-  if (opts && typeof opts.arel === "function") {
-    name ??= "subquery";
-    const alias = String(name);
-    let resolved: any = opts;
-    if (opts.isEagerLoading === true && typeof opts.applyJoinDependency === "function") {
-      const pending = opts.applyJoinDependency({}, (relation: any) => {
-        resolved = relation;
+  let opts: FromClause["value"] = this.fromClause.value;
+  let name = this.fromClause.name;
+  if (opts instanceof ActiveRecord.Relation) {
+    if (opts.isEagerLoading) {
+      opts = opts._applyEagerJoinDependency({
+        limitedIds: this._fromLimitedIds?.[0] === opts ? this._fromLimitedIds[1] : undefined,
       });
-      if (resolved === opts) {
-        pending.catch(() => {});
-        // @nie disposition=TODO
-        throw new NotImplementedError(
-          "Using an eager-loaded relation with a limit/offset over a collection " +
-            "association as a `from` subquery is not supported: Rails resolves this " +
-            "by executing a query to materialize the limited primary keys " +
-            "(distinct_relation_for_primary_key), which the synchronous `from` " +
-            "cannot do. Materialize the ids first, e.g. " +
-            "where(id: await rel.pluck(primaryKey)).",
-        );
-      }
     }
-    return resolved.arel().as(alias);
+    name ??= "subquery";
+    return opts.arel().as(toS(name));
+  } else {
+    return opts;
   }
-  return opts;
-}
-
-function tableStar(table: any): unknown {
-  return table.get(Arel.star());
 }
 
 /** @internal */
 export function buildSelect(this: QueryMethodsHost, arel: any): void {
-  const model: any = this.model;
   if (any(this.selectValues)) {
     arel.project(...arelColumns.call(this, this.selectValues));
-  } else if (
-    (model?.ignoredColumns?.length ?? 0) > 0 ||
-    model?.enumerateColumnsInSelectStatements
-  ) {
-    arel.project(
-      ...(model?.columnNames?.() ?? []).map((field: string) => {
-        const table: any = (this as any).table ?? model?.arelTable;
-        return table.get(field);
-      }),
-    );
+  } else if (any(this.model.ignoredColumns) || this.model.enumerateColumnsInSelectStatements) {
+    arel.project(...this.model.columnNames().map((field: string) => this.table.get(field)));
   } else {
-    const table: any = (this as any).table ?? model?.arelTable;
-    arel.project(table ? tableStar(table) : Arel.sql("*"));
+    arel.project(this.table.get(Arel.star()));
   }
 }
 
@@ -2084,10 +1894,12 @@ export function buildWithExpressionFromValue(
     if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0], false);
 
     const parts = value.map((query) => buildWithExpressionFromValue.call(this, query, true));
-    if (parts.length === 0) return undefined;
-    return parts.reduce(
-      (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
-    );
+    return parts
+      .slice(1)
+      .reduce(
+        (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
+        parts[0],
+      );
   }
   throw new ArgumentError(
     `Unsupported argument type: \`${String(value)}\` ${rubyClassNameOf(value)}`,
@@ -2098,13 +1910,10 @@ export function buildWithExpressionFromValue(
 export function buildWithValueFromHash(
   this: QueryMethodsHost,
   hash: Record<string, unknown>,
-): unknown[] {
+): Nodes.TableAlias[] {
   return Object.entries(hash).map(
     ([name, value]) =>
-      new Nodes.TableAlias(
-        buildWithExpressionFromValue.call(this, value) as any,
-        isRubySymbol(name) ? symbolToName(name) : name,
-      ),
+      new Nodes.TableAlias(buildWithExpressionFromValue.call(this, value) as any, name),
   );
 }
 
@@ -2123,34 +1932,29 @@ export function lookupTableKlassFromJoinDependencies(
 /** @internal */
 export function eachJoinDependencies(
   this: QueryMethodsHost,
-  joinDependencies: JoinDependency[] | undefined,
+  joinDependencies: JoinDependency[] = buildJoinDependencies.call(this),
   block: (join: any) => void,
 ): void {
-  const deps = joinDependencies ?? buildJoinDependencies.call(this);
-  for (const jd of deps) {
-    jd.each(block);
+  for (const joinDependency of joinDependencies) {
+    joinDependency.each(block);
   }
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
-  const joinNames: AssociationSpec[] = [];
-  const addNames = (specs: ReadonlyArray<AssociationSpec>) => {
-    for (const a of specs) if (!joinNames.includes(a)) joinNames.push(a);
-  };
-  addNames(this.joinsValues as AssociationSpec[]);
-  addNames(this.leftOuterJoinsValues);
-  addNames(this.eagerLoadValues);
-  addNames(this.includesValues);
+  let joins = union(this.joinsValues as AssociationSpec[], this.leftOuterJoinsValues);
+  if (!isEmpty(this.eagerLoadValues)) joins = union(joins, this.eagerLoadValues);
+  if (!isEmpty(this.includesValues)) joins = union(joins, this.includesValues);
 
-  const stashedJoins: JoinDependency[] = [];
-  const named = selectNamedJoins.call(this, joinNames, stashedJoins);
-  const jd = constructJoinDependency.call(this, named as AssociationSpec[], null);
-  stashedJoins.unshift(jd);
-  return stashedJoins;
+  const joinDependencies: JoinDependency[] = [];
+  joinDependencies.unshift(
+    constructJoinDependency.call(
+      this,
+      selectNamedJoins.call(this, joins, joinDependencies) as AssociationSpec[],
+      null,
+    ),
+  );
+  return joinDependencies;
 }
 
 /** @internal */
@@ -2172,9 +1976,7 @@ export function buildArel(
   if (this.offsetValue !== null) arel.skip(buildCastValue("OFFSET", toI(this.offsetValue)));
 
   if (this.groupValues.length > 0)
-    arel.group(
-      ...(arelColumns.call(this, [...new Set(this.groupValues)]) as (Nodes.Node | string)[]),
-    );
+    arel.group(...(arelColumns.call(this, uniq(this.groupValues)) as (ArelNode | string)[]));
 
   buildOrder.call(this, arel);
   buildWith.call(this, arel);
@@ -2189,7 +1991,7 @@ export function buildArel(
 
   if (this.annotateValues.length > 0) {
     const annotates =
-      this.annotateValues.length > 1 ? [...new Set(this.annotateValues)] : this.annotateValues;
+      this.annotateValues.length > 1 ? uniq(this.annotateValues) : this.annotateValues;
     arel.comment?.(...annotates);
   }
 
@@ -2203,19 +2005,12 @@ export function selectNamedJoins(
   stashedJoins: unknown[] | null = null,
   block?: (join: unknown) => void,
 ): unknown[] {
-  const cteJoins: string[] = [];
-  const associations: unknown[] = [];
-
-  for (const joinName of joinNames) {
-    if (
+  const [cteJoins, associations] = partition(
+    joinNames,
+    (joinName) =>
       isRubySymbol(joinName) &&
-      any(this.withValues, (cte) => joinName in cte || symbolToName(joinName) in cte)
-    ) {
-      cteJoins.push(symbolToName(joinName));
-    } else {
-      associations.push(joinName);
-    }
-  }
+      any(this.withValues, (cte) => joinName in cte || symbolToName(joinName) in cte),
+  ) as [string[], unknown[]];
 
   for (const cteName of cteJoins) {
     block?.(new CTEJoin(cteName));
@@ -2246,110 +2041,106 @@ export function selectAssociationList(
 
 /**
  * @internal
- * @missingRailsCall empty? — PERMANENT
  * @missingRailsName strip — PERMANENT
  */
 export function buildJoinBuckets(
   this: QueryMethodsHost,
-): [Record<string, unknown[]>, typeof Nodes.InnerJoin | typeof Nodes.OuterJoin] {
-  const buckets = new Proxy({} as Record<string, unknown[]>, {
-    get(h, k) {
-      if (typeof k !== "string") return Reflect.get(h, k);
-      return (h[k] ??= []);
-    },
+): [Hash<string, unknown[]>, typeof Nodes.InnerJoin | typeof Nodes.OuterJoin] {
+  const buckets = new Hash<string, unknown[]>((h, k) => {
+    const v: unknown[] = [];
+    h.set(k, v);
+    return v;
   });
 
-  const joinsValues = this.joinsValues;
-
-  const leftOuterJoinsValues = this.leftOuterJoinsValues;
-  const stashedLeft: JoinDependency[] = [];
-  if (leftOuterJoinsValues.length > 0) {
-    const namedLeft = selectNamedJoins.call(this, leftOuterJoinsValues, stashedLeft, (left) => {
-      if (left instanceof CTEJoin) {
-        buckets.join_node.push(buildWithJoinNode.call(this, left.name, Nodes.OuterJoin));
-      } else {
-        throw new ArgumentError("only Hash, Symbol and Array are allowed");
-      }
-    });
-
-    if (joinsValues.length === 0) {
-      buckets.named_join.push(...namedLeft);
-      buckets.stashed_join.push(...stashedLeft);
-      return [buckets, Nodes.OuterJoin];
-    }
-
-    const leftJd = constructJoinDependency.call(
+  let stashedLeftJoins: JoinDependency[] | undefined;
+  if (!isEmpty(this.leftOuterJoinsValues)) {
+    stashedLeftJoins = [];
+    const leftJoins = selectNamedJoins.call(
       this,
-      namedLeft as AssociationSpec[],
-      Nodes.OuterJoin,
+      this.leftOuterJoinsValues,
+      stashedLeftJoins,
+      (leftJoin) => {
+        if (leftJoin instanceof CTEJoin) {
+          buckets
+            .get("join_node")!
+            .push(buildWithJoinNode.call(this, leftJoin.name, Nodes.OuterJoin));
+        } else {
+          throw new ArgumentError("only Hash, Symbol and Array are allowed");
+        }
+      },
     );
-    stashedLeft.unshift(leftJd);
-  }
 
-  const joins = [...joinsValues];
-  const lastJoinValue = joins[joins.length - 1];
-  let stashedEagerLoad: JoinDependency | undefined;
-  if (lastJoinValue instanceof ActiveRecord.Associations.JoinDependency) {
-    if (lastJoinValue.baseKlass === this.model) {
-      joins.pop();
-      stashedEagerLoad = lastJoinValue;
+    if (isEmpty(this.joinsValues)) {
+      buckets.set("named_join", leftJoins);
+      buckets.set("stashed_join", stashedLeftJoins);
+      return [buckets, Nodes.OuterJoin];
+    } else {
+      stashedLeftJoins.unshift(
+        constructJoinDependency.call(this, leftJoins as AssociationSpec[], Nodes.OuterJoin),
+      );
     }
   }
 
-  const hasStashed = Boolean(stashedEagerLoad) || stashedLeft.length > 0;
+  const joins = [...this.joinsValues];
+  let stashedEagerLoad: JoinDependency | undefined;
+  if (joins[joins.length - 1] instanceof ActiveRecord.Associations.JoinDependency) {
+    if ((joins[joins.length - 1] as JoinDependency).baseKlass === this.model) {
+      stashedEagerLoad = joins.pop() as JoinDependency;
+    }
+  }
 
-  for (const [i, v] of joins.entries()) {
-    if (typeof v === "string" && !v.startsWith(":")) {
-      joins[i] = new Nodes.StringJoin(Arel.sql(v.trim()) as any) as Nodes.Join;
+  for (const [i, join] of joins.entries()) {
+    if (typeof join === "string" && !join.startsWith(":")) {
+      joins[i] = new Nodes.StringJoin(Arel.sql(join.trim()) as any) as Nodes.Join;
     }
   }
 
   while (joins[0] instanceof Nodes.Join) {
     const joinNode = joins.shift() as Nodes.Join;
-    if (!(joinNode instanceof Nodes.LeadingJoin) && hasStashed) {
-      buckets.join_node.push(joinNode);
+    if (!(joinNode instanceof Nodes.LeadingJoin) && (stashedEagerLoad || stashedLeftJoins)) {
+      buckets.get("join_node")!.push(joinNode);
     } else {
-      buckets.leading_join.push(joinNode);
+      buckets.get("leading_join")!.push(joinNode);
     }
   }
 
-  buckets.named_join = selectNamedJoins.call(this, joins, buckets.stashed_join, (join) => {
-    if (join instanceof Nodes.Join) {
-      buckets.join_node.push(join);
-    } else if (join instanceof CTEJoin) {
-      buckets.join_node.push(buildWithJoinNode.call(this, join.name));
-    } else {
-      throw new RuntimeError(`unknown class: ${rbObjClass(join)}`);
-    }
-  });
+  buckets.set(
+    "named_join",
+    selectNamedJoins.call(this, joins, buckets.get("stashed_join")!, (join) => {
+      if (join instanceof Nodes.Join) {
+        buckets.get("join_node")!.push(join);
+      } else if (join instanceof CTEJoin) {
+        buckets.get("join_node")!.push(buildWithJoinNode.call(this, join.name));
+      } else {
+        throw new RuntimeError(`unknown class: ${rbObjClassname(join)}`);
+      }
+    }),
+  );
 
-  buckets.stashed_join.push(...stashedLeft);
-  if (stashedEagerLoad) buckets.stashed_join.push(stashedEagerLoad);
+  if (stashedLeftJoins) buckets.get("stashed_join")!.push(...stashedLeftJoins);
+  if (stashedEagerLoad) buckets.get("stashed_join")!.push(stashedEagerLoad);
 
   return [buckets, Nodes.InnerJoin];
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function buildJoins(
   this: QueryMethodsHost,
   joinSources: any[],
   aliases?: AliasTracker,
 ): any[] {
-  if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return joinSources;
+  if (isEmpty(this.joinsValues) && isEmpty(this.leftOuterJoinsValues)) return joinSources;
 
   const [buckets, joinType] = buildJoinBuckets.call(this);
 
-  const namedJoins = buckets.named_join as AssociationSpec[];
-  const stashedJoins = buckets.stashed_join as JoinDependency[];
-  const leadingJoins = buckets.leading_join as Nodes.Join[];
-  const joinNodes = buckets.join_node as Nodes.Join[];
+  const namedJoins = buckets.get("named_join")! as AssociationSpec[];
+  const stashedJoins = buckets.get("stashed_join")! as JoinDependency[];
+  const leadingJoins = buckets.get("leading_join")! as Nodes.Join[];
+  const joinNodes = buckets.get("join_node")! as Nodes.Join[];
 
-  if (leadingJoins.length > 0) joinSources.push(...leadingJoins);
+  if (!isEmpty(leadingJoins)) joinSources.push(...leadingJoins);
 
-  if (!(namedJoins.length === 0 && stashedJoins.length === 0)) {
+  if (!(isEmpty(namedJoins) && isEmpty(stashedJoins))) {
     const aliasTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
     const joinDependency = constructJoinDependency.call(this, namedJoins, joinType);
     joinSources.push(
@@ -2357,46 +2148,39 @@ export function buildJoins(
     );
   }
 
-  if (joinNodes.length > 0) joinSources.push(...joinNodes);
+  if (!isEmpty(joinNodes)) joinSources.push(...joinNodes);
   return joinSources;
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
-export function buildWith(this: QueryMethodsHost, arel: any): void {
-  if (this.withValues.length === 0) return;
+/** @internal */
+export function buildWith(this: QueryMethodsHost, arel: SelectManager): SelectManager | undefined {
+  if (isEmpty(this.withValues)) return;
 
-  const withStatements = this.withValues.flatMap((withValue) =>
+  const withStatements = this.withValues.map((withValue) =>
     buildWithValueFromHash.call(this, withValue),
   );
 
-  if (this._withIsRecursive) {
-    arel.withRecursive?.(...withStatements);
-  } else {
-    arel.with?.(...withStatements);
-  }
+  return this._withIsRecursive
+    ? arel.with(":recursive", withStatements)
+    : arel.with(withStatements);
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export function buildWithJoinNode(
   this: QueryMethodsHost,
   name: string,
   kind: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin = Nodes.InnerJoin,
 ): unknown {
   const withTable = new ArelTable(name);
-  const table: any = this.table;
-  const mc = this.model;
-  return table
-    .join(withTable, kind)
-    .on(
-      withTable
-        .get(foreignKey(String(mc?.modelName ?? mc?.name ?? "Model")))
-        .eq(table.get(mc?.primaryKey ?? "id")),
-    )
-    .joinSources()[0];
+
+  return first(
+    this.table
+      .join(withTable, kind)
+      .on(
+        withTable
+          .get(foreignKey(String(this.model.modelName)))
+          .eq(this.table.get(this.model.primaryKey as string)),
+      )
+      .joinSources(),
+  );
 }

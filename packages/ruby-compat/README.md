@@ -38,7 +38,7 @@ barrel.
 
 ## What is here
 
-About 90 modules, grouped by the MRI area they port:
+About 110 modules, grouped by the MRI area they port:
 
 | area                        | modules                                                                                                                                                                                                                                                                                 |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -49,7 +49,7 @@ About 90 modules, grouped by the MRI area they port:
 | Array, Hash                 | Ruby `Array` methods (`pack`, `unpack1`, `slice`, `uniq`, …) and `Hash` methods with Ruby semantics (`fetch`, `merge`, `except`, default procs, …)                                                                                                                                      |
 | Exceptions                  | `Exception`, `StandardError`, `ArgumentError`, `NameError`, `NoMethodError`, `TypeError`, `KeyError`, `FrozenError`, `ZeroDivisionError`, …, and `Location` / `excBacktraceLocations` for backtraces                                                                                    |
 | Concurrency                 | `Monitor` / `synchronize` / `MonitorMixin`, `Mutex`, `Thread`, `Fiber`, `ThreadPoolExecutor`                                                                                                                                                                                            |
-| Stdlib                      | `File`, `Dir`, `FileUtils`, `IO`, `Tempfile`, `JSON`, `Base64`, `Digest`, `OpenSSL` (`Cipher`, `HMAC`), `SecureRandom`, `Zlib`, `URI`, `IPAddr`, `Gem`, `RbConfig`, `Process`                                                                                                           |
+| Stdlib                      | `Marshal`, `Psych`, `PP` / `PrettyPrint`, `Open3`, `File`, `Dir`, `FileUtils`, `IO`, `Tempfile`, `JSON`, `Base64`, `Digest`, `OpenSSL` (`Cipher`, `HMAC`), `SecureRandom`, `Zlib`, `URI`, `IPAddr`, `Gem`, `RbConfig`, `Process`                                                        |
 | Host adapters               | Pluggable backends for the host runtime: `registerFsAdapter`, `registerCryptoAdapter`, `registerProcessAdapter`, `registerZlibAdapter`, `registerHttpAdapter`, `registerOsAdapter`, `registerChildProcessAdapter`, `registerAsyncContextAdapter`. Node implementations are the default. |
 
 `src/index.ts` is the complete list.

@@ -1,5 +1,11 @@
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import "../tasks/mysql-database-tasks.js";
+import "../tasks/postgresql-database-tasks.js";
+import "../tasks/sqlite-database-tasks.js";
 
-export function clearRegisteredTasks(): void {
-  (DatabaseTasks as unknown as { _registeredTasks: unknown[] })._registeredTasks = [];
+const registry = DatabaseTasks as unknown as { tasks: Map<unknown, unknown> };
+const builtinTasks = new Map(registry.tasks);
+
+export function resetRegisteredTasks(): void {
+  registry.tasks = new Map(builtinTasks);
 }

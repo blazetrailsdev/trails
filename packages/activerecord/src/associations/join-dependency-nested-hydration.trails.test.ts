@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations, isAssociationCached } from "../associations.js";
+import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
-import { fixtures } from "../test-fixtures.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 import { resultFromRowHashes } from "../test-helpers/result-from-row-hashes.js";
@@ -36,7 +36,7 @@ describe("JoinDependency nested hydration", () => {
   });
 
   it("eager association loading grafts stashed associations to correct parent", () => {
-    const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, { comments: "author" }, Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {
@@ -70,11 +70,11 @@ describe("JoinDependency nested hydration", () => {
     expect(authorProxy1?.target).toBe(authorProxy2?.target);
 
     expect(comment1.association("author").target).toBeDefined();
-    expect(isAssociationCached(post, "author")).toBe(false);
+    expect(post.isAssociationCached("author")).toBe(false);
   });
 
   it("eager association loading with cascaded two levels and one level", () => {
-    const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, { comments: "author" }, Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {
@@ -98,7 +98,7 @@ describe("JoinDependency nested hydration", () => {
   });
 
   it("nested records are not readonly by default when no reflection scope marks readonly", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
     const rows = [
       aliasedRow(jd, {
         "": { id: 1, title: "Post A" },

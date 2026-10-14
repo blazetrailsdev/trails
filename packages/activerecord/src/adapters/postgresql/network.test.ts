@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IPAddr } from "@blazetrails/ruby-compat";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { fixtures } from "../../test-fixtures.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -89,7 +89,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("invalid network address", async () => {
-      const invalidAddress = PostgresqlNetworkAddress.new({
+      const invalidAddress = new PostgresqlNetworkAddress({
         cidr_address: "invalid addr",
         inet_address: "invalid addr",
       }) as any;
@@ -107,7 +107,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "postgresql_network_addresses");
+      const output = await dumpTableSchema("postgresql_network_addresses");
       expect(output).toMatch(/t\.inet\(\s*"inet_address",\s*\{[^}]*default:\s*"192\.168\.1\.1"/);
       expect(output).toMatch(
         /t\.cidr\(\s*"cidr_address",\s*\{[^}]*default:\s*"192\.168\.1\.0\/24"/,

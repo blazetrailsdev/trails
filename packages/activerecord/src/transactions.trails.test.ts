@@ -1,10 +1,15 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Fiber, kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
-import { LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
+import {
+  IsolatedExecutionState,
+  LoadInterlockAwareMonitor,
+  NullLock,
+  ThreadLoadInterlockAwareMonitor,
+} from "@blazetrails/activesupport";
 import { Base, transaction, registerModel } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { WrongReply } from "./test-helpers/models/reply.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
@@ -44,10 +49,11 @@ async function makeSQLiteTopic() {
   const adp = new BetterSQLite3Adapter({ database: ":memory:" });
   openAdapters.push(adp);
   await adp.execute(
-    "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+    "CREATE TABLE direct_topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
   );
   class Topic extends Base {
     static {
+      this.tableName = "direct_topics";
       this.attribute("id", "integer");
       this.attribute("title", "string");
       this.attribute("approved", "boolean");
@@ -60,7 +66,7 @@ async function makeSQLiteTopic() {
 afterEach(async () => {
   for (const a of openAdapters.splice(0)) {
     try {
-      await a.execute("DROP TABLE IF EXISTS topics");
+      await a.execute("DROP TABLE IF EXISTS direct_topics");
     } catch {}
     await a.disconnectBang();
   }
@@ -446,7 +452,7 @@ describe("aborting before_validation halts before the validators run", () => {
   fixtures({});
 
   const newInvalidReply = () =>
-    WrongReply.new({ title: "a reply", content: "" }) as unknown as {
+    new WrongReply({ title: "a reply", content: "" }) as unknown as {
       save(): Promise<boolean | undefined>;
       errors: { isAny(): boolean };
       beforeValidationForTransaction: () => Promise<void>;
@@ -468,5 +474,29 @@ describe("aborting before_validation halts before the validators run", () => {
 
     expect(await reply.save()).toBeFalsy();
     expect(reply.errors.isAny()).toBe(false);
+  });
+});
+
+describe("a pinned connection's Thread monitor (lock_thread=, abstract_adapter.rb:181-191)", () => {
+  it("selects the Thread arm, which serializes sibling promises inside a transaction", async () => {
+    const { adapter } = await makeSQLiteTopic();
+    adapter.setLockThread(IsolatedExecutionState.context());
+    const tm = adapter.transactionManager;
+    const log: string[] = [];
+    const sibling = (name: string) =>
+      tm.withinNewTransaction({}, async () => {
+        log.push(`${name}:enter`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        log.push(`${name}:exit`);
+      });
+
+    await tm.withinNewTransaction({}, () => Promise.all([sibling("a"), sibling("b")]));
+
+    expect(log).toEqual(["a:enter", "a:exit", "b:enter", "b:exit"]);
+    expect(adapter.lock).toBeInstanceOf(ThreadLoadInterlockAwareMonitor);
+    adapter.setLockThread(Fiber.current());
+    expect(adapter.lock).toBeInstanceOf(LoadInterlockAwareMonitor);
+    adapter.setLockThread(null);
+    expect(adapter.lock).toBe(NullLock);
   });
 });

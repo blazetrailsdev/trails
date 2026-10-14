@@ -1,11 +1,20 @@
+import type { MimeType } from "../action-dispatch/http/mime-type.js";
 import { AbstractController } from "../abstract-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
-import type { RackResponse } from "@blazetrails/rack";
-import { initializeIncludedModules, SafeBuffer, underscore } from "@blazetrails/activesupport";
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
+import type { RackResponse, Response as RackResponseObject } from "@blazetrails/rack";
+import {
+  classAttribute,
+  demodulize,
+  initializeIncludedModules,
+  isAnonymous,
+  SafeBuffer,
+  underscore,
+} from "@blazetrails/activesupport";
+import { rbCheckArrayType, rbModSingletonP, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
@@ -15,17 +24,7 @@ import {
   type RackAppObject,
 } from "../action-dispatch/middleware/stack.js";
 import type { RackEnv } from "@blazetrails/rack";
-import { includeContent } from "./metal/head.js";
-import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
-import {
-  _normalizeOptions as _normalizeOptionsFn,
-  _normalizeText as _normalizeTextFn,
-  _processOptions as _processOptionsFn,
-  _renderInPriorities as _renderInPrioritiesFn,
-  _setHtmlContentType as _setHtmlContentTypeFn,
-  _setRenderedContentType as _setRenderedContentTypeFn,
-  _setVaryHeader as _setVaryHeaderFn,
-} from "./metal/rendering.js";
+import type { EncodingTemplate } from "../action-dispatch/http/param-builder.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
   override build(app: RackApp | RackAppObject): RackApp;
@@ -101,15 +100,47 @@ const INCLUDE: Strategy = (list, action) => (list ?? []).includes(action);
 const EXCLUDE: Strategy = (list, action) => !(list ?? []).includes(action);
 const NULL: Strategy = () => true;
 
-const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
+function inherited(this: typeof Metal, subclass: typeof Metal): void {
+  subclass.middlewareStack = this.middlewareStack.dup();
+}
 
 export class Metal extends AbstractController {
+  static {
+    this.abstractBang();
+  }
+
+  declare static middlewareStack: MiddlewareStack;
+  declare static isMiddlewareStack: boolean;
+  declare middlewareStack: MiddlewareStack;
+  declare isMiddlewareStack: boolean;
+
+  static {
+    classAttribute.call(this, "middlewareStack", { default: new MiddlewareStack() });
+    const reader = Object.getOwnPropertyDescriptor(this, "middlewareStack")!;
+    Object.defineProperty(this, "middlewareStack", {
+      ...reader,
+      get(this: typeof Metal) {
+        if (
+          !Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack") &&
+          !rbModSingletonP(this)
+        ) {
+          inherited.call(Object.getPrototypeOf(this), this);
+        }
+        return reader.get!.call(this);
+      },
+    });
+  }
+
   _request!: Request;
   _response!: Response;
   _params: Parameters | Record<string, unknown> | null = null;
 
   constructor() {
     super();
+    fireInherited(
+      new.target as unknown as HelpersPathControllerClass,
+      Metal as unknown as HelpersPathControllerClass,
+    );
     initializeIncludedModules(this);
   }
 
@@ -130,24 +161,25 @@ export class Metal extends AbstractController {
   get response(): Response {
     return this._response;
   }
-  set response(value: Response) {
-    this.setResponseBang(value);
+  set response(response: Response | RackResponse | RackResponseObject) {
+    this.setResponseBang(response);
 
-    this.markPerformed();
+    this._responseBody = true;
   }
 
   get session(): Session {
     return this.request.session;
   }
 
-  static controllerPath(): string {
-    return underscore(this.name.replace(/Controller$/, ""));
-  }
+  protected static _controllerName?: string | null;
 
-  static controllerName(): string {
-    const path = this.controllerPath();
-    const lastSlash = path.lastIndexOf("/");
-    return lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+  static controllerName(): string | null {
+    if (Object.hasOwn(this, "_controllerName") && this._controllerName != null) {
+      return this._controllerName;
+    }
+    return (this._controllerName = isAnonymous(this)
+      ? null
+      : underscore(demodulize(this.name).replace(/Controller$/, "")));
   }
 
   static makeResponseBang(request: Request): Response {
@@ -156,25 +188,16 @@ export class Metal extends AbstractController {
     return res;
   }
 
-  static actionEncodingTemplate(_action: string): false {
+  static actionEncodingTemplate(_action: unknown): EncodingTemplate | false | null {
     return false;
   }
 
   static middleware(): MiddlewareStack {
-    let stack = _middlewareStacks.get(this);
-    if (!stack) {
-      const superclass = Object.getPrototypeOf(this) as typeof Metal | null;
-      stack =
-        superclass && typeof superclass.middleware === "function"
-          ? superclass.middleware().dup()
-          : new MiddlewareStack();
-      _middlewareStacks.set(this, stack);
-    }
-    return stack;
+    return this.middlewareStack;
   }
 
   static use(...args: unknown[]): void {
-    this.middleware().use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
+    this.middlewareStack.use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
   }
 
   static action(this: typeof Metal, name: string): RackApp {
@@ -183,11 +206,11 @@ export class Metal extends AbstractController {
       const res = this.makeResponseBang(req);
       const controller = new this();
       await controller.dispatch(name, req, res);
-      return controller.toRackResponse();
+      return controller.toA();
     };
 
-    if (this.middleware().isAny()) {
-      return this.middleware().build(name, app);
+    if (this.middlewareStack.isAny()) {
+      return this.middlewareStack.build(name, app);
     } else {
       return app;
     }
@@ -199,33 +222,25 @@ export class Metal extends AbstractController {
     req: Request,
     res: Response,
   ): Promise<RackResponse> {
-    if (this.middleware().isAny()) {
-      return await this.middleware().build(name, async () => {
+    if (this.middlewareStack.isAny()) {
+      return await this.middlewareStack.build(name, async () => {
         const controller = new this();
         await controller.dispatch(name, req, res);
-        return controller.toRackResponse();
+        return controller.toA();
       })(req.env);
     } else {
       const controller = new this();
       await controller.dispatch(name, req, res);
-      return controller.toRackResponse();
+      return controller.toA();
     }
   }
 
-  controllerPath(): string {
-    return (this.constructor as typeof Metal).controllerPath();
-  }
-
-  controllerName(): string {
+  controllerName(): string | null {
     return (this.constructor as typeof Metal).controllerName();
   }
 
-  inspect(): string {
-    return `#<${this.constructor.name}>`;
-  }
-
-  urlFor(string: string): string {
-    return string;
+  urlFor(string: unknown): string {
+    return string as string;
   }
 
   async dispatch(name: string, request: Request, response: Response): Promise<RackResponse> {
@@ -233,7 +248,7 @@ export class Metal extends AbstractController {
     this.setResponseBang(response);
     await this.process(name);
     request.commitFlash();
-    return this.toRackResponse();
+    return this.toA();
   }
 
   setRequestBang(request: Request): void {
@@ -241,8 +256,13 @@ export class Metal extends AbstractController {
     request.controllerInstance = this;
   }
 
-  setResponseBang(response: Response): void {
-    this._response = response;
+  setResponseBang(response: Response | RackResponse | RackResponseObject): void {
+    if (this._response) {
+      const [, , body] = rbCheckArrayType(this._response) ?? [];
+      if (rbObjRespondTo(body, "close")) (body as { close(): void }).close();
+    }
+
+    this._response = response as Response;
   }
 
   resetSession(): void {
@@ -259,6 +279,10 @@ export class Metal extends AbstractController {
     return this.response.status;
   }
 
+  get responseCode(): number {
+    return this.status;
+  }
+
   get headers(): Response["headers"] {
     return this.response.headers;
   }
@@ -271,7 +295,7 @@ export class Metal extends AbstractController {
     return this.response.location;
   }
 
-  set contentType(value: string) {
+  set contentType(value: string | MimeType | undefined) {
     this.response.contentType = value;
   }
 
@@ -283,44 +307,6 @@ export class Metal extends AbstractController {
     return this.response.mediaType;
   }
 
-  head(status: number | string | null, options?: Record<string, unknown>): true {
-    if (status !== null && typeof status === "object") {
-      throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
-    }
-    const resolvedStatus = status ?? "ok";
-    let location: unknown;
-    let contentType: unknown;
-    if (options) {
-      location = options.location;
-      contentType = options.content_type;
-      for (const [key, value] of Object.entries(options)) {
-        if (key === "location" || key === "content_type") continue;
-        this.headers.set(
-          key
-            .split(/[-_]/)
-            .map((v) => v[0].toUpperCase() + v.slice(1))
-            .join("-"),
-          String(value),
-        );
-      }
-    }
-    this.status = resolvedStatus;
-    if (location !== undefined && location !== null) {
-      this.location = this.urlFor(String(location));
-    }
-    if (includeContent(this.status)) {
-      if (!this.mediaType) {
-        const f = (this as Metal & { formats?: ReadonlyArray<string | symbol> }).formats;
-        const negotiated = f && f.length > 0 ? Mime.get(String(f[0]))?.toString() : undefined;
-        this.contentType =
-          contentType != null ? String(contentType) : (negotiated ?? MimeType.HTML.toString());
-      }
-      this.response.charset = false;
-    }
-    this.responseBody = "";
-    return true;
-  }
-
   override set responseBody(body: string | SafeBuffer | string[] | Buffer | null | undefined) {
     if (body === null || body === undefined) {
       this.response.resetBodyBang();
@@ -328,38 +314,22 @@ export class Metal extends AbstractController {
     }
     const str = Array.isArray(body)
       ? body.join("")
-      : Buffer.isBuffer(body) || body instanceof SafeBuffer
+      : body instanceof SafeBuffer
         ? body.toString()
         : body;
     this._responseBody = str;
     if (this.response) this.response.body = str;
   }
 
-  override get responseBody(): string | null {
-    const body = this._responseBody;
-    return typeof body === "string" ? body : (body?.toString() ?? null);
+  override get responseBody(): string | Buffer | true | null {
+    return this._responseBody;
   }
 
   override get performed(): boolean {
-    return super.performed || (this.response?.committed ?? false);
+    return this.responseBody != null || this.response.committed;
   }
 
-  toRackResponse(): RackResponse {
+  toA(): RackResponse {
     return this.response.toRack() as RackResponse;
   }
-
-  /** @internal */
-  static _normalizeOptions = _normalizeOptionsFn;
-  /** @internal */
-  static _normalizeText = _normalizeTextFn;
-  /** @internal */
-  static _processOptions = _processOptionsFn;
-  /** @internal */
-  static _renderInPriorities = _renderInPrioritiesFn;
-  /** @internal */
-  static _setHtmlContentType = _setHtmlContentTypeFn;
-  /** @internal */
-  static _setRenderedContentType = _setRenderedContentTypeFn;
-  /** @internal */
-  static _setVaryHeader = _setVaryHeaderFn;
 }

@@ -10,7 +10,7 @@ export class ActiveModel {
     return `${klass}.find(${params ?? ""})`;
   }
   static build(klass: string, params?: string): string {
-    return params == null ? `${klass}.new()` : `${klass}.new(${params})`;
+    return params == null ? `new ${klass}()` : `new ${klass}(${params})`;
   }
   save(): string {
     return `${this.name}.save()`;

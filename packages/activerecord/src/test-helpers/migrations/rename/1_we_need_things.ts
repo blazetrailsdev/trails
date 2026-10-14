@@ -1,6 +1,6 @@
 import { Migration } from "../../../migration.js";
 
-export class WeNeedThings extends Migration {
+export class WeNeedThings extends Migration.Current {
   async up(): Promise<void> {
     await this.createTable("things", (t) => {
       t.column("content", "text");

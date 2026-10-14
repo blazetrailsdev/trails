@@ -1,18 +1,14 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 
-import { fixtures } from "./test-fixtures.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("column_names sync virtual exclusion", () => {
   fixtures([], { useTransactionalTests: false });
   beforeAll(async () => {
-    const conn = (await Base.leaseConnection()) as unknown as {
-      internalSchemaCache: { columnsHash(pool: unknown, table: string): Promise<unknown> };
-      pool: unknown;
-    };
-    await conn.internalSchemaCache.columnsHash(conn.pool, "posts");
+    await Base.schemaCache().columnsHash("posts");
   });
 
   it("excludes virtual attributes from a synchronous column_names on a cold model", () => {

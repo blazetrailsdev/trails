@@ -8,7 +8,7 @@ export {
 
 export { Metal, MiddlewareStack, Middleware } from "./metal.js";
 
-export { Base, type RenderOptions, type RescueHandler } from "./base.js";
+export { Base, type RenderOptions } from "./base.js";
 export { DoubleRenderError } from "../abstract-controller/rendering.js";
 export { API } from "./api.js";
 
@@ -17,14 +17,6 @@ export {
   IntegrationTest,
   type IntegrationRequestOptions,
 } from "../action-dispatch/testing/integration.js";
-export {
-  wrapParameters,
-  applyParamsWrapper,
-  deriveWrapperKey,
-  type WrapParametersOptions,
-  type ParamsWrapperConfig,
-} from "./params-wrapper.js";
-
 export {
   Parameters,
   ParameterMissing,
@@ -66,35 +58,15 @@ export {
   Buffer as LiveBuffer,
   Response as LiveResponse,
 } from "./metal/live.js";
-export { BasicAuth, TokenAuth, DigestAuth } from "./metal/http-authentication.js";
+export { HttpAuthentication } from "./metal/http-authentication.js";
 export { Renderer } from "./renderer.js";
-export { Deprecator, deprecator, addRenderer, removeRenderer } from "./deprecator.js";
+export { Deprecator, deprecator } from "./deprecator.js";
+export { addRenderer, removeRenderer } from "./metal/renderers.js";
 export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
-export { defaultFormBuilder } from "./form-builder.js";
+export { FormBuilder, defaultFormBuilder } from "./form-builder.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
-export { renderForApi } from "./api/api-rendering.js";
-export {
-  inherited as inheritedWithHelpers,
-  type HelpersPathControllerClass,
-} from "./trailties/helpers.js";
-export {
-  helpersPath,
-  setHelpersPath,
-  setApplicationHelpers,
-  applicationHelperResolver,
-  loadApplicationHelperNames,
-  modulesForHelpers,
-} from "./metal/helpers.js";
-export { RescueRegistry } from "./metal/rescue.js";
-export { ParameterEncodingRegistry } from "./metal/parameter-encoding.js";
-export {
-  MemoryRateLimitStore,
-  isRateLimited,
-  rateLimit,
-  type RateLimitOptions,
-  type RateLimitStore,
-  type RateLimitingClassHost,
-  type RateLimitingHost,
-} from "./metal/rate-limiting.js";
+export { type HelpersPathControllerClass } from "./trailties/helpers.js";
+export { helperAttr, helpersPath, setHelpersPath, modulesForHelpers } from "./metal/helpers.js";
+export { ParameterEncoding } from "./metal/parameter-encoding.js";

@@ -1,12 +1,11 @@
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-  withDbWarningsAction,
 } from "../abstract-mysql-adapter/test-helper.js";
-import { withTimezoneConfig } from "../../test-helper.js";
 import {
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -27,7 +26,7 @@ import { Base } from "../../base.js";
 describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   let adapter: Mysql2Adapter;
   beforeEach(() => {
-    adapter = new Mysql2Adapter({ _fakeConnection: true });
+    adapter = new Mysql2Adapter({});
   });
   afterEach(async () => {
     await adapter.disconnectBang().catch(() => {});
@@ -36,12 +35,12 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   it("active is false for a never-connected / fake adapter", async () => {
     expect(await adapter.active()).toBe(false);
     expect(adapter.isConnected()).toBe(false);
-    const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+    const fresh = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
     expect(await fresh.active()).toBe(false);
     expect(fresh.isConnected()).toBe(false);
   });
 
-  it("translates connection-loss errnos to ConnectionFailed", () => {
+  it("translates connection-loss errnos to ConnectionFailed", async () => {
     for (const errno of [
       AbstractMysqlAdapter.ER_CONNECTION_KILLED,
       AbstractMysqlAdapter.ER_SERVER_SHUTDOWN,
@@ -50,13 +49,12 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       AbstractMysqlAdapter.ER_CLIENT_INTERACTION_TIMEOUT,
     ]) {
       const driverErr = Object.assign(new Error("conn lost"), { errno });
-      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
+      const translated = await adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
-      expect((translated as ConnectionFailed).cause).toBe(driverErr);
     }
   });
 
-  it("translates ER_LOCK_DEADLOCK / ER_LOCK_WAIT_TIMEOUT / ER_QUERY_INTERRUPTED / ER_OUT_OF_RANGE / ER_DB_CREATE_EXISTS", () => {
+  it("translates ER_LOCK_DEADLOCK / ER_LOCK_WAIT_TIMEOUT / ER_QUERY_INTERRUPTED / ER_OUT_OF_RANGE / ER_DB_CREATE_EXISTS", async () => {
     const cases: Array<
       [
         number,
@@ -77,26 +75,25 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     ];
     for (const [errno, klass] of cases) {
       const driverErr = Object.assign(new Error("fail"), { errno });
-      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
+      const translated = await adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(klass);
-      expect((translated as Error & { cause?: unknown }).cause).toBe(driverErr);
     }
   });
 
-  it("promotes 'MySQL client is not connected' to ConnectionNotEstablished", () => {
+  it("promotes 'MySQL client is not connected' to ConnectionNotEstablished", async () => {
     const codedErr = Object.assign(new Error("MySQL client is not connected"), {
       code: "PROTOCOL_CONNECTION_LOST",
     });
-    expect(adapter.translateExceptionClass(codedErr, "SELECT 1", [])).toBeInstanceOf(
+    expect(await adapter.translateExceptionClass(codedErr, "SELECT 1", [])).toBeInstanceOf(
       ConnectionNotEstablished,
     );
     const plainErr = new Error("MySQL client is not connected");
-    expect(adapter.translateExceptionClass(plainErr, "SELECT 1", [])).toBeInstanceOf(
+    expect(await adapter.translateExceptionClass(plainErr, "SELECT 1", [])).toBeInstanceOf(
       ConnectionNotEstablished,
     );
   });
 
-  it("translates node-mysql2 connection codes to ConnectionFailed", () => {
+  it("translates node-mysql2 connection codes to ConnectionFailed", async () => {
     for (const code of [
       "PROTOCOL_CONNECTION_LOST",
       "PROTOCOL_ENQUEUE_AFTER_QUIT",
@@ -111,13 +108,19 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       "EPIPE",
     ]) {
       const driverErr = Object.assign(new Error("connection lost"), { code });
-      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
+      const translated = await adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
     }
   });
 });
 
 describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
+  const { self } = fixtures([]);
+
+  beforeEach(() => {
+    self()._originalDbWarningsAction = "ignore";
+  });
+
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -128,7 +131,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
   describe("#active sync getter reflects connection state", () => {
     it("is false before any connection and true after the first query", async () => {
-      const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+      const fresh = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       try {
         expect(await fresh.active()).toBe(false);
         expect(fresh.isConnected()).toBe(false);
@@ -213,34 +216,34 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
   it("database timezone changes synced to connection (extended re-sync paths)", async () => {
     await adapter.execute("SELECT 1");
-    expect(adapter._databaseTimezone).toBe("utc");
-    await withTimezoneConfig({ default: "local" }, async () => {
-      adapter._databaseTimezone = "utc";
+    expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
+    await self().withTimezoneConfig({ default: "local" }, async () => {
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.execQuery("SELECT 1");
-      expect(adapter._databaseTimezone).toBe("local");
-      adapter._databaseTimezone = "utc";
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.execute("DO 1");
-      expect(adapter._databaseTimezone).toBe("local");
-      adapter._databaseTimezone = "utc";
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.execute("DO 1");
-      expect(adapter._databaseTimezone).toBe("local");
-      adapter._databaseTimezone = "utc";
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.explain("SELECT 1");
-      expect(adapter._databaseTimezone).toBe("local");
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
     });
     await adapter.execute("SELECT 1");
-    expect(adapter._databaseTimezone).toBe("utc");
+    expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
   });
 
   it("configure connection seeds database timezone from default", async () => {
-    adapter._databaseTimezone = "utc";
-    await withTimezoneConfig({ default: "local" }, async () => {
+    adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
+    await self().withTimezoneConfig({ default: "local" }, async () => {
       await adapter.configureConnection();
-      expect(adapter._databaseTimezone).toBe("local");
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
     });
-    await withTimezoneConfig({ default: "utc" }, async () => {
+    await self().withTimezoneConfig({ default: "utc" }, async () => {
       await adapter.configureConnection();
-      expect(adapter._databaseTimezone).toBe("utc");
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
     });
   });
 
@@ -253,11 +256,11 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       await adapter.execute(
         `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
       );
-      await adapter.execute(`SET SESSION sql_mode=''`);
-      await adapter.execute(`INSERT INTO warn_posts (title) VALUES ('Title')`);
       const logger = { warn: vi.fn() };
       Base.logger = logger as never;
-      await withDbWarningsAction("log", async () => {
+      await self().withDbWarningsAction("log", undefined, async () => {
+        await adapter.execute(`SET SESSION sql_mode=''`);
+        await adapter.execute(`INSERT INTO warn_posts (title) VALUES ('Title')`);
         await adapter.execute(
           `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
         );

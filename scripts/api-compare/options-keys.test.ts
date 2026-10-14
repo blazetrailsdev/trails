@@ -19,10 +19,36 @@ describe("diffOptionKeys", () => {
     expect(diff.extraInTs).toEqual([]);
   });
 
-  it("reports a TS key absent from the Ruby body as informational extra", () => {
-    const diff = diffOptionKeys(["through"], ["through", "validate"]);
+  it("reports a key the TS body reads that the Ruby body never names", () => {
+    const diff = diffOptionKeys(["through"], ["through", "validate"], [], ["through", "validate"]);
     expect(diff.missingInTs).toEqual([]);
     expect(diff.extraInTs).toEqual(["validate"]);
+  });
+
+  it("does not report a key the options TYPE declares but the body never reads", () => {
+    const columnOptions = ["after", "array", "as", "limit", "null", "precision"];
+    expect(diffOptionKeys(["null"], columnOptions, [], ["null"])).toEqual({
+      missingInTs: [],
+      extraInTs: [],
+    });
+  });
+
+  it("counts a key the TS body reads through an untyped cast as present", () => {
+    expect(diffOptionKeys(["column"], ["name"], [], ["column"])).toEqual({
+      missingInTs: [],
+      extraInTs: [],
+    });
+  });
+
+  it("reads a Ruby keyword param as the keyword, not an extra key", () => {
+    expect(
+      diffOptionKeys(["scope"], ["scope", "types"], [], ["scope", "types"], ["types"]),
+    ).toEqual({ missingInTs: [], extraInTs: [] });
+  });
+
+  it("drops a positional-param name from the TS reads as well", () => {
+    const diff = diffOptionKeys(["type"], ["type", "limit"], ["name", "type"], ["type"]);
+    expect(diff).toEqual({ missingInTs: [], extraInTs: [] });
   });
 
   it("suppresses a known rename (:constructor) instead of flagging it missing", () => {
@@ -33,7 +59,12 @@ describe("diffOptionKeys", () => {
   });
 
   it("ignores leading-underscore internal keys on both sides", () => {
-    const diff = diffOptionKeys(["_uses_legacy_index_name", "name"], ["_skipValidateOptions"]);
+    const diff = diffOptionKeys(
+      ["_uses_legacy_index_name", "name"],
+      ["_skipValidateOptions"],
+      [],
+      ["_skipValidateOptions"],
+    );
     expect(diff.missingInTs).toEqual(["name"]);
     expect(diff.extraInTs).toEqual([]);
   });
@@ -56,7 +87,7 @@ describe("diffOptionKeys", () => {
       missingInTs: [],
       extraInTs: [],
     });
-    const diff = diffOptionKeys(["b_key", "a_key"], ["zKey", "yKey"]);
+    const diff = diffOptionKeys(["b_key", "a_key"], ["zKey", "yKey"], [], ["zKey", "yKey"]);
     expect(diff.missingInTs).toEqual(["aKey", "bKey"]);
     expect(diff.extraInTs).toEqual(["yKey", "zKey"]);
   });
@@ -102,5 +133,36 @@ describe("matchOptionKeysAgainst", () => {
       [null, ["inverseOf"], ["through"]],
     );
     expect(verdict).toEqual({ comparable: true, missingInTs: [], extraInTs: [] });
+  });
+
+  it("is quiet for a pass-through on both sides, whatever the options type declares", () => {
+    const ts = [["except", "include", "methods", "only", "root"]];
+    expect(matchOptionKeysAgainst(["root"], ts, [], [["root"]])).toEqual({
+      comparable: true,
+      missingInTs: [],
+      extraInTs: [],
+    });
+  });
+
+  it("reports a key the TS body reads where the Ruby body only forwards", () => {
+    const ts = [["except", "include", "methods", "only", "root"]];
+    expect(matchOptionKeysAgainst(["root"], ts, [], [["root"], ["only"]])).toMatchObject({
+      extraInTs: ["only"],
+    });
+  });
+
+  it("only ever adds missingInTs when the Ruby key set widens", () => {
+    const narrow = matchOptionKeysAgainst(["root"], [["root"]], [], [["root", "only"]]);
+    const wide = matchOptionKeysAgainst(["root", "prefix"], [["root"]], [], [["root", "only"]]);
+    expect(narrow).toMatchObject({ missingInTs: [], extraInTs: ["only"] });
+    expect(wide).toMatchObject({ missingInTs: ["prefix"], extraInTs: ["only"] });
+  });
+
+  it("reports nothing extra for a bodiless candidate", () => {
+    expect(matchOptionKeysAgainst(["root"], [["root", "only"]])).toEqual({
+      comparable: true,
+      missingInTs: [],
+      extraInTs: [],
+    });
   });
 });

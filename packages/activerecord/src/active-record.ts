@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/activesupport";
-import { ThreadPoolExecutor } from "@blazetrails/ruby-compat";
-import { loadTags } from "@blazetrails/activesupport/yaml";
+import { rbEqq, rbObjIvarGet, rbObjIvarSet, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
@@ -28,7 +28,6 @@ let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _writingRole = "writing";
 let _readingRole = "reading";
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
-let _globalThreadPoolAsyncQueryExecutor: ThreadPoolExecutor | undefined;
 let _globalExecutorConcurrency: number | null | undefined;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _indexNestedAttributeErrors = false;
@@ -41,7 +40,7 @@ let _beforeCommittedOnAllRecords = false;
 let _runAfterTransactionCallbacksInOrderDefined = false;
 let _applicationRecordClass: AnyClass | null = null;
 let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
-let _schemaFormat: SchemaFormat = "ruby";
+let _schemaFormat: SchemaFormat = "ts";
 let _errorOnIgnoredOrder = false;
 let _timestampedMigrations = true;
 let _validateMigrationTimestamps = false;
@@ -87,13 +86,7 @@ export function setSchemaCacheIgnoredTables(
 }
 
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
-  return any(schemaCacheIgnoredTables(), (ignored) => {
-    if (ignored instanceof RegExp) {
-      ignored.lastIndex = 0;
-      return ignored.test(tableName);
-    }
-    return ignored === tableName;
-  });
+  return any(schemaCacheIgnoredTables(), (ignored) => rbEqq(ignored, tableName));
 }
 
 export function databaseCli(): Record<string, string | string[]> {
@@ -189,12 +182,17 @@ export function setAsyncQueryExecutor(
 
 export function globalThreadPoolAsyncQueryExecutor(): ThreadPoolExecutor {
   const concurrency = globalExecutorConcurrency() ?? 4;
-  return (_globalThreadPoolAsyncQueryExecutor ??= new ThreadPoolExecutor({
-    minThreads: 0,
-    maxThreads: concurrency,
-    maxQueue: concurrency * 4,
-    fallbackPolicy: "caller_runs",
-  }));
+  return (rbObjIvarGet(ActiveRecord, "@global_thread_pool_async_query_executor") ??
+    rbObjIvarSet(
+      ActiveRecord,
+      "@global_thread_pool_async_query_executor",
+      new ThreadPoolExecutor({
+        minThreads: 0,
+        maxThreads: concurrency,
+        maxQueue: concurrency * 4,
+        fallbackPolicy: "caller_runs",
+      }),
+    )) as ThreadPoolExecutor;
 }
 
 export function setGlobalExecutorConcurrency(globalExecutorConcurrency: number | null): void {
@@ -494,9 +492,9 @@ export function allOpenTransactions(): Transaction[] {
   return openTransactions;
 }
 
-loadTags["!ruby/object:ActiveRecord::AttributeSet"] = "ActiveModel::AttributeSet";
-loadTags["!ruby/object:ActiveRecord::Attribute::FromDatabase"] =
+YAML.loadTags["!ruby/object:ActiveRecord::AttributeSet"] = "ActiveModel::AttributeSet";
+YAML.loadTags["!ruby/object:ActiveRecord::Attribute::FromDatabase"] =
   "ActiveModel::Attribute::FromDatabase";
-loadTags["!ruby/object:ActiveRecord::LazyAttributeHash"] = "ActiveModel::LazyAttributeHash";
-loadTags["!ruby/object:ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::MysqlString"] =
+YAML.loadTags["!ruby/object:ActiveRecord::LazyAttributeHash"] = "ActiveModel::LazyAttributeHash";
+YAML.loadTags["!ruby/object:ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::MysqlString"] =
   "ActiveRecord::Type::String";
