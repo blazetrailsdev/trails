@@ -340,7 +340,10 @@ export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
 export const withDefaults = reverseMerge;
 
 export function reverseMergeBang<T extends object>(hash: T, otherHash: object): T {
-  if (!(hash instanceof Map) && !isPlainObject(hash)) {
+  if (
+    !isPlainObject(hash) &&
+    (!(hash instanceof Map) || rbObjRespondTo(hash, "reverseMergeBang"))
+  ) {
     return rbFSend(hash, "reverseMergeBang", otherHash) as T;
   }
   const merged = reverseMerge(hash, otherHash);

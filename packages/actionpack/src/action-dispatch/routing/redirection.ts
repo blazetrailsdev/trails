@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { extractOptionsBang, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
@@ -8,7 +8,7 @@ import {
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
-import { isEmpty, URI } from "@blazetrails/ruby-compat";
+import { ArgumentError, hashDelete, isEmpty, URI } from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
 
@@ -36,11 +36,11 @@ function scriptName(req: Request): string {
   return (req.env["SCRIPT_NAME"] as string) ?? "";
 }
 
-export class Redirect extends Endpoint {
+export class Redirect<B = RedirectBlock> extends Endpoint {
   readonly status: number;
-  readonly block: RedirectBlock;
+  readonly block: B;
 
-  constructor(status: number, block: RedirectBlock) {
+  constructor(status: number, block: B) {
     super();
     this.status = status;
     this.block = block;
@@ -88,7 +88,7 @@ export class Redirect extends Endpoint {
   }
 
   path(params: Record<string, string>, request: Request): string {
-    return this.block(params, request);
+    return (this.block as RedirectBlock)(params, request);
   }
 
   inspect(): string {
@@ -118,17 +118,9 @@ export class Redirect extends Endpoint {
 
 const URL_PARTS = /^([^?]+)?(\?[^#]+)?(#.+)?$/;
 
-export class PathRedirect extends Redirect {
-  constructor(status: number, pathTemplate: string) {
-    super(status, () => pathTemplate);
-  }
-
-  get template(): string {
-    return (this.block as () => string)();
-  }
-
+export class PathRedirect extends Redirect<string> {
   override path(params: Record<string, string>, _request: Request): string {
-    const tpl = this.template;
+    const tpl = this.block;
     const m = URL_PARTS.exec(tpl);
     if (m) {
       const [, p, q, f] = m;
@@ -147,7 +139,7 @@ export class PathRedirect extends Redirect {
   }
 
   override inspect(): string {
-    return `redirect(${this.status}, ${this.template})`;
+    return `redirect(${this.status}, ${this.block})`;
   }
 
   /** @internal */
@@ -223,17 +215,12 @@ export function redirect(
   ...args: Array<
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
   >
-): Redirect {
-  let options: (OptionRedirectOptions & { status?: number }) | undefined;
-  const last = args[args.length - 1];
-  if (last && typeof last === "object" && !("call" in last) && typeof last !== "function") {
-    options = args.pop() as OptionRedirectOptions & { status?: number };
-  }
-  const status = options?.status ?? 301;
-  if (options) delete options.status;
+): Redirect<unknown> {
+  const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
+  const status = (hashDelete(options, "status") as number | null) || 301;
   const path = args.shift();
 
-  if (options && Object.keys(options).length > 0) {
+  if (Object.keys(options).length > 0) {
     return new OptionRedirect(status, options);
   }
   if (typeof path === "string") {
@@ -246,7 +233,7 @@ export function redirect(
     const callable = path as RedirectCallable;
     block = (params, request) => callable.call(params, request);
   }
-  if (!block) throw new Error("redirection argument not supported");
+  if (!block) throw new ArgumentError("redirection argument not supported");
   return new Redirect(status, block);
 }
 

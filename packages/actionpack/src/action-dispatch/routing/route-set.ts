@@ -1086,13 +1086,13 @@ export class RouteSet {
   }
 
   urlFor(
-    options: Record<string, unknown>,
+    options: Record<string, unknown> | Hash<string, unknown>,
     routeName: string | null = null,
     urlStrategy: UrlStrategy = UNKNOWN,
     methodName: string | null = null,
     reserved: readonly string[] = RESERVED_OPTIONS,
   ): string {
-    options = { ...this.defaultUrlOptions, ...options };
+    options = merge(this.defaultUrlOptions, options) as Record<string, unknown>;
 
     let user: unknown = null;
     let password: unknown = null;

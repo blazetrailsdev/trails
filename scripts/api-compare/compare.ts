@@ -5654,7 +5654,7 @@ export function main() {
           rubyModule,
           level,
         );
-        if (ambiguous) return;
+        if (ambiguous && segments.length < 2) return;
         if (
           ownerRecordsNothing(
             tsCallsByFileNameOwner,
@@ -5907,7 +5907,7 @@ export function main() {
           rubyModule,
           level,
         );
-        if (ambiguous) return;
+        if (ambiguous && segments.length < 2) return;
         if (
           ownerRecordsNothing(
             tsCallArgsByFileNameOwner,
