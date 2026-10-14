@@ -4,8 +4,8 @@ import { TypeMetadata } from "./type-metadata.js";
 
 export class Column extends BaseColumn {
   /**
-   * @noRailsEquivalent CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor
    * @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor
+   * @noRailsEquivalent CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor
    */
   constructor(...args: ConstructorParameters<typeof BaseColumn>) {
     super(...args);
