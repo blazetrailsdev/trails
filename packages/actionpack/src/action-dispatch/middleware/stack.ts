@@ -1,4 +1,4 @@
-import { rbBlockGivenP } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -38,7 +38,7 @@ export class Middleware {
       : (this.klass as object).constructor.name;
   }
 
-  build(app: RackApp | RackAppObject): RackAppObject {
+  build(app: RackApp | RackAppObject): RackApp | RackAppObject {
     return new this.klass(app, ...this.args, ...(this.block ? [this.block] : []));
   }
 
@@ -50,10 +50,10 @@ export class Middleware {
 export class InstrumentationProxy {
   static readonly EVENT_NAME = "process_middleware.action_dispatch";
 
-  private _middleware: RackAppObject;
+  private _middleware: RackApp | RackAppObject;
   private _payload: { middleware: string };
 
-  constructor(middleware: RackAppObject, className: string) {
+  constructor(middleware: RackApp | RackAppObject, className: string) {
     this._middleware = middleware;
 
     this._payload = {
@@ -62,8 +62,10 @@ export class InstrumentationProxy {
   }
 
   call(env: RackEnv): Promise<RackResponse> {
-    return Notifications.instrument(InstrumentationProxy.EVENT_NAME, this._payload, () =>
-      this._middleware.call(env),
+    return Notifications.instrument(
+      InstrumentationProxy.EVENT_NAME,
+      this._payload,
+      () => rbFSend(this._middleware, "call", env) as Promise<RackResponse>,
     );
   }
 }
