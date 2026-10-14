@@ -18,7 +18,7 @@
 // offenders: `psych-adapter.ts` resolves `yaml` dynamically, so naming the YAML
 // coders costs nothing at load time and the miss surfaces where Ruby would
 // raise it, from the dump/load call.
-import { readFile, readdir } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
@@ -30,12 +30,14 @@ const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']
 /** The optional package itself — a static import of it is the load-time hazard. */
 const YAML_PACKAGE = "yaml";
 
-/** Cross-package specifier followed as a graph edge into its source file. */
-const CROSS_PACKAGE_EDGES = new Map([
-  ["@blazetrails/ruby-compat/psych", { pkg: "ruby-compat", file: "psych.ts" }],
-  ["@blazetrails/ruby-compat/psych-adapter", { pkg: "ruby-compat", file: "psych-adapter.ts" }],
-  ["@blazetrails/ruby-compat/yaml", { pkg: "ruby-compat", file: "yaml.ts" }],
-]);
+/**
+ * A `@blazetrails/<pkg>` specifier is followed into `<pkg>/src/index.ts`, and
+ * `@blazetrails/<pkg>/<sub>` into `<pkg>/src/<sub>.ts`.
+ */
+const CROSS_PACKAGE_RE = /^@blazetrails\/([^/]+)(?:\/(.+))?$/;
+
+/** A statement at column 0 is top level; an `await` in one is a top-level await. */
+const TOP_LEVEL_AWAIT_RE = /^(?:export\s+)?(?:(?:const|let|var)\s[^\n]*?=\s*)?await\b/m;
 
 async function tsFiles(dir: string, root = dir): Promise<string[]> {
   const out: string[] = [];
@@ -56,10 +58,10 @@ const key = (node: Node): string => `${node.pkg}/src/${node.file}`;
 
 /**
  * Files reachable from `<pkg>/src/index.ts` over value-import edges that
- * statically import `yaml`. `import type` is erased by tsc and carries no
- * load-time edge.
+ * statically import `yaml` or hold a top-level `await`. `import type` is erased
+ * by tsc and carries no load-time edge.
  */
-async function yamlImportersReachableFromIndex(pkg: string): Promise<string[]> {
+async function offendersReachableFromIndex(pkg: string): Promise<string[]> {
   const known = new Map<string, Set<string>>();
   const filesOf = async (name: string): Promise<Set<string>> => {
     let files = known.get(name);
@@ -79,15 +81,18 @@ async function yamlImportersReachableFromIndex(pkg: string): Promise<string[]> {
     seen.add(key(node));
 
     const source = await readFile(path.join(PACKAGES, node.pkg, "src", node.file), "utf8");
+    if (TOP_LEVEL_AWAIT_RE.test(source)) offenders.push(`${key(node)} (top-level await)`);
     for (const [, clause, specifier] of source.matchAll(IMPORT_RE)) {
       if (/^\s*type\b/.test(clause)) continue;
       if (specifier === YAML_PACKAGE) {
         offenders.push(key(node));
         continue;
       }
-      const crossPackage = CROSS_PACKAGE_EDGES.get(specifier);
+      const crossPackage = CROSS_PACKAGE_RE.exec(specifier);
       if (crossPackage) {
-        stack.push(crossPackage);
+        const [, name, sub = "index"] = crossPackage;
+        const file = `${sub}.ts`;
+        if (await exists(path.join(PACKAGES, name, "src", file))) stack.push({ pkg: name, file });
         continue;
       }
       if (!specifier.startsWith(".")) continue;
@@ -100,24 +105,39 @@ async function yamlImportersReachableFromIndex(pkg: string): Promise<string[]> {
   return [...new Set(offenders)].sort();
 }
 
+async function exists(file: string): Promise<boolean> {
+  return access(file).then(
+    () => true,
+    () => false,
+  );
+}
+
+const ROOTS = (await readdir(PACKAGES, { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
 describe("yaml optional dependency", () => {
-  it("is not reachable from the ruby-compat root import", async () => {
-    expect(await yamlImportersReachableFromIndex("ruby-compat")).toEqual([]);
+  it.each(ROOTS)("is not reachable from the %s root import", async (pkg) => {
+    if (!(await exists(path.join(PACKAGES, pkg, "src", "index.ts")))) return;
+    expect(await offendersReachableFromIndex(pkg)).toEqual([]);
   });
 
-  it("is not reachable from the activesupport root import", async () => {
-    expect(await yamlImportersReachableFromIndex("activesupport")).toEqual([]);
-  });
-
-  it("is not reachable from the activemodel root import", async () => {
-    expect(await yamlImportersReachableFromIndex("activemodel")).toEqual([]);
-  });
-
-  it("is not reachable from the activerecord root import", async () => {
-    expect(await yamlImportersReachableFromIndex("activerecord")).toEqual([]);
-  });
-
-  it("is not reachable from the actionview root import", async () => {
-    expect(await yamlImportersReachableFromIndex("actionview")).toEqual([]);
+  // The website is an application: its entries import `yaml` to register it.
+  it("is imported for its values only by psych-adapter.ts", async () => {
+    const importers: string[] = [];
+    for (const pkg of ROOTS.filter((name) => name !== "website")) {
+      const src = path.join(PACKAGES, pkg, "src");
+      if (!(await exists(src))) continue;
+      for (const file of await tsFiles(src)) {
+        if (`${pkg}/${file}` === "ruby-compat/psych-adapter.ts") continue;
+        const source = await readFile(path.join(src, file), "utf8");
+        for (const [, clause, specifier] of source.matchAll(IMPORT_RE)) {
+          if (specifier === YAML_PACKAGE && !/^\s*type\b/.test(clause))
+            importers.push(`${pkg}/${file}`);
+        }
+      }
+    }
+    expect(importers).toEqual([]);
   });
 });

@@ -85,3 +85,103 @@ describe("psych-adapter parse on a source held as its bytes", () => {
     expect(() => load(Uint8Array.from([0x61, 0x3a, 0x20, 0xff]))).toThrow(SyntaxError);
   });
 });
+
+describe("Psych.load and Psych.safe_load", () => {
+  it("permits Symbol under load but not under safe_load", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.load("--- :foo\n")).toBe(":foo");
+    expect(() => Psych.safeLoad("--- :foo\n")).toThrow(Psych.DisallowedClass);
+    expect(
+      Psych.safeLoad("--- :foo\n", { permittedSymbols: ["foo"], permittedClasses: ["Symbol"] }),
+    ).toBe(":foo");
+  });
+
+  it("raises on the first alias unless aliases is true", async () => {
+    const { Psych } = await import("./psych.js");
+    const yaml = "a: &x 1\nb: *x\n";
+    expect(() => Psych.load(yaml)).toThrow(Psych.AliasesNotEnabled);
+    expect(Psych.load(yaml, { aliases: true })).toEqual({ a: 1, b: 1 });
+  });
+
+  it("answers fallback only for an empty document", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.load("", { fallback: {} })).toEqual({});
+    expect(Psych.load("", { fallback: null })).toBeNull();
+    expect(Psych.load("--- 1\n", { fallback: {} })).toBe(1);
+  });
+
+  it("honours symbolize_names and freeze", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.load("foo: bar\n", { symbolizeNames: true })).toEqual({ ":foo": "bar" });
+    const frozen = Psych.load("a: [1]\n", { freeze: true }) as { a: unknown[] };
+    expect(Object.isFrozen(frozen)).toBe(true);
+    expect(Object.isFrozen(frozen.a)).toBe(true);
+  });
+});
+
+const nodeProcess = (
+  globalThis as unknown as { process: { getBuiltinModule(id: string): unknown } }
+).process;
+
+describe("Psych load_tags, dump_tags and domain_types", () => {
+  it("are reachable and writable with no backend registered", async () => {
+    vi.resetModules();
+    vi.spyOn(nodeProcess, "getBuiltinModule").mockImplementation(() => {
+      throw new Error("no module");
+    });
+    try {
+      const { Psych } = await import("./psych.js");
+      Psych.loadTags["!x"] = "X";
+      Psych.loadTags = {};
+      Psych.dumpTags = new Map();
+      Psych.domainTypes = Object.create(null);
+      Psych.addBuiltinType("x", (_tag, value) => value);
+      expect(Object.keys(Psych.domainTypes)).toEqual(["tag:yaml.org,2002:x"]);
+      expect(() => Psych.dump(1)).toThrow("cannot load such file -- yaml");
+    } finally {
+      vi.restoreAllMocks();
+      vi.resetModules();
+    }
+  });
+
+  it("revives a load-tagged mapping and dumps under a dump tag", async () => {
+    const { Psych } = await import("./psych.js");
+    const { registerConstant } = await import("./variable.js");
+    class PsychTrailsTagged {}
+    registerConstant("PsychTrailsTagged", PsychTrailsTagged);
+    Psych.loadTags["!tagged"] = "PsychTrailsTagged";
+    Psych.dumpTags.set(PsychTrailsTagged, "!tagged");
+    try {
+      expect(Psych.unsafeLoad("--- !tagged\na: 1\n")).toBeInstanceOf(PsychTrailsTagged);
+      expect(Psych.dump(new PsychTrailsTagged())).toBe("--- !tagged {}\n");
+    } finally {
+      delete Psych.loadTags["!tagged"];
+      Psych.dumpTags.delete(PsychTrailsTagged);
+    }
+  });
+
+  it("calls an add_builtin_type block with the key and the loaded value", async () => {
+    const { Psych } = await import("./psych.js");
+    Psych.addBuiltinType("point", (tag, value) => ({ tag, value }));
+    try {
+      expect(Psych.unsafeLoad("--- !!point [1, 2]\n")).toEqual({
+        tag: "tag:yaml.org,2002:point",
+        value: [1, 2],
+      });
+    } finally {
+      delete Psych.domainTypes["tag:yaml.org,2002:point"];
+    }
+  });
+});
+
+describe("Psych.dump of a tagged root", () => {
+  it("puts the root tag on the document-start line", async () => {
+    const { Psych } = await import("./psych.js");
+    const { registerConstant } = await import("./variable.js");
+    class PsychTrailsRoot {
+      a = 1;
+    }
+    registerConstant("PsychTrailsRoot", PsychTrailsRoot);
+    expect(Psych.dump(new PsychTrailsRoot())).toBe("--- !ruby/object:PsychTrailsRoot\na: 1\n");
+  });
+});

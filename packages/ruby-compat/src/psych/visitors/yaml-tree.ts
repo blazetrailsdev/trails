@@ -21,13 +21,16 @@ import { type StructInstance, isStruct } from "../../struct.js";
 import { temporalTag } from "../../temporal-tag.js";
 import { TypeError } from "../../type-error.js";
 import { registeredConstant } from "../../variable.js";
-import type { Document, Node, Scalar, YAMLMap } from "yaml";
+import type { Node, Scalar, YAMLMap } from "yaml";
 import { Psych } from "../../psych.js";
-import { yaml } from "../../psych-adapter.js";
+import type * as Yaml from "yaml";
+import { yaml as backend, type PsychDocument, type PsychNode } from "../../psych-adapter.js";
 import { Coder, coderSeq, coderTag, coderType } from "../coder.js";
 import { ClassLoader } from "../class-loader.js";
 import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
+
+const yaml = backend as unknown as typeof Yaml;
 
 type RubyTime = { isUtc(): boolean; strftime(format: string): string };
 type RubyDate = { gregorian(): { toS(): string } };
@@ -54,7 +57,7 @@ export interface YAMLTreeOptions {
  */
 export class YAMLTree {
   /** @internal */
-  protected readonly st = new Map<object, Node>();
+  protected readonly st = new Map<object, PsychNode>();
   private readonly doc = new yaml.Document();
   private anchors = 0;
   private readonly ss: ScalarScanner;
@@ -76,9 +79,9 @@ export class YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  accept(target: unknown): Node {
+  accept(target: unknown): PsychNode {
     if (target !== null && typeof target === "object" && this.st.has(target)) {
-      const node = this.st.get(target)!;
+      const node = this.st.get(target)! as Node;
       node.anchor ??= String(++this.anchors);
       return new yaml.Alias(node.anchor) as unknown as Node;
     }
@@ -325,7 +328,7 @@ export class YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  get tree(): Document {
+  get tree(): PsychDocument {
     return this.doc;
   }
 
@@ -373,7 +376,7 @@ export class RestrictedYAMLTree extends YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  override accept(target: unknown): Node {
+  override accept(target: unknown): PsychNode {
     if (!this.aliases && target !== null && typeof target === "object" && this.st.has(target)) {
       throw new BadAlias("Tried to dump an aliased object");
     }

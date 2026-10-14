@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `Psych` module is a
    namespace of module functions and classes; ESM syntax cannot spell `Psych.dump`. */
-import type { ParsedNode } from "yaml";
-import { yaml } from "./psych-adapter.js";
+import type * as Yaml from "yaml";
+import { yaml as backend, type PsychNode } from "./psych-adapter.js";
 import { Coder as PsychCoder } from "./psych/coder.js";
 import { ClassLoader as PsychClassLoader } from "./psych/class-loader.js";
 import {
@@ -15,6 +15,8 @@ import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { isPlainHash, rbModToS } from "./object.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
+
+const yaml = backend as unknown as typeof Yaml;
 
 export { coderTag } from "./psych/coder.js";
 
@@ -109,28 +111,59 @@ export namespace Psych {
   };
 
   /**
-   * `Psych.load_tags` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:741`).
+   * `Psych.load_tags` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:736,741`): a tag to
+   * the name of the class it loads as. Ruby's `attr_accessor`, so `Psych.loadTags = {}`
+   * replaces it.
    *
    * @noRailsEquivalent PERMANENT
    */
-  export const loadTags: Record<string, string> = Object.create(null) as Record<string, string>;
+  // eslint-disable-next-line prefer-const
+  export let loadTags: Record<string, string> = Object.create(null) as Record<string, string>;
 
   /**
-   * `Psych.dump_tags` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:742`).
+   * `Psych.dump_tags` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:737,742`): a class to
+   * the tag it dumps under.
    *
    * @noRailsEquivalent PERMANENT
    */
-  export const dumpTags = new Map<object, string>();
+  // eslint-disable-next-line prefer-const
+  export let dumpTags = new Map<object, string>();
 
   /**
-   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505`).
+   * `Psych.domain_types` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:738,743`): a tag
+   * key to `[key, block]`, the block called with the key and the loaded value.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  // eslint-disable-next-line prefer-const
+  export let domainTypes: Record<string, [string, (typeTag: string, value: unknown) => unknown]> =
+    Object.create(null) as Record<string, never>;
+
+  /**
+   * `Psych.add_builtin_type` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:682-686`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function addBuiltinType(
+    typeTag: string,
+    block: (typeTag: string, value: unknown) => unknown,
+  ): void {
+    const domain = "yaml.org,2002";
+    const key = ["tag", domain, typeTag].join(":");
+    domainTypes[key] = [key, block];
+  }
+
+  /**
+   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505`). libyaml writes a
+   * tagged root node on the `---` line (`YAML.dump(Object.new)` is
+   * `"--- !ruby/object {}\n"`), where the backend breaks the line.
    *
    * @noRailsEquivalent PERMANENT
    */
   export function dump(o: unknown): string {
     const visitor = YAMLTree.create();
     visitor.push(o);
-    return visitor.tree.toString({ directives: true });
+    return visitor.tree.toString({ directives: true }).replace(/^---\n!/, "--- !");
   }
 
   /**
@@ -148,7 +181,7 @@ export namespace Psych {
 
     const visitor = RestrictedYAMLTree.create(options);
     visitor.push(o);
-    return visitor.tree.toString({ directives: true });
+    return visitor.tree.toString({ directives: true }).replace(/^---\n!/, "--- !");
   }
 
   /**
@@ -185,7 +218,7 @@ export namespace Psych {
   export function parse(
     yamlString: string | Uint8Array,
     { filename: _filename = null as string | null } = {},
-  ): ParsedNode | false {
+  ): PsychNode | false {
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
     return yaml.parseDocument(yamlString).contents ?? false;
   }
@@ -212,7 +245,9 @@ export namespace Psych {
     if (!result) return fallback;
 
     const classLoader = new PsychClassLoader.Restricted(
-      permittedClasses.map((klass) => rbModToS(klass as new () => unknown)),
+      permittedClasses.map((klass) =>
+        typeof klass === "string" ? klass : rbModToS(klass as new () => unknown),
+      ),
       permittedSymbols.map(String),
     );
     const scanner = new PsychScalarScanner(classLoader, { strictInteger });
@@ -220,5 +255,37 @@ export namespace Psych {
       ? new ToRuby(scanner, classLoader, { symbolizeNames, freeze })
       : new NoAliasRuby(scanner, classLoader, { symbolizeNames, freeze });
     return visitor.accept(result);
+  }
+
+  /**
+   * `Psych.load` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:368-377`). trails has no
+   * `Symbol` class, so `permitted_classes: [Symbol]` names it, which
+   * `permitted_classes.map(&:to_s)` (`:326`) reads the same.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function load(
+    yamlString: string | Uint8Array,
+    {
+      permittedClasses = ["Symbol"] as unknown[],
+      permittedSymbols = [] as string[],
+      aliases = false,
+      filename = null as string | null,
+      fallback = null as unknown,
+      symbolizeNames = false,
+      freeze = false,
+      strictInteger = false,
+    } = {},
+  ): unknown {
+    return safeLoad(yamlString, {
+      permittedClasses,
+      permittedSymbols,
+      aliases,
+      filename,
+      fallback,
+      symbolizeNames,
+      freeze,
+      strictInteger,
+    });
   }
 }

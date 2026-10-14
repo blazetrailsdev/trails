@@ -1,19 +1,122 @@
 import { LoadError } from "./load-error.js";
 
-export type { CollectionTag, YAMLMap } from "yaml";
-
 /**
- * The libyaml binding `psych.so` is in MRI (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`
- * `require 'psych.so'`): the npm `yaml` package, an optional dependency. A
- * miss raises the `LoadError` `vendor/ruby/v3.3.11/lib/yaml.rb:3-18` re-raises.
+ * The libyaml binding `psych.so` stands behind (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`
+ * `require 'psych.so'`): by default the npm `yaml` package, an optional
+ * dependency, resolved on first use. Psych's own visitors read the rest of the
+ * backend's members by name.
  *
  * @noRailsEquivalent PERMANENT
  */
-export const yaml: typeof import("yaml") = await import("yaml").catch(() => {
-  const missing = (): never => {
-    throw new LoadError("cannot load such file -- yaml");
-  };
-  return { parse: missing, stringify: missing } as unknown as typeof import("yaml");
+export interface PsychAdapter {
+  parse(src: string, ...options: unknown[]): unknown;
+  stringify(value: unknown, ...options: unknown[]): string;
+}
+
+/**
+ * A node of the backend's tree, as Psych reads it: `Psych::Nodes::Node#tag`
+ * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:20`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface PsychNode {
+  tag?: string | null;
+}
+
+/**
+ * The backend's document: `Psych::Nodes::Document`
+ * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/document.rb:8`) and its `yaml`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface PsychDocument {
+  toString(options?: object): string;
+}
+
+const registry = new Map<string, PsychAdapter>();
+let currentAdapterName: string | null = null;
+let resolved: PsychAdapter | null = null;
+
+/**
+ * Seats a backend for `vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13` `require 'psych.so'`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function registerPsychAdapter(name: string, adapter: PsychAdapter): void {
+  registry.set(name, adapter);
+  if (name === currentAdapterName || currentAdapterName === null) resolved = null;
+}
+
+let nodeAttempted = false;
+
+interface NodeProcess {
+  versions?: { node?: string };
+  getBuiltinModule?(id: string): unknown;
+}
+
+function tryAutoRegisterNode(): boolean {
+  if (registry.has("yaml")) return true;
+  if (nodeAttempted) return false;
+  nodeAttempted = true;
+  try {
+    const proc = (globalThis as { process?: NodeProcess }).process;
+    if (!proc?.versions?.node || typeof proc.getBuiltinModule !== "function") return false;
+    const nodeModule = proc.getBuiltinModule("node:module") as {
+      createRequire(p: string): (id: string) => unknown;
+    };
+    registry.set("yaml", nodeModule.createRequire(import.meta.url)("yaml") as PsychAdapter);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves the backend as `psych.rb:13`'s `require 'psych.so'` would, at the
+ * call: the configured adapter, else any registered one, else a synchronous
+ * Node load of `yaml`. A miss raises the `LoadError` `vendor/ruby/v3.3.11/lib/yaml.rb:3-18`
+ * re-raises.
+ */
+function resolve(): PsychAdapter {
+  if (resolved) return resolved;
+  const name = currentAdapterName;
+  if (name) {
+    const reg = registry.get(name);
+    if (!reg) throw new LoadError(`cannot load such file -- ${name}`);
+    return (resolved = reg);
+  }
+  if (registry.size > 0 || tryAutoRegisterNode()) {
+    return (resolved = registry.get("yaml") ?? registry.values().next().value!);
+  }
+  throw new LoadError("cannot load such file -- yaml");
+}
+
+/**
+ * Names the backend `vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13` `require 'psych.so'` loads.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const psychAdapterConfig = {
+  /** @noRailsEquivalent PERMANENT */
+  get adapter(): string | null {
+    return currentAdapterName;
+  },
+  /** @noRailsEquivalent PERMANENT */
+  set adapter(name: string | null) {
+    currentAdapterName = name;
+    resolved = null;
+  },
+};
+
+/**
+ * The backend behind `vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`
+ * `require 'psych.so'`, resolved member by member on first read, so importing
+ * this module never loads it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const yaml: PsychAdapter = new Proxy({} as PsychAdapter, {
+  get: (_target, member) => (resolve() as unknown as Record<PropertyKey, unknown>)[member],
 });
 
 /**
@@ -25,7 +128,8 @@ export const yaml: typeof import("yaml") = await import("yaml").catch(() => {
  *
  * @noRailsEquivalent PERMANENT
  */
-export const parse = ((src: string | Uint8Array, ...options: unknown[]) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the parsed value is the caller's to shape, as `yaml.parse`'s own `any` leaves it
+export function parse(src: string | Uint8Array, ...options: unknown[]): any {
   if (src instanceof Uint8Array) {
     try {
       src = new TextDecoder("utf-8", { fatal: true }).decode(src);
@@ -33,8 +137,8 @@ export const parse = ((src: string | Uint8Array, ...options: unknown[]) => {
       throw new SyntaxError("invalid leading UTF-8 octet");
     }
   }
-  return (yaml.parse as (...args: unknown[]) => unknown)(src, ...options);
-}) as typeof import("yaml").parse;
+  return resolve().parse(src, ...options);
+}
 
 /**
  * The backend's own emitter, behind `vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`
@@ -42,4 +146,6 @@ export const parse = ((src: string | Uint8Array, ...options: unknown[]) => {
  *
  * @noRailsEquivalent PERMANENT
  */
-export const stringify: typeof import("yaml").stringify = yaml.stringify;
+export function stringify(value: unknown, ...options: unknown[]): string {
+  return resolve().stringify(value, ...options);
+}
