@@ -26,46 +26,46 @@ afterEach(() => {
   base().includeAllHelpers = true;
 });
 
-describe("ActionController::Railties::Helpers.inherited", () => {
-  it("assigns helpersPath and includes every application helper", () => {
+describe("ActionController::Railties::Helpers.inherited", async () => {
+  it("assigns helpersPath and includes every application helper", async () => {
     setHelpersPath([alternateHelpers]);
     const Base = base();
     const klass = subclassOf(Base);
 
-    inherited(klass);
+    await inherited(klass);
 
     expect(klass.helpersPath).toEqual(helpersPath());
     expect(klass._helpers!.isInclude(FooHelper)).toBe(true);
   });
 
-  it("includes nothing into a class that is not a direct subclass of Base", () => {
+  it("includes nothing into a class that is not a direct subclass of Base", async () => {
     setHelpersPath([alternateHelpers]);
     const Base = base();
     const grandchild = subclassOf(subclassOf(Base));
 
-    inherited(grandchild);
+    await inherited(grandchild);
 
     expect(grandchild.helpersPath).toEqual(helpersPath());
     expect(grandchild._helpers?.isInclude(FooHelper)).toBeFalsy();
   });
 
-  it("includes nothing when includeAllHelpers is false", () => {
+  it("includes nothing when includeAllHelpers is false", async () => {
     setHelpersPath([alternateHelpers]);
     const Base = base();
     Base.includeAllHelpers = false;
     const klass = subclassOf(Base);
 
-    inherited(klass);
+    await inherited(klass);
 
     expect(klass._helpers?.isInclude(FooHelper)).toBeFalsy();
   });
 
-  it("returns without touching a class that has no helpersPath slot", () => {
+  it("returns without touching a class that has no helpersPath slot", async () => {
     setHelpersPath([alternateHelpers]);
     const Base = base();
     const klass = { name: "Bare" } as HelpersPathControllerClass;
 
-    inherited(klass);
+    await inherited(klass);
 
     expect(klass._helpers).toBeUndefined();
   });

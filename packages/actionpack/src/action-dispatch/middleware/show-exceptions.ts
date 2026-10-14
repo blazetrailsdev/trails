@@ -1,9 +1,9 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
+import type { BacktraceCleaner } from "@blazetrails/activesupport";
 import { ExceptionWrapper } from "./exception-wrapper.js";
+import { Request } from "../http/request.js";
 import type { RackAppObject } from "./stack.js";
-
-export type ShowExceptionsMode = "all" | "rescuable" | "none";
 
 export class ShowExceptions {
   private app: RackApp;
@@ -15,27 +15,23 @@ export class ShowExceptions {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const rawMode = env["action_dispatch.show_exceptions"];
-    const mode: ShowExceptionsMode =
-      rawMode === "all" || rawMode === "rescuable" || rawMode === "none" ? rawMode : "none";
-
     try {
       return await this.app(env);
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
+      const exception = error instanceof Error ? error : new Error(String(error));
+      const request = new Request(env);
+      const backtraceCleaner =
+        (request.getHeader("action_dispatch.backtrace_cleaner") as BacktraceCleaner | undefined) ??
+        null;
+      const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
+      request.setHeader("action_dispatch.exception", wrapper.unwrappedException);
+      request.setHeader("action_dispatch.report_exception", !wrapper.rescueResponse());
 
-      if (mode === "none") {
-        throw err;
+      if (wrapper.isShow(request)) {
+        return this.renderException({ ...request.env }, wrapper);
+      } else {
+        throw exception;
       }
-
-      const wrapper = new ExceptionWrapper(err);
-
-      if (mode === "rescuable" && !wrapper.rescueResponse()) {
-        throw err;
-      }
-
-      env["action_dispatch.exception"] = err;
-      return this.renderException(env, wrapper);
     }
   }
 

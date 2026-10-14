@@ -31,14 +31,14 @@ export class DebugExceptions {
   }
 
   private app: RackApp;
-  private routesApp: unknown;
+  private routesApp: RoutesApp | null;
   private responseFormat: "default" | "api";
   private interceptors: Interceptor[];
   private _stderrLogger?: ActiveSupportLogger;
 
   constructor(
     app: RackApp,
-    routesApp: unknown = null,
+    routesApp: RoutesApp | null = null,
     responseFormat: "default" | "api" = "default",
     interceptors: Interceptor[] = DebugExceptions.interceptors,
   ) {
@@ -161,7 +161,7 @@ export class DebugExceptions {
       rbObjRespondTo(this.routesApp, "routes") &&
       (exception.isRoutingError() || exception.isTemplateError())
     ) {
-      return new RoutesInspector((this.routesApp as RoutesApp).routes().routes.routes);
+      return new RoutesInspector(this.routesApp!.routes().routes.routes);
     }
     return null;
   }
@@ -223,68 +223,59 @@ export class DebugExceptions {
       if (this.isApiRequest(contentType)) {
         return this.renderForApiRequest(contentType, wrapper);
       } else {
-        if (request.xhr) {
-          return this.renderTextError(wrapper);
-        }
-
-        return this.renderHtmlError(request, wrapper);
+        return this.renderForBrowserRequest(request, wrapper);
       }
     } else {
       throw exception;
     }
   }
 
-  private renderTextError(wrapper: ExceptionWrapper): RackResponse {
-    const body = [
-      `${wrapper.exceptionName} (${wrapper.message})`,
-      "",
-      ...wrapper.applicationTrace.slice(0, 10),
-    ].join("\n");
+  /** @internal */
+  renderForBrowserRequest(request: Request, wrapper: ExceptionWrapper): RackResponse {
+    let body: string;
+    let format: string;
+    if (request.xhr) {
+      body = [
+        `${wrapper.exceptionName} (${wrapper.message})`,
+        "",
+        ...wrapper.applicationTrace.slice(0, 10),
+      ].join("\n");
+      format = "text/plain";
+    } else {
+      const method = (request.getHeader("REQUEST_METHOD") as string) ?? "GET";
+      const path = (request.getHeader("PATH_INFO") as string) ?? "/";
+      const controller = request.getHeader("action_dispatch.controller") as string | undefined;
 
-    return [
-      wrapper.statusCode,
-      { "content-type": "text/plain; charset=utf-8" },
-      bodyFromString(body),
-    ];
-  }
+      const traceHtml = wrapper.applicationTrace
+        .slice(0, 20)
+        .map((line) => `  <li>${this.escapeHtml(String(line))}</li>`)
+        .join("\n");
 
-  private renderHtmlError(request: Request, wrapper: ExceptionWrapper): RackResponse {
-    const method = (request.getHeader("REQUEST_METHOD") as string) ?? "GET";
-    const path = (request.getHeader("PATH_INFO") as string) ?? "/";
-    const controller = request.getHeader("action_dispatch.controller") as string | undefined;
+      body = [
+        "<!DOCTYPE html>",
+        "<html>",
+        "<head>",
+        `  <title>${wrapper.exceptionName} at ${this.escapeHtml(path)}</title>`,
+        '  <meta charset="utf-8">',
+        "</head>",
+        "<body>",
+        `  <h1>${this.escapeHtml(wrapper.exceptionName)}</h1>`,
+        `  <h2>${this.escapeHtml(wrapper.message)}</h2>`,
+        controller ? `  <p>Controller: ${this.escapeHtml(controller)}</p>` : "",
+        `  <p>Request: ${this.escapeHtml(method)} ${this.escapeHtml(path)}</p>`,
+        "  <h3>Application Trace</h3>",
+        "  <ul>",
+        traceHtml,
+        "  </ul>",
+        "</body>",
+        "</html>",
+      ]
+        .filter((l) => l.length > 0)
+        .join("\n");
+      format = "text/html";
+    }
 
-    const traceHtml = wrapper.applicationTrace
-      .slice(0, 20)
-      .map((line) => `  <li>${this.escapeHtml(String(line))}</li>`)
-      .join("\n");
-
-    const html = [
-      "<!DOCTYPE html>",
-      "<html>",
-      "<head>",
-      `  <title>${wrapper.exceptionName} at ${this.escapeHtml(path)}</title>`,
-      '  <meta charset="utf-8">',
-      "</head>",
-      "<body>",
-      `  <h1>${this.escapeHtml(wrapper.exceptionName)}</h1>`,
-      `  <h2>${this.escapeHtml(wrapper.message)}</h2>`,
-      controller ? `  <p>Controller: ${this.escapeHtml(controller)}</p>` : "",
-      `  <p>Request: ${this.escapeHtml(method)} ${this.escapeHtml(path)}</p>`,
-      "  <h3>Application Trace</h3>",
-      "  <ul>",
-      traceHtml,
-      "  </ul>",
-      "</body>",
-      "</html>",
-    ]
-      .filter((l) => l.length > 0)
-      .join("\n");
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "text/html; charset=utf-8" },
-      bodyFromString(html),
-    ];
+    return this.render(wrapper.statusCode, body, format);
   }
 
   private escapeHtml(str: string): string {

@@ -538,7 +538,7 @@ export class Base extends Metal {
     return body;
   }
 
-  declare respondTo: OmitThisParameter<typeof respondTo>;
+  declare respondTo: (...mimes: Parameters<OmitThisParameter<typeof respondTo>>) => unknown;
 
   declare translate: OmitThisParameter<typeof translate>;
   declare t: OmitThisParameter<typeof t>;

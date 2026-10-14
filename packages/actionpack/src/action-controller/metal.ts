@@ -8,6 +8,7 @@ import type { RackResponse, Response as RackResponseObject } from "@blazetrails/
 import {
   classAttribute,
   demodulize,
+  extractOptionsBang,
   initializeIncludedModules,
   isAnonymous,
   SafeBuffer,
@@ -48,11 +49,7 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
     block?: MiddlewareBlock,
   ): Middleware {
     const next = [...args];
-    const last = next[next.length - 1];
-    const options: Record<string, unknown> =
-      last && typeof last === "object" && !Array.isArray(last)
-        ? { ...(next.pop() as Record<string, unknown>) }
-        : {};
+    const options: Record<string, unknown> = extractOptionsBang(next);
     const only = ([] as string[]).concat((options.only as string | string[]) ?? []).map(String);
     const except = ([] as string[]).concat((options.except as string | string[]) ?? []).map(String);
     delete options.only;

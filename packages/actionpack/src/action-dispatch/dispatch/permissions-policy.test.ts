@@ -68,7 +68,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
 
     call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.permissions_policy"] = POLICY;
-      env["action_dispatch.show_exceptions"] = ":none";
+      env["action_dispatch.show_exceptions"] = "none";
 
       return this.app(env);
     }
@@ -167,7 +167,7 @@ describe("PermissionsPolicyIntegrationTest", () => {
 
     call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.permissions_policy"] = POLICY;
-      env["action_dispatch.show_exceptions"] = ":none";
+      env["action_dispatch.show_exceptions"] = "none";
 
       return this.app(env);
     }
@@ -260,7 +260,7 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
 
     call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.permissions_policy"] = POLICY;
-      env["action_dispatch.show_exceptions"] = ":none";
+      env["action_dispatch.show_exceptions"] = "none";
 
       return this.app(env);
     }

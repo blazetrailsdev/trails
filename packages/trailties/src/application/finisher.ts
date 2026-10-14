@@ -74,7 +74,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   for (const [name, klass] of await loadControllers(this.paths())) {
     controllerConstants.set(name, klass);
   }
-  for (const klass of controllerConstants.values()) defineController(klass);
+  for (const klass of controllerConstants.values()) await defineController(klass);
   registerModel(await loadModels(this.paths()));
 });
 
@@ -254,16 +254,18 @@ async function collectControllers(
 const definedControllers = new WeakSet<object>();
 
 /** @noRailsEquivalent PERMANENT */
-function defineController(klass: object): void {
+async function defineController(klass: object): Promise<void> {
   const base = ActionController.Base;
   if (!((klass as { prototype: unknown }).prototype instanceof base)) return;
 
   const superclass = Object.getPrototypeOf(klass) as object;
-  if (superclass !== base) defineController(superclass);
+  if (superclass !== base) await defineController(superclass);
 
   if (definedControllers.has(klass)) return;
   definedControllers.add(klass);
-  ActionController.Railties.Helpers.inherited(klass as ActionController.HelpersPathControllerClass);
+  await ActionController.Railties.Helpers.inherited(
+    klass as ActionController.HelpersPathControllerClass,
+  );
 }
 
 /** @noRailsEquivalent PERMANENT */
