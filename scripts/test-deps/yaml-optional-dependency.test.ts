@@ -21,6 +21,7 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript-5";
 import { describe, it, expect } from "vitest";
 
 const PACKAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../packages");
@@ -36,8 +37,19 @@ const YAML_PACKAGE = "yaml";
  */
 const CROSS_PACKAGE_RE = /^@blazetrails\/([^/]+)(?:\/(.+))?$/;
 
-/** A statement at column 0 is top level; an `await` in one is a top-level await. */
-const TOP_LEVEL_AWAIT_RE = /^(?:export\s+)?(?:(?:const|let|var)\s[^\n]*?=\s*)?await\b/m;
+/**
+ * Whether `source` awaits outside every function body: an `await` expression
+ * or a `for await` reached without crossing a function-like node.
+ */
+function hasTopLevelAwait(source: string): boolean {
+  const visit = (node: ts.Node): boolean => {
+    if (ts.isFunctionLike(node) || ts.isClassStaticBlockDeclaration(node)) return false;
+    if (ts.isAwaitExpression(node)) return true;
+    if (ts.isForOfStatement(node) && node.awaitModifier) return true;
+    return ts.forEachChild(node, visit) ?? false;
+  };
+  return visit(ts.createSourceFile("module.ts", source, ts.ScriptTarget.Latest, false));
+}
 
 async function tsFiles(dir: string, root = dir): Promise<string[]> {
   const out: string[] = [];
@@ -81,7 +93,7 @@ async function offendersReachableFromIndex(pkg: string): Promise<string[]> {
     seen.add(key(node));
 
     const source = await readFile(path.join(PACKAGES, node.pkg, "src", node.file), "utf8");
-    if (TOP_LEVEL_AWAIT_RE.test(source)) offenders.push(`${key(node)} (top-level await)`);
+    if (hasTopLevelAwait(source)) offenders.push(`${key(node)} (top-level await)`);
     for (const [, clause, specifier] of source.matchAll(IMPORT_RE)) {
       if (/^\s*type\b/.test(clause)) continue;
       if (specifier === YAML_PACKAGE) {
@@ -121,6 +133,14 @@ describe("yaml optional dependency", () => {
   it.each(ROOTS)("is not reachable from the %s root import", async (pkg) => {
     if (!(await exists(path.join(PACKAGES, pkg, "src", "index.ts")))) return;
     expect(await offendersReachableFromIndex(pkg)).toEqual([]);
+  });
+
+  it("detects a top-level await in any position", () => {
+    expect(hasTopLevelAwait('const backend = (await import("yaml")).default;')).toBe(true);
+    expect(hasTopLevelAwait("export default await getBackend();")).toBe(true);
+    expect(hasTopLevelAwait("for await (const x of xs) {}")).toBe(true);
+    expect(hasTopLevelAwait("async function f() { await g(); }")).toBe(false);
+    expect(hasTopLevelAwait("const f = async () => await g();")).toBe(false);
   });
 
   it("is imported for its values only by psych-adapter.ts", async () => {

@@ -14,8 +14,7 @@ describe("ParametersSerializationTest", () => {
     Parameters.permitAllParameters = oldPermittedParameters;
   });
 
-  // BLOCKED: psych-dump-puts-root-tag-on-its-own-line
-  it.skip("YAML serialization", () => {
+  it("YAML serialization", () => {
     const params = new Parameters({ key: ":value" });
     const yamlDump = YAML.dump(params);
     expect(yamlDump).toMatch("--- !ruby/object:ActionController::Parameters");

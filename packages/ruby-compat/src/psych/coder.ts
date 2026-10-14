@@ -61,6 +61,19 @@ export class Coder {
   }
 
   /**
+   * `Psych::Coder#scalar` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:24-31`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  scalar(...args: unknown[]): unknown {
+    if (args.length > 0) {
+      [this[coderTag], this[coderScalar]] = args as [string | null, unknown];
+      this[coderType] = ":scalar";
+    }
+    return this[coderScalar];
+  }
+
+  /**
    * `Psych::Coder#scalar=` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:66-69`).
    *
    * @noRailsEquivalent PERMANENT

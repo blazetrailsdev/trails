@@ -185,3 +185,45 @@ describe("Psych.dump of a tagged root", () => {
     expect(Psych.dump(new PsychTrailsRoot())).toBe("--- !ruby/object:PsychTrailsRoot\na: 1\n");
   });
 });
+
+describe("ToRuby sequences and keys", () => {
+  it("revives !omap as a Psych::Omap and !ruby/array:Klass as that class", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Omap } = await import("./psych/omap.js");
+    const { registerConstant } = await import("./variable.js");
+    const omap = Psych.unsafeLoad("--- !omap\n- a: 1\n- b: 2\n") as InstanceType<typeof Omap>;
+    expect(omap).toBeInstanceOf(Omap);
+    expect([...omap.entries()]).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
+    class PsychTrailsList extends Array {}
+    registerConstant("PsychTrailsList", PsychTrailsList);
+    const list = Psych.unsafeLoad("--- !ruby/array:PsychTrailsList\n- 1\n- 2\n");
+    expect(list).toBeInstanceOf(PsychTrailsList);
+    expect([...(list as number[])]).toEqual([1, 2]);
+  });
+
+  it("symbolizes only String keys", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.load("1: a\nb: c\n", { symbolizeNames: true })).toEqual({ "1": "a", ":b": "c" });
+  });
+
+  it("hands a load-tagged scalar's value to init_with through Coder#scalar", async () => {
+    const { Psych } = await import("./psych.js");
+    const { registerConstant } = await import("./variable.js");
+    class PsychTrailsScalar {
+      value: unknown;
+      initWith(coder: InstanceType<typeof Psych.Coder>) {
+        this.value = coder.scalar();
+      }
+    }
+    registerConstant("PsychTrailsScalar", PsychTrailsScalar);
+    Psych.loadTags["!scalarish"] = "PsychTrailsScalar";
+    try {
+      expect((Psych.unsafeLoad("--- !scalarish hello\n") as PsychTrailsScalar).value).toBe("hello");
+    } finally {
+      delete Psych.loadTags["!scalarish"];
+    }
+  });
+});

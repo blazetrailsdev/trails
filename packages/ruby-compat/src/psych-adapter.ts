@@ -128,8 +128,7 @@ export const yaml: PsychAdapter = new Proxy({} as PsychAdapter, {
  *
  * @noRailsEquivalent PERMANENT
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function parse(src: string | Uint8Array, ...options: unknown[]): any {
+export function parse(src: string | Uint8Array, ...options: unknown[]): unknown {
   if (src instanceof Uint8Array) {
     try {
       src = new TextDecoder("utf-8", { fatal: true }).decode(src);

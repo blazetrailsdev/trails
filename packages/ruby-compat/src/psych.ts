@@ -154,14 +154,21 @@ export namespace Psych {
   }
 
   /**
-   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505`). libyaml writes a
+   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505`). There is no
+   * `IO` to write to, so the `io` slot only ever carries the options Hash. libyaml writes a
    * tagged root node on the `---` line (`YAML.dump(Object.new)` is
    * `"--- !ruby/object {}\n"`), where the backend breaks the line.
    *
    * @noRailsEquivalent PERMANENT
    */
-  export function dump(o: unknown): string {
-    const visitor = YAMLTree.create();
+  export function dump(
+    o: unknown,
+    io: YAMLTreeOptions | null = null,
+    options: YAMLTreeOptions = {},
+  ): string {
+    if (isPlainHash(io)) options = io as YAMLTreeOptions;
+
+    const visitor = YAMLTree.create(options);
     visitor.push(o);
     return visitor.tree.toString({ directives: true }).replace(/^---\n!/, "--- !");
   }

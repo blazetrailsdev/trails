@@ -7,6 +7,7 @@ import { Psych } from "../../psych.js";
 import type * as Yaml from "yaml";
 import { yaml as backend, type PsychNode } from "../../psych-adapter.js";
 import { Coder } from "../coder.js";
+import { Omap } from "../omap.js";
 import { ClassLoader } from "../class-loader.js";
 import { AliasesNotEnabled, AnchorNotDefined } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
@@ -106,7 +107,25 @@ export class ToRuby {
 
       return instance;
     }
-    return this.register(o, this.registerEmpty(o));
+
+    let match: RegExpExecArray | null;
+    if (!o.tag) {
+      return this.register(o, this.registerEmpty(o));
+    } else if (o.tag === "!omap" || o.tag === "tag:yaml.org,2002:omap") {
+      const map = this.register(o, new Omap());
+      for (const a of o.items as YAMLMap.Parsed[]) {
+        const { key, value } = a.items[0] as { key: ParsedNode; value: ParsedNode };
+        map.set(this.accept(key), this.accept(value));
+      }
+      return map;
+    } else if ((match = /^!(?:seq|ruby\/array):(.*)$/.exec(o.tag))) {
+      const klass = this.resolveClass(match[1]);
+      const list = this.register(o, allocate(klass) as unknown[]);
+      for (const c of o.items) list.push(this.accept(c));
+      return list;
+    } else {
+      return this.register(o, this.registerEmpty(o));
+    }
   }
 
   /**
@@ -240,14 +259,17 @@ export class ToRuby {
       for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(String(k), v);
     };
     for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
-      const key = String(this.accept(k));
+      const key = this.accept(k);
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
         if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") mergeBang(val as object);
         else if (yaml.isSeq(v)) (val as object[]).slice().reverse().forEach(mergeBang);
-        else aset(key, val);
+        else aset(String(key), val);
       } else {
-        aset(!tagged && this.symbolizeNames ? `:${key}` : key, val);
+        aset(
+          String(!tagged && this.symbolizeNames && typeof key === "string" ? `:${key}` : key),
+          val,
+        );
       }
     }
     return hash;
