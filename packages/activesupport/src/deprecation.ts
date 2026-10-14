@@ -124,6 +124,8 @@ export interface CallSite {
 export function callerLocations(start = 1, length?: number): CallerLocation[] {
   let sites: CallSite[] = [];
   const prepareStackTrace = Error.prepareStackTrace;
+  const stackTraceLimit = Error.stackTraceLimit;
+  Error.stackTraceLimit = length == null ? Infinity : 2 + start + length;
   Error.prepareStackTrace = (error, callSites) => {
     sites = callSites;
     return prepareStackTrace
@@ -135,6 +137,7 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
     stack = new Error().stack;
   } finally {
     Error.prepareStackTrace = prepareStackTrace;
+    Error.stackTraceLimit = stackTraceLimit;
   }
   if (stack == null) return [];
   const locations = stack
