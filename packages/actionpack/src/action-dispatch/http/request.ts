@@ -62,7 +62,7 @@ import { QueryParser } from "./query-parser.js";
 import { X_CASCADE } from "../constants.js";
 import type { PermissionsPolicy } from "../permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
-import { CustomParamEncoder, type ParamHash } from "../request/utils.js";
+import { CustomParamEncoder, RequestUtils, type ParamHash } from "../request/utils.js";
 import {
   authenticatedEncryptedCookieSalt as _authenticatedEncryptedCookieSalt,
   cookieJar as _cookieJar,
@@ -201,6 +201,8 @@ export const ENV_METHODS: readonly string[] = Object.freeze([
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Request {
+  static Utils = RequestUtils;
+
   static {
     for (const env of ENV_METHODS) {
       Object.defineProperty(
@@ -518,6 +520,7 @@ export class Request {
       get rawPost() {
         return req.rawPost;
       },
+      controllerClassFor: (name: string) => req.controllerClassFor(name),
       get logger() {
         const l = req.env["action_dispatch.logger"] ?? req.env["rack.logger"];
         return (l as { debug(m: string): void } | null | undefined) ?? null;

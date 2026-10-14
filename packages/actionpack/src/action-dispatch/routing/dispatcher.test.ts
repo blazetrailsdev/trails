@@ -22,6 +22,9 @@ function makeControllerClass(
   body: (action: string, req: RouterRequest) => [number, Record<string, string>, string[]],
 ): DispatchableControllerClass {
   return class {
+    static actionEncodingTemplate(): null {
+      return null;
+    }
     static makeResponseBang(request: Request): Response {
       const res = new Response();
       res.request = request;
@@ -180,6 +183,9 @@ describe("RouteDispatcher", () => {
 
 describe("Dispatcher over the controller constant table", () => {
   class PostsController {
+    static actionEncodingTemplate(): null {
+      return null;
+    }
     static makeResponseBang(request: Request): Response {
       const res = new Response();
       res.request = request;

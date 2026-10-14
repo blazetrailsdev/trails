@@ -5,7 +5,11 @@ import type { DispatchableControllerClass } from "../../routing/dispatcher.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { escapeSegment } from "../../journey/router/utils.js";
 
-class StubController {}
+class StubController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
+}
 
 beforeAll(() => {
   for (const name of ["posts", "late", "seed"]) {

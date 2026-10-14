@@ -5,7 +5,11 @@ import { controllerConstants } from "../http/request.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
-class StubController {}
+class StubController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
+}
 
 beforeAll(() => {
   for (const name of [

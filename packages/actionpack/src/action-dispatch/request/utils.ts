@@ -59,13 +59,13 @@ export class RequestUtils {
   }
 
   /** @internal */
-  static setBinaryEncoding<P extends ParamValue>(
-    _request: unknown,
-    params: P,
-    _controller: string | undefined,
-    _action: string | undefined,
-  ): P {
-    return params;
+  static setBinaryEncoding(
+    request: { controllerClassFor(name: string): unknown },
+    params: ParamHash,
+    controller: string | undefined,
+    action: string | undefined,
+  ): ParamHash {
+    return CustomParamEncoder.encode(request, params, controller, action);
   }
 
   static deepMunge(params: ParamValue): ParamValue {
@@ -98,6 +98,16 @@ export class CustomParamEncoder {
       params[key] = replaced;
     }
     return params;
+  }
+
+  static encode(
+    request: { controllerClassFor(name: string): unknown },
+    params: ParamHash,
+    controller: string | undefined,
+    action: string | undefined,
+  ): ParamHash {
+    const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(request, controller, action);
+    return CustomParamEncoder.encodeForTemplate(params, encodingTemplate);
   }
 
   static actionEncodingTemplate(
