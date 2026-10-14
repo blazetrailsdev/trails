@@ -89,7 +89,7 @@ export class BacktraceCleaner {
   }
 
   /** @internal */
-  private addCoreSilencer(): void {
+  protected addCoreSilencer(): void {
     this.addSilencer((line) => line.includes("<internal:"));
   }
 
@@ -99,7 +99,7 @@ export class BacktraceCleaner {
   }
 
   /** @internal */
-  private addStdlibSilencer(): void {
+  protected addStdlibSilencer(): void {
     this.addSilencer((line) => line.startsWith(RbConfig.CONFIG["rubylibdir"]));
   }
 

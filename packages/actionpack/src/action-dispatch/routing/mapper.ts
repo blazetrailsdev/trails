@@ -10,7 +10,10 @@ import { Pattern } from "../journey/path/pattern.js";
 import { Route as JourneyRoute, type VerbMatcher } from "../journey/route.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import {
+  BacktraceCleaner as ActiveSupportBacktraceCleaner,
   camelize,
+  callerLocations,
+  cattrAccessor,
   extractOptionsBang,
   isBlank,
   isPlainObject,
@@ -47,6 +50,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   dup,
   fetch,
+  File,
   groupBy,
   hashDelete,
   isSymbol,
@@ -606,7 +610,6 @@ export class Mapping {
 
   static readonly JOINED_SEPARATORS = SEPARATORS.join("");
 
-  /** @missingRailsArgs new — CONVERGEABLE mapping-make-route-source-location */
   makeRoute(name: string | null, precedence: number): JourneyRoute {
     return new JourneyRoute({
       name,
@@ -619,6 +622,7 @@ export class Mapping {
       precedence,
       scopeOptions: this.scopeOptions,
       internal: this._internal,
+      sourceLocation: this.routeSourceLocation(),
     });
   }
 
@@ -878,6 +882,25 @@ export class Mapping {
   private dispatcher(raiseOnNameError: boolean): Dispatcher {
     return new Dispatcher(raiseOnNameError);
   }
+
+  /** @internal */
+  private routeSourceLocation(): string | null | undefined {
+    if (Mapper.routeSourceLocations) {
+      const actionDispatchDir = File.expandPath(
+        "..",
+        File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)),
+      );
+      for (const location of callerLocations(1)) {
+        if ((location.absolutePath ?? location.path).startsWith(actionDispatchDir)) continue;
+
+        const cleanedPath = Mapper.backtraceCleaner.cleanFrame(location.path);
+        if (cleanedPath == null) continue;
+
+        return `${cleanedPath}:${location.lineno}`;
+      }
+      return null;
+    }
+  }
 }
 
 export type ScopeLevel =
@@ -1012,6 +1035,15 @@ export class Scope {
 include(Scope, Enumerable);
 
 export class Mapper {
+  static BacktraceCleaner: typeof ActiveSupportBacktraceCleaner = class BacktraceCleaner extends ActiveSupportBacktraceCleaner {
+    constructor() {
+      super();
+      this.removeSilencers();
+      this.addCoreSilencer();
+      this.addStdlibSilencer();
+    }
+  };
+
   static readonly URL_OPTIONS: readonly string[] = [
     "protocol",
     "subdomain",
@@ -1019,6 +1051,17 @@ export class Mapper {
     "host",
     "port",
   ];
+
+  declare static routeSourceLocations: boolean;
+  declare static backtraceCleaner: ActiveSupportBacktraceCleaner;
+
+  static {
+    cattrAccessor.call(this, "routeSourceLocations", { instanceAccessor: false, default: false });
+    cattrAccessor.call(this, "backtraceCleaner", {
+      instanceAccessor: false,
+      default: new this.BacktraceCleaner(),
+    });
+  }
 
   static Scope = Scope;
 
