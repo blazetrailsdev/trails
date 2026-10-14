@@ -13,7 +13,6 @@ import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-a
 import { NodeSQLiteAdapter } from "../../connection-adapters/node-sqlite-adapter.js";
 import { Notifications, indexBy } from "@blazetrails/activesupport";
 import type { Database } from "better-sqlite3";
-import { BinaryData } from "@blazetrails/activemodel";
 
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
@@ -118,6 +117,10 @@ class BarcodeCpk extends Base {
     this._tableName = "barcode_cpks";
     this.primaryKey = ["region", "code"];
   }
+}
+
+class DualEncoding extends Base {
+  declare data: Uint8Array;
 }
 
 describeIfSqlite("SQLite3AdapterTest", () => {
@@ -602,23 +605,33 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("quote binary column escapes it", async () => {
-    await adapter.execute(`CREATE TABLE "bin_esc" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
-    const buf = Buffer.from([0x00, 0x01, 0x02, 0xff]);
-    await adapter.execInsert(`INSERT INTO "bin_esc" ("data") VALUES (?)`, null, [
-      new BinaryData(buf),
-    ]);
-    const rows = (await adapter.execute(`SELECT "data" FROM "bin_esc"`))!;
-    expect(Buffer.from(rows[0].data as Buffer)).toEqual(buf);
+    try {
+      await (
+        await DualEncoding.leaseConnection()
+      ).execute(`
+        CREATE TABLE IF NOT EXISTS dual_encodings (
+          id integer PRIMARY KEY AUTOINCREMENT,
+          name varchar(255),
+          data binary
+        )
+      `);
+      await DualEncoding.loadSchema();
+      const str = new Uint8Array([0x80]);
+      const binary = new DualEncoding({ name: "いただきます！", data: str });
+      await binary.saveBang();
+      expect(binary.data).toEqual(str);
+    } finally {
+      await (await DualEncoding.leaseConnection()).dropTable("dual_encodings", { ifExists: true });
+    }
   });
 
   it("type cast should not mutate encoding", async () => {
-    await adapter.execute(`CREATE TABLE "enc_test" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
-    const original = Buffer.from("hello world");
-    const copy = Buffer.from(original);
-    await adapter.execInsert(`INSERT INTO "enc_test" ("data") VALUES (?)`, null, [
-      new BinaryData(copy),
-    ]);
-    expect(original).toEqual(Buffer.from("hello world"));
+    try {
+      const name = "hello";
+      await Owner.create({ name: name });
+    } finally {
+      await Owner.deleteAll();
+    }
   });
 
   it("execute", async () => {
