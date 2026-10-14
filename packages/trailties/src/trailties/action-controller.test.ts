@@ -97,7 +97,10 @@ describe("action_controller.set_helpers_path", () => {
 
   function bootAndInstantiate(klass: AbstractController.HelpersClassMethods): void {
     runLoadHooks("action_controller", klass);
-    new (klass as unknown as new () => unknown)();
+    ActionController.Railties.Helpers.inherited(
+      klass as ActionController.HelpersPathControllerClass,
+      ActionController.Base as unknown as ActionController.HelpersPathControllerClass,
+    );
   }
 
   it("test_all_helpers", async () => {

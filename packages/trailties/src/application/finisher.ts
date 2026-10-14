@@ -6,7 +6,11 @@ import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
-import { controllerConstants, type DispatchableControllerClass } from "@blazetrails/actionpack";
+import {
+  ActionController,
+  controllerConstants,
+  type DispatchableControllerClass,
+} from "@blazetrails/actionpack";
 import { Base, registerModel } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
@@ -241,9 +245,28 @@ async function collectControllers(
       if (typeof value === "function" && value.name.endsWith("Controller")) {
         const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
         out.set(name, value as DispatchableControllerClass);
+        defineController(value);
       }
     }
   }
+}
+
+const definedControllers = new WeakSet<object>();
+
+/** @noRailsEquivalent PERMANENT */
+function defineController(klass: object): void {
+  const base = ActionController.Base;
+  if (!((klass as { prototype: unknown }).prototype instanceof base)) return;
+
+  const superclass = Object.getPrototypeOf(klass) as object;
+  if (superclass !== base) defineController(superclass);
+
+  if (definedControllers.has(klass)) return;
+  definedControllers.add(klass);
+  ActionController.Railties.Helpers.inherited(
+    klass as ActionController.HelpersPathControllerClass,
+    base as unknown as ActionController.HelpersPathControllerClass,
+  );
 }
 
 /** @noRailsEquivalent PERMANENT */
