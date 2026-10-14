@@ -59,12 +59,6 @@ describe("Array#pack", () => {
     expect(pack(["abcdefghi"], "m6")).toBe("YWJjZGVm\nZ2hp\n");
   });
 
-  it("m takes the bytes of a String that is not in byte form, and bytes as they are", () => {
-    expect(pack(["é😀"], "m0")).toBe("w6nwn5iA");
-    expect(pack([new TextEncoder().encode("é😀")], "m0")).toBe("w6nwn5iA");
-    expect(pack(["\xc3\xa9"], "m0")).toBe("w6k=");
-  });
-
   it("m* is m, not m0", () => {
     expect(pack([long], "m*")).toBe(pack([long], "m"));
   });

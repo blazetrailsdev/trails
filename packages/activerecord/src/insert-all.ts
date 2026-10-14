@@ -357,7 +357,7 @@ export class InsertAll {
       );
     }
 
-    const nameOrColumns = uniqueBy ?? this.model.primaryKey;
+    const nameOrColumns = uniqueBy || this.model.primaryKey;
     const match = rbFArray(nameOrColumns).map((column) => rbObjAsString(column));
     const sortedMatch = sort(match);
 
@@ -483,7 +483,10 @@ export class Builder implements InsertBuilder {
   returning(): string | undefined {
     if (!rtest(this._insertAll.returning)) return undefined;
 
-    if (this._insertAll.returning instanceof Nodes.SqlLiteral) {
+    if (
+      this._insertAll.returning instanceof Nodes.SqlLiteral ||
+      (typeof this._insertAll.returning === "string" && !isSymbol(this._insertAll.returning))
+    ) {
       return this._insertAll.returning.toString();
     } else {
       return (rbFArray(this._insertAll.returning) as string[])

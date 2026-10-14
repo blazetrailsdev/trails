@@ -2,6 +2,7 @@ import { Encryption } from "../namespaces.js";
 import { isPlainObject } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  b,
   Base64,
   JSON,
   transformValues,
@@ -94,20 +95,27 @@ export class MessageSerializer implements MessageSerializerLike {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm b — PERMANENT
+   */
   private encodeIfNeeded(value: unknown): unknown {
     if (typeof value === "string" || value instanceof Uint8Array) {
-      return Base64.strictEncode64(value);
+      value = b(value);
+      return Base64.strictEncode64(value as string);
     } else {
       return value;
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm from — PERMANENT
+   */
   private decodeIfNeeded(value: unknown): unknown {
     try {
       if (typeof value === "string") {
-        return Base64.strictDecode64(value);
+        return Buffer.from(Base64.strictDecode64(value), "latin1");
       } else {
         return value;
       }

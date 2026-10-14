@@ -125,6 +125,16 @@ describe("InsertAll disallow_raw_sql!", () => {
     );
   });
 
+  itIfSupports(
+    "insert_conflict_target",
+    "names an Array unique_by as Ruby interpolates it when no unique index matches",
+    async () => {
+      await expect(
+        Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: ["isbn", "name"] }),
+      ).rejects.toThrow('No unique index found for ["isbn", "name"]');
+    },
+  );
+
   it("raises for a plain-string on_duplicate or returning, since only a Symbol is safe", async () => {
     await expect(
       Book.upsertAll([{ name: "Rework", author_id: 1 }], { onDuplicate: "skip" as ":skip" }),

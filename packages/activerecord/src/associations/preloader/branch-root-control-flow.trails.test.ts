@@ -48,5 +48,6 @@ describe("Preloader::Branch root control flow", () => {
     expect(() => names([[":posts", { author: ":books" }]])).toThrow(
       "Association names must be Symbol or String, got: Hash",
     );
+    expect(() => names([10])).toThrow("Association names must be Symbol or String, got: Integer");
   });
 });

@@ -109,16 +109,13 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * @noRailsEquivalent PERMANENT — Ruby core `Array#pack`
  * (`vendor/ruby/v3.3.11/pack.c:197`).
  */
-export function pack(
-  ary: ReadonlyArray<string | number | bigint | Uint8Array>,
-  fmt: string,
-): string {
+export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string): string {
   const res: string[] = [];
   let p = 0;
   const pend = fmt.length;
   let idx = 0;
 
-  const nextfrom = (): string | number | bigint | Uint8Array => {
+  const nextfrom = (): string | number | bigint => {
     if (idx >= ary.length) throw new ArgumentError(toofew);
     return ary[idx++];
   };
@@ -209,15 +206,9 @@ export function pack(
     }
     if (type !== "m") unknownDirective("pack", type, fmt);
 
-    const from = nextfrom() as string | Uint8Array;
-    let s: Uint8Array;
-    if (from instanceof Uint8Array) {
-      s = from;
-    } else if (/[\u0100-\uffff]/.test(from)) {
-      s = new TextEncoder().encode(from);
-    } else {
-      s = Uint8Array.from(from, (c) => c.charCodeAt(0));
-    }
+    const from = nextfrom() as string;
+    const s = new Uint8Array(from.length);
+    for (let i = 0; i < from.length; i++) s[i] = from.charCodeAt(i) & 0xff;
     let ptr = 0;
     let plen = s.length;
 
