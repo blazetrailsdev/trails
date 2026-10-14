@@ -14,7 +14,7 @@ import {
 import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { rbModToS } from "./object.js";
-import { RestrictedYAMLTree, YAMLTree } from "./psych/visitors/yaml-tree.js";
+import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
 export { coderTag } from "./psych/coder.js";
 
@@ -134,14 +134,18 @@ export namespace Psych {
   }
 
   /**
-   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578`).
+   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578`). There is
+   * no `IO` to write to, so the `io` slot only ever carries the options Hash.
    *
    * @noRailsEquivalent PERMANENT
    */
   export function safeDump(
     o: unknown,
-    options: { permittedClasses?: unknown[]; permittedSymbols?: string[]; aliases?: boolean } = {},
+    io: YAMLTreeOptions | null = null,
+    options: YAMLTreeOptions = {},
   ): string {
+    if (io !== null) options = io;
+
     const visitor = RestrictedYAMLTree.create(options);
     visitor.push(o);
     return visitor.tree.toString({ directives: true });
@@ -161,8 +165,12 @@ export namespace Psych {
    *
    * @noRailsEquivalent PERMANENT
    */
-  export function unsafeLoad(yamlString: string | Uint8Array): unknown {
-    const result = parse(yamlString);
+  export function unsafeLoad(
+    yamlString: string | Uint8Array,
+    { filename = null as string | null, fallback = false as unknown } = {},
+  ): unknown {
+    const result = parse(yamlString, { filename });
+    if (!result) return fallback;
     return ToRuby.create().accept(result);
   }
 
@@ -174,9 +182,12 @@ export namespace Psych {
    *
    * @noRailsEquivalent PERMANENT
    */
-  export function parse(yamlString: string | Uint8Array): ParsedNode | null {
+  export function parse(
+    yamlString: string | Uint8Array,
+    { filename: _filename = null as string | null } = {},
+  ): ParsedNode | false {
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
-    return yaml.parseDocument(yamlString).contents;
+    return yaml.parseDocument(yamlString).contents ?? false;
   }
 
   /**
@@ -190,13 +201,14 @@ export namespace Psych {
       permittedClasses = [] as unknown[],
       permittedSymbols = [] as string[],
       aliases = false,
+      filename = null as string | null,
       fallback = null as unknown,
       symbolizeNames = false,
       freeze = false,
       strictInteger = false,
     } = {},
   ): unknown {
-    const result = parse(yamlString);
+    const result = parse(yamlString, { filename });
     if (!result) return fallback;
 
     const classLoader = new PsychClassLoader.Restricted(

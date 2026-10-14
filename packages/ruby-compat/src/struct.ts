@@ -117,6 +117,17 @@ export const Struct = {
     const klass = class {
       [RSTRUCT]!: unknown[];
 
+      /**
+       * `struct_alloc` (`vendor/ruby/v3.3.11/struct.c:810`): every member starts `nil`.
+       *
+       * @noRailsEquivalent PERMANENT
+       */
+      static allocate(): object {
+        const st = Object.create(this.prototype) as StructInstance;
+        rbStructInitialize(st, []);
+        return st;
+      }
+
       /** `rb_struct_initialize_m` (`vendor/ruby/v3.3.11/struct.c:742`). */
       constructor(...values: unknown[]) {
         rbStructInitialize(this as unknown as StructInstance, values);

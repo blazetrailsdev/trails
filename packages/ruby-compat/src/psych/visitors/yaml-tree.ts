@@ -44,7 +44,6 @@ type Instant = { toZonedDateTimeISO(timeZone: string): ZonedDateTime };
 /** The `options` Hash `YAMLTree.create` takes (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:48`). */
 export interface YAMLTreeOptions {
   permittedClasses?: unknown[];
-  permittedSymbols?: string[];
   aliases?: boolean;
 }
 
@@ -59,6 +58,8 @@ export class YAMLTree {
   private readonly doc = new yaml.Document();
   private anchors = 0;
   private readonly ss: ScalarScanner;
+  /** @internal */
+  protected readonly options: YAMLTreeOptions;
 
   /**
    * `YAMLTree.create` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:48`).
@@ -72,8 +73,9 @@ export class YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(ss: ScalarScanner, _options: YAMLTreeOptions = {}) {
+  constructor(ss: ScalarScanner, options: YAMLTreeOptions = {}) {
     this.ss = ss;
+    this.options = options;
   }
 
   /** @noRailsEquivalent PERMANENT */
