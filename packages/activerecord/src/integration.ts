@@ -1,11 +1,10 @@
 import { type Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { rbFSend, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbFArray, rbFSend, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   included,
   isPresent,
-  kernelArray,
   squish,
   parameterize,
   truncate,
@@ -31,7 +30,7 @@ interface Identifiable {
 
 export function toParam(this: Identifiable): string | null {
   if (this.id == null || this.id === false) return null;
-  return kernelArray(this.id).join(this.constructor.paramDelimiter);
+  return rbFArray(this.id).join(this.constructor.paramDelimiter);
 }
 
 export function cacheKey(this: Identifiable): string {

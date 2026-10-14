@@ -334,7 +334,8 @@ export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
   if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
     return rbFSend(otherHash, "merge", obj) as T;
   }
-  return { ...otherHash, ...obj } as T;
+  if (otherHash instanceof Map) otherHash = Object.fromEntries(otherHash);
+  return { ...otherHash, ...obj };
 }
 
 export const withDefaults = reverseMerge;
