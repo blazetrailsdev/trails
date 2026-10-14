@@ -609,6 +609,10 @@ class ResourcesTest extends TestCase {
 
 describe("ResourcesTest", () => {
   let tc: ResourcesTest;
+  const withRestfulRouting = (...args: Parameters<ResourcesTest["withRestfulRouting"]>) =>
+    tc.withRestfulRouting(...args);
+  const withSingletonResources = (...args: Parameters<ResourcesTest["withSingletonResources"]>) =>
+    tc.withSingletonResources(...args);
   const assertNamedRoute = (...args: Parameters<ResourcesTest["assertNamedRoute"]>) =>
     tc.assertNamedRoute(...args);
   const assertNotRecognizes = (...args: Parameters<ResourcesTest["assertNotRecognizes"]>) =>
@@ -646,7 +650,7 @@ describe("ResourcesTest", () => {
     tc.setup();
   });
   it("default restful routes", async () => {
-    await tc.withRestfulRouting("messages", async () => {
+    await withRestfulRouting("messages", async () => {
       await assertSimplyRestfulFor("messages");
     });
   });
@@ -656,7 +660,7 @@ describe("ResourcesTest", () => {
     const memberMethods: Options = { rss: "get", atom: "get", upload: "post", fix: "post" };
     const pathNames: Options = { new: "nuevo", rss: "canal", fix: "corrigir" };
 
-    await tc.withRestfulRouting(
+    await withRestfulRouting(
       "messages",
       { collection: collectionMethods, member: memberMethods, pathNames },
       async () => {
@@ -707,7 +711,7 @@ describe("ResourcesTest", () => {
   });
 
   it("multiple default restful routes", async () => {
-    await tc.withRestfulRouting("messages", "comments", async () => {
+    await withRestfulRouting("messages", "comments", async () => {
       await assertSimplyRestfulFor("messages");
       await assertSimplyRestfulFor("comments");
     });
@@ -716,7 +720,7 @@ describe("ResourcesTest", () => {
   it("multiple resources with options", async () => {
     const expectedOptions = { controller: "threads", action: "index" };
 
-    await tc.withRestfulRouting(
+    await withRestfulRouting(
       "messages",
       "comments",
       { controller: expectedOptions.controller },
@@ -728,7 +732,7 @@ describe("ResourcesTest", () => {
   });
 
   it("with custom conditions", async () => {
-    await tc.withRestfulRouting("messages", { conditions: { subdomain: "app" } }, () => {
+    await withRestfulRouting("messages", { conditions: { subdomain: "app" } }, () => {
       expect(
         tc.routes!.recognizePath("/messages", { method: "get", subdomain: "app" } as {
           method: string;
@@ -740,7 +744,7 @@ describe("ResourcesTest", () => {
   it("irregular id with no constraints should raise error", async () => {
     const expectedOptions = { controller: "messages", action: "show", id: "1.1.1" };
 
-    await tc.withRestfulRouting("messages", async () => {
+    await withRestfulRouting("messages", async () => {
       await assertRaises([Assertion], {}, () => {
         assertRecognizes(expectedOptions, { path: "messages/1.1.1", method: "get" });
       });
@@ -750,14 +754,14 @@ describe("ResourcesTest", () => {
   it("irregular id with constraints should pass", async () => {
     const expectedOptions = { controller: "messages", action: "show", id: "1.1.1" };
 
-    await tc.withRestfulRouting("messages", { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } }, () => {
+    await withRestfulRouting("messages", { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } }, () => {
       assertRecognizes(expectedOptions, { path: "messages/1.1.1", method: "get" });
     });
   });
 
   it("with path prefix constraints", async () => {
     const expectedOptions = { controller: "messages", action: "show", thread_id: "1.1.1", id: "1" };
-    await tc.withRestfulRouting(
+    await withRestfulRouting(
       "messages",
       { pathPrefix: "/thread/:thread_id", constraints: { thread_id: /[0-9]\.[0-9]\.[0-9]/ } },
       () => {
@@ -769,7 +773,7 @@ describe("ResourcesTest", () => {
   it("irregular id constraints should get passed to member actions", async () => {
     const expectedOptions = { controller: "messages", action: "custom", id: "1.1.1" };
 
-    await tc.withRestfulRouting(
+    await withRestfulRouting(
       "messages",
       { member: { custom: "get" }, constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } },
       () => {
@@ -779,7 +783,7 @@ describe("ResourcesTest", () => {
   });
 
   it("with path prefix", async () => {
-    await tc.withRestfulRouting("messages", { pathPrefix: "/thread/:thread_id" }, async () => {
+    await withRestfulRouting("messages", { pathPrefix: "/thread/:thread_id" }, async () => {
       await assertSimplyRestfulFor("messages", {
         pathPrefix: "thread/5/",
         options: { thread_id: "5" },
@@ -788,7 +792,7 @@ describe("ResourcesTest", () => {
   });
 
   it("multiple with path prefix", async () => {
-    await tc.withRestfulRouting(
+    await withRestfulRouting(
       "messages",
       "comments",
       { pathPrefix: "/thread/:thread_id" },
@@ -806,7 +810,7 @@ describe("ResourcesTest", () => {
   });
 
   it("with name prefix", async () => {
-    await tc.withRestfulRouting("messages", { as: "post_messages" }, async () => {
+    await withRestfulRouting("messages", { as: "post_messages" }, async () => {
       await assertSimplyRestfulFor("messages", { namePrefix: "post_" });
     });
   });
@@ -972,7 +976,7 @@ describe("ResourcesTest", () => {
 
   it("with member action", async () => {
     for (const method of ["patch", "put", "post"]) {
-      await tc.withRestfulRouting("messages", { member: { mark: method } }, async () => {
+      await withRestfulRouting("messages", { member: { mark: method } }, async () => {
         const markOptions = { action: "mark", id: "1" };
         const markPath = "/messages/1/mark";
         await assertRestfulRoutesFor("messages", {}, (options) => {
@@ -989,7 +993,7 @@ describe("ResourcesTest", () => {
   it("with member action and requirement", async () => {
     const expectedOptions = { controller: "messages", action: "mark", id: "1.1.1" };
 
-    await tc.withRestfulRouting(
+    await withRestfulRouting(
       "messages",
       { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ }, member: { mark: "get" } },
       () => {
@@ -1000,7 +1004,7 @@ describe("ResourcesTest", () => {
 
   it("member when override paths for default restful actions with", async () => {
     for (const method of ["patch", "put", "post"]) {
-      await tc.withRestfulRouting(
+      await withRestfulRouting(
         "messages",
         { member: { mark: method }, pathNames: { new: "nuevo" } },
         async () => {
@@ -1168,7 +1172,7 @@ describe("ResourcesTest", () => {
   });
 
   it("override new method", async () => {
-    await tc.withRestfulRouting("messages", async () => {
+    await withRestfulRouting("messages", async () => {
       await assertRestfulRoutesFor("messages", {}, async (options) => {
         assertRecognizes({ ...options, action: "new" }, { path: "/messages/new", method: "get" });
         await assertRaises([RoutingError], {}, () => {
@@ -1272,7 +1276,7 @@ describe("ResourcesTest", () => {
   });
 
   it("restful routes dont generate duplicates", async () => {
-    await tc.withRestfulRouting("messages", () => {
+    await withRestfulRouting("messages", () => {
       const routes = tc.routes!.routes.routes;
       for (const route of routes) {
         for (const r of routes) {
@@ -1288,13 +1292,13 @@ describe("ResourcesTest", () => {
   });
 
   it("should create singleton resource routes", async () => {
-    await tc.withSingletonResources("account", async () => {
+    await withSingletonResources("account", async () => {
       await assertSingletonRestfulFor("account");
     });
   });
 
   it("should create multiple singleton resource routes", async () => {
-    await tc.withSingletonResources("account", "product", async () => {
+    await withSingletonResources("account", "product", async () => {
       await assertSingletonRestfulFor("account");
       await assertSingletonRestfulFor("product");
     });
