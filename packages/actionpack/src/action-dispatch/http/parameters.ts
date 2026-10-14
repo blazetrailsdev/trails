@@ -46,8 +46,8 @@ export interface ParametersHost {
 
 export class Parameters {
   declare controllerClassFor: ParametersHost["controllerClassFor"];
-  protected declare setHeader: ParametersHost["setHeader"];
-  protected declare deleteHeader: ParametersHost["deleteHeader"];
+  declare protected setHeader: ParametersHost["setHeader"];
+  declare protected deleteHeader: ParametersHost["deleteHeader"];
 
   /** @internal */
   private static _parameterParsers: ParameterParsers = DEFAULT_PARSERS;
