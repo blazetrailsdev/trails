@@ -19,7 +19,7 @@ scaffold's functional tests, ported from Rails' templates, pass. The
 It is pre-release. Nothing is published to npm yet, so you run it from a
 checkout of this repository.
 
-- [Quickstart](#quickstart), verified end to end on 2026-09-30
+- [Quickstart](#quickstart), verified end to end on 2026-10-14
 - [Models: the ActiveRecord surface](#models-the-activerecord-surface)
 - [Typed models with `trails-tsc`](#typed-models-with-trails-tsc)
 - [Packages](#packages)
@@ -30,8 +30,8 @@ checkout of this repository.
 
 ## Quickstart
 
-Every command and every output block in this section was run on 2026-09-30
-against `main` at `53a6249ae6`, on Linux with Node 24.16.0 and SQLite, with
+Every command and every output block in this section was run on 2026-10-14
+against `main` at `b8bcadc150`, on Linux with Node 24.16.0 and SQLite, with
 `TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround.
 
 ### 1. Build the framework from a checkout
@@ -95,13 +95,13 @@ bin/trails generate scaffold Post title:string body:text
 
 ```text
       invoke  active_record
-      create  db/migrate/20260930175642_create_posts.ts
+      create  db/migrate/20261014154434_create_posts.ts
       create  app/models/post.ts
       invoke  test_unit
       create  test/models/post.test.ts
       create  test/fixtures/posts.yml
       invoke  resource_route
-       route  mapper.resources("posts");
+       route  this.resources("posts");
       invoke  scaffold_controller
       create  app/controllers/posts-controller.ts
       create  app/views/posts
@@ -121,22 +121,21 @@ pnpm db:migrate
 ```
 
 ```text
-== 20260930175642 CreatePosts: migrating ======================================
+== 20261014154434 CreatePosts: migrating ======================================
 -- createTable("posts")
-   -> 0.0060s
-== 20260930175642 CreatePosts: migrated (0.0070s) =============================
-
-All migrations are up to date.
+   -> 0.0082s
+== 20261014154434 CreatePosts: migrated (0.0112s) =============================
 ```
 
-The migration is an ordinary `Migration` subclass, and the migrate writes
+The migration subclasses `Migration.get(8.0)`, Rails' `ActiveRecord::Migration[8.0]`,
+and the migrate writes
 `db/schema.ts` from the live database, as Rails writes `schema.rb`:
 
 ```ts
-// db/migrate/20260930175642_create_posts.ts
+// db/migrate/20261014154434_create_posts.ts
 import { Migration } from "@blazetrails/activerecord";
 
-export class CreatePosts extends Migration {
+export class CreatePosts extends Migration.get(8.0) {
   async change(): Promise<void> {
     await this.createTable("posts", (t) => {
       t.string("title");
@@ -300,6 +299,7 @@ fails the build with:
 
 ```text
 app/models/check.ts(4,7): error TS2322: Type 'string | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
 ```
 
 The build also passes after `generate scaffold`.
