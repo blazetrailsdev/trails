@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ActiveSupportJSON, include, isPresent, type Included } from "@blazetrails/activesupport";
 import { Utils, bodyFromString } from "@blazetrails/rack";
 import {
+  RFC2396_PARSER,
   URI,
   first,
   rbModConstDefined,
@@ -16,7 +17,7 @@ import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { Request, controllerConstants } from "../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
-import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import { RouteSet, type DrawCallback } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UnknownHttpMethod, UrlGenerationError } from "../metal/exceptions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingTestHelpers, RoutingVerbs } from "../../test-helpers/abstract-unit.js";
@@ -2362,5 +2363,566 @@ describe("RouteSetTest", () => {
     });
 
     expect(tc.urlFor(set, { controller: "ibocorp", action: "show", page: 1 })).toBe("/ibocorp");
+  });
+
+  it("generate with optional params recalls last request", async () => {
+    set.draw(function () {
+      this.get("blog/", { controller: "blog", action: "index" });
+
+      this.get("blog(/:year(/:month(/:day)))", {
+        controller: "blog",
+        action: "show_date",
+        constraints: { year: /(19|20)\d\d/, month: /[01]?\d/, day: /[0-3]?\d/ },
+        day: null,
+        month: null,
+      });
+
+      this.get("blog/show/:id", { controller: "blog", action: "show", id: /\d+/ });
+
+      deprecator().silence(() => {
+        this.get("blog/:controller/:action(/:id)");
+      });
+
+      this.get("*anything", { controller: "blog", action: "unknown_request" });
+    });
+
+    const recognizePath = async (path: string) => {
+      await tc.get(URI.parse("http://example.org" + path));
+      return tc.controller!.request.pathParameters;
+    };
+
+    expect(await recognizePath("/blog")).toEqual({ controller: "blog", action: "index" });
+    expect(await recognizePath("/blog/show/123")).toEqual({
+      controller: "blog",
+      action: "show",
+      id: "123",
+    });
+    expect(await recognizePath("/blog/2004")).toEqual({
+      controller: "blog",
+      action: "show_date",
+      year: "2004",
+      day: null,
+      month: null,
+    });
+    expect(await recognizePath("/blog/2004/12")).toEqual({
+      controller: "blog",
+      action: "show_date",
+      year: "2004",
+      month: "12",
+      day: null,
+    });
+    expect(await recognizePath("/blog/2004/12/25")).toEqual({
+      controller: "blog",
+      action: "show_date",
+      year: "2004",
+      month: "12",
+      day: "25",
+    });
+    expect(await recognizePath("/blog/articles/edit/123")).toEqual({
+      controller: "articles",
+      action: "edit",
+      id: "123",
+    });
+    expect(await recognizePath("/blog/articles/show_stats")).toEqual({
+      controller: "articles",
+      action: "show_stats",
+    });
+    expect(await recognizePath("/blog/wibble")).toEqual({
+      controller: "blog",
+      action: "unknown_request",
+      anything: "blog/wibble",
+    });
+    expect(await recognizePath("/junk")).toEqual({
+      controller: "blog",
+      action: "unknown_request",
+      anything: "junk",
+    });
+
+    await tc.get(URI.parse("http://example.org/blog/2006/07/28"));
+
+    expect(tc.controller!.request.pathParameters).toEqual({
+      controller: "blog",
+      action: "show_date",
+      year: "2006",
+      month: "07",
+      day: "28",
+    });
+    expect(tc.controller!.urlFor({ day: 25, onlyPath: true })).toBe("/blog/2006/07/25");
+    expect(tc.controller!.urlFor({ year: 2005, onlyPath: true })).toBe("/blog/2005");
+    expect(tc.controller!.urlFor({ action: "show", id: 123, onlyPath: true })).toBe(
+      "/blog/show/123",
+    );
+    expect(tc.controller!.urlFor({ year: 2006, onlyPath: true })).toBe("/blog/2006");
+    expect(tc.controller!.urlFor({ year: 2006, month: null, onlyPath: true })).toBe("/blog/2006");
+  });
+});
+
+const Mapping: DrawCallback = function () {
+  this.namespace("admin", () => {
+    this.resources("users", "posts");
+  });
+
+  this.namespace("api", () => {
+    this.root({ to: "users#index" });
+  });
+
+  this.get({
+    "/blog(/:year(/:month(/:day)))": "posts#show_date",
+    constraints: {
+      year: /(19|20)\d\d/,
+      month: /[01]?\d/,
+      day: /[0-3]?\d/,
+    },
+    day: null,
+    month: null,
+  });
+
+  this.get("archive/:year", {
+    controller: "archive",
+    action: "index",
+    defaults: { year: null },
+    constraints: { year: /\d{4}/ },
+    as: "blog",
+  });
+
+  this.resources("people");
+  this.get({ "legacy/people": "people#index", legacy: "true" });
+
+  this.get("symbols", { controller: "symbols", action: "show", name: ":as_symbol" });
+  this.get({ "id_default(/:id)": "foo#id_default", id: 1 });
+  this.match({ get_or_post: "foo#get_or_post", via: [":get", ":post"] });
+  this.get({ "optional/:optional": "posts#index" });
+  this.get({ "projects/:project_id": "project#index", as: "project" });
+  this.get({ clients: "projects#index" });
+
+  this.get({ "ignorecase/geocode/:postalcode": "geocode#show", postalcode: /hx\d\d-\d[a-z]{2}/i });
+  this.get({
+    "extended/geocode/:postalcode": "geocode#show",
+    constraints: {
+      postalcode: /\d{5}(-\d{4})?/,
+    },
+    as: "geocode",
+  });
+
+  this.get({ "news(.:format)": "news#index" });
+
+  deprecator().silence(() => {
+    this.get({ "comment/:id(/:action)": "comments#show" });
+    this.get("ws/:controller(/:action(/:id))", { ws: true });
+    this.get({ "account(/:action)": "account#subscription" });
+    this.get("pages/:page_id/:controller(/:action(/:id))");
+    this.get(":controller/ping", { action: "ping" });
+  });
+
+  this.get("こんにちは/世界", { controller: "news", action: "index" });
+
+  deprecator().silence(() => {
+    this.match(":controller(/:action(/:id))(.:format)", { via: ":all" });
+  });
+
+  this.root({ to: "news#index" });
+};
+
+class RackMountIntegrationTests {
+  routes!: RouteSet;
+  controller: Base | null = null;
+
+  setup(): void {
+    this.routes = new RouteSet();
+    this.routes.draw(Mapping);
+  }
+
+  sortExtrasBang(extras: [string, string[]]): [string, string[]] {
+    if (extras.length === 2) {
+      extras[1].sort((a, b) => String(a).localeCompare(String(b)));
+    }
+    return extras;
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- `include RoutingTestHelpers` (`routing_test.rb:1997`) is the only module mixed in.
+interface RackMountIntegrationTests extends Included<typeof RoutingTestHelpers> {}
+include(RackMountIntegrationTests, RoutingTestHelpers);
+
+describe("RackMountIntegrationTests", () => {
+  let tc: RackMountIntegrationTests;
+
+  beforeEach(() => {
+    tc = new RackMountIntegrationTests();
+    tc.setup();
+  });
+
+  it("recognize path", () => {
+    const routes = tc.routes;
+    expect(routes.recognizePath("/admin/users", { method: "get" })).toEqual({
+      controller: "admin/users",
+      action: "index",
+    });
+    expect(routes.recognizePath("/admin/users", { method: "post" })).toEqual({
+      controller: "admin/users",
+      action: "create",
+    });
+    expect(routes.recognizePath("/admin/users/new", { method: "get" })).toEqual({
+      controller: "admin/users",
+      action: "new",
+    });
+    expect(routes.recognizePath("/admin/users/1", { method: "get" })).toEqual({
+      controller: "admin/users",
+      action: "show",
+      id: "1",
+    });
+    expect(routes.recognizePath("/admin/users/1", { method: "put" })).toEqual({
+      controller: "admin/users",
+      action: "update",
+      id: "1",
+    });
+    expect(routes.recognizePath("/admin/users/1", { method: "delete" })).toEqual({
+      controller: "admin/users",
+      action: "destroy",
+      id: "1",
+    });
+    expect(routes.recognizePath("/admin/users/1/edit", { method: "get" })).toEqual({
+      controller: "admin/users",
+      action: "edit",
+      id: "1",
+    });
+
+    expect(routes.recognizePath("/admin/posts", { method: "get" })).toEqual({
+      controller: "admin/posts",
+      action: "index",
+    });
+    expect(routes.recognizePath("/admin/posts/new", { method: "get" })).toEqual({
+      controller: "admin/posts",
+      action: "new",
+    });
+
+    expect(routes.recognizePath("/api", { method: "get" })).toEqual({
+      controller: "api/users",
+      action: "index",
+    });
+    expect(routes.recognizePath("/api/", { method: "get" })).toEqual({
+      controller: "api/users",
+      action: "index",
+    });
+
+    expect(routes.recognizePath("/blog/2009", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "show_date",
+      year: "2009",
+      month: null,
+      day: null,
+    });
+    expect(routes.recognizePath("/blog/2009/01", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "show_date",
+      year: "2009",
+      month: "01",
+      day: null,
+    });
+    expect(routes.recognizePath("/blog/2009/01/01", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "show_date",
+      year: "2009",
+      month: "01",
+      day: "01",
+    });
+
+    expect(routes.recognizePath("/archive/2010")).toEqual({
+      controller: "archive",
+      action: "index",
+      year: "2010",
+    });
+    expect(routes.recognizePath("/archive")).toEqual({ controller: "archive", action: "index" });
+
+    expect(routes.recognizePath("/people", { method: "get" })).toEqual({
+      controller: "people",
+      action: "index",
+    });
+    expect(routes.recognizePath("/people.xml", { method: "get" })).toEqual({
+      controller: "people",
+      action: "index",
+      format: "xml",
+    });
+    expect(routes.recognizePath("/people", { method: "post" })).toEqual({
+      controller: "people",
+      action: "create",
+    });
+    expect(routes.recognizePath("/people/new", { method: "get" })).toEqual({
+      controller: "people",
+      action: "new",
+    });
+    expect(routes.recognizePath("/people/1", { method: "get" })).toEqual({
+      controller: "people",
+      action: "show",
+      id: "1",
+    });
+    expect(routes.recognizePath("/people/1.xml", { method: "get" })).toEqual({
+      controller: "people",
+      action: "show",
+      id: "1",
+      format: "xml",
+    });
+    expect(routes.recognizePath("/people/1", { method: "put" })).toEqual({
+      controller: "people",
+      action: "update",
+      id: "1",
+    });
+    expect(routes.recognizePath("/people/1", { method: "delete" })).toEqual({
+      controller: "people",
+      action: "destroy",
+      id: "1",
+    });
+    expect(routes.recognizePath("/people/1/edit", { method: "get" })).toEqual({
+      controller: "people",
+      action: "edit",
+      id: "1",
+    });
+    expect(routes.recognizePath("/people/1/edit.xml", { method: "get" })).toEqual({
+      controller: "people",
+      action: "edit",
+      id: "1",
+      format: "xml",
+    });
+
+    expect(routes.recognizePath("/symbols")).toEqual({
+      controller: "symbols",
+      action: "show",
+      name: ":as_symbol",
+    });
+    expect(routes.recognizePath("/id_default/1")).toEqual({
+      controller: "foo",
+      action: "id_default",
+      id: "1",
+    });
+    expect(routes.recognizePath("/id_default/2")).toEqual({
+      controller: "foo",
+      action: "id_default",
+      id: "2",
+    });
+    expect(routes.recognizePath("/id_default")).toEqual({
+      controller: "foo",
+      action: "id_default",
+      id: 1,
+    });
+    expect(routes.recognizePath("/get_or_post", { method: "get" })).toEqual({
+      controller: "foo",
+      action: "get_or_post",
+    });
+    expect(routes.recognizePath("/get_or_post", { method: "post" })).toEqual({
+      controller: "foo",
+      action: "get_or_post",
+    });
+    expect(() => routes.recognizePath("/get_or_post", { method: "put" })).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/get_or_post", { method: "delete" })).toThrow(RoutingError);
+
+    expect(routes.recognizePath("/optional/bar")).toEqual({
+      controller: "posts",
+      action: "index",
+      optional: "bar",
+    });
+    expect(() => routes.recognizePath("/optional")).toThrow(RoutingError);
+
+    expect(routes.recognizePath("/ws/posts/show/1", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "show",
+      id: "1",
+      ws: true,
+    });
+    expect(routes.recognizePath("/ws/posts/list", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "list",
+      ws: true,
+    });
+    expect(routes.recognizePath("/ws/posts", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "index",
+      ws: true,
+    });
+
+    expect(routes.recognizePath("/account", { method: "get" })).toEqual({
+      controller: "account",
+      action: "subscription",
+    });
+    expect(routes.recognizePath("/account/subscription", { method: "get" })).toEqual({
+      controller: "account",
+      action: "subscription",
+    });
+    expect(routes.recognizePath("/account/billing", { method: "get" })).toEqual({
+      controller: "account",
+      action: "billing",
+    });
+
+    expect(routes.recognizePath("/pages/1/notes", { method: "get" })).toEqual({
+      page_id: "1",
+      controller: "notes",
+      action: "index",
+    });
+    expect(routes.recognizePath("/pages/1/notes/list", { method: "get" })).toEqual({
+      page_id: "1",
+      controller: "notes",
+      action: "list",
+    });
+    expect(routes.recognizePath("/pages/1/notes/show/2", { method: "get" })).toEqual({
+      page_id: "1",
+      controller: "notes",
+      action: "show",
+      id: "2",
+    });
+
+    expect(routes.recognizePath("/posts/ping", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "ping",
+    });
+    expect(routes.recognizePath("/posts", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "index",
+    });
+    expect(routes.recognizePath("/posts/index", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "index",
+    });
+    expect(routes.recognizePath("/posts/show", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "show",
+    });
+    expect(routes.recognizePath("/posts/show/1", { method: "get" })).toEqual({
+      controller: "posts",
+      action: "show",
+      id: "1",
+    });
+    expect(routes.recognizePath("/posts/create", { method: "post" })).toEqual({
+      controller: "posts",
+      action: "create",
+    });
+
+    expect(routes.recognizePath("/ignorecase/geocode/hx12-1az")).toEqual({
+      controller: "geocode",
+      action: "show",
+      postalcode: "hx12-1az",
+    });
+    expect(routes.recognizePath("/ignorecase/geocode/hx12-1AZ")).toEqual({
+      controller: "geocode",
+      action: "show",
+      postalcode: "hx12-1AZ",
+    });
+    expect(routes.recognizePath("/extended/geocode/12345-1234")).toEqual({
+      controller: "geocode",
+      action: "show",
+      postalcode: "12345-1234",
+    });
+    expect(routes.recognizePath("/extended/geocode/12345")).toEqual({
+      controller: "geocode",
+      action: "show",
+      postalcode: "12345",
+    });
+
+    expect(routes.recognizePath("/", { method: "get" })).toEqual({
+      controller: "news",
+      action: "index",
+    });
+    expect(routes.recognizePath(null)).toEqual({ controller: "news", action: "index" });
+    expect(routes.recognizePath("/news.rss", { method: "get" })).toEqual({
+      controller: "news",
+      action: "index",
+      format: "rss",
+    });
+
+    expect(() => routes.recognizePath("/none", { method: "get" })).toThrow(RoutingError);
+  });
+
+  it("generate extras", () => {
+    const routes = tc.routes;
+    expect(routes.generateExtras({ controller: "people" })).toEqual(["/people", []]);
+    expect(routes.generateExtras({ controller: "people", foo: "bar" })).toEqual([
+      "/people",
+      ["foo"],
+    ]);
+    expect(routes.generateExtras({ controller: "people", action: "index" })).toEqual([
+      "/people",
+      [],
+    ]);
+    expect(routes.generateExtras({ controller: "people", action: "index", foo: "bar" })).toEqual([
+      "/people",
+      ["foo"],
+    ]);
+    expect(routes.generateExtras({ controller: "people", action: "new" })).toEqual([
+      "/people/new",
+      [],
+    ]);
+    expect(routes.generateExtras({ controller: "people", action: "new", foo: "bar" })).toEqual([
+      "/people/new",
+      ["foo"],
+    ]);
+    expect(routes.generateExtras({ controller: "people", action: "show", id: "1" })).toEqual([
+      "/people/1",
+      [],
+    ]);
+    expect(
+      tc.sortExtrasBang(
+        routes.generateExtras({
+          controller: "people",
+          action: "show",
+          id: "1",
+          foo: "2",
+          bar: "3",
+        }),
+      ),
+    ).toEqual(["/people/1", ["bar", "foo"]]);
+    expect(
+      routes.generateExtras({
+        controller: "people",
+        action: "create",
+        person: { first_name: "Josh", last_name: "Peek" },
+      }),
+    ).toEqual(["/people", ["person"]]);
+    expect(
+      routes.generateExtras({ controller: "people", action: "create", people: ["Josh", "Dave"] }),
+    ).toEqual(["/people", ["people"]]);
+
+    expect(routes.generateExtras({ controller: "posts", action: "show", id: "1" })).toEqual([
+      "/posts/show/1",
+      [],
+    ]);
+    expect(
+      tc.sortExtrasBang(
+        routes.generateExtras({ controller: "posts", action: "show", id: "1", foo: "2", bar: "3" }),
+      ),
+    ).toEqual(["/posts/show/1", ["bar", "foo"]]);
+    expect(routes.generateExtras({ controller: "posts", action: "index" })).toEqual(["/posts", []]);
+    expect(routes.generateExtras({ controller: "posts", action: "index", foo: "bar" })).toEqual([
+      "/posts",
+      ["foo"],
+    ]);
+  });
+
+  it("extras", () => {
+    let params: Record<string, unknown> = { controller: "people" };
+    expect(tc.routes.extraKeys(params)).toEqual([]);
+    expect(params).toEqual({ controller: "people" });
+
+    params = { controller: "people", foo: "bar" };
+    expect(tc.routes.extraKeys(params)).toEqual(["foo"]);
+    expect(params).toEqual({ controller: "people", foo: "bar" });
+
+    params = { controller: "people", action: "create", person: { name: "Josh" } };
+    expect(tc.routes.extraKeys(params)).toEqual(["person"]);
+    expect(params).toEqual({ controller: "people", action: "create", person: { name: "Josh" } });
+
+    params = { controller: "people", action: "create", domain: { foo: "Josh" } };
+    expect(tc.routes.extraKeys(params)).toEqual(["domain"]);
+    expect(params).toEqual({ controller: "people", action: "create", domain: { foo: "Josh" } });
+  });
+
+  it("unicode path", () => {
+    expect(
+      tc.routes.recognizePath(RFC2396_PARSER.escape("こんにちは/世界"), { method: "get" }),
+    ).toEqual({ controller: "news", action: "index" });
+  });
+
+  it("downcased unicode path", () => {
+    expect(
+      tc.routes.recognizePath(RFC2396_PARSER.escape("こんにちは/世界").toLowerCase(), {
+        method: "get",
+      }),
+    ).toEqual({ controller: "news", action: "index" });
   });
 });

@@ -1087,23 +1087,15 @@ export class Mapper {
     }
   }
 
-  resources(
-    name: string,
-    optionsOrCallback?: RouteOptions | MapperCallback,
-    callback?: MapperCallback,
-  ): void {
-    let options: RouteOptions = {};
-    let cb: MapperCallback | undefined;
+  resources(...resources: Array<string | RouteOptions | MapperCallback>): void {
+    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+      | MapperCallback
+      | undefined;
+    let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (typeof optionsOrCallback === "function") {
-      cb = optionsOrCallback;
-    } else if (optionsOrCallback) {
-      options = dup(optionsOrCallback);
-      cb = callback;
-    }
-
-    if (this.applyCommonBehaviorFor("resources", [name], options, cb)) return;
+    if (this.applyCommonBehaviorFor("resources", resources as string[], options, cb)) return;
     options = this.applyActionOptions("resources", options);
+    const name = String(resources.pop());
 
     const resource = new Resource(
       name,
@@ -1217,23 +1209,15 @@ export class Mapper {
     }
   }
 
-  resource(
-    name: string,
-    optionsOrCallback?: RouteOptions | MapperCallback,
-    callback?: MapperCallback,
-  ): void {
-    let options: RouteOptions = {};
-    let cb: MapperCallback | undefined;
+  resource(...resources: Array<string | RouteOptions | MapperCallback>): void {
+    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+      | MapperCallback
+      | undefined;
+    let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (typeof optionsOrCallback === "function") {
-      cb = optionsOrCallback;
-    } else if (optionsOrCallback) {
-      options = dup(optionsOrCallback);
-      cb = callback;
-    }
-
-    if (this.applyCommonBehaviorFor("resource", [name], options, cb)) return;
+    if (this.applyCommonBehaviorFor("resource", resources as string[], options, cb)) return;
     options = this.applyActionOptions("resource", options);
+    const name = String(resources.pop());
 
     const resource = new SingletonResource(
       name,
@@ -2373,8 +2357,12 @@ export class Mapper {
     options: RouteOptions,
     block: MapperCallback | undefined,
   ): boolean {
-    const dispatch = (...args: unknown[]) =>
-      (this as unknown as Record<string, (...a: unknown[]) => unknown>)[method](...args);
+    const dispatch = (resource: string, options: RouteOptions, block?: MapperCallback) =>
+      (this as unknown as Record<string, (...a: unknown[]) => unknown>)[method](
+        resource,
+        options,
+        ...(block ? [block] : []),
+      );
 
     if (resources.length > 1) {
       for (const r of resources) dispatch(r, options, block);

@@ -1241,7 +1241,7 @@ export class RouteSet {
   }
 
   recognizePath(
-    path: string,
+    path: string | null,
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
     const method = String(environment.method ?? "GET").toUpperCase();
