@@ -17,6 +17,7 @@ export class Column extends BaseColumn {
     return (this.sqlTypeMetadata as TypeMetadata | null)?.fmod ?? null;
   }
 
+  /** @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,

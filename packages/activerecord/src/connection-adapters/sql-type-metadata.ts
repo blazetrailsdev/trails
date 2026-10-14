@@ -21,7 +21,10 @@ export class SqlTypeMetadata {
   readonly precision: number | null;
   readonly scale: number | null;
 
-  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
+  /**
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15
+   * @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor
+   */
   constructor(
     options: {
       sqlType?: string | null;
