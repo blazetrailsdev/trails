@@ -74,6 +74,7 @@ export class Buffer {
   private writeReferenceThreshold = MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT;
   private readReferenceThreshold = MSGPACK_BUFFER_STRING_READ_REFERENCE_DEFAULT;
   private tailMem: ArrayBufferLike | null = null;
+  private mappedString = new WeakSet<ArrayBufferLike>();
   private ioBufferSize = MSGPACK_BUFFER_IO_BUFFER_SIZE_DEFAULT;
 
   constructor(...argv: unknown[]) {
@@ -368,7 +369,7 @@ export class Buffer {
       throw new EOFError("IO reached end of file");
     }
 
-    this.chunks.push(ioBuffer.slice());
+    this.appendImpl(ioBuffer, len, false);
 
     return len;
   }
@@ -403,6 +404,7 @@ export class Buffer {
     const mappedString = string.slice();
 
     this.chunks.push(mappedString);
+    this.mappedString.add(mappedString.buffer);
   }
 
   private writableSize(): number {
@@ -489,20 +491,21 @@ export class Buffer {
     length -= tailAvail;
 
     const tail = this.chunks.length === 0 ? null : this.chunks[this.chunks.length - 1];
-    const capacity = tail == null ? 0 : tail.length;
+    const capacity = tail == null ? 0 : tail.byteOffset + tail.length;
 
-    if (tail == null || tail.buffer !== this.tailMem || capacity <= MSGPACK_RMEM_PAGE_SIZE) {
+    if (tail == null || this.mappedString.has(tail.buffer) || capacity <= MSGPACK_RMEM_PAGE_SIZE) {
       const mem = this.chunkMalloc(length);
       mem.set(data);
 
       this.chunks.push(mem.subarray(0, length));
       this.tailMem = mem.buffer;
     } else {
-      const tailFilled = tail.length;
-      const mem = this.chunkRealloc(tail, tailFilled + length, capacity);
+      const tailFilled = tail.byteOffset + tail.length;
+      const first = new Uint8Array(tail.buffer, 0, tailFilled);
+      const mem = this.chunkRealloc(first, tailFilled + length, capacity);
       mem.set(data, tailFilled);
 
-      this.chunks[this.chunks.length - 1] = mem.subarray(0, tailFilled + length);
+      this.chunks[this.chunks.length - 1] = mem.subarray(tail.byteOffset, tailFilled + length);
       this.tailMem = mem.buffer;
     }
   }
@@ -593,7 +596,7 @@ export class Buffer {
     if (
       length <= avail &&
       string.length === 0 &&
-      this.chunks[0].buffer !== this.tailMem &&
+      this.mappedString.has(this.chunks[0].buffer) &&
       length >= this.readReferenceThreshold
     ) {
       string.push(this.chunks[0].subarray(0, length));

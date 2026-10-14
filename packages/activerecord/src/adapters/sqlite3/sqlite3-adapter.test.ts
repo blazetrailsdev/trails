@@ -619,7 +619,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       const str = new Uint8Array([0x80]);
       const binary = new DualEncoding({ name: "いただきます！", data: str });
       await binary.saveBang();
-      expect(new Uint8Array(binary.data)).toEqual(str);
+      expect(binary.data).toEqual(str);
     } finally {
       await (await DualEncoding.leaseConnection()).dropTable("dual_encodings", { ifExists: true });
     }
