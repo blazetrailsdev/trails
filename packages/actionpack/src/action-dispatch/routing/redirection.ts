@@ -36,7 +36,7 @@ function scriptName(req: Request): string {
   return (req.env["SCRIPT_NAME"] as string) ?? "";
 }
 
-export class Redirect<B = RedirectBlock> extends Endpoint {
+export class Redirect<B = unknown> extends Endpoint {
   readonly status: number;
   readonly block: B;
 
@@ -216,8 +216,11 @@ export function redirect(
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
   >
 ): Redirect<unknown> {
+  const last = args[args.length - 1];
   let block: RedirectBlock | undefined =
-    typeof args[args.length - 1] === "function" ? (args.pop() as RedirectBlock) : undefined;
+    typeof last === "function" && !Object.hasOwn(last, "call")
+      ? (args.pop() as RedirectBlock)
+      : undefined;
   const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
   const deleted = hashDelete(options, "status") as number | false | null;
   const status = deleted != null && deleted !== false ? deleted : 301;
@@ -229,7 +232,7 @@ export function redirect(
   if (typeof path === "string") {
     return new PathRedirect(status, path);
   }
-  if (typeof path === "function") {
+  if (typeof path === "function" && !Object.hasOwn(path, "call")) {
     block = path;
   } else if (path && typeof (path as RedirectCallable).call === "function") {
     const callable = path as RedirectCallable;
