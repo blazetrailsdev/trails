@@ -632,8 +632,8 @@ What the prose above means in practice:
 - **Full stack** (`trails new`): generates an app that type-checks, then boots,
   migrates, routes, runs a console, renders TSE views with layouts, and serves
   from Vite in development. `generate scaffold` produces a working CRUD
-  resource with passing tests, as the quickstart shows. A real app will still
-  hit unported ActionView helpers and ActionController modules.
+  resource with passing tests, as the quickstart shows. A real app is most
+  likely to hit unported ActionView helpers.
 
 ## Requirements
 
