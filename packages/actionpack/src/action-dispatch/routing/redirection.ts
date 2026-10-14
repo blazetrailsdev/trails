@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { extractOptionsBang, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
@@ -8,7 +8,7 @@ import {
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
-import { isEmpty, URI } from "@blazetrails/ruby-compat";
+import { ArgumentError, hashDelete, isEmpty, URI } from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
 
@@ -216,16 +216,11 @@ export function redirect(
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
   >
 ): Redirect<unknown> {
-  let options: (OptionRedirectOptions & { status?: number }) | undefined;
-  const last = args[args.length - 1];
-  if (last && typeof last === "object" && !("call" in last) && typeof last !== "function") {
-    options = args.pop() as OptionRedirectOptions & { status?: number };
-  }
-  const status = options?.status ?? 301;
-  if (options) delete options.status;
+  const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
+  const status = (hashDelete(options, "status") as number | null) ?? 301;
   const path = args.shift();
 
-  if (options && Object.keys(options).length > 0) {
+  if (Object.keys(options).length > 0) {
     return new OptionRedirect(status, options);
   }
   if (typeof path === "string") {
@@ -238,7 +233,7 @@ export function redirect(
     const callable = path as RedirectCallable;
     block = (params, request) => callable.call(params, request);
   }
-  if (!block) throw new Error("redirection argument not supported");
+  if (!block) throw new ArgumentError("redirection argument not supported");
   return new Redirect(status, block);
 }
 

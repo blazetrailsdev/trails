@@ -12,12 +12,17 @@ import {
   assertRaises,
   stub,
 } from "@blazetrails/activesupport";
-import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { deprecator } from "../deprecator.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { RoutedRackApp } from "../../test-helpers/abstract-unit.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
+import {
+  Parameters,
+  UnfilteredParameters,
+} from "../../action-controller/metal/strong-parameters.js";
+import { Redirection } from "../routing/redirection.js";
 
 class StubController {
   static actionEncodingTemplate(): null {
@@ -2283,11 +2288,53 @@ describe("TestRoutingMapper", () => {
     expect(t.request.params["id"]).toBe("home");
   });
 
-  it.skip("custom param", () => {});
+  it.skip("custom param", async () => {
+    draw(function () {
+      this.resources("profiles", { param: "username" }, () => {
+        this.get("details", { on: "member" });
+        this.resources("messages");
+      });
+    });
 
-  it.skip("custom param constraint", () => {});
+    await t.get("/profiles/bob");
+    expect(t.response.body).toBe("profiles#show");
+    expect(t.request.params["username"]).toBe("bob");
 
-  it.skip("colon containing custom param", () => {});
+    await t.get("/profiles/bob/details");
+    expect(t.request.params["username"]).toBe("bob");
+
+    await t.get("/profiles/bob/messages/34");
+    expect(t.request.params["profile_username"]).toBe("bob");
+    expect(t.request.params["id"]).toBe("34");
+  });
+
+  it.skip("custom param constraint", async () => {
+    draw(function () {
+      this.resources("profiles", { param: "username", username: /[a-z]+/ }, () => {
+        this.get("details", { on: "member" });
+        this.resources("messages");
+      });
+    });
+
+    await t.get("/profiles/bob1");
+    expect(t.response.status).toBe(404);
+
+    await t.get("/profiles/bob1/details");
+    expect(t.response.status).toBe(404);
+
+    await t.get("/profiles/bob1/messages/34");
+    expect(t.response.status).toBe(404);
+  });
+
+  it.skip("colon containing custom param", async () => {
+    const ex = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.resources("profiles", { param: "username/:is_admin" });
+      });
+    });
+
+    expect(ex.message).toMatch(/:param option can't contain colon/);
+  });
 
   it("invalid route name raises error", () => {
     const routes = new RouteSet();
@@ -2313,10 +2360,48 @@ describe("TestRoutingMapper", () => {
     ).toThrow(/Invalid route name/);
   });
 
-  it.skip("duplicate route name raises error", () => {});
+  it("duplicate route name raises error", async () => {
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/collision", { to: "collision#show", as: "collision" });
+        this.get("/duplicate", { to: "duplicate#show", as: "collision" });
+      });
+    });
+  });
 
-  it.skip("duplicate route name via resources raises error", () => {});
-  it.skip("controller name with leading slash raise error", () => {});
+  it("duplicate route name via resources raises error", async () => {
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.resources("collisions");
+        this.get("/collision", { to: "collision#show", as: "collision" });
+      });
+    });
+  });
+  it("controller name with leading slash raise error", async () => {
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/feeds/:service", { to: "/feeds#show" });
+      });
+    });
+
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/feeds/:service", { controller: "/feeds", action: "show" });
+      });
+    });
+
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/api/feeds/:service", { to: "/api/feeds#show" });
+      });
+    });
+
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.resources("feeds", { controller: "/feeds" });
+      });
+    });
+  });
   it("match with empty via", () => {
     const routes = new RouteSet();
     expect(() =>
@@ -2325,8 +2410,32 @@ describe("TestRoutingMapper", () => {
       }),
     ).toThrow(ArgumentError);
   });
-  it.skip("multiple roots raises error", () => {});
-  it.skip("multiple namespaced roots", () => {});
+  it("multiple roots raises error", async () => {
+    const ex = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.root("pages#index", { constraints: { host: "www.example.com" } });
+        this.root("admin/pages#index", { constraints: { host: "admin.example.com" } });
+      });
+    });
+    expect(ex.message).toMatch(/Invalid route name, already in use: 'root'/);
+  });
+  it("multiple namespaced roots", () => {
+    draw(function () {
+      this.namespace("foo", () => {
+        this.root("test#index");
+      });
+
+      this.root("test#index");
+
+      this.namespace("bar", () => {
+        this.root("test#index");
+      });
+    });
+
+    expect(t.fooRootPath()).toBe("/foo");
+    expect(t.rootPath()).toBe("/");
+    expect(t.barRootPath()).toBe("/bar");
+  });
 
   it.skip("resource new actions", () => {});
 
@@ -2541,13 +2650,137 @@ describe("TestRoutingMapper", () => {
     expect(t.noticePath({ id: "1" })).toBe("/notices/1");
   });
 
-  it.skip("shallow custom param", () => {});
-  it.skip("shallow path inside namespace is not added twice", () => {});
-  it.skip("shallow path and prefix are not added to non shallow routes", () => {});
-  it.skip("scope path is copied to shallow path", () => {});
-  it.skip("scope as is copied to shallow prefix", () => {});
-  it.skip("scope shallow prefix is not overwritten by as", () => {});
-  it.skip("scope shallow path is not overwritten by path", () => {});
+  it.skip("shallow custom param", async () => {
+    draw(function () {
+      this.resources("orders", () => {
+        this.constraints({ download: /[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/ }, () => {
+          this.resources("downloads", { param: "download", shallow: true });
+        });
+      });
+    });
+
+    await t.get("/downloads/0c0c0b68-d24b-11e1-a861-001ff3fffe6f.zip");
+    expect(t.response.body).toBe("downloads#show");
+    expect(t.request.params["download"]).toBe("0c0c0b68-d24b-11e1-a861-001ff3fffe6f");
+  });
+  it("shallow path inside namespace is not added twice", async () => {
+    draw(function () {
+      this.namespace("admin", () => {
+        this.shallow(() => {
+          this.resources("posts", () => {
+            this.resources("comments");
+          });
+        });
+      });
+    });
+
+    await t.get("/admin/posts/1/comments");
+    expect(t.response.body).toBe("admin/comments#index");
+    expect(t.adminPostCommentsPath("1")).toBe("/admin/posts/1/comments");
+  });
+  it("shallow path and prefix are not added to non shallow routes", async () => {
+    draw(function () {
+      this.scope({ shallowPath: "projects", shallowPrefix: "project" }, () => {
+        this.resources("projects", () => {
+          this.resources("files", { controller: "project_files", shallow: true });
+        });
+      });
+    });
+
+    await t.get("/projects");
+    expect(t.response.body).toBe("projects#index");
+    expect(t.projectsPath()).toBe("/projects");
+
+    await t.get("/projects/new");
+    expect(t.response.body).toBe("projects#new");
+    expect(t.newProjectPath()).toBe("/projects/new");
+
+    await t.post("/projects");
+    expect(t.response.body).toBe("projects#create");
+
+    await t.get("/projects/1");
+    expect(t.response.body).toBe("projects#show");
+    expect(t.projectPath("1")).toBe("/projects/1");
+
+    await t.get("/projects/1/edit");
+    expect(t.response.body).toBe("projects#edit");
+    expect(t.editProjectPath("1")).toBe("/projects/1/edit");
+
+    await t.patch("/projects/1");
+    expect(t.response.body).toBe("projects#update");
+
+    await t.delete("/projects/1");
+    expect(t.response.body).toBe("projects#destroy");
+
+    await t.get("/projects/1/files");
+    expect(t.response.body).toBe("project_files#index");
+    expect(t.projectFilesPath("1")).toBe("/projects/1/files");
+
+    await t.get("/projects/1/files/new");
+    expect(t.response.body).toBe("project_files#new");
+    expect(t.newProjectFilePath("1")).toBe("/projects/1/files/new");
+
+    await t.post("/projects/1/files");
+    expect(t.response.body).toBe("project_files#create");
+
+    await t.get("/projects/files/2");
+    expect(t.response.body).toBe("project_files#show");
+    expect(t.projectFilePath("2")).toBe("/projects/files/2");
+
+    await t.get("/projects/files/2/edit");
+    expect(t.response.body).toBe("project_files#edit");
+    expect(t.editProjectFilePath("2")).toBe("/projects/files/2/edit");
+
+    await t.patch("/projects/files/2");
+    expect(t.response.body).toBe("project_files#update");
+
+    await t.delete("/projects/files/2");
+    expect(t.response.body).toBe("project_files#destroy");
+  });
+  it("scope path is copied to shallow path", () => {
+    draw(function () {
+      this.scope({ path: "foo" }, () => {
+        this.resources("posts", () => {
+          this.resources("comments", { shallow: true });
+        });
+      });
+    });
+
+    expect(t.commentPath("1")).toBe("/foo/comments/1");
+  });
+  it("scope as is copied to shallow prefix", () => {
+    draw(function () {
+      this.scope({ as: "foo" }, () => {
+        this.resources("posts", () => {
+          this.resources("comments", { shallow: true });
+        });
+      });
+    });
+
+    expect(t.fooCommentPath("1")).toBe("/comments/1");
+  });
+  it("scope shallow prefix is not overwritten by as", () => {
+    draw(function () {
+      this.scope({ as: "foo", shallowPrefix: "bar" }, () => {
+        this.resources("posts", () => {
+          this.resources("comments", { shallow: true });
+        });
+      });
+    });
+
+    expect(t.barCommentPath("1")).toBe("/comments/1");
+  });
+  it("scope shallow path is not overwritten by path", () => {
+    draw(function () {
+      this.scope({ path: "foo", shallowPath: "bar" }, () => {
+        this.resources("posts", () => {
+          this.resources("comments", { shallow: true });
+        });
+      });
+    });
+
+    expect(t.commentPath("1")).toBe("/bar/comments/1");
+  });
 
   it("url generator for optional prefix static and dynamic segment", async () => {
     draw(function () {
@@ -2791,12 +3024,87 @@ describe("TestRoutingMapper", () => {
       "/customers/1/invoices/aged/3",
     );
   });
-  it.skip("named route check", () => {});
-  it.skip("explicitly avoiding the named route", () => {});
-  it.skip("nested route in nested resource", () => {});
-  it.skip("root in deeply nested scope", () => {});
-  it.skip("multiple positional args with the same name", () => {});
-  it.skip("resource where as is empty", () => {});
+  it("named route check", () => {
+    let before: boolean | undefined;
+    let after: boolean | undefined;
+
+    draw(function () {
+      before = this.hasNamedRoute("hello");
+      this.get("/hello", { as: "hello", to: "hello#world" });
+      after = this.hasNamedRoute("hello");
+    });
+
+    expect(before).toBe(false);
+    expect(after).toBe(true);
+  });
+  it("explicitly avoiding the named route", () => {
+    draw(function () {
+      this.scope({ as: "routes" }, () => {
+        this.get("/c/:id", { as: "collision", to: "collision#show" });
+        this.get("/collision", { to: "collision#show" });
+        this.get("/no_collision", { to: "collision#show", as: null });
+      });
+    });
+
+    expect(rbObjRespondTo(t, "routesNoCollisionPath")).toBe(false);
+  });
+  it("nested route in nested resource", async () => {
+    draw(function () {
+      this.resources("posts", { only: ["index", "show"] }, () => {
+        this.resources("comments", { except: "destroy" }, () => {
+          this.get({ views: "comments#views", as: "views" });
+        });
+      });
+    });
+
+    await t.get("/posts/1/comments/2/views");
+    expect(t.response.body).toBe("comments#views");
+    expect(t.postCommentViewsPath({ post_id: "1", comment_id: "2" })).toBe(
+      "/posts/1/comments/2/views",
+    );
+  });
+  it("root in deeply nested scope", async () => {
+    draw(function () {
+      this.resources("posts", { only: ["index", "show"] }, () => {
+        this.namespace("admin", () => {
+          this.root({ to: "index#index" });
+        });
+      });
+    });
+
+    await t.get("/posts/1/admin");
+    expect(t.response.body).toBe("admin/index#index");
+    expect(t.postAdminRootPath({ post_id: "1" })).toBe("/posts/1/admin");
+  });
+  it("multiple positional args with the same name", async () => {
+    draw(function () {
+      this.get({ "/downloads/:id/:id.tar": "downloads#show", as: "download", format: false });
+    });
+
+    const expectedParams = {
+      controller: "downloads",
+      action: "show",
+      id: "1",
+    };
+
+    await t.get("/downloads/1/1.tar");
+    expect(t.response.body).toBe("downloads#show");
+    expect(t.request.pathParameters).toEqual(expectedParams);
+    expect(t.downloadPath("1")).toBe("/downloads/1/1.tar");
+    expect(t.downloadPath("1", "1")).toBe("/downloads/1/1.tar");
+  });
+  it.skip("resource where as is empty", () => {
+    draw(function () {
+      this.resource("post", { as: "" });
+
+      this.scope("post", { as: "post" }, () => {
+        this.resource("comment", { as: "" });
+      });
+    });
+
+    expect(t.newPath()).toBe("/post/new");
+    expect(t.newPostPath()).toBe("/post/comment/new");
+  });
   it("resources where as is empty", () => {
     const routes = new RouteSet();
     routes.draw(function () {
@@ -2810,11 +3118,82 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "new")).toBe("/posts/new");
     expect(routes.pathFor({}, "new_posts")).toBe("/posts/comments/new");
   });
-  it.skip("scope where as is empty", () => {});
-  it.skip("multiple named roots", () => {});
-  it.skip("nested routes under format resource", () => {});
-  it.skip("passing action parameters to url helpers raises error if parameters are not permitted", () => {});
-  it.skip("passing action parameters to url helpers is allowed if parameters are permitted", () => {});
+  it("scope where as is empty", () => {
+    draw(function () {
+      this.scope("post", { as: "" }, () => {
+        this.resource("user");
+        this.resources("comments");
+      });
+    });
+
+    expect(t.newUserPath()).toBe("/post/user/new");
+    expect(t.newCommentPath()).toBe("/post/comments/new");
+  });
+  it("multiple named roots", async () => {
+    draw(function () {
+      this.namespace("foo", () => {
+        this.root("pages#index", { constraints: { host: "www.example.com" } });
+        this.root("admin/pages#index", {
+          constraints: { host: "admin.example.com" },
+          as: "admin_root",
+        });
+      });
+
+      this.root("pages#index", { constraints: { host: "www.example.com" } });
+      this.root("admin/pages#index", {
+        constraints: { host: "admin.example.com" },
+        as: "admin_root",
+      });
+    });
+
+    await t.get("http://www.example.com/foo");
+    expect(t.response.body).toBe("foo/pages#index");
+
+    await t.get("http://admin.example.com/foo");
+    expect(t.response.body).toBe("foo/admin/pages#index");
+
+    await t.get("http://www.example.com/");
+    expect(t.response.body).toBe("pages#index");
+
+    await t.get("http://admin.example.com/");
+    expect(t.response.body).toBe("admin/pages#index");
+  });
+  it("nested routes under format resource", async () => {
+    draw(function () {
+      this.resources("formats", () => {
+        this.resources("items");
+      });
+    });
+
+    await t.get("/formats/1/items.json");
+    expect(t.response.status).toBe(200);
+    expect(t.response.body).toBe("items#index");
+    expect(t.formatItemsPath(1, "json")).toBe("/formats/1/items.json");
+
+    await t.get("/formats/1/items/2.json");
+    expect(t.response.status).toBe(200);
+    expect(t.response.body).toBe("items#show");
+    expect(t.formatItemPath(1, 2, "json")).toBe("/formats/1/items/2.json");
+  });
+  it("passing action parameters to url helpers raises error if parameters are not permitted", async () => {
+    draw(function () {
+      this.root({ to: "projects#index" });
+    });
+    const params = new Parameters({ id: "1" });
+
+    await assertRaises([UnfilteredParameters], {}, () => {
+      t.rootPath(params);
+    });
+  });
+  it("passing action parameters to url helpers is allowed if parameters are permitted", () => {
+    draw(function () {
+      this.root({ to: "projects#index" });
+    });
+    const params = new Parameters({ id: "1" });
+    params.permitBang();
+
+    expect(t.rootPath(params)).toBe("/?id=1");
+  });
 
   it("redirect https", async () => {
     draw(function () {
@@ -2827,7 +3206,14 @@ describe("TestRoutingMapper", () => {
     });
   });
 
-  it.skip("redirect argument error", () => {});
+  it("redirect argument error", async () => {
+    const routes = new (class {
+      redirect = Redirection.redirect;
+    })();
+    await assertRaises([ArgumentError], {}, () => {
+      routes.redirect(new Object() as never);
+    });
+  });
 
   it("greedy resource id regexp doesnt match edit and custom action", () => {
     const routes = new RouteSet();
@@ -2879,16 +3265,116 @@ describe("TestRoutingMapper", () => {
     verifyRedirect("http://www.example.com/countries/all/cities");
   });
 
-  it.skip("action from path is frozen", () => {});
-  it.skip("absolute controller namespace", () => {});
-  it.skip("namespace as controller", () => {});
-  it.skip("route with dashes in path", () => {});
-  it.skip("shorthand route with dashes in path", () => {});
-  it.skip("resource routes with dashes in path", () => {});
-  it.skip("mix string to controller action", () => {});
-  it.skip("mix string to controller", () => {});
-  it.skip("mix string to action", () => {});
-  it.skip("head fetch with mount on root", () => {});
+  it("action from path is frozen", async () => {
+    draw(function () {
+      this.get({ search: "search" });
+    });
+
+    await t.get("/search");
+    expect(Object.isFrozen(t.request.params["action"])).toBe(true);
+  });
+  it("absolute controller namespace", async () => {
+    draw(function () {
+      this.namespace("foo", () => {
+        this.get("/", { to: "/bar#index", as: "root" });
+      });
+    });
+
+    await t.get("/foo");
+    expect(t.response.body).toBe("bar#index");
+    expect(t.fooRootPath()).toBe("/foo");
+  });
+  it("namespace as controller", async () => {
+    draw(function () {
+      this.namespace("foo", () => {
+        this.get("/", { to: "/bar#index", as: "root" });
+      });
+    });
+
+    await t.get("/foo");
+    expect(t.response.body).toBe("bar#index");
+    expect(t.fooRootPath()).toBe("/foo");
+  });
+  it("route with dashes in path", async () => {
+    draw(function () {
+      this.get("/contact-us", { to: "pages#contact_us" });
+    });
+
+    await t.get("/contact-us");
+    expect(t.response.body).toBe("pages#contact_us");
+    expect(t.contactUsPath()).toBe("/contact-us");
+  });
+  it("shorthand route with dashes in path", async () => {
+    draw(function () {
+      this.get("/about-us/index");
+    });
+
+    await t.get("/about-us/index");
+    expect(t.response.body).toBe("about_us#index");
+    expect(t.aboutUsIndexPath()).toBe("/about-us/index");
+  });
+  it("resource routes with dashes in path", async () => {
+    draw(function () {
+      this.resources("photos", { only: ["show"] }, () => {
+        this.get("user-favorites", { on: "collection" });
+        this.get("preview-photo", { on: "member" });
+        this.get("summary-text");
+      });
+    });
+
+    await t.get("/photos/user-favorites");
+    expect(t.response.body).toBe("photos#user_favorites");
+    expect(t.userFavoritesPhotosPath()).toBe("/photos/user-favorites");
+
+    await t.get("/photos/1/preview-photo");
+    expect(t.response.body).toBe("photos#preview_photo");
+    expect(t.previewPhotoPhotoPath("1")).toBe("/photos/1/preview-photo");
+
+    await t.get("/photos/1/summary-text");
+    expect(t.response.body).toBe("photos#summary_text");
+    expect(t.photoSummaryTextPath("1")).toBe("/photos/1/summary-text");
+
+    await t.get("/photos/1");
+    expect(t.response.body).toBe("photos#show");
+    expect(t.photoPath("1")).toBe("/photos/1");
+  });
+  it("mix string to controller action", async () => {
+    draw(function () {
+      this.get("/projects", { controller: "project_files", action: "index", to: "comments#index" });
+    });
+    await t.get("/projects");
+    expect(t.response.body).toBe("comments#index");
+  });
+  it("mix string to controller", async () => {
+    draw(function () {
+      this.get("/projects", { controller: "project_files", to: "comments#index" });
+    });
+    await t.get("/projects");
+    expect(t.response.body).toBe("comments#index");
+  });
+  it("mix string to action", async () => {
+    draw(function () {
+      this.get("/projects", { action: "index", to: "comments#index" });
+    });
+    await t.get("/projects");
+    expect(t.response.body).toBe("comments#index");
+  });
+  it("head fetch with mount on root", async () => {
+    draw(function () {
+      this.get({ "/home": "test#index" });
+      this.mount((env: Record<string, unknown>) => [200, {}, [env["REQUEST_METHOD"]]], {
+        at: "/",
+      });
+    });
+
+    await t.head("/home");
+    assertResponse("ok");
+    expect(t.response.body).toBe("test#index");
+
+    await t.head("/foobar");
+    assertResponse("ok");
+    expect(t.response.body).toBe("HEAD");
+  });
   it("dynamic action segments are deprecated", async () => {
     await assertDeprecated(deprecator(), () => {
       new RouteSet().draw(function () {
@@ -2896,7 +3382,15 @@ describe("TestRoutingMapper", () => {
       });
     });
   });
-  it.skip("routes with double colon", () => {});
+  it("routes with double colon", async () => {
+    draw(function () {
+      this.get("/sort::sort", { to: "sessions#sort" });
+    });
+
+    await t.get("/sort:asc");
+    expect(t.request.params["sort"]).toBe("asc");
+    expect(t.response.body).toBe("sessions#sort");
+  });
 });
 
 describe("ActionController::Routing", () => {
