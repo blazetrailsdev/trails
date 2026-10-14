@@ -115,10 +115,9 @@ export const ClassMethods = {
   },
 };
 
-export { FixtureSet } from "./fixtures.js";
-
 type BaseClass = typeof Base;
 
+/** @noRailsEquivalent PERMANENT */
 export type FixtureSetAccessor<T> = {
   (fixtureName: string, forceReload?: true | ":reload"): T | Promise<T>;
   (...fixtureNames: unknown[]): Array<T | Promise<T>>;

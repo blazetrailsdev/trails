@@ -1,5 +1,5 @@
 import { Hash } from "@blazetrails/ruby-compat";
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
@@ -878,6 +878,34 @@ describe("DirtyTest", () => {
       (record as any).nonPersistedAttributeWillChange();
       expect(await record.save()).toBeTruthy();
     });
+  });
+
+  it("getters with side effects are allowed", async () => {
+    let updated: Promise<boolean | undefined> | undefined;
+    const PirateBase = Pirate as unknown as Omit<typeof Pirate, "prototype"> &
+      (new (...args: never[]) => Omit<Pirate, "catchphrase"> & {
+        get catchphrase(): string | null;
+        set catchphrase(value: unknown);
+      });
+    const klass = class extends PirateBase {
+      get catchphrase(): string | null {
+        if (isBlank(super.catchphrase)) {
+          updated = this.updateAttribute("catchphrase", "arr");
+        }
+        return super.catchphrase;
+      }
+      set catchphrase(value: unknown) {
+        super.catchphrase = value;
+      }
+    };
+
+    const pirate = (await (klass as unknown as typeof Pirate).createBang({
+      catchphrase: "lol",
+    })) as unknown as InstanceType<typeof klass>;
+    await pirate.updateAttribute("catchphrase", null);
+
+    expect(pirate.catchphrase).toBe("arr");
+    await updated;
   });
 
   it("attributes assigned but not selected are dirty", async () => {

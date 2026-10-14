@@ -663,16 +663,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       'PERMANENT: CLAUDE.md § "Ruby Strings are JS string primitives".',
   },
   {
-    testFile: "dirty_test.rb",
-    tests: ["getters with side effects are allowed"],
-    reason:
-      "The overridden reader persists as a side effect (`update_attribute` " +
-      "inside `def catchphrase`, dirty_test.rb:807) and the assertion relies " +
-      "on that write completing before the reader returns. trails persistence " +
-      "is async; a JS getter cannot await, so the persist would float as an " +
-      "unawaited promise — no faithful sync equivalent.",
-  },
-  {
     testFile: "database_selector_test.rb",
     tests: ["preventing writes works in a threaded environment"],
     reason:
