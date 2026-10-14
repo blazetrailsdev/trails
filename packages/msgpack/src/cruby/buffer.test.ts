@@ -108,15 +108,10 @@ describe("MessagePack::Buffer", () => {
   };
 
   const staticExamples = () => STATIC_EXAMPLES;
-
   const randomCases = () => randomCasesExamples()[0];
-
   const randomExamples = () => randomCasesExamples()[1];
-
   const cases = () => (memo.cases ??= { ...staticCases(), ...randomCases() });
-
   const examples = () => (memo.examples ??= { ...staticExamples(), ...randomExamples() });
-
   const caseKeys = () => Object.keys(examples());
 
   const empty01 = () => new Buffer();
