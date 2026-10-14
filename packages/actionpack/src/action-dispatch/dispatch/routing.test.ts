@@ -37,8 +37,6 @@ import {
   UnfilteredParameters,
 } from "../../action-controller/metal/strong-parameters.js";
 import { Redirection } from "../routing/redirection.js";
-import { UrlFor } from "../routing/url-for.js";
-import { RoutingUrlFor } from "@blazetrails/actionview";
 
 class StubController {
   static actionEncodingTemplate(): null {
@@ -5024,8 +5022,6 @@ describe("TestUriPathEscaping", () => {
 });
 
 describe("TestMultipleNestedController", () => {
-  include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
-
   const Routes = new RouteSet();
   Routes.draw(function () {
     this.namespace("foo", () => {
