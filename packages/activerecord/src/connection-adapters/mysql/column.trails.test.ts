@@ -48,13 +48,13 @@ describe("MysqlColumn", () => {
 
 describe("MySQL::TypeMetadata#deduplicated", () => {
   it("deduplicates the delegated SqlTypeMetadata and freezes itself", () => {
-    const a = TypeMetadata.new(new SqlTypeMetadata({ sqlType: "int", type: "integer" }), {
+    const a = new TypeMetadata(new SqlTypeMetadata({ sqlType: "int", type: "integer" }), {
       extra: "auto_increment",
     });
-    const b = TypeMetadata.new(new SqlTypeMetadata({ sqlType: "int", type: "integer" }), {
+    const b = new TypeMetadata(new SqlTypeMetadata({ sqlType: "int", type: "integer" }), {
       extra: "auto_increment",
     });
-    const other = TypeMetadata.new(new SqlTypeMetadata({ sqlType: "int", type: "integer" }));
+    const other = new TypeMetadata(new SqlTypeMetadata({ sqlType: "int", type: "integer" }));
 
     expect(a).toBe(b);
     expect(other).not.toBe(a);

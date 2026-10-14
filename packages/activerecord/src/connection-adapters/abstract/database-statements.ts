@@ -22,7 +22,6 @@ import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
   rbGetKwargs,
   aryReject,
-  initialize,
   kernelInteger,
   Module,
   rbInspect,
@@ -790,13 +789,7 @@ export function castResult(rawResult: any): never {
 
 export const create = insert;
 
-export const DatabaseStatements = new Module((mod) => {
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-    this: DatabaseStatementsHost & { resetTransaction(): void },
-  ): void {
-    this.resetTransaction();
-  };
-}).include({
+export const DatabaseStatements = new Module().include({
   resetTransaction,
   selectAll(
     this: DatabaseStatementsDefaultsHost,

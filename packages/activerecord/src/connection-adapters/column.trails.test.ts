@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Column, NullColumn } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 
@@ -104,11 +104,8 @@ describe("NullColumn", () => {
   it("deduplicate returns self and triggers sqlTypeMetadata deduplication", () => {
     const meta = makeMetadata();
     const col = new Column("name", null, meta);
-    const spy = vi.spyOn(meta, "deduplicate");
-    const result = col.deduplicate();
-    expect(result).toBe(col);
-    expect(spy).toHaveBeenCalledOnce();
-    spy.mockRestore();
+    expect(col.deduplicate()).toBe(col);
+    expect(col.sqlTypeMetadata).toBe(meta.deduplicate());
   });
 
   it("deduplicate is a no-op when sqlTypeMetadata is null", () => {
@@ -118,15 +115,14 @@ describe("NullColumn", () => {
   });
 
   it("new returns the registered instance for an equal column", () => {
-    const first = Column.new("dedup_new", null, makeMetadata());
-    const second = Column.new("dedup_new", null, makeMetadata());
+    const first = new Column("dedup_new", null, makeMetadata());
+    const second = new Column("dedup_new", null, makeMetadata());
     expect(Object.isFrozen(first)).toBe(true);
     expect(second).toBe(first);
-    expect(new Column("dedup_new", null, makeMetadata())).not.toBe(first);
   });
 
   it("negate is deduplicate", () => {
-    const first = Column.new("dedup_negate", null, makeMetadata());
+    const first = new Column("dedup_negate", null, makeMetadata());
     expect(new Column("dedup_negate", null, makeMetadata()).negate()).toBe(first);
     expect(makeMetadata({ sqlType: "dedup_negate" }).negate()).toBe(
       makeMetadata({ sqlType: "dedup_negate" }).deduplicate(),

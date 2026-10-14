@@ -366,7 +366,7 @@ export async function newColumnFromField(
     [def, defFn] = [null, def];
   }
 
-  return Column.new(fieldName, def, meta, field["Null"] === "YES", defFn, {
+  return new Column(fieldName, def, meta, field["Null"] === "YES", defFn, {
     collation: field["Collation"] ?? null,
     comment: presence(field["Comment"] as string | undefined) ?? null,
   });
@@ -378,7 +378,7 @@ export function fetchTypeMetadata(
   sqlType: string,
   extra: string = "",
 ): TypeMetadata {
-  return TypeMetadata.new(
+  return new TypeMetadata(
     BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType) as SqlTypeMetadata,
     {
       extra,

@@ -41,7 +41,11 @@ import { TAG } from "./inlined-from-tags.js";
  * The packages whose missing-tag arm gates. Only-grow: a package joins in the
  * PR that converts its constructors, and none leaves to turn a red run green.
  */
-export const MISSING_TAG_PACKAGES: readonly string[] = ["actioncontroller", "actiondispatch"];
+export const MISSING_TAG_PACKAGES: readonly string[] = [
+  "actioncontroller",
+  "actiondispatch",
+  "i18n",
+];
 
 export interface InlinedFromFinding {
   package: string;
@@ -150,6 +154,10 @@ export function inlinedFromFindings(
       const ctor = klass.instanceMethods.find((m) => m.name === "constructor");
       const tags = ctor?.inlinedFrom ?? [];
       if (tags.length === 0 && !enrolled.includes(name)) continue;
+      // A re-export alias (`export type { AbstractAdapter as DatabaseAdapter }`)
+      // is its own manifest entry, filed under the re-exporting file.
+      if (ctor?.file !== undefined && klass.file !== undefined && ctor.file !== klass.file)
+        continue;
       const tsFile = ctor?.file ?? klass.file;
       if (tsFile === undefined) continue;
       const short = (klass.name ?? owner).split(".").pop()!;

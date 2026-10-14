@@ -292,7 +292,7 @@ export function newColumnFromField(
 
   const rowid = isColumnTheRowid(field, definitions);
 
-  return Column.new(
+  return new Column(
     field["name"] as string,
     defaultValue,
     typeMetadata,

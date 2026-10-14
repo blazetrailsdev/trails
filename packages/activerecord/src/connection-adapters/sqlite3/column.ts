@@ -25,6 +25,7 @@ export class Column extends BaseColumn {
     this._autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
     this._generatedType = options.generatedType ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   isAutoIncrement(): boolean {

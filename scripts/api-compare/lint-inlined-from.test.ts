@@ -126,13 +126,19 @@ const API = tag("ActiveModel::API#initialize", `${AM}/api.rb:80-84`);
 
 function messages(
   inlinedFrom: InlinedFrom[],
-  { owner = "Base", file = "base.ts", enrolled = [] as string[], reexport = false } = {},
+  {
+    owner = "Base",
+    file = "base.ts",
+    enrolled = [] as string[],
+    reexport = false,
+    alias = undefined as string | undefined,
+  } = {},
 ): string[] {
   const ctor = { ...def("constructor", "", 1, 1), file, inlinedFrom };
   const classes = reexport
     ? {
         [`${file}:${owner}`]: { ...entity(file, [ctor]), name: owner },
-        [`index.ts:${owner}`]: { ...entity("index.ts", [ctor]), name: owner },
+        [`index.ts:${alias ?? owner}`]: { ...entity("index.ts", [ctor]), name: alias ?? owner },
       }
     : { [owner]: entity(file, [ctor]) };
   const ts = { packages: { activerecord: { classes, modules: {} } } } as unknown as ApiManifest;
@@ -245,7 +251,7 @@ describe("inlinedFromFindings", () => {
 
   it("leaves the missing-tag arm off for a package that is not enrolled", () => {
     expect(messages([])).toEqual([]);
-    expect(MISSING_TAG_PACKAGES).toEqual(["actioncontroller", "actiondispatch"]);
+    expect(MISSING_TAG_PACKAGES).toEqual(["actioncontroller", "actiondispatch", "i18n"]);
   });
 
   it("pairs a class by its name under a file-qualified key, and once when an index re-exports it", () => {
@@ -254,6 +260,17 @@ describe("inlinedFromFindings", () => {
     expect(messages([LAST, NEW, FIRST, CORE], { enrolled, reexport: true })).toEqual([
       "ActiveModel::API#initialize is inlined untagged: ActiveRecord::Base reaches it from another Ruby file",
     ]);
+  });
+
+  it("skips an index re-export under an alias, whose constructor sits in another file", () => {
+    const enrolled = ["activerecord"];
+    expect(
+      messages([LAST, NEW, FIRST, CORE, API], {
+        enrolled,
+        reexport: true,
+        alias: "DatabaseAdapter",
+      }),
+    ).toEqual([]);
   });
 
   it("ends the chain at an initialize that calls no super", () => {

@@ -2,7 +2,9 @@ import { EMPTY_HASH, normalizeKeys, toSym } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 import {
   ArgumentError as RubyArgumentError,
+  Module,
   NoMethodError,
+  include,
   rbInspect,
 } from "@blazetrails/ruby-compat";
 
@@ -68,11 +70,62 @@ export interface MissingTranslationOptions {
 
 const PERMITTED_KEYS = ["scope", "default"] as const;
 
-export class Base extends ArgumentError {
-  readonly locale: Locale;
-  readonly key: TranslationKey;
-  readonly options: MissingTranslationOptions;
-  private keysCache?: TranslationKey[];
+interface BaseHost extends Base {
+  _keys?: TranslationKey[];
+}
+
+export interface Base {
+  locale: Locale;
+  key: TranslationKey;
+  options: MissingTranslationOptions;
+  keys(): TranslationKey[];
+  message: string;
+  normalizedOption(key: TranslationKey): string;
+  toString(): string;
+  toException(): MissingTranslationData;
+}
+
+export const Base: Module = new Module().include({
+  keys(this: BaseHost): TranslationKey[] {
+    if (!this._keys) {
+      const keys = normalizeKeys(this.locale, this.key, this.options.scope);
+      if (keys.length < 2) keys.push("no key");
+      this._keys = keys;
+    }
+    return this._keys;
+  },
+
+  get message(): string {
+    const self = this as unknown as Base;
+    const fallbacks = self.options.default;
+    if (Array.isArray(fallbacks) && fallbacks.length > 0) {
+      const otherOptions = [self.key, ...fallbacks]
+        .map((k) => `- ${self.normalizedOption(k as TranslationKey)}`)
+        .join("\n");
+      return `Translation missing. Options considered were:\n${otherOptions}`;
+    }
+    return `Translation missing: ${self.keys().join(".")}`;
+  },
+
+  normalizedOption(this: Base, key: TranslationKey): string {
+    return normalizeKeys(this.locale, key, this.options.scope).join(".");
+  },
+
+  toString(this: Base): string {
+    return this.message;
+  },
+
+  toException(this: Base): MissingTranslationData {
+    return new MissingTranslationData(this.locale, this.key, this.options);
+  },
+});
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is `include Base` on the type side.
+export interface MissingTranslation extends Base {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class MissingTranslation extends ArgumentError {
+  static readonly Base = Base;
 
   constructor(
     locale: Locale,
@@ -81,8 +134,8 @@ export class Base extends ArgumentError {
   ) {
     super();
     this.name = "MissingTranslation";
-    this.locale = locale;
     this.key = key;
+    this.locale = locale;
     this.options = {};
     const slice = this.options as Record<string, unknown>;
     for (const permitted of PERMITTED_KEYS) {
@@ -92,54 +145,34 @@ export class Base extends ArgumentError {
       if (typeof v === "function") slice[k] = rbInspect(v);
     }
   }
-
-  keys(): TranslationKey[] {
-    if (!this.keysCache) {
-      const keys = normalizeKeys(this.locale, this.key, this.options.scope);
-      if (keys.length < 2) keys.push("no key");
-      this.keysCache = keys;
-    }
-    return this.keysCache;
-  }
-
-  override get message(): string {
-    const fallbacks = this.options.default;
-    if (Array.isArray(fallbacks) && fallbacks.length > 0) {
-      const otherOptions = [this.key, ...fallbacks]
-        .map((k) => `- ${this.normalizedOption(k as TranslationKey)}`)
-        .join("\n");
-      return `Translation missing. Options considered were:\n${otherOptions}`;
-    }
-    return `Translation missing: ${this.keys().join(".")}`;
-  }
-
-  normalizedOption(key: TranslationKey): string {
-    return normalizeKeys(this.locale, key, this.options.scope).join(".");
-  }
-
-  override toString(): string {
-    return this.message;
-  }
-
-  toException(): MissingTranslationData {
-    return new MissingTranslationData(this.locale, this.key, this.options);
-  }
 }
+include(MissingTranslation, Base);
 
-export class MissingTranslation extends Base {
-  static readonly Base = Base;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is `include MissingTranslation::Base` on the type side.
+export interface MissingTranslationData extends Base {}
 
-export class MissingTranslationData extends Base {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class MissingTranslationData extends ArgumentError {
   constructor(
     locale: Locale,
     key: TranslationKey,
     options: MissingTranslationOptions = EMPTY_HASH,
   ) {
-    super(locale, key, options);
+    super();
     this.name = "MissingTranslationData";
+    this.key = key;
+    this.locale = locale;
+    this.options = {};
+    const slice = this.options as Record<string, unknown>;
+    for (const permitted of PERMITTED_KEYS) {
+      if (permitted in options) slice[permitted] = options[permitted];
+    }
+    for (const [k, v] of Object.entries(options)) {
+      if (typeof v === "function") slice[k] = rbInspect(v);
+    }
   }
 }
+include(MissingTranslationData, Base);
 
 export class InvalidPluralizationData extends ArgumentError {
   readonly entry: unknown;

@@ -23,7 +23,7 @@ import {
   globalThreadPoolAsyncQueryExecutor,
   lazilyLoadSchemaCache,
 } from "../../active-record.js";
-import { Executor, initializeIncludedModules } from "@blazetrails/activesupport";
+import { Executor } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
@@ -37,7 +37,7 @@ import {
 import { SchemaReflection, BoundSchemaReflection } from "../schema-cache.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
-import { ConnectionPoolConfiguration } from "./query-cache.js";
+import { ConnectionPoolConfiguration, DEFAULT_SIZE, QueryCacheRegistry } from "./query-cache.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
@@ -264,6 +264,11 @@ export class ConnectionPool implements ReapablePool {
   }
 
   private _boundSchemaCache?: BoundSchemaReflection;
+  declare private _queryCacheVersion: { value: number };
+  declare private _threadQueryCaches: QueryCacheRegistry;
+  declare private _queryCacheMaxSize: number | null;
+
+  /** @inlinedFrom ActiveRecord::ConnectionAdapters::QueryCache::ConnectionPoolConfiguration#initialize rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/query_cache.rb:117-130 */
   constructor(poolConfig: PoolConfig) {
     this.poolConfig = poolConfig;
     this.dbConfig = poolConfig.dbConfig;
@@ -280,7 +285,18 @@ export class ConnectionPool implements ReapablePool {
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     void this.reaper.run();
 
-    initializeIncludedModules(this);
+    this._queryCacheVersion = { value: 0 };
+    this._threadQueryCaches = new QueryCacheRegistry();
+    const queryCache = this.dbConfig?.queryCache;
+    if (queryCache === 0 || queryCache === false) {
+      this._queryCacheMaxSize = null;
+    } else if (typeof queryCache === "number") {
+      this._queryCacheMaxSize = queryCache;
+    } else if (queryCache == null) {
+      this._queryCacheMaxSize = DEFAULT_SIZE;
+    } else {
+      this._queryCacheMaxSize = null;
+    }
   }
 
   get schemaCache(): BoundSchemaReflection {

@@ -37,7 +37,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     options: MergeColumnOptions = {},
   ): void {
     this.columns(tableName).push(
-      Column.new(name, options.default ?? null, this.fetchTypeMetadata(sqlType), options.null),
+      new Column(name, options.default ?? null, this.fetchTypeMetadata(sqlType), options.null),
     );
   }
 

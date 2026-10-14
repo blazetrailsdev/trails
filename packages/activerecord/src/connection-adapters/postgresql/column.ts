@@ -38,6 +38,7 @@ export class Column extends BaseColumn {
     this._serial = options.serial ?? false;
     this._identity = options.identity ?? null;
     this._generated = options.generated ?? null;
+    if (new.target === Column) return this.deduplicate();
   }
 
   isIdentity(): boolean {

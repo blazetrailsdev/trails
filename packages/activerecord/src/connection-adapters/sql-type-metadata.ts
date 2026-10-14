@@ -14,7 +14,6 @@ export interface SqlTypeMetadata extends Included<typeof Deduplicable> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class SqlTypeMetadata {
   declare static registry: typeof ClassMethods.registry;
-  declare static new: typeof ClassMethods.new;
 
   sqlType: string | null;
   readonly type: string | undefined;
@@ -22,6 +21,7 @@ export class SqlTypeMetadata {
   readonly precision: number | null;
   readonly scale: number | null;
 
+  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
   constructor(
     options: {
       sqlType?: string | null;
@@ -36,6 +36,7 @@ export class SqlTypeMetadata {
     this.limit = options.limit ?? null;
     this.precision = options.precision ?? null;
     this.scale = options.scale ?? null;
+    if (new.target === SqlTypeMetadata) return this.deduplicate();
   }
 
   equals(other: unknown): boolean {

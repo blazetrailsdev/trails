@@ -165,7 +165,6 @@ describe("ColumnDeduplicationTrails", () => {
   it("interns the sqlTypeMetadata onto the shared canonical instance", () => {
     const canonical = meta({ sqlType: "bigint" }).deduplicate();
     const own = meta({ sqlType: "bigint" });
-    expect(own).not.toBe(canonical);
     const column = new Column("dedup_interned", null, own, false).deduplicate();
     expect(column.sqlTypeMetadata).toBe(canonical);
     expect(Object.isFrozen(canonical)).toBe(true);
