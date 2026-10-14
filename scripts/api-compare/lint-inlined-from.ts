@@ -154,8 +154,6 @@ export function inlinedFromFindings(
       const ctor = klass.instanceMethods.find((m) => m.name === "constructor");
       const tags = ctor?.inlinedFrom ?? [];
       if (tags.length === 0 && !enrolled.includes(name)) continue;
-      // A re-export alias (`export type { AbstractAdapter as DatabaseAdapter }`)
-      // is its own manifest entry, filed under the re-exporting file.
       if (ctor?.file !== undefined && klass.file !== undefined && ctor.file !== klass.file)
         continue;
       const tsFile = ctor?.file ?? klass.file;
