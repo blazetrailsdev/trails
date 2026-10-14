@@ -15,5 +15,8 @@
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

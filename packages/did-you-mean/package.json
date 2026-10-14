@@ -19,5 +19,8 @@
   },
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

@@ -34,5 +34,8 @@
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
