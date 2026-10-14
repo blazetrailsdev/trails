@@ -119,6 +119,7 @@ export namespace Psych {
     },
   };
 
+  /* eslint-disable prefer-const */
   /**
    * `Psych.load_tags` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:736,741`): a tag to
    * the name of the class it loads as. Ruby's `attr_accessor`, so `Psych.loadTags = {}`
@@ -126,7 +127,6 @@ export namespace Psych {
    *
    * @noRailsEquivalent PERMANENT
    */
-  // eslint-disable-next-line prefer-const
   export let loadTags: Record<string, string> = Object.create(null) as Record<string, string>;
 
   /**
@@ -135,7 +135,6 @@ export namespace Psych {
    *
    * @noRailsEquivalent PERMANENT
    */
-  // eslint-disable-next-line prefer-const
   export let dumpTags = new Map<object, string>();
 
   /**
@@ -144,9 +143,10 @@ export namespace Psych {
    *
    * @noRailsEquivalent PERMANENT
    */
-  // eslint-disable-next-line prefer-const
   export let domainTypes: Record<string, [string, (typeTag: string, value: unknown) => unknown]> =
     Object.create(null) as Record<string, never>;
+
+  /* eslint-enable prefer-const */
 
   /**
    * `Psych.add_builtin_type` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:682-686`).
