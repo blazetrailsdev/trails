@@ -117,7 +117,8 @@ export class RoutesProxy implements UrlForHost {
     return objRespondToMissing(this, method, _) || rbObjRespondTo(this._helpers, method);
   }
 
-  methodMissing(method: string, ...args: unknown[]): unknown {
+  /** @internal */
+  private methodMissing(method: string, ...args: unknown[]): unknown {
     if (rbObjRespondTo(this._helpers, method)) {
       let options: Record<string, unknown> = extractOptionsBang(args);
       options = { ...this.urlOptions(), ...(options ?? {}) };

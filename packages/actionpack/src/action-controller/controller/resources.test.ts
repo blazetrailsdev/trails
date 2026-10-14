@@ -14,6 +14,7 @@ import {
 import {
   hashDelete,
   rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbObjClassname,
   rbObjSingletonClass,
@@ -30,11 +31,6 @@ import { RoutingError } from "../metal/exceptions.js";
 import { TestCase } from "../test-case.js";
 import type { Base } from "../base.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
-import {
-  assertRecognizes,
-  assertRouting,
-  type RoutingAssertionsHost,
-} from "../../action-dispatch/testing/assertions/routing.js";
 
 type Options = Record<string, any>;
 
@@ -438,92 +434,177 @@ class ResourcesTest extends TestCase {
     }
     expect(actual, `Error on route: ${route}(${rbInspect(options)})`).toEqual(expected);
   }
-}
-
-function assertNotRecognizes(host: RoutingAssertionsHost, options: Options, path: Options): void {
-  expect(() =>
-    assertRecognizes.call(host, options, path as unknown as Parameters<typeof assertRecognizes>[1]),
-  ).toThrow();
-}
-
-function assertWhetherAllowed(
-  host: RoutingAssertionsHost,
-  allowed: string | string[],
-  notAllowed: string | string[],
-  options: Options,
-  action: string,
-  path: string,
-  method: string,
-): void {
-  const opts = { ...options, action };
-  const pathOpts = { path, method };
-  if (([] as string[]).concat(allowed).includes(action)) {
-    assertRecognizes.call(host, opts, pathOpts);
-  } else if (([] as string[]).concat(notAllowed).includes(action)) {
-    assertNotRecognizes(host, opts, pathOpts);
-  } else {
-    throw new Error(`Invalid action passed: ${action}`);
+  assertResourceMethods(
+    expected: string[],
+    resource: unknown,
+    actionMethod: string,
+    method: string,
+  ): void {
+    const methods = (rbFSend(resource, `${actionMethod}Methods`) as Options)[method];
+    expect(methods.length, rbInspect(methods)).toBe(expected.length);
+    for (const action of expected) {
+      expect(methods, `${method} not in ${actionMethod} methods: ${rbInspect(methods)}`).toContain(
+        action,
+      );
+    }
   }
-}
 
-function assertResourceAllowedRoutes(
-  host: RoutingAssertionsHost,
-  controller: string,
-  options: Options,
-  shallowOptions: Options,
-  allowed: string | string[],
-  notAllowed: string | string[],
-  path = controller,
-): void {
-  const shallowPath = `${path}/${shallowOptions["id"]}`;
-  const opts = { ...options, controller };
-  const shallowOpts = { ...shallowOptions, ...opts };
+  async assertResourceAllowedRoutes(
+    controller: string,
+    options: Options,
+    shallowOptions: Options,
+    allowed: string | string[],
+    notAllowed: string | string[],
+    path = controller,
+  ): Promise<void> {
+    const shallowPath = `${path}/${shallowOptions.id}`;
+    const format = options.format != null ? `.${options.format}` : "";
+    options.controller = controller;
+    Object.assign(shallowOptions, options);
 
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "index", `${path}`, "get");
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "new", `${path}/new`, "get");
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "create", `${path}`, "post");
-  assertWhetherAllowed(host, allowed, notAllowed, shallowOpts, "show", `${shallowPath}`, "get");
-  assertWhetherAllowed(
-    host,
-    allowed,
-    notAllowed,
-    shallowOpts,
-    "edit",
-    `${shallowPath}/edit`,
-    "get",
-  );
-  assertWhetherAllowed(host, allowed, notAllowed, shallowOpts, "update", `${shallowPath}`, "put");
-  assertWhetherAllowed(
-    host,
-    allowed,
-    notAllowed,
-    shallowOpts,
-    "destroy",
-    `${shallowPath}`,
-    "delete",
-  );
-}
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "index",
+      `${path}${format}`,
+      "get",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "new",
+      `${path}/new${format}`,
+      "get",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "create",
+      `${path}${format}`,
+      "post",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      shallowOptions,
+      "show",
+      `${shallowPath}${format}`,
+      "get",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      shallowOptions,
+      "edit",
+      `${shallowPath}/edit${format}`,
+      "get",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      shallowOptions,
+      "update",
+      `${shallowPath}${format}`,
+      "put",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      shallowOptions,
+      "destroy",
+      `${shallowPath}${format}`,
+      "delete",
+    );
+  }
 
-function assertSingletonResourceAllowedRoutes(
-  host: RoutingAssertionsHost,
-  controller: string,
-  options: Options,
-  allowed: string | string[],
-  notAllowed: string | string[],
-  path = controller.replace(/s$/, ""),
-): void {
-  const opts = { ...options, controller };
+  async assertSingletonResourceAllowedRoutes(
+    controller: string,
+    options: Options,
+    allowed: string | string[],
+    notAllowed: string | string[],
+    path = singularize(controller),
+  ): Promise<void> {
+    const format = options.format != null ? `.${options.format}` : "";
+    options.controller = controller;
 
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "new", `${path}/new`, "get");
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "create", `${path}`, "post");
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "show", `${path}`, "get");
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "edit", `${path}/edit`, "get");
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "update", `${path}`, "put");
-  assertWhetherAllowed(host, allowed, notAllowed, opts, "destroy", `${path}`, "delete");
-}
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "new",
+      `${path}/new${format}`,
+      "get",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "create",
+      `${path}${format}`,
+      "post",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "show",
+      `${path}${format}`,
+      "get",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "edit",
+      `${path}/edit${format}`,
+      "get",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "update",
+      `${path}${format}`,
+      "put",
+    );
+    await this.assertWhetherAllowed(
+      allowed,
+      notAllowed,
+      options,
+      "destroy",
+      `${path}${format}`,
+      "delete",
+    );
+  }
 
-function makeHost(): RoutingAssertionsHost {
-  return { routes: new RouteSet() };
+  async assertWhetherAllowed(
+    allowed: string | string[],
+    notAllowed: string | string[],
+    options: Options,
+    action: string,
+    path: string,
+    method: string,
+  ): Promise<void> {
+    options = { ...options, action };
+    const pathOptions = { path, method };
+
+    if (([] as string[]).concat(allowed).includes(action)) {
+      this.assertRecognizes(options, pathOptions);
+    } else if (([] as string[]).concat(notAllowed).includes(action)) {
+      await this.assertNotRecognizes(options, pathOptions);
+    } else {
+      throw new Assertion("Invalid Action has passed");
+    }
+  }
+
+  async assertNotRecognizes(expectedOptions: Options, path: Options): Promise<void> {
+    await assertRaises([Assertion], {}, () => {
+      this.assertRecognizes(expectedOptions, path as { path: string; method: string });
+    });
+  }
 }
 
 describe("ResourcesTest", () => {
@@ -1288,26 +1369,24 @@ describe("ResourcesTest", () => {
 
   it.skip("test_should_nest_singleton_resource_in_resources — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
 
-  it("test_should_not_allow_delete_or_patch_or_put_on_collection_path", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("messages");
+  it("test_should_not_allow_delete_or_patch_or_put_on_collection_path", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("messages");
+      });
+      await tc.assertNotRecognizes(
+        { controller: "messages", action: "update" },
+        { path: "/messages", method: "patch" },
+      );
+      await tc.assertNotRecognizes(
+        { controller: "messages", action: "update" },
+        { path: "/messages", method: "put" },
+      );
+      await tc.assertNotRecognizes(
+        { controller: "messages", action: "destroy" },
+        { path: "/messages", method: "delete" },
+      );
     });
-    assertNotRecognizes(
-      host,
-      { controller: "messages", action: "update" },
-      { path: "/messages", method: "patch" },
-    );
-    assertNotRecognizes(
-      host,
-      { controller: "messages", action: "update" },
-      { path: "/messages", method: "put" },
-    );
-    assertNotRecognizes(
-      host,
-      { controller: "messages", action: "destroy" },
-      { path: "/messages", method: "delete" },
-    );
   });
 
   it.skip("test_new_style_named_routes_for_resource — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
@@ -1330,91 +1409,95 @@ describe("ResourcesTest", () => {
 
   it.skip("test_with_path_segment_path_prefix_constraints — pending: resources path: option not implemented", () => {});
 
-  it("test_resource_has_only_show_action", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("products", { only: "show" });
+  it("test_resource_has_only_show_action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "show" });
+      });
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
     });
-    assertResourceAllowedRoutes(host, "products", {}, { id: "1" }, "show", [
-      "index",
-      "new",
-      "create",
-      "edit",
-      "update",
-      "destroy",
-    ]);
   });
 
-  it("test_resource_has_only_show_action_with_string_value", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("products", { only: "show" });
+  it("test_resource_has_only_show_action_with_string_value", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "show" });
+      });
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
     });
-    assertResourceAllowedRoutes(host, "products", {}, { id: "1" }, "show", [
-      "index",
-      "new",
-      "create",
-      "edit",
-      "update",
-      "destroy",
-    ]);
   });
 
-  it("test_singleton_resource_has_only_show_action", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resource("account", { only: "show" });
+  it("test_singleton_resource_has_only_show_action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { only: "show" });
+      });
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
     });
-    assertSingletonResourceAllowedRoutes(host, "accounts", {}, "show", [
-      "new",
-      "create",
-      "edit",
-      "update",
-      "destroy",
-    ]);
   });
 
-  it("test_singleton_resource_has_only_show_action_with_string_value", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resource("account", { only: "show" });
+  it("test_singleton_resource_has_only_show_action_with_string_value", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { only: "show" });
+      });
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
     });
-    assertSingletonResourceAllowedRoutes(host, "accounts", {}, "show", [
-      "new",
-      "create",
-      "edit",
-      "update",
-      "destroy",
-    ]);
   });
 
-  it("test_resource_does_not_have_destroy_action", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("products", { except: "destroy" });
+  it("test_resource_does_not_have_destroy_action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { except: "destroy" });
+      });
+      await tc.assertResourceAllowedRoutes(
+        "products",
+        {},
+        { id: "1" },
+        ["index", "new", "create", "show", "edit", "update"],
+        "destroy",
+      );
     });
-    assertResourceAllowedRoutes(
-      host,
-      "products",
-      {},
-      { id: "1" },
-      ["index", "new", "create", "show", "edit", "update"],
-      "destroy",
-    );
   });
 
-  it("test_singleton_resource_does_not_have_destroy_action", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resource("account", { except: "destroy" });
+  it("test_singleton_resource_does_not_have_destroy_action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { except: "destroy" });
+      });
+      await tc.assertSingletonResourceAllowedRoutes(
+        "accounts",
+        {},
+        ["new", "create", "show", "edit", "update"],
+        "destroy",
+      );
     });
-    assertSingletonResourceAllowedRoutes(
-      host,
-      "accounts",
-      {},
-      ["new", "create", "show", "edit", "update"],
-      "destroy",
-    );
   });
 
   it.skip("test_resource_has_show_action_but_does_not_have_destroy_action — pending: only+except combined not applied (only wins, except ignored)", () => {});
@@ -1441,106 +1524,107 @@ describe("ResourcesTest", () => {
 
   it.skip("test_nested_resource_has_only_show_and_member_action — pending: collection/member extra routes don't inherit controller from resources scope", () => {});
 
-  it("test_nested_resource_does_not_inherit_only_option", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("products", { only: "show" }, () =>
-        this.resources("images", { except: "destroy" }),
+  it("test_nested_resource_does_not_inherit_only_option", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "show" }, () =>
+          this.resources("images", { except: "destroy" }),
+        );
+      });
+      await tc.assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1" },
+        { id: "2" },
+        ["index", "new", "create", "show", "edit", "update"],
+        "destroy",
+        "products/1/images",
       );
     });
-    assertResourceAllowedRoutes(
-      host,
-      "images",
-      { product_id: "1" },
-      { id: "2" },
-      ["index", "new", "create", "show", "edit", "update"],
-      "destroy",
-      "products/1/images",
-    );
   });
 
-  it("test_nested_resource_does_not_inherit_only_option_by_default", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("products", { only: "show" }, () => this.resources("images"));
-    });
-    assertResourceAllowedRoutes(
-      host,
-      "images",
-      { product_id: "1" },
-      { id: "2" },
-      ["index", "new", "create", "show", "edit", "update", "destroy"],
-      [],
-      "products/1/images",
-    );
-  });
-
-  it("test_nested_resource_does_not_inherit_except_option", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("products", { except: "show" }, () =>
-        this.resources("images", { only: "destroy" }),
+  it("test_nested_resource_does_not_inherit_only_option_by_default", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "show" }, () => this.resources("images"));
+      });
+      await tc.assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1" },
+        { id: "2" },
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+        [],
+        "products/1/images",
       );
     });
-    assertResourceAllowedRoutes(
-      host,
-      "images",
-      { product_id: "1" },
-      { id: "2" },
-      "destroy",
-      ["index", "new", "create", "show", "edit", "update"],
-      "products/1/images",
-    );
   });
 
-  it("test_nested_resource_does_not_inherit_except_option_by_default", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resources("products", { except: "show" }, () => this.resources("images"));
+  it("test_nested_resource_does_not_inherit_except_option", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { except: "show" }, () =>
+          this.resources("images", { only: "destroy" }),
+        );
+      });
+      await tc.assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1" },
+        { id: "2" },
+        "destroy",
+        ["index", "new", "create", "show", "edit", "update"],
+        "products/1/images",
+      );
     });
-    assertResourceAllowedRoutes(
-      host,
-      "images",
-      { product_id: "1" },
-      { id: "2" },
-      ["index", "new", "create", "show", "edit", "update", "destroy"],
-      [],
-      "products/1/images",
-    );
   });
 
-  it("test_default_singleton_restful_route_uses_get", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.resource("product");
+  it("test_nested_resource_does_not_inherit_except_option_by_default", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { except: "show" }, () => this.resources("images"));
+      });
+      await tc.assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1" },
+        { id: "2" },
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+        [],
+        "products/1/images",
+      );
     });
-    assertRouting.call(host, "/product", { controller: "products", action: "show" });
   });
 
-  it("test_assert_routing_accepts_all_as_a_valid_method", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.match("/products", { to: "products#show", via: ":all" });
+  it("test_default_singleton_restful_route_uses_get", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("product");
+      });
+      tc.assertRouting("/product", { controller: "products", action: "show" });
     });
-    assertRouting.call(
-      host,
-      { path: "/products", method: "all" },
-      { controller: "products", action: "show" },
-    );
   });
 
-  it("test_assert_routing_fails_when_not_all_http_methods_are_recognized", () => {
-    const host = makeHost();
-    host.routes!.draw(function () {
-      this.match("/products", { to: "products#show", via: [":get", ":post", ":put"] });
-    });
-    expect(() =>
-      assertRouting.call(
-        host,
+  it("test_assert_routing_accepts_all_as_a_valid_method", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.match("/products", { to: "products#show", via: ":all" });
+      });
+      tc.assertRouting(
         { path: "/products", method: "all" },
         { controller: "products", action: "show" },
-      ),
-    ).toThrow();
+      );
+    });
+  });
+
+  it("test_assert_routing_fails_when_not_all_http_methods_are_recognized", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.match("/products", { to: "products#show", via: [":get", ":post", ":put"] });
+      });
+      await assertRaises([Assertion], {}, () => {
+        tc.assertRouting(
+          { path: "/products", method: "all" },
+          { controller: "products", action: "show" },
+        );
+      });
+    });
   });
 
   it.skip("test_singleton_resource_name_is_not_singularized — pending: assertSingletonRestfulFor requires named-route URL helpers (#T-AC14)", () => {});

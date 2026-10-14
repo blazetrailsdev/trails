@@ -106,26 +106,6 @@ describe("RoutesProxy", () => {
     const proxy = new RoutesProxy(makeRoutes(), makeScope(makeRoutes()), {});
     expect((proxy as RoutesProxyInstance).missingUrl).toBeUndefined();
   });
-});
-
-describe("mergeScriptNames", () => {
-  it("returns newScriptName when previous is null", () => {
-    expect(mergeScriptNames(null, "/foo")).toBe("/foo");
-    expect(mergeScriptNames(undefined, "/foo")).toBe("/foo");
-  });
-
-  it("keeps context parts of previous and appends new", () => {
-    expect(mergeScriptNames("/ctx/old", "/mounted")).toBe("/ctx/mounted");
-  });
-
-  it("handles deeper context", () => {
-    expect(mergeScriptNames("/a/b/old", "/mounted")).toBe("/a/b/mounted");
-  });
-
-  it("handles new with multiple parts", () => {
-    expect(mergeScriptNames("/ctx/old", "/m/n")).toBe("/m/n");
-  });
-
   it("forwards a helper defined on a url helpers module as a property", () => {
     const routes = new RouteSet();
     routes.draw(function () {
@@ -158,5 +138,24 @@ describe("mergeScriptNames", () => {
 
     expect("dynamicPath" in proxy).toBe(true);
     expect(proxy.dynamicPath()).toBe("/dynamic");
+  });
+});
+
+describe("mergeScriptNames", () => {
+  it("returns newScriptName when previous is null", () => {
+    expect(mergeScriptNames(null, "/foo")).toBe("/foo");
+    expect(mergeScriptNames(undefined, "/foo")).toBe("/foo");
+  });
+
+  it("keeps context parts of previous and appends new", () => {
+    expect(mergeScriptNames("/ctx/old", "/mounted")).toBe("/ctx/mounted");
+  });
+
+  it("handles deeper context", () => {
+    expect(mergeScriptNames("/a/b/old", "/mounted")).toBe("/a/b/mounted");
+  });
+
+  it("handles new with multiple parts", () => {
+    expect(mergeScriptNames("/ctx/old", "/m/n")).toBe("/m/n");
   });
 });
