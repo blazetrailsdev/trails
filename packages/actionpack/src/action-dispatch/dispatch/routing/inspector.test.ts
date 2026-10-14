@@ -332,6 +332,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
+  // BLOCKED: inspector-routes-when-expanded-colocated-source-location
   it.skip("routes when expanded", () => {
     try {
       Mapper.routeSourceLocations = true;

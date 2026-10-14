@@ -120,6 +120,7 @@ interface PolymorphicRoutesTest {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 class PolymorphicRoutesTest extends ActionController.TestCase {
   static Routes: RouteSet = new RouteSet();
+  declare static defaultUrlOptions: Record<string, unknown>;
 
   declare project: Project;
   declare task: Task;
@@ -136,8 +137,7 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     this.Routes.draw(function () {});
     include(this, this.Routes.urlHelpers());
 
-    (this as unknown as { defaultUrlOptions: Record<string, unknown> }).defaultUrlOptions["host"] =
-      "example.com";
+    this.defaultUrlOptions["host"] = "example.com";
   }
 
   override setup(): void {
@@ -155,8 +155,7 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
   }
 
   assertUrl(url: string, args: unknown): void {
-    const host = (this.constructor as unknown as { defaultUrlOptions: Record<string, unknown> })
-      .defaultUrlOptions["host"];
+    const host = (this.constructor as typeof PolymorphicRoutesTest).defaultUrlOptions["host"];
 
     const prefix = `http://${host}`;
     assertEqual(
@@ -277,9 +276,10 @@ class PolymorphicPathRoutesTest extends PolymorphicRoutesTest {
     include(this, Context);
   }
 
+  declare controller: PolymorphicRoutesTest["controller"];
+
   override assertUrl(url: string, args: unknown): void {
-    const host = (this.constructor as unknown as { defaultUrlOptions: Record<string, unknown> })
-      .defaultUrlOptions["host"];
+    const host = (this.constructor as typeof PolymorphicRoutesTest).defaultUrlOptions["host"];
 
     const prefix = `http://${host}`;
     assertEqual(url.startsWith(prefix) ? url.slice(prefix.length) : url, this.urlFor(args));
