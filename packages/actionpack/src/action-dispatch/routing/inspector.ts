@@ -107,10 +107,10 @@ export class RouteWrapper extends SimpleDelegator {
 }
 
 export class RoutesInspector {
-  private readonly routes: readonly Route[];
+  private readonly routes: Iterable<Route>;
   private engines: Record<string, CollectedRoute[]>;
 
-  constructor(routes: readonly Route[]) {
+  constructor(routes: Iterable<Route>) {
     this.routes = routes;
     this.engines = {};
   }
@@ -153,17 +153,17 @@ export class RoutesInspector {
   }
 
   /** @internal */
-  private filterRoutes(filter: NormalizedFilter): readonly Route[] {
+  private filterRoutes(filter: NormalizedFilter): Iterable<Route> {
     if (!filter) return this.routes;
-    return this.routes.filter((route) => {
+    return Array.from(this.routes).filter((route) => {
       const w = new RouteWrapper(route);
       return Object.entries(filter).some(([k, v]) => w.isMatchesFilter(k, v));
     });
   }
 
   /** @internal */
-  private collectRoutes(routes: readonly Route[]): CollectedRoute[] {
-    return routes
+  private collectRoutes(routes: Iterable<Route>): CollectedRoute[] {
+    return Array.from(routes)
       .map((r) => new RouteWrapper(r))
       .filter((w) => !w.isInternal())
       .map((w) => {
@@ -186,7 +186,7 @@ export class RoutesInspector {
 
     const routes = (route.rackApp as { routes(): unknown }).routes();
     if (routes instanceof RouteSet) {
-      this.engines[name] = this.collectRoutes(routes.routes.routes);
+      this.engines[name] = this.collectRoutes(routes.routes);
     }
   }
 }
