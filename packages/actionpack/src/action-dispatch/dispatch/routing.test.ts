@@ -2470,7 +2470,58 @@ describe("TestRoutingMapper", () => {
     expect(t.barRootPath()).toBe("/bar");
   });
 
-  it.skip("resource new actions", () => {});
+  it("resource new actions", async () => {
+    draw(function () {
+      this.resources("replies", () => {
+        this.new(() => {
+          this.post("preview");
+        });
+      });
+
+      this.scope("pt", { as: "pt" }, () => {
+        this.resources("projects", { pathNames: { new: "novo" }, path: "projetos" }, () => {
+          this.post("preview", { on: "new" });
+        });
+
+        this.resource("admin", { pathNames: { new: "novo" }, path: "administrador" }, () => {
+          this.post("preview", { on: "new" });
+        });
+
+        this.resources("products", { pathNames: { new: "novo" } }, () => {
+          this.new(() => {
+            this.post("preview");
+          });
+        });
+      });
+
+      this.resource("profile", () => {
+        this.new(() => {
+          this.post("preview");
+        });
+      });
+    });
+
+    expect(t.previewNewReplyPath()).toBe("/replies/new/preview");
+    expect(t.previewNewPtProjectPath()).toBe("/pt/projetos/novo/preview");
+    expect(t.previewNewPtAdminPath()).toBe("/pt/administrador/novo/preview");
+    expect(t.previewNewPtProductPath()).toBe("/pt/products/novo/preview");
+    expect(t.previewNewProfilePath()).toBe("/profile/new/preview");
+
+    await t.post("/replies/new/preview");
+    expect(t.response.body).toBe("replies#preview");
+
+    await t.post("/pt/projetos/novo/preview");
+    expect(t.response.body).toBe("projects#preview");
+
+    await t.post("/pt/administrador/novo/preview");
+    expect(t.response.body).toBe("admins#preview");
+
+    await t.post("/pt/products/novo/preview");
+    expect(t.response.body).toBe("products#preview");
+
+    await t.post("/profile/new/preview");
+    expect(t.response.body).toBe("profiles#preview");
+  });
 
   it("shallow false inside nested shallow resource", async () => {
     draw(function () {
@@ -3023,7 +3074,31 @@ describe("TestRoutingMapper", () => {
     });
   });
 
-  it.skip("resource constraints are pushed to scope", () => {});
+  it("resource constraints are pushed to scope", async () => {
+    draw(function () {
+      this.namespace("wiki", () => {
+        this.resources("articles", { id: /[^/]+/ }, () => {
+          this.resources("comments", { only: ["create", "new"] });
+        });
+      });
+    });
+
+    await t.get("/wiki/articles/Ruby_on_Rails_3.0");
+    expect(t.response.body).toBe("wiki/articles#show");
+    expect(t.wikiArticlePath({ id: "Ruby_on_Rails_3.0" })).toBe("/wiki/articles/Ruby_on_Rails_3.0");
+
+    await t.get("/wiki/articles/Ruby_on_Rails_3.0/comments/new");
+    expect(t.response.body).toBe("wiki/comments#new");
+    expect(t.newWikiArticleCommentPath({ article_id: "Ruby_on_Rails_3.0" })).toBe(
+      "/wiki/articles/Ruby_on_Rails_3.0/comments/new",
+    );
+
+    await t.post("/wiki/articles/Ruby_on_Rails_3.0/comments");
+    expect(t.response.body).toBe("wiki/comments#create");
+    expect(t.wikiArticleCommentsPath({ article_id: "Ruby_on_Rails_3.0" })).toBe(
+      "/wiki/articles/Ruby_on_Rails_3.0/comments",
+    );
+  });
 
   it("custom resource actions defined using string", () => {
     const routes = new RouteSet();
