@@ -888,7 +888,7 @@ export class Mapping {
     if (Mapper.routeSourceLocations) {
       const actionDispatchDir = File.expandPath(
         "..",
-        File.dirname(new URL(import.meta.url).pathname),
+        File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)),
       );
       for (const location of callerLocations(1)) {
         if ((location.absolutePath ?? location.path).startsWith(actionDispatchDir)) continue;
@@ -1054,8 +1054,6 @@ export class Mapper {
     "port",
   ];
 
-  static Scope = Scope;
-
   declare static routeSourceLocations: boolean;
   declare static backtraceCleaner: ActiveSupportBacktraceCleaner;
 
@@ -1066,6 +1064,8 @@ export class Mapper {
       default: new BacktraceCleaner(),
     });
   }
+
+  static Scope = Scope;
 
   /** @internal */
   _concerns: Map<string, ConcernCallable> = new Map();

@@ -148,7 +148,9 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
       if (!m) return [];
       const path = m[1] ?? m[3];
       const callSite = sites[1 + start + i];
-      const absolutePath = callSite?.isEval() ? undefined : path.replace(/^file:\/\//, "");
+      const absolutePath = callSite?.isEval()
+        ? undefined
+        : decodeURIComponent(path.replace(/^file:\/\//, ""));
       const lineno = Number(m[2] ?? m[4]);
       const label = /at ([^ (]+)/.exec(line.trim())?.[1] ?? "";
       return [
