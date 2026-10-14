@@ -737,6 +737,7 @@ describe("Migration index forwarders", () => {
 });
 
 describeIfPostgresqlAdapter("Migration index forwarders (PostgreSQL)", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("addIndex concurrently leaves an invalid index after a unique violation", async () => {
     const conn = await Base.leaseConnection();
     await conn.dropTable("ex", { ifExists: true });
