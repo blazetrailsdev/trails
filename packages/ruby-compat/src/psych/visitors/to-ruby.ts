@@ -1,6 +1,7 @@
 import { Range } from "../../range.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
+import type { Struct, StructInstance } from "../../struct.js";
 import type { Alias, Node, ParsedNode, Scalar, YAMLMap, YAMLSeq } from "yaml";
 import { Psych } from "../../psych.js";
 import { yaml } from "../../psych-adapter.js";
@@ -109,6 +110,34 @@ export class ToRuby {
       return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
 
     let match: RegExpExecArray | null;
+    if ((match = /^!ruby\/struct:?(.*)?$/.exec(o.tag))) {
+      const klass = this.resolveClass(match[1]);
+
+      if (klass) {
+        const s = this.register(o, allocate(klass)) as StructInstance & Record<string, unknown>;
+
+        const members: Record<string, unknown> = {};
+        const structMembers = s.members().map((x) => this.classLoader.symbolize(x));
+        for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
+          const member = this.accept(k) as string;
+          const value = this.accept(v);
+          if (structMembers.includes(this.classLoader.symbolize(member))) {
+            s[member] = value;
+          } else {
+            members[String(member).replace(/^@/, "")] = value;
+          }
+        }
+        return this.initWith(s, members, o);
+      } else {
+        const klass = this.classLoader.struct() as typeof Struct;
+        const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+        const s = new (klass.new(
+          ...Object.keys(h).map((k) => this.classLoader.symbolize(k).slice(1)),
+        ))(...Object.values(h));
+        this.register(o, s);
+        return s;
+      }
+    }
     if ((match = /^!ruby\/object:?(.*)?$/.exec(o.tag))) {
       const name = match[1] || "Object";
       if (name === "Hash")

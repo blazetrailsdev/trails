@@ -1,9 +1,5 @@
 import { Psych } from "@blazetrails/ruby-compat/psych";
-import {
-  parse as yamlParse,
-  stringify as yamlStringify,
-} from "@blazetrails/ruby-compat/psych-adapter";
-import { Hash, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.js";
 
@@ -17,35 +13,25 @@ class SafeCoder {
   ) {}
 
   dump(object: unknown): string {
-    if (!(this.unsafeLoad ?? useYamlUnsafeLoad())) this.assertDumpable(object);
-    return yamlStringify(object, { directives: true });
+    if (this.unsafeLoad == null ? useYamlUnsafeLoad() : this.unsafeLoad) {
+      return Psych.dump(object);
+    } else {
+      return Psych.safeDump(object, {
+        permittedClasses: [...this.permittedClasses, ...yamlColumnPermittedClasses()],
+        aliases: true,
+      });
+    }
   }
 
   load(payload: unknown): unknown {
-    return yamlParse(payload as string);
-  }
-
-  private assertDumpable(value: unknown, seen = new Set<object>()): void {
-    if (value === null || typeof value !== "object") return;
-    if (seen.has(value)) return;
-    seen.add(value);
-    if (Array.isArray(value)) {
-      for (const element of value) this.assertDumpable(element, seen);
-      return;
+    if (this.unsafeLoad == null ? useYamlUnsafeLoad() : this.unsafeLoad) {
+      return Psych.unsafeLoad(payload as string | Uint8Array);
+    } else {
+      return Psych.safeLoad(payload as string | Uint8Array, {
+        permittedClasses: [...this.permittedClasses, ...yamlColumnPermittedClasses()],
+        aliases: true,
+      });
     }
-    if (value instanceof Hash) {
-      for (const element of value.values() as unknown[]) this.assertDumpable(element, seen);
-      return;
-    }
-    const proto = Object.getPrototypeOf(value);
-    if (proto === Object.prototype || proto === null) {
-      for (const element of Object.values(value)) this.assertDumpable(element, seen);
-      return;
-    }
-    for (const permitted of [...this.permittedClasses, ...yamlColumnPermittedClasses()]) {
-      if (typeof permitted === "function" && value instanceof permitted) return;
-    }
-    throw new Psych.DisallowedClass("dump", value.constructor?.name ?? "Object");
   }
 }
 

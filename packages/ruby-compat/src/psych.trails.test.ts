@@ -39,6 +39,44 @@ describe("Psych with Date, DateTime and Time unseated", () => {
   });
 });
 
+describe("Psych with a Struct and the safe paths", () => {
+  it("dumps a named Struct by its members and revives it", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Struct } = await import("./struct.js");
+    const { registerConstant } = await import("./variable.js");
+    const Point = Struct.new("x", "y");
+    registerConstant("PsychTrailsPoint", Point);
+    const yaml = Psych.dump(new Point(1, "a"));
+    expect(yaml).toContain("!ruby/struct:PsychTrailsPoint\nx: 1\ny: a\n");
+    const point = Psych.unsafeLoad(yaml) as InstanceType<typeof Point>;
+    expect(point).toBeInstanceOf(Point);
+    expect(point.equals(new Point(1, "a"))).toBe(true);
+  });
+
+  it("revives an untagged-class struct as an anonymous Struct", async () => {
+    const { Psych } = await import("./psych.js");
+    const s = Psych.unsafeLoad("--- !ruby/struct\nx: 1\n") as { x: unknown; members(): string[] };
+    expect(s.members()).toEqual(["x"]);
+    expect(s.x).toBe(1);
+  });
+
+  it("safe_dump refuses a class that is not permitted and safe_load a tag that is not", async () => {
+    const { Psych } = await import("./psych.js");
+    class Widget {}
+    expect(() => Psych.safeDump(new Widget())).toThrow(Psych.DisallowedClass);
+    expect(Psych.safeDump({ a: [1, "x"] }, { aliases: true })).toBe("---\na:\n  - 1\n  - x\n");
+    expect(() => Psych.safeLoad("--- !ruby/object:Widget {}\n")).toThrow(Psych.DisallowedClass);
+    expect(Psych.safeLoad("--- {a: 1}\n")).toEqual({ a: 1 });
+  });
+
+  it("answers the fallback for an empty document", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.parse("")).toBe(false);
+    expect(Psych.unsafeLoad("")).toBe(false);
+    expect(Psych.safeLoad("")).toBeNull();
+  });
+});
+
 describe("psych-adapter parse on a source held as its bytes", () => {
   it("decodes UTF-8 and raises SyntaxError for malformed bytes", async () => {
     const { parse } = await import("./psych-adapter.js");

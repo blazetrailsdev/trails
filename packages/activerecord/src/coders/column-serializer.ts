@@ -1,5 +1,12 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbInspect, rbObjClassname, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  rbClassNewInstance,
+  rbInspect,
+  rbModToS,
+  rbObjClassname,
+  rbObjIsKindOf,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { SerializationTypeMismatch } from "../errors.js";
 
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };
@@ -44,7 +51,7 @@ export class ColumnSerializer {
   load(payload: unknown): unknown {
     if (payload == null) {
       if (this._objectClass !== (Object as unknown)) {
-        return new (this._objectClass as new () => unknown)();
+        return rbClassNewInstance(this._objectClass);
       }
       return null;
     }
@@ -53,22 +60,16 @@ export class ColumnSerializer {
     this.assertValidValue(object, { action: "load" });
 
     if (object == null && this._objectClass !== (Object as unknown)) {
-      object = new (this._objectClass as new () => unknown)();
+      object = rbClassNewInstance(this._objectClass);
     }
 
     return object;
   }
 
   assertValidValue(object: unknown, { action }: { action: string }): void {
-    if (
-      !(
-        object == null ||
-        this._objectClass === (Object as unknown) ||
-        Object(object) instanceof this._objectClass
-      )
-    ) {
+    if (!(object == null || rbObjIsKindOf(object, this._objectClass))) {
       throw new SerializationTypeMismatch(
-        `can't ${action} \`${this._attrName}\`: was supposed to be a ${this._objectClass.name}, ` +
+        `can't ${action} \`${this._attrName}\`: was supposed to be a ${rbModToS(this._objectClass)}, ` +
           `but was a ${rbObjClassname(object)}. -- ${rbInspect(object)}`,
       );
     }
@@ -81,7 +82,7 @@ export class ColumnSerializer {
     } catch (e: unknown) {
       if (!(e instanceof ArgumentError)) throw e;
       throw new ArgumentError(
-        `Cannot serialize ${this._objectClass.name}. Classes passed to \`serialize\` must have a 0 argument constructor.`,
+        `Cannot serialize ${rbModToS(this._objectClass)}. Classes passed to \`serialize\` must have a 0 argument constructor.`,
       );
     }
   }

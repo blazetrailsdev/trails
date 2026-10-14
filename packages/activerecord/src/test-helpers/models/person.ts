@@ -335,6 +335,8 @@ export const Insure = {
 };
 
 export class SerializedPerson extends Base {
+  declare insures: unknown;
+
   static {
     this._tableName = "people";
     this.serialize("insures", { coder: Insure });

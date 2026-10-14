@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbCString } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { JSON as JsonCoder } from "./json.js";
 import { SerializationTypeMismatch } from "../errors.js";
@@ -70,7 +71,7 @@ describe("ColumnSerializerTest", () => {
   });
 
   it("assert_valid_value accepts a primitive of the object class", () => {
-    const cs = new ColumnSerializer("attr", JsonCoder, String as never);
+    const cs = new ColumnSerializer("attr", JsonCoder, rbCString);
     expect(() => cs.assertValidValue("x", { action: "dump" })).not.toThrow();
     expect(() => cs.assertValidValue(1, { action: "dump" })).toThrow(SerializationTypeMismatch);
   });

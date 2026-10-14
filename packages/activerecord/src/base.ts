@@ -29,7 +29,6 @@ import {
   JSONSerializer,
   Model,
   ValueType,
-  type AttributeOptions,
   ValidationsCallbacks,
 } from "@blazetrails/activemodel";
 import { Table, Nodes } from "@blazetrails/arel";
@@ -247,7 +246,10 @@ import {
   attributeCameFromUser as _attributeCameFromUser,
 } from "./attribute-methods/before-type-cast.js";
 import { Query as _Query } from "./attribute-methods/query.js";
-import { Serialization as _AttrSerialization } from "./attribute-methods/serialization.js";
+import {
+  Serialization as _AttrSerialization,
+  type SerializeOptions,
+} from "./attribute-methods/serialization.js";
 import {
   toParam as _toParam,
   Integration as _Integration,
@@ -1061,13 +1063,7 @@ export class Base extends Model {
 
   declare static defaultColumnSerializer: unknown;
 
-  declare static serialize: (
-    attribute: string,
-    options?: AttributeOptions & {
-      coder?: unknown;
-      type?: "Array" | "Hash" | (new (...args: any[]) => any);
-    },
-  ) => void;
+  declare static serialize: (attribute: string, options?: SerializeOptions) => void;
 
   declare static localStoredAttributes: typeof _localStoredAttributes;
 

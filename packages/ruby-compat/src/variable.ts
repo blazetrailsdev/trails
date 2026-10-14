@@ -6,6 +6,7 @@ import { NameError } from "./name-error.js";
 import { classpaths, rbCBasicObject, rbCSymbol, rbModName } from "./object.js";
 import { Range } from "./range.js";
 import { Rational } from "./rational.js";
+import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
 
 const _constants = new Map<string, unknown>();
@@ -319,6 +320,7 @@ registerConstant("Hash", Hash);
 registerConstant("Exception", Exception);
 registerConstant("Range", Range);
 registerConstant("Regexp", RegExp);
+registerConstant("Struct", Struct);
 registerConstant("Symbol", rbCSymbol);
 
 registerConstant("Rational", Rational);
