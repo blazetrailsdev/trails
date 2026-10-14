@@ -58,8 +58,6 @@ export class YAMLTree {
   private readonly doc = new yaml.Document();
   private anchors = 0;
   private readonly ss: ScalarScanner;
-  /** @internal */
-  protected readonly options: YAMLTreeOptions;
 
   /**
    * `YAMLTree.create` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:48`).
@@ -73,9 +71,8 @@ export class YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(ss: ScalarScanner, options: YAMLTreeOptions = {}) {
+  constructor(ss: ScalarScanner, _options: YAMLTreeOptions = {}) {
     this.ss = ss;
-    this.options = options;
   }
 
   /** @noRailsEquivalent PERMANENT */

@@ -13,7 +13,7 @@ import {
 } from "./psych/exception.js";
 import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
-import { rbModToS } from "./object.js";
+import { isPlainHash, rbModToS } from "./object.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
 export { coderTag } from "./psych/coder.js";
@@ -144,7 +144,7 @@ export namespace Psych {
     io: YAMLTreeOptions | null = null,
     options: YAMLTreeOptions = {},
   ): string {
-    if (io !== null) options = io;
+    if (isPlainHash(io)) options = io as YAMLTreeOptions;
 
     const visitor = RestrictedYAMLTree.create(options);
     visitor.push(o);
