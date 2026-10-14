@@ -1,4 +1,4 @@
-import { KeyError, LoadError } from "@blazetrails/ruby-compat";
+import { fetch, LoadError, rbInspect, rbModToS, rbObjClass } from "@blazetrails/ruby-compat";
 
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
@@ -28,6 +28,46 @@ function fromBinary(binary: string): string {
   return Buffer.from(binary, "latin1").toString("utf8");
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export interface Serializer {
+  dump(entryOrValue: Entry | unknown): string | Entry;
+  dumpCompressed?(entry: Entry, threshold: number): string | Entry;
+  _load(dumped: string | Entry): unknown;
+  dumped(dumped: string | Entry): boolean;
+  load(dumped: unknown): unknown;
+  /** @internal */
+  marshalLoad(payload: string): unknown;
+  /** @internal */
+  isAvailable?(): boolean;
+}
+
+function load(dumped: unknown): unknown {
+  if (typeof dumped === "string") {
+    if (messagePackWithFallback.dumped(dumped)) {
+      return messagePackWithFallback._load(dumped);
+    } else if (marshal71WithFallback.dumped(dumped)) {
+      return marshal71WithFallback._load(dumped);
+    } else if (marshal70WithFallback.dumped(dumped)) {
+      return marshal70WithFallback._load(dumped);
+    } else {
+      Store.logger?.warn(
+        `Unrecognized payload prefix ${rbInspect(dumped.slice(0, 1))}; deserializing as nil`,
+      );
+      return null;
+    }
+  } else if (passthroughWithFallback.dumped(dumped as Entry)) {
+    return passthroughWithFallback._load(dumped as Entry);
+  } else {
+    Store.logger?.warn(
+      `Unrecognized payload class ${rbModToS(rbObjClass(dumped))}; deserializing as nil`,
+    );
+    return null;
+  }
+}
+
 /** @internal */
 function marshalLoad(payload: string): unknown {
   try {
@@ -37,18 +77,7 @@ function marshalLoad(payload: string): unknown {
   }
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export interface Serializer {
-  dump(entryOrValue: Entry | unknown): string | Entry;
-  dumpCompressed?(entry: Entry, threshold: number): string | Entry;
-  _load(dumped: string | Entry): unknown;
-  dumped(dumped: unknown): boolean;
-  /** @internal */
-  isAvailable?(): boolean;
-}
+const serializerWithFallback = { load, marshalLoad };
 
 const MARK_UNCOMPRESSED = "\x00";
 const MARK_COMPRESSED = "\x01";
@@ -56,6 +85,8 @@ const MARK_COMPRESSED = "\x01";
 const MARSHAL_SIGNATURE = "\x04\x08";
 
 const passthroughWithFallback: Serializer = {
+  ...serializerWithFallback,
+
   dump(entry: Entry | unknown): Entry {
     return entry as Entry;
   },
@@ -68,12 +99,14 @@ const passthroughWithFallback: Serializer = {
     return entry as Entry;
   },
 
-  dumped(dumped: unknown): boolean {
+  dumped(dumped: string | Entry): boolean {
     return dumped instanceof Entry;
   },
 };
 
 const marshal70WithFallback: Serializer = {
+  ...serializerWithFallback,
+
   dump(entry: Entry | unknown): string {
     return MARK_UNCOMPRESSED + toBinary(coder.dump((entry as Entry).pack()));
   },
@@ -95,32 +128,36 @@ const marshal70WithFallback: Serializer = {
     const compressed = s[0] === MARK_COMPRESSED;
     const rest = s.slice(1);
     const payload = compressed ? inflate(rest) : fromBinary(rest);
-    return Entry.unpack(marshalLoad(payload) as unknown[]);
+    return Entry.unpack(this.marshalLoad(payload) as unknown[]);
   },
 
-  dumped(dumped: unknown): boolean {
+  dumped(dumped: string | Entry): boolean {
     return (
-      typeof dumped === "string" &&
-      (dumped[0] === MARK_UNCOMPRESSED || dumped[0] === MARK_COMPRESSED)
+      (dumped as string).startsWith(MARK_UNCOMPRESSED) ||
+      (dumped as string).startsWith(MARK_COMPRESSED)
     );
   },
 };
 
 const marshal71WithFallback: Serializer = {
+  ...serializerWithFallback,
+
   dump(value: Entry | unknown): string {
     return MARSHAL_SIGNATURE + toBinary(coder.dump(value));
   },
 
   _load(dumped: string | Entry): unknown {
-    return marshalLoad(fromBinary((dumped as string).slice(MARSHAL_SIGNATURE.length)));
+    return this.marshalLoad(fromBinary((dumped as string).slice(MARSHAL_SIGNATURE.length)));
   },
 
-  dumped(dumped: unknown): boolean {
-    return typeof dumped === "string" && dumped.startsWith(MARSHAL_SIGNATURE);
+  dumped(dumped: string | Entry): boolean {
+    return (dumped as string).startsWith(MARSHAL_SIGNATURE);
   },
 };
 
 const messagePackWithFallback: Serializer = {
+  ...serializerWithFallback,
+
   dump(value: Entry | unknown): string {
     return Buffer.from(ActiveSupport.MessagePack!.CacheSerializer.dump(value)).toString("latin1");
   },
@@ -132,11 +169,10 @@ const messagePackWithFallback: Serializer = {
     return result === undefined ? null : result;
   },
 
-  dumped(dumped: unknown): boolean {
+  dumped(dumped: string | Entry): boolean {
     return (
       this.isAvailable!() &&
-      typeof dumped === "string" &&
-      ActiveSupport.MessagePack!.isSignature(Buffer.from(dumped, "latin1"))
+      ActiveSupport.MessagePack!.isSignature(Buffer.from(dumped as string, "latin1"))
     );
   },
 
@@ -153,42 +189,16 @@ const SERIALIZERS: Record<string, Serializer> = {
   message_pack: messagePackWithFallback,
 };
 
-function sharedLoad(dumped: unknown): unknown {
-  if (typeof dumped === "string") {
-    if (messagePackWithFallback.dumped(dumped)) {
-      return messagePackWithFallback._load(dumped);
-    } else if (marshal71WithFallback.dumped(dumped)) {
-      return marshal71WithFallback._load(dumped);
-    } else if (marshal70WithFallback.dumped(dumped)) {
-      return marshal70WithFallback._load(dumped);
-    } else {
-      Store.logger?.warn(
-        `Unrecognized payload prefix ${JSON.stringify(dumped[0])}; deserializing as nil`,
-      );
-      return null;
-    }
-  } else if (passthroughWithFallback.dumped(dumped)) {
-    return passthroughWithFallback._load(dumped as Entry);
-  } else {
-    Store.logger?.warn(`Unrecognized payload class ${typeof dumped}; deserializing as nil`);
-    return null;
-  }
-}
-
 /** @internal */
 export const SerializerWithFallback = {
   SERIALIZERS,
 
-  load: sharedLoad,
-
   /** @missingRailsCall require — PERMANENT */
-  get(format: string): Serializer & { load(dumped: unknown): unknown } {
+  get(format: string): Serializer {
     if (format.includes("message_pack") && ActiveSupport.MessagePack === undefined) {
       throw new LoadError("cannot load such file -- active_support/message_pack");
     }
 
-    const s = SERIALIZERS[format];
-    if (!s) throw new KeyError(`key not found: ${JSON.stringify(format)}`);
-    return { ...s, load: sharedLoad };
+    return fetch(SERIALIZERS, format);
   },
 };
