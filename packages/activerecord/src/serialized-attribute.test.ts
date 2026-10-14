@@ -660,7 +660,7 @@ describe("SerializedAttributeTest", () => {
 });
 
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
-  const { self } = fixtures(["topics", "posts"]);
+  const { posts, self } = fixtures(["topics", "posts"]);
 
   let useYamlUnsafeLoadWas: boolean;
   let yamlColumnPermittedClassesDefault: unknown[];
@@ -794,5 +794,259 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     Topic.serialize("content", { yaml: { permittedClasses: [RubyTime] } });
     const topic = new Topic({ content: RubyTime.now() });
     expect(await topic.save()).toBeTruthy();
+  });
+
+  it("serialize does not eagerly load columns", async () => {
+    Topic.resetColumnInformation();
+    await assertNoQueries(false, () => {
+      Topic.serialize("content");
+    });
+  });
+
+  it("serialized attribute in base class", async () => {
+    Topic.serialize("content", { type: Hash });
+
+    const hash = { content1: "value1", content2: "value2" };
+    const importantTopic = await ImportantTopic.create({ content: hash });
+    expect(importantTopic.content).toEqual(hash);
+
+    await importantTopic.reload();
+    expect(importantTopic.content).toEqual(hash);
+  });
+
+  it("serialized attribute calling dup method", () => {
+    Topic.serialize("content", { coder: JSON });
+
+    const orig = new Topic({ content: { foo: "bar" } });
+    const clone = orig.dup();
+    expect(clone.content).toEqual(orig.content);
+  });
+
+  it("serialized json attribute returns unserialized value", async () => {
+    Topic.serialize("content", { coder: JSON });
+    const myPost = posts("welcome");
+
+    const t = new Topic({ content: myPost });
+    await t.saveBang();
+    await t.reload();
+
+    expect(t.content).toBeInstanceOf(Object);
+    expect(t.content["id"]).toEqual(myPost.id);
+    expect(t.content["title"]).toEqual(myPost.title);
+  });
+
+  it("json read legacy null", async () => {
+    Topic.serialize("content", { coder: JSON });
+
+    const id = await (
+      await Topic.leaseConnection()
+    ).insert("INSERT INTO topics (content) VALUES('null')");
+    const t = await Topic.find(id);
+
+    expect(t.content).toBeNull();
+  });
+
+  it("json read db null", async () => {
+    Topic.serialize("content", { coder: JSON });
+
+    const id = await (
+      await Topic.leaseConnection()
+    ).insert("INSERT INTO topics (content) VALUES(NULL)");
+    const t = await Topic.find(id);
+
+    expect(t.content).toBeNull();
+  });
+
+  it("serialized attribute declared in subclass", async () => {
+    const hash = { important1: "value1", important2: "value2" };
+    const importantTopic = await ImportantTopic.create({ important: hash });
+    expect(importantTopic.important).toEqual(hash);
+
+    await importantTopic.reload();
+    expect(importantTopic.important).toEqual(hash);
+    expect(importantTopic.readAttribute("important")).toEqual(hash);
+  });
+
+  it("serialized string attribute", async () => {
+    const myobj = "Yes";
+    const topic = await (await Topic.create({ content: myobj })).reload();
+    expect(topic.content).toEqual(myobj);
+  });
+
+  it("nil serialized attribute without class constraint", () => {
+    const topic = new Topic();
+    expect(topic.content).toBeNull();
+  });
+
+  it("nil not serialized without class constraint", async () => {
+    expect(await new Topic({ content: null }).save()).toBeTruthy();
+    expect(await Topic.where({ content: null }).count()).toEqual(1);
+  });
+
+  it("nil not serialized with class constraint", async () => {
+    Topic.serialize("content", { type: Hash });
+    expect(await new Topic({ content: null }).save()).toBeTruthy();
+    expect(await Topic.where({ content: null }).count()).toEqual(1);
+  });
+
+  it("serialized default class", async () => {
+    Topic.serialize("content", { type: Hash });
+    const topic = new Topic();
+    expect(rbObjClass(topic.content)).toEqual(Hash);
+    expect(rbObjClass(topic.readAttribute("content"))).toEqual(Hash);
+    hashAset(topic.content, "beer", "MadridRb");
+    expect(await topic.save()).toBeTruthy();
+    await topic.reload();
+    expect(rbObjClass(topic.content)).toEqual(Hash);
+    expect(hashAref(topic.content, "beer")).toEqual("MadridRb");
+  });
+
+  it("serialized no default class for object", () => {
+    const topic = new Topic();
+    expect(topic.content).toBeNull();
+  });
+
+  it("serialized boolean value true", async () => {
+    let topic = new Topic({ content: true });
+    expect(await topic.save()).toBeTruthy();
+    topic = await topic.reload();
+    expect(topic.content).toEqual(true);
+  });
+
+  it("serialized boolean value false", async () => {
+    let topic = new Topic({ content: false });
+    expect(await topic.save()).toBeTruthy();
+    topic = await topic.reload();
+    expect(topic.content).toEqual(false);
+  });
+
+  it("serialize with coder", async () => {
+    const someClass = class extends Struct.new("foo") {
+      static dump(value: { foo: unknown }): unknown {
+        return value.foo;
+      }
+
+      static load(value: unknown): unknown {
+        return new this(value);
+      }
+    };
+
+    Topic.serialize("content", { coder: someClass });
+    const topic = new Topic({ content: new someClass("my value") });
+    await topic.saveBang();
+    await topic.reload();
+    expect(topic.content).toBeInstanceOf(someClass);
+    expect(topic.content).toEqual(new someClass("my value"));
+  });
+
+  it("regression serialized default on text column with null false", () => {
+    const light = new TrafficLight();
+    expect(light.state).toEqual([]);
+    expect(light.long_state).toEqual([]);
+  });
+
+  it("serialized column should unserialize after update column", async () => {
+    const t = await Topic.create({ content: "first" });
+    expect(t.content).toEqual("first");
+
+    await t.updateColumn("content", ["second"]);
+    expect(t.content).toEqual(["second"]);
+    expect((await t.reload()).content).toEqual(["second"]);
+  });
+
+  it("serialized column should unserialize after update attribute", async () => {
+    const t = await Topic.create({ content: "first" });
+    expect(t.content).toEqual("first");
+
+    await t.updateAttribute("content", "second");
+    expect(t.content).toEqual("second");
+    expect((await t.reload()).content).toEqual("second");
+  });
+
+  it("nil is not changed when serialized with a class", () => {
+    Topic.serialize("content", { type: Array });
+
+    const topic = new Topic({ content: null });
+
+    expect(topic.attributeChanged("content")).toBeFalsy();
+  });
+
+  it("newly emptied serialized hash is changed", async () => {
+    Topic.serialize("content", { type: Hash });
+    const topic = await Topic.create({ content: { things: "stuff" } });
+    delete topic.content["things"];
+    await topic.saveBang();
+    await topic.reload();
+
+    expect(topic.content).toEqual({});
+  });
+
+  it("values cast from nil are persisted as nil", async () => {
+    Topic.serialize("content", { type: Hash });
+    const topic = await Topic.createBang({ content: {} });
+    const topic2 = await Topic.createBang({ content: null });
+
+    const found = (await Topic.where({ content: null })).sort((a, b) => a.id - b.id);
+    expect(found.map((t) => t.equals([topic, topic2][found.indexOf(t)]))).toEqual([true, true]);
+  });
+
+  it("serialized attribute can be defined in abstract classes", async () => {
+    const klass = class extends Base {
+      static {
+        this.abstractClass = true;
+        this.tableName = null;
+        this.serialize("content", { type: Hash });
+      }
+    };
+
+    const subclass = class extends klass {
+      static {
+        this.tableName = "topics";
+      }
+    };
+
+    subclass.defineAttributeMethods();
+
+    const topic = await subclass.createBang({ content: { foo: 1 } });
+    const found = await subclass.where({ content: { foo: 1 } });
+    expect(found.map((t) => t.equals(topic))).toEqual([true]);
+  });
+
+  it("mutation detection does not double serialize", async () => {
+    const coder = {
+      dump(value: string | null): string | null {
+        if (value == null) return null;
+        return value + " encoded";
+      },
+      load(value: string | null): string | null {
+        if (value == null) return null;
+        return value.replaceAll(" encoded", "");
+      },
+    };
+    const typeClass = class extends ValueType {
+      override serialize(value: unknown): unknown {
+        if (value == null) return null;
+        return (value as string) + " serialized";
+      }
+
+      override deserialize(value: unknown): unknown {
+        if (value == null) return null;
+        return (value as string).replaceAll(" serialized", "");
+      }
+    };
+    include(typeClass, Mutable);
+    const type = new typeClass();
+    const model = class extends Topic {
+      declare foo: any;
+
+      static {
+        this.attribute("foo", type);
+        this.serialize("foo", { coder });
+      }
+    };
+
+    const topic = await model.createBang({ foo: "bar" });
+    void topic.foo;
+    expect(topic.isChanged).toBeFalsy();
   });
 });

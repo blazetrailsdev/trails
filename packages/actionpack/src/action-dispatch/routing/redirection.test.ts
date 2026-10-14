@@ -37,6 +37,11 @@ describe("redirect()", () => {
     expect(r).toBeInstanceOf(Redirect);
     expect(r.status).toBe(301);
   });
+  it("takes a status with a trailing block", () => {
+    const r = redirect({ status: 302 }, () => "/dyn");
+    expect(r.status).toBe(302);
+    expect(r.path({}, {} as never)).toBe("/dyn");
+  });
 
   it("raises for unsupported arguments", () => {
     expect(() => redirect(123 as unknown as string)).toThrow(/not supported/);

@@ -12,7 +12,13 @@ import {
   assertRaises,
   stub,
 } from "@blazetrails/activesupport";
-import { include, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import { include, rbConstGet, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
+import { Flash } from "../middleware/flash.js";
+import { CookieStore } from "../middleware/session/cookie-store.js";
+import { ShowExceptions } from "../middleware/show-exceptions.js";
+import type { MiddlewareFactory } from "../middleware/stack.js";
 import { Base } from "../../action-controller/base.js";
 import { deprecator } from "../deprecator.js";
 import { IntegrationTest } from "../testing/integration.js";
@@ -3551,20 +3557,64 @@ describe("TestDefaultScope", () => {
 });
 
 describe("TestRecognizePath", () => {
-  it("hash constraints dont leak between routes", () => {
-    const routes = new RouteSet();
+  class PageConstraint {
+    readonly key: string;
+    readonly pattern: RegExp;
+
+    constructor(key: string, pattern: RegExp) {
+      this.key = key;
+      this.pattern = pattern;
+    }
+
+    matches(request: Request): boolean {
+      return this.pattern.test(String(request.pathParameters[this.key]));
+    }
+  }
+
+  const Routes = IntegrationTest.stubControllers((routes) => {
     routes.draw(function () {
       this.get("/hash/:foo", { to: "pages#show", constraints: { foo: /foo/ } });
-      this.get("/hash/:bar", { to: "pages#show_bar" });
+      this.get("/hash/:bar", { to: "pages#show", constraints: { bar: /bar/ } });
+
+      this.get("/proc/:foo", {
+        to: "pages#show",
+        constraints: (r: Request) => /foo/.test(String(r.pathParameters.foo)),
+      });
+      this.get("/proc/:bar", {
+        to: "pages#show",
+        constraints: (r: Request) => /bar/.test(String(r.pathParameters.bar)),
+      });
+
+      this.get("/class/:foo", { to: "pages#show", constraints: new PageConstraint("foo", /foo/) });
+      this.get("/class/:bar", { to: "pages#show", constraints: new PageConstraint("bar", /bar/) });
     });
-    const m = routes.recognizePath("/hash/bar");
-    expect(m.action).toBe("show_bar");
-    expect(m.bar).toBe("bar");
+    return routes;
   });
 
-  it.skip("proc constraints dont leak between routes", () => {});
+  it("hash constraints dont leak between routes", () => {
+    const expectedParams = { controller: "pages", action: "show", bar: "bar" };
+    const actualParams = recognizePath("/hash/bar");
 
-  it.skip("class constraints dont leak between routes", () => {});
+    expect(actualParams).toEqual(expectedParams);
+  });
+
+  it("proc constraints dont leak between routes", () => {
+    const expectedParams = { controller: "pages", action: "show", bar: "bar" };
+    const actualParams = recognizePath("/proc/bar");
+
+    expect(actualParams).toEqual(expectedParams);
+  });
+
+  it("class constraints dont leak between routes", () => {
+    const expectedParams = { controller: "pages", action: "show", bar: "bar" };
+    const actualParams = recognizePath("/class/bar");
+
+    expect(actualParams).toEqual(expectedParams);
+  });
+
+  function recognizePath(path: string) {
+    return Routes.recognizePath(path);
+  }
 });
 
 describe("TestTildeAndMinusPaths", () => {
@@ -3625,9 +3675,41 @@ describe("TestUrlGenerationErrors", () => {
     expect(() => urlHelpers.productPath(null)).toThrow(message);
   });
 
-  it.skip("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", () => {});
+  it("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", async () => {
+    const Routes = new RouteSet();
+    Routes.draw(function () {
+      this.get("/products/:id", { to: "products#show", as: "product" });
+    });
+    const message =
+      'No route matches {:action=>"show", :controller=>"products", :id=>nil}, possible unmatched constraints: [:id]';
 
-  it.skip("exceptions have suggestions for fix", () => {});
+    const urlHelpers = Routes.urlHelpers() as unknown as Record<
+      string,
+      (...args: unknown[]) => string
+    >;
+    const error = await assertRaises([UrlGenerationError], {}, () =>
+      urlHelpers.productPath({ id: null }),
+    );
+    expect(error.message).toMatch(message);
+  });
+
+  // BLOCKED: url-helper-positional-nil-collides-with-a-string-id-option
+  it.skip("exceptions have suggestions for fix", async () => {
+    const Routes = new RouteSet();
+    Routes.draw(function () {
+      this.get("/products/:id", { to: "products#show", as: "product" });
+    });
+    const urlHelpers = Routes.urlHelpers() as unknown as Record<
+      string,
+      (...args: unknown[]) => string
+    >;
+    const error = await assertRaises([UrlGenerationError], {}, () =>
+      urlHelpers.productPath(null, { id: "url-tested" }),
+    );
+    expect((error as UrlGenerationError & { detailedMessage(): string }).detailedMessage()).toMatch(
+      "Did you mean?",
+    );
+  });
 });
 
 describe("TestAltApp", () => {
@@ -4211,17 +4293,144 @@ describe("TestRouteDefaults", () => {
 });
 
 describe("TestRackAppRouteGeneration", () => {
-  it.skip("mounted application doesnt match unnamed route", () => {});
+  const Routes = IntegrationTest.stubControllers((routes) => {
+    routes.draw(function () {
+      const rackApp = (_env: Record<string, unknown>) => [
+        200,
+        { "Content-Type": "text/plain" },
+        [],
+      ];
+      this.mount(rackApp, { at: "/account", as: "account" });
+      this.mount(rackApp, { at: "/:locale/account", as: "localized_account" });
+    });
+    return routes;
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestRackAppRouteGeneration extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  include(TestRackAppRouteGeneration, Routes.urlHelpers());
+  registerConstant("TestRackAppRouteGeneration", TestRackAppRouteGeneration);
+
+  let t: TestRackAppRouteGeneration;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestRackAppRouteGeneration;
+  });
+
+  it("mounted application doesnt match unnamed route", async () => {
+    await assertRaises([UrlGenerationError], {}, () => {
+      expect(t.urlFor({ controller: "products", action: "index", onlyPath: true })).toBe(
+        "/account?controller=products",
+      );
+    });
+
+    await assertRaises([UrlGenerationError], {}, () => {
+      expect(
+        t.urlFor({ controller: "products", action: "index", locale: "de", onlyPath: true }),
+      ).toBe("/de/account?controller=products");
+    });
+  });
 });
 
 describe("TestRedirectRouteGeneration", () => {
-  it.skip("redirect doesnt match unnamed route", () => {});
+  const Routes = IntegrationTest.stubControllers((routes) => {
+    routes.draw(function () {
+      this.get("/account", { to: this.redirect("/myaccount"), as: "account" });
+      this.get("/:locale/account", {
+        to: this.redirect("/%{locale}/myaccount"),
+        as: "localized_account",
+      });
+    });
+    return routes;
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestRedirectRouteGeneration extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  include(TestRedirectRouteGeneration, Routes.urlHelpers());
+  registerConstant("TestRedirectRouteGeneration", TestRedirectRouteGeneration);
+
+  let t: TestRedirectRouteGeneration;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestRedirectRouteGeneration;
+  });
+
+  it("redirect doesnt match unnamed route", async () => {
+    await assertRaises([UrlGenerationError], {}, () => {
+      expect(t.urlFor({ controller: "products", action: "index", onlyPath: true })).toBe(
+        "/account?controller=products",
+      );
+    });
+
+    await assertRaises([UrlGenerationError], {}, () => {
+      expect(
+        t.urlFor({ controller: "products", action: "index", locale: "de", onlyPath: true }),
+      ).toBe("/de/account?controller=products");
+    });
+  });
 });
 
 describe("TestErrorsInController", () => {
-  it.skip("legit no method errors are not caught", () => {});
-  it.skip("legit name errors are not caught", () => {});
-  it.skip("legit routing not found responses", () => {});
+  class PostsController extends Base {
+    async foo(): Promise<void> {
+      (null as unknown as { iDoNotExist(): void }).iDoNotExist();
+    }
+
+    async bar(): Promise<void> {
+      rbConstGet(PostsController, "NonExistingClass");
+    }
+  }
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    deprecator().silence(() => {
+      this.get("/:controller(/:action)");
+    });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestErrorsInController extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestErrorsInController", TestErrorsInController);
+
+  let t: TestErrorsInController;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("posts", PostsController);
+    t = testCase as TestErrorsInController;
+  });
+  afterEach(() => {
+    controllerConstants.delete("posts");
+  });
+
+  it("legit no method errors are not caught", async () => {
+    await t.get("/posts/foo");
+    expect(t.response.status).toBe(500);
+  });
+
+  it("legit name errors are not caught", async () => {
+    await t.get("/posts/bar");
+    expect(t.response.status).toBe(500);
+  });
+
+  it("legit routing not found responses", async () => {
+    await t.get("/posts/baz");
+    expect(t.response.status).toBe(404);
+
+    await t.get("/i_do_not_exist");
+    expect(t.response.status).toBe(404);
+  });
 });
 
 describe("TestPartialDynamicPathSegments", () => {
@@ -4247,12 +4456,107 @@ describe("TestPartialDynamicPathSegments", () => {
 });
 
 describe("TestOptionalScopesWithOrWithoutParams", () => {
-  it.skip("stays unscoped with or without params", () => {});
-  it.skip("preserves scope with or without params", () => {});
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.scope({ module: "test_optional_scopes_with_or_without_params" }, () => {
+      this.scope("(:locale)", { locale: /en|es/ }, () => {
+        this.get("home", { controller: "home", action: "index" });
+        this.get("with_param/:foo", { to: "home#withParam", as: "with_param" });
+        this.get("without_param", { to: "home#withoutParam" });
+      });
+    });
+  });
+
+  class HomeController extends Base {
+    async index(): Promise<void> {
+      await this.render({
+        inline: "<%= withParamPath({ foo: 'bar' }) %> | <%= withoutParamPath() %>",
+      });
+    }
+
+    async withParam(): Promise<void> {}
+    async withoutParam(): Promise<void> {}
+  }
+  include(HomeController, Routes.urlHelpers());
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestOptionalScopesWithOrWithoutParams extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestOptionalScopesWithOrWithoutParams", TestOptionalScopesWithOrWithoutParams);
+
+  let t: TestOptionalScopesWithOrWithoutParams;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("test_optional_scopes_with_or_without_params/home", HomeController);
+    t = testCase as TestOptionalScopesWithOrWithoutParams;
+  });
+
+  it("stays unscoped with or without params", async () => {
+    await t.get("/home");
+    expect(t.response.body).toBe("/with_param/bar | /without_param");
+  });
+
+  it("preserves scope with or without params", async () => {
+    await t.get("/es/home");
+    expect(t.response.body).toBe("/es/with_param/bar | /es/without_param");
+  });
 });
 
 describe("TestPathParameters", () => {
-  it.skip("path parameters are not mutated", () => {});
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.scope({ module: "test_path_parameters" }, () => {
+      this.scope(":locale", { locale: /en|ar/ }, () => {
+        this.root({ to: "home#index" });
+        this.get("/about", { to: "pages#about" });
+      });
+    });
+
+    deprecator().silence(() => {
+      this.get(":controller(/:action/(:id))");
+    });
+  });
+
+  class HomeController extends Base {
+    async index(): Promise<void> {
+      await this.render({ inline: "<%= rootPath() %>" });
+    }
+  }
+  include(HomeController, Routes.urlHelpers());
+
+  class PagesController extends Base {
+    async about(): Promise<void> {
+      await this.render({
+        inline: "<%= rootPath({ locale: 'ar' }) %> | <%= urlFor({ locale: 'ar' }) %>",
+      });
+    }
+  }
+  include(PagesController, Routes.urlHelpers());
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestPathParameters extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestPathParameters", TestPathParameters);
+
+  let t: TestPathParameters;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("test_path_parameters/home", HomeController);
+    controllerConstants.set("test_path_parameters/pages", PagesController);
+    t = testCase as TestPathParameters;
+  });
+
+  // BLOCKED: view-rendered-with-route-url-helpers-answers-url-for
+  it.skip("path parameters are not mutated", async () => {
+    await t.get("/en/about");
+    expect(t.response.body).toBe("/ar | /ar/about");
+  });
 });
 
 describe("TestInternalRoutingParams", () => {
@@ -4269,12 +4573,125 @@ describe("TestInternalRoutingParams", () => {
 });
 
 describe("FlashRedirectTest", () => {
-  it.skip("block redirect commits flash", () => {});
+  const SessionKey = "_myapp_session";
+  const Generator = new CachingKeyGenerator(
+    new KeyGenerator("b3c631c314c0bbca50c1b2843150fe33", { iterations: 1000 }),
+  );
+  const Rotations = new RotationConfiguration();
+  const SIGNED_COOKIE_SALT = "signed cookie";
+  const ENCRYPTED_SIGNED_COOKIE_SALT = "signed encrypted cookie";
+
+  class KeyGeneratorMiddleware {
+    private app: (env: Record<string, unknown>) => unknown;
+
+    constructor(app: (env: Record<string, unknown>) => unknown) {
+      this.app = app;
+    }
+
+    call(env: Record<string, unknown>): unknown {
+      env["action_dispatch.key_generator"] ??= Generator;
+      env["action_dispatch.cookies_rotations"] ??= Rotations;
+      env["action_dispatch.signed_cookie_salt"] = SIGNED_COOKIE_SALT;
+      env["action_dispatch.encrypted_signed_cookie_salt"] = ENCRYPTED_SIGNED_COOKIE_SALT;
+
+      return this.app(env);
+    }
+  }
+
+  class FooController extends Base {
+    async bar(): Promise<void> {
+      await this.render({ plain: (this.flash.get("foo") as string | undefined) || "foo" });
+    }
+  }
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get("/foo", {
+      to: this.redirect((_params, req) => {
+        req.flash!.set("foo", "bar");
+        return "/bar";
+      }),
+    });
+    this.get("/bar", { to: "flash_redirect_test/foo#bar" });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes, (middleware) => {
+    middleware.use(KeyGeneratorMiddleware as unknown as MiddlewareFactory);
+    middleware.use(CookieStore as MiddlewareFactory, { key: SessionKey });
+    middleware.use(Flash as unknown as MiddlewareFactory);
+    middleware.delete(ShowExceptions as MiddlewareFactory);
+  });
+
+  class FlashRedirectTest extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  include(FlashRedirectTest, Routes.urlHelpers());
+  registerConstant("FlashRedirectTest", FlashRedirectTest);
+
+  let t: FlashRedirectTest;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("flash_redirect_test/foo", FooController);
+    t = testCase as FlashRedirectTest;
+  });
+
+  it("block redirect commits flash", async () => {
+    await t.get("/foo", { env: { "action_dispatch.key_generator": Generator } });
+    t.assertResponse("redirect");
+
+    await t.followRedirectBang();
+    expect(t.response.body).toBe("bar");
+  });
 });
 
 describe("TestRelativeUrlRootGeneration", () => {
-  it.skip("url helpers", () => {});
-  it.skip("optimized url helpers", () => {});
+  const config = new RouteSet.Config("/blog", false);
+
+  const Routes = IntegrationTest.stubControllers(config, (routes) => {
+    routes.draw(function () {
+      this.get("/", { to: "posts#index", as: "posts" });
+      this.get("/:id", { to: "posts#show", as: "post" });
+    });
+    return routes;
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestRelativeUrlRootGeneration extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+
+    declare postsPath: (...args: unknown[]) => string;
+    declare postPath: (...args: unknown[]) => string;
+  }
+  include(TestRelativeUrlRootGeneration, Routes.urlHelpers());
+  registerConstant("TestRelativeUrlRootGeneration", TestRelativeUrlRootGeneration);
+
+  let t: TestRelativeUrlRootGeneration;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestRelativeUrlRootGeneration;
+  });
+
+  const urlHelpers = () =>
+    Routes.urlHelpers() as unknown as Record<string, (...args: unknown[]) => string>;
+
+  it("url helpers", () => {
+    expect(t.postsPath({})).toBe("/blog/");
+    expect(urlHelpers().postsPath({})).toBe("/blog/");
+
+    expect(t.postPath({ id: "1" })).toBe("/blog/1");
+    expect(urlHelpers().postPath({ id: "1" })).toBe("/blog/1");
+  });
+
+  it("optimized url helpers", () => {
+    expect(t.postsPath()).toBe("/blog/");
+    expect(urlHelpers().postsPath()).toBe("/blog/");
+
+    expect(t.postPath("1")).toBe("/blog/1");
+    expect(urlHelpers().postPath("1")).toBe("/blog/1");
+  });
 });
 
 describe("TestHttpMethods", () => {
@@ -4409,5 +4826,39 @@ describe("TestConstraintsAccessingParameters", () => {
 });
 
 describe("TestDefaultUrlOptions", () => {
-  it.skip("positional args with format false", () => {});
+  class PostsController extends Base {
+    async archive(): Promise<void> {
+      await this.render({ plain: "posts#archive" });
+    }
+  }
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.defaultUrlOptions = { locale: "en" };
+    this.scope(":locale", { format: false }, () => {
+      this.get("/posts/:year/:month/:day", { to: "posts#archive", as: "archived_posts" });
+    });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class TestDefaultUrlOptions extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+
+    declare archivedPostsPath: (...args: unknown[]) => string;
+  }
+  include(TestDefaultUrlOptions, Routes.urlHelpers());
+  registerConstant("TestDefaultUrlOptions", TestDefaultUrlOptions);
+
+  let t: TestDefaultUrlOptions;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("posts", PostsController);
+    t = testCase as TestDefaultUrlOptions;
+  });
+
+  it("positional args with format false", () => {
+    expect(t.archivedPostsPath(2014, 12, 13)).toBe("/en/posts/2014/12/13");
+  });
 });

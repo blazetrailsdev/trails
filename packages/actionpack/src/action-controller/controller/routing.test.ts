@@ -2041,6 +2041,11 @@ describe("RouteSetTest", () => {
         this.get({ "page/:name": "pages#show", constraints: { name: /(david|jamis)/i } });
       });
     }).not.toThrow();
+    expect(() => {
+      set.draw(function () {
+        this.get({ "page/:name": "pages#show", constraints: { name: /(david|jamis)/ } });
+      });
+    }).not.toThrow();
   });
 
   it("route with subdomain and constraints must receive params", () => {

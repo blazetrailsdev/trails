@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {
   assertCalled,
   assertCalledWith as assertCalledWithArgs,
@@ -1367,7 +1367,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
   });
 });
 
-function databaseTasksTruncateAllTest(): () => Promise<void> {
+describe("DatabaseTasksTruncateAllTest", () => {
   const { self } = fixtures(["courses", "colleges"], { useTransactionalTests: false });
 
   let schemaMigration: SchemaMigration;
@@ -1395,7 +1395,7 @@ function databaseTasksTruncateAllTest(): () => Promise<void> {
     Base.configurations(oldConfigurations);
   });
 
-  return async () => {
+  async function testTruncateTables(): Promise<void> {
     expect(await schemaMigration.count()).toBeGreaterThan(0);
     expect(await internalMetadata.count()).toBeGreaterThan(0);
     expect(await Course.count()).toBeGreaterThan(0);
@@ -1413,35 +1413,39 @@ function databaseTasksTruncateAllTest(): () => Promise<void> {
     expect(await internalMetadata.count()).toBeGreaterThan(0);
     expect(await Course.count()).toBe(0);
     expect(await College.count()).toBe(0);
-  };
-}
+  }
 
-describe("DatabaseTasksTruncateAllTest", () => {
-  it.skipIf(inMemoryDb())("truncate tables", databaseTasksTruncateAllTest());
-});
-
-describe("DatabaseTasksTruncateAllWithPrefixTest", () => {
-  beforeEach(() => {
-    Base.tableNamePrefix = "p_";
+  it.skipIf(inMemoryDb())("truncate tables", async () => {
+    await testTruncateTables();
   });
 
-  afterEach(() => {
-    Base.tableNamePrefix = "";
+  describe("DatabaseTasksTruncateAllWithPrefixTest", () => {
+    beforeAll(() => {
+      Base.tableNamePrefix = "p_";
+    });
+
+    afterAll(() => {
+      Base.tableNamePrefix = "";
+    });
+
+    it.skipIf(inMemoryDb())("truncate tables", async () => {
+      await testTruncateTables();
+    });
   });
 
-  it.skipIf(inMemoryDb())("truncate tables", databaseTasksTruncateAllTest());
-});
+  describe("DatabaseTasksTruncateAllWithSuffixTest", () => {
+    beforeAll(() => {
+      Base.tableNameSuffix = "_s";
+    });
 
-describe("DatabaseTasksTruncateAllWithSuffixTest", () => {
-  beforeEach(() => {
-    Base.tableNameSuffix = "_s";
+    afterAll(() => {
+      Base.tableNameSuffix = "";
+    });
+
+    it.skipIf(inMemoryDb())("truncate tables", async () => {
+      await testTruncateTables();
+    });
   });
-
-  afterEach(() => {
-    Base.tableNameSuffix = "";
-  });
-
-  it.skipIf(inMemoryDb())("truncate tables", databaseTasksTruncateAllTest());
 });
 
 describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
