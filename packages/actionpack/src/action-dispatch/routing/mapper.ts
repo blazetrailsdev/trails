@@ -1035,7 +1035,7 @@ export class Scope {
 include(Scope, Enumerable);
 
 export class Mapper {
-  static BacktraceCleaner = class BacktraceCleaner extends ActiveSupportBacktraceCleaner {
+  static BacktraceCleaner: typeof ActiveSupportBacktraceCleaner = class BacktraceCleaner extends ActiveSupportBacktraceCleaner {
     constructor() {
       super();
       this.removeSilencers();
