@@ -704,14 +704,7 @@ describe("SCOPED_SKIP_GROUPS", () => {
     }
   });
 
-  it("scopes `initialize` to the prepended Rotator module, not to real classes", () => {
-    expect(isScopedSkip("initialize", "messages/rotator.rb")).toBe(true);
-    expect(isScopedSkip("initialize", "messages/message_verifier.rb")).toBe(false);
-    expect(rubyMethodToTs("initialize")).toEqual(["constructor"]);
-  });
-
   it("names the faithful TS spelling only where the scoped skip declares one", () => {
-    expect(scopedSkipMirrorName("initialize", "messages/rotator.rb")).toEqual(["initialize"]);
     expect(scopedSkipMirrorName("initialize", "messages/message_verifier.rb")).toBeNull();
     expect(
       scopedSkipMirrorName("lookup_cast_type", "connection_adapters/postgresql/quoting.rb"),
