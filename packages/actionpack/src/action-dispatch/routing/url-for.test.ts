@@ -170,6 +170,14 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(options).toEqual({ controller: "posts", action: "show" });
   });
 
+  it("leaves a permitted Parameters' hash untouched when url_options are merged in", () => {
+    const host = makeHost({ urlOptions: () => ({ host: "www.example.com" }) });
+    const params = new Parameters({ controller: "posts", action: "show" });
+    params.permitBang();
+    fullUrlFor.call(host, params);
+    expect(params.toH().has("host")).toBe(false);
+  });
+
   it("unpermitted Parameters throw UnfilteredParameters from toH()", () => {
     const params = new Parameters({ id: 1 });
     expect(() => fullUrlFor.call(makeHost(), params)).toThrow(/unpermitted|unfiltered/i);

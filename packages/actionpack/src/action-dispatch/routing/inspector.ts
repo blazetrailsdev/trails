@@ -31,13 +31,13 @@ function formatConstraints(c: Record<string, unknown>): string {
   return `{${parts.join(", ")}}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- types the names SimpleDelegator forwards to Route (inspector.rb:10).
 export interface RouteWrapper extends Pick<
   Route,
   "app" | "requirements" | "parts" | "internal" | "verb" | "sourceLocation"
 > {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class RouteWrapper extends SimpleDelegator {
   private _reqs: string | undefined = undefined;
 
@@ -47,7 +47,8 @@ export class RouteWrapper extends SimpleDelegator {
       return (this.__getobj__() as Route).path.match(value as string) !== undefined;
     }
 
-    return (value as RegExp).test((this as unknown as Record<string, string>)[filter]);
+    const target = (this as unknown as Record<string, string | null | undefined>)[filter];
+    return target != null && (value as RegExp).test(target);
   }
 
   get endpoint(): string {
