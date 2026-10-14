@@ -5,7 +5,7 @@ import {
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { rbFSend, registerConstant } from "@blazetrails/ruby-compat";
 import { Request } from "../../http/request.js";
 import { Base } from "../../../action-controller/base.js";
 import { deprecator } from "../../deprecator.js";
@@ -39,7 +39,7 @@ describe("QueryStringParsingTest", () => {
 
     async call(env: RackEnv): Promise<RackResponse> {
       this.populateRackCache(env);
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
   }
 
