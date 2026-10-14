@@ -203,6 +203,7 @@ export class URL {
   }
 
   declare protected getHeader: (name: string) => unknown;
+  declare protected ssl: boolean;
   declare protected xForwardedHost: string | undefined;
   declare protected serverName: string | undefined;
   declare protected fullpath: string;
@@ -216,7 +217,7 @@ export class URL {
   }
 
   get protocol(): string {
-    return (this._protocol ??= (this as unknown as { ssl: boolean }).ssl ? "https://" : "http://");
+    return (this._protocol ??= this.ssl ? "https://" : "http://");
   }
 
   get rawHostWithPort(): string {

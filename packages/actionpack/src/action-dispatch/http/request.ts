@@ -66,7 +66,7 @@ import {
   filteredParameters as _filteredParameters,
   filteredPath as _filteredPath,
   filteredQueryString as _filteredQueryString,
-  FilterParameters,
+  type FilterParameters,
   parameterFilter as _parameterFilter,
   parameterFilterFor as _parameterFilterFor,
 } from "./filter-parameters.js";
@@ -215,6 +215,7 @@ export class Request {
   }
 
   readonly env: RackEnv;
+  declare readonly ssl: boolean;
 
   #method?: string;
   #requestMethod?: string;
@@ -853,6 +854,7 @@ export interface Request extends Omit<
   | "requestMethod"
   | "host"
   | "hostWithPort"
+  | "ssl"
   | "port"
   | "serverPort"
   | "url"
