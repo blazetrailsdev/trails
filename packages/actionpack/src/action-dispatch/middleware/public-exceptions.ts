@@ -4,6 +4,8 @@ import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { Mime, MimeType } from "../http/mime-type.js";
+import { InvalidType } from "../http/mime-negotiation.js";
+import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 
 async function* emptyBody(): RackBody {}
@@ -27,11 +29,12 @@ export class PublicExceptions {
     const pathInfo = String(env["PATH_INFO"] ?? "");
     const status = parseInt(pathInfo.slice(1), 10) || 0;
 
+    const request = new Request(env);
     let contentType: MimeType | undefined;
     try {
-      contentType = this.firstFormat(env);
+      contentType = request.formats[0] as MimeType | undefined;
     } catch (e) {
-      if (!(e instanceof MimeType.InvalidMimeType)) throw e;
+      if (!(e instanceof InvalidType)) throw e;
       contentType = Mime.get(":text");
     }
 
@@ -41,13 +44,6 @@ export class PublicExceptions {
     };
 
     return this.render(status, contentType, body);
-  }
-
-  private firstFormat(env: RackEnv): MimeType | undefined {
-    const accept = String(env["HTTP_ACCEPT"] ?? "").trim();
-    if (accept === "") return MimeType.lookupByExtension("html");
-    const parsed = MimeType.parse(accept);
-    return parsed[0];
   }
 
   private render(status: number, contentType: MimeType | undefined, body: ErrorBody): RackResponse {

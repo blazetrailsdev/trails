@@ -349,22 +349,6 @@ export class Request {
     return `${this.scheme}://${this.hostWithPort()}${this.fullpath}`;
   }
 
-  get secureProtocol(): boolean {
-    return HttpURL.secureProtocol;
-  }
-
-  set secureProtocol(value: boolean) {
-    HttpURL.secureProtocol = value;
-  }
-
-  get tldLength(): number {
-    return HttpURL.tldLength;
-  }
-
-  set tldLength(value: number) {
-    HttpURL.tldLength = value;
-  }
-
   domain(tldLength: number = HttpURL.tldLength): string | null {
     return HttpURL.extractDomain(this.host, tldLength);
   }
@@ -1033,9 +1017,10 @@ export interface Request {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
-export interface Request extends CspRequest, CacheRequest {}
+export interface Request extends CspRequest, CacheRequest, HttpURL {}
 include(Request, CspRequest);
 include(Request, CacheRequest);
+include(Request, HttpURL);
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {

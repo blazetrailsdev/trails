@@ -330,6 +330,7 @@ export class MimeType {
     }
   }
 
+  /** @inventedArm if — PERMANENT */
   static lookup(string: string): MimeType {
     if (LOOKUP.has(string)) return LOOKUP.get(string)!;
 

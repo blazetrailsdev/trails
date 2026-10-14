@@ -157,6 +157,8 @@ function buildHostUrl(
 export class URL {
   declare static secureProtocol: boolean;
   declare static tldLength: number;
+  declare secureProtocol: boolean;
+  declare tldLength: number;
 
   static {
     mattrAccessor.call(this, "secureProtocol", { default: false });
