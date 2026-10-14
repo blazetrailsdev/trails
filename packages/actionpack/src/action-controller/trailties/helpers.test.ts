@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { extend, File, include } from "@blazetrails/ruby-compat";
-import { ClassMethods, helpersPath, setHelpersPath } from "../metal/helpers.js";
+import { File } from "@blazetrails/ruby-compat";
+import { helpersPath, setHelpersPath } from "../metal/helpers.js";
+import { Base as ActionControllerBase } from "../base.js";
 import { inherited, type HelpersPathControllerClass } from "./helpers.js";
-import { Helpers } from "../../abstract-controller/helpers.js";
 
 import { FooHelper } from "../../test-helpers/fixtures/alternate-helpers/foo-helper.js";
 
@@ -13,10 +13,7 @@ const alternateHelpers = File.expandPath(
 );
 
 function base(): HelpersPathControllerClass {
-  const Base = class Base {};
-  include(Base, Helpers);
-  extend(Base, ClassMethods);
-  return Object.assign(Base, { helpersPath: [], includeAllHelpers: true });
+  return ActionControllerBase as unknown as HelpersPathControllerClass;
 }
 
 function subclassOf(parent: HelpersPathControllerClass): HelpersPathControllerClass {
@@ -26,6 +23,7 @@ function subclassOf(parent: HelpersPathControllerClass): HelpersPathControllerCl
 
 afterEach(() => {
   setHelpersPath([]);
+  base().includeAllHelpers = true;
 });
 
 describe("ActionController::Railties::Helpers.inherited", () => {
@@ -34,7 +32,7 @@ describe("ActionController::Railties::Helpers.inherited", () => {
     const Base = base();
     const klass = subclassOf(Base);
 
-    inherited(klass, Base);
+    inherited(klass);
 
     expect(klass.helpersPath).toEqual(helpersPath());
     expect(klass._helpers!.isInclude(FooHelper)).toBe(true);
@@ -45,7 +43,7 @@ describe("ActionController::Railties::Helpers.inherited", () => {
     const Base = base();
     const grandchild = subclassOf(subclassOf(Base));
 
-    inherited(grandchild, Base);
+    inherited(grandchild);
 
     expect(grandchild.helpersPath).toEqual(helpersPath());
     expect(grandchild._helpers?.isInclude(FooHelper)).toBeFalsy();
@@ -57,7 +55,7 @@ describe("ActionController::Railties::Helpers.inherited", () => {
     Base.includeAllHelpers = false;
     const klass = subclassOf(Base);
 
-    inherited(klass, Base);
+    inherited(klass);
 
     expect(klass._helpers?.isInclude(FooHelper)).toBeFalsy();
   });
@@ -67,7 +65,7 @@ describe("ActionController::Railties::Helpers.inherited", () => {
     const Base = base();
     const klass = { name: "Bare" } as HelpersPathControllerClass;
 
-    inherited(klass, Base);
+    inherited(klass);
 
     expect(klass._helpers).toBeUndefined();
   });

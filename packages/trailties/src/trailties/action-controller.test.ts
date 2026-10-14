@@ -99,7 +99,6 @@ describe("action_controller.set_helpers_path", () => {
     runLoadHooks("action_controller", klass);
     ActionController.Railties.Helpers.inherited(
       klass as ActionController.HelpersPathControllerClass,
-      ActionController.Base as unknown as ActionController.HelpersPathControllerClass,
     );
   }
 

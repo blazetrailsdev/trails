@@ -74,6 +74,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   for (const [name, klass] of await loadControllers(this.paths())) {
     controllerConstants.set(name, klass);
   }
+  for (const klass of controllerConstants.values()) defineController(klass);
   registerModel(await loadModels(this.paths()));
 });
 
@@ -245,7 +246,6 @@ async function collectControllers(
       if (typeof value === "function" && value.name.endsWith("Controller")) {
         const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
         out.set(name, value as DispatchableControllerClass);
-        defineController(value);
       }
     }
   }
@@ -263,10 +263,7 @@ function defineController(klass: object): void {
 
   if (definedControllers.has(klass)) return;
   definedControllers.add(klass);
-  ActionController.Railties.Helpers.inherited(
-    klass as ActionController.HelpersPathControllerClass,
-    base as unknown as ActionController.HelpersPathControllerClass,
-  );
+  ActionController.Railties.Helpers.inherited(klass as ActionController.HelpersPathControllerClass);
 }
 
 /** @noRailsEquivalent PERMANENT */

@@ -13,9 +13,12 @@ import { X_CASCADE } from "../constants.js";
 import { Mime, type MimeType } from "../http/mime-type.js";
 import { Request } from "../http/request.js";
 import { InvalidType } from "../http/mime-negotiation.js";
+import { RoutesInspector } from "../routing/inspector.js";
+import type { RouteSet } from "../routing/route-set.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
+type RoutesApp = { routes(): RouteSet };
 
 export type Interceptor = (request: Request, exception: Error) => void;
 
@@ -153,7 +156,13 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  routesInspector(_exception: ExceptionWrapper): unknown {
+  routesInspector(exception: ExceptionWrapper): RoutesInspector | null {
+    if (
+      rbObjRespondTo(this.routesApp, "routes") &&
+      (exception.isRoutingError() || exception.isTemplateError())
+    ) {
+      return new RoutesInspector((this.routesApp as RoutesApp).routes().routes.routes);
+    }
     return null;
   }
 
@@ -190,7 +199,7 @@ export class DebugExceptions {
       const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
 
       this.invokeInterceptors(request, exception, wrapper);
-      if (!wrapper.show(request)) throw exception;
+      if (!wrapper.isShow(request)) throw exception;
       return this.renderException(request, exception, wrapper);
     }
   }
