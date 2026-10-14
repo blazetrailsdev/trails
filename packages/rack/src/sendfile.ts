@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File, rbFSend } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { escapePath } from "./utils.js";
@@ -15,7 +15,7 @@ export class Sendfile {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [, headers, body] = response;
 
     if (body && typeof body.toPath === "function") {

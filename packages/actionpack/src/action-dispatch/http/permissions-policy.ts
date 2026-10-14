@@ -1,4 +1,4 @@
-import { ArgumentError, hashDelete, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, hashDelete, rbFSend, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
@@ -20,7 +20,7 @@ export class Middleware {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [, headers] = response;
 
     if (this.policyPresent(headers)) return response;

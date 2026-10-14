@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, it, expect } from "vitest";
 import { Module, assertEqual } from "@blazetrails/activesupport";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { registerConstant, unregisterConstant, rbFSend } from "@blazetrails/ruby-compat";
 import {
   CONTENT_TYPE,
   Lint,
@@ -70,7 +70,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
       env["action_dispatch.permissions_policy"] = POLICY;
       env["action_dispatch.show_exceptions"] = "none";
 
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
   }
 
@@ -169,7 +169,7 @@ describe("PermissionsPolicyIntegrationTest", () => {
       env["action_dispatch.permissions_policy"] = POLICY;
       env["action_dispatch.show_exceptions"] = "none";
 
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
   }
 
@@ -262,7 +262,7 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
       env["action_dispatch.permissions_policy"] = POLICY;
       env["action_dispatch.show_exceptions"] = "none";
 
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
   }
 

@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { CONTENT_LENGTH, TRANSFER_ENCODING, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -9,7 +10,7 @@ export class ContentLength {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
 
     if (

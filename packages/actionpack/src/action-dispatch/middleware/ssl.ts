@@ -1,6 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
-import { merge } from "@blazetrails/ruby-compat";
+import { merge, rbFSend } from "@blazetrails/ruby-compat";
 
 export interface RedirectOptions {
   status?: number;
@@ -87,10 +87,12 @@ export class SSL {
       if (!this.redirectExclude(env)) {
         return this.redirectToHttps(env);
       }
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
-    const [status, headers, body] = await this.app(env);
+    const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
+      typeof this.app
+    >);
 
     this.setHstsHeaderBang(headers);
 

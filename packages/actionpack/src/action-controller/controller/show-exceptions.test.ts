@@ -128,7 +128,7 @@ describe("ShowExceptionsFormatsTest", () => {
 });
 
 describe("ShowFailsafeExceptionsTest", () => {
-  // BLOCKED: middleware-build-returns-a-closure-not-the-middleware-instance
+  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
   it.skip("render failsafe exception", async ({ task }) => {
     const t = new IntegrationTest(task.name);
     t.app = ShowExceptionsOverriddenController.action("boom");

@@ -2128,7 +2128,7 @@ export class CheckPending {
       }
     });
 
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {

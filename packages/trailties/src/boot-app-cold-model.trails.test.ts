@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import { MockRequest, bodyToString } from "@blazetrails/rack";
@@ -41,13 +43,15 @@ describe("a booted app's models are warm before user code runs", () => {
 
   it("answers a first-request form POST that builds the model with new", async () => {
     await boot();
-    const [status, , body] = await Trails.application!.app()(
+    const [status, , body] = await (rbFSend(
+      Trails.application!.app(),
+      "call",
       MockRequest.envFor("/posts", {
         ":method": "POST",
         ":params": { post: { title: "x" } },
         HTTP_ACCEPT: "application/json",
       }),
-    );
+    ) as Promise<RackResponse>);
     expect([status, await bodyToString(body)]).toEqual([201, '{"title":"x"}']);
   }, 15_000);
 });

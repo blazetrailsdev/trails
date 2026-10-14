@@ -10,7 +10,7 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import { include, isSymbol, KeyError, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
+import { include, isSymbol, KeyError, rbEqual, symbolToS, rbFSend } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   isPlainObject,
@@ -627,7 +627,9 @@ export class Cookies {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new ActionDispatch.Request(env) as CookiesRequest;
-    let response: RackResponse | Response = await this.app(env);
+    let response: RackResponse | Response = await (rbFSend(this.app, "call", env) as ReturnType<
+      typeof this.app
+    >);
 
     if (request.isHaveCookieJar()) {
       const cookieJar = request.cookieJar();

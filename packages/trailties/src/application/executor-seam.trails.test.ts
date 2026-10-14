@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Executor as ActionDispatchExecutor } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -100,10 +101,10 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
       return [200, {}, []] as unknown as RackResponse;
     });
 
-    const [status, , stackBody] = await stackApp({
+    const [status, , stackBody] = await (rbFSend(stackApp, "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/",
-    } as unknown as RackEnv);
+    } as unknown as RackEnv) as Promise<RackResponse>);
 
     expect(status).toBe(200);
     expect(rows).toEqual([{ one: 1 }]);

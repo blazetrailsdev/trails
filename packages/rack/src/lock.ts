@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 interface Mutex {
@@ -28,7 +29,7 @@ export class Lock {
     this.mutex.lock();
     let response: [number, Record<string, string | string[]>, any];
     try {
-      response = await this.app(env);
+      response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (e) {
       this.mutex.unlock();
       throw e;

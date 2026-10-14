@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, HEAD as HEAD_METHOD } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -9,7 +10,7 @@ export class Head {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [, , body] = response;
 
     if (env[REQUEST_METHOD] === HEAD_METHOD) {

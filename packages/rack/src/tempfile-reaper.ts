@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { RACK_TEMPFILES } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -19,7 +20,7 @@ export class TempfileReaper {
 
     let response: [number, Record<string, string | string[]>, any];
     try {
-      response = await this.app(env);
+      response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (e) {
       this.closeTempfiles(env);
       throw e;

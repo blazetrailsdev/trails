@@ -17,6 +17,7 @@ import {
   Module,
   type Generic,
   Hash,
+  rbFSend,
   rbInspect,
   rbStrSend,
   stringSplit,
@@ -51,6 +52,7 @@ import {
   MiddlewareStack,
   type MiddlewareFactory,
   type RackApp,
+  type RackAppObject,
 } from "../action-dispatch/middleware/stack.js";
 import {
   RouteSet,
@@ -120,7 +122,7 @@ export class RoutedRackApp {
 
   readonly routes: RouteSet;
   private _stack: MiddlewareStack;
-  private _app: RackApp;
+  private _app: RackApp | RackAppObject;
 
   constructor(routes: RouteSet, blk?: (stack: MiddlewareStack) => void) {
     this.routes = routes;
@@ -129,7 +131,7 @@ export class RoutedRackApp {
   }
 
   call(env: RackEnv): Promise<RackResponse> {
-    return this._app(env);
+    return rbFSend(this._app, "call", env) as Promise<RackResponse>;
   }
 
   config(): Config {

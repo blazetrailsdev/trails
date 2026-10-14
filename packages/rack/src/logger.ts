@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "./index.js";
 
 export interface LoggerStream {
@@ -16,7 +17,7 @@ export class Logger {
   async call(env: RackEnv): Promise<RackResponse> {
     const errors = env["rack.errors"] as LoggerStream | undefined;
     env["rack.logger"] = new RackLogger(errors);
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 

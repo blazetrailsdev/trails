@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { bodyToString } from "@blazetrails/rack";
 import { Application } from "./application.js";
@@ -16,11 +18,11 @@ describe("a generated app renders its own views", () => {
 
     await Trails.initialize();
 
-    const [status, headers, body] = await app.app()({
+    const [status, headers, body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/show",
       HTTP_ACCEPT: "*/*",
-    });
+    }) as Promise<RackResponse>);
     const html = await bodyToString(body);
     expect(status).toBe(200);
     expect(headers["content-type"]).toMatch(/text\/html/);

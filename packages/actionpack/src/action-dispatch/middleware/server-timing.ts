@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import {
   Notifications,
   IsolatedExecutionState,
@@ -65,7 +66,7 @@ export class ServerTiming {
   async call(env: RackEnv): Promise<RackResponse> {
     let response: RackResponse | undefined;
     const events = await this.subscriber.collectEvents(async () => {
-      response = await this.app(env);
+      response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     });
 
     const headers = response![1];

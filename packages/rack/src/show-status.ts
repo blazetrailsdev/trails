@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_SHOWSTATUS_DETAIL } from "./constants.js";
 import { HTTP_STATUS_CODES, escapeHtml } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
@@ -10,7 +11,7 @@ export class ShowStatus {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
     const detail = env[RACK_SHOWSTATUS_DETAIL];
 

@@ -1,4 +1,4 @@
-import { rbBlockGivenP } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -11,7 +11,7 @@ export interface RackAppObject {
 export type MiddlewareBlock = (...args: any[]) => unknown;
 
 export type MiddlewareFactory = new (
-  app: RackApp,
+  app: any,
   ...args: any[]
 ) => { call(env: RackEnv): Promise<RackResponse> };
 
@@ -38,28 +38,22 @@ export class Middleware {
       : (this.klass as object).constructor.name;
   }
 
-  build(app: RackApp): RackApp {
-    const mw: RackApp | RackAppObject = new this.klass(
-      app,
-      ...this.args,
-      ...(this.block ? [this.block] : []),
-    );
-    return typeof mw === "function" ? mw : (env: RackEnv) => mw.call(env);
+  build(app: RackApp | RackAppObject): RackApp | RackAppObject {
+    return new this.klass(app, ...this.args, ...(this.block ? [this.block] : []));
   }
 
-  buildInstrumented(app: RackApp): RackApp {
-    const proxy = new InstrumentationProxy(this.build(app), this.inspect());
-    return (env: RackEnv) => proxy.call(env);
+  buildInstrumented(app: RackApp | RackAppObject): InstrumentationProxy {
+    return new InstrumentationProxy(this.build(app), this.inspect());
   }
 }
 
 export class InstrumentationProxy {
   static readonly EVENT_NAME = "process_middleware.action_dispatch";
 
-  private _middleware: RackApp;
+  private _middleware: RackApp | RackAppObject;
   private _payload: { middleware: string };
 
-  constructor(middleware: RackApp, className: string) {
+  constructor(middleware: RackApp | RackAppObject, className: string) {
     this._middleware = middleware;
 
     this._payload = {
@@ -68,8 +62,10 @@ export class InstrumentationProxy {
   }
 
   call(env: RackEnv): Promise<RackResponse> {
-    return Notifications.instrument(InstrumentationProxy.EVENT_NAME, this._payload, () =>
-      this._middleware(env),
+    return Notifications.instrument(
+      InstrumentationProxy.EVENT_NAME,
+      this._payload,
+      () => rbFSend(this._middleware, "call", env) as Promise<RackResponse>,
     );
   }
 }
@@ -212,10 +208,10 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries[Symbol.iterator]();
   }
 
-  build(app: RackApp | RackAppObject): RackApp {
+  build(app: RackApp | RackAppObject): RackApp | RackAppObject {
     const instrumenting = Notifications.notifier.listening(InstrumentationProxy.EVENT_NAME);
     const middlewares = Object.freeze(this.middlewares);
-    let current: RackApp = typeof app === "function" ? app : (env: RackEnv) => app.call(env);
+    let current: RackApp | RackAppObject = app;
     for (let i = middlewares.length - 1; i >= 0; i--) {
       if (instrumenting) {
         current = middlewares[i].buildInstrumented(current);

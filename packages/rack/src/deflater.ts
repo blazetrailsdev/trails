@@ -1,4 +1,4 @@
-import { File, GzipWriter } from "@blazetrails/ruby-compat";
+import { File, GzipWriter, rbFSend } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
@@ -42,7 +42,11 @@ export class Deflater {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const response = (await this.app(env)) as [number, Record<string, any>, any];
+    const response = (await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>)) as [
+      number,
+      Record<string, any>,
+      any,
+    ];
     const [status, headers, body] = response;
 
     if (!this.shouldDeflate(env, status, headers, body)) {

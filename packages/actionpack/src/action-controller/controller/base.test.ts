@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
 import {
   assert,
@@ -202,10 +204,10 @@ describe("ControllerInstanceTests", () => {
       };
 
       const responseHeaders = (
-        await (SimpleController as unknown as typeof Base).action("hello")({
+        await (rbFSend((SimpleController as unknown as typeof Base).action("hello"), "call", {
           REQUEST_METHOD: "GET",
           "rack.input": () => {},
-        })
+        }) as Promise<RackResponse>)
       )[1];
 
       assert("x-frame-options" in responseHeaders);

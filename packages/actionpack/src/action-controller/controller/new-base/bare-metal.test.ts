@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import {
   assert,
   assertEmpty,
@@ -44,7 +45,11 @@ registerConstant("BareMetalTest::BareController", BareController);
 
 describe("BareTest", () => {
   it("response body is a Rack-compatible response", async () => {
-    const [status, headers, body] = await BareController.action("index")(MockRequest.envFor("/"));
+    const [status, headers, body] = await (rbFSend(
+      BareController.action("index"),
+      "call",
+      MockRequest.envFor("/"),
+    ) as Promise<RackTriplet>);
     assertEqual(200, status);
     let string = "";
 
@@ -184,83 +189,163 @@ async function body(rackResponse: RackTriplet): Promise<string> {
 
 describe("HeadTest", () => {
   it("head works on its own", async () => {
-    const status = (await HeadController.action("index")(MockRequest.envFor("/")))[0];
+    const status = (
+      await (rbFSend(
+        HeadController.action("index"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[0];
     assertEqual(404, status);
   });
 
   it("head :continue (100) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("continue")(MockRequest.envFor("/")))[1];
+    const headers = (
+      await (rbFSend(
+        HeadController.action("continue"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :switching_protocols (101) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("switchingProtocols")(MockRequest.envFor("/")))[1];
+    const headers = (
+      await (rbFSend(
+        HeadController.action("switchingProtocols"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :processing (102) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("processing")(MockRequest.envFor("/")))[1];
+    const headers = (
+      await (rbFSend(
+        HeadController.action("processing"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :early_hints (103) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("earlyHints")(MockRequest.envFor("/")))[1];
+    const headers = (
+      await (rbFSend(
+        HeadController.action("earlyHints"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :no_content (204) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("noContent")(MockRequest.envFor("/")))[1];
+    const headers = (
+      await (rbFSend(
+        HeadController.action("noContent"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :reset_content (205) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("resetContent")(MockRequest.envFor("/")))[1];
+    const headers = (
+      await (rbFSend(
+        HeadController.action("resetContent"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :not_modified (304) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("notModified")(MockRequest.envFor("/")))[1];
+    const headers = (
+      await (rbFSend(
+        HeadController.action("notModified"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>)
+    )[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :no_content (204) does not return any content", async () => {
-    const content = await body(await HeadController.action("noContent")(MockRequest.envFor("/")));
+    const content = await body(
+      await (rbFSend(
+        HeadController.action("noContent"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>),
+    );
     assertEmpty(content);
   });
 
   it("head :reset_content (205) does not return any content", async () => {
     const content = await body(
-      await HeadController.action("resetContent")(MockRequest.envFor("/")),
+      await (rbFSend(
+        HeadController.action("resetContent"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>),
     );
     assertEmpty(content);
   });
 
   it("head :not_modified (304) does not return any content", async () => {
-    const content = await body(await HeadController.action("notModified")(MockRequest.envFor("/")));
+    const content = await body(
+      await (rbFSend(
+        HeadController.action("notModified"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>),
+    );
     assertEmpty(content);
   });
 
   it("head :continue (100) does not return any content", async () => {
-    const content = await body(await HeadController.action("continue")(MockRequest.envFor("/")));
+    const content = await body(
+      await (rbFSend(
+        HeadController.action("continue"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>),
+    );
     assertEmpty(content);
   });
 
   it("head :switching_protocols (101) does not return any content", async () => {
     const content = await body(
-      await HeadController.action("switchingProtocols")(MockRequest.envFor("/")),
+      await (rbFSend(
+        HeadController.action("switchingProtocols"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>),
     );
     assertEmpty(content);
   });
 
   it("head :processing (102) does not return any content", async () => {
-    const content = await body(await HeadController.action("processing")(MockRequest.envFor("/")));
+    const content = await body(
+      await (rbFSend(
+        HeadController.action("processing"),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackTriplet>),
+    );
     assertEmpty(content);
   });
 });
