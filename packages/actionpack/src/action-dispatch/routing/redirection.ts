@@ -8,7 +8,15 @@ import {
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
-import { ArgumentError, hashDelete, isEmpty, URI } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  hashDelete,
+  isEmpty,
+  rbFSend,
+  rbObjIsProc,
+  rbObjRespondTo,
+  URI,
+} from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
 
@@ -88,7 +96,7 @@ export class Redirect<B = unknown> extends Endpoint {
   }
 
   path(params: Record<string, string>, request: Request): string {
-    return (this.block as RedirectBlock)(params, request);
+    return rbFSend(this.block, "call", params, request) as string;
   }
 
   inspect(): string {
@@ -217,12 +225,9 @@ export function redirect(
   >
 ): Redirect<unknown> {
   const last = args[args.length - 1];
-  let block: RedirectBlock | undefined =
-    typeof last === "function" &&
-    last.call === Function.prototype.call &&
-    !/^class\b/.test(Function.prototype.toString.call(last))
-      ? (args.pop() as RedirectBlock)
-      : undefined;
+  let block: RedirectBlock | RedirectCallable | undefined = rbObjIsProc(last)
+    ? (args.pop() as RedirectBlock)
+    : undefined;
   const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
   const deleted = hashDelete(options, "status") as number | false | null;
   const status = deleted != null && deleted !== false ? deleted : 301;
@@ -234,20 +239,8 @@ export function redirect(
   if (typeof path === "string") {
     return new PathRedirect(status, path);
   }
-  if (
-    typeof path === "function" &&
-    path.call === Function.prototype.call &&
-    !/^class\b/.test(Function.prototype.toString.call(path))
-  ) {
-    block = path;
-  } else if (
-    path &&
-    typeof (path as RedirectCallable).call === "function" &&
-    (path as RedirectCallable).call !== Function.prototype.call
-  ) {
-    const callable = path as RedirectCallable;
-    block = (params, request) => callable.call(params, request);
-  }
+
+  if (rbObjRespondTo(path, "call")) block = path as RedirectBlock | RedirectCallable;
   if (!block) throw new ArgumentError("redirection argument not supported");
   return new Redirect(status, block);
 }

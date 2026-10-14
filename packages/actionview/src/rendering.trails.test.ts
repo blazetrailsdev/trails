@@ -1,3 +1,4 @@
+import "./test-helpers/abstract-unit.js";
 import { describe, expect, it } from "vitest";
 import {
   AbstractController,
@@ -5,11 +6,8 @@ import {
   Request,
   Response,
   RouteSet,
-  UrlFor,
 } from "@blazetrails/actionpack";
-import { RoutingUrlFor, urlFor } from "./routing-url-for.js";
-
-RoutingUrlFor.include(UrlFor);
+import { urlFor } from "./routing-url-for.js";
 
 describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
   it("includes RoutingUrlFor through routes.url_helpers' UrlFor included hook", async () => {

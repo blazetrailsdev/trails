@@ -1,7 +1,14 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import { block as rbBlock, fetch, hashDelete, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  block as rbBlock,
+  fetch,
+  hashDelete,
+  isSymbol,
+  rbFPublicSend,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 import { Routing } from "../../namespaces.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
@@ -255,13 +262,11 @@ export class HelperMethodBuilder {
       [method, args] = builder.handleModel(recordOrHashOrArray as ToModel);
     }
 
-    const helper = (target as unknown as Record<string, unknown>)[method];
-    if (typeof helper !== "function") {
-      throw new ArgumentError(`undefined route helper ${method}`);
+    if (Object.keys(options).length === 0) {
+      return rbFPublicSend(target, method, ...args) as string;
+    } else {
+      return rbFPublicSend(target, method, ...args, options) as string;
     }
-    return Object.keys(options).length === 0
-      ? (helper as (...a: unknown[]) => string).call(target, ...args)
-      : (helper as (...a: unknown[]) => string).call(target, ...args, options);
   }
 
   readonly suffix: string;

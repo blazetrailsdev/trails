@@ -997,6 +997,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }
+  if (mid === "call" && rbObjIsProc(recv)) return recv(...args);
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);

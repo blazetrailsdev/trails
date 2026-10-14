@@ -20,7 +20,12 @@ import {
 } from "./url-for.js";
 import type { PolymorphicHost } from "./polymorphic-routes.js";
 import { include } from "@blazetrails/activesupport";
-import { objRespondToMissing, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  NoMethodError,
+  objRespondToMissing,
+  rbFPublicSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
 
 export type RoutesProxyHelpers = Record<string, unknown>;
@@ -83,7 +88,7 @@ export class RoutesProxy implements UrlForHost {
         if (typeof prop === "string" && !(prop in target)) {
           const fn = target._helpers[prop];
           if (typeof fn === "function") {
-            return (...args: unknown[]) => target._dispatch(prop, args);
+            return (...args: unknown[]) => target.methodMissing(prop, ...args);
           }
         }
         return Reflect.get(target, prop, receiver);
@@ -115,24 +120,29 @@ export class RoutesProxy implements UrlForHost {
     return objRespondToMissing(this, method, _) || rbObjRespondTo(this._helpers, method);
   }
 
-  /** @internal */
-  private _dispatch(method: string, args: unknown[]): unknown {
-    const fn = this._helpers[method];
-    if (typeof fn !== "function") {
-      throw new TypeError(`undefined helper '${method}' on RoutesProxy`);
-    }
-    const inlineOptions = extractOptions(args);
-    const options: Record<string, unknown> = { ...this.urlOptions(), ...inlineOptions };
+  methodMissing(method: string, ...args: unknown[]): unknown {
+    if (rbObjRespondTo(this._helpers, method)) {
+      let options: Record<string, unknown> = extractOptions(args);
+      options = { ...this.urlOptions(), ...(options ?? {}) };
 
-    if (this._scriptNamer) {
-      options["scriptName"] = mergeScriptNames(
-        options["scriptName"] as string | null | undefined,
-        this._scriptNamer(options),
+      if (this._scriptNamer) {
+        options["scriptName"] = mergeScriptNames(
+          options["scriptName"] as string | null | undefined,
+          this._scriptNamer(options),
+        );
+      }
+
+      args.push(options);
+      return rbFPublicSend(this._helpers, method, ...args);
+    } else {
+      throw new NoMethodError(
+        `undefined method '${method}' for an instance of RoutesProxy`,
+        method,
+        args,
+        false,
+        { receiver: this },
       );
     }
-
-    args.push(options);
-    return (fn as (...a: unknown[]) => unknown).apply(this._helpers, args);
   }
 }
 
