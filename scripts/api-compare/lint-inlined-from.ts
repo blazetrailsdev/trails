@@ -164,13 +164,19 @@ export function inlinedFromFindings(
       const seat = `${name} ${tsFile} ${klass.name ?? owner}`;
       if (visited.has(seat)) continue;
       visited.add(seat);
-      const counterpart = rubyEntities.find(
+      const mirrored = rubyEntities.filter(
         (entity) =>
           entity.package === name &&
-          entity.fqn.split("::").pop() === short &&
           entity.info.file !== undefined &&
           rubyFileToTs(entity.info.file, name) === tsFile,
       );
+      const classes = mirrored.filter((entity) => !modules.has(entity.fqn));
+      const declared = Object.values(pkg.classes).filter(
+        (other) => (other as unknown as ClassInfo).file === tsFile,
+      );
+      const counterpart =
+        mirrored.find((entity) => entity.fqn.split("::").pop() === short) ??
+        (classes.length === 1 && declared.length === 1 ? classes[0] : undefined);
       const reached = counterpart && reachedHooks(counterpart, modules);
       const report = (hook: string, message: string, fix?: InlinedFromFinding["fix"]) =>
         findings.push({ package: name, tsFile, owner, hook, message, ...(fix ? { fix } : {}) });

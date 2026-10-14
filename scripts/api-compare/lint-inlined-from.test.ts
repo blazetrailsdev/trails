@@ -132,6 +132,7 @@ function messages(
     enrolled = [] as string[],
     reexport = false,
     alias = undefined as string | undefined,
+    sibling = false,
   } = {},
 ): string[] {
   const ctor = { ...def("constructor", "", 1, 1), file, inlinedFrom };
@@ -141,6 +142,7 @@ function messages(
         [`index.ts:${alias ?? owner}`]: { ...entity("index.ts", [ctor]), name: alias ?? owner },
       }
     : { [owner]: entity(file, [ctor]) };
+  if (sibling) Object.assign(classes, { Sibling: entity(file) });
   const ts = { packages: { activerecord: { classes, modules: {} } } } as unknown as ApiManifest;
   return inlinedFromFindings(ruby, ts, enrolled).map((f) => `${f.hook} ${f.message}`);
 }
@@ -204,7 +206,12 @@ describe("inlinedFromFindings", () => {
   });
 
   it("flags a tag on a constructor that mirrors no Rails class", () => {
-    expect(messages([CORE], { owner: "Helper" })[0]).toContain("mirror no Rails class or module");
+    expect(messages([CORE], { owner: "Helper", file: "helper.ts" })[0]).toContain(
+      "mirror no Rails class or module",
+    );
+    expect(messages([CORE], { owner: "Helper", sibling: true })[0]).toContain(
+      "mirror no Rails class or module",
+    );
   });
 
   it("flags a citation that differs from the manifest's def span, with the fix", () => {
@@ -277,6 +284,14 @@ describe("inlinedFromFindings", () => {
         alias: "DatabaseAdapter",
       }),
     ).toEqual([]);
+  });
+
+  it("pairs a renamed class with the one Rails class of its mirrored file", () => {
+    const enrolled = ["activerecord"];
+    expect(messages([LAST, NEW, FIRST, CORE, API], { owner: "BaseRecord", enrolled })).toEqual([]);
+    expect(messages([CORE], { owner: "ProxyRecord", file: "proxy.ts" })).toEqual([
+      "ActiveRecord::Core#initialize names a module ActiveRecord::Proxy does not include or prepend",
+    ]);
   });
 
   it("ends the chain at an initialize that calls no super", () => {

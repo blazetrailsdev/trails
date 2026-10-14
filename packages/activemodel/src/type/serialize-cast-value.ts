@@ -1,4 +1,4 @@
-import { Concern, extend, include, included, initialize, Module } from "@blazetrails/activesupport";
+import { Concern, extend, include, included, Module } from "@blazetrails/activesupport";
 import {
   rbModAncestors,
   rbModInstanceMethod,
@@ -21,7 +21,6 @@ export const SerializeCastValue = new Module() as Module<{
   DefaultImplementation: Module;
   [included](klass: { prototype: object }): void;
   serialize(type: SerializeCastValueType, value: unknown): unknown;
-  [initialize](this: SerializeCastValueHost): void;
 };
 extend(SerializeCastValue, Concern);
 
@@ -91,7 +90,3 @@ SerializeCastValue.defineMethod(
   "itselfIfSerializeCastValueCompatible",
   itselfIfSerializeCastValueCompatible,
 );
-
-SerializeCastValue[initialize] = function (this: SerializeCastValueHost): void {
-  this.constructor.serializeCastValueCompatible();
-};

@@ -1,10 +1,4 @@
-import {
-  classAttribute,
-  include,
-  included,
-  initializeIncludedModules,
-  rbHash,
-} from "@blazetrails/activesupport";
+import { classAttribute, include, included, rbHash } from "@blazetrails/activesupport";
 import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
 import { DelegateClass, rbObjInspect } from "@blazetrails/ruby-compat";
 
@@ -83,10 +77,13 @@ export const Normalization = {
 };
 
 export class NormalizedValueType extends DelegateClass(ValueType) {
+  declare static serializeCastValueCompatible: () => boolean;
+
   readonly castType: ValueType;
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
 
+  /** @inlinedFrom ActiveModel::Type::SerializeCastValue#initialize rails/v8.0.2/activemodel/lib/active_model/type/serialize_cast_value.rb:41-44 */
   constructor({
     castType,
     normalizer,
@@ -97,7 +94,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     normalizeNil: boolean;
   }) {
     super(castType);
-    initializeIncludedModules(this);
+    (this.constructor as typeof NormalizedValueType).serializeCastValueCompatible();
     this.castType = castType;
     this.normalizer = normalizer;
     this.normalizeNil = normalizeNil;
