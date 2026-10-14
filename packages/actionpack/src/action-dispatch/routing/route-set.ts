@@ -377,6 +377,7 @@ export class UrlHelper {
     return t._routes.urlFor(hash, this.routeName, urlStrategy, methodName);
   }
 
+  /** @inventedArm block — PERMANENT */
   handlePositionalArgs(
     controllerOptions: Record<string, unknown>,
     innerOptions: Record<string, unknown> | Hash<string, unknown>,

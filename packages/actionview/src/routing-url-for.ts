@@ -21,11 +21,15 @@ type Parameters = InstanceType<NonNullable<typeof TopLevel.ActionController>["Pa
 export interface RoutingUrlFor {
   urlFor(options?: unknown): string;
   urlOptions(): Record<string, unknown>;
+  /** @internal */
   optimizeRoutesGeneration(): boolean;
   polymorphicPath(record: unknown, options: Record<string, unknown>): string;
   polymorphicUrl(record: unknown, options: Record<string, unknown>): string;
+  /** @internal */
   _routesContext(): unknown;
+  /** @internal */
   _generatePathsByDefault(): boolean;
+  /** @internal */
   ensureOnlyPathOption(options: Record<string, unknown> | Parameters): void;
 }
 

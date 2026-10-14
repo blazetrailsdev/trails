@@ -211,6 +211,7 @@ export interface RedirectCallable {
   call(params: Record<string, string>, request: Request): string;
 }
 
+/** @inventedArm hasOwn — PERMANENT */
 export function redirect(
   ...args: Array<
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
