@@ -354,7 +354,7 @@ describe("Controller routing integration", () => {
   it("match with multiple verbs", () => {
     const routes = new RouteSet();
     routes.draw(function () {
-      this.match("/login", { to: "sessions#create", via: ["get", "post"] });
+      this.match("/login", { to: "sessions#create", via: [":get", ":post"] });
     });
     expect(() => routes.recognizePath("/login")).not.toThrow();
     expect(() => routes.recognizePath("/login", { method: "post" })).not.toThrow();

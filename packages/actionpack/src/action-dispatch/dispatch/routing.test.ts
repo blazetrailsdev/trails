@@ -2288,7 +2288,7 @@ describe("TestRoutingMapper", () => {
     expect(t.request.params["id"]).toBe("home");
   });
 
-  it.skip("custom param", async () => {
+  it("custom param", async () => {
     draw(function () {
       this.resources("profiles", { param: "username" }, () => {
         this.get("details", { on: "member" });
@@ -2308,7 +2308,7 @@ describe("TestRoutingMapper", () => {
     expect(t.request.params["id"]).toBe("34");
   });
 
-  it.skip("custom param constraint", async () => {
+  it("custom param constraint", async () => {
     draw(function () {
       this.resources("profiles", { param: "username", username: /[a-z]+/ }, () => {
         this.get("details", { on: "member" });
@@ -2326,7 +2326,7 @@ describe("TestRoutingMapper", () => {
     expect(t.response.status).toBe(404);
   });
 
-  it.skip("colon containing custom param", async () => {
+  it("colon containing custom param", async () => {
     const ex = await assertRaises([ArgumentError], {}, () => {
       draw(function () {
         this.resources("profiles", { param: "username/:is_admin" });
@@ -2650,7 +2650,7 @@ describe("TestRoutingMapper", () => {
     expect(t.noticePath({ id: "1" })).toBe("/notices/1");
   });
 
-  it.skip("shallow custom param", async () => {
+  it("shallow custom param", async () => {
     draw(function () {
       this.resources("orders", () => {
         this.constraints({ download: /[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/ }, () => {
@@ -3093,7 +3093,7 @@ describe("TestRoutingMapper", () => {
     expect(t.downloadPath("1")).toBe("/downloads/1/1.tar");
     expect(t.downloadPath("1", "1")).toBe("/downloads/1/1.tar");
   });
-  it.skip("resource where as is empty", () => {
+  it("resource where as is empty", () => {
     draw(function () {
       this.resource("post", { as: "" });
 
