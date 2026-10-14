@@ -120,10 +120,10 @@ export const ClassMethods = {
     const noDefault = default_ === undefined;
     name = this.resolveAttributeName(name);
     if (typeof type === "string") type = this.resolveTypeName(type, opts);
-    if (type != null) type = this.hookAttributeType(name, type as ValueType);
+    if (type != null) type = this.hookAttributeType(name, type);
 
     if (type != null || noDefault) {
-      this.pendingAttributeModifications().push(new PendingType(name, type as ValueType | null));
+      this.pendingAttributeModifications().push(new PendingType(name, type));
     }
     if (!noDefault) this.pendingAttributeModifications().push(new PendingDefault(name, default_));
 
