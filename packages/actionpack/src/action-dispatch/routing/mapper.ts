@@ -50,6 +50,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   dup,
   fetch,
+  File,
   groupBy,
   hashDelete,
   isSymbol,
@@ -885,7 +886,10 @@ export class Mapping {
   /** @internal */
   private routeSourceLocation(): string | null | undefined {
     if (Mapper.routeSourceLocations) {
-      const actionDispatchDir = new URL("..", import.meta.url).pathname;
+      const actionDispatchDir = File.expandPath(
+        "..",
+        File.dirname(new URL(import.meta.url).pathname),
+      );
       for (const location of callerLocations(1)) {
         if ((location.absolutePath ?? location.path).startsWith(actionDispatchDir)) continue;
 
