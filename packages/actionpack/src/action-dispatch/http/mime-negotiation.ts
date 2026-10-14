@@ -38,13 +38,6 @@ export class MimeNegotiation {
       Record<string, () => boolean>;
   }
 
-  set format(extension: unknown) {
-    this.parameters["format"] = extension == null ? "" : String(extension);
-    this.setHeader("action_dispatch.request.formats", [
-      MimeType.lookupByExtension(this.parameters["format"] as string),
-    ]);
-  }
-
   set formats(extensions: unknown[]) {
     this.parameters["format"] = extensions[0] == null ? "" : String(extensions[0]);
     this.setHeader(
@@ -88,6 +81,13 @@ export function accepts(this: MimeNegotiationHost): MimeType[] {
   }) as MimeType[];
 }
 
+export function setFormat(this: MimeNegotiationHost, extension: unknown): void {
+  this.parameters["format"] = extension == null ? "" : String(extension);
+  this.setHeader("action_dispatch.request.formats", [
+    MimeType.lookupByExtension(this.parameters["format"] as string),
+  ]);
+}
+
 export function format(this: MimeNegotiationHost, _viewPath?: unknown): MimeType | NullType {
   return formats.call(this)[0] ?? NullType.instance;
 }
@@ -96,7 +96,7 @@ export function formats(this: MimeNegotiationHost): MimeType[] {
   return this.fetchHeader("action_dispatch.request.formats", (k) => {
     let v: MimeType[];
     let extType: MimeType | undefined;
-    if (paramsReadable.call(this)) {
+    if (isParamsReadable.call(this)) {
       const f = this.parameters["format"];
       const found = f != null ? MimeType.lookupByExtension(String(f)) : undefined;
       v = found ? [found] : [];
@@ -143,11 +143,11 @@ export function negotiateMime(
 
 /** @internal */
 export function shouldApplyVaryHeader(this: MimeNegotiationHost): boolean {
-  return !paramsReadable.call(this) && useAcceptHeader.call(this) && validAcceptHeader.call(this);
+  return !isParamsReadable.call(this) && useAcceptHeader.call(this) && validAcceptHeader.call(this);
 }
 
 /** @internal */
-export function paramsReadable(this: MimeNegotiationHost): boolean {
+export function isParamsReadable(this: MimeNegotiationHost): boolean {
   try {
     return this.parameters["format"] != null;
   } catch (err) {

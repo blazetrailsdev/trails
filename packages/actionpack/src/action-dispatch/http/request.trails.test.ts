@@ -48,7 +48,11 @@ describe("Request ENV_METHODS readers", () => {
 
 describe("Request include MimeNegotiation", () => {
   it("keeps its own format / formats / variant readers beside the module's writers", () => {
-    for (const name of ["format", "formats", "variant"]) {
+    expect(typeof Object.getOwnPropertyDescriptor(Request.prototype, "format")?.get).toBe(
+      "function",
+    );
+    expect(typeof Request.prototype.setFormat).toBe("function");
+    for (const name of ["formats", "variant"]) {
       const descriptor = Object.getOwnPropertyDescriptor(Request.prototype, name);
       expect(typeof descriptor?.get).toBe("function");
       expect(typeof descriptor?.set).toBe("function");

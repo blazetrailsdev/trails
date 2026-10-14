@@ -20,6 +20,17 @@ export interface FilterParametersHost extends ParametersHost {
   params: Record<string, unknown>;
 }
 
+export class FilterParameters {
+  /** @internal */
+  declare _filteredParameters: Record<string, unknown> | null;
+  /** @internal */
+  declare _filteredEnv: Record<string, unknown> | null;
+  /** @internal */
+  declare _filteredPath: string | null;
+  /** @internal */
+  declare _parameterFilter: ParameterFilter | null;
+}
+
 interface CachedState {
   _filteredParameters?: Record<string, unknown> | null;
   _filteredEnv?: Record<string, unknown> | null;

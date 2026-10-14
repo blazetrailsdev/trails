@@ -8,6 +8,7 @@ export const KEY = "action_dispatch.request.flash_hash";
 export interface FlashRequestHost {
   env: RackEnv;
   getHeader(name: string): any;
+  flashHash(): FlashHash | null;
   session: {
     isEnabled?(): boolean;
     isLoaded(): boolean;
@@ -18,22 +19,25 @@ export interface FlashRequestHost {
   };
 }
 
-export function flash(this: FlashRequestHost, value?: FlashHash | null): FlashHash | null {
-  if (arguments.length > 0) {
-    const normalized = value ?? null;
-    this.env[KEY] = normalized;
-    return normalized;
+export class RequestMethods {
+  get flash(): FlashHash | null {
+    const flash = this.flashHash();
+    if (flash) return flash;
+    return (this.flash = FlashHash.fromSessionValue(
+      (this as unknown as FlashRequestHost).session.get("flash"),
+    ));
   }
-  const existing = flashHash.call(this);
-  if (existing) return existing;
-  const built = FlashHash.fromSessionValue(this.session.get("flash"));
-  this.env[KEY] = built;
-  return built;
-}
 
-/** @internal */
-export function flashHash(this: FlashRequestHost): FlashHash | null {
-  return (this.getHeader(KEY) as FlashHash | null | undefined) ?? null;
+  set flash(flash: FlashHash | null) {
+    (this as unknown as FlashRequestHost).env[KEY] = flash;
+  }
+
+  /** @internal */
+  flashHash(): FlashHash | null {
+    return (
+      ((this as unknown as FlashRequestHost).getHeader(KEY) as FlashHash | null | undefined) ?? null
+    );
+  }
 }
 
 /** @internal */
@@ -41,7 +45,7 @@ export function commitFlash(this: FlashRequestHost): void {
   const session = this.session;
   if (session.isEnabled && !session.isEnabled()) return;
 
-  const hash = flashHash.call(this);
+  const hash = this.flashHash();
   if (hash && (!hash.isEmpty() || session.isKey("flash"))) {
     session.set("flash", hash.toSessionValue());
     this.env[KEY] = hash.dup();

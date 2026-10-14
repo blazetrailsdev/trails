@@ -1,4 +1,4 @@
-import { isBlank, mattrAccessor, toParam, toQuery } from "@blazetrails/activesupport";
+import { isBlank, mattrAccessor, presence, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
 import { fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
@@ -200,5 +200,86 @@ export class URL {
     if ("params" in options) addParams(parts, options.params);
     if ("anchor" in options) addAnchor(parts, options.anchor);
     return parts.join("");
+  }
+
+  declare protected getHeader: (name: string) => unknown;
+  declare protected xForwardedHost: string | undefined;
+  declare protected serverName: string | undefined;
+  declare protected fullpath: string;
+  /** @internal */
+  declare protected _protocol: string | null;
+  /** @internal */
+  declare protected _port: number | null;
+
+  get url(): string {
+    return this.protocol + this.hostWithPort() + this.fullpath;
+  }
+
+  get protocol(): string {
+    return (this._protocol ??= (this as unknown as { ssl: boolean }).ssl ? "https://" : "http://");
+  }
+
+  get rawHostWithPort(): string {
+    const forwarded = presence(this.xForwardedHost);
+    if (forwarded != null) {
+      return forwarded.split(/,\s?/).at(-1)!;
+    } else {
+      return (
+        (this.getHeader("HTTP_HOST") as string | undefined) ||
+        `${this.serverName ?? ""}:${this.getHeader("SERVER_PORT") ?? ""}`
+      );
+    }
+  }
+
+  get host(): string {
+    return this.rawHostWithPort.replace(/:\d+$/, "");
+  }
+
+  hostWithPort(): string {
+    return `${this.host}${this.portString}`;
+  }
+
+  get port(): number {
+    if (this._port == null) {
+      const match = this.rawHostWithPort.match(/:(\d+)$/);
+      this._port = match ? Number(toI(match[1])) : this.standardPort;
+    }
+    return this._port;
+  }
+
+  get standardPort(): number {
+    if ("https://" === this.protocol) {
+      return 443;
+    } else {
+      return 80;
+    }
+  }
+
+  get isStandardPort(): boolean {
+    return this.port === this.standardPort;
+  }
+
+  get optionalPort(): number | null {
+    return this.isStandardPort ? null : this.port;
+  }
+
+  get portString(): string {
+    return this.isStandardPort ? "" : `:${this.port}`;
+  }
+
+  get serverPort(): number {
+    return Number(toI(this.getHeader("SERVER_PORT")));
+  }
+
+  domain(tldLength: number = URL.tldLength): string | null {
+    return URL.extractDomain(this.host, tldLength);
+  }
+
+  subdomains(tldLength: number = URL.tldLength): string[] {
+    return URL.extractSubdomains(this.host, tldLength);
+  }
+
+  subdomain(tldLength: number = URL.tldLength): string {
+    return URL.extractSubdomain(this.host, tldLength);
   }
 }

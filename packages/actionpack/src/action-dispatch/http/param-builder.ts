@@ -105,7 +105,7 @@ export class ParamBuilder {
   }
 
   fromHash(
-    hash: ParamHash,
+    hash: ParamHash | Hash<string, ParamValue>,
     options: { encodingTemplate?: EncodingTemplate | false | null } = {},
   ): ParamHash {
     hash = CustomParamEncoder.encodeForTemplate(hash, options.encodingTemplate);

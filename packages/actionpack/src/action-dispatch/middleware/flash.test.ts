@@ -5,8 +5,7 @@ import {
   FlashHash,
   type FlashRequestHost,
   commitFlash,
-  flash,
-  flashHash,
+  RequestMethods,
   resetSession,
 } from "./flash.js";
 
@@ -35,17 +34,21 @@ function makeSession(initial: Record<string, unknown> = {}) {
   };
 }
 
-function makeHost(initial: Record<string, unknown> = {}): FlashRequestHost & {
-  session: ReturnType<typeof makeSession>;
-} {
+function makeHost(initial: Record<string, unknown> = {}): FlashRequestHost &
+  RequestMethods & {
+    session: ReturnType<typeof makeSession>;
+  } {
   const env: RackEnv = {};
-  return { env, getHeader: (k: string) => env[k], session: makeSession(initial) };
+  return Object.setPrototypeOf(
+    { env, getHeader: (k: string) => env[k], session: makeSession(initial) },
+    RequestMethods.prototype,
+  );
 }
 
 describe("Flash::RequestMethods", () => {
   it("flash builds from session on first access", () => {
     const host = makeHost({ flash: { flashes: { notice: "hi" }, discard: [] } });
-    const f = flash.call(host)!;
+    const f = host.flash!;
     expect(f.get("notice")).toBe("hi");
     expect(host.env[KEY]).toBe(f);
   });
@@ -53,33 +56,33 @@ describe("Flash::RequestMethods", () => {
   it("flash setter stores the value and a subsequent get returns it (no session rebuild)", () => {
     const host = makeHost({ flash: { flashes: { stale: "old" }, discard: [] } });
     const fresh = new FlashHash({ notice: "fresh" });
-    flash.call(host, fresh);
-    expect(flash.call(host)).toBe(fresh);
-    expect(flash.call(host)!.get("notice")).toBe("fresh");
+    host.flash = fresh;
+    expect(host.flash).toBe(fresh);
+    expect(host.flash.get("notice")).toBe("fresh");
   });
 
   it("flashHash returns null when flash has not been touched", () => {
     const host = makeHost();
-    expect(flashHash.call(host)).toBeNull();
+    expect(host.flashHash()).toBeNull();
   });
 
   it("commitFlash writes toSessionValue into the session and replaces the cache with a dup", () => {
     const host = makeHost();
     const f = new FlashHash({ notice: "hi", drop: "x" });
     f.discard("drop");
-    flash.call(host, f);
+    host.flash = f;
 
     commitFlash.call(host);
 
     expect(host.session._store.get("flash")).toEqual({ discard: [], flashes: { notice: "hi" } });
-    const cached = flashHash.call(host);
+    const cached = host.flashHash();
     expect(cached).not.toBe(f);
     expect(cached!.get("notice")).toBe("hi");
   });
 
   it("commitFlash deletes session['flash'] when the projected hash is empty", () => {
     const host = makeHost({ flash: { flashes: { gone: "x" } } });
-    const f = flash.call(host)!;
+    const f = host.flash!;
     f.discard("gone");
 
     commitFlash.call(host);
@@ -91,7 +94,7 @@ describe("Flash::RequestMethods", () => {
     const host = makeHost();
     host.session._setEnabled(false);
     const f = new FlashHash({ notice: "hi" });
-    flash.call(host, f);
+    host.flash = f;
 
     commitFlash.call(host);
 
@@ -100,7 +103,7 @@ describe("Flash::RequestMethods", () => {
 
   it("resetSession clears the cached flash hash", () => {
     const host = makeHost();
-    flash.call(host, new FlashHash({ notice: "hi" }));
+    host.flash = new FlashHash({ notice: "hi" });
     resetSession.call(host);
     expect(host.env[KEY]).toBeNull();
   });

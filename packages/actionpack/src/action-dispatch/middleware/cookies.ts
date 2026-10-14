@@ -16,6 +16,7 @@ import {
   isPlainObject,
   isPresent,
   mattrAccessor,
+  onLoad,
 } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -728,6 +729,29 @@ export const cookiesRotations = requestEnvAccessor<RotationConfiguration>(
 export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
   "action_dispatch.use_cookies_with_metadata",
 );
+
+export const RequestCookieMethods = {
+  cookieJar,
+  isHaveCookieJar,
+  keyGenerator,
+  signedCookieSalt,
+  encryptedCookieSalt,
+  encryptedSignedCookieSalt,
+  authenticatedEncryptedCookieSalt,
+  useAuthenticatedCookieEncryption,
+  encryptedCookieCipher,
+  signedCookieDigest,
+  secretKeyBase,
+  cookiesSerializer,
+  cookiesSameSiteProtection,
+  cookiesDigest,
+  cookiesRotations,
+  useCookiesWithMetadata,
+};
+
+onLoad("action_dispatch_request", function (this: object) {
+  include(this, RequestCookieMethods);
+});
 
 const MAX_COOKIE_SIZE = 4096;
 
