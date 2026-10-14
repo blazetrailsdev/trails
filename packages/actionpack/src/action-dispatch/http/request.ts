@@ -1,5 +1,12 @@
 import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
-import { rbRegMatchP, rbStrDump, toI } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  StringIO,
+  forceEncoding,
+  rbRegMatchP,
+  rbStrDump,
+  toI,
+} from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -455,10 +462,15 @@ export class Request {
     return this.remoteIp;
   }
 
-  get body(): string {
-    const rawPost = this.getHeader("RAW_POST_DATA");
-    if (rawPost != null) return String(rawPost);
-    return this.readBodyStream();
+  /** @missingRailsArgs force_encoding — PERMANENT */
+  get body(): unknown {
+    let rawPost = this.getHeader("RAW_POST_DATA") as string | null | undefined | false;
+    if (rawPost != null && rawPost !== false) {
+      rawPost = forceEncoding(rawPost, Encoding.BINARY);
+      return new StringIO(rawPost);
+    } else {
+      return this.bodyStream;
+    }
   }
 
   get rawPost(): string {

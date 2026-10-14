@@ -26,10 +26,12 @@ import {
   File,
   rbInspect,
   rbObjClassname,
+  rbObjEncoding,
   rbObjId,
   rbObjIvarGet,
   rbObjIvarSet,
   RuntimeError,
+  StringIO,
 } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -88,7 +90,13 @@ class TestController extends Base {
   }
 
   async renderBody() {
-    await this.render({ plain: this.request.body });
+    (this.request.body as StringIO).rewind();
+    await this.render({ plain: (this.request.body as StringIO).read() });
+  }
+
+  async renderBodyEncoding() {
+    (this.request.body as StringIO).rewind();
+    await this.render({ plain: rbObjEncoding((this.request.body as StringIO).read()).name });
   }
 
   async testParams() {
@@ -305,8 +313,14 @@ describe("TestCaseTest", () => {
     assertEqual(toQuery(params), tc.response.body);
   });
 
-  // BLOCKED: request-body-is-a-string-not-an-io
-  it.skip("body stream is binary", () => {});
+  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the body read is a JS string, so its encoding reads UTF-8 where Ruby's is BINARY.
+  it.skip("body stream is binary", async () => {
+    const params = { page: { name: "page name" }, "some key": 123 };
+
+    await tc.post("renderBodyEncoding", { params: { ...params } });
+
+    assertEqual(Encoding.BINARY.name, tc.response.body);
+  });
 
   it("document body and params with post", async () => {
     await tc.post("testParams", { params: { id: 1 } });
