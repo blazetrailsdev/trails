@@ -47,13 +47,9 @@ function isUndefined(target: object, prop: string, superclass: object): boolean 
 type MethodMissing = (this: unknown, called: string, args: unknown[]) => unknown;
 
 export abstract class DeprecationProxy {
-  static new(...args: unknown[]): unknown {
-    const object = args[0];
-
-    if (object == null || object === false) return object;
-    const instance = new (this as unknown as new (...a: unknown[]) => DeprecationProxy)(...args);
+  constructor() {
     return undefMethodProxy(
-      instance,
+      this,
       DeprecationProxy.prototype.methodMissing,
       Object.getPrototypeOf(DeprecationProxy.prototype),
     );
@@ -149,21 +145,6 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
 }
 
 export class DeprecatedConstantProxy extends Module {
-  static new(...args: unknown[]): unknown {
-    const object = args[0];
-
-    if (object == null || object === false) return object;
-    const instance = new (this as unknown as new (...a: unknown[]) => DeprecatedConstantProxy)(
-      ...args,
-    );
-    return undefMethodProxy(
-      instance,
-      DeprecatedConstantProxy.prototype.methodMissing as MethodMissing,
-      Module.prototype,
-      DeprecatedConstantProxy.prototype.constMissing,
-    );
-  }
-
   private _oldConst: string;
   private _newConst: string;
   private _deprecator: Deprecation;
@@ -183,6 +164,12 @@ export class DeprecatedConstantProxy extends Module {
     this._newConst = newConst;
     this._deprecator = deprecator;
     this._message = message ?? `${oldConst} is deprecated! Use ${newConst} instead.`;
+    return undefMethodProxy(
+      this,
+      DeprecatedConstantProxy.prototype.methodMissing as MethodMissing,
+      Module.prototype,
+      DeprecatedConstantProxy.prototype.constMissing,
+    );
   }
 
   inspect(): string {

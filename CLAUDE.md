@@ -1171,6 +1171,12 @@ ratified here so no port re-derives them.
   `setRawMode`, and `stty` reports libc- and locale-dependent text, never the
   number. ruby-compat raises a bare `SystemCallError` where Ruby raises the
   specific `Errno` class. A native termios binding is not taken on.
+- **A `self.new` that answers `nil` or `false`.** A JS constructor that returns
+  a primitive answers `this` instead, so a Rails `self.new` ported as the
+  constructor (RFC 0188) cannot answer `nil`: `DeprecationProxy`'s
+  `return object unless object` (`deprecation/proxy_wrappers.rb:6-11`) and
+  `TimeZone.new`'s unknown-name `self[name]` (`values/time_zone.rb:216-218`)
+  drop that arm. Ruled by the repo owner on 2026-10-14.
 - **SQLite's double-quoted-string setting.** better-sqlite3 compiles with
   `SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
   `strict: false` cannot re-enable double-quoted string literals on that
