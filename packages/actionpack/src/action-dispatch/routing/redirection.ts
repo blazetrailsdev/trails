@@ -216,6 +216,8 @@ export function redirect(
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
   >
 ): Redirect<unknown> {
+  const block0 =
+    typeof args[args.length - 1] === "function" ? (args.pop() as RedirectBlock) : undefined;
   const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
   const deleted = hashDelete(options, "status") as number | false | null;
   const status = deleted != null && deleted !== false ? deleted : 301;
@@ -227,7 +229,7 @@ export function redirect(
   if (typeof path === "string") {
     return new PathRedirect(status, path);
   }
-  let block: RedirectBlock | undefined;
+  let block: RedirectBlock | undefined = block0;
   if (typeof path === "function") {
     block = path;
   } else if (path && typeof (path as RedirectCallable).call === "function") {
