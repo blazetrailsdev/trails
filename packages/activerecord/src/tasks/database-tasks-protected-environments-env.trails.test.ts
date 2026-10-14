@@ -17,8 +17,10 @@ import type { HashConfig } from "../database-configurations/hash-config.js";
 import { adapterType } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const dirs: string[] = [];
   const env = "storyenv";
 
@@ -111,6 +113,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
 });
 
 describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const dirs: string[] = [];
   const env = "storyenv";
 
@@ -225,6 +228,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
 });
 
 describe("EnvironmentMismatchError message", () => {
+  fixtures({}, { useTransactionalTests: false });
   const msg =
     "You are attempting to modify a database that was last run in `staging` environment.\n" +
     "You are running in `development` environment. " +
@@ -250,6 +254,7 @@ describe("EnvironmentMismatchError message", () => {
 });
 
 describe("NoEnvironmentInSchemaError message", () => {
+  fixtures({}, { useTransactionalTests: false });
   const msg =
     "Environment data not found in the schema. To resolve this issue, run: \n\n" +
     "        bin/trails db environment:set";
@@ -271,6 +276,7 @@ describe("NoEnvironmentInSchemaError message", () => {
 });
 
 describe("PendingMigrationError message", () => {
+  fixtures({}, { useTransactionalTests: false });
   const pendingMigrations = [{ filename: "db/migrate/1_create_people.ts" }] as never;
   const command =
     "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db migrate";
@@ -304,6 +310,7 @@ describe("PendingMigrationError message", () => {
 });
 
 describe("DatabaseTasks.env", () => {
+  fixtures({}, { useTransactionalTests: false });
   const trails = TopLevel.Trails;
 
   afterEach(() => {

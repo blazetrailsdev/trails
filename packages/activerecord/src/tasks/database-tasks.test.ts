@@ -114,6 +114,7 @@ const ADAPTERS_TASKS = {
 };
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const recreateMetadataTables = async () => {
     if (adapterType !== "sqlite" || inMemoryDb()) return;
     const schemaMigration = Base.connectionPool().schemaMigration;
@@ -214,6 +215,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 });
 
 describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())("with multiple databases", async () => {
     const env = DEFAULT_ENV();
 
@@ -1105,6 +1107,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): {
 }
 
 describe("DatabaseTasksMigrateTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const { captureMigrationOutput } = databaseTasksMigrationTestCase();
 
   it.skipIf(skipMigrationTestCase)(
@@ -1153,6 +1156,7 @@ describe("DatabaseTasksMigrateTest", () => {
 });
 
 describe("DatabaseTasksMigrateScopeTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const { captureMigrationOutput } = databaseTasksMigrationTestCase("scope");
 
   it.skipIf(skipMigrationTestCase)("migrate using scope and verbose mode", async () => {
@@ -1219,6 +1223,7 @@ describe("DatabaseTasksMigrateScopeTest", () => {
 });
 
 describe("DatabaseTasksMigrateStatusTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   databaseTasksMigrationTestCase();
 
   let schemaMigration: SchemaMigration;
@@ -1244,6 +1249,7 @@ describe("DatabaseTasksMigrateStatusTest", () => {
 });
 
 describe("DatabaseTasksMigrateErrorTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("migrate raise error on invalid version format", async () => {
     const version = getEnv("VERSION");
     let e: Error;

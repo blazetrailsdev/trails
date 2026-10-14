@@ -4,6 +4,7 @@ import { getFn, setFn } from "vitest/suite";
 import { Time } from "@blazetrails/date";
 import {
   RuntimeError,
+  publicInstanceMethods,
   iseqLocationSetup,
   rbModMethodDefined,
   rbModToS,
@@ -18,24 +19,93 @@ declare module "vitest" {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
-export const describedClasses = new WeakMap<object, typeof TestCase>();
-/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
-export const topLevel = {};
+type Matcher = RegExp | ((desc: string, ...additional: string[]) => boolean);
+type DescribedSuite = { name: string; file?: unknown; suite?: DescribedSuite };
+type SpecClass = typeof TestCase & { desc?: string; children?: SpecClass[] };
+
+/** @noRailsEquivalent PERMANENT */
+export const TYPES: [Matcher, typeof TestCase][] = [[/(?:)/, TestCase]];
+
+/** @noRailsEquivalent PERMANENT */
+export function registerSpecType(
+  matcherOrKlass: Matcher | typeof TestCase,
+  klass: typeof TestCase | undefined = undefined,
+  block: Matcher | undefined = undefined,
+): void {
+  let matcher: Matcher;
+  if (block) {
+    [matcher, klass] = [block, matcherOrKlass as typeof TestCase];
+  } else {
+    matcher = matcherOrKlass as Matcher;
+  }
+  TYPES.unshift([matcher, klass!]);
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function specType(desc: string, ...additional: string[]): typeof TestCase {
+  return TYPES.find(([matcher]) => {
+    if (typeof matcher === "function") {
+      return matcher(desc, ...additional);
+    } else {
+      return matcher.test(String(desc));
+    }
+  })![1];
+}
+
+function children(klass: SpecClass): SpecClass[] {
+  if (!Object.hasOwn(klass, "children")) klass.children = [];
+  return klass.children!;
+}
+
+function nukeTestMethodsBang(klass: SpecClass): void {
+  for (const name of publicInstanceMethods(klass).filter((n) => /^test_/.test(n))) {
+    Object.defineProperty(klass.prototype, name, { value: undefined, configurable: true });
+  }
+}
+
+function create(sclas: SpecClass, name: string, desc: string): SpecClass {
+  const cls: SpecClass = class extends sclas {};
+  Object.defineProperty(cls, "name", { value: name });
+  cls.desc = desc;
+  nukeTestMethodsBang(cls);
+
+  children(sclas).push(cls);
+
+  return cls;
+}
+
+const described = new WeakMap<object, SpecClass>();
+let fileClass: SpecClass | undefined;
+
+/** @noRailsEquivalent PERMANENT */
+export function describe(suite: DescribedSuite | undefined): SpecClass {
+  if (suite === undefined || suite.file === suite) {
+    return (fileClass ??= create(specType(""), "", ""));
+  }
+  let cls = described.get(suite);
+  if (cls === undefined) {
+    const constant = safeConstantize(suite.name);
+    if (typeof constant === "function" && constant.prototype instanceof TestCase) {
+      cls = constant as SpecClass;
+    } else {
+      const parent =
+        suite.suite === undefined || suite.suite.file === suite.suite ? undefined : suite.suite;
+      const stackLast = parent === undefined ? fileClass : describe(parent);
+      const name = [stackLast?.name, suite.name].filter((n) => n != null && n !== "").join("::");
+      const sclas = stackLast || specType(suite.name);
+      cls = create(sclas, name, suite.name);
+    }
+    described.set(suite, cls);
+  }
+  return cls;
+}
 
 const capturing = new WeakSet<object>();
 const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
 
 beforeEach(async (context: TestContext) => {
   _takeAssertions();
-  let klass = TestCase;
-  for (let suite = context.task.suite; suite != null && klass === TestCase; suite = suite.suite) {
-    const constant = describedClasses.get(suite) ?? safeConstantize(suite.name);
-    if (typeof constant === "function" && constant.prototype instanceof TestCase) {
-      klass = constant as typeof TestCase;
-    }
-  }
-  if (klass === TestCase) klass = describedClasses.get(topLevel) ?? TestCase;
+  const klass = describe(context.task.suite);
   const testName = `test_${context.task.name.replace(/\s+/g, "_")}`;
   const defined = rbModMethodDefined(klass, testName);
   if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);

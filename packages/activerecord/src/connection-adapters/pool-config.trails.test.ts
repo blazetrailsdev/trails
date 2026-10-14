@@ -4,6 +4,7 @@ import { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { SchemaReflection } from "./schema-cache.js";
 import { Monitor } from "@blazetrails/activesupport";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 function makeDbConfig(name = "primary") {
   return new HashConfig("default", name, {
@@ -17,6 +18,7 @@ function makeDescriptor(name = "primary") {
 }
 
 describe("PoolConfig", () => {
+  fixtures({}, { useTransactionalTests: false });
   let config: PoolConfig;
 
   beforeEach(() => {

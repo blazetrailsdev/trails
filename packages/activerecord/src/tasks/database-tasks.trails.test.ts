@@ -5,8 +5,10 @@ import { Base } from "../base.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("DatabaseTasksWithTemporaryPoolTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   afterEach(async () => {
     await Base.establishConnection(ambientPoolConfiguration());
   });

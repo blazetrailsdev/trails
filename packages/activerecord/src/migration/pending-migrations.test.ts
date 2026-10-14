@@ -10,6 +10,7 @@ import { DatabaseConfigurations, type RawConfigurations } from "../database-conf
 import { camelize, Logger } from "@blazetrails/activesupport";
 import { currentAdapter, inMemoryDb } from "../support/adapter-helper.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 const MIGRATION_MODULE = new URL("../migration.js", import.meta.url).pathname;
 
@@ -17,6 +18,7 @@ const skip = !currentAdapter("SQLite3Adapter") || inMemoryDb();
 
 describe.skipIf(skip)("Migration", () => {
   describe("PendingMigrationsTest", () => {
+    fixtures({}, { useTransactionalTests: false });
     let tmpDir: string;
     let originalConfigurations: DatabaseConfigurations;
 

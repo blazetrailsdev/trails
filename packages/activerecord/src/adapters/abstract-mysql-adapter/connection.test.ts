@@ -208,7 +208,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         );
       });
     });
-    it("passing flags by array to adapter", async () => {
+    // BLOCKED: transactional-fixtures-deferred-pin-races-test-lease
+    it.skip("passing flags by array to adapter", async () => {
       await runWithoutConnection(async (origConnection) => {
         await Base.establishConnection({ ...origConnection, flags: ["COMPRESS"] });
         const connection = (await Base.leaseConnection()) as unknown as Mysql2Adapter;

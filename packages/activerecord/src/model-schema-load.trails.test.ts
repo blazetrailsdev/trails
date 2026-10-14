@@ -8,6 +8,7 @@ import { Column } from "./connection-adapters/column.js";
 import { SchemaCache } from "./connection-adapters/schema-cache.js";
 import { lookupCastTypeFromColumn } from "./connection-adapters/postgresql/quoting.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -44,6 +45,7 @@ function makeAdapter(
 }
 
 describe("loadSchemaFromAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
   let Model: typeof Base;
 
   beforeEach(() => {
@@ -213,6 +215,7 @@ describe("loadSchemaFromAdapter", () => {
 });
 
 describe("loadSchemaFromAdapter integration details", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("defines prototype accessors so record.column works", async () => {
     class Post extends Base {
       static override tableName = "posts";
@@ -331,6 +334,7 @@ describe("loadSchemaFromAdapter integration details", () => {
 });
 
 describe("a schema cache loaded from a dump", () => {
+  fixtures({}, { useTransactionalTests: false });
   function dumpLoadedCache(): SchemaCache {
     const dumped = new SchemaCache();
     dumped.setColumns("posts", [new Column("guid", null)]);
@@ -378,6 +382,7 @@ describe("a schema cache loaded from a dump", () => {
 });
 
 describe("set adapter auto-loads schema", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("awaiting Base.loadSchema() populates schema-sourced defs end-to-end", async () => {
     class Post extends Base {
       static override tableName = "posts";

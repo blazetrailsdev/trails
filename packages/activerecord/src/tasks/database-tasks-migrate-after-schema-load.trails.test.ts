@@ -8,8 +8,10 @@ import { DEFAULT_ENV } from "../connection-handling.js";
 import { Base } from "../base.js";
 import { schemaFormat, setSchemaFormat } from "../active-record.js";
 import { MIGRATIONS_ROOT } from "../config.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const dirs: string[] = [];
 
   afterEach(async () => {

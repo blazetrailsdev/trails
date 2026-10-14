@@ -4,6 +4,7 @@ import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-dou
 import { registerModel } from "./associations.js";
 import { loadSchema } from "./model-schema.js";
 import { defaultValue } from "./type.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 type Cols = Record<string, { sqlType: string; name: string; default: null }>;
 
@@ -57,6 +58,7 @@ async function buildHierarchy(asked: string[]) {
 }
 
 describe("loadSchema — own-table descendant under an STI ancestor", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("reflects the descendant's own table, not the STI base's", async () => {
     const asked: string[] = [];
     const { Ticket } = await buildHierarchy(asked);
