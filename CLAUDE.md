@@ -1176,7 +1176,8 @@ ratified here so no port re-derives them.
   constructor (RFC 0188) cannot answer `nil`: `DeprecationProxy`'s
   `return object unless object` (`deprecation/proxy_wrappers.rb:6-11`) and
   `TimeZone.new`'s unknown-name `self[name]` (`values/time_zone.rb:216-218`)
-  drop that arm. Ruled by the repo owner on 2026-10-14.
+  drop that arm. An unknown zone name reaches `create`, which raises
+  `TZInfo::InvalidTimezoneIdentifier`. Ruled by the repo owner on 2026-10-14.
 - **SQLite's double-quoted-string setting.** better-sqlite3 compiles with
   `SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
   `strict: false` cannot re-enable double-quoted string literals on that

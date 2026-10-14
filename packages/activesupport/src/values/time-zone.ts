@@ -596,13 +596,13 @@ export class Timezone {
 }
 
 export class TimeZone {
-  readonly name!: string;
-  readonly tzinfo!: Timezone;
-  private readonly _utcOffset!: number | null;
+  declare readonly name: string;
+  declare readonly tzinfo: Timezone;
+  declare private readonly _utcOffset: number | null;
 
   /** @inventedArm if — PERMANENT */
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
-    if (!creating) return TimeZone.find(name)!;
+    if (!creating) return TimeZone.find(name) ?? TimeZone.create(name);
     creating = false;
     this.name = name;
     this._utcOffset = utcOffset;
@@ -658,7 +658,11 @@ export class TimeZone {
     tzinfo: Timezone | null = null,
   ): TimeZone {
     creating = true;
-    return new TimeZone(name, utcOffset, tzinfo);
+    try {
+      return new TimeZone(name, utcOffset, tzinfo);
+    } finally {
+      creating = false;
+    }
   }
 
   static all(): TimeZone[] {
