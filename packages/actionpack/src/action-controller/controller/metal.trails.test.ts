@@ -19,10 +19,10 @@ describe("Metal#params", () => {
   it("params memoizes request.parameters on first read", () => {
     const c = new (class extends Metal {})();
     const req = makeRequest();
-    (req as any).parameters = { id: "1" };
+    req.setHeader("action_dispatch.request.parameters", { id: "1" });
     c.setRequestBang(req);
     const first = c.params;
-    (req as any).parameters = { id: "2" };
+    req.setHeader("action_dispatch.request.parameters", { id: "2" });
     expect(c.params).toBe(first);
     expect(first).toEqual({ id: "1" });
   });
@@ -35,7 +35,7 @@ describe("Metal#params", () => {
       }
     }
     const req = makeRequest();
-    (req as any).parameters = { id: "42" };
+    req.setHeader("action_dispatch.request.parameters", { id: "42" });
     const c = new TestController();
     const assigned = new Parameters({ id: "7" });
     c.params = assigned;

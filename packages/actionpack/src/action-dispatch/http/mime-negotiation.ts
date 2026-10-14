@@ -15,7 +15,7 @@ export interface MimeNegotiationHost {
   setHeader(key: string, value: unknown): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   parameters: Record<string, unknown>;
-  accept: string;
+  accept: string | undefined;
   xhr: boolean;
 }
 

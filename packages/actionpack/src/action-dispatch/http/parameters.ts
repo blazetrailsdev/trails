@@ -41,7 +41,7 @@ export interface ParametersHost {
   contentLength: number;
   contentMimeType: MimeType | null;
   rawPost: string;
-  logger?: { debug(message: string): void } | null;
+  logger?: unknown;
 }
 
 export class Parameters {
@@ -149,7 +149,7 @@ export function logParseErrorOnce(this: ParametersHost): void {
   this.setHeader(PARSE_ERROR_LOGGED_KEY, true);
   const msg = `Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`;
   if (this.logger) {
-    this.logger.debug(msg);
+    (this.logger as { debug(message: string): void }).debug(msg);
     return;
   }
   try {

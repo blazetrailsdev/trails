@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Response } from "./response.js";
+import { bytes } from "@blazetrails/ruby-compat";
 
 describe("ActionDispatch::Response#location", () => {
   it("is nil when no Location header is set, as Rack's get_header answers", () => {
@@ -17,5 +18,13 @@ describe("ActionDispatch::Response#body=", () => {
     response.body = bytes;
     expect(response.bodyParts()).toEqual([bytes]);
     expect(response.getHeader("content-length")).toBe("5");
+  });
+});
+
+describe("ActionDispatch::Response::Buffer#body", () => {
+  it("appends a binary String chunk byte for byte", () => {
+    const response = new Response();
+    response.body = Buffer.from([0x89, 0x50, 0xff, 0xc3, 0x28]);
+    expect(bytes(response.body)).toEqual([0x89, 0x50, 0xff, 0xc3, 0x28]);
   });
 });

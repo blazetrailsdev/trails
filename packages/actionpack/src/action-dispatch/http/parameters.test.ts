@@ -190,7 +190,7 @@ describe("logParseErrorOnce", () => {
     const messages: string[] = [];
     const host = makeHost({
       rawPost: "garbage",
-      logger: { debug: (m) => messages.push(m) },
+      logger: { debug: (m: string) => messages.push(m) },
     });
     logParseErrorOnce.call(host);
     logParseErrorOnce.call(host);

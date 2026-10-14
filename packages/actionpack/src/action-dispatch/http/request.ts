@@ -3,6 +3,7 @@ import {
   Encoding,
   StringIO,
   forceEncoding,
+  rbModConstSet,
   rbRegMatchP,
   rbStrDump,
   toI,
@@ -50,7 +51,6 @@ import {
   useAcceptHeader as _useAcceptHeader,
   validAcceptHeader as _validAcceptHeader,
   variant as _variant,
-  type MimeNegotiationHost,
 } from "./mime-negotiation.js";
 import {
   include,
@@ -75,18 +75,18 @@ import { QueryParser } from "./query-parser.js";
 import { X_CASCADE } from "../constants.js";
 import { Request as PermissionsPolicyRequest } from "./permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
-import { CustomParamEncoder, RequestUtils, type ParamHash } from "../request/utils.js";
+import { Utils, type ParamHash } from "../request/utils.js";
 import "../middleware/cookies.js";
 import type { RequestCookieMethods } from "../middleware/cookies.js";
 import {
   Parameters as _Parameters,
   paramsParsers as _paramsParsers,
   parseFormattedParameters as _parseFormattedParameters,
+  parameters as _parameters,
   pathParameters as _pathParameters,
   logParseErrorOnce as _logParseErrorOnce,
   type ParameterParser,
   type ParameterParsers,
-  type ParametersHost,
 } from "./parameters.js";
 import { Headers as HttpHeaders } from "./headers.js";
 import type { GetIp } from "../middleware/remote-ip.js";
@@ -197,7 +197,7 @@ export const ENV_METHODS: readonly string[] = Object.freeze([
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Request {
-  static Utils = RequestUtils;
+  declare static Utils: typeof Utils;
 
   static {
     for (const env of ENV_METHODS) {
@@ -297,20 +297,20 @@ export class Request {
   declare negotiateMime: (order: MimeType[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
   get format(): MimeType | NullType {
-    return _format.call(mimeHost(this));
+    return _format.call(this);
   }
   declare setFormat: (extension: unknown) => void;
   get formats(): MimeType[] {
-    return _formats.call(mimeHost(this));
+    return _formats.call(this);
   }
   set formats(extensions: unknown[]) {
-    mimeHost(this).formats = extensions;
+    Reflect.set(_MimeNegotiation.prototype, "formats", extensions, this);
   }
   get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
-    return _variant.call(mimeHost(this));
+    return _variant.call(this);
   }
   set variant(value: string | string[] | null | undefined) {
-    mimeHost(this).variant = value;
+    Reflect.set(_MimeNegotiation.prototype, "variant", value, this);
   }
 
   declare static ignoreAcceptHeader: boolean;
@@ -386,11 +386,11 @@ export class Request {
   }
 
   get pathParameters(): Record<string, unknown> {
-    return _pathParameters.call(this._paramsHost);
+    return _pathParameters.call(this);
   }
 
   set pathParameters(params: Record<string, unknown>) {
-    this._paramsHost.pathParameters = params;
+    Reflect.set(_Parameters.prototype, "pathParameters", params, this);
   }
 
   static get parameterParsers(): ParameterParsers {
@@ -401,38 +401,6 @@ export class Request {
     parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
   ) {
     _Parameters.parameterParsers = parsers;
-  }
-
-  /** @internal */
-  private get _paramsHost(): ParametersHost & _Parameters {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const req = this;
-    const host: ParametersHost = {
-      getHeader: (k) => req.env[k],
-      setHeader: (k, v) => ((req.env[k] = v), v),
-      deleteHeader: (k) => void delete req.env[k],
-      get queryParameters() {
-        return req.queryParameters;
-      },
-      get requestParameters() {
-        return req.requestParameters;
-      },
-      get contentLength() {
-        return req.contentLength;
-      },
-      get contentMimeType() {
-        return req.contentMimeType;
-      },
-      get rawPost() {
-        return req.rawPost;
-      },
-      controllerClassFor: (name: string) => req.controllerClassFor(name),
-      get logger() {
-        const l = req.env["action_dispatch.logger"] ?? req.env["rack.logger"];
-        return (l as { debug(m: string): void } | null | undefined) ?? null;
-      },
-    };
-    return Object.setPrototypeOf(host, _Parameters.prototype) as ParametersHost & _Parameters;
   }
 
   /** @internal */
@@ -679,7 +647,7 @@ export class Request {
   GET(): Record<string, unknown> {
     try {
       return this.fetchHeader("action_dispatch.request.query_parameters", (k) => {
-        const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(
+        const encodingTemplate = Request.Utils.CustomParamEncoder.actionEncodingTemplate(
           this,
           this.pathParameters["controller"] as string | undefined,
           this.pathParameters["action"] as string | undefined,
@@ -701,15 +669,14 @@ export class Request {
   POST(): Record<string, unknown> {
     try {
       return this.fetchHeader("action_dispatch.request.request_parameters", (k) => {
-        const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(
+        const encodingTemplate = Request.Utils.CustomParamEncoder.actionEncodingTemplate(
           this,
           this.pathParameters["controller"] as string | undefined,
           this.pathParameters["action"] as string | undefined,
         );
 
         let paramList: Array<[string, unknown]> | null = null;
-        const host = this._paramsHost;
-        let pr = _parseFormattedParameters.call(host, this.paramsParsers(), () => {
+        let pr = this.parseFormattedParameters(this.paramsParsers(), () => {
           if ((paramList = this.requestParametersList()) != null) {
             return ParamBuilder.fromPairs(paramList, { encodingTemplate: encodingTemplate });
           } else {
@@ -732,12 +699,7 @@ export class Request {
   }
 
   get parameters(): Record<string, unknown> {
-    const override = this.env["action_dispatch.request.parameters_override"];
-    if (override) return override as Record<string, unknown>;
-    return this.params;
-  }
-  set parameters(value: Record<string, unknown>) {
-    this.env["action_dispatch.request.parameters_override"] = value;
+    return _parameters.call(this);
   }
 
   sendEarlyHints(links: Record<string, string>): void {
@@ -795,18 +757,18 @@ export class Request {
 
   /** @internal */
   paramsParsers(): ParameterParsers {
-    return _paramsParsers.call(this._paramsHost);
+    return _paramsParsers.call(this);
   }
   /** @internal */
   parseFormattedParameters(
     parsers: ParameterParsers,
     fallback: () => Record<string, unknown>,
   ): ReturnType<ParameterParser> {
-    return _parseFormattedParameters.call(this._paramsHost, parsers, fallback);
+    return _parseFormattedParameters.call(this, parsers, fallback);
   }
   /** @internal */
   logParseErrorOnce(): void {
-    _logParseErrorOnce.call(this._paramsHost);
+    _logParseErrorOnce.call(this);
   }
 
   static create(env: RackEnv = {}): Request {
@@ -926,51 +888,26 @@ export interface Request {
 }
 Request.prototype.dup = RackRequest.prototype.dup as unknown as () => Request;
 
-type MimeHost = MimeNegotiationHost & _MimeNegotiation;
-const MIME_HOSTS = new WeakMap<Request, MimeHost>();
-function mimeHost(req: Request): MimeHost {
-  let h = MIME_HOSTS.get(req);
-  if (!h) {
-    h = Object.create(_MimeNegotiation.prototype, {
-      constructor: { get: () => req.constructor },
-      getHeader: { value: (k: string) => req.env[k] },
-      setHeader: {
-        value: (k: string, v: unknown) => {
-          req.env[k] = v;
-          return v;
-        },
-      },
-      fetchHeader: {
-        value: <T>(k: string, fallback: (key: string) => T) => req.fetchHeader(k, fallback),
-      },
-      parameters: { get: () => req.parameters },
-      accept: { get: () => req.accept },
-      xhr: { get: () => req.xhr },
-    }) as MimeHost;
-    MIME_HOSTS.set(req, h);
-  }
-  return h;
-}
 Object.defineProperty(Request.prototype, "contentMimeType", {
   get(this: Request) {
-    return _contentMimeType.call(mimeHost(this));
+    return _contentMimeType.call(this);
   },
   configurable: true,
 });
 Object.defineProperty(Request.prototype, "accepts", {
   get(this: Request) {
-    return _accepts.call(mimeHost(this));
+    return _accepts.call(this);
   },
   configurable: true,
 });
 Request.prototype.hasContentType = function (this: Request) {
-  return _hasContentType.call(mimeHost(this));
+  return _hasContentType.call(this);
 };
 Request.prototype.negotiateMime = function (this: Request, order: MimeType[]) {
-  return _negotiateMime.call(mimeHost(this), order);
+  return _negotiateMime.call(this, order);
 };
 Request.prototype.shouldApplyVaryHeader = function (this: Request) {
-  return _shouldApplyVaryHeader.call(mimeHost(this));
+  return _shouldApplyVaryHeader.call(this);
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `ActiveSupport.on_load(:action_dispatch_request) { include RequestCookieMethods }` (`action_dispatch/middleware/cookies.rb:93-95`). */
@@ -1016,17 +953,19 @@ export class PASS_NOT_FOUND {
   }
 }
 Request.prototype.validAcceptHeader = function (this: Request) {
-  return _validAcceptHeader.call(mimeHost(this));
+  return _validAcceptHeader.call(this);
 };
 Request.prototype.useAcceptHeader = function (this: Request) {
-  return _useAcceptHeader.call(mimeHost(this));
+  return _useAcceptHeader.call(this);
 };
 Request.prototype.formatFromPathExtension = function (this: Request) {
-  return _formatFromPathExtension.call(mimeHost(this));
+  return _formatFromPathExtension.call(this);
 };
 Request.prototype.setFormat = _setFormat;
 Request.prototype.isParamsReadable = _isParamsReadable;
 
 ActionDispatch.Request = Request;
+rbModConstSet(Request, "Utils", Utils);
+rbModConstSet(ActionDispatch, "MissingController", MissingController);
 
 runLoadHooks("action_dispatch_request", Request);

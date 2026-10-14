@@ -1,6 +1,6 @@
 import type { Time } from "@blazetrails/date";
 import { cattrAccessor, include, presence } from "@blazetrails/activesupport";
-import { File, IO, IOError, stringSplit } from "@blazetrails/ruby-compat";
+import { File, IO, IOError, rbObjAsString, strNew, stringSplit } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
@@ -69,7 +69,10 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
   get body(): string {
     if (this._strBody !== null) return this._strBody;
     let buf = "";
-    for (const chunk of this.each()) buf += String(chunk);
+    for (const chunk of this.each()) {
+      const str = rbObjAsString(chunk);
+      buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
+    }
     this._strBody = buf;
     return this._strBody;
   }
