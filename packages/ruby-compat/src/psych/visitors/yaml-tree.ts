@@ -1,14 +1,23 @@
 import { Hash } from "../../hash.js";
 import {
   rbCDate,
+  rbCFalseClass,
+  rbCFloat,
+  rbCInteger,
+  rbCNilClass,
+  rbCString,
   rbCTime,
+  rbCTrueClass,
+  rbInspect,
   rbModName,
+  rbObjClass,
   rbModToS,
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjRespondTo,
 } from "../../object.js";
 import { Range } from "../../range.js";
+import { type StructInstance, isStruct } from "../../struct.js";
 import { temporalTag } from "../../temporal-tag.js";
 import { TypeError } from "../../type-error.js";
 import { registeredConstant } from "../../variable.js";
@@ -17,6 +26,7 @@ import { Psych } from "../../psych.js";
 import { yaml } from "../../psych-adapter.js";
 import { Coder, coderSeq, coderTag, coderType } from "../coder.js";
 import { ClassLoader } from "../class-loader.js";
+import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
 
 type RubyTime = { isUtc(): boolean; strftime(format: string): string };
@@ -31,13 +41,21 @@ type ZonedDateTime = {
 };
 type Instant = { toZonedDateTimeISO(timeZone: string): ZonedDateTime };
 
+/** The `options` Hash `YAMLTree.create` takes (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:48`). */
+export interface YAMLTreeOptions {
+  permittedClasses?: unknown[];
+  permittedSymbols?: string[];
+  aliases?: boolean;
+}
+
 /**
  * `Psych::Visitors::YAMLTree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:15`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export class YAMLTree {
-  private readonly st = new Map<object, Node>();
+  /** @internal */
+  protected readonly st = new Map<object, Node>();
   private readonly doc = new yaml.Document();
   private anchors = 0;
   private readonly ss: ScalarScanner;
@@ -47,14 +65,14 @@ export class YAMLTree {
    *
    * @noRailsEquivalent PERMANENT
    */
-  static create(): YAMLTree {
+  static create(options: YAMLTreeOptions = {}): YAMLTree {
     const classLoader = new ClassLoader();
     const ss = new ScalarScanner(classLoader);
-    return new YAMLTree(ss);
+    return new this(ss, options);
   }
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(ss: ScalarScanner) {
+  constructor(ss: ScalarScanner, _options: YAMLTreeOptions = {}) {
     this.ss = ss;
   }
 
@@ -91,6 +109,7 @@ export class YAMLTree {
     if (target instanceof RegExp) return this.visitRegexp(target);
     if (Array.isArray(target)) return this.visitArray(target);
     if (target instanceof Map) return this.visitHash(target);
+    if (isStruct(target)) return this.visitStruct(target);
     if (target !== null && typeof target === "object") {
       return [Object.prototype, null].includes(Object.getPrototypeOf(target) as object | null)
         ? this.visitHash(target)
@@ -110,6 +129,28 @@ export class YAMLTree {
     map.tag = tag;
     this.register(o, map);
     this.dumpIvars(o, map);
+    return map;
+  }
+
+  private visitStruct(o: StructInstance & object): Node {
+    const tag = ["!ruby/struct", rbModName(o.constructor as new () => unknown)]
+      .filter((part) => part != null)
+      .join(":");
+
+    const map = new yaml.YAMLMap();
+    map.tag = tag;
+    this.register(o, map);
+    for (const member of o.members()) {
+      map.add(
+        new yaml.Pair(
+          this.doc.createNode(member),
+          this.accept((o as unknown as Record<string, unknown>)[member]),
+        ),
+      );
+    }
+
+    this.dumpIvars(o, map);
+
     return map;
   }
 
@@ -292,5 +333,57 @@ export class YAMLTree {
   /** @noRailsEquivalent PERMANENT */
   push(object: unknown): void {
     this.doc.contents = this.accept(object) as typeof this.doc.contents;
+  }
+}
+
+/**
+ * `Psych::Visitors::RestrictedYAMLTree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:540`).
+ * A Symbol is a string here, so `Symbol === target` and `visit_Symbol`'s
+ * `permitted_symbols` check have no value to turn on.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class RestrictedYAMLTree extends YAMLTree {
+  /**
+   * `RestrictedYAMLTree::DEFAULT_PERMITTED_CLASSES` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:541`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static readonly DEFAULT_PERMITTED_CLASSES: ReadonlySet<unknown> = new Set([
+    rbCTrueClass,
+    rbCFalseClass,
+    rbCNilClass,
+    rbCInteger,
+    rbCFloat,
+    rbCString,
+    Array,
+    Hash,
+  ]);
+
+  private readonly permittedClasses: Set<unknown>;
+  private readonly aliases: boolean;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(ss: ScalarScanner, options: YAMLTreeOptions = {}) {
+    super(ss, options);
+    this.permittedClasses = new Set(RestrictedYAMLTree.DEFAULT_PERMITTED_CLASSES);
+    for (const klass of options.permittedClasses ?? []) {
+      this.permittedClasses.add(klass);
+    }
+    this.aliases = options.aliases ?? false;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  override accept(target: unknown): Node {
+    if (!this.aliases && target !== null && typeof target === "object" && this.st.has(target)) {
+      throw new BadAlias("Tried to dump an aliased object");
+    }
+
+    const klass = rbObjClass(target);
+    if (!this.permittedClasses.has(klass)) {
+      throw new DisallowedClass("dump", rbModName(klass) ?? rbInspect(klass));
+    }
+
+    return super.accept(target);
   }
 }

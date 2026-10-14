@@ -52,6 +52,7 @@ export interface AttributeOptions {
   scale?: number | null;
   array?: boolean;
   range?: boolean;
+  [option: string]: unknown;
 }
 
 export function attributeNames(this: {

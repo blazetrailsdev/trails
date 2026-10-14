@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbClassNewInstance } from "./include.js";
 import { rbAbsintSize } from "./numeric.js";
 import {
   rbCBasicObject,
@@ -10,7 +11,6 @@ import {
   rbCSymbol,
   rbCTrueClass,
   rbCClass,
-  rbClassNewInstance,
   rbObjClass,
   rbClassOf,
   rbObjSingletonClass,
