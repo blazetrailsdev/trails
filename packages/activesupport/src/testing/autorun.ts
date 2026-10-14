@@ -25,7 +25,20 @@ type DescribedSuite = { name: string; file?: unknown; suite?: DescribedSuite };
 export const TYPES: [Matcher, typeof TestCase][] = [[/(?:)/, TestCase]];
 
 /** @noRailsEquivalent PERMANENT */
-export function registerSpecType(matcher: Matcher, klass: typeof TestCase): void {
+export function registerSpecType(
+  ...args: [matcher: Matcher, klass: typeof TestCase] | [klass: typeof TestCase, block: Matcher]
+): void {
+  const last = args[args.length - 1];
+  const block =
+    typeof last === "function" && last !== TestCase && !(last.prototype instanceof TestCase)
+      ? (last as Matcher)
+      : undefined;
+  let matcher: Matcher, klass: typeof TestCase;
+  if (block) {
+    [matcher, klass] = [block, args[0] as typeof TestCase];
+  } else {
+    [matcher, klass] = args as [Matcher, typeof TestCase];
+  }
   TYPES.unshift([matcher, klass]);
 }
 
