@@ -89,11 +89,11 @@ export class ToRuby {
   private visit(o: ParsedNode): unknown {
     if (yaml.isAlias(o)) return this.visitPsychNodesAlias(o);
     if (yaml.isMap(o)) return this.visitMapping(o);
-    if (yaml.isSeq(o)) return this.visitSequence(o);
+    if (yaml.isSeq(o)) return this.visitPsychNodesSequence(o);
     return this.register(o, this.deserialize(o));
   }
 
-  private visitSequence(o: YAMLSeq.Parsed): unknown {
+  private visitPsychNodesSequence(o: YAMLSeq.Parsed): unknown {
     const klass = this.resolveClass(this.loadTags[o.tag ?? ""]);
     if (klass) {
       const instance = allocate(klass);

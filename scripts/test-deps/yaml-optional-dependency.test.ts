@@ -123,7 +123,6 @@ describe("yaml optional dependency", () => {
     expect(await offendersReachableFromIndex(pkg)).toEqual([]);
   });
 
-  // The website is an application: its entries import `yaml` to register it.
   it("is imported for its values only by psych-adapter.ts", async () => {
     const importers: string[] = [];
     for (const pkg of ROOTS.filter((name) => name !== "website")) {

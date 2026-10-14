@@ -44,7 +44,7 @@ let resolved: PsychAdapter | null = null;
  */
 export function registerPsychAdapter(name: string, adapter: PsychAdapter): void {
   registry.set(name, adapter);
-  if (name === currentAdapterName || currentAdapterName === null) resolved = null;
+  if (name === currentAdapterName) resolved = null;
 }
 
 let nodeAttempted = false;
@@ -73,7 +73,7 @@ function tryAutoRegisterNode(): boolean {
 
 /**
  * Resolves the backend as `psych.rb:13`'s `require 'psych.so'` would, at the
- * call: the configured adapter, else any registered one, else a synchronous
+ * call: the configured adapter, else one registered as `yaml`, else a synchronous
  * Node load of `yaml`. A miss raises the `LoadError` `vendor/ruby/v3.3.11/lib/yaml.rb:3-18`
  * re-raises.
  */
@@ -85,8 +85,8 @@ function resolve(): PsychAdapter {
     if (!reg) throw new LoadError(`cannot load such file -- ${name}`);
     return (resolved = reg);
   }
-  if (registry.size > 0 || tryAutoRegisterNode()) {
-    return (resolved = registry.get("yaml") ?? registry.values().next().value!);
+  if (tryAutoRegisterNode()) {
+    return (resolved = registry.get("yaml")!);
   }
   throw new LoadError("cannot load such file -- yaml");
 }
@@ -128,7 +128,7 @@ export const yaml: PsychAdapter = new Proxy({} as PsychAdapter, {
  *
  * @noRailsEquivalent PERMANENT
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the parsed value is the caller's to shape, as `yaml.parse`'s own `any` leaves it
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parse(src: string | Uint8Array, ...options: unknown[]): any {
   if (src instanceof Uint8Array) {
     try {
