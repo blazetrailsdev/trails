@@ -1087,23 +1087,15 @@ export class Mapper {
     }
   }
 
-  resources(
-    name: string,
-    optionsOrCallback?: RouteOptions | MapperCallback,
-    callback?: MapperCallback,
-  ): void {
-    let options: RouteOptions = {};
-    let cb: MapperCallback | undefined;
+  resources(...resources: Array<string | RouteOptions | MapperCallback>): void {
+    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+      | MapperCallback
+      | undefined;
+    let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (typeof optionsOrCallback === "function") {
-      cb = optionsOrCallback;
-    } else if (optionsOrCallback) {
-      options = dup(optionsOrCallback);
-      cb = callback;
-    }
-
-    if (this.applyCommonBehaviorFor("resources", [name], options, cb)) return;
+    if (this.applyCommonBehaviorFor("resources", resources as string[], options, cb)) return;
     options = this.applyActionOptions("resources", options);
+    const name = resources.pop() as string;
 
     const resource = new Resource(
       name,
@@ -1217,23 +1209,15 @@ export class Mapper {
     }
   }
 
-  resource(
-    name: string,
-    optionsOrCallback?: RouteOptions | MapperCallback,
-    callback?: MapperCallback,
-  ): void {
-    let options: RouteOptions = {};
-    let cb: MapperCallback | undefined;
+  resource(...resources: Array<string | RouteOptions | MapperCallback>): void {
+    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+      | MapperCallback
+      | undefined;
+    let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (typeof optionsOrCallback === "function") {
-      cb = optionsOrCallback;
-    } else if (optionsOrCallback) {
-      options = dup(optionsOrCallback);
-      cb = callback;
-    }
-
-    if (this.applyCommonBehaviorFor("resource", [name], options, cb)) return;
+    if (this.applyCommonBehaviorFor("resource", resources as string[], options, cb)) return;
     options = this.applyActionOptions("resource", options);
+    const name = resources.pop() as string;
 
     const resource = new SingletonResource(
       name,
@@ -2166,8 +2150,11 @@ export class Mapper {
   }
 
   /** @internal */
-  canonicalAction(action: string): boolean {
-    return CANONICAL_ACTIONS.includes(SYMBOL.test(action) ? symbolToS(action) : action);
+  isCanonicalAction(action: string): boolean {
+    return (
+      this.isResourceMethodScope() &&
+      CANONICAL_ACTIONS.includes(SYMBOL.test(action) ? symbolToS(action) : action)
+    );
   }
 
   /** @internal */
@@ -2192,7 +2179,7 @@ export class Mapper {
   pathForAction(action: string, path: string | undefined): string {
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     if (path != null) return `${prefix}/${path}`;
-    if (this.canonicalAction(action)) {
+    if (this.isCanonicalAction(action)) {
       return prefix;
     } else {
       const actionPath = this.actionPath(action);
@@ -2207,7 +2194,7 @@ export class Mapper {
   ): string | undefined {
     let prefix: string | undefined;
     if (as !== undefined && as !== null) prefix = as;
-    else if (action && !this.canonicalAction(action)) prefix = action;
+    else if (action && !this.isCanonicalAction(action)) prefix = action;
     if (prefix && prefix !== "/" && prefix.length > 0) {
       return Mapper.normalizeName(prefix.replace(/-/g, "_"));
     }
@@ -2373,20 +2360,20 @@ export class Mapper {
     options: RouteOptions,
     block: MapperCallback | undefined,
   ): boolean {
-    const dispatch = (...args: unknown[]) =>
-      (this as unknown as Record<string, (...a: unknown[]) => unknown>)[method](...args);
+    const self = this as unknown as Record<string, (...a: unknown[]) => unknown>;
+    const blockArg = block ? [block] : [];
 
     if (resources.length > 1) {
-      for (const r of resources) dispatch(r, options, block);
+      for (const r of resources) self[method](r, options, ...blockArg);
       return true;
     }
     if (options.shallow) {
       delete options.shallow;
-      this.shallow(() => dispatch(resources.pop()!, options, block));
+      this.shallow(() => self[method](resources.pop()!, options, ...blockArg));
       return true;
     }
     if (this.isResourceScope()) {
-      this.nested(() => dispatch(resources.pop()!, options, block));
+      this.nested(() => self[method](resources.pop()!, options, ...blockArg));
       return true;
     }
 
@@ -2412,7 +2399,7 @@ export class Mapper {
       }
     }
     if (hasScopeOption) {
-      this.scope(scopeOptions, () => dispatch(resources.pop()!, options, block));
+      this.scope(scopeOptions, () => self[method](resources.pop()!, options, ...blockArg));
       return true;
     }
     return false;
