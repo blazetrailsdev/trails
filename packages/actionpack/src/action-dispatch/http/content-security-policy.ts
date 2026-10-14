@@ -98,64 +98,144 @@ export class ContentSecurityPolicy {
   }
 
   defaultSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("default-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["default-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "default-src");
+    }
   }
   scriptSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("script-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["script-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "script-src");
+    }
   }
   scriptSrcAttr(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("script-src-attr", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["script-src-attr"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "script-src-attr");
+    }
   }
   scriptSrcElem(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("script-src-elem", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["script-src-elem"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "script-src-elem");
+    }
   }
   styleSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("style-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["style-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "style-src");
+    }
   }
   styleSrcAttr(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("style-src-attr", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["style-src-attr"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "style-src-attr");
+    }
   }
   styleSrcElem(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("style-src-elem", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["style-src-elem"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "style-src-elem");
+    }
   }
   imgSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("img-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["img-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "img-src");
+    }
   }
   fontSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("font-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["font-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "font-src");
+    }
   }
   connectSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("connect-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["connect-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "connect-src");
+    }
   }
   mediaSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("media-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["media-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "media-src");
+    }
   }
   objectSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("object-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["object-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "object-src");
+    }
   }
   frameSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("frame-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["frame-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "frame-src");
+    }
   }
   childSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("child-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["child-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "child-src");
+    }
   }
   workerSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("worker-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["worker-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "worker-src");
+    }
   }
   frameAncestors(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("frame-ancestors", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["frame-ancestors"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "frame-ancestors");
+    }
   }
   formAction(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("form-action", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["form-action"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "form-action");
+    }
   }
   baseUri(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("base-uri", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["base-uri"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "base-uri");
+    }
   }
   manifestSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("manifest-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["manifest-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "manifest-src");
+    }
   }
   prefetchSrc(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("prefetch-src", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["prefetch-src"] = this.applyMappings(sources as CSPSource[]));
+    } else {
+      return hashDelete(this.directives, "prefetch-src");
+    }
   }
   sandbox(...values: CSPSourceOrClear[]): DirectiveValue | null {
     if (values.length === 0) {
@@ -198,19 +278,19 @@ export class ContentSecurityPolicy {
     }
   }
   requireTrustedTypesFor(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("require-trusted-types-for", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["require-trusted-types-for"] = this.applyMappings(
+        sources as CSPSource[],
+      ));
+    } else {
+      return hashDelete(this.directives, "require-trusted-types-for");
+    }
   }
   trustedTypes(...sources: CSPSourceOrClear[]): DirectiveValue | null {
-    return this.setDirective("trusted-types", sources);
-  }
-
-  /** @internal */
-  private setDirective(name: string, sources: CSPSourceOrClear[]): DirectiveValue | null {
-    const first = sources[0];
-    if (first != null && first !== false) {
-      return (this.directives[name] = this.applyMappings(sources as CSPSource[]));
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["trusted-types"] = this.applyMappings(sources as CSPSource[]));
     } else {
-      return hashDelete(this.directives, name);
+      return hashDelete(this.directives, "trusted-types");
     }
   }
 

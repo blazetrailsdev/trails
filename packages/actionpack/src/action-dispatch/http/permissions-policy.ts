@@ -60,95 +60,174 @@ export class PermissionsPolicy {
   }
 
   accelerometer(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("accelerometer", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["accelerometer"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "accelerometer");
+    }
   }
   ambientLightSensor(
     ...sources: Array<PolicySource | false | null | undefined>
   ): PolicySource[] | null {
-    return this._set("ambient-light-sensor", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["ambient-light-sensor"] = this.applyMappings(
+        sources as PolicySource[],
+      ));
+    } else {
+      return hashDelete(this.directives, "ambient-light-sensor");
+    }
   }
   autoplay(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("autoplay", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["autoplay"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "autoplay");
+    }
   }
   camera(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("camera", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["camera"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "camera");
+    }
   }
   displayCapture(
     ...sources: Array<PolicySource | false | null | undefined>
   ): PolicySource[] | null {
-    return this._set("display-capture", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["display-capture"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "display-capture");
+    }
   }
   encryptedMedia(
     ...sources: Array<PolicySource | false | null | undefined>
   ): PolicySource[] | null {
-    return this._set("encrypted-media", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["encrypted-media"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "encrypted-media");
+    }
   }
   fullscreen(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("fullscreen", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["fullscreen"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "fullscreen");
+    }
   }
   geolocation(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("geolocation", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["geolocation"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "geolocation");
+    }
   }
   gyroscope(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("gyroscope", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["gyroscope"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "gyroscope");
+    }
   }
   hid(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("hid", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["hid"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "hid");
+    }
   }
   idleDetection(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("idle-detection", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["idle-detection"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "idle-detection");
+    }
   }
   keyboardMap(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("keyboard-map", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["keyboard-map"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "keyboard-map");
+    }
   }
   magnetometer(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("magnetometer", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["magnetometer"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "magnetometer");
+    }
   }
   microphone(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("microphone", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["microphone"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "microphone");
+    }
   }
   midi(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("midi", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["midi"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "midi");
+    }
   }
   payment(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("payment", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["payment"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "payment");
+    }
   }
   pictureInPicture(
     ...sources: Array<PolicySource | false | null | undefined>
   ): PolicySource[] | null {
-    return this._set("picture-in-picture", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["picture-in-picture"] = this.applyMappings(
+        sources as PolicySource[],
+      ));
+    } else {
+      return hashDelete(this.directives, "picture-in-picture");
+    }
   }
   screenWakeLock(
     ...sources: Array<PolicySource | false | null | undefined>
   ): PolicySource[] | null {
-    return this._set("screen-wake-lock", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["screen-wake-lock"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "screen-wake-lock");
+    }
   }
   serial(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("serial", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["serial"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "serial");
+    }
   }
   syncXhr(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("sync-xhr", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["sync-xhr"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "sync-xhr");
+    }
   }
   usb(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("usb", sources);
+    if (sources[0] != null && sources[0] !== false) {
+      return (this.directives["usb"] = this.applyMappings(sources as PolicySource[]));
+    } else {
+      return hashDelete(this.directives, "usb");
+    }
   }
   webShare(...sources: Array<PolicySource | false | null | undefined>): PolicySource[] | null {
-    return this._set("web-share", sources);
-  }
-
-  /** @internal */
-  private _set(
-    directive: string,
-    sources: Array<PolicySource | false | null | undefined>,
-  ): PolicySource[] | null {
     if (sources[0] != null && sources[0] !== false) {
-      return (this.directives[directive] = this.applyMappings(sources as PolicySource[]));
+      return (this.directives["web-share"] = this.applyMappings(sources as PolicySource[]));
     } else {
-      return hashDelete(this.directives, directive);
+      return hashDelete(this.directives, "web-share");
     }
   }
 
-  /** @internal */
   initializeCopy(other: PermissionsPolicy): Record<string, PolicySource[]> {
     return (this.directives = deepDup(other.directives));
   }

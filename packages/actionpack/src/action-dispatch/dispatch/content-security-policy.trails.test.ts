@@ -4,8 +4,16 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ContentSecurityPolicy, Middleware } from "../http/content-security-policy.js";
 import { Request } from "../http/request.js";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 
 describe("ContentSecurityPolicyTest", () => {
+  it("dup keeps a dynamic source callable", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc(() => "https://example.com");
+    const copy = rbObjDup(policy);
+    expect(copy.build({})).toBe("script-src https://example.com");
+  });
+
   it("report_uri stores a nil uri instead of deleting the directive", () => {
     const policy = new ContentSecurityPolicy();
     policy.reportUri(null as unknown as string);
