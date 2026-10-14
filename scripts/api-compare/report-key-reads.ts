@@ -47,8 +47,12 @@ export interface RubyBody {
   reads: [string, string | null][];
 }
 
-/** `extract-key-reads.rb`: Ruby file → def name → its bodies. */
-export type RubyKeyReads = Record<string, Record<string, RubyBody[]>>;
+/** `extract-key-reads.rb`, per package: Ruby file → def name → its bodies, and
+ *  owner → the modules it `include`s or `extend`s. */
+export interface RubyKeyReads {
+  defs: Record<string, Record<string, RubyBody[]>>;
+  includes: Record<string, string[]>;
+}
 
 export interface TsBody {
   owner: string;
@@ -157,7 +161,7 @@ function ownerOf(node: ts.Node): string {
 function bindingNames(pattern: ts.ObjectBindingPattern): string[] {
   return pattern.elements.flatMap((el) => {
     const name = el.propertyName ?? el.name;
-    return el.dotDotDotToken || !ts.isIdentifier(name) ? [] : [name.text];
+    return el.dotDotDotToken || !ts.isIdentifier(name) ? [] : [tsKey(name.text)];
   });
 }
 
@@ -297,25 +301,47 @@ export function ownerSeat(owner: string, seat: string): string {
 }
 
 /**
- * The Ruby body a pair reads: the one its owner and seat name. A file holding
- * the name once answers with that body whatever its owner (an included
- * module's def, a `module_function`), since there is no other to confuse it
- * with; several bodies and no match is no body.
+ * Whether `owner` mixes in `module` with an `include`/`extend` whose written
+ * name `module` ends with.
  */
-export function rubyBodyOf(row: SkeletonRow, bodies: readonly RubyBody[]): RubyBody | undefined {
-  const want = ownerSeat(row.rubyOwner ?? "", row.rubySeat ?? "instance");
+function mixesIn(includes: Readonly<Record<string, string[]>>, owner: string, module: string) {
+  return (includes[owner] ?? []).some((m) => module === m || module.endsWith(`::${m}`));
+}
+
+/**
+ * The Ruby body a pair reads: the one its owner and seat name. Where the owner
+ * records none, the file's lone body answers only when it is the same owner's
+ * on the other seat (a `module_function`) or a module the owner mixes in.
+ */
+export function rubyBodyOf(
+  row: SkeletonRow,
+  bodies: readonly RubyBody[],
+  includes: Readonly<Record<string, string[]>> = {},
+): RubyBody | undefined {
+  const owner = row.rubyOwner ?? "";
+  const want = ownerSeat(owner, row.rubySeat ?? "instance");
   const own = bodies.filter((b) => ownerSeat(b.owner, b.seat) === want);
-  return own.length === 1 ? own[0] : bodies.length === 1 ? bodies[0] : undefined;
+  if (own.length === 1) return own[0];
+  const [lone] = bodies;
+  return bodies.length === 1 && (lone.owner === owner || mixesIn(includes, owner, lone.owner))
+    ? lone
+    : undefined;
 }
 
 /**
  * The TS body a pair reads: its owner's, on the seat the Ruby def is defined
- * on, else the file's one body of the name.
+ * on. Where the owner records none, the file's lone body answers only when it
+ * is a top-level function, which is how a mixin's method is ported (CLAUDE.md,
+ * "Module mixins"), or the class compare.ts names `<Owner>__mixin`.
  */
 export function tsBodyOf(row: SkeletonRow, bodies: readonly TsBody[]): TsBody | undefined {
   let own = bodies.filter((b) => b.owner === (row.tsOwner ?? ""));
   if (own.length > 1) own = own.filter((b) => b.isStatic === (row.rubySeat === "class"));
-  return own.length === 1 ? own[0] : bodies.length === 1 ? bodies[0] : undefined;
+  if (own.length === 1) return own[0];
+  const [lone] = bodies;
+  return bodies.length === 1 && (lone.owner === "" || `${lone.owner}__mixin` === row.tsOwner)
+    ? lone
+    : undefined;
 }
 
 export interface PackageTally {
@@ -430,9 +456,9 @@ async function main(): Promise<number> {
     return tallies.get(pkg)!;
   };
   for (const row of artifact.skeletons) {
-    const rubyBodies = ruby[row.package]?.[row.rubyFile]?.[row.rubyName];
+    const rubyBodies = ruby[row.package]?.defs[row.rubyFile]?.[row.rubyName];
     if (rubyBodies === undefined) continue;
-    const rubyBody = rubyBodyOf(row, rubyBodies);
+    const rubyBody = rubyBodyOf(row, rubyBodies, ruby[row.package].includes);
     const tsPath = path.join(packageSrcDir(row.package), row.tsFile);
     if (!tsFiles.has(tsPath)) {
       const text = await readFile(tsPath, "utf8").catch(() => undefined);

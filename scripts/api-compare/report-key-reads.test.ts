@@ -39,7 +39,7 @@ const extract = async (source: string[]) => {
       path.join(import.meta.dirname, "extract-key-reads.rb"),
       JSON.stringify({ actionpack: dir }),
     ]);
-    return (JSON.parse(out.toString()) as Record<string, RubyKeyReads>).actionpack["url_for.rb"];
+    return (JSON.parse(out.toString()) as Record<string, RubyKeyReads>).actionpack;
   } finally {
     await rm(dir, { recursive: true });
   }
@@ -49,7 +49,7 @@ const RUBY_SUBPROCESS_TIMEOUT_MS = 30_000;
 
 describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   it("extract-key-reads.rb records a named-receiver [] per def, and no []= write", async () => {
-    const defs = await extract([
+    const { defs } = await extract([
       "def url_for(options, x = 1, **kw)",
       "  options[:only_path]",
       "  @config[:adapter]",
@@ -58,7 +58,7 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
       "  foo.bar[:baz]",
       "end",
     ]);
-    expect(defs.url_for).toEqual([
+    expect(defs["url_for.rb"].url_for).toEqual([
       {
         owner: "",
         seat: "instance",
@@ -73,7 +73,7 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   });
 
   it("extract-key-reads.rb keys a def by its owner and seat", async () => {
-    const defs = await extract([
+    const { defs, includes } = await extract([
       "module A",
       "  class B; def call; o[:b]; end; def self.call; o[:s]; end; end",
       "  class C; class << self; def call; o[:c]; end; end; end",
@@ -81,9 +81,11 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
       "  D = Struct.new(:x) do; def call; o[:d]; end; end",
       "  class A::E; def call; o[:e]; end; end",
       "  class ::F; def call; def inner; o[:i]; end; o[:f]; end; end",
+      "  class ::G::H; include M, N::O; def call; o[:h]; end; end",
       "end",
     ]);
-    expect(defs.call.map((b) => `${b.owner} ${b.seat} ${b.reads[0][1]}`)).toEqual([
+    expect(includes).toEqual({ "G::H": ["M", "N::O"] });
+    expect(defs["url_for.rb"].call.map((b) => `${b.owner} ${b.seat} ${b.reads[0][1]}`)).toEqual([
       "A::B instance b",
       "A::B class s",
       "A::C class c",
@@ -91,6 +93,7 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
       "A::D instance d",
       "A::E instance e",
       "F instance f",
+      "G::H instance h",
     ]);
   });
 
@@ -124,6 +127,19 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
     expect(tsBodyOf({ ...ROW, tsOwner: "Z" }, ts.get("call")!)).toBeUndefined();
   });
 
+  it("a lone body of another owner joins only through a mixin", () => {
+    const env: RubyBody[] = [
+      { owner: "R::Env", seat: "instance", params: [], reads: [["o", "e"]] },
+    ];
+    const row = { ...ROW, rubyOwner: "R", rubySeat: "instance" as const };
+    expect(rubyBodyOf(row, env)).toBeUndefined();
+    expect(rubyBodyOf(row, env, { R: ["Env"] })).toBe(env[0]);
+    const other = tsKeyReads("class B { call(o) { return o.b; } }").get("call")!;
+    expect(tsBodyOf({ ...ROW, tsOwner: "C" }, other)).toBeUndefined();
+    const mixin = tsKeyReads("function call(this: C, o) { return o.c; }").get("call")!;
+    expect(tsBodyOf({ ...ROW, tsOwner: "C" }, mixin)).toBe(mixin[0]);
+  });
+
   it("a nested function that is itself a compared pair reads for itself", () => {
     const text = "function urlFor(options) { function host(options) { return options.host; } }";
     expect(tsKeyReads(text).get("urlFor")![0].reads.get("options")).toEqual(new Set(["host"]));
@@ -147,6 +163,9 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
     expect(buckets("return rest;", [["options", "host"]], "{ ...rest }, k")).toEqual([
       "options[:host] key-unread",
     ]);
+    expect(
+      buckets("return onlyPath;", [["options", "only_path"]], "{ only_path: onlyPath }, k"),
+    ).toEqual(["options[:only_path] matched"]);
   });
 
   it.each([

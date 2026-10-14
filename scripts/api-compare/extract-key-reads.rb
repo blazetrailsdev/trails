@@ -21,10 +21,15 @@
 # positional parameters, then its `**kwrest`, which is how a port that
 # destructures a Hash parameter is credited.
 #
+# `includes` maps an owner to the modules it `include`s or `extend`s, as
+# written, which is what lets a pair owned by the includer read the module's
+# body.
+#
 # Usage: ruby extract-key-reads.rb '{"<pkg>": "<lib dir>", …}'
-# Prints {"<pkg>": {"<file under lib>": {"<def name>":
+# Prints {"<pkg>": {"defs": {"<file under lib>": {"<def name>":
 #   [{"owner": "<A::B>", "seat": "class"|"instance", "params": […],
-#     "reads": [["<recv>", "<key>"|null], …]}, …]}}}.
+#     "reads": [["<recv>", "<key>"|null], …]}, …]}},
+#   "includes": {"<A::B>": ["<C>", …]}}}.
 require "json"
 require "ripper"
 
@@ -62,7 +67,8 @@ end
 
 def const_path(node)
   case node && node[0]
-  when :const_ref, :top_const_ref then [node[1][1]]
+  when :const_ref then [node[1][1]]
+  when :top_const_ref then ["", node[1][1]]
   when :var_ref then node[1][0] == :@const ? [node[1][1]] : nil
   when :const_path_ref
     outer = const_path(node[1])
@@ -75,7 +81,7 @@ end
 def nested_owner(owner, node)
   path = const_path(node)
   return nil unless path
-  return path if node[0] == :top_const_ref
+  return path.drop(1) if path.first == ""
 
   head = owner.rindex(path.first) if path.length > 1
   head ? owner[0...head] + path : owner + path
@@ -90,21 +96,27 @@ def param_names(params)
   positional + kwrest
 end
 
-def walk(node, defs, owner = [], singleton = false)
+def walk(node, defs, includes, owner = [], singleton = false)
   return unless node.is_a?(Array)
 
+  if node[0] == :command && %w[include extend].include?(node[1][1]) && node[2].is_a?(Array)
+    (node[2][1] || []).each do |arg|
+      path = const_path(arg)
+      (includes[owner.join("::")] ||= []) << path.reject(&:empty?).join("::") if path
+    end
+  end
   case node[0]
   when :class, :module
     nested = nested_owner(owner, node[1])
-    return node.each { |child| walk(child, defs, owner, singleton) } unless nested
+    return node.each { |child| walk(child, defs, includes, owner, singleton) } unless nested
 
-    return walk(node.last, defs, nested, false)
+    return walk(node.last, defs, includes, nested, false)
   when :sclass
-    return walk(node.last, defs, owner, true)
+    return walk(node.last, defs, includes, owner, true)
   when :assign
     target = node[1]
     if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) && target[1][0] == :@const
-      return walk(node[2], defs, owner + [target[1][1]], false)
+      return walk(node[2], defs, includes, owner + [target[1][1]], false)
     end
   end
   name, params, body = node[1], node[2], node[3] if node[0] == :def
@@ -121,15 +133,16 @@ def walk(node, defs, owner = [], singleton = false)
       }
     end
   end
-  node.each { |child| walk(child, defs, owner, singleton) }
+  node.each { |child| walk(child, defs, includes, owner, singleton) }
 end
 
 out = JSON.parse(ARGV.fetch(0)).to_h do |pkg, dir|
+  includes = {}
   files = Dir.glob(File.join(dir, "**", "*.rb")).sort.to_h do |path|
     defs = {}
-    walk(Ripper.sexp(File.read(path)), defs)
+    walk(Ripper.sexp(File.read(path)), defs, includes)
     [path.delete_prefix("#{dir}/"), defs]
   end
-  [pkg, files.reject { |_, defs| defs.empty? }]
+  [pkg, { defs: files.reject { |_, defs| defs.empty? }, includes: includes }]
 end
 puts JSON.generate(out)
