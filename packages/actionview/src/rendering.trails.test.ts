@@ -7,10 +7,9 @@ import {
   RouteSet,
   UrlFor,
 } from "@blazetrails/actionpack";
-import { include } from "@blazetrails/ruby-compat";
-import { RoutingUrlFor } from "./routing-url-for.js";
+import { RoutingUrlFor, urlFor } from "./routing-url-for.js";
 
-include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+RoutingUrlFor.include(UrlFor);
 
 describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
   it("includes RoutingUrlFor through routes.url_helpers' UrlFor included hook", async () => {
@@ -35,7 +34,7 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
       urlFor(options?: unknown): string;
     };
 
-    expect(view.urlFor).toBe(RoutingUrlFor.prototype.urlFor);
+    expect(view.urlFor).toBe(urlFor);
     expect(view.urlFor({ controller: "foo", action: "other" })).toBe("/other");
   });
 });

@@ -3693,8 +3693,7 @@ describe("TestUrlGenerationErrors", () => {
     expect(error.message).toMatch(message);
   });
 
-  // BLOCKED: url-helper-positional-nil-collides-with-a-string-id-option
-  it.skip("exceptions have suggestions for fix", async () => {
+  it("exceptions have suggestions for fix", async () => {
     const Routes = new RouteSet();
     Routes.draw(function () {
       this.get("/products/:id", { to: "products#show", as: "product" });
@@ -4552,8 +4551,7 @@ describe("TestPathParameters", () => {
     t = testCase as TestPathParameters;
   });
 
-  // BLOCKED: view-rendered-with-route-url-helpers-answers-url-for
-  it.skip("path parameters are not mutated", async () => {
+  it("path parameters are not mutated", async () => {
     await t.get("/en/about");
     expect(t.response.body).toBe("/ar | /ar/about");
   });

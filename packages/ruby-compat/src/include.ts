@@ -473,7 +473,16 @@ export class Module<I extends object = Record<never, never>> {
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  appendFeatures(base: AnyClass): void {
+  appendFeatures(base: AnyClass | Module): void {
+    if (base instanceof Module) {
+      const carrier = carrierOf(base);
+      if (isModuleMethodTablePresent({ prototype: carrier }, this)) return;
+      trackIncludedModule(carrier, this);
+      let nested = nestedModules.get(base);
+      if (!nested) nestedModules.set(base, (nested = []));
+      nested.push(this);
+      return;
+    }
     for (const mod of nestedModules.get(this) ?? []) {
       if (!isModuleMethodTablePresent(base, mod)) Module.prototype.appendFeatures.call(mod, base);
     }

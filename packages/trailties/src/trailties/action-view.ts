@@ -1,10 +1,4 @@
-import {
-  include,
-  onLoad,
-  TopLevel,
-  type Deprecators,
-  type Reloader,
-} from "@blazetrails/activesupport";
+import { onLoad, TopLevel, type Deprecators, type Reloader } from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
@@ -205,7 +199,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.setup_action_pack", () => {
       onLoad("action_controller", () => {
-        include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+        RoutingUrlFor.include(UrlFor);
       });
     });
   }

@@ -1,9 +1,10 @@
-import { SpellChecker } from "@blazetrails/did-you-mean";
+import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { toSentence } from "@blazetrails/activesupport";
+import { StandardError, include } from "@blazetrails/ruby-compat";
 
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
-export class ActionControllerError extends Error {
+export class ActionControllerError extends StandardError {
   constructor(msg?: string) {
     super(msg ?? "");
     this.name = "ActionControllerError";
@@ -67,6 +68,7 @@ export class UrlGenerationError extends ActionControllerError {
     return this.#cachedCorrections;
   }
 }
+include(UrlGenerationError, Correctable);
 
 export class MethodNotAllowed extends ActionControllerError {
   constructor(...allowedMethods: string[]) {

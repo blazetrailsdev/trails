@@ -17,6 +17,7 @@ import {
   type Included,
   InvalidURIError,
   merge,
+  block,
   mergeBang,
   Module,
   URI,
@@ -400,7 +401,7 @@ export class UrlHelper {
       }
       eachKey(innerOptions, (key) => {
         const at = pathParams.indexOf(key);
-        if (at !== -1) pathParams.splice(at, 1);
+        if (at !== -1 && args[at] !== null) pathParams.splice(at, 1);
       });
 
       args.forEach((arg, index) => {
@@ -409,7 +410,13 @@ export class UrlHelper {
       });
     }
 
-    return mergeBang(result, innerOptions);
+    return mergeBang(
+      result,
+      innerOptions,
+      block((key: string, oldval: unknown, newval: unknown) =>
+        args[pathParams.indexOf(key)] === null ? oldval : newval,
+      ),
+    );
   }
 }
 
