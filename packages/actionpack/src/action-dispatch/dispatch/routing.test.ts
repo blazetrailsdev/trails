@@ -3822,8 +3822,8 @@ describe("TestNamespaceWithControllerOption", () => {
     t.app = IntegrationTest.buildApp(routes);
     t.routes = routes;
   }
-  const assertRouting = (...args: Parameters<IntegrationTest["assertRouting"]>) =>
-    t.assertRouting(...args);
+  const assertRouting = (path: string, options: Record<string, unknown>) =>
+    t.assertRouting(path, options);
 
   it("missing controller", async () => {
     const ex = await assertRaises([ArgumentError], {}, () => {
