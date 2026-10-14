@@ -14,6 +14,4 @@ allowBuilds:
 
 pmOnFail: ignore
 
-# Fail `pnpm install` fast on a Node below the root `engines.node` (>=24):
-# packages/rack/dist/request.js uses duplicate named capture groups.
 engineStrict: true
