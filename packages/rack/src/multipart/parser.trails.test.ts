@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BoundedIO, EmptyContentError, Parser } from "./parser.js";
+import { MockRequest } from "../mock-request.js";
+import { Request } from "../request.js";
 import { QueryParser } from "../query-parser.js";
 import { EOFError, File } from "@blazetrails/ruby-compat";
 
@@ -90,5 +92,18 @@ describe("Rack::Multipart::Parser encodings", () => {
     expect(caught).toBeInstanceOf(EOFError);
     expect(caught).not.toBeInstanceOf(EmptyContentError);
     expect((caught as Error).message).toBe("bad content body");
+  });
+});
+
+describe("Parser#tag_multipart_encoding", () => {
+  it("decodes a UTF-8 field name once, however many times it is forced", () => {
+    const nameBytes = String.fromCharCode(...new TextEncoder().encode("Iñtërnâtiônàlizætiøn"));
+    const input = `--AaB03x\r\nContent-Disposition: form-data; name="${nameBytes}"\r\n\r\nvalue\r\n--AaB03x--\r\n`;
+    const env = MockRequest.envFor("/", {
+      ":method": "POST",
+      ":input": input,
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    });
+    expect(new Request(env).POST).toEqual({ Iñtërnâtiônàlizætiøn: "value" });
   });
 });

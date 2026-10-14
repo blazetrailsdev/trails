@@ -88,7 +88,8 @@ class TestController extends Base {
   }
 
   async renderBody() {
-    await this.render({ plain: this.request.body });
+    this.request.body.rewind();
+    await this.render({ plain: this.request.body.read() });
   }
 
   async testParams() {
@@ -305,7 +306,7 @@ describe("TestCaseTest", () => {
     assertEqual(toQuery(params), tc.response.body);
   });
 
-  // BLOCKED: request-body-is-a-string-not-an-io
+  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the body read is a JS string, so its encoding reads UTF-8 where Ruby's is BINARY.
   it.skip("body stream is binary", () => {});
 
   it("document body and params with post", async () => {

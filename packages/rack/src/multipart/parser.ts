@@ -471,9 +471,7 @@ export class Parser {
     name = String(name);
     let encoding: Encoding | null = Encoding.UTF_8;
 
-    name = forceEncoding(name, encoding);
-
-    if (filename != null) return [name, body];
+    if (filename != null) return [forceEncoding(name, encoding), body];
 
     if (contentType != null) {
       const list = contentType.split(";");
