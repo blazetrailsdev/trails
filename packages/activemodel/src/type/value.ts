@@ -1,7 +1,6 @@
 import {
   type Included,
   include,
-  initializeIncludedModules,
   rbDeclareIvar,
   rbInspect as inspect,
   rbEqual,
@@ -35,6 +34,7 @@ export class ValueType<T = unknown> {
     return this.__limit;
   }
 
+  /** @inlinedFrom ActiveModel::Type::SerializeCastValue#initialize rails/v8.0.2/activemodel/lib/active_model/type/serialize_cast_value.rb:41-44 */
   constructor(
     kwargs: {
       precision?: number | null;
@@ -43,7 +43,7 @@ export class ValueType<T = unknown> {
     } = {},
   ) {
     const { precision = null, limit = null, scale = null } = kwargs;
-    initializeIncludedModules(this);
+    (this.constructor as typeof ValueType).serializeCastValueCompatible();
     this._precision = precision;
     this._scale = scale;
     this.__limit = limit;
