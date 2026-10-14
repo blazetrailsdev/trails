@@ -31,7 +31,6 @@ import * as Type from "./type.js";
 import { Text } from "./type/text.js";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { withTimezoneConfig } from "./test-helper.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
 import {
@@ -119,7 +118,7 @@ class EncryptedType extends Text {
 include(EncryptedType, Mutable);
 
 describe("SerializedAttributeTest", () => {
-  const { posts } = fixtures(["topics", "posts"]);
+  const { posts, self } = fixtures(["topics", "posts"]);
 
   let yamlColumnPermittedClassesDefault: unknown[];
 
@@ -417,7 +416,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialize attribute via select method when time zone available", async () => {
-    await withTimezoneConfig({ awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ awareAttributes: true }, async () => {
       Topic.serialize("content", { type: MyObject });
 
       const myobj = new MyObject("value1", "value2");
@@ -661,7 +660,7 @@ describe("SerializedAttributeTest", () => {
 });
 
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
-  fixtures(["topics", "posts"]);
+  const { self } = fixtures(["topics", "posts"]);
 
   let useYamlUnsafeLoadWas: boolean;
   let yamlColumnPermittedClassesDefault: unknown[];
@@ -768,7 +767,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("serialize attribute via select method when time zone available", async () => {
-    await withTimezoneConfig({ awareAttributes: true }, async () => {
+    await self().withTimezoneConfig({ awareAttributes: true }, async () => {
       Topic.serialize("content", { type: Hash });
 
       const myobj = { somevalue: "thevalue" };
