@@ -10,13 +10,14 @@
  * convention `IO#write` (`io.ts`) and {@link forceEncoding} already read. The
  * receiver's bytes are therefore its UTF-8 bytes, trails' external encoding,
  * and a receiver that is already in byte form is 7-bit ASCII in every call
- * site Rails makes, where the transcoding is the identity.
+ * site Rails makes, where the transcoding is the identity. A `Uint8Array`
+ * receiver is a String held as its bytes, and answers them in byte form.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#b`
  * (`vendor/ruby/v3.3.11/string.c:10955` `rb_str_b`).
  */
-export function b(str: string): string {
-  const bytes = new TextEncoder().encode(str);
+export function b(str: string | Uint8Array): string {
+  const bytes = str instanceof Uint8Array ? str : new TextEncoder().encode(str);
   let str2 = "";
   for (const byte of bytes) str2 += String.fromCharCode(byte);
   return str2;

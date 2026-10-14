@@ -1,6 +1,14 @@
 import { Encryption } from "../namespaces.js";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { JSON, transformValues, type Bytes, type Hash } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  b,
+  Base64,
+  JSON,
+  transformValues,
+  type Bytes,
+  type Hash,
+} from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, Encoding, ForbiddenClass } from "./errors.js";
@@ -87,10 +95,14 @@ export class MessageSerializer implements MessageSerializerLike {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm b — PERMANENT
+   */
   private encodeIfNeeded(value: unknown): unknown {
-    if (typeof value === "string" || Buffer.isBuffer(value)) {
-      return Buffer.from(value as string).toString("base64");
+    if (typeof value === "string" || value instanceof Uint8Array) {
+      value = b(value);
+      return Base64.strictEncode64(value as string);
     } else {
       return value;
     }
@@ -98,25 +110,19 @@ export class MessageSerializer implements MessageSerializerLike {
 
   /**
    * @internal
-   * @inventedArm if — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
-   * @inventedArm throw — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   * @inventedArm from — PERMANENT
    */
   private decodeIfNeeded(value: unknown): unknown {
-    if (typeof value === "string") {
-      try {
-        const buf = Buffer.from(value, "base64");
-        const reencoded = buf.toString("base64").replace(/=+$/, "");
-        const normalized = value.replace(/=+$/, "");
-        if (normalized !== reencoded) {
-          throw new Decryption("Invalid base64 encoding");
-        }
-        return buf;
-      } catch (e) {
-        if (e instanceof Decryption) throw e;
-        throw new Decryption("Invalid base64 encoding");
+    try {
+      if (typeof value === "string") {
+        return Buffer.from(Base64.strictDecode64(value), "latin1");
+      } else {
+        return value;
       }
+    } catch (e) {
+      if (!(e instanceof ArgumentError || e instanceof TypeError)) throw e;
+      throw new Encoding();
     }
-    return value;
   }
 }
 

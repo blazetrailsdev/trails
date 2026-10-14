@@ -27,7 +27,7 @@ import {
   assertRespondTo,
 } from "@blazetrails/activesupport";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
-import { withExampleTable } from "../../support/ddl-helper.js";
+import * as DdlHelper from "../../support/ddl-helper.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../errors.js";
 import { BusyException } from "../../sqlite/errors.js";
@@ -83,37 +83,16 @@ async function withStrictStringsByDefault(fn: () => Promise<void>): Promise<void
   }
 }
 
-async function createExampleTable(): Promise<void> {
-  await adapter.execute(
-    `CREATE TABLE "ex" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
-  );
+async function withExampleTable(
+  definition: string | null | undefined,
+  tableName = "ex",
+  block: () => Promise<void>,
+): Promise<void> {
+  definition ||= "id integer PRIMARY KEY AUTOINCREMENT,\nnumber integer\n";
+  await DdlHelper.withExampleTable(adapter, tableName, definition, block);
 }
 
 afterEach(async () => {
-  await adapter.execute(`DROP TABLE IF EXISTS typed`);
-  await adapter.execute(`DROP TABLE IF EXISTS no_pk`);
-  await adapter.execute(`DROP TABLE IF EXISTS bin_esc`);
-  await adapter.execute(`DROP TABLE IF EXISTS enc_test`);
-  await adapter.execute(`DROP TABLE IF EXISTS def_vals`);
-  await adapter.execute(`DROP TABLE IF EXISTS strict_items`);
-  await adapter.execute(`DROP TABLE IF EXISTS custom_pk_src`);
-  await adapter.execute(`DROP TABLE IF EXISTS custom_pk_dest`);
-  await adapter.execute(`DROP TABLE IF EXISTS cpk_src`);
-  await adapter.execute(`DROP TABLE IF EXISTS cpk_dest`);
-  await adapter.execute(`DROP TABLE IF EXISTS custom_pk`);
-  await adapter.execute(`DROP TABLE IF EXISTS change_pk`);
-  await adapter.execute(`DROP TABLE IF EXISTS barcodes`);
-  await adapter.execute(`DROP TABLE IF EXISTS test`);
-  await adapter.execute(`DROP TABLE IF EXISTS testings`);
-  await adapter.execute(`DROP TABLE IF EXISTS rowid_test`);
-  await adapter.execute(`DROP TABLE IF EXISTS rowid_lower`);
-  await adapter.execute(`DROP TABLE IF EXISTS text_pk`);
-  await adapter.execute(`DROP TABLE IF EXISTS mixed_case`);
-  await adapter.execute(`DROP TABLE IF EXISTS auto_inc`);
-  await adapter.execute(`DROP TABLE IF EXISTS cpk`);
-  await adapter.execute(`DROP TABLE IF EXISTS cpk_table`);
-  await adapter.execute(`DROP TABLE IF EXISTS foos`);
-  await adapter.execute(`DROP TABLE IF EXISTS ex`);
   await pool.disconnect();
   Notifications.unsubscribeAll();
 });
@@ -217,30 +196,37 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("exec insert", async () => {
-    await createExampleTable();
-    const vals = [new QueryAttribute("number", 10, new ValueType())];
-    await adapter.execInsert("insert into ex (number) VALUES (?)", "SQL", vals);
+    await withExampleTable(undefined, undefined, async () => {
+      const vals = [new QueryAttribute("number", 10, new ValueType())];
+      await adapter.execInsert("insert into ex (number) VALUES (?)", "SQL", vals);
 
-    const result = await adapter.execQuery("select number from ex where number = ?", "SQL", vals);
+      const result = await adapter.execQuery("select number from ex where number = ?", "SQL", vals);
 
-    expect(result.rows.length).toEqual(1);
-    expect(result.rows[0][0]).toEqual(10);
+      expect(result.rows.length).toEqual(1);
+      expect(result.rows[0][0]).toEqual(10);
+    });
   });
 
   it("exec insert with quote", async () => {
-    await createExampleTable();
-    const vals = [new QueryAttribute("number", 10, new ValueType())];
-    await adapter.execInsert('insert into "ex" (number) VALUES (?)', "SQL", vals);
+    await withExampleTable(undefined, undefined, async () => {
+      const vals = [new QueryAttribute("number", 10, new ValueType())];
+      await adapter.execInsert('insert into "ex" (number) VALUES (?)', "SQL", vals);
 
-    const result = await adapter.execQuery('select number from "ex" where number = ?', "SQL", vals);
+      const result = await adapter.execQuery(
+        'select number from "ex" where number = ?',
+        "SQL",
+        vals,
+      );
 
-    expect(result.rows.length).toEqual(1);
-    expect(result.rows[0][0]).toEqual(10);
+      expect(result.rows.length).toEqual(1);
+      expect(result.rows[0][0]).toEqual(10);
+    });
   });
 
   it("primary key returns nil for no pk", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
-    expect(await adapter.primaryKey("ex")).toBeNull();
+    await withExampleTable("id int, data string", undefined, async () => {
+      expect(await adapter.primaryKey("ex")).toBeNull();
+    });
   });
 
   it("connection no db", async () => {
@@ -571,45 +557,48 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("exec no binds", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
-    let result = await adapter.execQuery("SELECT id, data FROM ex");
-    expect(result.rows.length).toEqual(0);
-    expect(result.columns.length).toEqual(2);
-    expect(result.columns).toEqual(["id", "data"]);
+    await withExampleTable("id int, data string", undefined, async () => {
+      let result = await adapter.execQuery("SELECT id, data FROM ex");
+      expect(result.rows.length).toEqual(0);
+      expect(result.columns.length).toEqual(2);
+      expect(result.columns).toEqual(["id", "data"]);
 
-    await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
-    result = await adapter.execQuery("SELECT id, data FROM ex");
-    expect(result.rows.length).toEqual(1);
-    expect(result.columns.length).toEqual(2);
+      await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+      result = await adapter.execQuery("SELECT id, data FROM ex");
+      expect(result.rows.length).toEqual(1);
+      expect(result.columns.length).toEqual(2);
 
-    expect(result.rows).toEqual([[1, "foo"]]);
+      expect(result.rows).toEqual([[1, "foo"]]);
+    });
   });
 
   it("exec query with binds", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
-    await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
-    const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
-      new QueryAttribute(null, 1, new ValueType()),
-    ]);
+    await withExampleTable("id int, data string", undefined, async () => {
+      await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+      const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
+        new QueryAttribute(null, 1, new ValueType()),
+      ]);
 
-    expect(result.rows.length).toEqual(1);
-    expect(result.columns.length).toEqual(2);
+      expect(result.rows.length).toEqual(1);
+      expect(result.columns.length).toEqual(2);
 
-    expect(result.rows).toEqual([[1, "foo"]]);
+      expect(result.rows).toEqual([[1, "foo"]]);
+    });
   });
 
   it("exec query typecasts bind vals", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
-    await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+    await withExampleTable("id int, data string", undefined, async () => {
+      await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
 
-    const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
-      new QueryAttribute("id", "1-fuu", new IntegerType()),
-    ]);
+      const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
+        new QueryAttribute("id", "1-fuu", new IntegerType()),
+      ]);
 
-    expect(result.rows.length).toEqual(1);
-    expect(result.columns.length).toEqual(2);
+      expect(result.rows.length).toEqual(1);
+      expect(result.columns.length).toEqual(2);
 
-    expect(result.rows).toEqual([[1, "foo"]]);
+      expect(result.rows).toEqual([[1, "foo"]]);
+    });
   });
 
   it("quote binary column escapes it", async () => {
@@ -633,39 +622,42 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("execute", async () => {
-    await createExampleTable();
-    await adapter.execute("INSERT INTO ex (number) VALUES (10)");
-    const records = (await adapter.execute("SELECT * FROM ex"))!;
-    expect(records.length).toEqual(1);
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute("INSERT INTO ex (number) VALUES (10)");
+      const records = (await adapter.execute("SELECT * FROM ex"))!;
+      expect(records.length).toEqual(1);
 
-    const record = records[0];
-    expect(record["number"]).toEqual(10);
-    expect(record["id"]).toEqual(1);
+      const record = records[0];
+      expect(record["number"]).toEqual(10);
+      expect(record["id"]).toEqual(1);
+    });
   });
 
   it("insert logged", async () => {
-    await createExampleTable();
-    const sql = "INSERT INTO ex (number) VALUES (10)";
-    const name = "foo";
+    await withExampleTable(undefined, undefined, async () => {
+      const sql = "INSERT INTO ex (number) VALUES (10)";
+      const name = "foo";
 
-    const pragmaQuery: [string, string, unknown[]] = [`PRAGMA table_xinfo("ex")`, "SCHEMA", []];
-    const schemaQuery: [string, string, unknown[]] = [
-      "SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = 'ex'",
-      "SCHEMA",
-      [],
-    ];
-    const modifiedInsertQuery: [string, string, unknown[]] = [`${sql} RETURNING "id"`, name, []];
-    await assertLogged([pragmaQuery, schemaQuery, modifiedInsertQuery], async () => {
-      await adapter.insert(sql, name);
+      const pragmaQuery: [string, string, unknown[]] = [`PRAGMA table_xinfo("ex")`, "SCHEMA", []];
+      const schemaQuery: [string, string, unknown[]] = [
+        "SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = 'ex'",
+        "SCHEMA",
+        [],
+      ];
+      const modifiedInsertQuery: [string, string, unknown[]] = [`${sql} RETURNING "id"`, name, []];
+      await assertLogged([pragmaQuery, schemaQuery, modifiedInsertQuery], async () => {
+        await adapter.insert(sql, name);
+      });
     });
   });
 
   it("insert id value returned", async () => {
-    await createExampleTable();
-    const sql = "INSERT INTO ex (number) VALUES (10)";
-    const idval = "vuvuzela";
-    const id = await adapter.insert(sql, null, null, idval);
-    expect(id).toEqual(idval);
+    await withExampleTable(undefined, undefined, async () => {
+      const sql = "INSERT INTO ex (number) VALUES (10)";
+      const idval = "vuvuzela";
+      const id = await adapter.insert(sql, null, null, idval);
+      expect(id).toEqual(idval);
+    });
   });
 
   it("exec insert with returning disabled", async () => {
@@ -674,15 +666,16 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       database: ":memory:",
       insertReturning: false,
     }) as unknown as SQLite3Adapter;
-    await createExampleTable();
-    const result = await adapter.execInsert(
-      "insert into ex (number) VALUES ('foo')",
-      null,
-      [],
-      "id",
-    );
-    const expected = (await adapter.query("select max(id) from ex"))[0][0];
-    expect(result.rows[0][0]).toEqual(Number(expected));
+    await withExampleTable(undefined, undefined, async () => {
+      const result = await adapter.execInsert(
+        "insert into ex (number) VALUES ('foo')",
+        null,
+        [],
+        "id",
+      );
+      const expected = (await adapter.query("select max(id) from ex"))[0][0];
+      expect(result.rows[0][0]).toEqual(Number(expected));
+    });
     adapter = originalConn;
   });
 
@@ -692,195 +685,224 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       database: ":memory:",
       insertReturning: false,
     }) as unknown as SQLite3Adapter;
-    await createExampleTable();
-    const result = await adapter.execInsert("insert into ex DEFAULT VALUES", null, [], "id");
-    const expected = (await adapter.query("select max(id) from ex"))[0][0];
-    expect(result.rows[0][0]).toEqual(Number(expected));
+    await withExampleTable(undefined, undefined, async () => {
+      const result = await adapter.execInsert("insert into ex DEFAULT VALUES", null, [], "id");
+      const expected = (await adapter.query("select max(id) from ex"))[0][0];
+      expect(result.rows[0][0]).toEqual(Number(expected));
+    });
     adapter = originalConn;
   });
 
   it("select rows", async () => {
-    await createExampleTable();
-    for (let i = 0; i < 2; i++) {
-      await adapter.create(`INSERT INTO ex (number) VALUES (${i})`);
-    }
-    const rows = await adapter.selectRows("select number, id from ex");
-    expect(rows).toEqual([
-      [0, 1],
-      [1, 2],
-    ]);
+    await withExampleTable(undefined, undefined, async () => {
+      for (let i = 0; i < 2; i++) {
+        await adapter.create(`INSERT INTO ex (number) VALUES (${i})`);
+      }
+      const rows = await adapter.selectRows("select number, id from ex");
+      expect(rows).toEqual([
+        [0, 1],
+        [1, 2],
+      ]);
+    });
   });
 
   it("select rows logged", async () => {
-    await createExampleTable();
-    const sql = "select * from ex";
-    const name = "foo";
-    await assertLogged([[sql, name, []]], async () => {
-      await adapter.selectRows(sql, name);
+    await withExampleTable(undefined, undefined, async () => {
+      const sql = "select * from ex";
+      const name = "foo";
+      await assertLogged([[sql, name, []]], async () => {
+        await adapter.selectRows(sql, name);
+      });
     });
   });
 
   it("transaction", async () => {
-    await createExampleTable();
-    const countSql = "select count(*) from ex";
+    await withExampleTable(undefined, undefined, async () => {
+      const countSql = "select count(*) from ex";
 
-    await adapter.beginDbTransaction();
-    await adapter.create("INSERT INTO ex (number) VALUES (10)");
+      await adapter.beginDbTransaction();
+      await adapter.create("INSERT INTO ex (number) VALUES (10)");
 
-    expect((await adapter.selectRows(countSql))[0][0]).toEqual(1);
-    await adapter.rollbackDbTransaction();
-    expect((await adapter.selectRows(countSql))[0][0]).toEqual(0);
+      expect((await adapter.selectRows(countSql))[0][0]).toEqual(1);
+      await adapter.rollbackDbTransaction();
+      expect((await adapter.selectRows(countSql))[0][0]).toEqual(0);
+    });
   });
 
   it("tables", async () => {
-    await createExampleTable();
-    expect(await adapter.tables()).toEqual(["ex"]);
+    await withExampleTable(undefined, undefined, async () => {
+      expect(await adapter.tables()).toEqual(["ex"]);
+      await withExampleTable(
+        "id integer PRIMARY KEY AUTOINCREMENT, number integer",
+        "people",
+        async () => {
+          expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
+        },
+      );
+    });
+  });
+
+  it("columns", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const columns = (await adapter.columns("ex")).sort((a, b) => a.name.localeCompare(b.name));
+      expect(columns.length).toEqual(2);
+      expect(columns.map((c) => c.name)).toEqual(["id", "number"]);
+      expect(columns.map((c) => c.default)).toEqual([null, null]);
+      expect(columns.map((c) => c.null)).toEqual([true, true]);
+    });
+  });
+
+  it("columns with default", async () => {
     await withExampleTable(
-      adapter,
-      "people",
-      "id integer PRIMARY KEY AUTOINCREMENT, number integer",
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer default 10",
+      undefined,
       async () => {
-        expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
+        const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
+        expect(column.default).toBe("10");
       },
     );
   });
 
-  it("columns", async () => {
-    await createExampleTable();
-    const columns = (await adapter.columns("ex")).sort((a, b) => a.name.localeCompare(b.name));
-    expect(columns.length).toEqual(2);
-    expect(columns.map((c) => c.name)).toEqual(["id", "number"]);
-    expect(columns.map((c) => c.default)).toEqual([null, null]);
-    expect(columns.map((c) => c.null)).toEqual([true, true]);
-  });
-
-  it("columns with default", async () => {
-    await adapter.execute(
-      `CREATE TABLE "ex" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer default 10)`,
-    );
-    const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
-    expect(column.default).toBe("10");
-  });
-
   it("columns with not null", async () => {
-    await adapter.execute(
-      `CREATE TABLE "ex" (id integer PRIMARY KEY AUTOINCREMENT, number integer not null)`,
+    await withExampleTable(
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer not null",
+      undefined,
+      async () => {
+        const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
+        expect(column.null).toBeFalsy();
+      },
     );
-    const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
-    expect(column.null).toBeFalsy();
   });
 
   it("add column with not null", async () => {
-    await adapter.execute(
-      `CREATE TABLE "ex" (id integer PRIMARY KEY AUTOINCREMENT, number integer not null)`,
+    await withExampleTable(
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer not null",
+      undefined,
+      async () => {
+        await assertNothingRaised(async () => {
+          await adapter.addColumn("ex", "name", "string", { null: false });
+        });
+        const column = (await adapter.columns("ex")).find((x) => x.name === "name")!;
+        expect(column.null).toBeFalsy();
+      },
     );
-    await assertNothingRaised(async () => {
-      await adapter.addColumn("ex", "name", "string", { null: false });
-    });
-    const column = (await adapter.columns("ex")).find((x) => x.name === "name")!;
-    expect(column.null).toBeFalsy();
   });
 
   it("index", async () => {
-    await createExampleTable();
-    await adapter.addIndex("ex", "id", { unique: true, name: "fun" });
-    const indexes = await adapter.indexes("ex");
-    const index = indexes.find((idx) => idx.name === "fun")!;
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id", { unique: true, name: "fun" });
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "fun")!;
 
-    expect(index.table).toEqual("ex");
-    expect(index.unique).toBeTruthy();
-    expect(index.columns).toEqual(["id"]);
+      expect(index.table).toEqual("ex");
+      expect(index.unique).toBeTruthy();
+      expect(index.columns).toEqual(["id"]);
+    });
   });
 
   it("index with if not exists", async () => {
-    await createExampleTable();
-    await adapter.addIndex("ex", "id");
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id");
 
-    await assertNothingRaised(async () => {
-      await adapter.addIndex("ex", "id", { ifNotExists: true });
+      await assertNothingRaised(async () => {
+        await adapter.addIndex("ex", "id", { ifNotExists: true });
+      });
     });
   });
 
   it("non unique index", async () => {
-    await createExampleTable();
-    await adapter.addIndex("ex", "id", { name: "fun" });
-    const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
-    expect(index.unique).toBeFalsy();
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id", { name: "fun" });
+      const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
+      expect(index.unique).toBeFalsy();
+    });
   });
 
   it("compound index", async () => {
-    await createExampleTable();
-    await adapter.addIndex("ex", ["id", "number"], { name: "fun" });
-    const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
-    expect([...index.columns].sort()).toEqual(["id", "number"].sort());
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", ["id", "number"], { name: "fun" });
+      const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
+      expect([...index.columns].sort()).toEqual(["id", "number"].sort());
+    });
   });
 
   it("partial index with comment", async () => {
-    await createExampleTable();
-    await adapter.addIndex("ex", "id", { name: "fun", where: "number > 0 /*tag:test*/" });
-    const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
-    expect(index.columns).toEqual(["id"]);
-    expect(index.where).toBe("number > 0");
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id", { name: "fun", where: "number > 0 /*tag:test*/" });
+      const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
+      expect(index.columns).toEqual(["id"]);
+      expect(index.where).toBe("number > 0");
+    });
   });
 
   itIfSupports("expression_index", "expression index", async () => {
-    await createExampleTable();
-    await adapter.execute(`CREATE INDEX "expression" ON "ex" (max(id, number))`);
-    const indexes = await adapter.indexes("ex");
-    const index = indexes.find((idx) => idx.name === "expression")!;
-    expect(index.columns).toBe("max(id, number)");
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(`CREATE INDEX "expression" ON "ex" (max(id, number))`);
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("max(id, number)");
+    });
   });
 
   itIfSupports("expression_index", "expression index with trailing comment", async () => {
-    await createExampleTable();
-    await adapter.execute(`CREATE INDEX expression on ex (number % 10) /* comment */`);
-    const indexes = await adapter.indexes("ex");
-    const index = indexes.find((idx) => idx.name === "expression")!;
-    expect(index.columns).toBe("number % 10");
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(`CREATE INDEX expression on ex (number % 10) /* comment */`);
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("number % 10");
+    });
   });
 
   itIfSupports("expression_index", "expression index with where", async () => {
-    await createExampleTable();
-    await adapter.execute(
-      `CREATE INDEX "expression" ON "ex" (id % 10, max(id, number)) WHERE id > 1000`,
-    );
-    const indexes = await adapter.indexes("ex");
-    const index = indexes.find((idx) => idx.name === "expression")!;
-    expect(index.columns).toBe("id % 10, max(id, number)");
-    expect(index.where).toBe("id > 1000");
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(
+        `CREATE INDEX "expression" ON "ex" (id % 10, max(id, number)) WHERE id > 1000`,
+      );
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("id % 10, max(id, number)");
+      expect(index.where).toBe("id > 1000");
+    });
   });
 
   itIfSupports("expression_index", "complicated expression", async () => {
-    await createExampleTable();
-    await adapter.execute(
-      `CREATE INDEX expression ON ex (id % 10, (CASE WHEN number > 0 THEN max(id, number) END))WHERE(id > 1000)`,
-    );
-    const indexes = await adapter.indexes("ex");
-    const index = indexes.find((idx) => idx.name === "expression")!;
-    expect(index.columns).toBe("id % 10, (CASE WHEN number > 0 THEN max(id, number) END)");
-    expect(index.where).toBe("(id > 1000)");
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(
+        `CREATE INDEX expression ON ex (id % 10, (CASE WHEN number > 0 THEN max(id, number) END))WHERE(id > 1000)`,
+      );
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("id % 10, (CASE WHEN number > 0 THEN max(id, number) END)");
+      expect(index.where).toBe("(id > 1000)");
+    });
   });
 
   itIfSupports("expression_index", "not everything an expression", async () => {
-    await createExampleTable();
-    await adapter.execute(`CREATE INDEX "expression" ON "ex" (id, max(id, number))`);
-    const indexes = await adapter.indexes("ex");
-    const index = indexes.find((idx) => idx.name === "expression")!;
-    expect(index.columns).toBe("id, max(id, number)");
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(`CREATE INDEX "expression" ON "ex" (id, max(id, number))`);
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("id, max(id, number)");
+    });
   });
 
   it("primary key", async () => {
-    await createExampleTable();
-    expect(await adapter.primaryKey("ex")).toEqual("id");
-    await adapter.execute(
-      `CREATE TABLE "foos" (internet integer PRIMARY KEY AUTOINCREMENT, number integer not null)`,
-    );
-    expect(await adapter.primaryKey("foos")).toEqual("internet");
+    await withExampleTable(undefined, undefined, async () => {
+      expect(await adapter.primaryKey("ex")).toEqual("id");
+      await withExampleTable(
+        "internet integer PRIMARY KEY AUTOINCREMENT, number integer not null",
+        "foos",
+        async () => {
+          expect(await adapter.primaryKey("foos")).toEqual("internet");
+        },
+      );
+    });
   });
 
   it("no primary key", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (number integer not null)`);
-    expect(await adapter.primaryKey("ex")).toBeNull();
+    await withExampleTable("number integer not null", undefined, async () => {
+      expect(await adapter.primaryKey("ex")).toBeNull();
+    });
   });
 
   it("copy table with existing records have custom primary key", async () => {
@@ -1206,57 +1228,69 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("rowid column", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id_uppercase INTEGER PRIMARY KEY)`);
-    expect(
-      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
-        "id_uppercase"
-      ].rowid,
-    ).toBeTruthy();
+    await withExampleTable("id_uppercase INTEGER PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_uppercase"
+        ].rowid,
+      ).toBeTruthy();
+    });
   });
 
   it("lowercase rowid column", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id_lowercase integer PRIMARY KEY)`);
-    expect(
-      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
-        "id_lowercase"
-      ].rowid,
-    ).toBeTruthy();
+    await withExampleTable("id_lowercase integer PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_lowercase"
+        ].rowid,
+      ).toBeTruthy();
+    });
   });
 
   it("non integer column returns false for rowid", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id_int_short int PRIMARY KEY)`);
-    expect(
-      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
-        "id_int_short"
-      ].rowid,
-    ).toBeFalsy();
+    await withExampleTable("id_int_short int PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_int_short"
+        ].rowid,
+      ).toBeFalsy();
+    });
   });
 
   it("mixed case integer colum returns true for rowid", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id_mixed_case InTeGeR PRIMARY KEY)`);
-    expect(
-      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
-        "id_mixed_case"
-      ].rowid,
-    ).toBeTruthy();
+    await withExampleTable("id_mixed_case InTeGeR PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_mixed_case"
+        ].rowid,
+      ).toBeTruthy();
+    });
   });
 
   it("rowid column with autoincrement returns true for rowid", async () => {
-    await adapter.execute(`CREATE TABLE "ex" (id_autoincrement integer PRIMARY KEY AUTOINCREMENT)`);
-    expect(
-      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
-        "id_autoincrement"
-      ].rowid,
-    ).toBeTruthy();
+    await withExampleTable(
+      "id_autoincrement integer PRIMARY KEY AUTOINCREMENT",
+      undefined,
+      async () => {
+        expect(
+          indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+            "id_autoincrement"
+          ].rowid,
+        ).toBeTruthy();
+      },
+    );
   });
 
   it("integer cpk column returns false for rowid", async () => {
-    await adapter.execute(
-      `CREATE TABLE "cpk_table" (id integer, shop_id integer, PRIMARY KEY (shop_id, id))`,
+    await withExampleTable(
+      "id integer, shop_id integer, PRIMARY KEY (shop_id, id)",
+      "cpk_table",
+      async () => {
+        expect(
+          ((await adapter.columns("cpk_table")) as SQLite3Column[]).some((c) => c.rowid),
+        ).toBeFalsy();
+      },
     );
-    expect(
-      ((await adapter.columns("cpk_table")) as SQLite3Column[]).some((c) => c.rowid),
-    ).toBeFalsy();
   });
 
   it("tables logs name", async () => {
@@ -1267,22 +1301,20 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("table exists logs name", async () => {
-    await adapter.execute(
-      `CREATE TABLE "ex" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "number" INTEGER)`,
-    );
-    const sql =
-      "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = 'ex' AND type IN ('table')";
-    await assertLogged([[sql, "SCHEMA", []]], async () => {
-      expect(await adapter.tableExists("ex")).toBeTruthy();
+    await withExampleTable(undefined, undefined, async () => {
+      const sql =
+        "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = 'ex' AND type IN ('table')";
+      await assertLogged([[sql, "SCHEMA", []]], async () => {
+        expect(await adapter.tableExists("ex")).toBeTruthy();
+      });
     });
   });
 
   it("indexes logs", async () => {
-    await adapter.execute(
-      `CREATE TABLE "ex" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "number" INTEGER)`,
-    );
-    await assertLogged([[`PRAGMA index_list("ex")`, "SCHEMA", []]], async () => {
-      await adapter.indexes("ex");
+    await withExampleTable(undefined, undefined, async () => {
+      await assertLogged([[`PRAGMA index_list("ex")`, "SCHEMA", []]], async () => {
+        await adapter.indexes("ex");
+      });
     });
   });
 
