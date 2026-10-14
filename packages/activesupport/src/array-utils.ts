@@ -80,16 +80,18 @@ export function toSentence(
       defaultConnectors[camelize(k, "lower")] = v;
     }
   }
-  for (const [k, v] of Object.entries(options)) {
-    if (v !== undefined) defaultConnectors[k] = (v ?? "") as string;
+  options = Object.assign(defaultConnectors, options);
+
+  switch (array.length) {
+    case 0:
+      return "";
+    case 1:
+      return `${array[0]}`;
+    case 2:
+      return `${array[0]}${options.twoWordsConnector ?? ""}${array[1]}`;
+    default:
+      return `${array.slice(0, -1).join(options.wordsConnector ?? "")}${options.lastWordConnector ?? ""}${array.at(-1)}`;
   }
-  const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
-
-  if (array.length === 0) return "";
-  if (array.length === 1) return `${array[0]}`;
-  if (array.length === 2) return `${array[0]}${twoWordsConnector}${array[1]}`;
-
-  return `${array.slice(0, -1).join(wordsConnector)}${lastWordConnector}${array[array.length - 1]}`;
 }
 
 export function inGroups<T>(

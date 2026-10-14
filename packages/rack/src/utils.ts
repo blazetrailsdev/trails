@@ -300,24 +300,23 @@ export function setCookieHeader(
     partitioned = "";
 
   if (typeof value === "object" && !Array.isArray(value)) {
-    const opts = value;
-    if (opts.escapeKey !== false) key = escapeCookieKey(key);
-    if (opts.domain) domain = `; domain=${opts.domain}`;
-    if (opts.path) path = `; path=${opts.path}`;
-    if (opts.maxAge !== undefined) maxAge = `; max-age=${opts.maxAge}`;
-    if (opts.expires) expires = `; expires=${httpDate(opts.expires)}`;
-    if (opts.secure) secure = "; secure";
-    if ("httponly" in opts ? opts.httponly : opts.httpOnly) httponly = "; httponly";
-    if (opts.sameSite !== undefined && opts.sameSite !== false && opts.sameSite !== null) {
-      const ss = opts.sameSite;
+    if (value.escapeKey !== false) key = escapeCookieKey(key);
+    if (value.domain) domain = `; domain=${value.domain}`;
+    if (value.path) path = `; path=${value.path}`;
+    if (value.maxAge !== undefined) maxAge = `; max-age=${value.maxAge}`;
+    if (value.expires) expires = `; expires=${httpDate(value.expires)}`;
+    if (value.secure) secure = "; secure";
+    if ("httponly" in value ? value.httponly : value.httpOnly) httponly = "; httponly";
+    if (value.sameSite !== undefined && value.sameSite !== false && value.sameSite !== null) {
+      const ss = value.sameSite;
       if (ss === ":none" || ss === "None" || ss === ":None") sameSite = "; samesite=none";
       else if (ss === ":lax" || ss === "Lax" || ss === ":Lax") sameSite = "; samesite=lax";
       else if (ss === true || ss === ":strict" || ss === "Strict" || ss === ":Strict")
         sameSite = "; samesite=strict";
       else throw new ArgumentError(`Invalid :same_site value: ${rbInspect(ss)}`);
     }
-    if (opts.partitioned) partitioned = "; partitioned";
-    value = opts.value;
+    if (value.partitioned) partitioned = "; partitioned";
+    value = value.value;
   } else {
     key = escapeCookieKey(key);
   }

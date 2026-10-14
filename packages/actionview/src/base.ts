@@ -330,16 +330,18 @@ export class Base {
     block?: () => unknown,
   ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
     if ((options as object | null)?.constructor === Object) {
-      const hash = options as RenderOptions;
-      return this.inRenderingContext(hash, () => {
+      return this.inRenderingContext(options as RenderOptions, () => {
         if (block) {
           return this.viewRenderer.renderPartial(
             this,
-            { ...hash, partial: hash.layout as RenderOptions["partial"] },
+            {
+              ...(options as RenderOptions),
+              partial: (options as RenderOptions).layout as RenderOptions["partial"],
+            },
             block,
           );
         } else {
-          return this.viewRenderer.render(this, hash);
+          return this.viewRenderer.render(this, options as RenderOptions);
         }
       });
     } else {

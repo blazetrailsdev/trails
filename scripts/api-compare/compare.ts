@@ -1833,8 +1833,13 @@ interface CallResult {
 export interface CallSkeleton {
   rubyFile: string;
   rubyName: string;
+  /** The Ruby class/module the `def` sits in, and the seat it is defined on. */
+  rubyOwner?: string;
+  rubySeat?: OwnerSeat;
   tsFile: string;
   tsName: string;
+  /** The TS class the pair resolved to; `""` is a top-level function. */
+  tsOwner?: string;
   ruby: string[];
   ts: string[];
   /** The SAME-FILE methods this pair's own `ref:` reaches resolve to, folded
@@ -5787,8 +5792,11 @@ export function main() {
           callSkeletons.push({
             rubyFile,
             rubyName,
+            rubyOwner: rubyModule,
+            rubySeat: level,
             tsFile: skeletonFile,
             tsName,
+            ...(tsClass !== undefined ? { tsOwner: tsClass } : {}),
             ruby: foldSkeletonTokens(rubySkeleton, "ruby", tsFolded),
             ts: tsFolded,
             rubyHelpers: sameFileHelperSkeletons(

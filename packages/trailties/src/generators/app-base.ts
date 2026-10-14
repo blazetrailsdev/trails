@@ -173,7 +173,7 @@ export abstract class AppBase extends GeneratorBase {
   }
   /** @internal */
   dependsOnSystemTest(): boolean {
-    return !(this.skip("SystemTest") || this.skip("Test") || this.options.api);
+    return !(this.options.skipSystemTest || this.options.skipTest || this.options.api);
   }
 
   /** @internal */

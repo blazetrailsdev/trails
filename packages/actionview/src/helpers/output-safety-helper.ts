@@ -70,10 +70,7 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
   for (const [k, v] of Object.entries(i18nConnectors)) {
     defaultConnectors[camelize(k, "lower")] = v;
   }
-  for (const [k, v] of Object.entries(options)) {
-    if (v !== undefined) defaultConnectors[k] = v as string | SafeBuffer | null;
-  }
-  const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
+  options = Object.assign(defaultConnectors, options);
 
   switch (array.length) {
     case 0:
@@ -81,13 +78,16 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
     case 1:
       return htmlEscape(array[0]);
     case 2:
-      return safeJoin([array[0], array[1]], twoWordsConnector as string | SafeBuffer);
-    default: {
-      const allButLast = array.slice(0, -1);
-      const last = array[array.length - 1];
-      const joinedHead = safeJoin(allButLast, wordsConnector as string | SafeBuffer);
-      return safeJoin([joinedHead, lastWordConnector, last], null);
-    }
+      return safeJoin([array[0], array[1]], options.twoWordsConnector);
+    default:
+      return safeJoin(
+        [
+          safeJoin(array.slice(0, -1), options.wordsConnector),
+          options.lastWordConnector,
+          array.at(-1),
+        ],
+        null,
+      );
   }
 }
 
