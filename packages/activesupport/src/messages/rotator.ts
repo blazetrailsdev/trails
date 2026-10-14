@@ -11,7 +11,7 @@ export interface Rotatable {
   readMessage(message: string, options?: Record<string, unknown>): unknown;
 }
 
-export interface RotatorHost {
+interface RotatorHost {
   args: unknown[];
   options: Record<string, unknown>;
   rotations: Rotatable[];

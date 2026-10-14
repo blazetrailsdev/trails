@@ -35,10 +35,14 @@ const SEPARATOR = "--";
 export class MessageVerifier extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
 
-  declare args: unknown[];
-  declare options: Record<string, unknown>;
-  declare rotations: Rotatable[];
-  declare _onRotation: OnRotation | null;
+  /** @internal */
+  declare protected args: unknown[];
+  /** @internal */
+  declare protected options: Record<string, unknown>;
+  /** @internal */
+  declare protected rotations: Rotatable[];
+  /** @internal */
+  declare protected _onRotation: OnRotation | null;
 
   declare rotate: (...args: unknown[]) => this;
   declare onRotation: (callback: OnRotation) => this;
