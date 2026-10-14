@@ -12,16 +12,12 @@ import { ExceptionWrapper } from "./exception-wrapper.js";
 import { X_CASCADE } from "../constants.js";
 import { Mime, type MimeType } from "../http/mime-type.js";
 import { Request } from "../http/request.js";
+import { InvalidType } from "../http/mime-negotiation.js";
+import { RoutesInspector } from "../routing/inspector.js";
+import type { RouteSet } from "../routing/route-set.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
-
-export interface DebugExceptionsOptions {
-  showDetailedExceptions?: boolean;
-  showExceptions?: boolean;
-  interceptors?: Interceptor[];
-  responseFormat?: "default" | "api";
-}
 
 export type Interceptor = (request: Request, exception: Error) => void;
 
@@ -34,18 +30,21 @@ export class DebugExceptions {
   }
 
   private app: RackApp;
-  private showDetailedExceptions: boolean;
-  private showExceptions: boolean;
-  private interceptors: Interceptor[];
+  private routesApp: { routes(): RouteSet } | null;
   private responseFormat: "default" | "api";
+  private interceptors: Interceptor[];
   private _stderrLogger?: ActiveSupportLogger;
 
-  constructor(app: RackApp, options: DebugExceptionsOptions = {}) {
+  constructor(
+    app: RackApp,
+    routesApp: { routes(): RouteSet } | null = null,
+    responseFormat: "default" | "api" = "default",
+    interceptors: Interceptor[] = DebugExceptions.interceptors,
+  ) {
     this.app = app;
-    this.showDetailedExceptions = options.showDetailedExceptions !== false;
-    this.showExceptions = options.showExceptions !== false;
-    this.interceptors = options.interceptors ?? [...DebugExceptions.interceptors];
-    this.responseFormat = options.responseFormat ?? "default";
+    this.routesApp = routesApp;
+    this.responseFormat = responseFormat;
+    this.interceptors = interceptors;
   }
 
   /** @internal */
@@ -156,7 +155,13 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  routesInspector(_exception: ExceptionWrapper): unknown {
+  routesInspector(exception: ExceptionWrapper): RoutesInspector | null {
+    if (
+      rbObjRespondTo(this.routesApp, "routes") &&
+      (exception.isRoutingError() || exception.isTemplateError())
+    ) {
+      return new RoutesInspector(this.routesApp!.routes().routes);
+    }
     return null;
   }
 
@@ -193,7 +198,7 @@ export class DebugExceptions {
       const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
 
       this.invokeInterceptors(request, exception, wrapper);
-      if (!this.showExceptions) throw exception;
+      if (!wrapper.isShow(request)) throw exception;
       return this.renderException(request, exception, wrapper);
     }
   }
@@ -205,73 +210,71 @@ export class DebugExceptions {
   ): RackResponse {
     this.logError(request, wrapper);
 
-    if (!this.showDetailedExceptions) {
+    if (rtest(request.getHeader("action_dispatch.show_detailed_exceptions"))) {
+      let contentType: MimeType | undefined;
+      try {
+        contentType = request.formats[0];
+      } catch (e) {
+        if (!(e instanceof InvalidType)) throw e;
+        contentType = Mime.get("text")!;
+      }
+
+      if (this.isApiRequest(contentType)) {
+        return this.renderForApiRequest(contentType, wrapper);
+      } else {
+        return this.renderForBrowserRequest(request, wrapper);
+      }
+    } else {
       throw exception;
     }
+  }
 
-    const contentType = request.formats[0];
-    if (this.isApiRequest(contentType)) {
-      return this.renderForApiRequest(contentType, wrapper);
-    }
-
+  /** @internal */
+  renderForBrowserRequest(request: Request, wrapper: ExceptionWrapper): RackResponse {
+    let body: string;
+    let format: string;
     if (request.xhr) {
-      return this.renderTextError(wrapper);
+      body = [
+        `${wrapper.exceptionName} (${wrapper.message})`,
+        "",
+        ...wrapper.applicationTrace.slice(0, 10),
+      ].join("\n");
+      format = "text/plain";
+    } else {
+      const method = (request.getHeader("REQUEST_METHOD") as string) ?? "GET";
+      const path = (request.getHeader("PATH_INFO") as string) ?? "/";
+      const controller = request.getHeader("action_dispatch.controller") as string | undefined;
+
+      const traceHtml = wrapper.applicationTrace
+        .slice(0, 20)
+        .map((line) => `  <li>${this.escapeHtml(String(line))}</li>`)
+        .join("\n");
+
+      body = [
+        "<!DOCTYPE html>",
+        "<html>",
+        "<head>",
+        `  <title>${wrapper.exceptionName} at ${this.escapeHtml(path)}</title>`,
+        '  <meta charset="utf-8">',
+        "</head>",
+        "<body>",
+        `  <h1>${this.escapeHtml(wrapper.exceptionName)}</h1>`,
+        `  <h2>${this.escapeHtml(wrapper.message)}</h2>`,
+        controller ? `  <p>Controller: ${this.escapeHtml(controller)}</p>` : "",
+        `  <p>Request: ${this.escapeHtml(method)} ${this.escapeHtml(path)}</p>`,
+        "  <h3>Application Trace</h3>",
+        "  <ul>",
+        traceHtml,
+        "  </ul>",
+        "</body>",
+        "</html>",
+      ]
+        .filter((l) => l.length > 0)
+        .join("\n");
+      format = "text/html";
     }
 
-    return this.renderHtmlError(request, wrapper);
-  }
-
-  private renderTextError(wrapper: ExceptionWrapper): RackResponse {
-    const body = [
-      `${wrapper.exceptionName} (${wrapper.message})`,
-      "",
-      ...wrapper.applicationTrace.slice(0, 10),
-    ].join("\n");
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "text/plain; charset=utf-8" },
-      bodyFromString(body),
-    ];
-  }
-
-  private renderHtmlError(request: Request, wrapper: ExceptionWrapper): RackResponse {
-    const method = (request.getHeader("REQUEST_METHOD") as string) ?? "GET";
-    const path = (request.getHeader("PATH_INFO") as string) ?? "/";
-    const controller = request.getHeader("action_dispatch.controller") as string | undefined;
-
-    const traceHtml = wrapper.applicationTrace
-      .slice(0, 20)
-      .map((line) => `  <li>${this.escapeHtml(String(line))}</li>`)
-      .join("\n");
-
-    const html = [
-      "<!DOCTYPE html>",
-      "<html>",
-      "<head>",
-      `  <title>${wrapper.exceptionName} at ${this.escapeHtml(path)}</title>`,
-      '  <meta charset="utf-8">',
-      "</head>",
-      "<body>",
-      `  <h1>${this.escapeHtml(wrapper.exceptionName)}</h1>`,
-      `  <h2>${this.escapeHtml(wrapper.message)}</h2>`,
-      controller ? `  <p>Controller: ${this.escapeHtml(controller)}</p>` : "",
-      `  <p>Request: ${this.escapeHtml(method)} ${this.escapeHtml(path)}</p>`,
-      "  <h3>Application Trace</h3>",
-      "  <ul>",
-      traceHtml,
-      "  </ul>",
-      "</body>",
-      "</html>",
-    ]
-      .filter((l) => l.length > 0)
-      .join("\n");
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "text/html; charset=utf-8" },
-      bodyFromString(html),
-    ];
+    return this.render(wrapper.statusCode, body, format);
   }
 
   private escapeHtml(str: string): string {

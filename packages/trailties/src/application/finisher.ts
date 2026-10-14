@@ -6,7 +6,11 @@ import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
-import { controllerConstants, type DispatchableControllerClass } from "@blazetrails/actionpack";
+import {
+  ActionController,
+  controllerConstants,
+  type DispatchableControllerClass,
+} from "@blazetrails/actionpack";
 import { Base, registerModel } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
@@ -70,6 +74,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   for (const [name, klass] of await loadControllers(this.paths())) {
     controllerConstants.set(name, klass);
   }
+  for (const klass of controllerConstants.values()) await defineController(klass);
   registerModel(await loadModels(this.paths()));
 });
 
@@ -244,6 +249,23 @@ async function collectControllers(
       }
     }
   }
+}
+
+const definedControllers = new WeakSet<object>();
+
+/** @noRailsEquivalent PERMANENT */
+async function defineController(klass: object): Promise<void> {
+  const base = ActionController.Base;
+  if (!((klass as { prototype: unknown }).prototype instanceof base)) return;
+
+  const superclass = Object.getPrototypeOf(klass) as object;
+  if (superclass !== base) await defineController(superclass);
+
+  if (definedControllers.has(klass)) return;
+  definedControllers.add(klass);
+  await ActionController.Railties.Helpers.inherited(
+    klass as ActionController.HelpersPathControllerClass,
+  );
 }
 
 /** @noRailsEquivalent PERMANENT */

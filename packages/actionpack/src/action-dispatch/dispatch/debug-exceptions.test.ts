@@ -27,18 +27,28 @@ const routingErrorApp = async (_env: RackEnv): Promise<RackResponse> => {
 };
 
 function makeEnv(overrides: Partial<RackEnv> = {}): RackEnv {
-  return { REQUEST_METHOD: "GET", PATH_INFO: "/test", ...overrides };
+  return {
+    REQUEST_METHOD: "GET",
+    PATH_INFO: "/test",
+    "action_dispatch.show_detailed_exceptions": true,
+    "action_dispatch.show_exceptions": "all",
+    ...overrides,
+  };
 }
 
 describe("DebugExceptionsTest", () => {
   it("skip diagnosis if not showing detailed exceptions", async () => {
-    const mw = new DebugExceptions(errorApp, { showDetailedExceptions: false });
-    await expect(mw.call(makeEnv())).rejects.toThrow("Something went wrong");
+    const mw = new DebugExceptions(errorApp);
+    await expect(
+      mw.call(makeEnv({ "action_dispatch.show_detailed_exceptions": false })),
+    ).rejects.toThrow("Something went wrong");
   });
 
   it("skip diagnosis if not showing exceptions", async () => {
-    const mw = new DebugExceptions(errorApp, { showExceptions: false });
-    await expect(mw.call(makeEnv())).rejects.toThrow("Something went wrong");
+    const mw = new DebugExceptions(errorApp);
+    await expect(mw.call(makeEnv({ "action_dispatch.show_exceptions": "none" }))).rejects.toThrow(
+      "Something went wrong",
+    );
   });
 
   it("rescue with diagnostics message", async () => {
@@ -63,7 +73,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("rescue with JSON error for JSON API request", async () => {
-    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+    const mw = new DebugExceptions(errorApp, null, "api");
     const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
@@ -83,7 +93,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("rescue with XML format for XML API requests", async () => {
-    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+    const mw = new DebugExceptions(errorApp, null, "api");
     const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/xml" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/xml");
@@ -95,7 +105,7 @@ describe("DebugExceptionsTest", () => {
   it("rescue with JSON format as fallback if API request format is not supported", async () => {
     MimeType.register("text/wibble", ":wibble");
     try {
-      const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+      const mw = new DebugExceptions(errorApp, null, "api");
       const [status, headers] = await mw.call(makeEnv({ HTTP_ACCEPT: "text/wibble" }));
       expect(status).toBe(500);
       expect(headers["content-type"]).toContain("application/json");
@@ -234,25 +244,21 @@ describe("DebugExceptionsTest", () => {
 
   it("invoke interceptors before rendering", async () => {
     let intercepted = false;
-    const mw = new DebugExceptions(errorApp, {
-      interceptors: [
-        () => {
-          intercepted = true;
-        },
-      ],
-    });
+    const mw = new DebugExceptions(errorApp, null, "default", [
+      () => {
+        intercepted = true;
+      },
+    ]);
     await mw.call(makeEnv());
     expect(intercepted).toBe(true);
   });
 
   it("bad interceptors doesnt debug exceptions", async () => {
-    const mw = new DebugExceptions(errorApp, {
-      interceptors: [
-        () => {
-          throw new Error("interceptor broke");
-        },
-      ],
-    });
+    const mw = new DebugExceptions(errorApp, null, "default", [
+      () => {
+        throw new Error("interceptor broke");
+      },
+    ]);
     const [status] = await mw.call(makeEnv());
     expect(status).toBe(500);
   });
@@ -277,10 +283,10 @@ describe("DebugExceptionsTest", () => {
       { "x-cascade": "pass" },
       bodyFromString(""),
     ];
-    const mw = new DebugExceptions(passApp, { showExceptions: false });
-    await expect(mw.call(makeEnv({ PATH_INFO: "/pass" }))).rejects.toThrow(
-      'No route matches [GET] "/pass"',
-    );
+    const mw = new DebugExceptions(passApp);
+    await expect(
+      mw.call(makeEnv({ PATH_INFO: "/pass", "action_dispatch.show_exceptions": "none" })),
+    ).rejects.toThrow('No route matches [GET] "/pass"');
   });
 
   it("closes the response body on cascade pass", async () => {
@@ -295,8 +301,10 @@ describe("DebugExceptionsTest", () => {
       { "x-cascade": "pass" },
       body,
     ];
-    const mw = new DebugExceptions(passApp, { showExceptions: false });
-    await expect(mw.call(makeEnv({ PATH_INFO: "/pass" }))).rejects.toThrow(RoutingErrorClass);
+    const mw = new DebugExceptions(passApp);
+    await expect(
+      mw.call(makeEnv({ PATH_INFO: "/pass", "action_dispatch.show_exceptions": "none" })),
+    ).rejects.toThrow(RoutingErrorClass);
     expect(closed).toBe(true);
   });
 
@@ -329,7 +337,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("json error includes traces", async () => {
-    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+    const mw = new DebugExceptions(errorApp, null, "api");
     const [, , body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
     const json = JSON.parse(await bodyToString(body));
     expect(json.traces).toBeTruthy();
@@ -345,14 +353,14 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("xml error includes exception name", async () => {
-    const mw = new DebugExceptions(routingErrorApp, { responseFormat: "api" });
+    const mw = new DebugExceptions(routingErrorApp, null, "api");
     const [, , body] = await mw.call(makeEnv({ HTTP_ACCEPT: "text/xml" }));
     const xml = await bodyToString(body);
     expect(xml).toContain("RoutingError");
   });
 
   it("routes non-HTML requests through renderForApiRequest when responseFormat is 'api'", async () => {
-    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+    const mw = new DebugExceptions(errorApp, null, "api");
     const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
@@ -365,7 +373,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("isApiRequest is false for HTML accept even when responseFormat is 'api'", () => {
-    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+    const mw = new DebugExceptions(errorApp, null, "api");
     expect(mw.isApiRequest(MimeType.lookup("text/html"))).toBe(false);
     expect(mw.isApiRequest(MimeType.lookup("application/json"))).toBe(true);
     expect(mw.isApiRequest(null)).toBe(true);

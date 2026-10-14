@@ -14,6 +14,7 @@ import {
   fsAdapterConfig,
   registerFsAdapter,
   type FsAdapter,
+  type Module,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
@@ -507,8 +508,23 @@ describe("Trails.application integration (boot-app fixture)", () => {
     app.config.considerAllRequestsLocal = true;
     await Trails.initialize();
 
-    const [status] = await app.app()({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
+    const [status] = await app.call({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
     expect(status).toBe(500);
+  });
+
+  it("includes every application helper into ApplicationController at boot, before any request", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppHelpersAtBoot extends BootApp {}
+    Application.register(BootAppHelpersAtBoot);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    await Trails.initialize();
+
+    const { ApplicationController } =
+      await import("./__fixtures__/boot-app/app/controllers/application-controller.js");
+    const helpers = (ApplicationController as unknown as { _helpers: Module })._helpers;
+    expect(helpers.instanceMethods()).toContain("statusBadge");
   });
 });
 
@@ -739,7 +755,7 @@ describe("Application::DefaultMiddlewareStack", () => {
     const mw = new DefaultMiddlewareStack(app, app.config, paths)
       .buildStack()
       .middlewares.find((m) => m.klass === DebugExceptions)!;
-    expect(mw.args).toEqual([{ responseFormat: "api" }]);
+    expect(mw.args).toEqual([app, "api"]);
   });
 
   it("default stack always includes RequestId, ShowExceptions, DebugExceptions, Callbacks, Static", () => {

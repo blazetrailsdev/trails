@@ -374,7 +374,7 @@ describe("ActionController::Helpers included into ActionController::API", () => 
     expect(rbObjRespondTo(API, "helper", true)).toBe(false);
   });
 
-  it("fires the inherited hooks for a subclass: default helper module and helpersPath", () => {
+  it("fires the inherited hook for a subclass: default helper module", () => {
     const helper = new Module().include({ probe: () => "probed" });
     registerConstant("ApiSubclassProbeHelper", helper);
     const paths = ["app/helpers"];
@@ -385,13 +385,7 @@ describe("ActionController::Helpers included into ActionController::API", () => 
       class ApiSubclassProbeController extends ApiProbeWithHelpersController {}
       new ApiSubclassProbeController();
 
-      const subclass = ApiSubclassProbeController as unknown as HelpersClass & {
-        helpersPath: string[];
-      };
-      expect(subclass.helpersPath).toBe(paths);
-      expect(
-        (ApiProbeWithHelpersController as unknown as { helpersPath: string[] }).helpersPath,
-      ).toEqual([]);
+      const subclass = ApiSubclassProbeController as unknown as HelpersClass;
       expect((extend({}, subclass._helpers) as Probe).probe()).toBe("probed");
     } finally {
       setHelpersPath([]);

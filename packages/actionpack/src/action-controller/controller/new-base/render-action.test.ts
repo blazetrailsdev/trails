@@ -114,8 +114,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
       t = new RenderLayoutTest(task.name);
     });
 
-    // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-    it.skip("rendering with layout => true", async () => {
+    it("rendering with layout => true", async () => {
       await assertRaises([ArgumentError], {}, async () => {
         await t.get("/render_action/basic/helloWorldWithLayout", {
           headers: { "action_dispatch.show_exceptions": "none" },
@@ -137,8 +136,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
       assertStatus(200);
     });
 
-    // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-    it.skip("rendering with layout => 'greetings'", async () => {
+    it("rendering with layout => 'greetings'", async () => {
       await assertRaises([MissingTemplate], {}, async () => {
         await t.get("/render_action/basic/helloWorldWithCustomLayout", {
           headers: { "action_dispatch.show_exceptions": "none" },

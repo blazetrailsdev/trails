@@ -1,4 +1,5 @@
 import type { HelpersClass, HelpersClassMethods } from "../../abstract-controller/helpers.js";
+import { moduleParents } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { helpersPath } from "../metal/helpers.js";
 import { ActionController } from "../../namespaces.js";
@@ -9,42 +10,22 @@ export interface HelpersPathControllerClass extends HelpersClassMethods {
   helper?: HelpersClass["helper"];
 }
 
-const fired = new WeakSet<object>();
+export async function inherited(klass: HelpersPathControllerClass): Promise<void> {
+  if (!rbObjRespondTo(klass, "helpersPath=")) return;
 
-/** @noRailsEquivalent CONVERGEABLE port-action-controller-helpers-and-the-inherited-hook */
-export function fireInherited(
-  klass: HelpersPathControllerClass,
-  metal: HelpersPathControllerClass,
-): void {
-  const chain: HelpersPathControllerClass[] = [];
-  for (
-    let k: HelpersPathControllerClass | null = klass;
-    k && k !== metal && Object.getPrototypeOf(k) !== metal;
-    k = Object.getPrototypeOf(k) as HelpersPathControllerClass | null
-  ) {
-    chain.unshift(k);
+  let paths: string[];
+  const namespace = moduleParents(klass).find((m) => rbObjRespondTo(m, "trailtieHelpersPaths"));
+  if (namespace != null) {
+    paths = await (
+      namespace as { trailtieHelpersPaths(): Promise<string[]> }
+    ).trailtieHelpersPaths();
+  } else {
+    paths = helpersPath();
   }
 
-  for (const k of chain) {
-    if (fired.has(k)) continue;
-    fired.add(k);
-    if ("helpersPath" in (Object.getPrototypeOf(k) as object)) {
-      inherited(k, ActionController.Base as unknown as HelpersPathControllerClass);
-    }
-    if (rbObjRespondTo(k, "_writeLayoutMethod", true)) {
-      (k as unknown as { _writeLayoutMethod(): void })._writeLayoutMethod();
-    }
-  }
-}
+  klass.helpersPath = paths;
 
-export function inherited(
-  klass: HelpersPathControllerClass,
-  base: HelpersPathControllerClass,
-): void {
-  if (!("helpersPath" in klass)) return;
-
-  klass.helpersPath = helpersPath();
-
+  const base = ActionController.Base as unknown as HelpersPathControllerClass;
   if (Object.getPrototypeOf(klass) === base && base.includeAllHelpers) {
     (klass as HelpersClass).helper(":all");
   }

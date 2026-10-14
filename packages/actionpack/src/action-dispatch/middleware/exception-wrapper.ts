@@ -301,7 +301,7 @@ export class ExceptionWrapper {
     return statusCode(status.slice(1));
   }
 
-  show(request: ShowExceptionsRequest): boolean {
+  isShow(request: ShowExceptionsRequest): boolean {
     const config = request.getHeader("action_dispatch.show_exceptions");
     if (config === "none") return false;
     if (config === "rescuable") return this.rescueResponse();

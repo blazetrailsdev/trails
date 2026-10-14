@@ -35,8 +35,7 @@ class ShowExceptionsController extends Base {
 }
 
 describe("ShowExceptionsTest", () => {
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("show error page from a remote ip", async ({ task }) => {
+  it("show error page from a remote ip", async ({ task }) => {
     const t = new IntegrationTest(task.name);
     t.app = ShowExceptionsController.action("boom");
     t.remoteAddr = "208.77.188.166";
@@ -79,8 +78,7 @@ class ShowExceptionsOverriddenController extends ShowExceptionsController {
 }
 
 describe("ShowExceptionsOverriddenTest", () => {
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("show error page", async ({ task }) => {
+  it("show error page", async ({ task }) => {
     const t = new IntegrationTest(task.name);
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { params: { detailed: "0" } });
@@ -103,8 +101,7 @@ describe("ShowExceptionsFormatsTest", () => {
     t = new IntegrationTest(task.name);
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("render json exception", async () => {
+  it("render json exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "application/json" } });
     assertResponse("internal_server_error");
@@ -114,8 +111,7 @@ describe("ShowExceptionsFormatsTest", () => {
     );
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("render xml exception", async () => {
+  it("render xml exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "application/xml" } });
     assertResponse("internal_server_error");

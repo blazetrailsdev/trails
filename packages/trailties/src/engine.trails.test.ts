@@ -57,7 +57,7 @@ describe("Railtie class-level method_missing", () => {
     set.draw(function () {
       this.mount(BlogEngine as never, { at: "/blog", as: "blog" });
     });
-    const output = new RoutesInspector(set.routes.routes).format(new ConsoleFormatter.Sheet());
+    const output = new RoutesInspector(set.routes).format(new ConsoleFormatter.Sheet());
 
     expect(output).toContain("Routes for Blog::Engine:");
     expect(output).toContain("cart GET  /cart(.:format) cart#show");

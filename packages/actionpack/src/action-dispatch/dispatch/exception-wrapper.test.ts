@@ -138,21 +138,21 @@ describe("ExceptionWrapperTest", () => {
 
   it("#show? returns false when using :rescuable and the exceptions is not rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new Error("generic"));
-    expect(wrapper.show(requestWith("rescuable"))).toBe(false);
+    expect(wrapper.isShow(requestWith("rescuable"))).toBe(false);
   });
 
   it("#show? returns true when using :rescuable and the exceptions is rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new ActionNotFound(""));
-    expect(wrapper.show(requestWith("rescuable"))).toBe(true);
+    expect(wrapper.isShow(requestWith("rescuable"))).toBe(true);
   });
 
   it("#show? returns false when using :none and the exceptions is rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new ActionNotFound(""));
-    expect(wrapper.show(requestWith("none"))).toBe(false);
+    expect(wrapper.isShow(requestWith("none"))).toBe(false);
   });
 
   it("#show? returns true when using :all and the exceptions is not rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new Error("generic"));
-    expect(wrapper.show(requestWith("all"))).toBe(true);
+    expect(wrapper.isShow(requestWith("all"))).toBe(true);
   });
 });

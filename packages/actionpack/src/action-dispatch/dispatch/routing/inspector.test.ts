@@ -43,7 +43,7 @@ describe("RoutesInspectorTest", () => {
   ): string[] {
     set.draw(cb);
     const { formatter = new ConsoleFormatter.Sheet(), ...filter } = opts;
-    return stringSplit(new RoutesInspector(set.routes.routes).format(formatter, filter), "\n");
+    return stringSplit(new RoutesInspector(set.routes).format(formatter, filter), "\n");
   }
 
   it("displaying routes for engines", () => {

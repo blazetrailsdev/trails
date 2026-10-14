@@ -4,11 +4,11 @@ import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
-import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import type { RackResponse, Response as RackResponseObject } from "@blazetrails/rack";
 import {
   classAttribute,
   demodulize,
+  extractOptionsBang,
   initializeIncludedModules,
   isAnonymous,
   SafeBuffer,
@@ -49,11 +49,7 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
     block?: MiddlewareBlock,
   ): Middleware {
     const next = [...args];
-    const last = next[next.length - 1];
-    const options: Record<string, unknown> =
-      last && typeof last === "object" && !Array.isArray(last)
-        ? { ...(next.pop() as Record<string, unknown>) }
-        : {};
+    const options: Record<string, unknown> = extractOptionsBang(next);
     const only = ([] as string[]).concat((options.only as string | string[]) ?? []).map(String);
     const except = ([] as string[]).concat((options.except as string | string[]) ?? []).map(String);
     delete options.only;
@@ -137,10 +133,7 @@ export class Metal extends AbstractController {
 
   constructor() {
     super();
-    fireInherited(
-      new.target as unknown as HelpersPathControllerClass,
-      Metal as unknown as HelpersPathControllerClass,
-    );
+    fireInherited(new.target, Metal);
     initializeIncludedModules(this);
   }
 
@@ -331,5 +324,27 @@ export class Metal extends AbstractController {
 
   toA(): RackResponse {
     return this.response.toRack() as RackResponse;
+  }
+}
+
+const fired = new WeakSet<object>();
+
+/** @noRailsEquivalent CONVERGEABLE layouts-inherited-writes-layout-method-at-first-construction */
+function fireInherited(klass: object, metal: object): void {
+  const chain: object[] = [];
+  for (
+    let k: object | null = klass;
+    k && k !== metal && Object.getPrototypeOf(k) !== metal;
+    k = Object.getPrototypeOf(k) as object | null
+  ) {
+    chain.unshift(k);
+  }
+
+  for (const k of chain) {
+    if (fired.has(k)) continue;
+    fired.add(k);
+    if (rbObjRespondTo(k, "_writeLayoutMethod", true)) {
+      (k as { _writeLayoutMethod(): void })._writeLayoutMethod();
+    }
   }
 }
