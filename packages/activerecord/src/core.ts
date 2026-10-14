@@ -484,6 +484,7 @@ interface CoreHost {
   name: string;
   tableName?: string | null;
   primaryKey?: string | string[];
+  columnsHash(): Record<string, unknown>;
   filterAttributes: FilterAttributes;
   _filterAttributes?: FilterAttributes;
   _inspectionFilter?: any;
@@ -1004,8 +1005,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
 
     if (
       !compositePrimaryKey &&
-      (!Object.hasOwn((this as any).columnsHash(), key as string) ||
-        StatementCache.unsupportedValue(value))
+      (!Object.hasOwn(this.columnsHash(), key as string) || StatementCache.unsupportedValue(value))
     ) {
       return this.all().findBy(conditions);
     }
