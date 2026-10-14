@@ -3,6 +3,8 @@ import { wrap } from "@blazetrails/activesupport";
 import {
   groupBy,
   NoMethodError,
+  rbCheckArrayType,
+  rbFArray,
   rbObjClassname,
   rtest,
   symbolToS,
@@ -233,37 +235,19 @@ export class Branch {
     ));
   }
 
-  private buildChildren(children: any): Branch[] {
-    return wrap(children).flatMap((assoc: any) => {
-      if (assoc == null) return [];
-
-      if (Array.isArray(assoc)) {
-        return this.buildChildren(assoc);
-      }
-
-      if (typeof assoc === "object" && assoc !== null) {
-        return Object.keys(assoc).map(
-          (parent) =>
-            new Branch({
-              parent: this,
-              association: parent,
-              children: assoc[parent],
-              associateByDefault: this.associateByDefault,
-              scope: this.scope,
-            }),
-        );
-      }
-
-      return [
-        new Branch({
+  private buildChildren(children: unknown): Branch[] {
+    return wrap(children).flatMap((association) =>
+      rbFArray(association).flatMap((args) => {
+        const [parent, child] = rbCheckArrayType(args) ?? [args];
+        return new Branch({
           parent: this,
-          association: assoc,
-          children: null,
+          association: parent as string,
+          children: child,
           associateByDefault: this.associateByDefault,
           scope: this.scope,
-        }),
-      ];
-    });
+        });
+      }),
+    );
   }
 
   private preloaderFor(
