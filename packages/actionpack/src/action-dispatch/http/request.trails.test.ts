@@ -94,6 +94,16 @@ describe("Request module initialize bodies", () => {
   });
 });
 
+describe("Request on_load(:action_dispatch_request)", () => {
+  it("includes RequestCookieMethods onto Request.prototype", () => {
+    expect(Object.hasOwn(Request.prototype, "cookieJar")).toBe(true);
+    const keyGenerator = { generateKey: () => "k" };
+    const request = new Request({ "action_dispatch.key_generator": keyGenerator });
+    expect(request.keyGenerator()).toBe(keyGenerator);
+    expect(request.isHaveCookieJar()).toBe(false);
+  });
+});
+
 describe("Cache::Request.strict_freshness", () => {
   it("is read by Request#fresh through the module-level seat", () => {
     const old = CacheRequest.strictFreshness;

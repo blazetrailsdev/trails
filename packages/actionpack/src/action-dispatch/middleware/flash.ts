@@ -8,6 +8,7 @@ export const KEY = "action_dispatch.request.flash_hash";
 export interface FlashRequestHost {
   env: RackEnv;
   getHeader(name: string): any;
+  setHeader(name: string, value: unknown): unknown;
   flashHash(): FlashHash | null;
   session: {
     isEnabled?(): boolean;
@@ -29,7 +30,7 @@ export class RequestMethods {
   }
 
   set flash(flash: FlashHash | null) {
-    (this as unknown as FlashRequestHost).env[KEY] = flash;
+    (this as unknown as FlashRequestHost).setHeader(KEY, flash);
   }
 
   /** @internal */

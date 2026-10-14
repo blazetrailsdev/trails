@@ -40,7 +40,12 @@ function makeHost(initial: Record<string, unknown> = {}): FlashRequestHost &
   } {
   const env: RackEnv = {};
   return Object.setPrototypeOf(
-    { env, getHeader: (k: string) => env[k], session: makeSession(initial) },
+    {
+      env,
+      getHeader: (k: string) => env[k],
+      setHeader: (k: string, v: unknown) => (env[k] = v),
+      session: makeSession(initial),
+    },
     RequestMethods.prototype,
   );
 }

@@ -12,6 +12,7 @@ import {
 import { InvalidParameterError } from "@blazetrails/rack";
 import { MissingController } from "../http/request.js";
 import type { EncodingTemplate } from "../http/param-builder.js";
+import { UploadedFile, type UploadedFileOptions } from "../http/upload.js";
 
 export type ParamValue =
   | string
@@ -161,18 +162,18 @@ function normalize(params: ParamInput, stripNil: boolean): ParamValue {
     const mapped = params.map((el) => normalize(el, stripNil));
     return stripNil ? mapped.filter((el) => el !== null) : mapped;
   }
-  if (params instanceof Hash) {
-    const out: ParamHash = Object.create(null);
-    eachPair(params, (k, v) => {
-      out[k] = normalize(v, stripNil);
-    });
-    return out;
-  }
   if (params !== null && typeof params === "object") {
     const proto = Object.getPrototypeOf(params);
-    if (proto !== null && proto !== Object.prototype) return params;
+    if (!(params instanceof Hash) && proto !== null && proto !== Object.prototype) return params;
+    if (params instanceof Hash ? params.has("tempfile") : Object.hasOwn(params, "tempfile")) {
+      return new UploadedFile(
+        (params instanceof Hash ? Object.fromEntries(params) : params) as UploadedFileOptions,
+      ) as unknown as ParamValue;
+    }
     const out: ParamHash = Object.create(null);
-    for (const [k, v] of Object.entries(params)) out[k] = normalize(v, stripNil);
+    eachPair(params as ParamHash, (k, v) => {
+      out[k] = normalize(v, stripNil);
+    });
     return out;
   }
   return params;

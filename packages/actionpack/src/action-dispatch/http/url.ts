@@ -225,7 +225,7 @@ export class URL {
       return forwarded.split(/,\s?/).at(-1)!;
     } else {
       return (
-        (this.getHeader("HTTP_HOST") as string | undefined) ||
+        (this.getHeader("HTTP_HOST") as string | undefined) ??
         `${this.serverName ?? ""}:${this.getHeader("SERVER_PORT") ?? ""}`
       );
     }
