@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "test-fixtures.ts",
-    "rubyName": "fixtures",
-    "call": "size",
-    "reason": "`path.to_s.size` (test_fixtures.rb:62) is ported `String(path).length`; the `length` analogue credits a receiver by name and has no `to_s` → `String(...)` pairing. Unmasked when the `FixtureSet` re-export, whose `size` falsely credited the call, was deleted."
-  }
-]

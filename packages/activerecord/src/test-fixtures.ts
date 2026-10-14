@@ -13,6 +13,7 @@ import {
   rbObjClassname,
   strUminus,
   symbolToS,
+  toS,
 } from "@blazetrails/ruby-compat";
 import {
   Concern,
@@ -72,7 +73,7 @@ export const ClassMethods = {
             if (this.fileFixturePath)
               names = names.filter((f) => !f.startsWith(String(this.fileFixturePath)));
             return names.map((f) =>
-              f.slice(String(path).length, -RubyFile.extname(f).length).replace(/^\//, ""),
+              f.slice(toS(path).length, -RubyFile.extname(f).length).replace(/^\//, ""),
             );
           }),
         ),
