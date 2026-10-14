@@ -28,7 +28,7 @@ import "./assets/trailtie.js";
 import { Trails } from "./rails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
 import { Logger } from "@blazetrails/activesupport";
-import type { MiddlewareStack, RackApp, Request } from "@blazetrails/actionpack";
+import type { MiddlewareStack, RackApp, RackAppObject, Request } from "@blazetrails/actionpack";
 import type { RackEnv } from "@blazetrails/rack";
 
 let _appClass: typeof Application | null = null;
@@ -175,7 +175,7 @@ export class Application extends Engine {
   }
 
   /** @internal */
-  buildMiddlewareStack(): RackApp {
+  buildMiddlewareStack(): RackApp | RackAppObject {
     return this.app();
   }
 

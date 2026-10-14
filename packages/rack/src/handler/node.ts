@@ -1,4 +1,4 @@
-import { getHttpAsync, stderr, StringIO, Thread } from "@blazetrails/ruby-compat";
+import { getHttpAsync, stderr, StringIO, Thread, rbFSend } from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer, HttpSocket } from "@blazetrails/ruby-compat";
 import {
   HTTPS,
@@ -70,7 +70,9 @@ export class Node {
       const env = await this.requestEnv(req, new StringIO(await readBody(req)));
       env[RACK_IS_HIJACK] = false;
 
-      const [status, headers, body] = await this.app(env);
+      const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
+        typeof this.app
+      >);
       try {
         res.writeHead(status, sentHeaders(headers));
         for await (const chunk of body) {
@@ -111,7 +113,9 @@ export class Node {
           return socket;
         };
 
-        const [status, headers, body] = await this.app(env);
+        const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
+          typeof this.app
+        >);
         try {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK] as unknown;

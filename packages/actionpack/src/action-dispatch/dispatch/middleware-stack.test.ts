@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Notifications, type NotificationEvent as Event } from "@blazetrails/activesupport";
 import { block } from "@blazetrails/ruby-compat";
@@ -13,7 +14,7 @@ class FooMiddleware {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -23,7 +24,7 @@ class BarMiddleware {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -33,7 +34,7 @@ class BazMiddleware {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -43,7 +44,7 @@ class HiyaMiddleware {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -55,7 +56,7 @@ class QuxMiddleware {
     this.prefix = prefix;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -67,7 +68,7 @@ class BlockMiddleware {
     this.block = block;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -291,7 +292,7 @@ describe("MiddlewareStackTest", () => {
 
     await Notifications.subscribed(subscriber, "process_middleware.action_dispatch", async () => {
       const app = stack.build(async () => [200, {}, bodyFromString("")]);
-      await app({} as RackEnv);
+      await (rbFSend(app, "call", {} as RackEnv) as Promise<RackResponse>);
     });
 
     expect(events.length).toBe(2);
@@ -307,7 +308,7 @@ describe("MiddlewareStackTest", () => {
   it("build creates a callable app", async () => {
     const stack = new MiddlewareStack();
     const app = stack.build(async () => [200, {}, bodyFromString("OK")]);
-    const [status] = await app({} as RackEnv);
+    const [status] = await (rbFSend(app, "call", {} as RackEnv) as Promise<RackResponse>);
     expect(status).toBe(200);
   });
 

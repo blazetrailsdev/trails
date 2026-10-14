@@ -1,4 +1,4 @@
-import { rbObjClassname, stringInspect } from "@blazetrails/ruby-compat";
+import { rbObjClassname, stringInspect, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import {
   REQUEST_METHOD,
@@ -45,7 +45,7 @@ export class Lint {
 
     this.checkEnv(env);
 
-    const result = await this.app(env);
+    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
 
     if (!Array.isArray(result) || result.length !== 3) {
       throw new LintError("response is not a 3-element array");

@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { FileSystemResolver, FixtureResolver } from "@blazetrails/actionview";
 import { assert, assertEqual, assertRaises } from "@blazetrails/activesupport";
@@ -64,7 +66,11 @@ describe("RenderImplicitActionTest", () => {
   it("render does not traverse the file system", async () => {
     await assertRaises([ActionNotFound], {}, async () => {
       const actionName = ["..", "..", "fixtures", "shared"].join(File.SEPARATOR);
-      await SimpleController.action(actionName)(MockRequest.envFor("/"));
+      await (rbFSend(
+        SimpleController.action(actionName),
+        "call",
+        MockRequest.envFor("/"),
+      ) as Promise<RackResponse>);
     });
   });
 

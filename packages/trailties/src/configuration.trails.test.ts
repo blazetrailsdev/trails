@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { MiddlewareStack } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -6,13 +7,13 @@ import { MiddlewareStackProxy } from "./configuration.js";
 class Unicorns {
   constructor(private app: (env: RackEnv) => Promise<RackResponse>) {}
   call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 class Head {
   constructor(private app: (env: RackEnv) => Promise<RackResponse>) {}
   call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 

@@ -1,6 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Files, Mime, Request, Utils } from "@blazetrails/rack";
-import { File } from "@blazetrails/ruby-compat";
+import { File, rbFSend } from "@blazetrails/ruby-compat";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -30,7 +30,10 @@ export class Static {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    return (await this.fileHandler.attempt(env)) ?? this.app(env);
+    return (
+      (await this.fileHandler.attempt(env)) ??
+      (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>)
+    );
   }
 }
 

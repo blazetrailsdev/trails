@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { ActionableError, cattrAccessor } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
@@ -20,7 +21,7 @@ export class ActionableExceptions {
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new Request(env);
     if (!this.actionableRequest(request)) {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     const params = request.params;

@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   include,
@@ -114,7 +115,11 @@ function body(response: RackResponse): string {
 
 describe("HelperPathsTest", () => {
   it("helpers paths priority", async () => {
-    const responses = await HelpersPathsController.action("index")(TestRequest.defaultEnv());
+    const responses = await (rbFSend(
+      HelpersPathsController.action("index"),
+      "call",
+      TestRequest.defaultEnv(),
+    ) as Promise<RackResponse>);
 
     expect(body(responses)).toBe("pack1");
   });
@@ -224,7 +229,7 @@ describe("HelperTest", () => {
   });
 
   function callController(klass: typeof Base, action: string): Promise<RackResponse> {
-    return klass.action(action)(TestRequest.defaultEnv());
+    return rbFSend(klass.action(action), "call", TestRequest.defaultEnv()) as Promise<RackResponse>;
   }
 
   it("helper for nested controller", async () => {
@@ -367,7 +372,7 @@ describe("IsolatedHelpersTest", () => {
 
   class IsolatedHelpersTest extends TestCase {
     callController(klass: typeof Base, action: string): Promise<RackResponse> {
-      return klass.action(action)(this.request.env);
+      return rbFSend(klass.action(action), "call", this.request.env) as Promise<RackResponse>;
     }
 
     override setup(): void {

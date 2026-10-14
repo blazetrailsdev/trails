@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { bodyToString } from "@blazetrails/rack";
 import { Application } from "./application.js";
@@ -5,11 +7,11 @@ import { HealthController } from "./health-controller.js";
 import { Trails } from "./rails.js";
 
 async function requestUp(): Promise<[number, string]> {
-  const [status, , body] = await Trails.application!.app()({
+  const [status, , body] = await (rbFSend(Trails.application!.app(), "call", {
     REQUEST_METHOD: "GET",
     PATH_INFO: "/up",
     HTTP_ACCEPT: "*/*",
-  });
+  }) as Promise<RackResponse>);
   return [status, await bodyToString(body)];
 }
 

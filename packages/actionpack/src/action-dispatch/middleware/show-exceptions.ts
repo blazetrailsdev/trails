@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import type { BacktraceCleaner } from "@blazetrails/activesupport";
@@ -16,7 +17,7 @@ export class ShowExceptions {
 
   async call(env: RackEnv): Promise<RackResponse> {
     try {
-      return await this.app(env);
+      return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (error) {
       const exception = error instanceof Error ? error : new Error(String(error));
       const request = new Request(env);
@@ -50,9 +51,11 @@ export class ShowExceptions {
     request["REQUEST_METHOD"] = "GET";
     try {
       try {
-        const response = await (typeof this.exceptionsApp === "function"
-          ? this.exceptionsApp(request)
-          : this.exceptionsApp.call(request));
+        const response = await (rbFSend(
+          this.exceptionsApp,
+          "call",
+          request,
+        ) as Promise<RackResponse>);
         const cascade = response[1]["x-cascade"] ?? response[1]["X-Cascade"];
         return cascade === "pass" ? this.passResponse(status) : response;
       } catch {

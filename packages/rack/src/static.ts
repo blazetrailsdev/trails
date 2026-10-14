@@ -1,4 +1,4 @@
-import { Dir, File, Hash, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { Dir, File, Hash, rbObjIsKindOf, rbFSend } from "@blazetrails/ruby-compat";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
@@ -64,7 +64,7 @@ export class Static {
     const actualPath = cleanPathInfo(unescapePath(path));
 
     if (!this.canServe(actualPath)) {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     let response: [number, Record<string, any>, any] | null = null;
@@ -97,7 +97,7 @@ export class Static {
     response ??= await this.fileServer.call(env);
 
     if (this.cascade && response[0] === 404) {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     const headers = response[1];

@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse, RackBody } from "./index.js";
 import { Request } from "./request.js";
 
@@ -37,7 +38,7 @@ export class Events {
 
     let response: RackResponse;
     try {
-      response = await this.app(env);
+      response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (error) {
       for (const h of this.handlers) {
         h.onError?.(req, res, error as Error);

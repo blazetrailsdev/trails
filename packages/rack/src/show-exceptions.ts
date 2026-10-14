@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File, rbFSend } from "@blazetrails/ruby-compat";
 import { chomp } from "@blazetrails/ruby-compat";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
@@ -88,7 +88,7 @@ export class ShowExceptions {
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     try {
-      return await this.app(env);
+      return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (e: any) {
       const exceptionString = this.dumpException(e);
 

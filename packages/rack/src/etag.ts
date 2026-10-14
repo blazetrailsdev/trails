@@ -1,5 +1,5 @@
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { Digest } from "@blazetrails/ruby-compat";
+import { Digest, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 const DEFAULT_CACHE_CONTROL = "max-age=0, private, must-revalidate";
@@ -16,7 +16,7 @@ export class ETag {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
 
     let digest: string | null = null;

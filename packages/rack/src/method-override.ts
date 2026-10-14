@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
@@ -29,7 +30,7 @@ export class MethodOverride {
         env[REQUEST_METHOD] = method;
       }
     }
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 
   private methodOverride(env: Record<string, any>): string | null {

@@ -3,7 +3,7 @@ import { bodyFromString } from "@blazetrails/rack";
 import { isBlank, type Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
-import { IPAddr, regexpEscape } from "@blazetrails/ruby-compat";
+import { IPAddr, regexpEscape, rbFSend } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export const PORT_REGEX = "(?::\\d+)";
@@ -117,14 +117,15 @@ export class HostAuthorization {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    if (this.permissions.empty()) return this.app(env);
+    if (this.permissions.empty())
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
 
     const request = new Request(env);
     const blocked = this.blockedHosts(request);
 
     if (blocked.length === 0 || this.isExcluded(request)) {
       this.markAsAuthorized(request);
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     env["action_dispatch.blocked_hosts"] = blocked;

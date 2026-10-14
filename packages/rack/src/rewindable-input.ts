@@ -1,5 +1,5 @@
 import { RACK_INPUT } from "./constants.js";
-import { RUBY_PLATFORM } from "@blazetrails/ruby-compat";
+import { RUBY_PLATFORM, rbFSend } from "@blazetrails/ruby-compat";
 
 export class RewindableInput {
   private _io: any;
@@ -115,6 +115,6 @@ export class RewindableInputMiddleware {
     if (env[RACK_INPUT]) {
       env[RACK_INPUT] = new RewindableInput(env[RACK_INPUT]);
     }
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }

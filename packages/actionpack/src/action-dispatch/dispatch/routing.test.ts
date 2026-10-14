@@ -20,6 +20,7 @@ import {
   rbConstGet,
   rbObjRespondTo,
   registerConstant,
+  rbFSend,
 } from "@blazetrails/ruby-compat";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
@@ -4812,7 +4813,7 @@ describe("FlashRedirectTest", () => {
       env["action_dispatch.signed_cookie_salt"] = SIGNED_COOKIE_SALT;
       env["action_dispatch.encrypted_signed_cookie_salt"] = ENCRYPTED_SIGNED_COOKIE_SALT;
 
-      return this.app(env);
+      return rbFSend(this.app, "call", env);
     }
   }
 

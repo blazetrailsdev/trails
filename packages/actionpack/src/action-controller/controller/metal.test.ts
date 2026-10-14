@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it } from "vitest";
 import { assertMatch, assertNot } from "@blazetrails/activesupport";
 import { Headers } from "@blazetrails/rack";
@@ -25,10 +27,10 @@ describe("MetalControllerInstanceTests", () => {
 
       const responseHeaders = Headers.from(
         (
-          await SimpleController.action("hello")({
+          await (rbFSend(SimpleController.action("hello"), "call", {
             REQUEST_METHOD: "GET",
             "rack.input": () => {},
-          })
+          }) as Promise<RackResponse>)
         )[1],
       );
 

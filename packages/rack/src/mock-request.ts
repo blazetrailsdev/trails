@@ -21,6 +21,7 @@ import {
 import {
   type Generic,
   isSymbol,
+  rbFSend,
   rbObjRespondTo,
   RFC2396Parser,
   StringIO,
@@ -89,10 +90,9 @@ export class MockRequest {
   async request(method = GET, uri = "", opts: Record<string, any> = {}): Promise<MockResponse> {
     const env = MockRequest.envFor(uri, { ...opts, ":method": method });
 
-    let app: RackApp;
+    let app: RackApp | Lint;
     if (opts[":lint"]) {
-      const lint = new Lint(this.app);
-      app = lint.call.bind(lint);
+      app = new Lint(this.app);
     } else {
       app = this.app;
     }
@@ -100,7 +100,7 @@ export class MockRequest {
     const errors = env[RACK_ERRORS];
     let body: any;
     try {
-      const result = await app(env);
+      const result = await (rbFSend(app, "call", env) as ReturnType<RackApp>);
       const [status, headers, b] = result;
       body = b;
       return new MockResponse(status, headers, body, errors);

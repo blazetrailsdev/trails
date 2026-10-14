@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { PATH_INFO, QUERY_STRING, SCRIPT_NAME, RACK_RECURSIVE_INCLUDE } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -31,7 +32,10 @@ export class Recursive {
       const include = (newEnv: Record<string, any>, path: string) =>
         this.include(newEnv, path, scriptName);
       try {
-        return await this.app({ ...currentEnv, [RACK_RECURSIVE_INCLUDE]: include });
+        return await (rbFSend(this.app, "call", {
+          ...currentEnv,
+          [RACK_RECURSIVE_INCLUDE]: include,
+        }) as ReturnType<typeof this.app>);
       } catch (e) {
         if (e instanceof ForwardRequest) {
           const fwd = new URL(e.url, "http://localhost");
@@ -61,6 +65,6 @@ export class Recursive {
       [QUERY_STRING]: url.search ? url.search.substring(1) : "",
       [SCRIPT_NAME]: scriptName,
     };
-    return this.app(newEnv);
+    return rbFSend(this.app, "call", newEnv) as ReturnType<typeof this.app>;
   }
 }

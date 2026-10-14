@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
 import { assertNothingRaised, assertRaises, type CallbackChain } from "@blazetrails/activesupport";
@@ -832,9 +834,13 @@ describe("FilterTest", () => {
   it("dynamic dispatch", async () => {
     for (const action of ["foo", "bar", "baz"]) {
       tc.request.queryParameters["choose"] = action;
-      const response = (await FT_DynamicDispatchController.action(action)(tc.request.env)).at(
-        -1,
-      ) as Response;
+      const response = (
+        await (rbFSend(
+          FT_DynamicDispatchController.action(action),
+          "call",
+          tc.request.env,
+        ) as Promise<RackResponse>)
+      ).at(-1) as Response;
       expect(response.body).toBe(action);
     }
   });

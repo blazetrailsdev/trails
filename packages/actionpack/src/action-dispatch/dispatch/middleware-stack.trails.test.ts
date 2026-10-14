@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { block } from "@blazetrails/ruby-compat";
+import { block, rbFSend } from "@blazetrails/ruby-compat";
 import { MiddlewareStack, type MiddlewareBlock } from "../middleware/stack.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -11,7 +11,7 @@ class FooMiddleware {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -21,7 +21,7 @@ class BarMiddleware {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 
@@ -34,7 +34,7 @@ class BlockMiddleware {
     builtBlocks.push(block);
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }
 

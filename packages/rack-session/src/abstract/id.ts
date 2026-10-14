@@ -7,6 +7,7 @@ import {
   SecureRandom,
   verbose,
   rbInspect as inspect,
+  rbFSend,
   rbObjClassname,
   KeyError,
 } from "@blazetrails/ruby-compat";
@@ -385,7 +386,7 @@ export class Persisted {
   async context(env: RackEnv, app: RackApp | undefined = this.app): Promise<RackResponse> {
     const req = this.makeRequest(env);
     this.prepareSession(req);
-    const [status, headers, body] = await app!(req.env);
+    const [status, headers, body] = await (rbFSend(app, "call", req.env) as Promise<RackResponse>);
     const res = new ResponseRaw(status, headers);
     this.commitSession(req, res);
     return [status, headers, body];

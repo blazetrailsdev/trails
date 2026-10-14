@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 export class AuthBasic {
@@ -47,7 +48,7 @@ export class AuthBasic {
 
     if (await this.authenticator(username, password)) {
       env["REMOTE_USER"] = username;
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     return this.unauthorized();

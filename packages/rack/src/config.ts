@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 export class Config {
@@ -11,6 +12,6 @@ export class Config {
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     this.block(env);
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }

@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { BodyProxy } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
@@ -28,7 +29,7 @@ export class Executor {
     const state = await this.executor.runBang({ reset: true });
     let returned = false;
     try {
-      const response = await this.app(env);
+      const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
 
       if (env["action_dispatch.report_exception"]) {
         const error = env["action_dispatch.exception"];

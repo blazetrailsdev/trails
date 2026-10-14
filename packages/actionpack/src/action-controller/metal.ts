@@ -14,7 +14,12 @@ import {
   SafeBuffer,
   underscore,
 } from "@blazetrails/activesupport";
-import { rbCheckArrayType, rbModSingletonP, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  rbCheckArrayType,
+  rbFSend,
+  rbModSingletonP,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
@@ -27,13 +32,15 @@ import type { RackEnv } from "@blazetrails/rack";
 import type { EncodingTemplate } from "../action-dispatch/http/param-builder.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
-  override build(app: RackApp | RackAppObject): RackApp;
-  override build(action: string, app?: RackApp | RackAppObject): RackApp;
-  override build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
+  override build(app: RackApp | RackAppObject): RackApp | RackAppObject;
+  override build(action: string, app?: RackApp | RackAppObject): RackApp | RackAppObject;
+  override build(
+    action: string | RackApp | RackAppObject,
+    app?: RackApp | RackAppObject,
+  ): RackApp | RackAppObject {
     action = String(action);
 
-    let current: RackApp =
-      typeof app === "function" ? app : (env: RackEnv) => (app as RackAppObject).call(env);
+    let current = app as RackApp | RackAppObject;
     const middlewares = this.middlewares as Middleware[];
     for (let i = middlewares.length - 1; i >= 0; i--) {
       const middleware = middlewares[i];
@@ -193,7 +200,7 @@ export class Metal extends AbstractController {
     this.middlewareStack.use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
   }
 
-  static action(this: typeof Metal, name: string): RackApp {
+  static action(this: typeof Metal, name: string): RackApp | RackAppObject {
     const app: RackApp = async (env: RackEnv) => {
       const req = new Request(env);
       const res = this.makeResponseBang(req);
@@ -216,11 +223,15 @@ export class Metal extends AbstractController {
     res: Response,
   ): Promise<RackResponse> {
     if (this.middlewareStack.isAny()) {
-      return await this.middlewareStack.build(name, async () => {
-        const controller = new this();
-        await controller.dispatch(name, req, res);
-        return controller.toA();
-      })(req.env);
+      return await (rbFSend(
+        this.middlewareStack.build(name, async () => {
+          const controller = new this();
+          await controller.dispatch(name, req, res);
+          return controller.toA();
+        }),
+        "call",
+        req.env,
+      ) as Promise<RackResponse>);
     } else {
       const controller = new this();
       await controller.dispatch(name, req, res);

@@ -6,7 +6,7 @@ import {
   SERVER_PROTOCOL,
   CONTENT_LENGTH,
 } from "./constants.js";
-import { Process, sprintf } from "@blazetrails/ruby-compat";
+import { Process, sprintf, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { forwardedValues } from "./utils.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -28,7 +28,7 @@ export class CommonLogger {
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const beganAt = clockTime();
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
 
     response[2] = new BodyProxy(body, () => {

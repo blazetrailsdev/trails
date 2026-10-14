@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
@@ -13,10 +14,10 @@ export class ConditionalGet {
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const method = env[REQUEST_METHOD];
     if (method !== "GET" && method !== "HEAD") {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
 
     if (status === 200 && this.fresh(env, headers)) {

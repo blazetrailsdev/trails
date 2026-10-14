@@ -1,4 +1,4 @@
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { SecureRandom, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -21,7 +21,9 @@ export class RequestId {
     const requestId = this.makeRequestId(env[headerKey] as string | undefined);
     env["action_dispatch.request_id"] = requestId;
 
-    const [status, headers, body] = await this.app(env);
+    const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
+      typeof this.app
+    >);
     headers[this.header.toLowerCase()] = requestId;
     return [status, headers, body];
   }

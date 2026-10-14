@@ -1,3 +1,5 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import {
   Callbacks,
@@ -124,7 +126,7 @@ describe("DefaultMiddlewareStack (trails)", () => {
       ":method": "POST",
       ":params": { _method: "patch" },
     });
-    await stack.build(endpoint)(env);
+    await (rbFSend(stack.build(endpoint), "call", env) as Promise<RackResponse>);
     expect(seen).toBe("PATCH");
   });
 });
