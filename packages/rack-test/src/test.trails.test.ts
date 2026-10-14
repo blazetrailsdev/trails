@@ -16,3 +16,9 @@ describe("Rack::Test::Session#basic_authorize (trails)", () => {
     expect(session.lastRequest().env["HTTP_AUTHORIZATION"]).toBe("Basic dXPDqXI6cMOkc3M=");
   });
 });
+
+describe("Rack::Test::Session.new (trails)", () => {
+  it("returns the session itself when given a Session", () => {
+    expect(new Session(session)).toBe(session);
+  });
+});

@@ -5,19 +5,10 @@ export interface TimezoneOptions {
   limit?: number;
 }
 
-import { initialize } from "@blazetrails/activesupport";
 import { defaultTimezone } from "../../active-record.js";
 
 export class Timezone {
   declare _timezone?: "utc" | "local";
-
-  static *[initialize](
-    this: Timezone,
-    { timezone, ...kwargs }: TimezoneOptions = {},
-  ): Generator<[typeof kwargs]> {
-    yield [kwargs];
-    this._timezone = timezone;
-  }
 
   get isUtc(): boolean {
     return this.defaultTimezone === "utc";

@@ -3,8 +3,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import type { Initialized } from "@blazetrails/ruby-compat";
-import { Timezone } from "./internal/timezone.js";
+import { Timezone, type TimezoneOptions } from "./internal/timezone.js";
 
 export class Value extends DelegateClass(RubyTime) {}
 
@@ -12,10 +11,16 @@ export class Value extends DelegateClass(RubyTime) {}
 export interface Time extends Timezone {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Time extends (ActiveModelTime as Initialized<
-  typeof ActiveModelTime,
-  typeof Timezone
->) {
+export class Time extends ActiveModelTime {
+  /** @inlinedFrom ActiveRecord::Type::Internal::Timezone#initialize rails/v8.0.2/activerecord/lib/active_record/type/internal/timezone.rb:7-10 */
+  constructor({
+    timezone,
+    ...kwargs
+  }: TimezoneOptions & ConstructorParameters<typeof ActiveModelTime>[0] = {}) {
+    super(kwargs);
+    this._timezone = timezone;
+  }
+
   static Value = Value;
 
   override serialize(value: unknown): Value | null {
