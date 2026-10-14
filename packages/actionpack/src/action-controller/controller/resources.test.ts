@@ -11,7 +11,11 @@ import {
 
 type Options = Record<string, unknown>;
 
-class StubController {}
+class StubController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
+}
 
 beforeAll(() => {
   for (const name of ["accounts", "images", "messages", "products"]) {

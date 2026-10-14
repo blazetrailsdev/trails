@@ -403,7 +403,11 @@ describe("Mapper#mount", () => {
 });
 
 describe("Mapper block receivers", () => {
-  class StubController {}
+  class StubController {
+    static actionEncodingTemplate(): null {
+      return null;
+    }
+  }
 
   const names = ["health", "owners", "reports", "admin/posts", "posts", "pages", "profiles"];
 

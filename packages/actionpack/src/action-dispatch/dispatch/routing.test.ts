@@ -11,8 +11,15 @@ import {
   assertNothingRaised,
   assertRaises,
   stub,
+  underscore,
 } from "@blazetrails/activesupport";
-import { include, rbConstGet, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  include,
+  rbConstGet,
+  rbObjRespondTo,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Flash } from "../middleware/flash.js";
@@ -29,6 +36,8 @@ import {
   UnfilteredParameters,
 } from "../../action-controller/metal/strong-parameters.js";
 import { Redirection } from "../routing/redirection.js";
+import { UrlFor } from "../routing/url-for.js";
+import { RoutingUrlFor } from "@blazetrails/actionview";
 
 class StubController {
   static actionEncodingTemplate(): null {
@@ -131,6 +140,9 @@ async function redirectResponse(
 const routeSpec = (match: Record<string, unknown>): string => `${match.controller}#${match.action}`;
 
 class EchoParamsController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
   static makeResponseBang(request: Request): Response {
     const res = new Response();
     res.request = request;
@@ -3786,16 +3798,127 @@ describe("TestAltApp", () => {
 });
 
 describe("TestNamespaceWithControllerOption", () => {
-  it.skip("missing controller", () => {});
-  it.skip("missing controller with to", () => {});
-  it.skip("implicit controller with to", () => {});
-  it.skip("to is a symbol", () => {});
-  it.skip("missing action with to", () => {});
-  it.skip("valid controller options inside namespace", () => {});
-  it.skip("resources with valid namespaced controller option", () => {});
-  it.skip("warn with ruby constant syntax controller option", () => {});
-  it.skip("warn with ruby constant syntax namespaced controller option", () => {});
-  it.skip("warn with ruby constant syntax no colons", () => {});
+  class StorageFilesController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: "admin/storage_files#index" });
+    }
+  }
+
+  class TestNamespaceWithControllerOption extends IntegrationTest {}
+  registerConstant("TestNamespaceWithControllerOption", TestNamespaceWithControllerOption);
+
+  let t: TestNamespaceWithControllerOption;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("admin/storage_files", StorageFilesController);
+    t = testCase as TestNamespaceWithControllerOption;
+  });
+  afterEach(() => {
+    controllerConstants.delete("admin/storage_files");
+  });
+
+  function draw(block: DrawCallback): void {
+    const routes = new RouteSet();
+    routes.draw(block);
+    t.app = IntegrationTest.buildApp(routes);
+    t.routes = routes;
+  }
+
+  it("missing controller", async () => {
+    const ex = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/foo/bar", { action: ":index" });
+      });
+    });
+    expect(ex.message).toMatch(/Missing :controller/);
+  });
+
+  it("missing controller with to", async () => {
+    const ex = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/foo/bar", { to: "foo" });
+      });
+    });
+    expect(ex.message).toMatch(/Missing :controller/);
+  });
+
+  it("implicit controller with to", async () => {
+    draw(function () {
+      this.controller("foo", () => {
+        this.get("/foo/bar", { to: "bar" });
+      });
+    });
+    await t.assertRouting("/foo/bar", { controller: "foo", action: "bar" });
+  });
+
+  it("to is a symbol", async () => {
+    const ex = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/foo/bar", { to: ":foo" });
+      });
+    });
+    expect(ex.message).toMatch(/:to must respond to/);
+  });
+
+  it("missing action with to", async () => {
+    const ex = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/foo/bar", { to: "foo#" });
+      });
+    });
+    expect(ex.message).toMatch(/Missing :action/);
+  });
+
+  it("valid controller options inside namespace", async () => {
+    draw(function () {
+      this.namespace("admin", () => {
+        this.resources("storage_files", { controller: "storage_files" });
+      });
+    });
+
+    await t.get("/admin/storage_files");
+    expect(t.response.body).toBe("admin/storage_files#index");
+  });
+
+  it("resources with valid namespaced controller option", async () => {
+    draw(function () {
+      this.resources("storage_files", { controller: "admin/storage_files" });
+    });
+
+    await t.get("/storage_files");
+    expect(t.response.body).toBe("admin/storage_files#index");
+  });
+
+  it("warn with ruby constant syntax controller option", async () => {
+    const e = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.namespace("admin", () => {
+          this.resources("storage_files", { controller: "StorageFiles" });
+        });
+      });
+    });
+
+    expect(e.message).toMatch("'admin/StorageFiles' is not a supported controller name");
+  });
+
+  it("warn with ruby constant syntax namespaced controller option", async () => {
+    const e = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.resources("storage_files", { controller: "Admin::StorageFiles" });
+      });
+    });
+
+    expect(e.message).toMatch("'Admin::StorageFiles' is not a supported controller name");
+  });
+
+  it("warn with ruby constant syntax no colons", async () => {
+    const e = await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.resources("storage_files", { controller: "Admin" });
+      });
+    });
+
+    expect(e.message).toMatch("'Admin' is not a supported controller name");
+  });
 });
 
 describe("TestGlobRoutingMapper", () => {
@@ -4056,9 +4179,90 @@ describe("TestUrlConstraints", () => {
 });
 
 describe("TestInvalidUrls", () => {
-  it.skip("invalid UTF-8 encoding returns a bad request", () => {});
-  it.skip("params param_encoding uses ASCII 8bit", () => {});
-  it.skip("does not encode params besides id", () => {});
+  class FooController extends Base {
+    static {
+      this.paramEncoding("show", "id", Encoding.ASCII_8BIT);
+    }
+
+    async show(): Promise<void> {
+      await this.render({ plain: "foo#show" });
+    }
+  }
+
+  class TestInvalidUrls extends IntegrationTest {}
+  registerConstant("TestInvalidUrls", TestInvalidUrls);
+
+  let t: TestInvalidUrls;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("test_invalid_urls/foo", FooController);
+    t = testCase as TestInvalidUrls;
+  });
+  afterEach(() => {
+    controllerConstants.delete("test_invalid_urls/foo");
+  });
+  const get = (path: string) => t.get(path);
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
+  it("invalid UTF-8 encoding returns a bad request", async () => {
+    await t.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("/bar/:id", { to: this.redirect("/foo/show/%{id}") });
+
+        const ok = (_env: Record<string, unknown>) => [
+          200,
+          { "Content-Type": "text/plain" },
+          bodyFromString(""),
+        ];
+        this.get("/foobar/:id", { to: ok });
+
+        deprecator().silence(() => {
+          this.get("/:controller(/:action(/:id))");
+        });
+      });
+
+      await get("/%E2%EF%BF%BD%A6");
+      assertResponse("bad_request");
+
+      await get("/foo/%E2%EF%BF%BD%A6");
+      assertResponse("bad_request");
+
+      await get("/bar/%E2%EF%BF%BD%A6");
+      assertResponse("bad_request");
+
+      await get("/foobar/%E2%EF%BF%BD%A6");
+      assertResponse("bad_request");
+    });
+  });
+
+  it("params param_encoding uses ASCII 8bit", async () => {
+    await t.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("/foo/show(/:id)", { to: "test_invalid_urls/foo#show" });
+        this.get("/bar/show(/:id)", { controller: "test_invalid_urls/foo", action: "show" });
+      });
+
+      await get("/foo/show/%E2%EF%BF%BD%A6");
+      assertResponse("ok");
+
+      await get("/bar/show/%E2%EF%BF%BD%A6");
+      assertResponse("ok");
+    });
+  });
+
+  it("does not encode params besides id", async () => {
+    await t.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("/foo/show(/:id)", { to: "test_invalid_urls/foo#show" });
+        this.get("/bar/show(/:id)", { controller: "test_invalid_urls/foo", action: "show" });
+      });
+
+      await get("/foo/show/%E2%EF%BF%BD%A6?something_else=%E2%EF%BF%BD%A6");
+      assertResponse("bad_request");
+
+      await get("/foo/show/%E2%EF%BF%BD%A6?something_else=%E2%EF%BF%BD%A6");
+      assertResponse("bad_request");
+    });
+  });
 });
 
 describe("TestOptionalRootSegments", () => {
@@ -4695,7 +4899,76 @@ describe("TestRelativeUrlRootGeneration", () => {
 });
 
 describe("TestHttpMethods", () => {
-  it.skip("request method get can be matched", () => {});
+  const RFC2616 = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"];
+  const RFC2518 = ["PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK"];
+  const RFC3253 = [
+    "VERSION-CONTROL",
+    "REPORT",
+    "CHECKOUT",
+    "CHECKIN",
+    "UNCHECKOUT",
+    "MKWORKSPACE",
+    "UPDATE",
+    "LABEL",
+    "MERGE",
+    "BASELINE-CONTROL",
+    "MKACTIVITY",
+  ];
+  const RFC3648 = ["ORDERPATCH"];
+  const RFC3744 = ["ACL"];
+  const RFC5323 = ["SEARCH"];
+  const RFC4791 = ["MKCALENDAR"];
+  const RFC5789 = ["PATCH"];
+
+  class TestHttpMethods extends IntegrationTest {
+    simpleApp(response: string) {
+      return (_env: Record<string, unknown>) => [
+        200,
+        { "Content-Type": "text/plain" },
+        bodyFromString(response),
+      ];
+    }
+  }
+  registerConstant("TestHttpMethods", TestHttpMethods);
+
+  let t: TestHttpMethods;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestHttpMethods;
+    const s = t;
+    const routes = new RouteSet();
+    t.app = new RoutedRackApp(routes);
+
+    routes.draw(function () {
+      for (const method of [
+        ...RFC2616,
+        ...RFC2518,
+        ...RFC3253,
+        ...RFC3648,
+        ...RFC3744,
+        ...RFC5323,
+        ...RFC4791,
+        ...RFC5789,
+      ]) {
+        this.match({ "/": s.simpleApp(method), via: `:${underscore(method)}` });
+      }
+    });
+  });
+
+  for (const method of [
+    ...RFC2616,
+    ...RFC2518,
+    ...RFC3253,
+    ...RFC3648,
+    ...RFC3744,
+    ...RFC5323,
+    ...RFC4791,
+    ...RFC5789,
+  ]) {
+    it(`request method ${underscore(method)} can be matched`, async () => {
+      await t.get("/", { headers: { REQUEST_METHOD: method } });
+      expect(t.response.body).toBe(method);
+    });
+  }
 });
 
 describe("TestUriPathEscaping", () => {
@@ -4735,7 +5008,46 @@ describe("TestUriPathEscaping", () => {
 });
 
 describe("TestMultipleNestedController", () => {
-  it.skip("controller option which starts with '/' from multiple nested controller", () => {});
+  include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.namespace("foo", () => {
+      this.namespace("bar", () => {
+        this.get({ baz: "baz#index" });
+      });
+    });
+    this.get({ pooh: "pooh#index" });
+  });
+
+  class BazController extends Base {
+    async index(): Promise<void> {
+      await this.render({ inline: "<%= urlFor({ controller: '/pooh', action: 'index' }) %>" });
+    }
+  }
+  include(BazController, Routes.urlHelpers());
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestMultipleNestedController extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestMultipleNestedController", TestMultipleNestedController);
+
+  let t: TestMultipleNestedController;
+  beforeEach(({ testCase }) => {
+    controllerConstants.set("foo/bar/baz", BazController);
+    t = testCase as TestMultipleNestedController;
+  });
+  afterEach(() => {
+    controllerConstants.delete("foo/bar/baz");
+  });
+
+  it("controller option which starts with '/' from multiple nested controller", async () => {
+    await t.get("/foo/bar/baz");
+    expect(t.response.body).toBe("/pooh");
+  });
 });
 
 describe("TestRedirectInterpolation", () => {

@@ -18,6 +18,7 @@ import {
 function makeHost(overrides: Partial<ParametersHost> = {}): ParametersHost & Parameters {
   const headers = new Map<string, unknown>();
   const host: ParametersHost = {
+    controllerClassFor: () => ({ actionEncodingTemplate: () => null }),
     getHeader: (k) => headers.get(k),
     setHeader: (k, v) => {
       headers.set(k, v);

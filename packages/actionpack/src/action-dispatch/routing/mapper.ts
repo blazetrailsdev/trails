@@ -674,7 +674,7 @@ export class Mapping {
       if (this.to == null) {
         controller = this.defaultController;
         action = this.defaultAction;
-      } else if (typeof this.to === "string") {
+      } else if (typeof this.to === "string" && !SYMBOL.test(this.to)) {
         if (this.to.includes("#")) {
           const toEndpoint = stringSplit(this.to, "#");
           controller = toEndpoint[0];

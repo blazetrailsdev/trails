@@ -18,6 +18,7 @@ function makeHost(overrides: Partial<FilterParametersHost> = {}): FilterParamete
   const headers = new Map<string, unknown>();
   const env: Record<string, unknown> = {};
   return {
+    controllerClassFor: () => ({ actionEncodingTemplate: () => null }),
     getHeader: (k) => headers.get(k),
     setHeader: (k, v) => {
       headers.set(k, v);

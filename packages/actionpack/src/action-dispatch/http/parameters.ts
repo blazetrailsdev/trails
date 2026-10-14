@@ -2,7 +2,11 @@ import { Logger } from "@blazetrails/activesupport";
 import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
 
 import { merge } from "@blazetrails/ruby-compat";
+import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
 import { MimeType } from "./mime-type.js";
+import type { ParamHash } from "../request/utils.js";
+import { ActionDispatch } from "../../namespaces.js";
+import { BadRequest } from "../../action-controller/metal/exceptions.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
 
@@ -28,6 +32,7 @@ export class ParseError extends Error {
 }
 
 export interface ParametersHost {
+  controllerClassFor(name: string): unknown;
   getHeader(key: string): unknown;
   setHeader(key: string, value: unknown): unknown;
   deleteHeader(key: string): void;
@@ -40,6 +45,7 @@ export interface ParametersHost {
 }
 
 export class Parameters {
+  declare controllerClassFor: ParametersHost["controllerClassFor"];
   declare setHeader: ParametersHost["setHeader"];
   declare deleteHeader: ParametersHost["deleteHeader"];
 
@@ -73,8 +79,24 @@ export class Parameters {
   }
 
   set pathParameters(parameters: Record<string, unknown>) {
-    this.deleteHeader("action_dispatch.request.parameters");
-    this.setHeader(PARAMETERS_KEY, parameters);
+    try {
+      this.deleteHeader("action_dispatch.request.parameters");
+
+      parameters = ActionDispatch.Request.Utils.setBinaryEncoding(
+        this,
+        parameters as ParamHash,
+        parameters["controller"] as string | undefined,
+        parameters["action"] as string | undefined,
+      );
+      ActionDispatch.Request.Utils.checkParamEncoding(parameters as ParamHash);
+
+      this.setHeader(PARAMETERS_KEY, parameters);
+    } catch (e) {
+      if (e instanceof ParameterTypeError || e instanceof InvalidParameterError) {
+        throw new BadRequest(`Invalid path parameters: ${e.message}`);
+      }
+      throw e;
+    }
   }
 }
 

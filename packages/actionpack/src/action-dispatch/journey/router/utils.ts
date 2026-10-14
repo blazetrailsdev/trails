@@ -1,4 +1,4 @@
-import { format } from "@blazetrails/ruby-compat";
+import { format, strNew } from "@blazetrails/ruby-compat";
 
 export function normalizePath(path: string | null | undefined): string {
   let p = `/${path ?? ""}`.replace(/\/+/g, "/");
@@ -56,7 +56,7 @@ export class UriEncoder {
       last = match.index + match[0].length;
     }
     for (const b of encoder.encode(uri.slice(last))) bytes.push(b);
-    return new TextDecoder().decode(new Uint8Array(bytes));
+    return strNew(bytes);
   }
 
   private escape(component: string, pattern: RegExp): string {
