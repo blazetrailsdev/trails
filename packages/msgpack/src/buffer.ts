@@ -14,8 +14,11 @@ import { MessagePack } from "./namespaces.js";
 
 const MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT = 512 * 1024;
 const MSGPACK_BUFFER_STRING_WRITE_REFERENCE_MINIMUM = 256;
+const MSGPACK_BUFFER_STRING_READ_REFERENCE_DEFAULT = 256;
+const MSGPACK_BUFFER_STRING_READ_REFERENCE_MINIMUM = 256;
 const MSGPACK_BUFFER_IO_BUFFER_SIZE_DEFAULT = 32 * 1024;
 const MSGPACK_BUFFER_IO_BUFFER_SIZE_MINIMUM = 1024;
+const MSGPACK_RMEM_PAGE_SIZE = 4 * 1024;
 
 function CHECK_STRING_TYPE(value: unknown): void {
   if (typeof value !== "string" && !(value instanceof Uint8Array)) {
@@ -69,6 +72,8 @@ export class Buffer {
   private ioPartialReadMethod = "read";
   private ioWriteAllMethod = "write";
   private writeReferenceThreshold = MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT;
+  private readReferenceThreshold = MSGPACK_BUFFER_STRING_READ_REFERENCE_DEFAULT;
+  private tailMem: ArrayBufferLike | null = null;
   private ioBufferSize = MSGPACK_BUFFER_IO_BUFFER_SIZE_DEFAULT;
 
   constructor(...argv: unknown[]) {
@@ -104,7 +109,12 @@ export class Buffer {
     this.ioWriteAllMethod = getWriteAllMethod(io);
 
     if (options != null) {
-      let v = (options as { writeReferenceThreshold?: number | null }).writeReferenceThreshold;
+      let v = (options as { readReferenceThreshold?: number | null }).readReferenceThreshold;
+      if (v != null) {
+        this.readReferenceThreshold = Math.max(v, MSGPACK_BUFFER_STRING_READ_REFERENCE_MINIMUM);
+      }
+
+      v = (options as { writeReferenceThreshold?: number | null }).writeReferenceThreshold;
       if (v != null) {
         this.writeReferenceThreshold = Math.max(v, MSGPACK_BUFFER_STRING_WRITE_REFERENCE_MINIMUM);
       }
@@ -364,7 +374,7 @@ export class Buffer {
   }
 
   private appendString(string: string | Uint8Array): number {
-    const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string.slice();
+    const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string;
     const length = bytes.length;
 
     if (length > this.writeReferenceThreshold) {
@@ -385,16 +395,116 @@ export class Buffer {
         this.bufferAppend(string);
       }
     } else {
-      this.chunks.push(string);
+      this.appendReference(string);
     }
   }
 
+  private appendReference(string: Uint8Array): void {
+    const mappedString = string.slice();
+
+    this.chunks.push(mappedString);
+  }
+
+  private writableSize(): number {
+    if (this.chunks.length === 0) {
+      return 0;
+    }
+    const tail = this.chunks[this.chunks.length - 1];
+    if (tail.buffer !== this.tailMem) {
+      return 0;
+    }
+    return tail.buffer.byteLength - (tail.byteOffset + tail.length);
+  }
+
   private bufferAppend(data: Uint8Array): void {
-    if (data.length === 0) {
+    this.appendImpl(data, data.length, true);
+  }
+
+  private appendImpl(data: Uint8Array, length: number, flushToIo: boolean): void {
+    if (length === 0) {
       return;
     }
 
-    this.chunks.push(data);
+    if (length <= this.writableSize()) {
+      const tail = this.chunks[this.chunks.length - 1];
+      new Uint8Array(tail.buffer, tail.byteOffset + tail.length, length).set(data);
+      this.chunks[this.chunks.length - 1] = new Uint8Array(
+        tail.buffer,
+        tail.byteOffset,
+        tail.length + length,
+      );
+      return;
+    }
+
+    this.expand(data, length, flushToIo);
+  }
+
+  private chunkMalloc(requiredSize: number): Uint8Array {
+    if (requiredSize <= MSGPACK_RMEM_PAGE_SIZE) {
+      return new Uint8Array(MSGPACK_RMEM_PAGE_SIZE);
+    }
+
+    return new Uint8Array(requiredSize);
+  }
+
+  private chunkRealloc(mem: Uint8Array, requiredSize: number, currentSize: number): Uint8Array {
+    let nextSize = currentSize * 2;
+    while (nextSize < requiredSize) {
+      nextSize *= 2;
+    }
+    const realloced = new Uint8Array(nextSize);
+    realloced.set(mem);
+    return realloced;
+  }
+
+  private expand(data: Uint8Array, length: number, flushToIo: boolean): void {
+    if (flushToIo && this._io != null) {
+      this.flush();
+      if (this.writableSize() >= length) {
+        const tail = this.chunks[this.chunks.length - 1];
+        const tailAvail = this.writableSize();
+        new Uint8Array(tail.buffer, tail.byteOffset + tail.length, length).set(data);
+        this.chunks[this.chunks.length - 1] = new Uint8Array(
+          tail.buffer,
+          tail.byteOffset,
+          tail.length + tailAvail,
+        );
+        return;
+      }
+    }
+
+    const tailAvail = this.writableSize();
+    if (tailAvail > 0) {
+      const tail = this.chunks[this.chunks.length - 1];
+      new Uint8Array(tail.buffer, tail.byteOffset + tail.length, tailAvail).set(
+        data.subarray(0, tailAvail),
+      );
+      this.chunks[this.chunks.length - 1] = new Uint8Array(
+        tail.buffer,
+        tail.byteOffset,
+        tail.length + tailAvail,
+      );
+    }
+    data = data.subarray(tailAvail);
+    length -= tailAvail;
+
+    const tail = this.chunks.length === 0 ? null : this.chunks[this.chunks.length - 1];
+    const capacity = tail == null ? 0 : tail.length;
+
+    if (tail == null || tail.buffer !== this.tailMem || capacity <= MSGPACK_RMEM_PAGE_SIZE) {
+      const mem = this.chunkMalloc(length);
+      mem.set(data);
+
+      this.chunks.push(mem.subarray(0, length));
+      this.tailMem = mem.buffer;
+    } else {
+      const tailFilled = tail.length;
+      const mem = this.chunkRealloc(tail, tailFilled + length, capacity);
+      mem.set(data, tailFilled);
+
+      this.chunks[this.chunks.length - 1] = mem.subarray(0, tailFilled + length);
+      this.tailMem = mem.buffer;
+    }
   }
 
   private readUntilEof(out: Uint8Array[] | null, max: number): number {
@@ -479,6 +589,18 @@ export class Buffer {
 
   private readToStringNonblock(string: Uint8Array[], length: number): number {
     let avail = this.topReadableSize();
+
+    if (
+      length <= avail &&
+      string.length === 0 &&
+      this.chunks[0].buffer !== this.tailMem &&
+      length >= this.readReferenceThreshold
+    ) {
+      string.push(this.chunks[0].subarray(0, length));
+      this.consumed(length);
+      return length;
+    }
+
     const lengthOrig = length;
 
     while (true) {
