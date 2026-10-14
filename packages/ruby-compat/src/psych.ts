@@ -13,6 +13,7 @@ import {
 } from "./psych/exception.js";
 import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
+import { Omap as PsychOmap } from "./psych/omap.js";
 import { isPlainHash, rbModToS } from "./object.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
@@ -73,6 +74,14 @@ export namespace Psych {
    */
   export const Coder = PsychCoder;
   export type Coder = PsychCoder;
+
+  /**
+   * `Psych::Omap` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/omap.rb:3`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const Omap = PsychOmap;
+  export type Omap<K = unknown, V = unknown> = PsychOmap<K, V>;
 
   /**
    * `Psych::ClassLoader` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/class_loader.rb:6`).
@@ -155,9 +164,7 @@ export namespace Psych {
 
   /**
    * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505`). There is no
-   * `IO` to write to, so the `io` slot only ever carries the options Hash. libyaml writes a
-   * tagged root node on the `---` line (`YAML.dump(Object.new)` is
-   * `"--- !ruby/object {}\n"`), where the backend breaks the line.
+   * `IO` to write to, so the `io` slot only ever carries the options Hash.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -170,7 +177,7 @@ export namespace Psych {
 
     const visitor = YAMLTree.create(options);
     visitor.push(o);
-    return visitor.tree.toString({ directives: true }).replace(/^---\n!/, "--- !");
+    return visitor.tree.yaml(null, options);
   }
 
   /**
@@ -188,7 +195,7 @@ export namespace Psych {
 
     const visitor = RestrictedYAMLTree.create(options);
     visitor.push(o);
-    return visitor.tree.toString({ directives: true }).replace(/^---\n!/, "--- !");
+    return visitor.tree.yaml(null, options);
   }
 
   /**

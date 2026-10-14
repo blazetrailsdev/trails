@@ -26,7 +26,8 @@ import { describe, it, expect } from "vitest";
 
 const PACKAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../packages");
 
-const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']+)["']/g;
+const IMPORT_RE =
+  /(?:^|\n)\s*(?:(?:import|export)\s+([\s\S]*?)\s*from\s*|import\s+)["']([^"']+)["']/g;
 
 /** The optional package itself — a static import of it is the load-time hazard. */
 const YAML_PACKAGE = "yaml";
@@ -95,7 +96,7 @@ async function offendersReachableFromIndex(pkg: string): Promise<string[]> {
     const source = await readFile(path.join(PACKAGES, node.pkg, "src", node.file), "utf8");
     if (hasTopLevelAwait(source)) offenders.push(`${key(node)} (top-level await)`);
     for (const [, clause, specifier] of source.matchAll(IMPORT_RE)) {
-      if (/^\s*type\b/.test(clause)) continue;
+      if (/^\s*type\b/.test(clause ?? "")) continue;
       if (specifier === YAML_PACKAGE) {
         offenders.push(key(node));
         continue;
@@ -152,7 +153,7 @@ describe("yaml optional dependency", () => {
         if (`${pkg}/${file}` === "ruby-compat/psych-adapter.ts") continue;
         const source = await readFile(path.join(src, file), "utf8");
         for (const [, clause, specifier] of source.matchAll(IMPORT_RE)) {
-          if (specifier === YAML_PACKAGE && !/^\s*type\b/.test(clause))
+          if (specifier === YAML_PACKAGE && !/^\s*type\b/.test(clause ?? ""))
             importers.push(`${pkg}/${file}`);
         }
       }

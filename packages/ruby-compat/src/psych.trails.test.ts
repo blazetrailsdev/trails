@@ -227,3 +227,12 @@ describe("ToRuby sequences and keys", () => {
     }
   });
 });
+
+describe("Psych.dump options", () => {
+  it("passes indentation and line_width to the emitter", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.dump({ a: { b: 1 } }, { indentation: 4 })).toBe("---\na:\n    b: 1\n");
+    expect(Psych.dump({ a: { b: 1 } })).toBe("---\na:\n  b: 1\n");
+    expect(Psych.Omap).toBeDefined();
+  });
+});

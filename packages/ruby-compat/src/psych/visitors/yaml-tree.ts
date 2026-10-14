@@ -48,6 +48,8 @@ type Instant = { toZonedDateTimeISO(timeZone: string): ZonedDateTime };
 export interface YAMLTreeOptions {
   permittedClasses?: unknown[];
   aliases?: boolean;
+  indentation?: number;
+  lineWidth?: number;
 }
 
 /**
@@ -327,9 +329,26 @@ export class YAMLTree {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * `YAMLTree#tree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:97-100`).
+   * Its `yaml` is `Psych::Nodes::Node#yaml` (`nodes/node.rb:58-64`) over
+   * `Visitors::Emitter#initialize`'s options (`visitors/emitter.rb:5-17`).
+   * libyaml writes a tagged root node on the `---` line
+   * (`YAML.dump(Object.new)` is `"--- !ruby/object {}\n"`); the backend
+   * breaks the line there, so the emitted text is joined.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   get tree(): PsychDocument {
-    return this.doc;
+    const doc = this.doc;
+    return {
+      yaml(_io = null, options = {}) {
+        const du: { indent?: number; lineWidth?: number } = {};
+        if ("indentation" in options) du.indent = options.indentation;
+        if ("lineWidth" in options) du.lineWidth = options.lineWidth;
+        return doc.toString({ directives: true, ...du }).replace(/^---\n!/, "--- !");
+      },
+    };
   }
 
   /** @noRailsEquivalent PERMANENT */

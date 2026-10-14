@@ -24,13 +24,13 @@ export interface PsychNode {
 }
 
 /**
- * The backend's document: `Psych::Nodes::Document`
- * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/document.rb:8`) and its `yaml`.
+ * The tree `YAMLTree#tree` answers, emitted by `Psych::Nodes::Node#yaml`
+ * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:58-64`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export interface PsychDocument {
-  toString(options?: object): string;
+  yaml(io?: null, options?: { indentation?: number; lineWidth?: number }): string;
 }
 
 const registry = new Map<string, PsychAdapter>();
