@@ -1,4 +1,4 @@
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, hashDelete, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
@@ -163,7 +163,7 @@ export class ContentSecurityPolicy {
     } else if (values[0] != null && values[0] !== false) {
       this.directives["sandbox"] = values as CSPSource[];
     } else {
-      delete this.directives["sandbox"];
+      hashDelete(this.directives, "sandbox");
     }
     return this;
   }
@@ -171,7 +171,7 @@ export class ContentSecurityPolicy {
     if (types[0] != null && types[0] !== false) {
       this.directives["plugin-types"] = types as CSPSource[];
     } else {
-      delete this.directives["plugin-types"];
+      hashDelete(this.directives, "plugin-types");
     }
     return this;
   }
@@ -181,7 +181,7 @@ export class ContentSecurityPolicy {
   }
   blockAllMixedContent(enabled: boolean | null = true): this {
     if (enabled === false || enabled == null) {
-      delete this.directives["block-all-mixed-content"];
+      hashDelete(this.directives, "block-all-mixed-content");
       return this;
     }
     this.directives["block-all-mixed-content"] = true;
@@ -189,7 +189,7 @@ export class ContentSecurityPolicy {
   }
   upgradeInsecureRequests(enabled: boolean | null = true): this {
     if (enabled === false || enabled == null) {
-      delete this.directives["upgrade-insecure-requests"];
+      hashDelete(this.directives, "upgrade-insecure-requests");
       return this;
     }
     this.directives["upgrade-insecure-requests"] = true;
@@ -209,7 +209,7 @@ export class ContentSecurityPolicy {
   private setDirective(name: string, sources: CSPSourceOrClear[]): this {
     const first = sources[0];
     if (sources.length === 0 || first == null || first === false) {
-      delete this.directives[name];
+      hashDelete(this.directives, name);
       return this;
     }
     this.directives[name] = this.applyMappings(sources as CSPSource[]);

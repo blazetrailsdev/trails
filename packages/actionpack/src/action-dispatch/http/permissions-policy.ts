@@ -1,4 +1,4 @@
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, hashDelete, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
@@ -129,7 +129,7 @@ export class PermissionsPolicy {
   /** @internal */
   private _set(directive: string, sources: Array<PolicySource | null | undefined>): void {
     if (sources.length === 0 || sources[0] == null) {
-      delete this.directives[directive];
+      hashDelete(this.directives, directive);
     } else {
       this.directives[directive] = this.applyMappings(sources as PolicySource[]);
     }
