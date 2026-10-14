@@ -18,24 +18,58 @@ declare module "vitest" {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
-export const describedClasses = new WeakMap<object, typeof TestCase>();
-/** @noRailsEquivalent CONVERGEABLE activerecord-describes-are-named-test-case-constants */
-export const topLevel = {};
+type Matcher = RegExp | ((desc: string) => boolean);
+type DescribedSuite = { name: string; file?: unknown; suite?: DescribedSuite };
+
+/** @noRailsEquivalent PERMANENT */
+export const TYPES: [Matcher, typeof TestCase][] = [[/(?:)/, TestCase]];
+
+/** @noRailsEquivalent PERMANENT */
+export function registerSpecType(matcher: Matcher, klass: typeof TestCase): void {
+  TYPES.unshift([matcher, klass]);
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function specType(desc: string): typeof TestCase {
+  return TYPES.find(([matcher]) =>
+    typeof matcher === "function" ? matcher(desc) : matcher.test(String(desc)),
+  )![1];
+}
+
+function create(sclas: typeof TestCase, name: string): typeof TestCase {
+  const cls = class extends sclas {};
+  Object.defineProperty(cls, "name", { value: name });
+  return cls;
+}
+
+const described = new WeakMap<object, typeof TestCase>();
+let fileClass: typeof TestCase | undefined;
+
+/** @noRailsEquivalent PERMANENT */
+export function describe(suite: DescribedSuite | undefined): typeof TestCase {
+  if (suite === undefined || suite.file === suite) {
+    return (fileClass ??= create(specType(""), ""));
+  }
+  let cls = described.get(suite);
+  if (cls === undefined) {
+    const constant = safeConstantize(suite.name);
+    if (typeof constant === "function" && constant.prototype instanceof TestCase) {
+      cls = constant as typeof TestCase;
+    } else {
+      const sclas = describe(suite.suite);
+      cls = create(sclas, [sclas.name, suite.name].filter((n) => n !== "").join("::"));
+    }
+    described.set(suite, cls);
+  }
+  return cls;
+}
 
 const capturing = new WeakSet<object>();
 const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
 
 beforeEach(async (context: TestContext) => {
   _takeAssertions();
-  let klass = TestCase;
-  for (let suite = context.task.suite; suite != null && klass === TestCase; suite = suite.suite) {
-    const constant = describedClasses.get(suite) ?? safeConstantize(suite.name);
-    if (typeof constant === "function" && constant.prototype instanceof TestCase) {
-      klass = constant as typeof TestCase;
-    }
-  }
-  if (klass === TestCase) klass = describedClasses.get(topLevel) ?? TestCase;
+  const klass = describe(context.task.suite);
   const testName = `test_${context.task.name.replace(/\s+/g, "_")}`;
   const defined = rbModMethodDefined(klass, testName);
   if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);

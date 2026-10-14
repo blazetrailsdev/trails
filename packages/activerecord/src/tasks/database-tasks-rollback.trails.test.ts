@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -7,6 +7,8 @@ import { DEFAULT_ENV } from "../connection-handling.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { UnknownMigrationVersionError } from "../migration.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
+import { restoreWorkerConnection } from "../support/connection.js";
 
 const REVERT_LOG = "__trailsRollbackReverted";
 
@@ -29,16 +31,19 @@ export class ${name} extends Migration.Current {
 }
 
 describe("DatabaseTasksRollbackTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const dirs: string[] = [];
+  let prevConfigs: ReturnType<typeof Base.configurations>;
+
+  beforeEach(() => {
+    prevConfigs = Base.configurations();
+  });
 
   afterEach(async () => {
     delete (globalThis as Record<string, unknown>)[REVERT_LOG];
-    Base.configurations({});
-    try {
-      await Base.removeConnection();
-    } catch {
-      void 0;
-    }
+    await Base.removeConnection();
+    Base.configurations(prevConfigs);
+    await restoreWorkerConnection();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 

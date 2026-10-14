@@ -5,6 +5,7 @@ import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-dou
 import { registerModel } from "./associations.js";
 import { resetColumnInformation } from "./model-schema.js";
 import { defaultValue } from "./type.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -27,6 +28,7 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
 }
 
 describe("sync loadSchema / columnsHash", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("columnsHash returns cached Column objects when schema cache is populated", async () => {
     class Post extends Base {
       static override tableName = "posts";
@@ -356,6 +358,7 @@ describe("sync loadSchema / columnsHash", () => {
 });
 
 describe("sync loadSchema on a reflection that has not loaded its cache", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("reads a synchronous adapter's columns without seating a cache", async () => {
     class Post extends Base {
       static override tableName = "posts";

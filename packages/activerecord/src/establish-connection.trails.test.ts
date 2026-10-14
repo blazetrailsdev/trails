@@ -6,15 +6,27 @@ import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import { join } from "path";
 import { tmpdir } from "os";
+import { fixtures } from "./test-helpers/use-fixtures.js";
+
+let originalHandler: ConnectionHandler;
 
 async function resetConnection() {
   await Base.defaultConnectionHandler.clearAllConnectionsBang();
   Base.defaultConnectionHandler = new ConnectionHandler();
 }
 
+async function restoreConnection() {
+  await Base.defaultConnectionHandler.clearAllConnectionsBang();
+  Base.defaultConnectionHandler = originalHandler;
+}
+
 describe("Base.establishConnection", () => {
-  beforeEach(() => resetConnection());
-  afterEach(() => resetConnection());
+  fixtures({}, { useTransactionalTests: false });
+  beforeEach(() => {
+    originalHandler = Base.defaultConnectionHandler;
+    return resetConnection();
+  });
+  afterEach(() => restoreConnection());
 
   it("creates a PostgresAdapter from a postgres:// URL", async () => {
     await Base.establishConnection("postgres://localhost:5432/testdb");
@@ -96,8 +108,12 @@ describe("Base.establishConnection", () => {
 });
 
 describe("Base.adapter without establishConnection", () => {
-  beforeEach(() => resetConnection());
-  afterEach(() => resetConnection());
+  fixtures({}, { useTransactionalTests: false });
+  beforeEach(() => {
+    originalHandler = Base.defaultConnectionHandler;
+    return resetConnection();
+  });
+  afterEach(() => restoreConnection());
 
   it("throws when no connection is established", async () => {
     delete process.env.DATABASE_URL;

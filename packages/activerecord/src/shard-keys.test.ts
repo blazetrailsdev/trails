@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { assertEmpty } from "@blazetrails/activesupport";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("ShardsKeysTest", () => {
+  const { self } = fixtures([]);
   class UnshardedBase extends Base {
     static override abstractClass = true;
   }
@@ -16,10 +18,7 @@ describe("ShardsKeysTest", () => {
 
   let prevConfigs: DatabaseConfigurations;
 
-  let baselinePools: Set<unknown>;
-
   beforeEach(async () => {
-    baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     prevConfigs = Base.configurations();
     vi.stubEnv("TRAILS_ENV", "default_env");
     Base.configurations({
@@ -43,16 +42,9 @@ describe("ShardsKeysTest", () => {
   });
 
   afterEach(async () => {
-    await Base.connectionHandler.clearAllConnectionsBang();
-    for (const pool of Base.connectionHandler.connectionPoolList("all")) {
-      if (baselinePools.has(pool)) continue;
-      await Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
-        role: pool.role,
-        shard: pool.shard,
-      });
-    }
+    self().cleanUpConnectionHandler();
     Base.configurations(prevConfigs);
-    (Base as any)._shardKeys = undefined;
+    await Base.establishConnection(":arunit");
     vi.unstubAllEnvs();
   });
 
@@ -88,6 +80,14 @@ describe("ShardsKeysTest", () => {
   });
 
   it("connected to all shards can switch each to reading role", async () => {
+    self().teardownSharedConnectionPool();
+    await ShardedBase.connectsTo({
+      shards: {
+        shard_one: { writing: ":shard_one", reading: ":shard_one_reading" },
+        shard_two: { writing: ":shard_two", reading: ":shard_two_reading" },
+      },
+    });
+
     const results = await ShardedBase.connectedToAllShards({ role: "reading" }, () => {
       return ShardedBase.connectionPool().dbConfig.name;
     });

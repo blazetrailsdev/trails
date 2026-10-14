@@ -1,4 +1,4 @@
-import { describedClasses, topLevel } from "@blazetrails/activesupport/testing/autorun";
+import { describe } from "@blazetrails/activesupport/testing/autorun";
 import { getCurrentSuite } from "vitest/suite";
 import { RuntimeError, StandardError, rbClassInheritedP } from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
@@ -66,7 +66,7 @@ type FixturesResult = {
   ) => Promise<void>;
 };
 
-type SuiteScope = { suite?: SuiteScope };
+type SuiteScope = Parameters<typeof describe>[0];
 type TestCaseClass = typeof ActiveRecordTestCase;
 type TestCase = InstanceType<TestCaseClass>;
 
@@ -80,14 +80,15 @@ let rootTestCaseClass: TestCaseClass | undefined;
 
 let currentTestCase: TestCase | null = null;
 
-function rootTestCase(): TestCaseClass {
+/** @internal */
+export function rootTestCase(): TestCaseClass {
   if (rootTestCaseClass === undefined) {
     const { TestCase } = ActiveRecord;
     rootTestCaseClass = class extends TestCase {
       override async beforeSetup(): Promise<void> {
         const testKlass = this.constructor as TestCaseClass;
         currentTestCase = this;
-        if (!warmed.has(testKlass)) {
+        if (testKlass.fixtureTableNames.length > 0 && !warmed.has(testKlass)) {
           warmed.add(testKlass);
           await Base.withConnection(eagerWarmSchemaCache);
         }
@@ -113,22 +114,6 @@ function rootTestCase(): TestCaseClass {
     rootTestCaseClass.fixturePaths = [...TestCase.fixturePaths, USE_FIXTURES_ROOT];
   }
   return rootTestCaseClass;
-}
-
-function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
-  let klass = describedClasses.get(suite ?? topLevel) as TestCaseClass | undefined;
-  if (klass !== undefined) return klass;
-  if (suite === undefined) {
-    klass = rootTestCase();
-  } else {
-    let parent = suite.suite;
-    while (parent !== undefined && !describedClasses.has(parent)) parent = parent.suite;
-    klass = class extends (
-      ((describedClasses.get(parent ?? topLevel) as TestCaseClass | undefined) ?? rootTestCase())
-    ) {};
-  }
-  describedClasses.set(suite ?? topLevel, klass);
-  return klass;
 }
 
 const fixtureRegistryNames = new Map(
@@ -185,7 +170,7 @@ export function fixtures(
 ): Record<string, unknown> {
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
-  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
+  const klass = describe(getCurrentSuite().suite as SuiteScope) as TestCaseClass;
   klass.usesTransaction(
     ...(usesTransaction ?? []).map((name) => `test_${name.replace(/\s+/g, "_")}`),
   );
