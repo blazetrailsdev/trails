@@ -7,7 +7,7 @@ import {
   URL as HttpURL,
   QueryParser,
   RequestUtils,
-  CacheConfig,
+  CacheRequest,
   Response,
   ExceptionWrapper,
   type CustomProxies,
@@ -109,7 +109,7 @@ export class Trailtie extends BaseTrailtie {
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
       RequestUtils.performDeepMunge = cfg.performDeepMunge;
-      CacheConfig.strictFreshness = cfg.strictFreshness;
+      CacheRequest.strictFreshness = cfg.strictFreshness;
       Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
 
       Object.assign(ExceptionWrapper.rescueResponses, cfg.rescueResponses);

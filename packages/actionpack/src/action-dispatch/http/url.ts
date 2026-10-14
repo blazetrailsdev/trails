@@ -1,4 +1,4 @@
-import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
+import { isBlank, mattrAccessor, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
 import { fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
@@ -154,27 +154,34 @@ function buildHostUrl(
   return result;
 }
 
-export const URL = {
-  secureProtocol: false as boolean,
-  tldLength: 1 as number,
+export class URL {
+  declare static secureProtocol: boolean;
+  declare static tldLength: number;
+  declare secureProtocol: boolean;
+  declare tldLength: number;
 
-  extractDomain(host: string, tldLength: number): string | null {
+  static {
+    mattrAccessor.call(this, "secureProtocol", { default: false });
+    mattrAccessor.call(this, "tldLength", { default: 1 });
+  }
+
+  static extractDomain(host: string, tldLength: number): string | null {
     return namedHost(host) ? extractDomainFrom(host, tldLength) : null;
-  },
+  }
 
-  extractSubdomains(host: string, tldLength: number): string[] {
+  static extractSubdomains(host: string, tldLength: number): string[] {
     return namedHost(host) ? extractSubdomainsFrom(host, tldLength) : [];
-  },
+  }
 
-  extractSubdomain(host: string, tldLength: number): string {
+  static extractSubdomain(host: string, tldLength: number): string {
     return URL.extractSubdomains(host, tldLength).join(".");
-  },
+  }
 
-  urlFor(options: UrlOptions): string {
+  static urlFor(options: UrlOptions): string {
     return options.onlyPath ? URL.pathFor(options) : URL.fullUrlFor(options);
-  },
+  }
 
-  fullUrlFor(options: UrlOptions): string {
+  static fullUrlFor(options: UrlOptions): string {
     const { host, protocol, port } = options;
     if (!host) {
       throw new Error(
@@ -182,9 +189,9 @@ export const URL = {
       );
     }
     return buildHostUrl(host, port, protocol, options, URL.pathFor(options));
-  },
+  }
 
-  pathFor(options: UrlOptions): string {
+  static pathFor(options: UrlOptions): string {
     let path = (options.scriptName ?? "").replace(/\/$/, "");
     if ("path" in options && options.path !== undefined) path += options.path;
     if (options.trailingSlash && isBlank(path)) path = "/";
@@ -193,5 +200,5 @@ export const URL = {
     if ("params" in options) addParams(parts, options.params);
     if ("anchor" in options) addAnchor(parts, options.anchor);
     return parts.join("");
-  },
-};
+  }
+}

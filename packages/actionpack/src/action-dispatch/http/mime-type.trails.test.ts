@@ -54,7 +54,7 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
 
 describe("Mime::Type.lookup_by_extension", () => {
   it("reads EXTENSION_LOOKUP with no leading-dot normalization (mime_type.rb:175-177)", () => {
-    expect(MimeType.lookupByExtension("html")).toBe(MimeType.HTML);
+    expect(MimeType.lookupByExtension("html")).toBe(Mime.get(":html")!);
     expect(MimeType.lookupByExtension(".html")).toBeUndefined();
   });
 });
@@ -75,7 +75,7 @@ describe("Mime::Type.register fills LOOKUP and EXTENSION_LOOKUP separately (mime
     const alias = MimeType.registerAlias("application/xhtml+xml", ":foobar");
     expect([Mime.get(":foobar"), MimeType.lookup("application/xhtml+xml")]).toEqual([
       alias,
-      MimeType.HTML,
+      Mime.get(":html")!,
     ]);
     MimeType.unregister(":foobar");
   });

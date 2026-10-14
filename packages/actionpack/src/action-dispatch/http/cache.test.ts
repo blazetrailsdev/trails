@@ -13,7 +13,10 @@ import {
   type RequestCacheHost,
 } from "./cache.js";
 
-const req = (h: Record<string, string> = {}): RequestCacheHost => ({ getHeader: (n) => h[n] });
+const req = (h: Record<string, string> = {}): RequestCacheHost => ({
+  getHeader: (n) => h[n],
+  strictFreshness: false,
+});
 const res = (h: Record<string, string> = {}): Response => new Response(200, h);
 
 describe("Cache::Request", () => {

@@ -4952,69 +4952,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy",
-    "digest": "5be0a99bdde8f99b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy=",
-    "digest": "5231a87d815f3b4f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy_nonce",
-    "digest": "e4cd4ec99bba55a9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy_nonce_directives",
-    "digest": "512b6fb3269e0c94",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy_nonce_directives=",
-    "digest": "96cff0881f4db6a8",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy_nonce_generator",
-    "digest": "0556036bcb62d08c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy_nonce_generator=",
-    "digest": "e2dd8f6cd481b9c5",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy_report_only",
-    "digest": "ce69a67cbedcea76",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
-    "rubyName": "content_security_policy_report_only=",
-    "digest": "1944b82d81be04e0",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/request.rb",
     "rubyName": "controller_class",
     "digest": "6963d9799f26d4d7",
     "ref": "v8.0.2"

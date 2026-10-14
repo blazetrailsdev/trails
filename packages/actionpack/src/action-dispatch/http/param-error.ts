@@ -12,6 +12,7 @@ export class ParamError extends ParseError {
     this.name = "ActionDispatch::ParamError";
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](other: unknown): boolean {
     if (this === ParamError) {
       if (

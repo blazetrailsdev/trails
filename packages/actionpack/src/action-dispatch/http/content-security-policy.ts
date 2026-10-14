@@ -86,7 +86,7 @@ export class Middleware {
 }
 
 export class ContentSecurityPolicy {
-  private directives: Map<DirectiveName, DirectiveValue> = new Map();
+  directives: Map<DirectiveName, DirectiveValue> = new Map();
 
   constructor(init?: (policy: ContentSecurityPolicy) => void) {
     if (init) init(this);
@@ -158,9 +158,6 @@ export class ContentSecurityPolicy {
   prefetchSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("prefetch-src", sources);
   }
-  navigateTo(...sources: CSPSourceOrClear[]): this {
-    return this.setDirective("navigate-to", sources);
-  }
   sandbox(...values: CSPSourceOrClear[]): this {
     if (values.length === 0) {
       this.directives.set("sandbox", true);
@@ -182,9 +179,6 @@ export class ContentSecurityPolicy {
   reportUri(uri: CSPSource): this {
     this.directives.set("report-uri", [uri]);
     return this;
-  }
-  reportTo(...sources: CSPSourceOrClear[]): this {
-    return this.setDirective("report-to", sources);
   }
   blockAllMixedContent(enabled: boolean | null = true): this {
     if (enabled === false || enabled == null) {
@@ -262,11 +256,12 @@ export class ContentSecurityPolicy {
     const out: (string | null)[] = [];
     for (const [directive, sources] of this.directives) {
       if (Array.isArray(sources)) {
-        const built = this.buildDirective(directive, sources, context).join(" ");
         if (nonce && this.isNonceDirective(directive, nonceDirectives)) {
-          out.push(`${directive} ${built} 'nonce-${nonce}'`);
+          out.push(
+            `${directive} ${this.buildDirective(directive, sources, context).join(" ")} 'nonce-${nonce}'`,
+          );
         } else {
-          out.push(`${directive} ${built}`);
+          out.push(`${directive} ${this.buildDirective(directive, sources, context).join(" ")}`);
         }
       } else if (sources === true) {
         out.push(directive);
@@ -324,14 +319,6 @@ export class ContentSecurityPolicy {
   private isNonceDirective(directive: string, nonceDirectives: readonly string[]): boolean {
     return nonceDirectives.includes(directive);
   }
-
-  getDirectives(): Map<DirectiveName, DirectiveValue> {
-    return new Map(this.directives);
-  }
-
-  hasDirective(name: string): boolean {
-    return this.directives.has(name);
-  }
 }
 
 export const POLICY = "action_dispatch.content_security_policy";
@@ -349,8 +336,8 @@ export interface CspRequestHost {
 export type NonceGenerator = (request: unknown) => string;
 
 export class Request {
-  declare getHeader: CspRequestHost["getHeader"];
-  declare setHeader: CspRequestHost["setHeader"];
+  declare protected getHeader: CspRequestHost["getHeader"];
+  declare protected setHeader: CspRequestHost["setHeader"];
 
   get contentSecurityPolicy(): ContentSecurityPolicy | null | undefined {
     return this.getHeader(POLICY) as ContentSecurityPolicy | null | undefined;

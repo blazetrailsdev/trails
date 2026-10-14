@@ -135,7 +135,7 @@ describe("MimeTypeTest", () => {
 
   it("register callbacks", () => {
     let called = false;
-    MimeType.onRegister(() => {
+    MimeType.registerCallback(() => {
       called = true;
     });
     MimeType.register("application/x-callback-test", ":callback_test");
@@ -190,13 +190,18 @@ describe("MimeTypeTest", () => {
   });
 
   it("regexp matcher", () => {
-    expect(MimeType.HTML.match(/text/)).toBe(true);
-    expect(MimeType.HTML.match(/json/)).toBe(false);
+    expect(Mime.get(":js")!.match("text/javascript")).toBe(true);
+    expect(Mime.get(":js")!.match("application/javascript")).toBe(true);
+    expect(!Mime.get(":js")!.match("text/html")).toBe(true);
+    expect(!Mime.get(":js")!.match("text/javascript")).toBe(false);
+    expect(!Mime.get(":js")!.match("application/javascript")).toBe(false);
+    expect(Mime.get(":html")!.match("application/xhtml+xml")).toBe(true);
   });
 
   it("match?", () => {
-    expect(MimeType.HTML.match("text/html")).toBe(true);
-    expect(MimeType.HTML.match("application/json")).toBe(false);
+    expect(Mime.get(":js")!.match("text/javascript")).toBe(true);
+    expect(Mime.get(":js")!.match("application/javascript")).toBe(true);
+    expect(Mime.get(":js")!.match("text/html")).toBe(false);
   });
 
   it("can be initialized with wildcards", () => {
@@ -209,24 +214,42 @@ describe("MimeTypeTest", () => {
     expect(type.string).toBe("text/html");
   });
 
-  it("lookup by extension", () => {
-    expect(MimeType.lookupByExtension("html")).toBe(MimeType.HTML);
-    expect(MimeType.lookupByExtension("json")).toBe(MimeType.JSON);
-    expect(MimeType.lookupByExtension("xml")).toBe(MimeType.XML);
-    expect(MimeType.lookupByExtension("txt")).toBe(MimeType.TEXT);
+  it("can be initialized with parameters without having space after ;", () => {
+    assertEqual("text/html;parameter", new MimeType("text/html;parameter").toString());
+    assertEqual(
+      'text/html;parameter=abc;parameter2="xyz"',
+      new MimeType('text/html;parameter=abc;parameter2="xyz"').toString(),
+    );
   });
 
-  it("wildcard match", () => {
-    expect(MimeType.HTML.match("*/*")).toBe(true);
-    expect(MimeType.HTML.match("text/*")).toBe(true);
-    expect(MimeType.HTML.match("application/*")).toBe(false);
+  it("invalid mime types raise error", () => {
+    expect(() => new MimeType("too/many/slash")).toThrow(MimeType.InvalidMimeType);
+    expect(() => new MimeType("missingslash")).toThrow(MimeType.InvalidMimeType);
+    expect(() => new MimeType("improper/semicolon;")).toThrow(MimeType.InvalidMimeType);
+    expect(() => new MimeType('improper/semicolon; parameter=abc; parameter2="xyz";')).toThrow(
+      MimeType.InvalidMimeType,
+    );
+    expect(() => new MimeType("text/html, text/plain")).toThrow(MimeType.InvalidMimeType);
+    expect(() => new MimeType("*/html")).toThrow(MimeType.InvalidMimeType);
+    expect(() => new MimeType("")).toThrow(MimeType.InvalidMimeType);
+    expect(() => new MimeType(null)).toThrow(MimeType.InvalidMimeType);
+    expect(
+      () => new MimeType("text/html ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0 ;0;"),
+    ).toThrow(MimeType.InvalidMimeType);
+  });
+
+  it("lookup by extension", () => {
+    expect(MimeType.lookupByExtension("html")).toBe(Mime.get(":html")!);
+    expect(MimeType.lookupByExtension("json")).toBe(Mime.get(":json")!);
+    expect(MimeType.lookupByExtension("xml")).toBe(Mime.get(":xml")!);
+    expect(MimeType.lookupByExtension("txt")).toBe(Mime.get(":text")!);
   });
 
   it("all() returns unique registered types in registration order", () => {
     const all = MimeType.all();
     expect(new Set(all).size).toBe(all.length);
-    const htmlIdx = all.indexOf(MimeType.HTML);
-    const jsonIdx = all.indexOf(MimeType.JSON);
+    const htmlIdx = all.indexOf(Mime.get(":html")!);
+    const jsonIdx = all.indexOf(Mime.get(":json")!);
     expect(htmlIdx).toBeGreaterThanOrEqual(0);
     expect(jsonIdx).toBeGreaterThan(htmlIdx);
   });

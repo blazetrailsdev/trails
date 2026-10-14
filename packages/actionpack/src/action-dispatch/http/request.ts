@@ -23,6 +23,7 @@ import {
 import {
   etagMatches as _etagMatches,
   fresh as _fresh,
+  Request as CacheRequest,
   ifModifiedSince as _ifModifiedSince,
   ifNoneMatch as _ifNoneMatch,
   ifNoneMatchEtags as _ifNoneMatchEtags,
@@ -1015,9 +1016,11 @@ export interface Request {
   get xForwardedHost(): string | undefined;
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
-export interface Request extends CspRequest {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface Request extends CspRequest, CacheRequest, HttpURL {}
 include(Request, CspRequest);
+include(Request, CacheRequest);
+include(Request, HttpURL);
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {

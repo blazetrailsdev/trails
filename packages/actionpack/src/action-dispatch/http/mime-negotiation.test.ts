@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { Request } from "../request.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
-import { paramsReadable, type MimeNegotiationHost } from "./mime-negotiation.js";
+import { InvalidType, paramsReadable, type MimeNegotiationHost } from "./mime-negotiation.js";
 import { ParseError } from "./parameters.js";
 
 function makeHost(parameters: () => unknown): MimeNegotiationHost {
@@ -60,7 +60,7 @@ describe("MimeNegotiation.contentMimeType", () => {
 
   it("looks up the empty media type when CONTENT_TYPE is blank", () => {
     const req = new Request({ CONTENT_TYPE: "" });
-    expect(req.contentMimeType?.toString()).toBe("");
+    expect(() => req.contentMimeType).toThrow(InvalidType);
   });
 });
 
