@@ -1095,7 +1095,7 @@ export class Mapper {
 
     if (this.applyCommonBehaviorFor("resources", resources as string[], options, cb)) return;
     options = this.applyActionOptions("resources", options);
-    const name = String(resources.pop());
+    const name = resources.pop() as string;
 
     const resource = new Resource(
       name,
@@ -1217,7 +1217,7 @@ export class Mapper {
 
     if (this.applyCommonBehaviorFor("resource", resources as string[], options, cb)) return;
     options = this.applyActionOptions("resource", options);
-    const name = String(resources.pop());
+    const name = resources.pop() as string;
 
     const resource = new SingletonResource(
       name,
@@ -2360,24 +2360,20 @@ export class Mapper {
     options: RouteOptions,
     block: MapperCallback | undefined,
   ): boolean {
-    const dispatch = (resource: string, options: RouteOptions, block?: MapperCallback) =>
-      (this as unknown as Record<string, (...a: unknown[]) => unknown>)[method](
-        resource,
-        options,
-        ...(block ? [block] : []),
-      );
+    const self = this as unknown as Record<string, (...a: unknown[]) => unknown>;
+    const blockArg = block ? [block] : [];
 
     if (resources.length > 1) {
-      for (const r of resources) dispatch(r, options, block);
+      for (const r of resources) self[method](r, options, ...blockArg);
       return true;
     }
     if (options.shallow) {
       delete options.shallow;
-      this.shallow(() => dispatch(resources.pop()!, options, block));
+      this.shallow(() => self[method](resources.pop()!, options, ...blockArg));
       return true;
     }
     if (this.isResourceScope()) {
-      this.nested(() => dispatch(resources.pop()!, options, block));
+      this.nested(() => self[method](resources.pop()!, options, ...blockArg));
       return true;
     }
 
@@ -2403,7 +2399,7 @@ export class Mapper {
       }
     }
     if (hasScopeOption) {
-      this.scope(scopeOptions, () => dispatch(resources.pop()!, options, block));
+      this.scope(scopeOptions, () => self[method](resources.pop()!, options, ...blockArg));
       return true;
     }
     return false;
