@@ -235,6 +235,7 @@ export class Branch {
     ));
   }
 
+  /** @inventedArm rbCheckArrayType — PERMANENT */
   private buildChildren(children: unknown): Branch[] {
     return wrap(children).flatMap((association) =>
       rbFArray(association).flatMap((args) => {

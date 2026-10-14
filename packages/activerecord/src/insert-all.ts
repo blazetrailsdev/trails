@@ -476,6 +476,10 @@ export class Builder implements InsertBuilder {
     return this._connection.quoteColumnName(column);
   }
 
+  /**
+   * @inventedArm toSym — PERMANENT
+   * @inventedArm symbolToS — PERMANENT
+   */
   returning(): string | undefined {
     if (!rtest(this._insertAll.returning)) return undefined;
 
