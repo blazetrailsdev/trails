@@ -242,5 +242,6 @@ describe("Psych.dump canonical", () => {
     const { Psych } = await import("./psych.js");
     const { NotImplementedError } = await import("./not-implemented-error.js");
     expect(() => Psych.dump({ a: 1 }, { canonical: true })).toThrow(NotImplementedError);
+    expect(Psych.dump({ a: 1 }, { canonical: false })).toBe("---\na: 1\n");
   });
 });

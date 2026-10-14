@@ -335,7 +335,7 @@ export class YAMLTree {
    * `YAMLTree#tree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:97-100`).
    * Its `yaml` is `Psych::Nodes::Node#yaml` (`nodes/node.rb:58-64`) over
    * `Visitors::Emitter#initialize`'s options (`visitors/emitter.rb:5-17`); the
-   * backend has no canonical style, so `canonical` raises.
+   * backend has no canonical style, so `canonical: true` raises.
    * libyaml writes a tagged root node on the `---` line
    * (`YAML.dump(Object.new)` is `"--- !ruby/object {}\n"`) where the backend
    * breaks the line, so a tagged root's document start is written here.
@@ -348,7 +348,7 @@ export class YAMLTree {
       yaml(_io = null, options = {}) {
         const du: { indent?: number; lineWidth?: number } = {};
         if ("indentation" in options) du.indent = options.indentation;
-        if ("canonical" in options) throw new NotImplementedError("canonical");
+        if (options.canonical) throw new NotImplementedError("canonical");
         if ("lineWidth" in options) du.lineWidth = options.lineWidth;
         if (!doc.contents?.tag) return doc.toString({ directives: true, ...du });
         return `--- ${doc.toString(du)}`;
