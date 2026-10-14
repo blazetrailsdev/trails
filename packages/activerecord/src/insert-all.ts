@@ -357,7 +357,7 @@ export class InsertAll {
       );
     }
 
-    const nameOrColumns = uniqueBy || this.model.primaryKey;
+    const nameOrColumns = rtest(uniqueBy) ? uniqueBy : this.model.primaryKey;
     const match = rbFArray(nameOrColumns).map((column) => rbObjAsString(column));
     const sortedMatch = sort(match);
 
