@@ -997,7 +997,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }
-  // `rb_define_method(rb_cProc, "call", proc_call, -1)` (`vendor/ruby/v3.3.11/proc.c:4300`):
   if (mid === "call" && rbObjIsProc(recv)) return recv(...args);
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
