@@ -204,6 +204,7 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
 });
 
 describe("rememberTransactionRecordState / restoreTransactionRecordState (Story K)", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("rememberTransactionRecordState populates _startTransactionState with level and attributes", async () => {
     const { rememberTransactionRecordState } = await import("./transactions.js");
     const { Topic } = await makeSQLiteTopic();
@@ -268,6 +269,7 @@ describe("restoreTransactionRecordState composite primary key arm", () => {
 });
 
 describe("restore_transaction_record_state after rollback (Story K-followup)", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("rollback preserves in-TX user edits as dirty", async () => {
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
     const { Topic } = await makeSQLiteTopic();

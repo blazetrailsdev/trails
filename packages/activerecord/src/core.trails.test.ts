@@ -327,6 +327,7 @@ describe("connection checkout in cached find paths", () => {
 });
 
 describe("connection checkout for directly-assigned adapters", () => {
+  fixtures({}, { useTransactionalTests: false });
   let adapter: BetterSQLite3Adapter;
   let DirectTopic: typeof Base;
 

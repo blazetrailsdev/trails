@@ -34,6 +34,7 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
 }
 
 describe("_instantiate routes row values through adapter-resolved types", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("applies the schema-reflected cast type's deserialize on hydration", async () => {
     class Widget extends Base {
       static override tableName = "widgets";
