@@ -158,7 +158,6 @@ export function inlinedFromFindings(
         continue;
       const tsFile = ctor?.file ?? klass.file;
       if (tsFile === undefined) continue;
-      if (klass.file !== undefined && klass.file !== tsFile) continue;
       const short = (klass.name ?? owner).split(".").pop()!;
       const seat = `${name} ${tsFile} ${klass.name ?? owner}`;
       if (visited.has(seat)) continue;
