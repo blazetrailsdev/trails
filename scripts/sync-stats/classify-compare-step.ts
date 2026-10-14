@@ -25,7 +25,10 @@ export function classifyCompareStep(command: string): string | null {
     command.includes("test-compare/compare.ts") ||
     // Pre-RFC-0092 entry-point names, kept so historic logs still parse.
     command.includes("test-compare/test-compare.ts") ||
-    command.includes("test-compare/convention-compare.ts")
+    command.includes("test-compare/convention-compare.ts") ||
+    // Since trails#8289 the run happens inside the bg-gates scheduler, and the
+    // "Test comparison" step only prints its log.
+    /\bbg-gates\.mjs wait(?: \S+)* test-compare(?: |$)/.test(command)
   ) {
     return "test_compare";
   }
