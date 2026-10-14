@@ -138,4 +138,12 @@ describe("TestInheritedMiddleware", () => {
     const result = await app(envFor("/"));
     expect(result[1]["Configurable-Message"]).toBe("Configured by block.");
   });
+
+  it("middleware stack accepts only and except as options", async () => {
+    let result = await ActionsController.action("show")(envFor("/"));
+    expect(result[1]["Middleware-Order"]).toBe("First!");
+
+    result = await ActionsController.action("index")(envFor("/"));
+    expect(result[1]["Middleware-Order"]).toBeUndefined();
+  });
 });

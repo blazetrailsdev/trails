@@ -254,15 +254,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache " +
       "visibility cannot translate to single-threaded Node.js.",
   },
-  {
-    testFile: "relations_test.rb",
-    tests: ["where id with delegated ar object", "where relation with delegated ar object"],
-    reason:
-      "Wraps the record in Class.new(SimpleDelegator) (relations_test.rb:835-847). ruby-compat " +
-      "ports DelegateClass only, whose instances are `instanceof` the wrapped class where a " +
-      "Delegator is not `is_a?(Base)`. CONVERGEABLE " +
-      "ruby-compat-simple-delegator-for-delegated-ar-object-tests.",
-  },
   // --- Permanently not-portable: residual-skip-tail-sweep (RFC 0030) ---
   {
     testFile: "associations/has_one_associations_test.rb",

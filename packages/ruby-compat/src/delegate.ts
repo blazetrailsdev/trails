@@ -1,6 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { rbDefineAllocFunc } from "./include.js";
 import { methodMissingProxy } from "./method-missing-proxy.js";
+import { NotImplementedError } from "./not-implemented-error.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
 type MixinBase = new (...args: any[]) => object;
@@ -164,4 +165,66 @@ export function DelegateClass<T extends MixinBase>(
   block?.call(klass as unknown as Delegating<T>);
 
   return klass as unknown as Delegating<T>;
+}
+
+/**
+ * `Delegator` (`vendor/ruby/v3.3.11/lib/delegate.rb:39-246`) — the abstract
+ * class whose `method_missing` (`:82-93`) forwards every name the delegate
+ * answers, and whose `respond_to_missing?` (`:99-108`) answers for them. Both
+ * are the `get` and `has` traps of `methodMissingProxy`, read through
+ * `__getobj__` on every access.
+ *
+ * Nothing of the delegate is on its ancestor chain (`class Delegator <
+ * BasicObject`, `:39`): `is_a?(delegate.class)` is false, `respond_to?` true.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class Delegator {
+  /** @noRailsEquivalent PERMANENT */
+  constructor(obj: unknown) {
+    this.__setobj__(obj);
+    return methodMissingProxy(this, { delegate: (self) => self.__getobj__() });
+  }
+
+  /**
+   * `Delegator#__getobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:190-192`).
+   */
+  __getobj__(): unknown {
+    throw new NotImplementedError("need to define `__getobj__'");
+  }
+
+  /**
+   * `Delegator#__setobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:198-200`).
+   */
+  // eslint-disable-next-line unused-imports/no-unused-vars -- the abstract method names the parameter its overrides take.
+  __setobj__(obj: unknown): void {
+    throw new NotImplementedError("need to define `__setobj__'");
+  }
+}
+
+/**
+ * `SimpleDelegator` (`vendor/ruby/v3.3.11/lib/delegate.rb:318-343`), whose
+ * `@delegate_sd_obj` is a plain property as `DelegateClass`'s `delegateDcObj` is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class SimpleDelegator extends Delegator {
+  /** @noRailsEquivalent PERMANENT */
+  declare delegateSdObj: unknown;
+
+  /**
+   * `SimpleDelegator#__getobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:320-326`).
+   */
+  override __getobj__(): unknown {
+    if (!("delegateSdObj" in this)) throw new ArgumentError("not delegated");
+    return this.delegateSdObj;
+  }
+
+  /**
+   * `SimpleDelegator#__setobj__` (`vendor/ruby/v3.3.11/lib/delegate.rb:340-343`).
+   */
+  override __setobj__(obj: unknown): void {
+    if ((this as unknown) === obj) throw new ArgumentError("cannot delegate to self");
+    this.delegateSdObj = obj;
+  }
 }
