@@ -2983,6 +2983,7 @@ class ApiExtractor
     stmts = slot && node[slot]
     if stmts.is_a?(Array) && stmts[0].is_a?(Array)
       stmts[0...-1].each do |stmt|
+        void_block_tail([:bodystmt, [stmt]], found)
         found << stmt
         found << stmt while stmt.is_a?(Array) && (stmt = stmt[MODIFIER_SLOTS[stmt[0]] || stmt.length])
       end
@@ -3056,7 +3057,7 @@ class ApiExtractor
     case recv[0]
     when :var_ref, :vcall
       inner = recv[1]
-      inner.is_a?(Array) && %i[@ident @ivar @const].include?(inner[0]) ? inner[1] : nil
+      inner.is_a?(Array) && %i[@ident @ivar @cvar @const].include?(inner[0]) ? inner[1] : nil
     when :const_path_ref then const_name(recv[2])
     when :top_const_ref then const_name(recv[1])
     when :aref then symbol_key_name(recv[2])

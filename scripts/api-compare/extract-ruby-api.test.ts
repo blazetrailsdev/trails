@@ -3898,6 +3898,25 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             options.delete(:a) if flag
           end
 
+          def branched(args, flag)
+            if args.last.is_a?(Hash)
+              args.last.delete(:a)
+            elsif flag
+              args.first.delete(:b)
+            end
+            super
+          end
+
+          def branched_last(options)
+            if options
+              options.delete(:a)
+            end
+          end
+
+          def class_variable(name)
+            @@responses.key?(name)
+          end
+
           def iterated(options, names)
             names.each do |name|
               options.delete(name)
@@ -3959,6 +3978,15 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#modified_last"]).toEqual({
       delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched"]).toEqual({
+      delete: ["first", "last"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched_last"]).toEqual({
+      delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#class_variable"]).toEqual({
+      "key?": ["@@responses"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#iterated"]).toEqual({
       delete: ["options"],

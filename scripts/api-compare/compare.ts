@@ -881,6 +881,9 @@ function hasNativeFormAnalogue(
       return (
         tsNativeForms.has(`${analogue.form}:${snakeToCamel(bare)}`) ||
         (bare !== operand && tsNativeForms.has(`${analogue.form}:_${snakeToCamel(bare)}`)) ||
+        (analogue.key === true &&
+          /^[A-Z][A-Z0-9_]*$/.test(bare) &&
+          tsNativeForms.has(`${analogue.form}:${bare}`)) ||
         (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`))
       );
     }),

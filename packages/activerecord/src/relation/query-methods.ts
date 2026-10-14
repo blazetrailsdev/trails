@@ -3,7 +3,6 @@ import {
   extend,
   fetch,
   first,
-  hasKey,
   flatten,
   Hash,
   isEmpty,
@@ -1735,7 +1734,7 @@ export function arelColumn(
   const from = fromClause?.name || fromClause?.value;
 
   if (
-    hasKey(modelClass?.columnsHash?.() ?? {}, field) &&
+    Object.hasOwn(modelClass.columnsHash(), field) &&
     (!from || isTableNameMatches.call(this, from))
   ) {
     const table: any = this.table;

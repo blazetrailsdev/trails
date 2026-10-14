@@ -1,4 +1,4 @@
-import { hasKey, hashDelete, rtest } from "@blazetrails/ruby-compat";
+import { hashDelete, rtest } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import type { TableRows } from "./table-rows.js";
@@ -120,7 +120,7 @@ export class TableRow {
   private get reflectionClass(): typeof Base {
     return (this._reflectionClass ??= (() => {
       const inheritanceColumnName = this.modelMetadata.inheritanceColumnName;
-      if (inheritanceColumnName != null && hasKey(this._row, inheritanceColumnName)) {
+      if (inheritanceColumnName != null && Object.hasOwn(this._row, inheritanceColumnName)) {
         try {
           return this.modelClass!.findStiClass(String(this._row[inheritanceColumnName]));
         } catch {
@@ -135,7 +135,7 @@ export class TableRow {
   private fillTimestamps(): void {
     if (this.modelClass!.recordTimestamps) {
       for (const cName of this.modelMetadata.timestampColumnNames) {
-        if (!hasKey(this._row, cName)) this._row[cName] = this._now;
+        if (!Object.hasOwn(this._row, cName)) this._row[cName] = this._now;
       }
     }
   }
@@ -169,12 +169,12 @@ export class TableRow {
   }
 
   private isColumnDefined(col: string): boolean {
-    return !this.modelMetadata.hasColumn(col) || hasKey(this._row, col);
+    return !this.modelMetadata.hasColumn(col) || Object.hasOwn(this._row, col);
   }
 
   private resolveEnums(): void {
     for (const [name, values] of Object.entries(this.reflectionClass.definedEnums)) {
-      if (hasKey(this._row, name)) {
+      if (Object.hasOwn(this._row, name)) {
         this._row[name] = values.fetch(this._row[name] as string, this._row[name] as never);
       }
     }

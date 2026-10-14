@@ -1,4 +1,4 @@
-import { File, GzipWriter, hasKey } from "@blazetrails/ruby-compat";
+import { File, GzipWriter } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
@@ -92,7 +92,7 @@ export class Deflater {
     body: any,
   ): boolean {
     if (
-      hasKey(STATUS_WITH_NO_ENTITY_BODY, status) ||
+      Object.hasOwn(STATUS_WITH_NO_ENTITY_BODY, status) ||
       /\bno-transform\b/.test(String(headers[CACHE_CONTROL] ?? "")) ||
       (headers["content-encoding"] != null && !/\bidentity\b/.test(headers["content-encoding"]))
     ) {

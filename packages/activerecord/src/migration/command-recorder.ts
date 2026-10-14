@@ -182,7 +182,7 @@ export class CommandRecorder {
   /** @internal */
   invertCreateTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (isPlainObject(last(args))) {
-      hashDelete(last(args) as Record<string, unknown>, "ifNotExists");
+      delete (last(args) as Record<string, unknown>).ifNotExists;
     }
     return CommandRecorder.StraightReversions.instanceMethod("invertCreateTable")!.value.call(
       this,
@@ -245,7 +245,7 @@ export class CommandRecorder {
       );
     }
 
-    hashDelete(options, "ifExists");
+    delete options.ifExists;
 
     args = [table, columns];
     if (!isEmpty(options)) args.push(options);
@@ -273,7 +273,7 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddForeignKey(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    if (isPlainObject(last(args))) hashDelete(last(args) as Record<string, unknown>, "validate");
+    if (isPlainObject(last(args))) delete (last(args) as Record<string, unknown>).validate;
     return CommandRecorder.StraightReversions.instanceMethod("invertAddForeignKey")!.value.call(
       this,
       args,
@@ -304,7 +304,7 @@ export class CommandRecorder {
   invertAddCheckConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const options = last(args);
     if (isPlainObject(options)) {
-      hashDelete(options, "validate");
+      delete options.validate;
       if ("ifNotExists" in options) options["ifExists"] = hashDelete(options, "ifNotExists");
     }
     return CommandRecorder.StraightReversions.instanceMethod(

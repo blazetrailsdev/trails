@@ -1,4 +1,4 @@
-import { hasKey, regexpEscape, transformValues, uniq } from "@blazetrails/ruby-compat";
+import { regexpEscape, transformValues, uniq } from "@blazetrails/ruby-compat";
 import { Ast } from "../ast.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
@@ -73,7 +73,7 @@ export class AnchoredRegexp extends Visitor {
 
   protected override visitSYMBOL(node: Node): string {
     const name = node.toSym();
-    if (!hasKey(this._matchers, name)) return this._separatorRe;
+    if (!Object.hasOwn(this._matchers, name)) return this._separatorRe;
     return `(${regexUnion(this._matchers[name])})`;
   }
 
