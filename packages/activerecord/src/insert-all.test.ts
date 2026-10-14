@@ -15,6 +15,7 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -530,17 +531,21 @@ describe("InsertAllTest", () => {
     },
   );
 
-  itIfSupports("insert_on_duplicate_update", "upsert and db warnings", async () => {
-    try {
-      await self().withDbWarningsAction("raise", undefined, async () => {
-        await expect(
-          Book.upsert({ id: 1001, name: "Remote", author_id: 1 }),
-        ).resolves.not.toThrow();
-      });
-    } finally {
-      await Book.delete(1001);
-    }
-  });
+  itIfSupports.skipIf(inMemoryDb())(
+    "insert_on_duplicate_update",
+    "upsert and db warnings",
+    async () => {
+      try {
+        await self().withDbWarningsAction("raise", undefined, async () => {
+          await expect(
+            Book.upsert({ id: 1001, name: "Remote", author_id: 1 }),
+          ).resolves.not.toThrow();
+        });
+      } finally {
+        await Book.delete(1001);
+      }
+    },
+  );
 
   itIfSupports(
     "insert_on_duplicate_update",
