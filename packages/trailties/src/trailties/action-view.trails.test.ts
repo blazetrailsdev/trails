@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   Deprecators,
+  include,
   FileUpdateChecker,
   Logger,
   Reloader,
@@ -171,7 +172,9 @@ describe("action_view.setup_action_pack", () => {
     });
     runLoadHooks("action_controller", ActionController.Base);
 
-    const proto = RoutingUrlFor.prototype as unknown as Record<string, unknown>;
+    class View {}
+    include(View, RoutingUrlFor);
+    const proto = View.prototype as unknown as Record<string, unknown>;
     for (const name of ["routeFor", "fullUrlFor", "polymorphicUrl", "polymorphicPath"]) {
       expect(typeof proto[name], name).toBe("function");
     }
@@ -208,10 +211,10 @@ describe("action_view.setup_action_pack", () => {
     });
     runLoadHooks("action_controller", ActionController.Base);
 
-    const view = Object.create(RoutingUrlFor.prototype) as RoutingUrlFor;
-    expect(RoutingUrlFor.prototype.urlFor.call(view as never, "http://www.example.com")).toBe(
-      "http://www.example.com",
-    );
+    class View {}
+    include(View, RoutingUrlFor);
+    const view = Object.create(View.prototype) as RoutingUrlFor;
+    expect(view.urlFor("http://www.example.com")).toBe("http://www.example.com");
   });
 
   it("url_for with a Hash from a view generates a path, not a full URL, by default", async () => {
@@ -225,7 +228,9 @@ describe("action_view.setup_action_pack", () => {
     routes.draw(function () {
       this.get("/:controller/:action");
     });
-    const view = Object.assign(Object.create(RoutingUrlFor.prototype) as RoutingUrlFor, {
+    class View {}
+    include(View, RoutingUrlFor);
+    const view = Object.assign(Object.create(View.prototype) as RoutingUrlFor, {
       _routes: routes,
       controller: { urlOptions: () => ({ host: "example.com" }) },
     }) as unknown as RoutingUrlFor & RoutingUrlForHost & UrlHelperHost;

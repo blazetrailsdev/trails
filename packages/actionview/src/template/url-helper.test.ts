@@ -61,7 +61,7 @@ function viewWith(controller: unknown): Base {
   return Base.withViewPaths([], {}, controller);
 }
 
-include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+RoutingUrlFor.include(UrlFor);
 
 const routes = new RouteSet();
 routes.draw(function () {

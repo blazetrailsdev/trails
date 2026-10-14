@@ -273,15 +273,18 @@ export class Module<I extends object = Record<never, never>> {
       }
       return this;
     }
+    if (mod instanceof Module) {
+      Module.prototype.appendFeatures.call(mod, this);
+      if (typeof (mod as ModuleHooks)[included] === "function") {
+        (mod as ModuleHooks)[included]!(this);
+      } else {
+        featureHook(mod, "included")?.(this);
+      }
+      return this;
+    }
     const carrier = carrierOf(this);
     if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
       trackIncludedModule(carrier, mod);
-      if (mod instanceof Module) {
-        let nested = nestedModules.get(this);
-        if (!nested) nestedModules.set(this, (nested = []));
-        nested.push(mod);
-        return this;
-      }
       const installed = trackedKeys(carrier);
       const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
         string,
@@ -469,11 +472,28 @@ export class Module<I extends object = Record<never, never>> {
    * `rb_mod_append_features`, the splice `include` runs before `included`.
    * A `Module` this module included is spliced beneath it, as
    * `include_modules_at` (vendor/ruby/v3.3.11/class.c:1253) walks the included
-   * module's own ancestry, skipping one already in `base`'s.
+   * module's own ancestry, skipping one already in `base`'s. A `Module` base is
+   * a module including this one: every class already including `base` gets it
+   * too, as `rb_include_module` walks `base`'s subclasses
+   * (vendor/ruby/v3.3.11/class.c:1189-1215).
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  appendFeatures(base: AnyClass): void {
+  appendFeatures(base: AnyClass | Module): void {
+    if (base instanceof Module) {
+      const carrier = carrierOf(base);
+      if (isModuleMethodTablePresent({ prototype: carrier }, this)) return;
+      trackIncludedModule(carrier, this);
+      let nested = nestedModules.get(base);
+      if (!nested) nestedModules.set(base, (nested = []));
+      nested.push(this);
+      for (const link of includerCarriers.get(base) ?? []) {
+        if (!isModuleMethodTablePresent({ prototype: link }, this)) {
+          Module.prototype.appendFeatures.call(this, { prototype: link } as AnyClass);
+        }
+      }
+      return;
+    }
     for (const mod of nestedModules.get(this) ?? []) {
       if (!isModuleMethodTablePresent(base, mod)) Module.prototype.appendFeatures.call(mod, base);
     }

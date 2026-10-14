@@ -118,7 +118,7 @@ class Car {
   constructor(public color: string) {}
 }
 
-include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+RoutingUrlFor.include(UrlFor);
 
 const Routes = new RouteSet();
 Routes.draw(function () {

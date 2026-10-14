@@ -1922,3 +1922,45 @@ describe("Module#prependFeatures", () => {
     expect(new Klass().greet()).toBe("reopened");
   });
 });
+
+describe("Module#appendFeatures on a Module base", () => {
+  it("reaches a class that already includes the base", () => {
+    const Inner = new Module((mod) => {
+      mod.defineMethod("hello", () => "inner");
+    });
+    const Outer = new Module((mod) => {
+      mod.defineMethod("hello", function (this: object) {
+        return `outer>${Outer.superMethod(this, "hello")!() as string}`;
+      });
+    });
+    class Klass {}
+    include(Klass, Outer);
+    Outer.include(Inner);
+
+    const obj = new Klass() as { hello(): string };
+    expect(obj.hello()).toBe("outer>inner");
+    expect(isModuleIncluded(Klass, Inner)).toBe(true);
+  });
+});
+
+describe("Module#include of a Module", () => {
+  it("fires the included module's included hook", () => {
+    const seen: unknown[] = [];
+    const Inner = new Module() as Module & { [included](base: unknown): void };
+    Inner[included] = (base: unknown) => seen.push(base);
+    const Outer = new Module();
+    Outer.include(Inner);
+    expect(seen).toEqual([Outer]);
+  });
+});
+
+describe("Module#include of a Module with a named included", () => {
+  it("fires the named included hook", () => {
+    const seen: unknown[] = [];
+    const Inner = new Module() as Module & { included(base: unknown): void };
+    Inner.included = (base: unknown) => seen.push(base);
+    const Outer = new Module();
+    Outer.include(Inner);
+    expect(seen).toEqual([Outer]);
+  });
+});

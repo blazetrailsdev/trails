@@ -101,3 +101,24 @@ named explicitly (`render template: "test/hello_world"`) is looked up as
 written.
 
 This is ratified repo-wide here by the repo owner.
+
+## A `null` positional keeps its url-helper slot (`UrlHelper#handle_positional_args`)
+
+Rails' `handle_positional_args`
+(`actionpack/lib/action_dispatch/routing/route_set.rb:292-318`) removes every
+`inner_options` key from `path_params`, then merges `inner_options` over the
+positional values. In Ruby, `product_path(nil, "id" => "url-tested")` still
+fails generation, because the String key `"id"` is not the Symbol `:id` the
+positional `nil` fills
+(`actionpack/test/dispatch/routing_test.rb:4981-4984`).
+
+A Ruby Symbol is a JS string (§ "A Ruby Symbol is a JS string, never a JS
+`Symbol`" in the root CLAUDE.md), so trails has one key `id` for both. One of
+the two Ruby calls has to lose. The repo owner ruled on 2026-10-14 (trails#8906)
+that **only a `null` positional is kept**: it claims its slot, and an option of
+the same name does not override it. A non-null positional behaves as in Rails.
+The cost is that `productPath(null, { id: "1" })` raises where Rails' Symbol-key
+`product_path(nil, id: "1")` answers `/products/1`.
+
+`handlePositionalArgs` carries `@inventedArm block — PERMANENT` against this
+section. This is ratified here by the repo owner.

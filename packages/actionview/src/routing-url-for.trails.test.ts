@@ -33,8 +33,7 @@ interface Host extends RoutingUrlFor, RoutingUrlForHost, UrlHelperHost {
 
 let host: Host;
 
-include(
-  RoutingUrlFor as unknown as new (...args: never[]) => unknown,
+RoutingUrlFor.include(
   new Module((mod) =>
     mod.include({
       urlFor(this: Host, options?: unknown) {
@@ -51,6 +50,9 @@ include(
   ),
 );
 
+class View {}
+include(View, RoutingUrlFor);
+
 beforeEach(() => {
   TopLevel.ActionController = { Parameters } as never;
   TopLevel.ActionDispatch = {
@@ -58,7 +60,7 @@ beforeEach(() => {
       PolymorphicRoutes: { HelperMethodBuilder: { path: () => builder, url: () => builder } },
     },
   } as never;
-  host = Object.assign(Object.create(RoutingUrlFor.prototype) as RoutingUrlFor, {
+  host = Object.assign(Object.create(View.prototype) as RoutingUrlFor, {
     controller: null as unknown,
     seen: [] as unknown[],
     _backUrl,

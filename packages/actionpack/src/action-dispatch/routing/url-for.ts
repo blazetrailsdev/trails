@@ -14,6 +14,7 @@ import {
   isSymbol,
   Module,
   rbFPublicSend,
+  rbModMethodDefined,
   rbObjRespondTo,
   symbolToS,
   toH,
@@ -169,7 +170,7 @@ export const UrlFor = new Module((mod) => {
   (
     mod as unknown as { included(base: null, block: (this: UrlForIncluder) => void): void }
   ).included(null, function (this: UrlForIncluder) {
-    if (!("defaultUrlOptions" in this.prototype)) {
+    if (!rbModMethodDefined(this, "defaultUrlOptions")) {
       if (typeof this === "function") {
         classAttribute.call(this, "defaultUrlOptions");
       } else {

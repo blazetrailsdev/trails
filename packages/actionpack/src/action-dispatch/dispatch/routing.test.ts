@@ -7,6 +7,7 @@ import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
+  pluralize,
   assertDeprecated,
   assertNothingRaised,
   assertRaises,
@@ -129,14 +130,6 @@ afterEach(() => {
   controllerConstants.delete("posts");
 });
 
-async function redirectResponse(
-  routes: RouteSet,
-  url: string,
-): Promise<{ status: number; location: string | undefined }> {
-  const [status, headers] = await routes.call(MockRequest.envFor(url));
-  return { status, location: (headers as Record<string, string>)["location"] };
-}
-
 const routeSpec = (match: Record<string, unknown>): string => `${match.controller}#${match.action}`;
 
 class EchoParamsController {
@@ -198,28 +191,56 @@ describe("TestRoutingMapper", () => {
     }
   }
 
-  it("logout", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.delete("/logout", { to: "sessions#destroy", as: "logout" });
+  class GrumpyRestrictor {
+    static matches(_request: Request): boolean {
+      return false;
+    }
+  }
+
+  class YoutubeFavoritesRedirector {
+    static call(params: Record<string, string>, _request: Request): string {
+      return `http://www.youtube.com/watch?v=${params.youtube_id}`;
+    }
+  }
+
+  it("logout", async () => {
+    draw(function () {
+      this.controller("sessions", () => {
+        this.delete({ logout: ":destroy" });
+      });
     });
-    const m = routes.recognizePath("/logout", { method: "delete" });
-    expect(m.controller).toBe("sessions");
-    expect(m.action).toBe("destroy");
-    expect(routes.pathFor({}, "logout")).toBe("/logout");
+
+    await t.delete("/logout");
+    expect(t.response.body).toBe("sessions#destroy");
+
+    expect(t.logoutPath()).toBe("/logout");
+    expect(t.urlFor({ controller: "sessions", action: "destroy", onlyPath: true })).toBe("/logout");
   });
 
-  it("login", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/login", { to: "sessions#new", as: "login" });
-      this.post("/login", { to: "sessions#create" });
+  it("login", async () => {
+    draw(function () {
+      this.defaultUrlOptions = { host: "rubyonrails.org" };
+
+      this.controller("sessions", () => {
+        this.get({ login: ":new" });
+        this.post({ login: ":create" });
+      });
     });
-    const getM = routes.recognizePath("/login");
-    expect(getM.action).toBe("new");
-    const postM = routes.recognizePath("/login", { method: "post" });
-    expect(postM.action).toBe("create");
-    expect(routes.pathFor({}, "login")).toBe("/login");
+
+    await t.get("/login");
+    expect(t.response.body).toBe("sessions#new");
+    expect(t.loginPath()).toBe("/login");
+
+    await t.post("/login");
+    expect(t.response.body).toBe("sessions#create");
+
+    expect(t.urlFor({ controller: "sessions", action: "create", onlyPath: true })).toBe("/login");
+    expect(t.urlFor({ controller: "sessions", action: "new", onlyPath: true })).toBe("/login");
+
+    expect(t.urlFor({ controller: "sessions", action: "create" })).toBe(
+      "http://rubyonrails.org/login",
+    );
+    expect(t.loginUrl()).toBe("http://rubyonrails.org/login");
   });
 
   it("session singleton resource", () => {
@@ -1179,155 +1200,150 @@ describe("TestRoutingMapper", () => {
   });
 
   it("login redirect", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/login", { to: this.redirect("/dashboard"), as: "login" });
+    draw(function () {
+      this.get("account/login", { to: this.redirect("/login") });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/login");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/dashboard");
-    expect(status).toBe(301);
+
+    await t.get("/account/login");
+    verifyRedirect("http://www.example.com/login");
   });
 
   it("logout redirect without to", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/logout", { to: this.redirect("/"), as: "logout" });
+    draw(function () {
+      this.get({ "account/logout": this.redirect("/logout"), as: "logout_redirect" });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/logout");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/");
+
+    expect(t.logoutRedirectPath()).toBe("/account/logout");
+    await t.get("/account/logout");
+    verifyRedirect("http://www.example.com/logout");
   });
 
   it("namespace redirect", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.namespace("admin", () => {
-        this.get("/old", { to: this.redirect("/admin/new"), as: "old" });
+    draw(function () {
+      this.namespace("private", () => {
+        this.root({ to: this.redirect("/private/index") });
+        this.get("index", { to: "private#index" });
       });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/admin/old");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/admin/new");
+
+    await t.get("/private");
+    verifyRedirect("http://www.example.com/private/index");
   });
 
-  it("redirect with failing constraint", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/:id", { to: this.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
+  it("redirect with failing constraint", async () => {
+    draw(function () {
+      this.get("hi", { to: this.redirect("/foo"), constraints: GrumpyRestrictor });
     });
-    expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
+
+    await t.get("/hi");
+    expect(t.status).toBe(404);
   });
 
   it("redirect with passing constraint", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/:id", { to: this.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
+    draw(function () {
+      this.get("hi", { to: this.redirect("/foo"), constraints: (_req: Request) => true });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/posts/123");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/articles/123");
+
+    await t.get("/hi");
+    expect(t.status).toBe(301);
   });
 
   it("redirect modulo", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old/:id", { to: this.redirect("/new/%{id}") });
+    draw(function () {
+      this.get("account/modulo/:name", { to: this.redirect("/%{name}s") });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old/42");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/new/42");
+
+    await t.get("/account/modulo/name");
+    verifyRedirect("http://www.example.com/names");
   });
 
   it("redirect proc", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old/:id", { to: this.redirect((params) => `/new/${params.id}`), as: "old" });
+    draw(function () {
+      this.get("account/proc/:name", {
+        to: this.redirect((params, _req) => `/${pluralize(params.name)}`),
+      });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old/5");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/new/5");
+
+    await t.get("/account/proc/person");
+    verifyRedirect("http://www.example.com/people");
   });
 
   it("redirect proc with request", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old", { to: this.redirect((_params, req) => `${req.path}/new`), as: "old" });
+    draw(function () {
+      this.get({ "account/proc_req": this.redirect((_params, req) => `/${req.method}`) });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/old/new");
+
+    await t.get("/account/proc_req");
+    verifyRedirect("http://www.example.com/GET");
   });
 
   it("redirect hash with subdomain", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old", { to: this.redirect({ subdomain: "api" }), as: "old" });
+    draw(function () {
+      this.get("mobile", { to: this.redirect({ subdomain: "mobile" }) });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
-    expect(status).toBe(301);
-    expect(location).toBe("http://api.example.com/old");
+
+    await t.get("/mobile");
+    verifyRedirect("http://mobile.example.com/mobile");
   });
 
   it("redirect hash with domain and path", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old", { to: this.redirect({ domain: "other.com", path: "/new" }), as: "old" });
+    draw(function () {
+      this.get("documentation", {
+        to: this.redirect({ domain: "example-documentation.com", path: "" }),
+      });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.other.com/new");
+
+    await t.get("/documentation");
+    verifyRedirect("http://www.example-documentation.com");
   });
 
   it("redirect hash with path", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old", { to: this.redirect({ path: "/new" }), as: "old" });
+    draw(function () {
+      this.get("new_documentation", { to: this.redirect({ path: "/documentation/new" }) });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/new");
+
+    await t.get("/new_documentation");
+    verifyRedirect("http://www.example.com/documentation/new");
   });
 
   it("redirect hash with host", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old", { to: this.redirect({ host: "other.com" }), as: "old" });
+    draw(function () {
+      this.get("super_new_documentation", { to: this.redirect({ host: "super-docs.com" }) });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old");
-    expect(status).toBe(301);
-    expect(location).toBe("http://other.com/old");
+
+    await t.get("/super_new_documentation?section=top");
+    verifyRedirect("http://super-docs.com/super_new_documentation?section=top");
   });
 
   it("redirect hash path substitution", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/:id", { to: this.redirect({ path: "/articles/%{id}" }), as: "old_post" });
+    draw(function () {
+      this.get("stores/:name", { to: this.redirect({ subdomain: "stores", path: "/%{name}" }) });
     });
-    const { status, location } = await redirectResponse(routes, "http://example.com/posts/42");
-    expect(status).toBe(301);
-    expect(location).toBe("http://example.com/articles/42");
+
+    await t.get("/stores/iernest");
+    verifyRedirect("http://stores.example.com/iernest");
   });
 
   it("redirect hash path substitution with catch all", async () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old/*path", { to: this.redirect({ path: "/new/%{path}" }) });
+    draw(function () {
+      this.get("stores/:name(*rest)", {
+        to: this.redirect({ subdomain: "stores", path: "/%{name}%{rest}" }),
+      });
     });
-    const { status, location } = await redirectResponse(routes, "http://example.com/old/a/b/c");
-    expect(status).toBe(301);
-    expect(location).toBe("http://example.com/new/a/b/c");
+
+    await t.get("/stores/iernest/products");
+    verifyRedirect("http://stores.example.com/iernest/products");
   });
 
   it("redirect class", async () => {
-    const customRedirect = (params: Record<string, string>) => `/custom/${params.id}`;
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/old/:id", { to: this.redirect(customRedirect), as: "old" });
+    draw(function () {
+      this.get("youtube_favorites/:youtube_id/:name", {
+        to: this.redirect(YoutubeFavoritesRedirector),
+      });
     });
-    const { status, location } = await redirectResponse(routes, "http://www.example.com/old/7");
-    expect(status).toBe(301);
-    expect(location).toBe("http://www.example.com/custom/7");
+
+    await t.get("/youtube_favorites/oHg5SJYRHA0/rick-rolld");
+    verifyRedirect("http://www.youtube.com/watch?v=oHg5SJYRHA0");
   });
 
   it("resources for uncountable names", () => {
@@ -3705,8 +3721,7 @@ describe("TestUrlGenerationErrors", () => {
     expect(error.message).toMatch(message);
   });
 
-  // BLOCKED: url-helper-positional-nil-collides-with-a-string-id-option
-  it.skip("exceptions have suggestions for fix", async () => {
+  it("exceptions have suggestions for fix", async () => {
     const Routes = new RouteSet();
     Routes.draw(function () {
       this.get("/products/:id", { to: "products#show", as: "product" });
@@ -4758,8 +4773,7 @@ describe("TestPathParameters", () => {
     t = testCase as TestPathParameters;
   });
 
-  // BLOCKED: view-rendered-with-route-url-helpers-answers-url-for
-  it.skip("path parameters are not mutated", async () => {
+  it("path parameters are not mutated", async () => {
     await t.get("/en/about");
     expect(t.response.body).toBe("/ar | /ar/about");
   });

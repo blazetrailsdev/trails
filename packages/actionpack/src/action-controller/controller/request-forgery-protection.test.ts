@@ -27,7 +27,7 @@ import {
 import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 
-include(RoutingUrlFor, UrlFor);
+RoutingUrlFor.include(UrlFor);
 
 interface ActionsHost {
   sameOriginJs(): Promise<void>;
