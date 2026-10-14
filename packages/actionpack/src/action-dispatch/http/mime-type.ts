@@ -185,7 +185,7 @@ const METHOD_MISSING_HANDLER: ProxyHandler<MimeType | NullType> = {
 };
 
 export class MimeType {
-  [predicate: `is${string}`]: (() => boolean) | undefined;
+  [predicate: `is${string}`]: ((...args: never[]) => boolean) | undefined;
   /** @internal */
   readonly string: string;
   readonly symbol: string | null;
@@ -231,7 +231,7 @@ export class MimeType {
     return this.toString();
   }
 
-  match(mimeType: MimeType | string | null | undefined): boolean {
+  isMatch(mimeType: MimeType | string | null | undefined): boolean {
     if (mimeType == null) return false;
     const regexp = new RegExp(regexpEscape(mimeType.toString()));
     return (
@@ -360,9 +360,7 @@ export class MimeType {
 
   /** @internal */
   static parseDataWithTrailingStar(type: string): MimeType[] {
-    return MimeType.SET.select(
-      (m) => m.string.includes(type) || m.synonyms.some((s) => s.includes(type)),
-    );
+    return MimeType.SET.select((m) => m.isMatch(type));
   }
 
   static parse(acceptHeader: string): MimeType[] {

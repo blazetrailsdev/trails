@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ContentDisposition } from "./content-disposition.js";
+import { ContentDisposition } from "../http/content-disposition.js";
 
 describe("ContentDispositionTest", () => {
   it("encoding a Latin filename", () => {

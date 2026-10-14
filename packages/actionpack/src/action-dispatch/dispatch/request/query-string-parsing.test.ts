@@ -1,13 +1,57 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { Request } from "../http/request.js";
-import { RequestUtils } from "./utils.js";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Request as RackRequest, type RackApp, type RackEnv } from "@blazetrails/rack";
+import { registerConstant } from "@blazetrails/ruby-compat";
+import { Request } from "../../http/request.js";
+import { RequestUtils } from "../../request/utils.js";
+import { Base } from "../../../action-controller/base.js";
+import { deprecator } from "../../deprecator.js";
+import { IntegrationTest } from "../../testing/integration.js";
+import type { MiddlewareFactory } from "../../middleware/stack.js";
+import type { RouteSet } from "../../routing/route-set.js";
+import "../../../test-helpers/abstract-unit.js";
 
 function assertParses(expected: unknown, query: string): void {
   const req = new Request({ QUERY_STRING: query });
   expect(req.queryParameters).toEqual(expected);
 }
 
+class QueryStringParsingTest extends IntegrationTest {}
+registerConstant("QueryStringParsingTest", QueryStringParsingTest);
+
 describe("QueryStringParsingTest", () => {
+  class TestController extends Base {
+    static lastQueryParameters: unknown;
+
+    async parse(): Promise<void> {
+      TestController.lastQueryParameters = this.request.queryParameters;
+      await this.head(":ok");
+    }
+  }
+
+  class EarlyParse {
+    private app: RackApp;
+
+    constructor(app: RackApp) {
+      this.app = app;
+    }
+
+    populateRackCache(env: RackEnv): void {
+      void new RackRequest(env).params;
+    }
+
+    call(env: RackEnv) {
+      this.populateRackCache(env);
+      return this.app(env);
+    }
+  }
+
+  let t: QueryStringParsingTest;
+  beforeEach(({ testCase }) => {
+    t = testCase as QueryStringParsingTest;
+    t.app = IntegrationTest.buildApp(null, (middleware) => {
+      middleware.use(EarlyParse as unknown as MiddlewareFactory);
+    });
+  });
   const initialPerformDeepMunge = RequestUtils.performDeepMunge;
   afterEach(() => {
     RequestUtils.performDeepMunge = initialPerformDeepMunge;
@@ -125,5 +169,18 @@ describe("QueryStringParsingTest", () => {
       { location: ["1", "2"], age_group: ["2"] },
       "location[]=1&location[]=2&age_group[]=2",
     );
+  });
+
+  it("ambiguous query string returns a bad request", async () => {
+    await t.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        deprecator().silence(() => {
+          this.get(":action", { to: TestController });
+        });
+      });
+
+      await t.get("/parse", { headers: { QUERY_STRING: "foo[]=bar&foo[4]=bar" } });
+      t.assertResponse(":bad_request");
+    });
   });
 });

@@ -190,18 +190,18 @@ describe("MimeTypeTest", () => {
   });
 
   it("regexp matcher", () => {
-    expect(Mime.get(":js")!.match("text/javascript")).toBe(true);
-    expect(Mime.get(":js")!.match("application/javascript")).toBe(true);
-    expect(!Mime.get(":js")!.match("text/html")).toBe(true);
-    expect(!Mime.get(":js")!.match("text/javascript")).toBe(false);
-    expect(!Mime.get(":js")!.match("application/javascript")).toBe(false);
-    expect(Mime.get(":html")!.match("application/xhtml+xml")).toBe(true);
+    expect(Mime.get(":js")!.isMatch("text/javascript")).toBe(true);
+    expect(Mime.get(":js")!.isMatch("application/javascript")).toBe(true);
+    expect(!Mime.get(":js")!.isMatch("text/html")).toBe(true);
+    expect(!Mime.get(":js")!.isMatch("text/javascript")).toBe(false);
+    expect(!Mime.get(":js")!.isMatch("application/javascript")).toBe(false);
+    expect(Mime.get(":html")!.isMatch("application/xhtml+xml")).toBe(true);
   });
 
   it("match?", () => {
-    expect(Mime.get(":js")!.match("text/javascript")).toBe(true);
-    expect(Mime.get(":js")!.match("application/javascript")).toBe(true);
-    expect(Mime.get(":js")!.match("text/html")).toBe(false);
+    expect(Mime.get(":js")!.isMatch("text/javascript")).toBe(true);
+    expect(Mime.get(":js")!.isMatch("application/javascript")).toBe(true);
+    expect(Mime.get(":js")!.isMatch("text/html")).toBe(false);
   });
 
   it("can be initialized with wildcards", () => {

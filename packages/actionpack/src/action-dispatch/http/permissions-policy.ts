@@ -2,6 +2,7 @@ import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
+import { deepDup } from "@blazetrails/activesupport";
 
 /** @internal */
 const MAPPINGS: Record<string, string> = {
@@ -46,13 +47,13 @@ export class Middleware {
   }
 
   private policyEmpty(policy: PermissionsPolicy | null | undefined): boolean {
-    return policy?.directives.size === 0;
+    return policy != null && Object.keys(policy.directives).length === 0;
   }
 }
 
 export class PermissionsPolicy {
   /** @internal */
-  directives: Map<string, PolicySource[]> = new Map();
+  directives: Record<string, PolicySource[]> = {};
 
   constructor(block?: (policy: PermissionsPolicy) => void) {
     if (block) block(this);
@@ -128,15 +129,15 @@ export class PermissionsPolicy {
   /** @internal */
   private _set(directive: string, sources: Array<PolicySource | null | undefined>): void {
     if (sources.length === 0 || sources[0] == null) {
-      this.directives.delete(directive);
+      delete this.directives[directive];
     } else {
-      this.directives.set(directive, this.applyMappings(sources as PolicySource[]));
+      this.directives[directive] = this.applyMappings(sources as PolicySource[]);
     }
   }
 
   /** @internal */
   initializeCopy(other: PermissionsPolicy): this {
-    this.directives = new Map(Array.from(other.directives.entries()).map(([k, v]) => [k, [...v]]));
+    this.directives = deepDup(other.directives);
     return this;
   }
 
@@ -172,7 +173,7 @@ export class PermissionsPolicy {
   /** @internal */
   private buildDirectives(context?: unknown): Array<string | null> {
     const result: Array<string | null> = [];
-    for (const [directive, sources] of this.directives) {
+    for (const [directive, sources] of Object.entries(this.directives)) {
       if (Array.isArray(sources)) {
         result.push(`${directive} ${this.buildDirective(sources, context).join(" ")}`);
       } else if (sources) {

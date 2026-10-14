@@ -124,7 +124,7 @@ export function parseFormattedParameters(
   parsers: ParameterParsers,
   fallback: () => Record<string, unknown>,
 ): Record<string, unknown> {
-  if (this.contentLength === 0 || this.contentMimeType === null || !this.rawPost) {
+  if (this.contentLength === 0 || this.contentMimeType === null) {
     return fallback();
   }
   const strategy = parsers[this.contentMimeType.symbol!];

@@ -2,6 +2,7 @@ import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
+import { deepDup } from "@blazetrails/activesupport";
 
 export const MAPPINGS = {
   self: "'self'",
@@ -86,16 +87,14 @@ export class Middleware {
 }
 
 export class ContentSecurityPolicy {
-  directives: Map<DirectiveName, DirectiveValue> = new Map();
+  directives: Record<DirectiveName, DirectiveValue> = {};
 
   constructor(init?: (policy: ContentSecurityPolicy) => void) {
     if (init) init(this);
   }
 
   initializeCopy(other: ContentSecurityPolicy): void {
-    this.directives = new Map(
-      Array.from(other.directives.entries()).map(([k, v]) => [k, v === true ? true : [...v]]),
-    );
+    this.directives = deepDup(other.directives);
   }
 
   defaultSrc(...sources: CSPSourceOrClear[]): this {
@@ -160,40 +159,40 @@ export class ContentSecurityPolicy {
   }
   sandbox(...values: CSPSourceOrClear[]): this {
     if (values.length === 0) {
-      this.directives.set("sandbox", true);
+      this.directives["sandbox"] = true;
     } else if (values[0] != null && values[0] !== false) {
-      this.directives.set("sandbox", values as CSPSource[]);
+      this.directives["sandbox"] = values as CSPSource[];
     } else {
-      this.directives.delete("sandbox");
+      delete this.directives["sandbox"];
     }
     return this;
   }
   pluginTypes(...types: CSPSourceOrClear[]): this {
     if (types[0] != null && types[0] !== false) {
-      this.directives.set("plugin-types", types as CSPSource[]);
+      this.directives["plugin-types"] = types as CSPSource[];
     } else {
-      this.directives.delete("plugin-types");
+      delete this.directives["plugin-types"];
     }
     return this;
   }
   reportUri(uri: CSPSource): this {
-    this.directives.set("report-uri", [uri]);
+    this.directives["report-uri"] = [uri];
     return this;
   }
   blockAllMixedContent(enabled: boolean | null = true): this {
     if (enabled === false || enabled == null) {
-      this.directives.delete("block-all-mixed-content");
+      delete this.directives["block-all-mixed-content"];
       return this;
     }
-    this.directives.set("block-all-mixed-content", true);
+    this.directives["block-all-mixed-content"] = true;
     return this;
   }
   upgradeInsecureRequests(enabled: boolean | null = true): this {
     if (enabled === false || enabled == null) {
-      this.directives.delete("upgrade-insecure-requests");
+      delete this.directives["upgrade-insecure-requests"];
       return this;
     }
-    this.directives.set("upgrade-insecure-requests", true);
+    this.directives["upgrade-insecure-requests"] = true;
     return this;
   }
   requireSriFor(...types: CSPSourceOrClear[]): this {
@@ -210,10 +209,10 @@ export class ContentSecurityPolicy {
   private setDirective(name: string, sources: CSPSourceOrClear[]): this {
     const first = sources[0];
     if (sources.length === 0 || first == null || first === false) {
-      this.directives.delete(name);
+      delete this.directives[name];
       return this;
     }
-    this.directives.set(name, this.applyMappings(sources as CSPSource[]));
+    this.directives[name] = this.applyMappings(sources as CSPSource[]);
     return this;
   }
 
@@ -254,7 +253,7 @@ export class ContentSecurityPolicy {
     nonceDirectives: readonly string[],
   ): (string | null)[] {
     const out: (string | null)[] = [];
-    for (const [directive, sources] of this.directives) {
+    for (const [directive, sources] of Object.entries(this.directives)) {
       if (Array.isArray(sources)) {
         if (nonce && this.isNonceDirective(directive, nonceDirectives)) {
           out.push(
