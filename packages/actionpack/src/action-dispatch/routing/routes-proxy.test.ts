@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { RouteSet } from "./route-set.js";
 import { RoutesProxy, mergeScriptNames, type RoutesProxyInstance } from "./routes-proxy.js";
 import { urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
 
@@ -123,5 +124,39 @@ describe("mergeScriptNames", () => {
 
   it("handles new with multiple parts", () => {
     expect(mergeScriptNames("/ctx/old", "/m/n")).toBe("/m/n");
+  });
+
+  it("forwards a helper defined on a url helpers module as a property", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
+    });
+    const proxy = new RoutesProxy(
+      routes as unknown as UrlForRoutes,
+      { urlOptions: () => ({}) } as UrlForHost,
+      routes.urlHelpers() as unknown as Record<string, unknown>,
+    ) as RoutesProxyInstance;
+
+    expect("postPath" in proxy).toBe(true);
+    expect(proxy.postPath(1)).toBe("/posts/1");
+  });
+
+  it("forwards a helper its helpers answer through respond_to_missing", () => {
+    class Helpers {
+      respondToMissing(method: string): boolean {
+        return method === "dynamicPath";
+      }
+      methodMissing(_method: string, ..._args: unknown[]): string {
+        return "/dynamic";
+      }
+    }
+    const proxy = new RoutesProxy(
+      makeRoutes(),
+      { urlOptions: () => ({}) } as UrlForHost,
+      new Helpers() as unknown as Record<string, unknown>,
+    ) as RoutesProxyInstance;
+
+    expect("dynamicPath" in proxy).toBe(true);
+    expect(proxy.dynamicPath()).toBe("/dynamic");
   });
 });

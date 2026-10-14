@@ -886,12 +886,9 @@ export class Mapping {
   /** @internal */
   private routeSourceLocation(): string | null | undefined {
     if (Mapper.routeSourceLocations) {
-      const actionDispatchDir = File.expandPath(
-        "..",
-        File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)),
-      );
+      const actionDispatchDir = File.dirname(File.dirname(callerLocations(0, 1)[0].path));
       for (const location of callerLocations(1)) {
-        if ((location.absolutePath ?? location.path).startsWith(actionDispatchDir)) continue;
+        if (location.path.startsWith(actionDispatchDir)) continue;
 
         const cleanedPath = Mapper.backtraceCleaner.cleanFrame(location.path);
         if (cleanedPath == null) continue;

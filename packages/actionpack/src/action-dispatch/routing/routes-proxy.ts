@@ -19,7 +19,7 @@ import {
   type UrlForRoutes,
 } from "./url-for.js";
 import type { PolymorphicHost } from "./polymorphic-routes.js";
-import { include } from "@blazetrails/activesupport";
+import { extractOptionsBang, include } from "@blazetrails/activesupport";
 import {
   NoMethodError,
   objRespondToMissing,
@@ -85,16 +85,13 @@ export class RoutesProxy implements UrlForHost {
 
     return new Proxy(this, {
       get(target, prop, receiver) {
-        if (typeof prop === "string" && !(prop in target)) {
-          const fn = target._helpers[prop];
-          if (typeof fn === "function") {
-            return (...args: unknown[]) => target.methodMissing(prop, ...args);
-          }
+        if (typeof prop === "string" && !(prop in target) && target.respondToMissing(prop, false)) {
+          return (...args: unknown[]) => target.methodMissing(prop, ...args);
         }
         return Reflect.get(target, prop, receiver);
       },
       has(target, prop) {
-        if (typeof prop === "string" && prop in target._helpers) return true;
+        if (typeof prop === "string" && target.respondToMissing(prop, false)) return true;
         return Reflect.has(target, prop);
       },
     }) as RoutesProxy;
@@ -122,7 +119,7 @@ export class RoutesProxy implements UrlForHost {
 
   methodMissing(method: string, ...args: unknown[]): unknown {
     if (rbObjRespondTo(this._helpers, method)) {
-      let options: Record<string, unknown> = extractOptions(args);
+      let options: Record<string, unknown> = extractOptionsBang(args);
       options = { ...this.urlOptions(), ...(options ?? {}) };
 
       if (this._scriptNamer) {
@@ -167,19 +164,6 @@ function countSlashes(s: string): number {
   let n = 0;
   for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 47) n++;
   return n;
-}
-
-/** @internal */
-function extractOptions(arr: unknown[]): Record<string, unknown> {
-  const last = arr[arr.length - 1];
-  if (last != null && typeof last === "object" && !Array.isArray(last)) {
-    const proto = Object.getPrototypeOf(last);
-    if (proto === null || proto === Object.prototype) {
-      arr.pop();
-      return last as Record<string, unknown>;
-    }
-  }
-  return {};
 }
 
 include(RoutesProxy, UrlFor);
