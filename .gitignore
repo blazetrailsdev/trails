@@ -54,6 +54,10 @@ coverage/
 # makes the configured fixture databases a legitimate writer under db/.
 /db/
 
+# TestDatabasesTest's suffixed sqlite databases (test/db/primary.sqlite3-2):
+# Rails gitignores the same directory (activerecord/.gitignore:3, /test/db/).
+/test/db/
+
 # Scratch output from local screenshot/driver runs.
 tmp/
 
