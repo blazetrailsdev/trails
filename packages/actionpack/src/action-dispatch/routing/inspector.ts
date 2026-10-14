@@ -265,7 +265,7 @@ export class Sheet extends Base {
 export class Expanded extends Base {
   private width: number;
 
-  constructor(width = 80) {
+  constructor({ width = 80 }: { width?: number } = {}) {
     super();
     this.width = width;
   }

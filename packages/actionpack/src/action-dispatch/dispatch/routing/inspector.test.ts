@@ -348,7 +348,7 @@ describe("RoutesInspectorTest", () => {
           this.get("/custom/furnitures", { to: "custom_furnitures#show" });
           this.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
         },
-        { formatter: new ConsoleFormatter.Expanded(23) },
+        { formatter: new ConsoleFormatter.Expanded({ width: 23 }) },
       );
 
       const expected = [
