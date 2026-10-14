@@ -283,6 +283,9 @@ describe("inlinedFromFindings", () => {
   it("pairs a renamed class with the one Rails class of its mirrored file", () => {
     const enrolled = ["activerecord"];
     expect(messages([LAST, NEW, FIRST, CORE, API], { owner: "BaseRecord", enrolled })).toEqual([]);
+    expect(messages([CORE], { owner: "ProxyRecord", file: "proxy.ts" })).toEqual([
+      "ActiveRecord::Core#initialize names a module ActiveRecord::Proxy does not include or prepend",
+    ]);
   });
 
   it("ends the chain at an initialize that calls no super", () => {
