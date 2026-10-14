@@ -70,7 +70,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
     if (this._strBody !== null) return this._strBody;
     let buf = "";
     for (const chunk of this.each()) {
-      const str = rbObjAsString(chunk);
+      const str = rbObjAsString(chunk) as string | Uint8Array;
       buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
     }
     this._strBody = buf;
