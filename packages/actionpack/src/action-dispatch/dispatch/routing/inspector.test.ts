@@ -332,8 +332,8 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  // BLOCKED: inspector-routes-when-expanded-colocated-source-location
   it.skip("routes when expanded", () => {
+    // BLOCKED: source-location — Mapping#route_source_location (mapper.rb:378-391) skips frames under action-dispatch/, where this colocated test lives; inspector-routes-when-expanded-colocated-source-location
     try {
       Mapper.routeSourceLocations = true;
       const engine = engineClass();
