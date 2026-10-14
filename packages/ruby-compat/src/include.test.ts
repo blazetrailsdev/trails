@@ -1942,3 +1942,14 @@ describe("Module#appendFeatures on a Module base", () => {
     expect(isModuleIncluded(Klass, Inner)).toBe(true);
   });
 });
+
+describe("Module#include of a Module", () => {
+  it("fires the included module's included hook", () => {
+    const seen: unknown[] = [];
+    const Inner = new Module() as Module & { [included](base: unknown): void };
+    Inner[included] = (base: unknown) => seen.push(base);
+    const Outer = new Module();
+    Outer.include(Inner);
+    expect(seen).toEqual([Outer]);
+  });
+});

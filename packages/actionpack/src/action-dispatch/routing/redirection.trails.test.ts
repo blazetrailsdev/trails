@@ -15,3 +15,10 @@ describe("ActionDispatch::Routing::Redirection#redirect", () => {
     expect(endpoint.path({ id: "7" }, new Request({}))).toBe("/to/7");
   });
 });
+
+describe("ActionDispatch::Routing::Redirection#redirect with a class", () => {
+  it("raises ArgumentError for a class that does not answer call", () => {
+    class NotCallable {}
+    expect(() => redirect(NotCallable as never)).toThrow("redirection argument not supported");
+  });
+});

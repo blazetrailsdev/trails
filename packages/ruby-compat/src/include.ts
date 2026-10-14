@@ -275,6 +275,9 @@ export class Module<I extends object = Record<never, never>> {
     }
     if (mod instanceof Module) {
       Module.prototype.appendFeatures.call(mod, this);
+      if (typeof (mod as ModuleHooks)[included] === "function") {
+        (mod as ModuleHooks)[included]!(this);
+      }
       return this;
     }
     const carrier = carrierOf(this);

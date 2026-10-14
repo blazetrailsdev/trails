@@ -218,7 +218,9 @@ export function redirect(
 ): Redirect<unknown> {
   const last = args[args.length - 1];
   let block: RedirectBlock | undefined =
-    typeof last === "function" && last.call === Function.prototype.call
+    typeof last === "function" &&
+    last.call === Function.prototype.call &&
+    !/^class\b/.test(Function.prototype.toString.call(last))
       ? (args.pop() as RedirectBlock)
       : undefined;
   const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
@@ -232,9 +234,17 @@ export function redirect(
   if (typeof path === "string") {
     return new PathRedirect(status, path);
   }
-  if (typeof path === "function" && path.call === Function.prototype.call) {
+  if (
+    typeof path === "function" &&
+    path.call === Function.prototype.call &&
+    !/^class\b/.test(Function.prototype.toString.call(path))
+  ) {
     block = path;
-  } else if (path && typeof (path as RedirectCallable).call === "function") {
+  } else if (
+    path &&
+    typeof (path as RedirectCallable).call === "function" &&
+    (path as RedirectCallable).call !== Function.prototype.call
+  ) {
     const callable = path as RedirectCallable;
     block = (params, request) => callable.call(params, request);
   }
