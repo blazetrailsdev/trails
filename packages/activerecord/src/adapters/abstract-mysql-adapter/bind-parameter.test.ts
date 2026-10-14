@@ -69,7 +69,7 @@ describeIfMysqlAdapter("AbstractMysqlAdapter", () => {
     });
 
     it("where with float for string column using bind parameters", async () => {
-      await assertQuotedAs("'0'", 0.0);
+      await assertQuotedAs("'0.0'", new Number(0.0));
     });
 
     it("where with boolean for string column using bind parameters", async () => {
