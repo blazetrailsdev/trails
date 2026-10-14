@@ -1105,7 +1105,6 @@ export class Mapper {
     if (this.applyCommonBehaviorFor("resources", [name], options, cb)) return;
     options = this.applyActionOptions("resources", options);
 
-    const constraintsOpt = options.constraints;
     const resource = new Resource(
       name,
       this.isApiOnly(),
@@ -1127,7 +1126,7 @@ export class Mapper {
     const allowed = new Set(resource.actions());
     const merged = {
       ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
-      ...((constraintsOpt as RouteConstraints | undefined) ?? {}),
+      ...((options.constraints as RouteConstraints | undefined) ?? {}),
     };
     const constraints = Object.keys(merged).length > 0 ? merged : undefined;
     const newPath = this.actionPath("new");
@@ -1244,7 +1243,7 @@ export class Mapper {
     );
     const controller = resource.controller;
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
-    const basePath = `${prefix}/${name}`;
+    const basePath = `${prefix}/${resource.path}`;
     const names: Record<string, string | undefined> = {};
 
     const allowed = new Set(resource.actions());
