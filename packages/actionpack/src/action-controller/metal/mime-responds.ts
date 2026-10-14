@@ -1,3 +1,4 @@
+import { Module } from "@blazetrails/activesupport";
 import { Collector as AbstractCollector } from "../../abstract-controller/collector.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { NullType } from "../../action-dispatch/http/mime-type.js";
@@ -112,6 +113,10 @@ export function respondTo(
     throw new UnknownFormat();
   }
 }
+
+export const MimeResponds = new Module((mod) => {
+  mod.defineMethod("respondTo", respondTo);
+});
 
 export class VariantCollector {
   private _variant: readonly string[] | null;

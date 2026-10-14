@@ -24,7 +24,7 @@ import {
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
 import type { MimeType } from "../action-dispatch/http/mime-type.js";
-import { respondTo } from "./metal/mime-responds.js";
+import { MimeResponds, type respondTo } from "./metal/mime-responds.js";
 import type { head } from "./metal/head.js";
 import {
   ConditionalGet,
@@ -538,7 +538,7 @@ export class Base extends Metal {
     return body;
   }
 
-  respondTo = respondTo;
+  declare respondTo: OmitThisParameter<typeof respondTo>;
 
   declare translate: OmitThisParameter<typeof translate>;
   declare t: OmitThisParameter<typeof t>;
@@ -739,6 +739,7 @@ include(Base, ConditionalGet);
 include(Base, EtagWithTemplateDigest);
 include(Base, EtagWithFlash);
 include(Base, Caching);
+include(Base, MimeResponds);
 include(Base, ImplicitRender);
 include(Base, StrongParametersModule);
 include(Base, ParameterEncoding);
