@@ -1,13 +1,13 @@
 import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesupport";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
-import { InvalidMimeType, MimeType, NullType } from "./mime-type.js";
+import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /** @internal */
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
-export class InvalidType extends InvalidMimeType {}
+export class InvalidType extends MimeType.InvalidMimeType {}
 InvalidType.prototype.name = "ActionDispatch::Http::MimeNegotiation::InvalidType";
 
 export interface MimeNegotiationHost {
@@ -63,7 +63,7 @@ export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
       const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
       return this.setHeader(k, v);
     } catch (e) {
-      if (!(e instanceof InvalidMimeType)) throw e;
+      if (!(e instanceof MimeType.InvalidMimeType)) throw e;
       throw new InvalidType(e.message);
     }
   }) as MimeType | null;
@@ -82,7 +82,7 @@ export function accepts(this: MimeNegotiationHost): MimeType[] {
         header === "" ? ([contentMimeType.call(this)] as MimeType[]) : MimeType.parse(header);
       return this.setHeader(k, v);
     } catch (e) {
-      if (!(e instanceof InvalidMimeType)) throw e;
+      if (!(e instanceof MimeType.InvalidMimeType)) throw e;
       throw new InvalidType(e.message);
     }
   }) as MimeType[];

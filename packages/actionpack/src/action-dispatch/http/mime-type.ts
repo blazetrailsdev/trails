@@ -156,9 +156,6 @@ export class AcceptList {
   }
 }
 
-export class InvalidMimeType extends StandardError {}
-InvalidMimeType.prototype.name = "Mime::Type::InvalidMimeType";
-
 export const EXTENSION_LOOKUP: Map<string, MimeType> = new Map();
 export const LOOKUP: Map<string, MimeType> = new Map();
 
@@ -197,7 +194,7 @@ export class MimeType {
   private readonly _hash: number;
 
   /** @internal */
-  private static _registerCallbacks: Array<(type: MimeType) => void> = [];
+  private static registerCallbacks: Array<(type: MimeType) => void> = [];
 
   static readonly SET: Mimes = new Mimes();
 
@@ -212,11 +209,11 @@ export class MimeType {
     `^(?:\\*\\/\\*|${MimeType.MIME_NAME}\\/(?:\\*|${MimeType.MIME_NAME})(?:(?=(${MimeType.MIME_PARAMETER}))\\1)*\\s*)$`,
   );
 
-  static InvalidMimeType = InvalidMimeType;
+  static InvalidMimeType = class InvalidMimeType extends StandardError {};
 
   constructor(string: string | null, symbol: string | null = null, synonyms: string[] = []) {
     if (!(string != null && MimeType.MIME_REGEXP.test(string))) {
-      throw new InvalidMimeType(`${rbInspect(string)} is not a valid MIME type`);
+      throw new MimeType.InvalidMimeType(`${rbInspect(string)} is not a valid MIME type`);
     }
     this.string = string;
     this.symbol = symbol;
@@ -313,7 +310,7 @@ export class MimeType {
     if (!skipLookup) for (const str of [string, ...mimeTypeSynonyms]) LOOKUP.set(str, newMime);
     for (const ext of [symbolToS(symbol), ...extensionSynonyms]) EXTENSION_LOOKUP.set(ext, newMime);
 
-    for (const callback of MimeType._registerCallbacks) {
+    for (const callback of MimeType.registerCallbacks) {
       callback(newMime);
     }
     return newMime;
@@ -337,7 +334,7 @@ export class MimeType {
     if (LOOKUP.has(string)) return LOOKUP.get(string)!;
 
     const str = string === "" ? null : string.split(";", 2)[0].trimEnd();
-    return (str != null ? LOOKUP.get(str) : undefined) ?? new MimeType(str);
+    return LOOKUP.get(str as string) ?? new MimeType(str);
   }
 
   static lookupByExtension(extension: string | null): MimeType | undefined {
@@ -350,7 +347,7 @@ export class MimeType {
   }
 
   static registerCallback(callback: (type: MimeType) => void): void {
-    MimeType._registerCallbacks.push(callback);
+    MimeType.registerCallbacks.push(callback);
   }
 
   /** @internal */
@@ -459,6 +456,8 @@ export class NullType {
     return null;
   }
 }
+
+MimeType.InvalidMimeType.prototype.name = "Mime::Type::InvalidMimeType";
 
 registerDefaultMimeTypes(MimeType);
 
