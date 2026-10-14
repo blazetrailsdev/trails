@@ -345,6 +345,32 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           'parameter_encoding_test.rb:64 `assert_equal "ASCII-8BIT", @response.body` — a JS string carries no encoding tag and ruby-compat has no binary String carrier for a param value: `forceEncoding` returns a string for a string and `rbObjEncoding` answers UTF-8 for every string (packages/ruby-compat/src/string/force-encoding.ts)',
       },
     ],
+  "activerecord:adapters/sqlite3/sqlite3_adapter_test.rb › SQLite3AdapterTest › type cast should not mutate encoding":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'adapters/sqlite3/sqlite3_adapter_test.rb:485 `assert_equal Encoding::ASCII_8BIT, name.encoding` — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
+  "msgpack:cruby/buffer_spec.rb › doesn't allow #dup or #clone": [
+    {
+      kind: "expect_not_to_respond_to",
+      value: "s:dup",
+      as: "assert_equal",
+      reason:
+        "cruby/buffer_spec.rb:594 `expect(subject).to_not respond_to :dup` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
+    },
+    {
+      kind: "expect_not_to_respond_to",
+      value: "s:clone",
+      as: "assert_equal",
+      reason:
+        "cruby/buffer_spec.rb:595 `expect(subject).to_not respond_to :clone` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
+    },
+  ],
 };
 
 interface ReceiptableTestCase {
