@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { include, RuntimeError } from "@blazetrails/ruby-compat";
+import { type Hash, include, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { _routes as abstractControllerRoutes } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
@@ -19,9 +19,10 @@ import {
 import { RouteSet } from "./route-set.js";
 
 function makeRoutes(): UrlForRoutes & {
-  calls: Array<[Record<string, unknown>, string | null | undefined]>;
+  calls: Array<[Record<string, unknown> | Hash<string, unknown>, string | null | undefined]>;
 } {
-  const calls: Array<[Record<string, unknown>, string | null | undefined]> = [];
+  const calls: Array<[Record<string, unknown> | Hash<string, unknown>, string | null | undefined]> =
+    [];
   return {
     calls,
     urlFor(opts, routeName) {
@@ -155,7 +156,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const host = makeHost();
     const routes = host._routes as ReturnType<typeof makeRoutes>;
     fullUrlFor.call(host, params);
-    expect(Object.fromEntries(routes.calls[0][0] as Map<string, unknown>)).toEqual({
+    expect(Object.fromEntries(routes.calls[0][0] as Hash<string, unknown>)).toEqual({
       controller: "posts",
       action: "show",
       id: 7,

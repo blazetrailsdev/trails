@@ -36,11 +36,11 @@ function scriptName(req: Request): string {
   return (req.env["SCRIPT_NAME"] as string) ?? "";
 }
 
-export class Redirect extends Endpoint {
+export class Redirect<B = RedirectBlock> extends Endpoint {
   readonly status: number;
-  readonly block: RedirectBlock;
+  readonly block: B;
 
-  constructor(status: number, block: RedirectBlock) {
+  constructor(status: number, block: B) {
     super();
     this.status = status;
     this.block = block;
@@ -88,7 +88,7 @@ export class Redirect extends Endpoint {
   }
 
   path(params: Record<string, string>, request: Request): string {
-    return this.block(params, request);
+    return (this.block as RedirectBlock)(params, request);
   }
 
   inspect(): string {
@@ -118,17 +118,9 @@ export class Redirect extends Endpoint {
 
 const URL_PARTS = /^([^?]+)?(\?[^#]+)?(#.+)?$/;
 
-export class PathRedirect extends Redirect {
-  constructor(status: number, pathTemplate: string) {
-    super(status, () => pathTemplate);
-  }
-
-  get template(): string {
-    return (this.block as () => string)();
-  }
-
+export class PathRedirect extends Redirect<string> {
   override path(params: Record<string, string>, _request: Request): string {
-    const tpl = this.template;
+    const tpl = this.block;
     const m = URL_PARTS.exec(tpl);
     if (m) {
       const [, p, q, f] = m;
@@ -147,7 +139,7 @@ export class PathRedirect extends Redirect {
   }
 
   override inspect(): string {
-    return `redirect(${this.status}, ${this.template})`;
+    return `redirect(${this.status}, ${this.block})`;
   }
 
   /** @internal */
@@ -223,7 +215,7 @@ export function redirect(
   ...args: Array<
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
   >
-): Redirect {
+): Redirect<unknown> {
   let options: (OptionRedirectOptions & { status?: number }) | undefined;
   const last = args[args.length - 1];
   if (last && typeof last === "object" && !("call" in last) && typeof last !== "function") {
