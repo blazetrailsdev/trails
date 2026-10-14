@@ -17,7 +17,9 @@ describe("Mapping#routeSourceLocation", () => {
       this.get("/custom/assets", { to: "custom_assets#show" });
     });
 
-    const output = new RoutesInspector(set.routes).format(new ConsoleFormatter.Expanded(23));
+    const output = new RoutesInspector(set.routes).format(
+      new ConsoleFormatter.Expanded({ width: 23 }),
+    );
     expect(output).toMatch(
       new RegExp(
         `Source Location   \\| \\S*routing-source-location\\.trails\\.test\\.ts:${lineno + 2}$`,

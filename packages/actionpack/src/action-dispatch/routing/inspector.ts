@@ -1,6 +1,12 @@
 import { underscore } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { except, RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
+import {
+  except,
+  isEmpty,
+  RFC2396_PARSER,
+  rbInspect,
+  SimpleDelegator,
+} from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
@@ -20,16 +26,6 @@ export interface RoutesFilter {
 
 /** @internal */
 type NormalizedFilter = Record<string, RegExp | string> | null;
-
-/** @internal */
-function formatConstraints(c: Record<string, unknown>): string {
-  const parts = Object.entries(c).map(([k, v]) => {
-    if (v instanceof RegExp) return `${k}: ${v.toString()}`;
-    if (typeof v === "string") return `${k}: ${JSON.stringify(v)}`;
-    return `${k}: ${String(v)}`;
-  });
-  return `{${parts.join(", ")}}`;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- types the names SimpleDelegator forwards to Route (inspector.rb:10).
 export interface RouteWrapper extends Pick<
@@ -89,11 +85,10 @@ export class RouteWrapper extends SimpleDelegator {
 
   get reqs(): string {
     if (this._reqs !== undefined) return this._reqs;
-    let s = this.endpoint;
-    const c = this.constraints;
-    if (Object.keys(c).length > 0) s += ` ${formatConstraints(c)}`;
-    this._reqs = s;
-    return s;
+    let reqs = this.endpoint;
+    if (!isEmpty(this.constraints)) reqs += ` ${rbInspect(this.constraints)}`;
+    this._reqs = reqs;
+    return reqs;
   }
 
   /** @internal */
@@ -270,7 +265,7 @@ export class Sheet extends Base {
 export class Expanded extends Base {
   private width: number;
 
-  constructor(width = 80) {
+  constructor({ width = 80 }: { width?: number } = {}) {
     super();
     this.width = width;
   }

@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { TopLevel } from "@blazetrails/activesupport";
-import { File, stringSplit } from "@blazetrails/ruby-compat";
+import { BacktraceCleaner, callerLocations, TopLevel } from "@blazetrails/activesupport";
+import { File, rbInspect, stringSplit } from "@blazetrails/ruby-compat";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
-import type { MountableApp } from "../../routing/mapper.js";
+import { Mapper, type MountableApp } from "../../routing/mapper.js";
+import { deprecator } from "../../deprecator.js";
 import { RouteSet, type DrawCallback } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
 import { FIXTURE_LOAD_PATH } from "../../../test-helpers/abstract-unit.js";
@@ -93,7 +94,16 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("articles inspect with multiple verbs", () => {});
+  it("articles inspect with multiple verbs", () => {
+    const output = draw(function () {
+      this.match("articles/:id", { to: "articles#update", via: ["put", "patch"] });
+    });
+
+    expect(output).toEqual([
+      "Prefix Verb      URI Pattern             Controller#Action",
+      "       PUT|PATCH /articles/:id(.:format) articles#update",
+    ]);
+  });
 
   it("inspect shows custom assets", () => {
     const output = draw(function () {
@@ -132,19 +142,100 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("inspect routes shows dynamic action route", () => {});
+  it("inspect routes shows dynamic action route", () => {
+    const output = draw(function () {
+      deprecator().silence(() => {
+        this.get({ "api/:action": "api" });
+      });
+    });
 
-  it.skip("inspect routes shows controller and action only route", () => {});
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern            Controller#Action",
+      "       GET  /api/:action(.:format) api#:action",
+    ]);
+  });
 
-  it.skip("inspect routes shows controller and action route with constraints", () => {});
+  it("inspect routes shows controller and action only route", () => {
+    const output = draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action");
+      });
+    });
 
-  it.skip("rails routes shows route with defaults", () => {});
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern                    Controller#Action",
+      "       GET  /:controller/:action(.:format) :controller#:action",
+    ]);
+  });
 
-  it.skip("rails routes shows route with constraints", () => {});
+  it("inspect routes shows controller and action route with constraints", () => {
+    const output = draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id))", { id: /\d+/ });
+      });
+    });
 
-  it.skip("rails routes shows routes with dashes", () => {});
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern                            Controller#Action",
+      `       GET  /:controller(/:action(/:id))(.:format) :controller#:action ${rbInspect({ id: /\d+/ })}`,
+    ]);
+  });
 
-  it.skip("rails routes shows route with rack app", () => {});
+  it("rails routes shows route with defaults", () => {
+    const output = draw(function () {
+      this.get({ "photos/:id": "photos#show", defaults: { format: "jpg" } });
+    });
+
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern           Controller#Action",
+      `       GET  /photos/:id(.:format) photos#show ${rbInspect({ format: "jpg" })}`,
+    ]);
+  });
+
+  it("rails routes shows route with constraints", () => {
+    const output = draw(function () {
+      this.get({ "photos/:id": "photos#show", id: /[A-Z]\d{5}/ });
+    });
+
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern           Controller#Action",
+      `       GET  /photos/:id(.:format) photos#show ${rbInspect({ id: /[A-Z]\d{5}/ })}`,
+    ]);
+  });
+
+  it("rails routes shows routes with dashes", () => {
+    const output = draw(function () {
+      this.get({ "about-us": "pages#about_us" });
+      this.get("our-work/latest");
+
+      this.resources("photos", { only: ["show"] }, () => {
+        this.get("user-favorites", { on: "collection" });
+        this.get("preview-photo", { on: "member" });
+        this.get("summary-text");
+      });
+    });
+
+    expect(output).toEqual([
+      "               Prefix Verb URI Pattern                              Controller#Action",
+      "             about_us GET  /about-us(.:format)                      pages#about_us",
+      "      our_work_latest GET  /our-work/latest(.:format)               our_work#latest",
+      "user_favorites_photos GET  /photos/user-favorites(.:format)         photos#user_favorites",
+      "  preview_photo_photo GET  /photos/:id/preview-photo(.:format)      photos#preview_photo",
+      "   photo_summary_text GET  /photos/:photo_id/summary-text(.:format) photos#summary_text",
+      "                photo GET  /photos/:id(.:format)                    photos#show",
+    ]);
+  });
+
+  it("rails routes shows route with rack app", () => {
+    const output = draw(function () {
+      this.get({ "foo/:id": mountedRackApp, id: /[A-Z]\d{5}/ });
+    });
+
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern        Controller#Action",
+      `       GET  /foo/:id(.:format) MountedRackApp ${rbInspect({ id: /[A-Z]\d{5}/ })}`,
+    ]);
+  });
 
   it("rails routes shows named route with mounted rack app", () => {
     const output = draw(function () {
@@ -166,9 +257,32 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("rails routes shows route with rack app nested with dynamic constraints", () => {});
+  it("rails routes shows route with rack app nested with dynamic constraints", () => {
+    const constraint = class {
+      inspect(): string {
+        return "( my custom constraint )";
+      }
+    };
 
-  it.skip("rails routes dont show app mounted in assets prefix", () => {});
+    const output = draw(function () {
+      this.scope({ constraint: new constraint() }, () => {
+        this.mount(mountedRackApp, { at: "/foo" });
+      });
+    });
+
+    expect(output).toEqual([
+      "          Prefix Verb URI Pattern Controller#Action",
+      `mounted_rack_app      /foo        MountedRackApp ${rbInspect({ constraint: new constraint() })}`,
+    ]);
+  });
+
+  it("rails routes dont show app mounted in assets prefix", () => {
+    const output = draw(function () {
+      this.get({ "/sprockets": mountedRackApp });
+    });
+    expect(output[0]).not.toMatch(/MountedRackApp/);
+    expect(output[0]).not.toMatch(/\/sprockets/);
+  });
 
   it("rails routes shows route defined in under assets prefix", () => {
     const output = draw(function () {
@@ -182,7 +296,20 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("redirect", () => {});
+  it("redirect", () => {
+    const output = draw(function () {
+      this.get({ "/foo": this.redirect("/foo/bar"), constraints: { subdomain: "admin" } });
+      this.get({ "/bar": this.redirect({ path: "/foo/bar", status: 307 }) });
+      this.get({ "/foobar": this.redirect(() => "/foo/bar") });
+    });
+
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern       Controller#Action",
+      `   foo GET  /foo(.:format)    redirect(301, /foo/bar) ${rbInspect({ subdomain: "admin" })}`,
+      "   bar GET  /bar(.:format)    redirect(307, path: /foo/bar)",
+      "foobar GET  /foobar(.:format) redirect(301)",
+    ]);
+  });
 
   it("routes can be filtered", () => {
     const output = draw(
@@ -205,7 +332,60 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("routes when expanded", () => {});
+  it.skip("routes when expanded", () => {
+    // BLOCKED: source-location — Mapping#route_source_location (mapper.rb:378-391) skips frames under action-dispatch/, where this colocated test lives; inspector-routes-when-expanded-colocated-source-location
+    try {
+      Mapper.routeSourceLocations = true;
+      const engine = engineClass();
+      const fileName = new BacktraceCleaner().clean([callerLocations(0, 1)[0].path])[0];
+      const lineno = callerLocations(0, 1)[0].lineno;
+      engine.routes().draw(function () {
+        this.get("/cart", { to: "cart#show" });
+      });
+
+      const output = draw(
+        function () {
+          this.get("/custom/assets", { to: "custom_assets#show" });
+          this.get("/custom/furnitures", { to: "custom_furnitures#show" });
+          this.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
+        },
+        { formatter: new ConsoleFormatter.Expanded({ width: 23 }) },
+      );
+
+      const expected = [
+        "--[ Route 1 ]----------",
+        "Prefix            | custom_assets",
+        "Verb              | GET",
+        "URI               | /custom/assets(.:format)",
+        "Controller#Action | custom_assets#show",
+        `Source Location   | ${fileName}:${lineno + 7}`,
+        "--[ Route 2 ]----------",
+        "Prefix            | custom_furnitures",
+        "Verb              | GET",
+        "URI               | /custom/furnitures(.:format)",
+        "Controller#Action | custom_furnitures#show",
+        `Source Location   | ${fileName}:${lineno + 8}`,
+        "--[ Route 3 ]----------",
+        "Prefix            | blog",
+        "Verb              | ",
+        "URI               | /blog",
+        "Controller#Action | Blog::Engine",
+        `Source Location   | ${fileName}:${lineno + 9}`,
+        "",
+        "[ Routes for Blog::Engine ]",
+        "--[ Route 1 ]----------",
+        "Prefix            | cart",
+        "Verb              | GET",
+        "URI               | /cart(.:format)",
+        "Controller#Action | cart#show",
+        `Source Location   | ${fileName}:${lineno + 2}`,
+      ];
+
+      expect(output).toEqual(expected);
+    } finally {
+      Mapper.routeSourceLocations = false;
+    }
+  });
 
   it("no routes matched filter when expanded", () => {
     const output = draw(
@@ -234,9 +414,42 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("routes can be filtered with namespaced controllers", () => {});
+  it("routes can be filtered with namespaced controllers", () => {
+    const output = draw(
+      function () {
+        this.resources("articles");
+        this.namespace("admin", () => {
+          this.resources("posts");
+        });
+      },
+      { grep: "admin/posts" },
+    );
 
-  it.skip("regression route with controller regexp", () => {});
+    expect(output).toEqual([
+      "         Prefix Verb   URI Pattern                     Controller#Action",
+      "    admin_posts GET    /admin/posts(.:format)          admin/posts#index",
+      "                POST   /admin/posts(.:format)          admin/posts#create",
+      " new_admin_post GET    /admin/posts/new(.:format)      admin/posts#new",
+      "edit_admin_post GET    /admin/posts/:id/edit(.:format) admin/posts#edit",
+      "     admin_post GET    /admin/posts/:id(.:format)      admin/posts#show",
+      "                PATCH  /admin/posts/:id(.:format)      admin/posts#update",
+      "                PUT    /admin/posts/:id(.:format)      admin/posts#update",
+      "                DELETE /admin/posts/:id(.:format)      admin/posts#destroy",
+    ]);
+  });
+
+  it("regression route with controller regexp", () => {
+    const output = draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller(/:action)", { controller: /api\/[^/]+/, format: false });
+      });
+    });
+
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern            Controller#Action",
+      "       GET  /:controller(/:action) :controller#:action",
+    ]);
+  });
 
   it("routes with undefined filter", () => {
     const output = draw(
@@ -275,9 +488,34 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("displaying routes for internal engines", () => {});
+  it("displaying routes for internal engines", () => {
+    const engine = engineClass();
+    engine.routes().draw(function () {
+      this.get("/cart", { to: "cart#show" });
+      this.post("/cart", { to: "cart#create" });
+      this.patch("/cart", { to: "cart#update" });
+    });
 
-  it.skip("route with proc handler", () => {});
+    const output = draw(function () {
+      this.get("/custom/assets", { to: "custom_assets#show" });
+      this.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog", internal: true });
+    });
+
+    expect(output).toEqual([
+      "       Prefix Verb URI Pattern              Controller#Action",
+      "custom_assets GET  /custom/assets(.:format) custom_assets#show",
+    ]);
+  });
+
+  it("route with proc handler", () => {
+    const output = draw(function () {
+      this.get("/health", { to: () => [200, {}, ["OK"]] });
+    });
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern       Controller#Action",
+      "health GET  /health(.:format) Inline handler (Proc/Lambda)",
+    ]);
+  });
 
   it("digit-leading path segment does not produce an inferred name", () => {
     const output = draw(function () {
