@@ -175,7 +175,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const params = new Parameters({ controller: "posts", action: "show" });
     params.permitBang();
     fullUrlFor.call(host, params);
-    expect(params.toH().has("host")).toBe(false);
+    expect(params.toH().has("host")).toBeFalsy();
   });
 
   it("unpermitted Parameters throw UnfilteredParameters from toH()", () => {
