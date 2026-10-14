@@ -1034,15 +1034,17 @@ export class Scope {
 
 include(Scope, Enumerable);
 
+class BacktraceCleaner extends ActiveSupportBacktraceCleaner {
+  constructor() {
+    super();
+    this.removeSilencers();
+    this.addCoreSilencer();
+    this.addStdlibSilencer();
+  }
+}
+
 export class Mapper {
-  static BacktraceCleaner = class BacktraceCleaner extends ActiveSupportBacktraceCleaner {
-    constructor() {
-      super();
-      this.removeSilencers();
-      this.addCoreSilencer();
-      this.addStdlibSilencer();
-    }
-  };
+  static BacktraceCleaner = BacktraceCleaner;
 
   static readonly URL_OPTIONS: readonly string[] = [
     "protocol",
@@ -1059,7 +1061,7 @@ export class Mapper {
     cattrAccessor.call(this, "routeSourceLocations", { instanceAccessor: false, default: false });
     cattrAccessor.call(this, "backtraceCleaner", {
       instanceAccessor: false,
-      default: new this.BacktraceCleaner(),
+      default: new BacktraceCleaner(),
     });
   }
 
