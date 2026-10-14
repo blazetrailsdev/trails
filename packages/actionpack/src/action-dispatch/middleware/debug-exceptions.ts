@@ -18,7 +18,6 @@ import type { RouteSet } from "../routing/route-set.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
-type RoutesApp = { routes(): RouteSet };
 
 export type Interceptor = (request: Request, exception: Error) => void;
 
@@ -31,14 +30,14 @@ export class DebugExceptions {
   }
 
   private app: RackApp;
-  private routesApp: RoutesApp | null;
+  private routesApp: { routes(): RouteSet } | null;
   private responseFormat: "default" | "api";
   private interceptors: Interceptor[];
   private _stderrLogger?: ActiveSupportLogger;
 
   constructor(
     app: RackApp,
-    routesApp: RoutesApp | null = null,
+    routesApp: { routes(): RouteSet } | null = null,
     responseFormat: "default" | "api" = "default",
     interceptors: Interceptor[] = DebugExceptions.interceptors,
   ) {
