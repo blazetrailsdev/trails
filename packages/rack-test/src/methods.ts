@@ -34,9 +34,9 @@ function buildRackTestSession(this: MethodsHost, _name: unknown): Session {
     return this.buildRackMockSession!();
   } else {
     if ("defaultHost" in this) {
-      return Session.new(this.app, this.defaultHost);
+      return new Session(this.app, this.defaultHost);
     } else {
-      return Session.new(this.app);
+      return new Session(this.app);
     }
   }
 }

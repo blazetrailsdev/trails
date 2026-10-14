@@ -837,24 +837,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`ActiveSupport::Messages::Rotator#initialize` (messages/rotator.rb:6-12) " +
-      "is an `initialize` on a module Rails installs with `prepend`, so it runs " +
-      "as part of the *host's* constructor chain via `super`. TypeScript has no " +
-      "expression for that: `prepend()` " +
-      "(packages/ruby-compat/src/prepend.ts) wraps methods on the prototype " +
-      "and cannot wrap a constructor, so the port keeps the Rails name as an " +
-      "exported `initialize` function that each rotatable class calls from its " +
-      "own constructor (message-verifier.ts, message-encryptor.ts). There is no " +
-      "TS `constructor` at the mapped site for the comparison to find — the same " +
-      "shape as the `included`/`extended`/`inherited` hooks. Scoped to " +
-      "messages/rotator.rb so a real class's `initialize` is still expected to " +
-      "map to a `constructor`.",
-    names: ["initialize"],
-    rubyFiles: ["messages/rotator.rb"],
-    tsMirrorName: "initialize",
-  },
-  {
-    reason:
       "`ActiveModel::API#initialize` (api.rb:78-81) is an `initialize` on a " +
       "Concern, so in Ruby it joins the *host's* constructor chain via `super` " +
       "when a class does `include ActiveModel::API`. TypeScript has no " +

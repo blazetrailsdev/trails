@@ -3,11 +3,11 @@ import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
   fallBackTo,
-  initialize as initializeRotator,
   onRotation,
   readMessage as readMessageWithRotations,
   rotate,
   type OnRotation,
+  type Rotatable,
   type RotatableOptions,
 } from "./messages/rotator.js";
 import { ArgumentError, Thrown, type Format } from "./messages/serializer-with-fallback.js";
@@ -35,6 +35,15 @@ const SEPARATOR = "--";
 export class MessageVerifier extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
 
+  /** @internal */
+  declare protected args: unknown[];
+  /** @internal */
+  declare protected options: Record<string, unknown>;
+  /** @internal */
+  declare protected rotations: Rotatable[];
+  /** @internal */
+  declare protected _onRotation: OnRotation | null;
+
   declare rotate: (...args: unknown[]) => this;
   declare onRotation: (callback: OnRotation) => this;
   declare fallBackTo: (fallback: MessageVerifier) => this;
@@ -42,7 +51,11 @@ export class MessageVerifier extends Codec {
   private secret: string | Bytes;
   private digest: string;
 
-  constructor(secret: string | Bytes, options: MessageVerifierOptions = {}) {
+  /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
+  constructor(
+    secret: string | Bytes,
+    { onRotation = null, ...options }: MessageVerifierOptions = {},
+  ) {
     if (secret == null) throw new ArgumentError("Secret should not be nil.");
     super({
       serializer: options.serializer,
@@ -51,7 +64,10 @@ export class MessageVerifier extends Codec {
     });
     this.secret = secret;
     this.digest = options.digest ?? "sha1";
-    initializeRotator(this, [secret], options as Record<string, unknown>);
+    this.args = [secret];
+    this.options = options;
+    this.rotations = [];
+    this._onRotation = onRotation;
   }
 
   generate(value: unknown, options: GenerateOptions = {}): string {

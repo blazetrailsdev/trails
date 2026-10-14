@@ -251,7 +251,13 @@ describe("inlinedFromFindings", () => {
 
   it("leaves the missing-tag arm off for a package that is not enrolled", () => {
     expect(messages([])).toEqual([]);
-    expect(MISSING_TAG_PACKAGES).toEqual(["actioncontroller", "actiondispatch", "i18n"]);
+    expect(MISSING_TAG_PACKAGES).toEqual([
+      "actioncontroller",
+      "actiondispatch",
+      "activesupport",
+      "i18n",
+      "rack-test",
+    ]);
   });
 
   it("pairs a class by its name under a file-qualified key, and once when an index re-exports it", () => {
