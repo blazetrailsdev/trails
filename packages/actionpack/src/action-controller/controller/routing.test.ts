@@ -1291,8 +1291,9 @@ function assertUriEqual(expected: string, actual: string): void {
 }
 
 function sortQueryStringParams(uri: string): string {
-  const [path, queryString] = uri.split("?");
-  const qs = queryString != null ? queryString.split("&").sort().join("&") : queryString;
+  const path = uri.split("?")[0];
+  let qs: string | undefined = uri.split("?")[1];
+  if (qs != null) qs = qs.split("&").sort().join("&");
   return qs != null ? `${path}?${qs}` : path;
 }
 
@@ -1855,7 +1856,7 @@ describe("RouteSetTest", () => {
     });
 
     const args = { controller: "foo", action: "bar", id: "7", x: "y" };
-    expect(tc.urlFor(set, { ...args })).toBe("/foo/bar/7?x=y");
+    expect(tc.urlFor(set, args)).toBe("/foo/bar/7?x=y");
     expect(set.generateExtras(args)).toEqual(["/foo/bar/7", ["x"]]);
     expect(set.extraKeys(args)).toEqual(["x"]);
   });
@@ -2289,12 +2290,12 @@ describe("RouteSetTest", () => {
   it("default route should uri escape pluses", () => {
     const expected = { controller: "pages", action: "show", id: "hello world" };
     expect(tc.defaultRouteSet.recognizePath("/pages/show/hello%20world")).toEqual(expected);
-    expect(tc.urlFor(tc.defaultRouteSet, { ...expected })).toBe("/pages/show/hello%20world");
+    expect(tc.urlFor(tc.defaultRouteSet, expected)).toBe("/pages/show/hello%20world");
 
     expected["id"] = "hello+world";
     expect(tc.defaultRouteSet.recognizePath("/pages/show/hello+world")).toEqual(expected);
     expect(tc.defaultRouteSet.recognizePath("/pages/show/hello%2Bworld")).toEqual(expected);
-    expect(tc.urlFor(tc.defaultRouteSet, { ...expected })).toBe("/pages/show/hello+world");
+    expect(tc.urlFor(tc.defaultRouteSet, expected)).toBe("/pages/show/hello+world");
   });
 
   it("build empty query string", () => {
