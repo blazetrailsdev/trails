@@ -10,7 +10,6 @@ import {
 } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
-  RoutingUrlFor,
   embedAuthenticityTokenInRemoteForms,
   setEmbedAuthenticityTokenInRemoteForms,
 } from "@blazetrails/actionview";
@@ -24,10 +23,7 @@ import {
   RequestForgeryProtection,
   decodeCsrfToken,
 } from "../metal/request-forgery-protection.js";
-import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
-
-RoutingUrlFor.include(UrlFor);
 
 interface ActionsHost {
   sameOriginJs(): Promise<void>;

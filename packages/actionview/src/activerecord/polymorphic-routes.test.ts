@@ -70,12 +70,7 @@ class ModelDelegate {
   }
 }
 
-const Weblog = {
-  name: "Weblog",
-  isUseRelativeModelNaming(): boolean {
-    return true;
-  },
-};
+const Weblog: { name: string; isUseRelativeModelNaming?: () => boolean } = { name: "Weblog" };
 registerConstant("Weblog", Weblog);
 
 class Post extends Base {
@@ -91,6 +86,10 @@ class Blog extends Base {
     this.tableName = "projects";
   }
 }
+
+Weblog.isUseRelativeModelNaming = function (): boolean {
+  return true;
+};
 
 type Helper = (...args: unknown[]) => string;
 
@@ -151,7 +150,11 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     const host = (this.constructor as unknown as { defaultUrlOptions: Record<string, unknown> })
       .defaultUrlOptions["host"];
 
-    assertEqual(url.replace(new RegExp(`^http://${host}`), ""), this.polymorphicPath(args));
+    const prefix = `http://${host}`;
+    assertEqual(
+      url.startsWith(prefix) ? url.slice(prefix.length) : url,
+      this.polymorphicPath(args),
+    );
     assertEqual(url, this.polymorphicUrl(args));
     assertEqual(url, this.urlFor(args));
   }
@@ -174,7 +177,7 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withTestRoutes<T>(block: () => T): T {
+  withTestRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.resources("projects", () => {
@@ -199,7 +202,7 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withTopLevelAndNestedRoutes<T>(block: () => T): T {
+  withTopLevelAndNestedRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.resources("blogs", () => {
@@ -214,7 +217,7 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withAdminTestRoutes<T>(block: () => T): T {
+  withAdminTestRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.namespace("admin", () => {
@@ -236,7 +239,7 @@ class PolymorphicRoutesTest extends ActionController.TestCase {
     });
   }
 
-  withAdminAndSiteTestRoutes<T>(block: () => T): T {
+  withAdminAndSiteTestRoutes<T>(_options: Record<string, unknown> = {}, block: () => T): T {
     return this.withRouting((set: RouteSet) => {
       set.draw(function () {
         this.namespace("admin", () => {
@@ -266,7 +269,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("string", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       assertEqual("/projects", testCase.polymorphicPath("projects"));
       assertEqual("http://example.com/projects", testCase.polymorphicUrl("projects"));
       assertEqual("projects", testCase.urlFor("projects"));
@@ -274,7 +277,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("string with options", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       assertEqual(
         "http://example.com/projects?id=10",
         testCase.polymorphicUrl("projects", { id: 10 }),
@@ -283,13 +286,13 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("symbol", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       testCase.assertUrl("http://example.com/projects", ":projects");
     });
   });
 
   it("symbol with options", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       assertEqual(
         "http://example.com/projects?id=10",
         testCase.polymorphicUrl(":projects", { id: 10 }),
@@ -361,7 +364,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nil", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       const exception = await assertRaise([ArgumentError], {}, () => {
         testCase.polymorphicUrl(null);
       });
@@ -370,7 +373,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with empty list", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       const exception = await assertRaise([ArgumentError], {}, () => {
         testCase.polymorphicUrl([]);
       });
@@ -379,7 +382,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nil id", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       const exception = await assertRaise([ArgumentError], {}, () => {
         testCase.polymorphicUrl({ id: null });
       });
@@ -388,7 +391,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with entirely nil list", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       const exception = await assertRaise([ArgumentError], {}, async () => {
         await testCase.series.save();
         testCase.polymorphicUrl([null, null]);
@@ -398,7 +401,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nil in list for resource that could be top level or nested", async () => {
-    await testCase.withTopLevelAndNestedRoutes(async () => {
+    await testCase.withTopLevelAndNestedRoutes(undefined, async () => {
       await testCase.blogPost.save();
       assertEqual(
         `http://example.com/posts/${testCase.blogPost.id}`,
@@ -408,7 +411,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nil in list does not generate invalid link", async () => {
-    await testCase.withTopLevelAndNestedRoutes(async () => {
+    await testCase.withTopLevelAndNestedRoutes(undefined, async () => {
       const exception = await assertRaise([NoMethodError], {}, async () => {
         await testCase.series.save();
         testCase.polymorphicUrl([null, testCase.series]);
@@ -418,26 +421,26 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with record", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       testCase.assertUrl(`http://example.com/projects/${testCase.project.id}`, testCase.project);
     });
   });
 
   it("with class", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       testCase.assertUrl("http://example.com/projects", testCase.project.constructor);
     });
   });
 
   it("with class list of one", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       testCase.assertUrl("http://example.com/projects", [testCase.project.constructor]);
     });
   });
 
   it("class with options", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       assertEqual(
         "http://example.com/projects?foo=bar",
         testCase.polymorphicUrl(testCase.project.constructor, { foo: ":bar" }),
@@ -450,7 +453,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with new record", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       testCase.assertUrl("http://example.com/projects", testCase.project);
     });
   });
@@ -458,7 +461,7 @@ describe("PolymorphicRoutesTest", () => {
   it("new record arguments", () => {
     let params: unknown[] | null = null;
 
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       const projectsUrl = testCase.projectsUrl;
       const projectsPath = testCase.projectsPath;
       extend(testCase, {
@@ -479,14 +482,14 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with destroyed record", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.destroy();
       testCase.assertUrl("http://example.com/projects", testCase.project);
     });
   });
 
   it("with record and action", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       assertEqual(
         "http://example.com/projects/new",
         testCase.polymorphicUrl(testCase.project, { action: "new" }),
@@ -495,13 +498,13 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("url helper prefixed with new", () => {
-    testCase.withTestRoutes(() => {
+    testCase.withTestRoutes(undefined, () => {
       assertEqual("http://example.com/projects/new", testCase.newPolymorphicUrl(testCase.project));
     });
   });
 
   it("regression path helper prefixed with new and edit", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       assertEqual("/projects/new", testCase.newPolymorphicPath(testCase.project));
 
       await testCase.project.save();
@@ -513,7 +516,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("url helper prefixed with edit", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       assertEqual(
         `http://example.com/projects/${testCase.project.id}/edit`,
@@ -523,7 +526,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("url helper prefixed with edit with url options", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       assertEqual(
         `http://example.com/projects/${testCase.project.id}/edit?param1=10`,
@@ -533,7 +536,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("url helper with url options", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       assertEqual(
         `http://example.com/projects/${testCase.project.id}?param1=10`,
@@ -543,7 +546,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("format option", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       assertEqual(
         `http://example.com/projects/${testCase.project.id}.pdf`,
@@ -553,7 +556,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("format option with url options", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       assertEqual(
         `http://example.com/projects/${testCase.project.id}.pdf?param1=10`,
@@ -563,7 +566,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("id and format option", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       assertEqual(
         `http://example.com/projects/${testCase.project.id}.pdf`,
@@ -573,7 +576,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nested", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       await testCase.task.save();
       testCase.assertUrl(
@@ -584,7 +587,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nested unsaved", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       testCase.assertUrl(`http://example.com/projects/${testCase.project.id}/tasks`, [
         testCase.project,
@@ -594,7 +597,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nested destroyed", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       await testCase.task.destroy();
       testCase.assertUrl(`http://example.com/projects/${testCase.project.id}/tasks`, [
@@ -605,7 +608,7 @@ describe("PolymorphicRoutesTest", () => {
   });
 
   it("with nested class", async () => {
-    await testCase.withTestRoutes(async () => {
+    await testCase.withTestRoutes(undefined, async () => {
       await testCase.project.save();
       testCase.assertUrl(`http://example.com/projects/${testCase.project.id}/tasks`, [
         testCase.project,

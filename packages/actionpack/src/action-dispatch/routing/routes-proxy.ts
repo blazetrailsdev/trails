@@ -138,6 +138,9 @@ export class RoutesProxy implements UrlForHost {
       throw new NoMethodError(
         `undefined method '${method}' for an instance of RoutesProxy`,
         method,
+        args,
+        false,
+        { receiver: this },
       );
     }
   }

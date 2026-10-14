@@ -1,11 +1,11 @@
+import "../test-helpers/abstract-unit.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionController, Request, RouteSet, UrlFor } from "@blazetrails/actionpack";
+import { ActionController, Request, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { assertPredicate, extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { ArgumentError, include } from "@blazetrails/ruby-compat";
-import { RoutingUrlFor } from "../routing-url-for.js";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
 import * as UrlHelper from "../helpers/url-helper.js";
@@ -60,8 +60,6 @@ class Session {
 function viewWith(controller: unknown): Base {
   return Base.withViewPaths([], {}, controller);
 }
-
-RoutingUrlFor.include(UrlFor);
 
 const routes = new RouteSet();
 routes.draw(function () {

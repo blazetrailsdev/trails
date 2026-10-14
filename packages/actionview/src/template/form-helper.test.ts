@@ -1,5 +1,6 @@
+import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { RouteSet, UrlFor } from "@blazetrails/actionpack";
+import { RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
 import { I18n, extend, isPresent } from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
@@ -12,7 +13,6 @@ import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import type { FormBuilder } from "../helpers/form-helper.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
-import { RoutingUrlFor } from "../routing-url-for.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 class Post {
@@ -117,8 +117,6 @@ class Tag {
 class Car {
   constructor(public color: string) {}
 }
-
-RoutingUrlFor.include(UrlFor);
 
 const Routes = new RouteSet();
 Routes.draw(function () {
