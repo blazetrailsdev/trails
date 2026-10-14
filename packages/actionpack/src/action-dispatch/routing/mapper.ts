@@ -1940,18 +1940,18 @@ export class Mapper {
   }
 
   /** @internal */
-  mergeShallowPathScope(parent: string | undefined, child: string): string {
-    return Mapper.normalizePath(`${parent ?? ""}/${child}`);
+  mergeShallowPathScope(parent: string | undefined, child: string | null): string {
+    return Mapper.normalizePath(`${parent ?? ""}/${child ?? ""}`);
   }
 
   /** @internal */
-  mergeAsScope(parent: string | undefined, child: string): string {
-    return parent ? `${parent}_${child}` : child;
+  mergeAsScope(parent: string | undefined, child: string | null): string | null {
+    return parent ? `${parent}_${child ?? ""}` : child;
   }
 
   /** @internal */
-  mergeShallowPrefixScope(parent: string | undefined, child: string): string {
-    return parent ? `${parent}_${child}` : child;
+  mergeShallowPrefixScope(parent: string | undefined, child: string | null): string | null {
+    return parent ? `${parent}_${child ?? ""}` : child;
   }
 
   /** @internal */
@@ -2329,7 +2329,7 @@ function deleteWithDefault<T>(hash: Record<string, unknown>, key: string, defaul
 interface ScopeOptions {
   as?: string | null;
   module?: string;
-  shallowPath?: string;
+  shallowPath?: string | null;
   shallowPrefix?: string | null;
   [key: string]: unknown;
 }
