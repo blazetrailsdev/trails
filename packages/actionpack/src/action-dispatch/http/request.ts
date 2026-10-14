@@ -469,7 +469,7 @@ export class Request {
       rawPost = forceEncoding(rawPost, Encoding.BINARY);
       return new StringIO(rawPost);
     } else {
-      return this.bodyStream as StringIO;
+      return this.bodyStream;
     }
   }
 
@@ -727,8 +727,8 @@ export class Request {
       this.getHeader("REDIRECT_X_HTTP_AUTHORIZATION")) as string | undefined;
   }
 
-  get bodyStream(): unknown {
-    return this.getHeader("rack.input");
+  get bodyStream(): StringIO {
+    return this.getHeader("rack.input") as StringIO;
   }
 
   /** @internal */
