@@ -11,7 +11,9 @@ describe("ActiveRecord::Encryption::MessageSerializerTest (trails)", () => {
     const parsed = JSON.parse(dumped) as { h: { tag: string } };
     expect(parsed.h.tag).toBe(Buffer.from("café 😀", "utf-8").toString("base64"));
     const loaded = serializer.load(dumped);
-    expect((loaded.headers.get("tag") as Buffer).toString("utf-8")).toBe("café 😀");
+    expect(Buffer.from(loaded.headers.get("tag") as string, "latin1").toString("utf-8")).toBe(
+      "café 😀",
+    );
   });
 
   it("binary? returns false", () => {

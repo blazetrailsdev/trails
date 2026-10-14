@@ -32,12 +32,12 @@ export class Base64 {
    *
    * `bin` is an ASCII-8BIT String in this package's representation — one code
    * unit per byte, what {@link IO.binread} answers and {@link IO.binwrite}
-   * consumes.
+   * consumes — or the bytes themselves.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.strict_encode64`
    * (`vendor/ruby/v3.3.11/lib/base64.rb:273`).
    */
-  static strictEncode64(bin: string): string {
+  static strictEncode64(bin: string | Uint8Array): string {
     return pack([bin], "m0");
   }
 
