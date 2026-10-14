@@ -403,12 +403,13 @@ export function assignNestedAttributesForCollectionAssociation(
               (association as any).addToTarget(existingRecord, { skipCallbacks: true });
             }
 
-            const allowDestroy = isAllowDestroy.call(this, associationName);
             nestedTarget.push(existingRecord);
             pending = (
               pending
-                ? pending.then(() => assignToOrMarkForDestruction(existingRecord!, a, allowDestroy))
-                : assignToOrMarkForDestruction(existingRecord, a, allowDestroy)
+                ? pending.then(() =>
+                    assignToOrMarkForDestruction(existingRecord!, a, options.allowDestroy!),
+                  )
+                : assignToOrMarkForDestruction(existingRecord, a, options.allowDestroy!)
             ) as Promise<void> | undefined;
           } else {
             nestedTarget.push(null);

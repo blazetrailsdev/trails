@@ -5,7 +5,6 @@
  * no such key off that receiver.
  *
  *   pnpm parity:api:key-reads              # the per-package table and the rows
- *   pnpm parity:api:key-reads --all        # also the receiver-unread rows
  *
  * No call gate sees the read on either side: Ruby `h[k]` is an `:aref` node
  * and never enters `calls`, and both extractors spell it `ref:get` in the
@@ -16,16 +15,15 @@
  *
  * A Ruby read lands in one of three buckets. `matched`: the port reads the key
  * off the same receiver. `key-unread`: the port reads other keys off that
- * receiver and not this one, which is the row the report lists.
- * `receiver-unread`: the port reads nothing off a receiver of that name, which
- * is a renamed local or a destructured parameter far more often than a dropped
- * read, so it is counted and listed only under `--all`.
+ * receiver and not this one. `receiver-unread`: the port reads nothing off a
+ * receiver of that name. Where the Ruby receiver is a parameter the port
+ * destructures in its signature (`function f({ onlyPath } = {})`), the
+ * destructured names are the keys read off it. Both unread buckets are listed.
  *
- * Both halves key a body by file and bare name, so same-named methods in one
- * file (two classes' `call`, `def self.x` beside `def x`) pool their reads, and
- * a TS body's reads include its nested functions'. That only ever credits a
- * read, so `matched` is an upper bound and a listed row is never one the
- * pooling invented.
+ * Both halves key a body by owner: the Ruby half by enclosing class/module and
+ * seat, the TS half by enclosing class (or the object literal's variable) and
+ * `static`, joined on the owners the skeleton row carries. A TS body's reads
+ * include a nested function's unless that function is itself a compared pair.
  *
  * The population is the skeleton artifact's pairs. There is no gate and no
  * baseline. Run `pnpm parity:api --calls` first so call-skeletons.json is fresh.
@@ -42,11 +40,27 @@ import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR, packageSrcDir } from "./config.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import type { SkeletonArtifact, SkeletonRow } from "./report-arms.js";
 
-/** `extract-key-reads.rb`: Ruby file → def name → `[receiver, key | null]`. */
-export type RubyKeyReads = Record<string, Record<string, [string, string | null][]>>;
+export interface RubyBody {
+  owner: string;
+  seat: "class" | "instance";
+  params: string[];
+  reads: [string, string | null][];
+}
 
-/** Function name → receiver → the keys read off it; `*` is a computed key. */
-export type TsKeyReads = Map<string, Map<string, Set<string>>>;
+/** `extract-key-reads.rb`: Ruby file → def name → its bodies. */
+export type RubyKeyReads = Record<string, Record<string, RubyBody[]>>;
+
+export interface TsBody {
+  owner: string;
+  isStatic: boolean;
+  /** Per parameter (`this` excluded): its destructured names, else `null`. */
+  params: (string[] | null)[];
+  /** Receiver → the keys read off it; `*` is a computed key. */
+  reads: Map<string, Set<string>>;
+}
+
+/** Function name → its bodies. */
+export type TsKeyReads = Map<string, TsBody[]>;
 
 export type Bucket = "matched" | "key-unread" | "receiver-unread";
 
@@ -128,7 +142,42 @@ function functionName(node: ts.Node): string | undefined {
   return undefined;
 }
 
-export function tsKeyReads(text: string, fileName = "file.ts"): TsKeyReads {
+function ownerOf(node: ts.Node): string {
+  for (let up = node.parent; up !== undefined; up = up.parent) {
+    if ((ts.isClassDeclaration(up) || ts.isClassExpression(up)) && up.name) return up.name.text;
+    if (ts.isObjectLiteralExpression(up)) {
+      const decl = up.parent;
+      return ts.isVariableDeclaration(decl) && ts.isIdentifier(decl.name) ? decl.name.text : "";
+    }
+    if (ts.isFunctionLike(up)) return "";
+  }
+  return "";
+}
+
+function bindingNames(pattern: ts.ObjectBindingPattern): string[] {
+  return pattern.elements.map((el) => {
+    const name = el.propertyName ?? el.name;
+    return el.dotDotDotToken || !ts.isIdentifier(name) ? ANY_KEY : name.text;
+  });
+}
+
+function paramsOf(node: ts.Node): (string[] | null)[] {
+  const init = "initializer" in node ? (node.initializer as ts.Node | undefined) : undefined;
+  const fn = ts.isFunctionLike(node) ? node : init && ts.isFunctionLike(init) ? init : undefined;
+  return (fn?.parameters ?? [])
+    .filter((p) => !(ts.isIdentifier(p.name) && p.name.text === "this"))
+    .map((p) => (ts.isObjectBindingPattern(p.name) ? bindingNames(p.name) : null));
+}
+
+/**
+ * `paired` names the file's functions that are compared pairs: a nested
+ * function of one of those names reads for itself, not for its enclosing body.
+ */
+export function tsKeyReads(
+  text: string,
+  fileName = "file.ts",
+  paired: ReadonlySet<string> = new Set(),
+): TsKeyReads {
   const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const out: TsKeyReads = new Map();
   const collect = (node: ts.Node, reads: Map<string, Set<string>>): void => {
@@ -168,13 +217,25 @@ export function tsKeyReads(text: string, fileName = "file.ts"): TsKeyReads {
         add(node.initializer, el.dotDotDotToken || !ts.isIdentifier(name) ? ANY_KEY : name.text);
       }
     }
-    ts.forEachChild(node, (child) => collect(child, reads));
+    ts.forEachChild(node, (child) => {
+      const nested = functionName(child);
+      if (nested === undefined || !paired.has(nested)) collect(child, reads);
+    });
   };
   const visit = (node: ts.Node): void => {
     const name = functionName(node);
-    if (name !== undefined) {
-      if (!out.has(name)) out.set(name, new Map());
-      collect(node, out.get(name)!);
+    const overload = ts.isFunctionLike(node) && !(node as ts.FunctionLikeDeclaration).body;
+    if (name !== undefined && !overload) {
+      const reads = new Map<string, Set<string>>();
+      collect(node, reads);
+      const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+      if (!out.has(name)) out.set(name, []);
+      out.get(name)!.push({
+        owner: ownerOf(node),
+        isStatic: modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword) ?? false,
+        params: paramsOf(node),
+        reads,
+      });
     }
     ts.forEachChild(node, visit);
   };
@@ -185,15 +246,18 @@ export function tsKeyReads(text: string, fileName = "file.ts"): TsKeyReads {
 /** One row per distinct literal-Symbol `(receiver, key)` the Rails body reads. */
 export function keyReadRows(
   row: SkeletonRow,
-  ruby: readonly [string, string | null][],
-  tsReads: Map<string, Set<string>>,
+  ruby: Pick<RubyBody, "params" | "reads">,
+  ts: Pick<TsBody, "params" | "reads">,
 ): KeyReadRow[] {
   const seen = new Set<string>();
   const rows: KeyReadRow[] = [];
-  for (const [recv, sym] of ruby) {
+  for (const [recv, sym] of ruby.reads) {
     if (sym === null || seen.has(`${recv}\u0000${sym}`)) continue;
     seen.add(`${recv}\u0000${sym}`);
-    const keys = tsReads.get(snakeToCamel(recv.replace(/^@/, "")).replace(/^_+/, ""));
+    const destructured = ts.params[ruby.params.indexOf(recv)];
+    const keys =
+      ts.reads.get(snakeToCamel(recv.replace(/^@/, "")).replace(/^_+/, "")) ??
+      (ruby.params.includes(recv) && destructured ? new Set(destructured) : undefined);
     const key = tsKey(normalizeRubyKey(sym.replace(/\?$/, "")));
     const predicate = sym.endsWith("?") && keys?.has(`is${key[0].toUpperCase()}${key.slice(1)}`);
     const bucket: Bucket =
@@ -217,6 +281,38 @@ export function keyReadRows(
   return rows;
 }
 
+/** The one body the pair's owners name, else every candidate pooled. */
+function pooled<T extends { params: unknown[] }>(
+  bodies: readonly T[],
+  merge: (into: T, body: T) => void,
+): T | undefined {
+  if (bodies.length <= 1) return bodies[0];
+  const into = structuredClone(bodies[0]);
+  for (const body of bodies.slice(1)) merge(into, body);
+  return into;
+}
+
+/** The Ruby bodies a pair reads: the one its owner and seat name, where recorded. */
+export function rubyBodyOf(row: SkeletonRow, bodies: readonly RubyBody[]): RubyBody | undefined {
+  const own = bodies.filter((b) => b.owner === row.rubyOwner && b.seat === row.rubySeat);
+  return pooled(own.length > 0 ? own : bodies, (into, b) => into.reads.push(...b.reads));
+}
+
+/** The TS body a pair reads: its owner's, on the seat the Ruby def is defined on. */
+export function tsBodyOf(row: SkeletonRow, bodies: readonly TsBody[]): TsBody | undefined {
+  let own = row.tsOwner === undefined ? bodies : bodies.filter((b) => b.owner === row.tsOwner);
+  if (own.length > 1) {
+    const seated = own.filter((b) => b.isStatic === (row.rubySeat === "class"));
+    if (seated.length > 0) own = seated;
+  }
+  return pooled(own.length > 0 ? own : bodies, (into, b) => {
+    for (const [recv, keys] of b.reads) {
+      if (!into.reads.has(recv)) into.reads.set(recv, new Set());
+      for (const k of keys) into.reads.get(recv)!.add(k);
+    }
+  });
+}
+
 export interface PackageTally {
   pairs: number;
   arefs: number;
@@ -229,7 +325,6 @@ export interface PackageTally {
 export function renderReport(
   rows: readonly KeyReadRow[],
   tallies: ReadonlyMap<string, PackageTally>,
-  all: boolean,
 ): string {
   const head = ["package", "pairs", "arefs", "literal", "matched", "key-unread", "recv-unread"];
   const table = [...tallies]
@@ -248,7 +343,7 @@ export function renderReport(
       .slice(1)
       .map((c) => String(c).padStart(12))
       .join("")}`;
-  const listed = rows.filter((r) => r.bucket === "key-unread" || (all && r.bucket !== "matched"));
+  const listed = rows.filter((r) => r.bucket !== "matched");
   return [
     "key-read report: Rails reads of a literal Symbol key off a named receiver, against the " +
       "port's reads off that receiver — report-only (RFC 0190)",
@@ -274,7 +369,7 @@ async function readJson<T>(file: string): Promise<T | undefined> {
   }
 }
 
-async function main(argv: string[]): Promise<number> {
+async function main(): Promise<number> {
   const file = path.join(OUTPUT_DIR, "call-skeletons.json");
   const artifact = await readJson<SkeletonArtifact>(file);
   if (artifact === undefined) {
@@ -293,18 +388,29 @@ async function main(argv: string[]): Promise<number> {
     { maxBuffer: 256 * 1024 * 1024 },
   );
   const ruby = JSON.parse(stdout) as Record<string, RubyKeyReads>;
+  const pairedByFile = new Map<string, Set<string>>();
+  for (const row of artifact.skeletons) {
+    const tsPath = path.join(packageSrcDir(row.package), row.tsFile);
+    if (!pairedByFile.has(tsPath)) pairedByFile.set(tsPath, new Set());
+    pairedByFile.get(tsPath)!.add(row.tsName);
+  }
   const tsFiles = new Map<string, TsKeyReads>();
   const rows: KeyReadRow[] = [];
   const tallies = new Map<string, PackageTally>();
   for (const row of artifact.skeletons) {
-    const reads = ruby[row.package]?.[row.rubyFile]?.[row.rubyName];
-    if (reads === undefined) continue;
+    const rubyBodies = ruby[row.package]?.[row.rubyFile]?.[row.rubyName];
+    const rubyBody = rubyBodies && rubyBodyOf(row, rubyBodies);
+    if (rubyBody === undefined) continue;
     const tsPath = path.join(packageSrcDir(row.package), row.tsFile);
     if (!tsFiles.has(tsPath)) {
       const text = await readFile(tsPath, "utf8").catch(() => undefined);
-      tsFiles.set(tsPath, text === undefined ? new Map() : tsKeyReads(text, tsPath));
+      tsFiles.set(
+        tsPath,
+        text === undefined ? new Map() : tsKeyReads(text, tsPath, pairedByFile.get(tsPath)),
+      );
     }
-    const pairRows = keyReadRows(row, reads, tsFiles.get(tsPath)!.get(row.tsName) ?? new Map());
+    const tsBody = tsBodyOf(row, tsFiles.get(tsPath)!.get(row.tsName) ?? []);
+    const pairRows = keyReadRows(row, rubyBody, tsBody ?? { params: [], reads: new Map() });
     rows.push(...pairRows);
     const t = tallies.get(row.package) ?? {
       pairs: 0,
@@ -315,14 +421,14 @@ async function main(argv: string[]): Promise<number> {
       receiverUnread: 0,
     };
     t.pairs += 1;
-    t.arefs += reads.length;
+    t.arefs += rubyBody.reads.length;
     t.literal += pairRows.length;
     t.matched += pairRows.filter((r) => r.bucket === "matched").length;
     t.keyUnread += pairRows.filter((r) => r.bucket === "key-unread").length;
     t.receiverUnread += pairRows.filter((r) => r.bucket === "receiver-unread").length;
     tallies.set(row.package, t);
   }
-  console.log(renderReport(rows, tallies, argv.includes("--all")));
+  console.log(renderReport(rows, tallies));
   return 0;
 }
 
@@ -330,7 +436,7 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  process.exit(await main(process.argv.slice(2)));
+  process.exit(await main());
 }
 
 void runAsScript();

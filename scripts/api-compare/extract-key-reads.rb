@@ -13,8 +13,19 @@
 # (`:var_ref` / `:vcall`); the key is recorded when it is one literal Symbol
 # and is nil otherwise. `h[k] = v` is an `:aref_field` and is not a read.
 #
+# A body is keyed by its owner — the enclosing class/module's full name — and
+# its seat: `def self.x` and a `def` inside `class << self` are `class`, any
+# other `def` is `instance`; a `def` in a `ClassMethods` module is its
+# parent's, on the `class` seat, as compare.ts reads it, and a
+# `Name = Struct.new … do` block is `Name`'s. So two classes' `def call` in one file, or
+# `def self.x` beside `def x`, are separate bodies. `params` is the def's
+# positional parameters, then its `**kwrest`, which is how a port that
+# destructures a Hash parameter is credited.
+#
 # Usage: ruby extract-key-reads.rb '{"<pkg>": "<lib dir>", …}'
-# Prints {"<pkg>": {"<file under lib>": {"<def name>": [["<recv>", "<key>"|null], …]}}}.
+# Prints {"<pkg>": {"<file under lib>": {"<def name>":
+#   [{"owner": "<A::B>", "seat": "class"|"instance", "params": […],
+#     "reads": [["<recv>", "<key>"|null], …]}, …]}}}.
 require "json"
 require "ripper"
 
@@ -50,17 +61,58 @@ def collect(node, reads)
   node.each { |child| collect(child, reads) }
 end
 
-def walk(node, defs)
+def const_name(node)
+  case node && node[0]
+  when :const_ref, :top_const_ref then node[1][1]
+  when :var_ref then node[1][0] == :@const ? node[1][1] : nil
+  when :const_path_ref
+    outer = const_name(node[1])
+    outer && "#{outer}::#{node[2][1]}"
+  end
+end
+
+def param_names(params)
+  params = params[1] if params.is_a?(Array) && params[0] == :paren
+  return [] unless params.is_a?(Array) && params[0] == :params
+
+  positional = (params[1] || []).map { |p| p[1] } + (params[2] || []).map { |p| p[0][1] }
+  kwrest = params[6].is_a?(Array) && params[6][0] == :kwrest_param && params[6][1] ? [params[6][1][1]] : []
+  positional + kwrest
+end
+
+def walk(node, defs, owner = [], singleton = false)
   return unless node.is_a?(Array)
 
-  name, body = node[1], node[3] if node[0] == :def
-  name, body = node[3], node[5] if node[0] == :defs
+  case node[0]
+  when :class, :module
+    name = const_name(node[1])
+    return node.each { |child| walk(child, defs, owner, singleton) } unless name
+
+    return walk(node.last, defs, owner + [name], false)
+  when :sclass
+    return walk(node.last, defs, owner, true)
+  when :assign
+    target = node[1]
+    if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) && target[1][0] == :@const
+      return walk(node[2], defs, owner + [target[1][1]], false)
+    end
+  end
+  name, params, body = node[1], node[2], node[3] if node[0] == :def
+  name, params, body = node[3], node[4], node[5] if node[0] == :defs
   if name.is_a?(Array) && name[1].is_a?(String)
     reads = []
     collect(body, reads)
-    (defs[name[1]] ||= []).concat(reads) unless reads.empty?
+    unless reads.empty?
+      class_methods = owner.length > 1 && owner.last == "ClassMethods"
+      (defs[name[1]] ||= []) << {
+        owner: (class_methods ? owner[0...-1] : owner).join("::"),
+        seat: singleton || class_methods || node[0] == :defs ? "class" : "instance",
+        params: param_names(params),
+        reads: reads
+      }
+    end
   end
-  node.each { |child| walk(child, defs) }
+  node.each { |child| walk(child, defs, owner, singleton) }
 end
 
 out = JSON.parse(ARGV.fetch(0)).to_h do |pkg, dir|

@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { SkeletonRow } from "./report-arms.js";
-import { keyReadRows, tsKeyReads, type RubyKeyReads } from "./report-key-reads.js";
+import {
+  keyReadRows,
+  rubyBodyOf,
+  tsBodyOf,
+  tsKeyReads,
+  type RubyKeyReads,
+} from "./report-key-reads.js";
 
 const ROW: SkeletonRow = {
   package: "actionpack",
@@ -16,42 +22,104 @@ const ROW: SkeletonRow = {
   ts: [],
 };
 
-const buckets = (body: string, ruby: [string, string | null][]) =>
-  keyReadRows(ROW, ruby, tsKeyReads(`function urlFor(options, k) { ${body} }`).get("urlFor")!).map(
-    (r) => `${r.receiver}[:${r.key}] ${r.bucket}`,
-  );
+const buckets = (body: string, reads: [string, string | null][], params = "options, k") =>
+  keyReadRows(
+    ROW,
+    { params: ["options", "k"], reads },
+    tsKeyReads(`function urlFor(${params}) { ${body} }`).get("urlFor")![0],
+  ).map((r) => `${r.receiver}[:${r.key}] ${r.bucket}`);
+
+const extract = async (source: string[]) => {
+  const dir = await mkdtemp(path.join(tmpdir(), "key-reads-"));
+  try {
+    await writeFile(path.join(dir, "url_for.rb"), source.join("\n"));
+    const out = execFileSync("ruby", [
+      path.join(import.meta.dirname, "extract-key-reads.rb"),
+      JSON.stringify({ actionpack: dir }),
+    ]);
+    return (JSON.parse(out.toString()) as Record<string, RubyKeyReads>).actionpack["url_for.rb"];
+  } finally {
+    await rm(dir, { recursive: true });
+  }
+};
 
 const RUBY_SUBPROCESS_TIMEOUT_MS = 30_000;
 
 describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   it("extract-key-reads.rb records a named-receiver [] per def, and no []= write", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "key-reads-"));
-    try {
-      await writeFile(
-        path.join(dir, "url_for.rb"),
+    const defs = await extract([
+      "def url_for(options, x = 1, **kw)",
+      "  options[:only_path]",
+      "  @config[:adapter]",
+      '  html_options["class"]',
+      "  options[:host] = 1",
+      "  foo.bar[:baz]",
+      "end",
+    ]);
+    expect(defs.url_for).toEqual([
+      {
+        owner: "",
+        seat: "instance",
+        params: ["options", "x", "kw"],
+        reads: [
+          ["options", "only_path"],
+          ["@config", "adapter"],
+          ["html_options", null],
+        ],
+      },
+    ]);
+  });
+
+  it("extract-key-reads.rb keys a def by its owner and seat", async () => {
+    const defs = await extract([
+      "module A",
+      "  class B; def call; o[:b]; end; def self.call; o[:s]; end; end",
+      "  class C; class << self; def call; o[:c]; end; end; end",
+      "  module ClassMethods; def call; o[:m]; end; end",
+      "  D = Struct.new(:x) do; def call; o[:d]; end; end",
+      "end",
+    ]);
+    expect(defs.call.map((b) => `${b.owner} ${b.seat} ${b.reads[0][1]}`)).toEqual([
+      "A::B instance b",
+      "A::B class s",
+      "A::C class c",
+      "A class m",
+      "A::D instance d",
+    ]);
+  });
+
+  it("a pair reads the body its owners name on both sides", () => {
+    const ts = tsKeyReads(
+      "class B { call(o) { return o.b; } static call(o) { return o.s; } }" +
+        " class C { call(o) { return o.c; } }",
+    ).get("call")!;
+    const row = { ...ROW, tsOwner: "B", rubyOwner: "A::B", rubySeat: "class" as const };
+    expect([...tsBodyOf(row, ts)!.reads.get("o")!]).toEqual(["s"]);
+    expect(
+      rubyBodyOf(row, [
+        { owner: "A::B", seat: "instance", params: [], reads: [["o", "b"]] },
+        { owner: "A::B", seat: "class", params: [], reads: [["o", "s"]] },
+      ])!.reads,
+    ).toEqual([["o", "s"]]);
+  });
+
+  it("a nested function that is itself a compared pair reads for itself", () => {
+    const text = "function urlFor(options) { function host(options) { return options.host; } }";
+    expect(tsKeyReads(text).get("urlFor")![0].reads.get("options")).toEqual(new Set(["host"]));
+    expect(tsKeyReads(text, "f.ts", new Set(["host"])).get("urlFor")![0].reads.size).toBe(0);
+  });
+
+  it("a parameter the port destructures is read by its destructured names", () => {
+    expect(
+      buckets(
+        "return onlyPath;",
         [
-          "def url_for(options)",
-          "  options[:only_path]",
-          "  @config[:adapter]",
-          '  html_options["class"]',
-          "  options[:host] = 1",
-          "  foo.bar[:baz]",
-          "end",
-        ].join("\n"),
-      );
-      const out = execFileSync("ruby", [
-        path.join(import.meta.dirname, "extract-key-reads.rb"),
-        JSON.stringify({ actionpack: dir }),
-      ]);
-      const reads = JSON.parse(out.toString()) as Record<string, RubyKeyReads>;
-      expect(reads.actionpack["url_for.rb"].url_for).toEqual([
-        ["options", "only_path"],
-        ["@config", "adapter"],
-        ["html_options", null],
-      ]);
-    } finally {
-      await rm(dir, { recursive: true });
-    }
+          ["options", "only_path"],
+          ["options", "host"],
+        ],
+        "{ onlyPath }, k",
+      ),
+    ).toEqual(["options[:only_path] matched", "options[:host] key-unread"]);
   });
 
   it.each([
