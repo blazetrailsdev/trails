@@ -71,7 +71,7 @@ export const ClassMethods = {
               ]),
             ];
             if (this.fileFixturePath)
-              names = names.filter((f) => !f.startsWith(String(this.fileFixturePath)));
+              names = names.filter((f) => !f.startsWith(toS(this.fileFixturePath)));
             return names.map((f) =>
               f.slice(toS(path).length, -RubyFile.extname(f).length).replace(/^\//, ""),
             );
