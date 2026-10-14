@@ -1087,196 +1087,91 @@ export class Mapper {
     }
   }
 
-  resources(...resources: Array<string | RouteOptions | MapperCallback>): void {
-    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+  resources(...resources: Array<string | RouteOptions | MapperCallback>): this {
+    const block = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
       | MapperCallback
       | undefined;
     let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (this.applyCommonBehaviorFor("resources", resources as string[], options, cb)) return;
-    options = this.applyActionOptions("resources", options);
-    const name = resources.pop() as string;
+    if (this.applyCommonBehaviorFor("resources", resources as string[], options, block)) {
+      return this;
+    }
 
-    const resource = new Resource(
-      name,
-      this.isApiOnly(),
-      this._scope.get("shallow") === true,
-      options,
-    );
-    const shallow = resource.isShallow();
-    const path = resource.path;
-    const controller = resource.controller;
-    const param = resource.param;
-    const prefix = (this._scope.get("path") as string | undefined) ?? "";
-    const basePath = `${prefix}/${path}`;
+    this.withScopeLevel("resources", () => {
+      options = this.applyActionOptions("resources", options);
+      this.resourceScope(
+        new Resource(
+          resources.pop() as string,
+          this.isApiOnly(),
+          this._scope.get("shallow") as boolean,
+          options,
+        ),
+        () => {
+          if (block) block.call(this);
 
-    const shallowPath = shallow
-      ? `${(this._scope.get("shallowPath") as string | undefined) ?? ""}/${path}`
-      : basePath;
-    const names: Record<string, string | undefined> = {};
+          if (options.concerns) this.concerns(options.concerns);
 
-    const allowed = new Set(resource.actions());
-    const merged = {
-      ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
-      ...((options.constraints as RouteConstraints | undefined) ?? {}),
-    };
-    const constraints = Object.keys(merged).length > 0 ? merged : undefined;
-    const newPath = this.actionPath("new");
-    const editPath = this.actionPath("edit");
-
-    this.withScopeLevel("resources", () =>
-      this.resourceScope(resource, () => {
-        if (cb) cb.call(this);
-
-        if (options.concerns) this.concerns(options.concerns);
-
-        this.collection(() => {
-          if (allowed.has("index")) names.index = this.nameForAction(undefined, "index");
-        });
-
-        if (allowed.has("new")) {
-          this.new(() => {
-            names.new = this.nameForAction(undefined, "new");
+          this.collection(() => {
+            if (this.parentResource()!.actions().includes("index")) this.get(":index");
+            if (this.parentResource()!.actions().includes("create")) this.post(":create");
           });
-        }
 
-        this.member(() => {
-          if (allowed.has("edit")) names.edit = this.nameForAction(undefined, "edit");
-          if (allowed.has("show")) names.show = this.nameForAction(undefined, "show");
-        });
-      }),
-    );
+          if (this.parentResource()!.actions().includes("new")) {
+            this.new(() => {
+              this.get(":new");
+            });
+          }
 
-    if (allowed.has("index")) {
-      const as = names.index;
-      this.addRouteToSet("GET", basePath, controller, "index", as, constraints);
-    }
-
-    if (allowed.has("create")) {
-      this.addRouteToSet("POST", basePath, controller, "create", undefined, constraints);
-    }
-
-    if (allowed.has("new")) {
-      const as = names.new;
-      this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", as, constraints);
-    }
-
-    if (allowed.has("edit")) {
-      const as = names.edit;
-      this.addRouteToSet(
-        "GET",
-        `${shallowPath}/:${param}/${editPath}`,
-        controller,
-        "edit",
-        as,
-        constraints,
+          this.setMemberMappingsForResource();
+        },
       );
-    }
+    });
 
-    if (allowed.has("show")) {
-      const as = names.show;
-      this.addRouteToSet("GET", `${shallowPath}/:${param}`, controller, "show", as, constraints);
-    }
-
-    if (allowed.has("update")) {
-      this.addRouteToSet(
-        "PATCH",
-        `${shallowPath}/:${param}`,
-        controller,
-        "update",
-        undefined,
-        constraints,
-      );
-      this.addRouteToSet(
-        "PUT",
-        `${shallowPath}/:${param}`,
-        controller,
-        "update",
-        undefined,
-        constraints,
-      );
-    }
-
-    if (allowed.has("destroy")) {
-      this.addRouteToSet(
-        "DELETE",
-        `${shallowPath}/:${param}`,
-        controller,
-        "destroy",
-        undefined,
-        constraints,
-      );
-    }
+    return this;
   }
 
-  resource(...resources: Array<string | RouteOptions | MapperCallback>): void {
-    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+  resource(...resources: Array<string | RouteOptions | MapperCallback>): this {
+    const block = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
       | MapperCallback
       | undefined;
     let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (this.applyCommonBehaviorFor("resource", resources as string[], options, cb)) return;
-    options = this.applyActionOptions("resource", options);
-    const name = resources.pop() as string;
-
-    const resource = new SingletonResource(
-      name,
-      this.isApiOnly(),
-      this._scope.get("shallow") === true,
-      options,
-    );
-    const controller = resource.controller;
-    const prefix = (this._scope.get("path") as string | undefined) ?? "";
-    const basePath = `${prefix}/${resource.path}`;
-    const names: Record<string, string | undefined> = {};
-
-    const allowed = new Set(resource.actions());
-    const newPath = this.actionPath("new");
-    const editPath = this.actionPath("edit");
-
-    this.withScopeLevel("resource", () =>
-      this.resourceScope(resource, () => {
-        if (cb) cb.call(this);
-
-        if (options.concerns) this.concerns(options.concerns);
-
-        if (allowed.has("new")) {
-          this.new(() => {
-            names.new = this.nameForAction(undefined, "new");
-          });
-        }
-
-        this.member(() => {
-          if (allowed.has("edit")) names.edit = this.nameForAction(undefined, "edit");
-          if (allowed.has("show")) names.show = this.nameForAction(undefined, "show");
-        });
-      }),
-    );
-
-    if (allowed.has("new")) {
-      this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", names.new);
+    if (this.applyCommonBehaviorFor("resource", resources as string[], options, block)) {
+      return this;
     }
 
-    if (allowed.has("create")) {
-      this.addRouteToSet("POST", basePath, controller, "create");
-    }
+    this.withScopeLevel("resource", () => {
+      options = this.applyActionOptions("resource", options);
+      this.resourceScope(
+        new SingletonResource(
+          resources.pop() as string,
+          this.isApiOnly(),
+          this._scope.get("shallow") as boolean,
+          options,
+        ),
+        () => {
+          if (block) block.call(this);
 
-    if (allowed.has("show")) {
-      this.addRouteToSet("GET", basePath, controller, "show", names.show);
-    }
+          if (options.concerns) this.concerns(options.concerns);
 
-    if (allowed.has("edit")) {
-      this.addRouteToSet("GET", `${basePath}/${editPath}`, controller, "edit", names.edit);
-    }
+          if (this.parentResource()!.actions().includes("new")) {
+            this.new(() => {
+              this.get(":new");
+            });
+          }
 
-    if (allowed.has("update")) {
-      this.addRouteToSet("PATCH", basePath, controller, "update");
-      this.addRouteToSet("PUT", basePath, controller, "update");
-    }
+          this.setMemberMappingsForResource();
 
-    if (allowed.has("destroy")) {
-      this.addRouteToSet("DELETE", basePath, controller, "destroy");
-    }
+          if (this.parentResource()!.actions().includes("create")) {
+            this.collection(() => {
+              this.post(":create");
+            });
+          }
+        },
+      );
+    });
+
+    return this;
   }
 
   namespace(
@@ -1487,26 +1382,14 @@ export class Mapper {
 
   /** @internal */
   setMemberMappingsForResource(): void {
-    const parent = this.parentResource();
-    if (!parent) return;
-    const actions = parent.actions();
     this.member(() => {
-      const memberPath = this._scope.get("path") as string;
-      const controller = parent.resourceScope();
-      const editPath = this.actionPath("edit");
-      if (actions.includes("edit")) {
-        this.addRouteToSet("GET", `${memberPath}/${editPath}`, controller, "edit");
+      if (this.parentResource()!.actions().includes("edit")) this.get(":edit");
+      if (this.parentResource()!.actions().includes("show")) this.get(":show");
+      if (this.parentResource()!.actions().includes("update")) {
+        this.patch(":update");
+        this.put(":update");
       }
-      if (actions.includes("show")) {
-        this.addRouteToSet("GET", memberPath, controller, "show");
-      }
-      if (actions.includes("update")) {
-        this.addRouteToSet("PATCH", memberPath, controller, "update");
-        this.addRouteToSet("PUT", memberPath, controller, "update");
-      }
-      if (actions.includes("destroy")) {
-        this.addRouteToSet("DELETE", memberPath, controller, "destroy");
-      }
+      if (this.parentResource()!.actions().includes("destroy")) this.delete(":destroy");
     });
   }
 
@@ -1990,33 +1873,6 @@ export class Mapper {
       options as Record<string, unknown>,
     );
     this._set.addRoute(mapping, as);
-  }
-
-  /** @internal */
-  private addRouteToSet(
-    via: string,
-    path: string,
-    controller: string,
-    action: string,
-    name?: string | null,
-    constraints?: RouteConstraints,
-  ): void {
-    const formatted = this._scope.get("format") as boolean | undefined;
-    const mapping = Mapping.build(
-      this._scope,
-      this._set,
-      Parser.parse(Mapping.normalizePath(RFC2396_PARSER.escape(path), formatted))!,
-      controller,
-      action,
-      undefined,
-      [via],
-      formatted,
-      constraints ?? {},
-      true,
-      {},
-    );
-    if (name != null && (!/^[_a-z]/i.test(name) || this.hasNamedRoute(name))) name = undefined;
-    this._set.addRoute(mapping, name);
   }
 
   private isShallow(): boolean {

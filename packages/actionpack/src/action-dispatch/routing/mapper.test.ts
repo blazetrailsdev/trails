@@ -200,13 +200,6 @@ describe("Mapper public DSL additions", () => {
     expect(commentShow?.path.spec.toString()).toBe("/admin/comments/:id(.:format)");
   });
 
-  it("setMemberMappingsForResource is a safe no-op outside a resource scope", () => {
-    const set = new RouteSet();
-    const m = new Mapper(set);
-    expect(() => m.setMemberMappingsForResource()).not.toThrow();
-    expect(set.routes.routes).toEqual([]);
-  });
-
   it("shallow inside a namespace preserves the namespace prefix on member route names", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
