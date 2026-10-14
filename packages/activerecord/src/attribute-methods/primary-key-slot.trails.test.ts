@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { includedModules } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { AttributeMethods } from "../namespaces.js";
@@ -7,6 +7,11 @@ import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("per-instance @primary_key slot", () => {
   fixtures({}, { useTransactionalTests: false });
+
+  beforeEach(async () => {
+    await (await Base.leaseConnection()).schemaCache.clearDataSourceCacheBang("toys");
+  });
+
   it("seats the record's primary key from the class at init_internals", async () => {
     class SeatedToy extends Base {
       static override tableName = "toys";

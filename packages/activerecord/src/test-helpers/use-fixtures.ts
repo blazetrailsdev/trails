@@ -76,6 +76,15 @@ let useFixturesCount = 0;
 
 const warmed = new WeakSet<TestCaseClass>();
 
+const declared = new WeakSet<object>();
+
+function isDeclared(klass: TestCaseClass): boolean {
+  for (let k: object | null = klass; k !== null; k = Object.getPrototypeOf(k) as object | null) {
+    if (declared.has(k)) return true;
+  }
+  return false;
+}
+
 let rootTestCaseClass: TestCaseClass | undefined;
 
 let currentTestCase: TestCase | null = null;
@@ -88,7 +97,7 @@ export function rootTestCase(): TestCaseClass {
       override async beforeSetup(): Promise<void> {
         const testKlass = this.constructor as TestCaseClass;
         currentTestCase = this;
-        if (testKlass.fixtureTableNames.length > 0 && !warmed.has(testKlass)) {
+        if (isDeclared(testKlass) && !warmed.has(testKlass)) {
           warmed.add(testKlass);
           await Base.withConnection(eagerWarmSchemaCache);
         }
@@ -171,6 +180,7 @@ export function fixtures(
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
   const klass = describe(getCurrentSuite().suite as SuiteScope) as TestCaseClass;
+  declared.add(klass);
   klass.usesTransaction(
     ...(usesTransaction ?? []).map((name) => `test_${name.replace(/\s+/g, "_")}`),
   );

@@ -21,6 +21,7 @@ import { UrlConfig } from "./database-configurations/url-config.js";
 import { AdapterNotSpecified } from "./errors.js";
 
 describe("directly bound adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("connection, leaseConnection and withConnection resolve to the same session", async () => {
     class Boundish extends Base {}
     const bound = adapterDouble();
@@ -70,6 +71,7 @@ describe("connection without a threaded lease", () => {
 });
 
 describe("Arel toSql through Table.engine", () => {
+  fixtures({}, { useTransactionalTests: false });
   afterEach(() => {
     vi.restoreAllMocks();
   });
