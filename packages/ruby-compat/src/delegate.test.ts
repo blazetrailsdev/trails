@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { DelegateClass } from "./delegate.js";
+import { DelegateClass, SimpleDelegator } from "./delegate.js";
 
 class Target {
   _stored = "initial";
@@ -76,5 +76,23 @@ describe("TestDelegateClass", () => {
 
   it("test_delegateclass_class", () => {
     expect(new (DelegateClass(Target))(new Target())).toBeInstanceOf(Target);
+  });
+
+  it("test_simpledelegator_class", () => {
+    const simple = new SimpleDelegator([]);
+    expect(simple).not.toBeInstanceOf(Array);
+    expect(simple.constructor).toBe(SimpleDelegator);
+    expect("push" in simple).toBe(true);
+    expect((simple as unknown as unknown[]).length).toBe(0);
+  });
+
+  it("test_unset_simple_delegator", () => {
+    const unset = Object.create(SimpleDelegator.prototype) as SimpleDelegator;
+    expect(() => unset.__getobj__()).toThrow(ArgumentError);
+    expect(() => unset.__getobj__()).toThrow(/not delegated/);
+    expect(unset.__getobj__(() => "block")).toBe("block");
+    const proxied = new SimpleDelegator([]);
+    delete (proxied as { delegateSdObj?: unknown }).delegateSdObj;
+    expect("length" in proxied).toBe(false);
   });
 });

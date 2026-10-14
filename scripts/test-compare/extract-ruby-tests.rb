@@ -209,6 +209,9 @@ class TestExtractor
     @module_collect = nil
     @module_includes = {}
     @module_def_gates = {}
+    # Every class this file defines, in definition order, with the tests its own
+    # body emitted, for `replay_inherited_tests`.
+    @class_defs = []
 
     # Same-file non-assertion helper `def`s, keyed by name → list of definitions,
     # so a test that delegates its assertions to a helper (e.g. `test_copy_table`,
@@ -247,6 +250,7 @@ class TestExtractor
 
     walk(sexp)
 
+    replay_inherited_tests
     collect_lib_modules(filepath)
     flush_collected_modules
 
@@ -420,11 +424,41 @@ class TestExtractor
     # inside a module is a real test case), so suspend any module collection.
     prev = @module_collect
     @module_collect = nil
+    class_def = { name: name, superclass: superclass, ancestors: @describe_stack.dup, tests: [] }
+    @class_defs << class_def unless @in_non_test_class
+    first = @test_cases.length
     walk_body(node[3] || node[2])
+    class_def[:tests] = @test_cases[first..].select { |tc| tc[:ancestors] == class_def[:ancestors] }
     @module_collect = prev
     @in_non_test_class = prev_non_test
     @class_stack.pop
     @describe_stack.pop
+  end
+
+  # Minitest runs every `test_*` a test class answers, inherited ones included
+  # (`Minitest::Runnable.methods_matching`), so `ForeignKeyChangeColumnWithPrefixTest
+  # < ForeignKeyChangeColumnTest` (activerecord/test/cases/migration/foreign_key_test.rb:145)
+  # runs its superclass's six tests under its own name. Each same-file
+  # superclass's tests are replayed under the subclass, in definition order so a
+  # superclass already holds what it inherited; a redefined test is not copied.
+  # A reopened class (no `<`) is not a test superclass defined here.
+  def replay_inherited_tests
+    @class_defs.each do |class_def|
+      superclass = class_def[:superclass]
+      next unless superclass
+      parent = @class_defs.take_while { |other| !other.equal?(class_def) }.reverse
+        .find { |other| other[:superclass] && other[:name].split("::").last == superclass.split("::").last }
+      next unless parent
+      own = class_def[:tests].map { |tc| tc[:description] }
+      inherited = parent[:tests].reject { |tc| own.include?(tc[:description]) }.map do |tc|
+        tc.merge(
+          path: (class_def[:ancestors] + [tc[:description]]).join(" > "),
+          ancestors: class_def[:ancestors].dup,
+        )
+      end
+      class_def[:tests] += inherited
+      @test_cases.concat(inherited)
+    end
   end
 
   # `module Foo ... end` — when its body defines `def test_*`, the module is a

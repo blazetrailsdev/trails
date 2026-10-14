@@ -24,7 +24,7 @@ import {
   isPresent,
   toXmlArray,
 } from "@blazetrails/activesupport";
-import { PP } from "@blazetrails/ruby-compat";
+import { PP, SimpleDelegator } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -1086,19 +1086,25 @@ describe("RelationTest", () => {
     expect((await postsRel).length).toBe(3);
   });
 
-  it.skip("where id with delegated ar object", () => {
-    // BLOCKED: ruby-compat-simple-delegator-for-delegated-ar-object-tests
+  it("where id with delegated ar object", async () => {
+    const decorator = class extends SimpleDelegator {};
+    const author = (await Author.first())!;
+    expect((await Author.where({ id: new decorator(author) })).length).toBe(1);
+    expect((await Author.where({ id: [new decorator(author)] })).length).toBe(1);
   });
 
-  it.skip("where relation with delegated ar object", () => {
-    // BLOCKED: ruby-compat-simple-delegator-for-delegated-ar-object-tests
+  it("where relation with delegated ar object", async () => {
+    const decorator = class extends SimpleDelegator {};
+    const author = (await (await Post.last())!.author)!;
+    expect((await Post.where({ author: new decorator(author) })).length).toBe(3);
+    expect((await Post.where({ author: [new decorator(author)] })).length).toBe(3);
   });
 
   it("find by with delegated ar object", async () => {
-    const decorator = (record: object) => new Proxy(record, {});
+    const decorator = class extends SimpleDelegator {};
     const author = (await Author.first())!;
-    expect(await Author.findBy({ id: decorator(author) as any })).toEqual(author);
-    expect(await Author.findBy({ id: [decorator(author)] as any })).toEqual(author);
+    expect(await Author.findBy({ id: new decorator(author) })).toEqual(author);
+    expect(await Author.findBy({ id: [new decorator(author)] })).toEqual(author);
   });
 
   it("find with list of ar", async () => {

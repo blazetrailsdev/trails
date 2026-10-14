@@ -841,6 +841,8 @@ describe("SetupSubclassTest", () => {
     state.second = true;
   });
 
+  it("nothing", () => {});
+
   it("subclassing should preserve setups", () => {
     expect(state.first).toBeTruthy();
     expect(state.second).toBeTruthy();
