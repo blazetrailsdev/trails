@@ -29,6 +29,7 @@ import { Coder, coderSeq, coderTag, coderType } from "../coder.js";
 import { ClassLoader } from "../class-loader.js";
 import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
+import { NotImplementedError } from "../../not-implemented-error.js";
 
 const yaml = backend as unknown as typeof Yaml;
 
@@ -49,6 +50,7 @@ export interface YAMLTreeOptions {
   permittedClasses?: unknown[];
   aliases?: boolean;
   indentation?: number;
+  canonical?: boolean;
   lineWidth?: number;
 }
 
@@ -332,10 +334,11 @@ export class YAMLTree {
   /**
    * `YAMLTree#tree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:97-100`).
    * Its `yaml` is `Psych::Nodes::Node#yaml` (`nodes/node.rb:58-64`) over
-   * `Visitors::Emitter#initialize`'s options (`visitors/emitter.rb:5-17`).
+   * `Visitors::Emitter#initialize`'s options (`visitors/emitter.rb:5-17`); the
+   * backend has no canonical style, so `canonical` raises.
    * libyaml writes a tagged root node on the `---` line
-   * (`YAML.dump(Object.new)` is `"--- !ruby/object {}\n"`); the backend
-   * breaks the line there, so the emitted text is joined.
+   * (`YAML.dump(Object.new)` is `"--- !ruby/object {}\n"`) where the backend
+   * breaks the line, so a tagged root's document start is written here.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -345,8 +348,10 @@ export class YAMLTree {
       yaml(_io = null, options = {}) {
         const du: { indent?: number; lineWidth?: number } = {};
         if ("indentation" in options) du.indent = options.indentation;
+        if ("canonical" in options) throw new NotImplementedError("canonical");
         if ("lineWidth" in options) du.lineWidth = options.lineWidth;
-        return doc.toString({ directives: true, ...du }).replace(/^---\n!/, "--- !");
+        if (!doc.contents?.tag) return doc.toString({ directives: true, ...du });
+        return `--- ${doc.toString(du)}`;
       },
     };
   }

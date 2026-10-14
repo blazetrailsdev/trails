@@ -26,8 +26,26 @@ import { describe, it, expect } from "vitest";
 
 const PACKAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../packages");
 
-const IMPORT_RE =
-  /(?:^|\n)\s*(?:(?:import|export)\s+([\s\S]*?)\s*from\s*|import\s+)["']([^"']+)["']/g;
+/** Each static `import` / `export … from` specifier, and whether it is type-only. */
+function staticImports(source: string): { specifier: string; typeOnly: boolean }[] {
+  const out: { specifier: string; typeOnly: boolean }[] = [];
+  for (const statement of ts.createSourceFile("module.ts", source, ts.ScriptTarget.Latest, false)
+    .statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+      out.push({
+        specifier: statement.moduleSpecifier.text,
+        typeOnly: statement.importClause?.isTypeOnly ?? false,
+      });
+    } else if (
+      ts.isExportDeclaration(statement) &&
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      out.push({ specifier: statement.moduleSpecifier.text, typeOnly: statement.isTypeOnly });
+    }
+  }
+  return out;
+}
 
 /** The optional package itself — a static import of it is the load-time hazard. */
 const YAML_PACKAGE = "yaml";
@@ -95,8 +113,8 @@ async function offendersReachableFromIndex(pkg: string): Promise<string[]> {
 
     const source = await readFile(path.join(PACKAGES, node.pkg, "src", node.file), "utf8");
     if (hasTopLevelAwait(source)) offenders.push(`${key(node)} (top-level await)`);
-    for (const [, clause, specifier] of source.matchAll(IMPORT_RE)) {
-      if (/^\s*type\b/.test(clause ?? "")) continue;
+    for (const { specifier, typeOnly } of staticImports(source)) {
+      if (typeOnly) continue;
       if (specifier === YAML_PACKAGE) {
         offenders.push(key(node));
         continue;
@@ -136,6 +154,13 @@ describe("yaml optional dependency", () => {
     expect(await offendersReachableFromIndex(pkg)).toEqual([]);
   });
 
+  it("follows a side-effect import beside an export from", () => {
+    expect(staticImports('import "./a.js";\nexport { x } from "./b.js";')).toEqual([
+      { specifier: "./a.js", typeOnly: false },
+      { specifier: "./b.js", typeOnly: false },
+    ]);
+  });
+
   it("detects a top-level await in any position", () => {
     expect(hasTopLevelAwait('const backend = (await import("yaml")).default;')).toBe(true);
     expect(hasTopLevelAwait("export default await getBackend();")).toBe(true);
@@ -152,9 +177,8 @@ describe("yaml optional dependency", () => {
       for (const file of await tsFiles(src)) {
         if (`${pkg}/${file}` === "ruby-compat/psych-adapter.ts") continue;
         const source = await readFile(path.join(src, file), "utf8");
-        for (const [, clause, specifier] of source.matchAll(IMPORT_RE)) {
-          if (specifier === YAML_PACKAGE && !/^\s*type\b/.test(clause ?? ""))
-            importers.push(`${pkg}/${file}`);
+        for (const { specifier, typeOnly } of staticImports(source)) {
+          if (specifier === YAML_PACKAGE && !typeOnly) importers.push(`${pkg}/${file}`);
         }
       }
     }

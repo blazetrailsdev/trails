@@ -236,3 +236,11 @@ describe("Psych.dump options", () => {
     expect(Psych.Omap).toBeDefined();
   });
 });
+
+describe("Psych.dump canonical", () => {
+  it("raises NotImplementedError for the canonical emitter option", async () => {
+    const { Psych } = await import("./psych.js");
+    const { NotImplementedError } = await import("./not-implemented-error.js");
+    expect(() => Psych.dump({ a: 1 }, { canonical: true })).toThrow(NotImplementedError);
+  });
+});

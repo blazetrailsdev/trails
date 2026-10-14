@@ -30,7 +30,10 @@ export interface PsychNode {
  * @noRailsEquivalent PERMANENT
  */
 export interface PsychDocument {
-  yaml(io?: null, options?: { indentation?: number; lineWidth?: number }): string;
+  yaml(
+    io?: null,
+    options?: { indentation?: number; canonical?: boolean; lineWidth?: number },
+  ): string;
 }
 
 const registry = new Map<string, PsychAdapter>();
