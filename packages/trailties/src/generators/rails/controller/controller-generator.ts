@@ -17,6 +17,7 @@ export interface ControllerRunOptions {
 export class ControllerGenerator extends GeneratorBase {
   private actions: string[] = [];
   private name = "";
+  private _fileName?: string;
 
   constructor(options: GeneratorOptions) {
     super(options);
@@ -100,6 +101,6 @@ ${cases}
   }
 
   private fileName(): string {
-    return underscore(controllerPathHelpers(this.name).namespaceParts.at(-1)!);
+    return (this._fileName ??= underscore(controllerPathHelpers(this.name).namespaceParts.at(-1)!));
   }
 }
