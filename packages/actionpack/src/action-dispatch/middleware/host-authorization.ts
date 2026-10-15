@@ -169,7 +169,10 @@ export class DefaultResponseApp {
     return this.response(format, this.responseBody(request));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE debug-view-extends-action-view-base-and-renders-rescue-templates
+   */
   private responseBody(request: Request): string {
     if (!request.getHeader("action_dispatch.show_detailed_exceptions")) return "";
     const blocked = (request.env["action_dispatch.blocked_hosts"] as string[]) ?? [];
