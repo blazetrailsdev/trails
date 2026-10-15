@@ -10,6 +10,7 @@ import {
   imagePath,
   htmlPath,
   screenshotsDir,
+  ScreenshotHelper,
   outputType,
   displayImage,
   incrementUnique,
@@ -31,7 +32,6 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
     vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
     vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
-    vi.stubEnv("CAPYBARA_SAVE_PATH", "");
   });
 
   afterEach(() => {
@@ -56,8 +56,13 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   });
 
   it("image path uses the Vitest.save_path to set a custom directory", () => {
-    vi.stubEnv("CAPYBARA_SAVE_PATH", "custom_dir");
-    expect(imagePath.call(host)).toMatch(/custom_dir\/0_x\.png$/);
+    const originalSavePath = ScreenshotHelper.screenshotDirectory;
+    ScreenshotHelper.screenshotDirectory = "custom_dir";
+    try {
+      expect(imagePath.call(host)).toMatch(/custom_dir\/0_x\.png$/);
+    } finally {
+      ScreenshotHelper.screenshotDirectory = originalSavePath;
+    }
   });
 
   it("image path includes failures text if test did not pass", () => {
@@ -197,11 +202,16 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
     const dir = File.join(mkdtempSync(join(tmpdir(), "trails-screenshot-")), "tmp", "screenshots");
     FileUtils.mkdirP(dir);
     File.binwrite(File.join(dir, `${imageName.call(host)}.png`), "\u0089PNG");
-    vi.stubEnv("CAPYBARA_SAVE_PATH", dir);
+    const originalSavePath = ScreenshotHelper.screenshotDirectory;
+    ScreenshotHelper.screenshotDirectory = dir;
     vi.spyOn(globalThis.process, "cwd").mockReturnValue("");
 
-    const msg = displayImage.call(host, { html: false, screenshotOutput: "inline" });
-    expect(msg).toContain(Buffer.from(bytes).toString("base64"));
+    try {
+      const msg = displayImage.call(host, { html: false, screenshotOutput: "inline" });
+      expect(msg).toContain(Buffer.from(bytes).toString("base64"));
+    } finally {
+      ScreenshotHelper.screenshotDirectory = originalSavePath;
+    }
   });
 
   it("displayImage shows screenshot path in simple mode", () => {
