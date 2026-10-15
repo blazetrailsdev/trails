@@ -124,7 +124,6 @@ describe("Ruby extractor included-hook test macros", () => {
 
 describe("Ruby extractor zip loop expansion", () => {
   it("binds each pair of a literal zip receiver, one case per pair", () => {
-    // msgpack spec/packer_spec.rb:545-552.
     const { cases } = extract(
       `
       [1, 2, 4].zip([0xd4, 0xd5, 0xd6]).each do |n,b|

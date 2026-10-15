@@ -7876,7 +7876,6 @@ describe("extractClass — @inlinedFrom on a constructor", () => {
 
 describe("a top-level rbModDefineMethod seat", () => {
   it("is recorded as a method of the file, with params and call set", () => {
-    // msgpack core-ext.ts, the port of core_ext.rb:17-126.
     const info = extractFromFiles("/p", {
       "core-ext.ts": `
         rbModDefineMethod(rbCNilClass, "toMsgpackWithPacker", function (this: null, packer: Packer) {

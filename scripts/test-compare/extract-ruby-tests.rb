@@ -1051,12 +1051,8 @@ class TestExtractor
               inner[1].is_a?(Array) && inner[1][0] == :fcall
           [ident_name(inner[1][1]), inner[2]]
         end
-      # A group inside the loop carries the binding into its own path, which
-      # the ordinary walk's interpolation pattern records; leave it to that.
       return out << :group if %w[describe context].include?(name)
       style = TEST_MACRO_STYLES[name]
-      # A Minitest::Spec `it` loop in a `_test.rb` (arel's math_test.rb) stays
-      # one case, matched through its interpolation pattern as its TS twin is.
       style = nil if style == "it" && @current_file.end_with?("_test.rb")
       if style && args
         name_node = string_literal_node(args)
@@ -2145,7 +2141,6 @@ class TestExtractor
     recv = node[1]
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_block
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
-    # `is_expected` is `expect(subject)` (rspec-core memoized_helpers.rb).
     return nil unless recv.is_a?(Array) &&
       ((recv[0] == :fcall && ident_name(recv[1]) == "expect") ||
        (recv[0] == :vcall && ident_name(recv[1]) == "is_expected"))
