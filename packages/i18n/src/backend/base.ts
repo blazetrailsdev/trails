@@ -506,10 +506,13 @@ export abstract class Base {
     return [translations, false];
   }
 
-  /** @missingRailsCall load_file — PERMANENT */
+  /**
+   * @missingRailsCall load_file — PERMANENT
+   * @missingRailsArgs unsafe_load_file — PERMANENT
+   */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [YAML.unsafeLoad(readFile(filename), { freeze: true }), true];
+      return [YAML.unsafeLoad(readFile(filename), { filename, freeze: true }), true];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }

@@ -578,3 +578,19 @@ describe("DelegationNamedMethods", () => {
     expect(Comment.all().name).toBe("Comment");
   });
 });
+
+describe("Delegation#encodeWith", () => {
+  fixtures(["posts"]);
+
+  it("forwards to the records Array, which has no encode_with, while Relation#encodeWith wins", async () => {
+    const { Delegation } = await import("./delegation.js");
+    const { Psych } = await import("@blazetrails/ruby-compat/psych");
+    const { NoMethodError } = await import("@blazetrails/ruby-compat");
+    const posts = await Post.all().load();
+    const coder = new Psych.Coder(null);
+    expect(() => Delegation.prototype.encodeWith.call(posts as never, coder)).toThrow(
+      NoMethodError,
+    );
+    expect(Psych.dump(posts)).toMatch(/^---\n- !ruby\/object:Post\n/);
+  });
+});

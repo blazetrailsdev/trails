@@ -1,8 +1,12 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, first } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 
 YAML.addBuiltinType("omap", (_type, val) => {
-  return new OrderedHash((val as Record<string, unknown>[]).map((v) => Object.entries(v)[0]));
+  return OrderedHash.from(
+    (val as (Map<unknown, unknown> | Record<string, unknown>)[]).map(
+      (v) => first(v instanceof Map ? v : Object.entries(v)) as [unknown, unknown],
+    ),
+  );
 });
 
 export class OrderedHash<K, V> extends Hash<K, V> {
@@ -18,7 +22,7 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   encodeWith(coder: YAML.Coder): void {
     coder.representSeq(
       "!omap",
-      [...this].map(([k, v]) => ({ [k as PropertyKey]: v })),
+      [...this].map(([k, v]) => new Hash<K, V>().set(k, v)),
     );
   }
 

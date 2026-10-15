@@ -325,3 +325,26 @@ describe("Psych.load_file and Psych.unsafe_load_file", () => {
     });
   });
 });
+
+describe("Psych::SyntaxError and a Struct subclass", () => {
+  it("raises Psych::SyntaxError carrying the file and mark for a malformed document", async () => {
+    const { Psych } = await import("./psych.js");
+    let error: InstanceType<typeof Psych.SyntaxError> | undefined;
+    try {
+      Psych.unsafeLoad("a: b\n  c: d\n", { filename: "bad.yml" });
+    } catch (e) {
+      error = e as InstanceType<typeof Psych.SyntaxError>;
+    }
+    expect(error).toBeInstanceOf(Psych.SyntaxError);
+    expect(error).toBeInstanceOf(Psych.Exception);
+    expect(error!.file).toBe("bad.yml");
+    expect(error!.message).toMatch(/^\(bad\.yml\): .* at line \d+ column \d+$/);
+  });
+
+  it("dumps a class that extends Struct.new under its own name", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Struct } = await import("./struct.js");
+    class PsychTrailsPair extends Struct.new("a") {}
+    expect(Psych.dump(new PsychTrailsPair(1))).toBe("--- !ruby/struct:PsychTrailsPair\na: 1\n");
+  });
+});
