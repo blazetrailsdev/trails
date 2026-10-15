@@ -12,6 +12,7 @@ export class Translator {
   private scope: string;
   private model: TranslatorModel | null;
 
+  /** @missingRailsArgs gsub — CONVERGEABLE nested-attributes-writer-uses-rails-snake-attributes-spelling */
   constructor(
     object: unknown,
     objectName: string,

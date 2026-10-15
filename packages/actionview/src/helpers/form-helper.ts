@@ -838,6 +838,7 @@ export class FormBuilder {
     return I18n.t(defaults.shift(), { model: model, default: defaults }) as string;
   }
 
+  /** @missingRailsArgs respond_to? — CONVERGEABLE nested-attributes-writer-uses-rails-snake-attributes-spelling */
   private isNestedAttributesAssociation(associationName: string): boolean {
     return rbObjRespondTo(this.object, `${associationName}Attributes=`);
   }
