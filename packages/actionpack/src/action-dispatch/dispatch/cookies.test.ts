@@ -671,7 +671,8 @@ describe("CookiesTest", () => {
   });
 
   it("signed cookie rotating secret and digest", () => {
-    let secret: string | ReturnType<typeof signedSecret> = "b3c631c314c0bbca50c1b2843150fe33";
+    let secret: string | ReturnType<KeyGenerator["generateKey"]> =
+      "b3c631c314c0bbca50c1b2843150fe33";
 
     const request = cookieRequest({ "action_dispatch.signed_cookie_digest": "SHA256" });
     (request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
