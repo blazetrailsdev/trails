@@ -37,6 +37,7 @@ describe("MessagePack::CoreExt", () => {
     expect(rbObjRespondTo([], "toMsgpack")).toBe(true);
     expect(rbObjRespondTo({}, "toMsgpack")).toBe(true);
     expect(Object.hasOwn(Array.prototype, "toMsgpack")).toBe(false);
+    expect(rbObjRespondTo({}, "toJSON")).toBe(false);
   });
 
   it("write_int packs a whole number past 2**53 as an Integer, never a Float", () => {

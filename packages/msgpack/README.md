@@ -27,12 +27,10 @@ ruby-compat keeps for each (`rbCNilClass`, `rbCTrueClass`, `rbCFalseClass`,
 `toMsgpackWithPacker` there, and `rbFSend` looks a method up on that seat:
 `128.to_msgpack` is `rbFSend(128, "toMsgpack")`.
 
-`rbObjClass([])` is the global `Array` and a plain record has no class in its
-prototype chain, and trails patches neither `Array.prototype` nor
-`Object.prototype`. For those two `core-ext.ts` exports an `Array` and a `Hash`
-class that take the receiver first: `[].to_msgpack` is `Array.toMsgpack([])`.
-They are imported from `@blazetrails/msgpack/core-ext`, since their names are
-Ruby's top-level ones; the package index exports `CoreExt` alone.
+A JS array and a plain record carry no Ruby class of their own, and trails
+patches neither `Array.prototype` nor `Object.prototype`, so `rbFSend` looks
+them up on ruby-compat's `rbCArray` and `Hash` seats: `[].to_msgpack` is
+`rbFSend([], "toMsgpack")`.
 
 ## Where a JS value differs from the Ruby one
 

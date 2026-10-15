@@ -425,9 +425,7 @@ export const Extensions = new Module().include(ExtensionsMethods) as Module &
   typeof ExtensionsMethods;
 extend(Extensions, Extensions);
 
-if (ActiveSupport.MessagePack === undefined) {
-  rbModConstSet(ActiveSupport, "MessagePack", new Module());
-}
+rbModConstSet(ActiveSupport, "MessagePack", new Module());
 rbModConstSet(ActiveSupport.MessagePack!, "UnserializableObjectError", UnserializableObjectError);
 rbModConstSet(ActiveSupport.MessagePack!, "MissingClassError", MissingClassError);
 rbModConstSet(ActiveSupport.MessagePack!, "Extensions", Extensions);

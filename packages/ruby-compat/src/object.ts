@@ -369,6 +369,30 @@ function classSeatMethodTable(recv: unknown): object | null {
   return SPECIAL_CONST_CLASSES.has(klass) ? (klass.prototype as object) : null;
 }
 
+const HASH_CLASS_BODY = Symbol.for("@blazetrails/ruby-compat:HASH_CLASS_BODY");
+
+function reopenedSeatMethod(
+  recv: unknown,
+  mid: string,
+): ((...args: unknown[]) => unknown) | undefined {
+  if (Array.isArray(recv)) {
+    for (
+      let o: object | null = rbCArray.prototype;
+      o && o !== Object.prototype;
+      o = Object.getPrototypeOf(o) as object | null
+    ) {
+      const desc = Object.getOwnPropertyDescriptor(o, mid);
+      if (typeof desc?.value === "function") return desc.value as (...args: unknown[]) => unknown;
+    }
+  } else if (isPlainHash(recv)) {
+    const classBody = (Hash.prototype as { [HASH_CLASS_BODY]?: Set<string> })[HASH_CLASS_BODY];
+    if (classBody?.has(mid) !== false) return undefined;
+    const desc = Object.getOwnPropertyDescriptor(Hash.prototype, mid);
+    if (typeof desc?.value === "function") return desc.value as (...args: unknown[]) => unknown;
+  }
+  return undefined;
+}
+
 /**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
@@ -639,17 +663,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
-  for (
-    let o: object | null = Array.isArray(obj)
-      ? rbCArray.prototype
-      : isPlainHash(obj)
-        ? Hash.prototype
-        : null;
-    o && o !== Object.prototype;
-    o = Object.getPrototypeOf(o) as object | null
-  ) {
-    if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
-  }
+  if (reopenedSeatMethod(obj, mid) !== undefined) return true;
   let cme: PropertyDescriptor | undefined;
   for (
     let o: object | null = Object(obj);
@@ -1077,18 +1091,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
     return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);
   }
-  for (
-    let o: object | null = Array.isArray(recv)
-      ? rbCArray.prototype
-      : isPlainHash(recv)
-        ? Hash.prototype
-        : null;
-    o && o !== Object.prototype;
-    o = Object.getPrototypeOf(o) as object | null
-  ) {
-    const desc = Object.getOwnPropertyDescriptor(o, mid);
-    if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
-  }
+  const seated = reopenedSeatMethod(recv, mid);
+  if (seated !== undefined) return seated.apply(recv, args);
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
   }

@@ -1184,17 +1184,24 @@ describe("Kernel#send to a method on a core class seat", () => {
     expect(rbFSend(5.5, "isInteger")).toBe(false);
   });
 
-  it("reaches a Symbol's seat, not String's, and Hash's / Array's seat for a plain record / an array", () => {
+  it("reaches a Symbol's seat, not String's, and no seat for a plain record or an array", () => {
     seated(rbCString, () => "String");
-    seated(Hash, () => "Hash");
     expect(rbFSend("s", "seatedSelf")).toBe("String");
+    for (const recv of [":s", {}, []]) {
+      expect(basicObjRespondTo(recv, "seatedSelf")).toBe(false);
+      expect(() => rbFSend(recv, "seatedSelf")).toThrow(NoMethodError);
+    }
+    unseat(rbCString);
+  });
+
+  it("reaches Hash's seat for a plain record and rbCArray's for an array", () => {
+    rbModDefineMethod(Hash, "seatedSelf", () => "Hash");
+    rbModDefineMethod(rbCArray, "seatedSelf", () => "Array");
     expect(rbFSend(new Hash(), "seatedSelf")).toBe("Hash");
     expect(rbFSend({}, "seatedSelf")).toBe("Hash");
-    expect(() => rbFSend(":s", "seatedSelf")).toThrow(NoMethodError);
-    expect(() => rbFSend([], "seatedSelf")).toThrow(NoMethodError);
-    seated(rbCArray, () => "Array");
     expect(rbFSend([], "seatedSelf")).toBe("Array");
-    unseat(rbCString);
+    expect(basicObjRespondTo({}, "seatedSelf")).toBe(true);
+    expect(basicObjRespondTo([], "seatedSelf")).toBe(true);
     unseat(Hash);
     unseat(rbCArray);
   });
