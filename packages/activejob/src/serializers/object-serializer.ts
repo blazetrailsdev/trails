@@ -24,7 +24,7 @@ export class ObjectSerializer {
     return this.instance().serialize(argument);
   }
 
-  static deserialize(argument: Record<string, unknown>): unknown {
+  static deserialize(argument: Record<string, unknown> | Map<string, unknown>): unknown {
     return this.instance().deserialize(argument);
   }
 
@@ -39,7 +39,7 @@ export class ObjectSerializer {
     );
   }
 
-  deserialize(_json: Record<string, unknown>): unknown {
+  deserialize(_json: Record<string, unknown> | Map<string, unknown>): unknown {
     throw new NotImplementedError();
   }
 

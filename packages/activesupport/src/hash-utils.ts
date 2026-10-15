@@ -294,7 +294,8 @@ export function transformKeys(
   block: ((key: string) => string) | ((key: unknown) => unknown),
 ): Record<string, unknown> | Map<unknown, unknown> {
   if (hash instanceof Map) {
-    const result = new Map<unknown, unknown>();
+    const result =
+      hash instanceof Hash ? new Hash<unknown, unknown>() : new Map<unknown, unknown>();
     for (const [key, value] of hash) result.set((block as (key: unknown) => unknown)(key), value);
     return result;
   }

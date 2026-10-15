@@ -337,7 +337,11 @@ export function update<T>(
           block !== undefined && hash.has(key) ? block(key, hash.get(key)!, value) : value,
         );
       } else {
-        hash[key] = block !== undefined && hasKey(hash, key) ? block(key, hash[key], value) : value;
+        hashAset(
+          hash,
+          key,
+          block !== undefined && hasKey(hash, key) ? block(key, hash[key], value) : value,
+        );
       }
     }
   }

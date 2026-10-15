@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { HashWithIndifferentAccess, constantize } from "@blazetrails/activesupport";
 import {
   Hash,
+  hashAref,
+  update,
   rbHashSRuby2KeywordsHash,
   rbModConstSet,
   rbHashSRuby2KeywordsHashP,
@@ -50,6 +52,13 @@ describe("ActiveJob::Arguments", () => {
     expect(serialize([new Hash<string, number>().set("a", 1)])).toEqual([
       { a: 1, _aj_symbol_keys: [] },
     ]);
+  });
+
+  it("restores symbol keys on a Map hash as a Hash", async () => {
+    const [restored] = await deserialize([
+      new Hash<string, unknown>().set("a", 1).set("_aj_symbol_keys", ["a"]),
+    ]);
+    expect(restored).toBeInstanceOf(Hash);
   });
 
   it("deserializes a Map hash, including a custom-serialized one", async () => {
@@ -106,8 +115,8 @@ describe("ActiveJob::Arguments", () => {
       serialize(money: unknown) {
         return super.serialize(new Hash<string, unknown>().set("amount", (money as Money).amount));
       }
-      deserialize(hash: Record<string, unknown>) {
-        return new Money(hash.amount as number);
+      deserialize(hash: Record<string, unknown> | Map<string, unknown>) {
+        return new Money(hashAref(hash, "amount") as number);
       }
       protected klass() {
         return Money;
@@ -120,6 +129,14 @@ describe("ActiveJob::Arguments", () => {
       { _aj_serialized: "ActiveJob::Serializers::MoneySerializer", amount: 5 },
     ]);
     expect(await deserialize(serialized)).toEqual([new Money(5)]);
+    const asMap = new Hash<string, unknown>()
+      .set("_aj_serialized", "ActiveJob::Serializers::MoneySerializer")
+      .set("amount", 7);
+    expect(await deserialize([asMap])).toEqual([new Money(7)]);
+    const withProto = MoneySerializer.instance().serialize(new Money(1));
+    expect(
+      Object.keys(update(withProto, new Hash<string, unknown>().set("__proto__", 2))),
+    ).toContain("__proto__");
     expect(MoneySerializer.instance()).toBe(MoneySerializer.instance());
     expect(MoneySerializer.instance()).not.toBe(ObjectSerializer.instance());
   });

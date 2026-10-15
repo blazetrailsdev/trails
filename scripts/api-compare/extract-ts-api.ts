@@ -1176,14 +1176,22 @@ export function extractFromProgram(
       else entity.instanceMethods[at] = method;
     }
 
-    for (const attr of collectClassAttributeCalls(sourceFile)) {
+    // A top-level call on the file's own synthesized module (`mattrAccessor.call(Serializers, …)`
+    // in serializers.ts) cannot resolve until that module is synthesized below, so it retries.
+    const deferredAttributeCalls: ClassAttributeCall[] = [];
+    const creditAttribute = (attr: ClassAttributeCall, retry: boolean): boolean => {
       const target =
         [attr.enclosing, attr.receiver]
           .filter((n): n is string => n !== undefined)
           .map((n) => `${relPath}:${n}`)
           .find((key) => info.classes[key] || info.modules[key]) ??
         (attr.enclosingSeatsModule === true ? `${relPath}:${attr.enclosing}` : undefined);
-      if (target === undefined) continue;
+      if (target === undefined) {
+        if (!retry && attr.enclosing === undefined && attr.receiver !== undefined) {
+          deferredAttributeCalls.push(attr);
+        }
+        return false;
+      }
       if (!info.classes[target] && !info.modules[target]) {
         info.modules[target] = {
           name: attr.enclosing!,
@@ -1228,7 +1236,10 @@ export function extractFromProgram(
           }
         }
       }
-      fileHasClassOrModule = true;
+      return true;
+    };
+    for (const attr of collectClassAttributeCalls(sourceFile)) {
+      if (creditAttribute(attr, false)) fileHasClassOrModule = true;
     }
 
     // Also capture functions exported via `export { foo, bar }` (named export lists).
@@ -1411,6 +1422,7 @@ export function extractFromProgram(
         };
       }
     }
+    for (const attr of deferredAttributeCalls) creditAttribute(attr, true);
     currentImportAliases = undefined;
   }
 

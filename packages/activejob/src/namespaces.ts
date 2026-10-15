@@ -16,7 +16,7 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
 export interface SerializerLike {
   isSerialize(argument: unknown): boolean;
   serialize(argument: unknown): unknown;
-  deserialize(argument: Record<string, unknown>): unknown;
+  deserialize(argument: Record<string, unknown> | Map<string, unknown>): unknown;
 }
 
 export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
