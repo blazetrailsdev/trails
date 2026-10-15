@@ -118,14 +118,13 @@ describe("Psych object protocol", () => {
   it("merges << keys, the first sequence entry winning", () => {
     const loaded = Psych.unsafeLoad(
       "a: &a {x: 1, y: 1}\nb: &b {x: 2, z: 2}\nc:\n  <<: [*a, *b]\n  w: 0\n",
-    ) as Record<string, Record<string, number>>;
-    expect({ ...loaded["c"] }).toEqual({ x: 1, y: 1, z: 2, w: 0 });
+    ) as Map<string, Map<string, number>>;
+    expect(Object.fromEntries(loaded.get("c")!)).toEqual({ x: 1, y: 1, z: 2, w: 0 });
   });
 
   it("keeps a __proto__ key as an own key", () => {
-    const loaded = Psych.unsafeLoad("__proto__: 1\n") as Record<string, unknown>;
-    expect(Object.getPrototypeOf(loaded)).toBeNull();
-    expect(Object.hasOwn(loaded, "__proto__")).toBe(true);
+    const loaded = Psych.unsafeLoad("__proto__: 1\n") as Map<string, unknown>;
+    expect([...loaded]).toEqual([["__proto__", 1]]);
   });
 
   it("resolves a legacy tag through load_tags", () => {

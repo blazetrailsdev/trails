@@ -121,7 +121,7 @@ describe("YAML.unsafe_load", () => {
   it("loads a symbol key that contains spaces", () => {
     const string = ":user name: This is the user name.";
     const expected = { ":user name": "This is the user name." };
-    expect(send(string)).toEqual(expected);
+    expect(Object.fromEntries(send(string) as Map<string, unknown>)).toEqual(expected);
   });
 
   // PERMANENT-SKIP: ruby-compat's Date is not seated as a Psych scalar type, so 2001-07-23 does not revive as `Date.new(2001, 7, 23)`.

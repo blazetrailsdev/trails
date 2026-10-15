@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { Hash } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { YAMLColumn } from "./yaml-column.js";
 import { Temporal } from "@blazetrails/date";
@@ -9,7 +10,7 @@ describe("YAMLColumn round-trip", () => {
     const coder = new YAMLColumn("params");
     const dumped = coder.dump({ token: "abc", count: 3 });
     expect(typeof dumped).toBe("string");
-    expect(coder.load(dumped)).toEqual({ token: "abc", count: 3 });
+    expect(coder.load(dumped)).toEqual(new Hash().set("token", "abc").set("count", 3));
   });
 
   it("dumps nil as null and loads nil/blank as null", () => {
@@ -22,7 +23,9 @@ describe("YAMLColumn round-trip", () => {
   it("round-trips nested structures", () => {
     const coder = new YAMLColumn("params");
     const value = { a: [1, 2, { b: "x" }], c: { d: true } };
-    expect(coder.load(coder.dump(value))).toEqual(value);
+    expect(coder.load(coder.dump(value))).toEqual(
+      new Hash().set("a", [1, 2, new Hash().set("b", "x")]).set("c", new Hash().set("d", true)),
+    );
   });
 
   describe("safe dump", () => {

@@ -597,8 +597,8 @@ export class Parameters {
         this._permitted = false;
         break;
       case "!ruby/hash-with-ivars:ActionController::Parameters":
-        this.parameters = withIndifferentAccess(coder["elements"] as Record<string, unknown>);
-        this._permitted = (coder["ivars"] as Record<string, boolean>)[":@permitted"];
+        this.parameters = withIndifferentAccess(coder["elements"] as Hash<unknown, unknown>);
+        this._permitted = (coder["ivars"] as Map<string, boolean>).get(":@permitted")!;
         break;
       case "!ruby/object:ActionController::Parameters":
         this.parameters = coder["parameters"] as HashWithIndifferentAccess<unknown>;

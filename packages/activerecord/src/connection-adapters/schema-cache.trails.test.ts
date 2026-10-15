@@ -13,10 +13,19 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { File, Marshal } from "@blazetrails/ruby-compat";
+import { File, Hash, Marshal } from "@blazetrails/ruby-compat";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+
+function revivedColumnOptions(index: IndexDefinition): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(index.columnOptions()).map(([k, v]) => [
+      k,
+      typeof v === "object" && v !== null ? new Hash<unknown, unknown>().merge(v) : v,
+    ]),
+  );
+}
 
 function makeColumn(
   name: string,
@@ -84,7 +93,7 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     const [loaded] = await roundTrip(live);
 
     expect(loaded).toBeInstanceOf(IndexDefinition);
-    expect(loaded.columnOptions()).toEqual(live[0].columnOptions());
+    expect(loaded.columnOptions()).toEqual(revivedColumnOptions(live[0]));
     expect(loaded.isDefinedFor(["first_name"], { unique: true })).toBe(true);
     expect(loaded.isDefinedFor(["last_name"])).toBe(false);
     expect(loaded.isDefinedFor(undefined, { name: "index_people_on_first_name" })).toBe(true);
@@ -103,7 +112,7 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     ];
     const [loaded] = await roundTrip(live);
 
-    expect(loaded.columnOptions()).toEqual(live[0].columnOptions());
+    expect(loaded.columnOptions()).toEqual(revivedColumnOptions(live[0]));
     expect(loaded.opclasses).toBe("text_pattern_ops");
     expect(loaded.where).toBe("deleted_at IS NULL");
     expect(loaded.using).toBe("btree");
@@ -123,7 +132,7 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     expect(loaded.columns).toBe("lower(first_name)");
     expect(loaded.orders).toBe("desc");
     expect(loaded.opclasses).toBe("text_pattern_ops");
-    expect(loaded.columnOptions()).toEqual(live[0].columnOptions());
+    expect(loaded.columnOptions()).toEqual(revivedColumnOptions(live[0]));
     expect(loaded.isDefinedFor("lower(first_name)")).toBe(true);
   });
 

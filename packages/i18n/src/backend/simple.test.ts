@@ -1,4 +1,4 @@
-import { kernelCatch } from "@blazetrails/ruby-compat";
+import { Hash, kernelCatch } from "@blazetrails/ruby-compat";
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
@@ -148,10 +148,14 @@ describe("I18nBackendSimpleTest", () => {
 
   it("simple load_yml: loads data from a YAML file", () => {
     const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
-    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    assertPredicate((data as TranslationData)["en"], (en) =>
-      Object.isFrozen(((en as TranslationData)["foo"] as TranslationData)["bar"]),
+    const expected = new Hash<unknown, unknown>().set(
+      "en",
+      new Hash<unknown, unknown>().set("foo", new Hash<unknown, unknown>().set("bar", "baz")),
+    );
+    expect(data).toEqual(expected);
+    expect(data).toEqual(expected);
+    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get("en"), (en) =>
+      Object.isFrozen(en!.get("foo")!.get("bar")),
     );
   });
 

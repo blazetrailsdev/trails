@@ -117,6 +117,14 @@ class EncryptedType extends Text {
 }
 include(EncryptedType, Mutable);
 
+function hashOf(literal: object): Hash<unknown, unknown> {
+  const hash = new Hash<unknown, unknown>();
+  for (const [k, v] of Object.entries(literal)) {
+    hash.set(k, v !== null && typeof v === "object" && !Array.isArray(v) ? hashOf(v) : v);
+  }
+  return hash;
+}
+
 describe("SerializedAttributeTest", () => {
   const { posts, self } = fixtures(["topics", "posts"]);
 
@@ -179,7 +187,7 @@ describe("SerializedAttributeTest", () => {
     };
 
     const t = new klass();
-    expect(t.content).toEqual({ key: "value" });
+    expect(t.content).toEqual(hashOf({ key: "value" }));
   });
 
   it("serialized attribute on custom attribute with default", () => {
@@ -194,7 +202,7 @@ describe("SerializedAttributeTest", () => {
     };
 
     const t = new klass();
-    expect(t.content).toEqual({ key: "value" });
+    expect(t.content).toEqual(hashOf({ key: "value" }));
   });
 
   it("serialized attribute in base class", async () => {
@@ -202,20 +210,20 @@ describe("SerializedAttributeTest", () => {
 
     const hash = { content1: "value1", content2: "value2" };
     const importantTopic = await ImportantTopic.create({ content: hash });
-    expect(importantTopic.content).toEqual(hash);
+    expect(importantTopic.content).toEqual(hashOf(hash));
 
     await importantTopic.reload();
-    expect(importantTopic.content).toEqual(hash);
+    expect(importantTopic.content).toEqual(hashOf(hash));
   });
 
   it("serialized attributes from database on subclass", async () => {
     Topic.serialize("content", { type: Hash });
 
     let t = new ImportantTopic({ content: { foo: "bar" } });
-    expect(t.content).toEqual({ foo: "bar" });
+    expect(t.content).toEqual(hashOf({ foo: "bar" }));
     await t.saveBang();
     t = (await ImportantTopic.last())!;
-    expect(t.content).toEqual({ foo: "bar" });
+    expect(t.content).toEqual(hashOf({ foo: "bar" }));
   });
 
   it("serialized attribute calling dup method", () => {
@@ -266,11 +274,11 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute declared in subclass", async () => {
     const hash = { important1: "value1", important2: "value2" };
     const importantTopic = await ImportantTopic.create({ important: hash });
-    expect(importantTopic.important).toEqual(hash);
+    expect(importantTopic.important).toEqual(hashOf(hash));
 
     await importantTopic.reload();
-    expect(importantTopic.important).toEqual(hash);
-    expect(importantTopic.readAttribute("important")).toEqual(hash);
+    expect(importantTopic.important).toEqual(hashOf(hash));
+    expect(importantTopic.readAttribute("important")).toEqual(hashOf(hash));
   });
 
   it("serialized time attribute", async () => {
@@ -339,7 +347,7 @@ describe("SerializedAttributeTest", () => {
     Topic.serialize("content", { type: Hash });
     const topic = new Topic({ content: settings });
     expect(await topic.save()).toBeTruthy();
-    expect((await Topic.find(topic.id)).content).toEqual(settings);
+    expect((await Topic.find(topic.id)).content).toEqual(hashOf(settings));
   });
 
   it("where by serialized attribute with array", async () => {
@@ -489,11 +497,11 @@ describe("SerializedAttributeTest", () => {
   it("newly emptied serialized hash is changed", async () => {
     Topic.serialize("content", { type: Hash });
     const topic = await Topic.create({ content: { things: "stuff" } });
-    delete topic.content["things"];
+    topic.content.delete("things");
     await topic.saveBang();
     await topic.reload();
 
-    expect(topic.content).toEqual({});
+    expect(topic.content).toEqual(hashOf({}));
   });
 
   it("is not changed when stored blob", async () => {
@@ -699,7 +707,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     };
 
     const t = new klass();
-    expect(t.content).toEqual({ key: "value" });
+    expect(t.content).toEqual(hashOf({ key: "value" }));
   });
 
   it("nil is always persisted as null", async () => {
@@ -722,17 +730,17 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     };
 
     const t = new klass();
-    expect(t.content).toEqual({ key: "value" });
+    expect(t.content).toEqual(hashOf({ key: "value" }));
   });
 
   it("serialized attributes from database on subclass", async () => {
     Topic.serialize("content", { type: Hash });
 
     let t = new ImportantTopic({ content: { foo: "bar" } });
-    expect(t.content).toEqual({ foo: "bar" });
+    expect(t.content).toEqual(hashOf({ foo: "bar" }));
     await t.saveBang();
     t = (await ImportantTopic.last())!;
-    expect(t.content).toEqual({ foo: "bar" });
+    expect(t.content).toEqual(hashOf({ foo: "bar" }));
   });
 
   it("serialized attribute on alias attribute", async () => {
@@ -748,10 +756,10 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
     const myobj = { somevalue: "thevalue" };
     const topic = await klass.createBang({ object: myobj });
-    expect(topic.object).toEqual(myobj);
+    expect(topic.object).toEqual(hashOf(myobj));
 
     await topic.reload();
-    expect(topic.object).toEqual(myobj);
+    expect(topic.object).toEqual(hashOf(myobj));
   });
 
   it("unexpected serialized type", async () => {
@@ -773,7 +781,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       const myobj = { somevalue: "thevalue" };
       const topic = await Topic.create({ content: myobj });
 
-      expect((await Topic.select("content").find(topic.id)).content).toEqual(myobj);
+      expect((await Topic.select("content").find(topic.id)).content).toEqual(hashOf(myobj));
       const found = await Topic.select("id").find(topic.id);
       await assertRaises([MissingAttributeError], {}, () => found.content);
     });
@@ -808,10 +816,10 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
     const hash = { content1: "value1", content2: "value2" };
     const importantTopic = await ImportantTopic.create({ content: hash });
-    expect(importantTopic.content).toEqual(hash);
+    expect(importantTopic.content).toEqual(hashOf(hash));
 
     await importantTopic.reload();
-    expect(importantTopic.content).toEqual(hash);
+    expect(importantTopic.content).toEqual(hashOf(hash));
   });
 
   it("serialized attribute calling dup method", () => {
@@ -860,11 +868,11 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   it("serialized attribute declared in subclass", async () => {
     const hash = { important1: "value1", important2: "value2" };
     const importantTopic = await ImportantTopic.create({ important: hash });
-    expect(importantTopic.important).toEqual(hash);
+    expect(importantTopic.important).toEqual(hashOf(hash));
 
     await importantTopic.reload();
-    expect(importantTopic.important).toEqual(hash);
-    expect(importantTopic.readAttribute("important")).toEqual(hash);
+    expect(importantTopic.important).toEqual(hashOf(hash));
+    expect(importantTopic.readAttribute("important")).toEqual(hashOf(hash));
   });
 
   it("serialized string attribute", async () => {
@@ -974,11 +982,11 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   it("newly emptied serialized hash is changed", async () => {
     Topic.serialize("content", { type: Hash });
     const topic = await Topic.create({ content: { things: "stuff" } });
-    delete topic.content["things"];
+    topic.content.delete("things");
     await topic.saveBang();
     await topic.reload();
 
-    expect(topic.content).toEqual({});
+    expect(topic.content).toEqual(hashOf({}));
   });
 
   it("values cast from nil are persisted as nil", async () => {

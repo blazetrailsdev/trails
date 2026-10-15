@@ -93,7 +93,7 @@ export class EncryptedConfiguration extends EncryptedFile {
     if (hash === null || typeof hash !== "object" || Array.isArray(hash)) return hash;
 
     const h = new OrderedOptions();
-    for (const [k, v] of Object.entries(hash)) {
+    for (const [k, v] of hash instanceof Map ? hash : Object.entries(hash)) {
       h.set(k, this.deepTransform(v));
     }
     return h;

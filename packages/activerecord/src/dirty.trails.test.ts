@@ -1,3 +1,4 @@
+import { Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -14,14 +15,14 @@ describe("Dirty restore of an in-place mutation", () => {
   it("restoreAttributes restores a serialized attribute mutated in place", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     expect(topic.isChanged).toBe(true);
     expect(topic.changed).toEqual(["content"]);
 
     (topic as unknown as { restoreAttributes(): void }).restoreAttributes();
 
-    expect(topic.content).toEqual({ a: "a" });
+    expect(topic.content).toEqual(new Hash().set("a", "a"));
     expect(topic.changed).toEqual([]);
     expect(topic.isChanged).toBe(false);
   });
@@ -29,20 +30,20 @@ describe("Dirty restore of an in-place mutation", () => {
   it("restoreAttributeBang restores a serialized attribute mutated in place", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     (topic as unknown as { restoreAttributeBang(name: string): void }).restoreAttributeBang(
       "content",
     );
 
-    expect(topic.content).toEqual({ a: "a" });
+    expect(topic.content).toEqual(new Hash().set("a", "a"));
     expect(topic.isChanged).toBe(false);
   });
 
   it("attributeChangedInPlace is true for a serialized attribute mutated in place", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     expect(topic.attributeChangedInPlace("content")).toBe(true);
   });
@@ -68,7 +69,7 @@ describe("Dirty restore of an in-place mutation", () => {
 
     expect(topic.previousChanges.has("content")).toBe(true);
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     expect(topic.isChanged).toBeTruthy();
 

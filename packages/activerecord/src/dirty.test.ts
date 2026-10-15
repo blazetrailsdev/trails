@@ -548,18 +548,18 @@ describe("DirtyTest", () => {
 
       expect(topic.isChanged).toBeFalsy();
 
-      (topic.content as Record<string, string>)["b"] = "b";
+      (topic.content as Hash<string, string>).set("b", "b");
 
       expect(topic.isChanged).toBeTruthy();
 
       await topic.saveBang();
 
       expect(topic.isChanged).toBeFalsy();
-      expect((topic.content as Record<string, string>)["b"]).toBe("b");
+      expect((topic.content as Hash<string, string>).get("b")).toBe("b");
 
       await topic.reload();
 
-      expect((topic.content as Record<string, string>)["b"]).toBe("b");
+      expect((topic.content as Hash<string, string>).get("b")).toBe("b");
     });
   });
 
@@ -570,12 +570,12 @@ describe("DirtyTest", () => {
 
       const updatedAt = topic.updated_at;
       await withTravel(1000, async () => {
-        (topic.content as Record<string, string>)["hello"] = "world";
+        (topic.content as Hash<string, string>).set("hello", "world");
         await topic.saveBang();
       });
 
       expect(topic.updated_at).not.toEqual(updatedAt);
-      expect((topic.content as Record<string, string>)["hello"]).toBe("world");
+      expect((topic.content as Hash<string, string>).get("hello")).toBe("world");
     });
   });
 
@@ -601,7 +601,7 @@ describe("DirtyTest", () => {
 
     void (topic as any).changesToSave;
 
-    expect(topic.content).toEqual([{ a: "a" }]);
+    expect(topic.content).toEqual([new Hash().set("a", "a")]);
   });
 
   it("previous changes", async () => {

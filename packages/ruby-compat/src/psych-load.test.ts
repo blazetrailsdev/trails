@@ -121,7 +121,7 @@ describe("YAML.load", () => {
   it("loads a symbol key that contains spaces", () => {
     const string = ":user name: This is the user name.";
     const expected = { ":user name": "This is the user name." };
-    expect(send(string)).toEqual(expected);
+    expect(Object.fromEntries(send(string) as Map<string, unknown>)).toEqual(expected);
   });
 
   // PERMANENT-SKIP: load_spec.rb:7 runs it only under `Psych::VERSION < "4.0.0"`; the port is Psych 4.

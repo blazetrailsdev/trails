@@ -1703,10 +1703,9 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
 
 /**
  * `rb_class_new_instance` (`vendor/ruby/v3.3.11/object.c:2158`), `Class#new`
- * with no arguments. A Hash is a plain object (CLAUDE.md, "Ruby idioms that
- * do not translate literally") and a String a primitive (CLAUDE.md, "Ruby
- * Strings are JS string primitives"), so `empty_hash_alloc`
- * (`vendor/ruby/v3.3.11/hash.c:1488`) is `{}` and `empty_str_alloc`
+ * with no arguments. `empty_hash_alloc` (`vendor/ruby/v3.3.11/hash.c:1488`) is a
+ * `Hash`, and a String is a primitive (CLAUDE.md, "Ruby Strings are JS string
+ * primitives"), so `empty_str_alloc`
  * (`vendor/ruby/v3.3.11/string.c:858`) is `""`. `Class.new` is an anonymous
  * class (`rb_class_initialize`, `vendor/ruby/v3.3.11/object.c:2007`), and
  * `Regexp.new` takes one to three arguments (`rb_reg_initialize_m`,
@@ -1715,7 +1714,7 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
  * @noRailsEquivalent PERMANENT
  */
 export function rbClassNewInstance(klass: unknown): unknown {
-  if (klass === Hash) return {};
+  if (klass === Hash) return new Hash();
   if (klass === rbCString) return "";
   if (klass === rbCClass) return class {};
   if (klass === RegExp) {

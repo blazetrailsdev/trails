@@ -22,6 +22,9 @@ describe("YAML.load_file", () => {
     File.open(testFile, "w", (io) => {
       YAML.dump({ bar: 2, car: 1 }, io);
     });
-    expect(YAML.loadFile(testFile)).toEqual({ bar: 2, car: 1 });
+    expect(Object.fromEntries(YAML.loadFile(testFile) as Map<string, unknown>)).toEqual({
+      bar: 2,
+      car: 1,
+    });
   });
 });

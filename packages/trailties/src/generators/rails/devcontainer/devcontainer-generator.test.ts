@@ -18,7 +18,11 @@ const run = (o: Opts = {}) =>
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
 const dc = () => JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
-const cm = () => YAML.load(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+const cm = () =>
+  JSON.parse(JSON.stringify(YAML.load(read(".devcontainer/compose.yaml")))) as Record<
+    string,
+    unknown
+  >;
 const features = () => dc().features as Record<string, unknown>;
 const env = () => (dc().containerEnv as Record<string, string> | undefined) ?? {};
 const services = () => cm().services as Record<string, Record<string, unknown>>;
