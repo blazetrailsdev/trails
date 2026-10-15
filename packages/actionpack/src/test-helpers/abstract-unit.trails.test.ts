@@ -148,6 +148,12 @@ describe("CookieAssertions", () => {
     expect(tc.parseSetCookieAttributes("Path=/; Secure")).toEqual({ path: "/", secure: true });
   });
 
+  it("keeps a cookie named __proto__ as an own key", () => {
+    const cookies = tc.parseSetCookiesHeaders("__proto__=x; path=/");
+    expect(Object.keys(cookies)).toEqual(["__proto__"]);
+    expect(Object.hasOwn(cookies, "__proto__")).toBe(true);
+  });
+
   it("asserts cookie attributes and headers", () => {
     tc.assertSetCookieAttributes("user_name", { samesite: "lax" });
     tc.assertSetCookieAttributes("login", "httponly");

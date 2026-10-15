@@ -17,6 +17,7 @@ import {
   Module,
   type Generic,
   hashAref,
+  hashAset,
   rbFSend,
   rbInspect,
   rbStrSend,
@@ -549,7 +550,7 @@ export const CookieAssertions = {
 
       attributes["value"] = value;
 
-      cookies[name] = this.parseSetCookieAttributes(fields, attributes);
+      hashAset(cookies, name, this.parseSetCookieAttributes(fields, attributes));
     });
 
     return cookies;
