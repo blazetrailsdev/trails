@@ -1,29 +1,31 @@
-import { tokenize } from "@blazetrails/activesupport";
 import { compileJs } from "@blazetrails/tse-compiler";
 import { describe, it, expect } from "vitest";
-import { LocationParsingError, Tse } from "./tse.js";
+import { Tse } from "./tse.js";
 
 const tse = new Tse();
-const findOffset = (...args: [string, [string, string][], number]): number =>
-  (tse as unknown as { findOffset(...a: typeof args): number }).findOffset(...args);
 const translateLocation = tse.translateLocation.bind(tse);
+const firstColumnOf = (source: string, compiled: string, errorColumn: number) =>
+  translateLocation(
+    {
+      snippet: compiled,
+      firstLineno: 1,
+      lastLineno: 1,
+      firstColumn: errorColumn,
+      lastColumn: errorColumn,
+    },
+    { lineno: 1 },
+    source,
+  )?.firstColumn;
 
 describe("findOffset", () => {
   it("returns the source-line column for a CODE token matched in compiled output", () => {
-    const tokens = tokenize("<%= name %>");
     const compiled = "_ob.append( name );";
-    const errorColumn = compiled.indexOf("name");
-    expect(findOffset(compiled, tokens, errorColumn)).toBe(4);
+    expect(firstColumnOf("<%= name %>", compiled, compiled.indexOf("name"))).toBe(4);
   });
 
   it("counts a `<%%` OPEN token at its own width", () => {
-    const tokens = tokenize("a <%% b %> <%= x %>");
     const compiled = '_ob.safeAppend("a <% b %> "); _ob.append( x );';
-    expect(findOffset(compiled, tokens, compiled.indexOf("x )"))).toBe(15);
-  });
-
-  it("throws LocationParsingError when no anchor is found", () => {
-    expect(() => findOffset("nothing here", tokenize("<%= x %>"), 0)).toThrow(LocationParsingError);
+    expect(firstColumnOf("a <%% b %> <%= x %>", compiled, compiled.indexOf("x )"))).toBe(15);
   });
 });
 

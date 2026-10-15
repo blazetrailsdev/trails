@@ -178,7 +178,9 @@ describe("TestCase#wrap_execution", () => {
         return block();
       },
     };
-    TopLevel.Trails = { application: { executor } } as unknown as typeof trails;
+    TopLevel.Trails = {
+      application: { executor, envConfig: () => ({}) },
+    } as unknown as typeof trails;
     try {
       await request(task.name);
       expect(wrapped).toBe(0);
