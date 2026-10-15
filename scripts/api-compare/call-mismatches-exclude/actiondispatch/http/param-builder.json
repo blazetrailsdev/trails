@@ -9,6 +9,6 @@
       "ref:paramsClass",
       "ref:paramDepthLimit"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "Rails passes `@params_class, param_depth_limit` (param_builder.rb:166-168) to an `initialize(param_depth_limit)` that takes one argument (param_builder.rb:15) and never sets `@params_class`, a Rack leftover that raises ArgumentError; the port passes the one argument the constructor declares."
   }
 ]
