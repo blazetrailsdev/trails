@@ -5,5 +5,14 @@
     "rubyName": "_write_layout_method",
     "call": "inspect",
     "reason": "Rails `inspect`s `prefixes` and a String `_layout` into Ruby source it `class_eval`s (layouts.rb:287,299); the port builds closures over the values, so there is no source text to quote into."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "layouts.ts",
+    "rubyName": "_write_layout_method",
+    "call": "inspect",
+    "kind": "rubyCompat",
+    "tsExport": "rbInspect",
+    "reason": "Rails `inspect`s `prefixes` and a String `_layout` into Ruby source it `class_eval`s (layouts.rb:287,299); the port builds closures over the values, so there is no source text for `rbInspect` to quote into."
   }
 ]
