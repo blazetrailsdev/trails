@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  validateApp,
-  GID,
-  MissingModelIdError,
-  InvalidComponentError,
-  BadURIError,
-} from "./uri/gid.js";
+import { URI } from "@blazetrails/ruby-compat";
+import { GID, MissingModelIdError, InvalidComponentError, BadURIError } from "./uri/gid.js";
 
 function assertRaise(klass: new (...args: never[]) => Error, block: () => unknown): Error {
   try {
@@ -26,7 +21,7 @@ function assertBadUri(uri: string): void {
 }
 
 function assertInvalidApp(value: string | null): void {
-  expect(() => validateApp(value)).toThrow();
+  expect(() => GID.validateApp(value)).toThrow();
 }
 
 describe("URI::GIDTest", () => {
@@ -108,13 +103,7 @@ describe("URI::GIDTest", () => {
   });
 
   it("new returns invalid gid when not checking", () => {
-    const synthetic = new GID("gid:///", {
-      app: "",
-      modelName: "",
-      modelId: "",
-      params: {},
-    });
-    expect(synthetic).toBeTruthy();
+    expect(new GID(...URI.split("gid:///"))).toBeTruthy();
   });
 });
 
@@ -205,7 +194,7 @@ describe("URI::GIDAppValidationTest", () => {
   });
 
   it("app with hyphen is allowed", () => {
-    expect(validateApp("foo-bar")).toBe("foo-bar");
+    expect(GID.validateApp("foo-bar")).toBe("foo-bar");
   });
 });
 

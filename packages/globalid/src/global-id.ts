@@ -1,5 +1,5 @@
 import { getApp } from "./config.js";
-import { GID, validateApp, type GidComponents } from "./uri/gid.js";
+import { GID, type GidComponents } from "./uri/gid.js";
 import type { Identification as IdentificationModule } from "./identification.js";
 import type {
   LocateOptions,
@@ -140,7 +140,7 @@ export class GlobalID {
   }
 
   static validateApp(app: string | null | undefined): string {
-    return validateApp(app);
+    return GID.validateApp(app);
   }
 
   get modelClass(): LocatorModel {

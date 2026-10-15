@@ -425,15 +425,17 @@ const CONNINFO_KEYWORDS: Record<string, string> = {
   Promise: "Promise",
 };
 
-export function conndefaults(): { keyword: string; val: string | null }[] {
+/** @internal */
+function conndefaults(): { keyword: string; val: string | null }[] {
   return Object.keys(CONNINFO_KEYWORDS).map((keyword) => ({ keyword, val: null }));
 }
 
 export function conndefaultsHash(): Record<string, string | null> {
-  return conndefaults().reduce<Record<string, string | null>>((hash, info) => {
+  const hash: Record<string, string | null> = {};
+  for (const info of conndefaults()) {
     hash[info.keyword] = info.val;
-    return hash;
-  }, {});
+  }
+  return hash;
 }
 
 export async function connect(connParams: Record<string, unknown>): Promise<PGConnection> {

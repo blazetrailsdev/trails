@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { assertEqual } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { setApp, _resetApp } from "./config.js";
@@ -24,7 +25,7 @@ describe("SignedGlobalID pick_purpose explicit-null semantics", () => {
     const sgid = SignedGlobalID.create(person, { verifier, for: null });
     expect(sgid.purpose).toBeNull();
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
-    expect(SignedGlobalID.parse(sgid.toString(), { verifier, for: null })?.uri).toEqual(sgid.uri);
+    assertEqual(sgid.uri, SignedGlobalID.parse(sgid.toString(), { verifier, for: null })?.uri);
   });
 });
 

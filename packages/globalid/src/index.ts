@@ -9,7 +9,7 @@ export { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
 /** @internal */
 export { _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
 export type { SignedGlobalIDOptions, ParseOptions } from "./signed-global-id.js";
-export { validateApp, GID, MissingModelIdError, InvalidModelIdError } from "./uri/gid.js";
+export { GID, MissingModelIdError, InvalidModelIdError } from "./uri/gid.js";
 export type { GidComponents } from "./uri/gid.js";
 export { Locator, BaseLocator, UnscopedLocator, BlockLocator } from "./locator.js";
 /** @internal */

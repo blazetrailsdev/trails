@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setApp, _resetApp } from "./config.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil, assertEqual } from "@blazetrails/activesupport";
 import { rbHash, registerConstant, resetConstants, uniq } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { GID } from "./uri/gid.js";
@@ -100,7 +100,7 @@ describe("GlobalIDParamEncodedTest", () => {
 
   it("parsing", () => {
     const gid = GlobalID.create(fakeModel("id"));
-    expect(GlobalID.parse(gid.toParam())).toEqual(gid);
+    assertEqual(gid, GlobalID.parse(gid.toParam()));
   });
 
   it("finding", async () => {
@@ -237,36 +237,38 @@ describe("GlobalIDCreationTest", () => {
 
   it("as param", () => {
     expect(personGid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbi81");
-    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbi81")).toEqual(personGid);
+    assertEqual(personGid, GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbi81"));
 
     expect(personUuidGid.toParam()).toBe(
       "Z2lkOi8vYmN4L1BlcnNvblV1aWQvN2VmOWI2MTQtMzUzYy00M2ExLWEyMDMtYWIyMzA3ODUxOTkw",
     );
-    expect(
+    assertEqual(
+      personUuidGid,
       GlobalID.parse(
         "Z2lkOi8vYmN4L1BlcnNvblV1aWQvN2VmOWI2MTQtMzUzYy00M2ExLWEyMDMtYWIyMzA3ODUxOTkw",
       ),
-    ).toEqual(personUuidGid);
+    );
 
     expect(personNamespacedGid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbjo6Q2hpbGQvNA");
-    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbjo6Q2hpbGQvNA")).toEqual(personNamespacedGid);
+    assertEqual(personNamespacedGid, GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbjo6Q2hpbGQvNA"));
 
     expect(personModelGid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbk1vZGVsLzE");
-    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbk1vZGVsLzE")).toEqual(personModelGid);
+    assertEqual(personModelGid, GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbk1vZGVsLzE"));
 
     const expectedEncoded =
       "Z2lkOi8vYmN4L0NvbXBvc2l0ZVByaW1hcnlLZXlNb2RlbC90ZW5hbnQta2V5LXZhbHVlL2lkLXZhbHVl";
     expect(cpkModelGid.toParam()).toBe(expectedEncoded);
-    expect(GlobalID.parse(expectedEncoded)).toEqual(cpkModelGid);
+    assertEqual(cpkModelGid, GlobalID.parse(expectedEncoded));
   });
 
   it("as URI", () => {
-    expect(personGid.uri).toEqual(GID.parse("gid://bcx/Person/5"));
-    expect(personUuidGid.uri).toEqual(GID.parse(`gid://bcx/PersonUuid/${uuid}`));
-    expect(personNamespacedGid.uri).toEqual(GID.parse("gid://bcx/Person::Child/4"));
-    expect(personModelGid.uri).toEqual(GID.parse("gid://bcx/PersonModel/1"));
-    expect(cpkModelGid.uri).toEqual(
+    assertEqual(GID.parse("gid://bcx/Person/5"), personGid.uri);
+    assertEqual(GID.parse(`gid://bcx/PersonUuid/${uuid}`), personUuidGid.uri);
+    assertEqual(GID.parse("gid://bcx/Person::Child/4"), personNamespacedGid.uri);
+    assertEqual(GID.parse("gid://bcx/PersonModel/1"), personModelGid.uri);
+    assertEqual(
       GID.parse("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value"),
+      cpkModelGid.uri,
     );
   });
 
@@ -341,7 +343,7 @@ describe("GlobalIDCreationTest", () => {
 
     expect(gid1.hash()).not.toEqual(rbHash(gid1.uri));
 
-    expect([gid1, gid1.uri]).toEqual(uniq([gid1, gid1.uri]));
+    assertEqual(uniq([gid1, gid1.uri]), [gid1, gid1.uri]);
   });
 });
 

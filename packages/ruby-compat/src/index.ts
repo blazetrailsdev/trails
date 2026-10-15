@@ -467,6 +467,7 @@ export {
   RFC2396Parser,
   RFC3986_PARSER,
   URI,
+  Util,
 } from "./uri.js";
 
 import { Kernel } from "./include.js";

@@ -4,7 +4,14 @@
  * `uri/http` and `uri/generic` behind it, exactly as MRI's requires do
  * (`vendor/ruby/v3.3.11/lib/uri/https.rb:10`, `vendor/ruby/v3.3.11/lib/uri/http.rb:10`).
  */
-export { URI, BadURIError, Error, InvalidComponentError, InvalidURIError } from "./uri/common.js";
+export {
+  URI,
+  BadURIError,
+  Error,
+  InvalidComponentError,
+  InvalidURIError,
+  Util,
+} from "./uri/common.js";
 export { DEFAULT_PARSER, RFC2396_PARSER, RFC3986_PARSER } from "./uri/common.js";
 export { RFC2396Parser } from "./uri/rfc2396-parser.js";
 export { Generic } from "./uri/generic.js";
