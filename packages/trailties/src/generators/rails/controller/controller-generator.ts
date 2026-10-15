@@ -96,8 +96,7 @@ ${cases}
   }
 
   private assignNamesBang(name: string): void {
-    this.classPath = name.includes("/") ? name.split("/") : name.split("::");
-    this.classPath = this.classPath.map((p) => underscore(p));
+    this.classPath = controllerPathHelpers(name).namespaceParts.map((p) => underscore(p));
     this._namedBaseFileName = this.classPath.pop()!;
     this._fileName = undefined;
   }

@@ -1234,7 +1234,7 @@ app sets it to `:html5` through the gem's railtie (`railtie.rb:7-10`,
 backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `Testing.defaultHtmlVersion` defaults to `:html5`, no railtie copies
 `domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
-`NotImplementedError`, the same raise as Rails' arm for an unsupported parser. Ruled by
+`NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
 
 ## Ruby protocol methods with a different JS mechanism
