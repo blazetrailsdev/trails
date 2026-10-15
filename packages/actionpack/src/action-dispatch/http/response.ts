@@ -211,7 +211,7 @@ export class RackBody {
   }
 
   each(...args: RubyArgs): unknown {
-    return (this._response.each as (...args: RubyArgs) => unknown).call(this._response, ...args);
+    return this._response.each(...(args as [((chunk: unknown) => unknown)?]));
   }
 
   call(...arguments_: RubyArgs): unknown {
@@ -274,6 +274,7 @@ export class FileBody {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
   static Headers = Headers;
+  static Header = Headers;
 
   declare static defaultCharset: string | null;
   declare defaultCharset: string | null;
