@@ -666,6 +666,19 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(combined).toMatch(/`arrayElementType` is only valid when `type` is "array"/);
   });
 
+  it("warnMissingTable writes one stderr line per model", async () => {
+    const { warnMissingTable } = await import("./cli.js");
+    const { err } = spyExitAndStderr();
+    const warn = warnMissingTable();
+    const missing = { className: "PullRequest", tableName: "pull_requests", fileName: "pr.ts" };
+    warn(missing);
+    warn(missing);
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0][0])).toMatch(
+      /PullRequest \(pr\.ts\) reads table "pull_requests"/,
+    );
+  });
+
   it("loadSchemaColumns: merges tables from more than one --schema file", async () => {
     const { loadSchemaColumns } = await import("./cli.js");
     const a = writeSchemaJson({ users: { name: "string" } });
