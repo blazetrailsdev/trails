@@ -17,6 +17,7 @@ import {
   Module,
   type Generic,
   Hash,
+  hashAref,
   rbFSend,
   rbInspect,
   rbStrSend,
@@ -647,25 +648,27 @@ export const CookieAssertions = {
   },
 };
 
+type HeadersHash = Map<string, unknown> | Record<string, unknown>;
+
 type HeadersAssertionsHost = {
-  response: { headers: Map<string, unknown> };
-  normalizeHeaders(headers: Map<string, unknown>): Map<string, unknown>;
+  response: { headers: HeadersHash };
+  normalizeHeaders(headers: HeadersHash): HeadersHash;
   normalizedJoinHeader(header: unknown): unknown;
 };
 
 export const HeadersAssertions = {
-  normalizeHeaders(headers: Map<string, unknown>): Map<string, unknown> {
+  normalizeHeaders(headers: HeadersHash): HeadersHash {
     return transformKeys(headers, (key) => key.toLowerCase());
   },
 
   assertHeaders(
     this: HeadersAssertionsHost,
     expected: Record<string, unknown>,
-    actual: Map<string, unknown> = this.response.headers,
+    actual: HeadersHash = this.response.headers,
   ): void {
     actual = this.normalizeHeaders(actual);
     for (const [key, value] of Object.entries(expected)) {
-      assertEqual(value, actual.get(key));
+      assertEqual(value, hashAref(actual, key));
     }
   },
 
@@ -673,16 +676,16 @@ export const HeadersAssertions = {
     this: HeadersAssertionsHost,
     key: string,
     value: unknown,
-    actual: Map<string, unknown> = this.response.headers,
+    actual: HeadersHash = this.response.headers,
   ): void {
     actual = this.normalizeHeaders(actual);
-    assertEqual(value, actual.get(key));
+    assertEqual(value, hashAref(actual, key));
   },
 
   assertNotHeader(
     this: HeadersAssertionsHost,
     key: string,
-    actual: Map<string, unknown> = this.response.headers,
+    actual: HeadersHash = this.response.headers,
   ): void {
     actual = this.normalizeHeaders(actual);
     assertNotIncludes(actual, key);

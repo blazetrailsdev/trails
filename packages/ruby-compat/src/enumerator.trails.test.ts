@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Enumerator, toEnum } from "./enumerator.js";
 import { block } from "./hash.js";
 import { StopIteration } from "./stop-iteration.js";
+import { rbFSend } from "./object.js";
 
 describe("Enumerator", () => {
   const source = {
@@ -63,5 +64,13 @@ describe("Enumerator", () => {
     await expect(enumerator.next()).rejects.toThrow(new StopIteration("iteration reached an end"));
     await expect(enumerator.next()).rejects.toThrow(StopIteration);
     expect(ran).toEqual(["first", "second"]);
+  });
+});
+
+describe("Array#each with no block (rb_ary_each's RETURN_SIZED_ENUMERATOR, vendor/ruby/v3.3.11/array.c:2532)", () => {
+  it("answers an Enumerator over an Array, and an object's own each is still dispatched", () => {
+    expect([...(rbFSend(["a", "b"], "each") as Iterable<unknown>)]).toEqual(["a", "b"]);
+    const own = { each: (block?: unknown) => `own:${typeof block}` };
+    expect(rbFSend(own, "each")).toBe("own:undefined");
   });
 });

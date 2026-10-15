@@ -16,6 +16,7 @@ import { rbRegToS } from "./regexp.js";
 import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
 import { registeredConstant } from "./variable.js";
+import { toEnum } from "./enumerator.js";
 
 type Klass = abstract new (...args: never) => unknown;
 
@@ -1066,6 +1067,13 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     }
     if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
     if (recv == null) throw new NoMethodError("undefined method 'include?' for nil", "include?");
+  }
+  if (
+    mid === "each" &&
+    args[0] == null &&
+    (Array.isArray(recv) || recv instanceof Set || recv instanceof Map || isPlainHash(recv))
+  ) {
+    return toEnum(recv, "each");
   }
   if (mid === "each" && typeof args[0] === "function") {
     const block = args[0] as AnyFunction;

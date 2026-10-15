@@ -20,6 +20,7 @@ import {
   rbObjClassname,
   rbObjRespondTo,
   stringDelete,
+  toEnum,
   toS,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
@@ -90,10 +91,12 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     return !this._aborted;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  override *each(): IterableIterator<unknown> {
+  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
+  override each(block?: (chunk: unknown) => unknown): unknown {
     if (this._strBody !== null) {
-      yield this._strBody;
+      if (!block) return toEnum(this, "each");
+
+      return block(this._strBody);
     } else {
       const popped: string[] = [];
       try {
@@ -106,7 +109,9 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
         if (e instanceof ThreadError) for (const str of popped) void this._buf.push(str);
         throw e;
       }
-      yield* popped;
+      if (!block) return toEnum(popped, "each");
+
+      popped.forEach(block);
     }
   }
 

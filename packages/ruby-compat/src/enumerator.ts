@@ -1,6 +1,6 @@
 import { Fiber } from "./fiber.js";
 import { rbBlockGivenP } from "./hash.js";
-import { rtest } from "./object.js";
+import { rbFSend, rtest } from "./object.js";
 import { StopIteration } from "./stop-iteration.js";
 
 /**
@@ -106,8 +106,7 @@ export class Enumerator<T = unknown> {
    */
   each(block?: (...args: never[]) => unknown): unknown {
     if (!block) return this;
-    const meth = (this.obj as Record<string, (...args: unknown[]) => unknown>)[this.meth];
-    return meth.call(this.obj, ...this.args, block);
+    return rbFSend(this.obj, this.meth, ...this.args, block);
   }
 
   /**

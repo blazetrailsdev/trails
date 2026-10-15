@@ -50,7 +50,6 @@ describe("Metal#response_body=", () => {
     c.setResponseBang(makeResponse());
     c.responseBody = htmlSafe("<p>hi</p>");
     expect(c.response.body).toBe("<p>hi</p>");
-    expect(c.response.getHeader("content-length")).toBe("9");
   });
 });
 

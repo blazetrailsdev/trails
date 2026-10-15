@@ -87,6 +87,20 @@ describe("extractClass — a `declare` member typed `typeof fn`", () => {
   });
 });
 
+describe("extractClass — a splat whose last element is a block", () => {
+  it("credits a rest typed as a tuple ending in a function, and not a bare rest", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        call(...args: unknown[] | [...unknown[], () => void]): void {}
+        each(...args: unknown[]): void {}
+      }`,
+    );
+    const params = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.params;
+    expect(params("call")[0].admitsFunction).toBe(true);
+    expect(params("each")[0].admitsFunction).toBeUndefined();
+  });
+});
+
 describe("extractClass — a `declare` member typed by a function type", () => {
   it("records the declared method's parameters as aliasParams, through a named call signature too", () => {
     const cls = extractFromSource(

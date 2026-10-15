@@ -69,6 +69,7 @@ export { Lint, LintError } from "./lint.js";
 export { Head } from "./head.js";
 export { Sendfile } from "./sendfile.js";
 export { ConditionalGet } from "./conditional-get.js";
+export { ContentLength } from "./content-length.js";
 export { ETag } from "./etag.js";
 export { TempfileReaper } from "./tempfile-reaper.js";
 export { Lock } from "./lock.js";

@@ -1,6 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { Options, Session, type SessionStore } from "../../request/session.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertEqual, assertNil, MemoryStore } from "@blazetrails/activesupport";
+import {
+  bodyFromString,
+  Lint,
+  Request as RackRequest,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
+import { RouteSet } from "../../routing/route-set.js";
+import { IntegrationTest } from "../../testing/integration.js";
+import { RoutedRackApp } from "../../../test-helpers/abstract-unit.js";
+import { CacheStore } from "../../middleware/session/cache-store.js";
+import type { MiddlewareFactory } from "../../middleware/stack.js";
 
 function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = {}): SessionStore {
   const exists = opts.exists ?? true;
@@ -187,6 +199,48 @@ describe("Request", () => {
       const s = Session.create(makeStore(), req, {});
       s.destroy();
       expect(s.idWas()).toBe(1);
+    });
+  });
+
+  describe("SessionIntegrationTest", () => {
+    class MySessionApp {
+      call(env: RackEnv): RackResponse {
+        const request = new RackRequest(env);
+        (request.session as Session).set("hello", "Hello from MySessionApp!");
+        return [200, {}, bodyFromString("Hello from MySessionApp!")];
+      }
+    }
+
+    const Router = new RouteSet();
+    Router.draw(function () {
+      this.get({ "/mysessionapp": new MySessionApp() });
+    });
+
+    class SessionIntegrationTest extends IntegrationTest {
+      declare cache: MemoryStore;
+
+      override get app(): unknown {
+        return (this._app ??= new RoutedRackApp(Router, (middleware) => {
+          this.cache = new MemoryStore();
+          middleware.use(CacheStore as MiddlewareFactory, {
+            key: "_session_id",
+            cache: this.cache,
+          });
+          middleware.use(Lint as unknown as MiddlewareFactory);
+        }));
+      }
+
+      override set app(value: unknown) {
+        this._app = value;
+      }
+    }
+
+    it("session follows rack api contract 1", async () => {
+      const testCase = new SessionIntegrationTest(expect.getState().currentTestName!);
+      await testCase.get("/mysessionapp");
+      testCase.assertResponse("ok");
+      assertEqual("Hello from MySessionApp!", testCase.response.body);
+      assertEqual("Hello from MySessionApp!", testCase.session().get("hello"));
     });
   });
 });

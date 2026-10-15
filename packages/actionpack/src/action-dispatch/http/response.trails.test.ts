@@ -17,7 +17,6 @@ describe("ActionDispatch::Response#body=", () => {
     const response = new Response();
     response.body = bytes;
     expect(response.bodyParts()).toEqual([bytes]);
-    expect(response.getHeader("content-length")).toBe("5");
   });
 });
 
@@ -33,5 +32,29 @@ describe("ActionDispatch::Response::Buffer#to_ary", () => {
   it("answers the Array buffer itself", () => {
     const response = new Response(200, {}, ["a", "b"]);
     expect((response.toA()[2] as RackBody).toAry()).toEqual(["a", "b"]);
+  });
+});
+
+describe("ActionDispatch::Response::RackBody#call", () => {
+  it("forwards a hijacked stream unchanged, as Rails' call(*arguments, &block) does", () => {
+    const response = new Response();
+    const received: unknown[][] = [];
+    response.stream = {
+      toPath: () => "",
+      call: (...args: unknown[]) => received.push(args),
+    } as typeof response.stream;
+    const stream = { write() {} };
+    (response.toA()[2] as RackBody).call(stream);
+    expect(received).toEqual([[stream]]);
+  });
+});
+
+describe("ActionDispatch::Response::RackBody#each", () => {
+  it("passes its block through to Response#each", () => {
+    const response = new Response(200, {}, ["a", "b"]);
+    const parts: unknown[] = [];
+    (response.toA()[2] as RackBody).each((part: unknown) => parts.push(part));
+    expect(parts).toEqual(["a", "b"]);
+    expect(response.isSent).toBe(true);
   });
 });
