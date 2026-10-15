@@ -47,7 +47,7 @@ export function deserialize(argument: Record<string, unknown> | Map<string, unkn
   const serializer = safeConstantize(serializerName as string) as SerializerLike | null;
   if (serializer == null) throw new ArgumentError(`Serializer ${serializerName} is not known`);
 
-  return serializer.deserialize(argument);
+  return serializer.deserialize(argument as Record<string, unknown>);
 }
 
 export function serializers(): Set<SerializerLike> {
