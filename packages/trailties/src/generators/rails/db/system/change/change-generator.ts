@@ -215,8 +215,10 @@ export class ChangeGenerator extends GeneratorBase {
         );
     }
 
-    if (!any([...(composeConfig.get("volumes") ?? [])])) hashDelete(composeConfig, "volumes");
-    if (!any(composeConfig.get("services").get("rails-app").get("depends_on") ?? [])) {
+    const volumes = composeConfig.get("volumes");
+    if (!(volumes != null && any([...volumes]))) hashDelete(composeConfig, "volumes");
+    const dependsOn = composeConfig.get("services").get("rails-app").get("depends_on");
+    if (!(dependsOn != null && any(dependsOn))) {
       hashDelete(composeConfig.get("services").get("rails-app"), "depends_on");
     }
 
