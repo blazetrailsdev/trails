@@ -1,4 +1,4 @@
-import { kernelCatch, kernelThrow, rbEnsure } from "@blazetrails/ruby-compat";
+import { kernelCatch, kernelThrow, rbEnsure, Thread } from "@blazetrails/ruby-compat";
 import * as I18n from "./i18n.js";
 import type { ExceptionHandlerLike } from "./config.js";
 import type { Base } from "./backend/base.js";
@@ -52,15 +52,15 @@ export function reservedKeysPattern(): RegExp {
   return reservedKeysPatternCache;
 }
 
-let currentConfig: Config | undefined;
-
 export function config(): Config {
-  currentConfig ??= new Config();
-  return currentConfig;
+  return (
+    (Thread.current().threadVariableGet(":i18n_config") as Config | null) ||
+    (Thread.current().threadVariableSet(":i18n_config", new Config()) as Config)
+  );
 }
 
 export function setConfig(value: Config): void {
-  currentConfig = value;
+  Thread.current().threadVariableSet(":i18n_config", value);
 }
 
 /**
@@ -72,7 +72,7 @@ export function setConfig(value: Config): void {
  * folds into `setConfig` once that cache hangs off the Config instance.
  */
 export function resetConfig(): void {
-  currentConfig = undefined;
+  Thread.current().threadVariableSet(":i18n_config", null);
   normalizedKeyCache.clear();
 }
 

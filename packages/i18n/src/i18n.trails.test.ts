@@ -1,3 +1,4 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "./exceptions.js";
 import {
@@ -30,6 +31,20 @@ describe("I18n.withLocale", () => {
     resetConfig();
     resetClassConfig();
     config().enforceAvailableLocales = false;
+  });
+
+  it("gives each Thread its own locale while concurrent blocks await", async () => {
+    const read = (tmpLocale: string) =>
+      new Thread(() =>
+        withLocale(tmpLocale, async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return locale();
+        }),
+      );
+    const de = read("de");
+    const fr = read("fr");
+    expect([await de.value(), await fr.value()]).toEqual(["de", "fr"]);
+    expect(locale()).toBe("en");
   });
 
   it("keeps the locale set across an await and restores it when the block settles", async () => {
