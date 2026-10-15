@@ -185,8 +185,9 @@ export class ChangeGenerator extends GeneratorBase {
       if (composeConfig["volumes"] != null) delete composeConfig["volumes"][database.volume!];
       const dependsOn = composeConfig["services"]["rails-app"]["depends_on"] as string[] | null;
       if (dependsOn != null) {
-        const index = dependsOn.indexOf(database.name);
-        if (index !== -1) dependsOn.splice(index, 1);
+        for (let i = dependsOn.length - 1; i >= 0; i--) {
+          if (dependsOn[i] === database.name) dependsOn.splice(i, 1);
+        }
       }
     }
 
