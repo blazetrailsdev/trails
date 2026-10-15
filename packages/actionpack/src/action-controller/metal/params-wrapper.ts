@@ -3,7 +3,6 @@ import {
   except,
   flatten,
   last,
-  merge,
   rbFArray,
   rbObjDup,
   rbObjRespondTo,
@@ -209,14 +208,14 @@ export function wrapParameters(
   if (isPlainObject(nameOrModelOrOptions)) {
     options = nameOrModelOrOptions as Record<string, unknown>;
   } else if (nameOrModelOrOptions === false) {
-    options = merge(options, { format: [] });
+    options = { ...options, format: [] };
   } else if (typeof nameOrModelOrOptions === "string") {
-    options = merge(options, { name: nameOrModelOrOptions });
+    options = { ...options, name: nameOrModelOrOptions };
   } else {
     model = nameOrModelOrOptions;
   }
 
-  const opts = Options.fromHash(merge(slice(this._wrapperOptions.toH(), "format"), options));
+  const opts = Options.fromHash({ ...slice(this._wrapperOptions.toH(), "format"), ...options });
   opts.model = model;
   opts.klass = this;
 

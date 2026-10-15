@@ -831,21 +831,17 @@ export class SchemaStatements {
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     let sql: string;
-    const native = type == null ? undefined : this.nativeDatabaseTypes()[type];
+    const native = (type == null ? undefined : this.nativeDatabaseTypes()[type]) as
+      | Record<string, any>
+      | undefined;
     if (native === undefined) {
       sql = type == null ? "" : String(type);
     } else {
-      const spec = (typeof native === "string" ? { name: native } : native) as {
-        name?: string;
-        limit?: number;
-        precision?: number;
-        scale?: number;
-      };
-      sql = spec.name ?? String(type);
+      sql = String(typeof native === "string" ? native : native["name"]);
       let { precision, scale, limit } = options;
       if (type === "decimal") {
-        scale ??= spec.scale;
-        precision ??= spec.precision;
+        scale ??= native["scale"];
+        precision ??= native["precision"];
         if (precision != null) {
           sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
         } else if (scale != null) {
@@ -855,16 +851,16 @@ export class SchemaStatements {
         }
       } else if (
         (type === "datetime" || type === "timestamp" || type === "time" || type === "interval") &&
-        (precision ??= spec.precision) != null
+        (precision ??= native["precision"]) != null
       ) {
         if (precision >= 0 && precision <= 6) {
           sql += `(${precision})`;
         } else {
           throw new ArgumentError(
-            `No ${spec.name} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
+            `No ${native["name"]} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
           );
         }
-      } else if (type !== "primary_key" && (limit ??= spec.limit) != null) {
+      } else if (type !== "primary_key" && (limit ??= native["limit"]) != null) {
         sql += `(${limit})`;
       }
     }
@@ -1781,14 +1777,14 @@ export class SchemaStatements {
     tableName: string,
     options: ColumnOptions = {},
   ): Promise<Array<string | [string, () => Promise<void>]>> {
-    const opts: ColumnOptions = { ...options };
-    if (opts.null == null) opts.null = false;
-    if (!("precision" in opts) && (this as any).supportsDatetimeWithPrecision?.()) {
-      opts.precision = 6;
+    options = { ...options };
+    if (options.null == null) options.null = false;
+    if (!("precision" in options) && (this as any).supportsDatetimeWithPrecision?.()) {
+      options.precision = 6;
     }
     return [
-      await this.addColumnForAlter(tableName, "created_at", "datetime", opts),
-      await this.addColumnForAlter(tableName, "updated_at", "datetime", opts),
+      await this.addColumnForAlter(tableName, "created_at", "datetime", options),
+      await this.addColumnForAlter(tableName, "updated_at", "datetime", options),
     ];
   }
 

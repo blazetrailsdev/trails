@@ -123,7 +123,7 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
 
   /** @internal */
   private mergeDefaults(options: Record<string, unknown>): Record<string, unknown> {
-    return this.defaults ? merge(this.defaults, options) : options;
+    return this.defaults ? { ...this.defaults, ...options } : options;
   }
 }
 
@@ -366,7 +366,7 @@ export class UrlHelper {
     urlStrategy: UrlStrategy,
   ): string {
     const controllerOptions = t.urlOptions();
-    const options = merge(controllerOptions, this.options);
+    const options = { ...controllerOptions, ...this.options };
     const hash = this.handlePositionalArgs(
       controllerOptions,
       innerOptions ?? {},

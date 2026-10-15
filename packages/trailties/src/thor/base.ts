@@ -13,7 +13,6 @@ import {
   included,
   initialize,
   last,
-  merge,
   max,
   NotImplementedError,
   rbArgv,
@@ -205,7 +204,7 @@ ThorBase.attrWriter("options", "parentOptions", "args");
   let parseOptions = klass.classOptions();
 
   const commandOptions = hashDelete(config, "commandOptions") as Record<string, Option> | null;
-  if (rtest(commandOptions)) parseOptions = merge(parseOptions, commandOptions);
+  if (rtest(commandOptions)) parseOptions = { ...parseOptions, ...commandOptions };
 
   let arrayOptions: unknown[];
   let hashOptions: Record<string, unknown>;

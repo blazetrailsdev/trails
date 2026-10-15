@@ -25,6 +25,11 @@
  * `static`, joined on the owners the skeleton row carries. A TS body's reads
  * include a nested function's unless that function is itself a compared pair.
  *
+ * Where the TS file re-exports the owner (`export { Store } from
+ * "./cache/store.js"`) rather than defining it, the body is read from the
+ * module the re-export names: compare.ts credits the class to the file the
+ * Ruby path maps to, which is the re-exporting one.
+ *
  * The population is the skeleton artifact's pairs. There is no gate and no
  * baseline. Run `pnpm parity:api --calls` first so call-skeletons.json is fresh.
  */
@@ -265,6 +270,25 @@ export function tsKeyReads(
   return out;
 }
 
+/** The relative module `text` re-exports `name` from, if it does. */
+export function reexportSource(text: string, name: string): string | undefined {
+  const source = ts.createSourceFile("file.ts", text, ts.ScriptTarget.Latest, true);
+  for (const stmt of source.statements) {
+    if (
+      ts.isExportDeclaration(stmt) &&
+      stmt.moduleSpecifier &&
+      ts.isStringLiteral(stmt.moduleSpecifier) &&
+      stmt.moduleSpecifier.text.startsWith(".") &&
+      stmt.exportClause &&
+      ts.isNamedExports(stmt.exportClause) &&
+      stmt.exportClause.elements.some((el) => el.name.text === name)
+    ) {
+      return stmt.moduleSpecifier.text;
+    }
+  }
+  return undefined;
+}
+
 /** One row per distinct literal-Symbol `(receiver, key)` the Rails body reads. */
 export function keyReadRows(
   row: SkeletonRow,
@@ -494,12 +518,18 @@ async function main(): Promise<number> {
     const rubyBodies = ruby[row.package]?.defs[row.rubyFile]?.[row.rubyName];
     if (rubyBodies === undefined) continue;
     const rubyBody = rubyBodyOf(row, rubyBodies, ruby[row.package].includes);
-    const tsPath = path.join(packageSrcDir(row.package), row.tsFile);
+    let tsPath = path.join(packageSrcDir(row.package), row.tsFile);
+    const text = await readFile(tsPath, "utf8").catch(() => undefined);
+    const from = text === undefined ? undefined : reexportSource(text, row.tsOwner ?? "");
+    if (from !== undefined) {
+      tsPath = path.resolve(path.dirname(tsPath), from.replace(/\.js$/, ".ts"));
+    }
     if (!tsFiles.has(tsPath)) {
-      const text = await readFile(tsPath, "utf8").catch(() => undefined);
+      const body =
+        from === undefined ? text : await readFile(tsPath, "utf8").catch(() => undefined);
       tsFiles.set(
         tsPath,
-        text === undefined ? new Map() : tsKeyReads(text, tsPath, pairedByFile.get(tsPath)),
+        body === undefined ? new Map() : tsKeyReads(body, tsPath, pairedByFile.get(tsPath)),
       );
     }
     const tsBodies = tsFiles.get(tsPath)!.get(row.tsName) ?? [];

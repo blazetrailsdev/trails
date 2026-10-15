@@ -1,4 +1,3 @@
-import { merge } from "@blazetrails/ruby-compat";
 import { HashConfig } from "./hash-config.js";
 import { type DatabaseConfigOptions } from "./database-config.js";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
@@ -16,7 +15,7 @@ export class UrlConfig extends HashConfig {
     super(envName, name, configurationHash);
 
     this.url = url;
-    this._configurationHash = merge(this._configurationHash, this.buildUrlHash());
+    this._configurationHash = { ...this._configurationHash, ...this.buildUrlHash() };
 
     if (this._configurationHash.schemaDump === "false") {
       this._configurationHash.schemaDump = false;

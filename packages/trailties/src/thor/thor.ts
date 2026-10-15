@@ -9,7 +9,6 @@ import {
   include,
   initializeIncludedModules,
   isEmpty,
-  merge,
   mergeBang,
   puts,
   Range,
@@ -627,7 +626,7 @@ export class Thor {
   static findCommandPossibilities(this: ThorClass, meth: string): string[] {
     const len = toS(meth).length;
     const possibilities = sort(
-      Object.keys(merge(this.allCommands(), this.map())).filter((n) => meth === n.slice(0, len)),
+      Object.keys({ ...this.allCommands(), ...this.map() }).filter((n) => meth === n.slice(0, len)),
     );
     const uniquePossibilities = uniq(
       possibilities.map((k) => (rtest(this.map()[k]) ? this.map()[k] : k)),

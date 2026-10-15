@@ -1,5 +1,5 @@
 import { Concern, Module, extend } from "@blazetrails/activesupport";
-import { ArgumentError, File, merge, slice } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, slice } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Base, RenderOptions } from "../base.js";
@@ -62,9 +62,10 @@ export function sendData(
   options: SendDataOptions = {},
 ): unknown {
   this.sendFileHeadersBang(options);
-  return this.render(
-    merge(slice(options as Record<string, unknown>, "status", "contentType"), { body: data }),
-  );
+  return this.render({
+    ...slice(options as Record<string, unknown>, "status", "contentType"),
+    body: data,
+  });
 }
 
 /** @internal */

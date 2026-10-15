@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { camelize, constantize, inquiry, singularize, tableize } from "@blazetrails/activesupport";
-import { hashDelete, merge, rbFPublicSend } from "@blazetrails/ruby-compat";
+import { hashDelete, rbFPublicSend } from "@blazetrails/ruby-compat";
 
 export interface DelegatedTypeOptions {
   types: string[];
@@ -18,7 +18,7 @@ export function delegatedType(
   this.belongsTo(
     role,
     hashDelete(options as Record<string, unknown>, "scope") as DelegatedTypeOptions["scope"] | null,
-    merge(options, { polymorphic: true }),
+    { ...options, polymorphic: true },
   );
   this.defineDelegatedTypeMethods(role, { types, options });
 }

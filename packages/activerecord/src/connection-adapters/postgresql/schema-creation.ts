@@ -1,4 +1,4 @@
-import { isSymbol } from "@blazetrails/ruby-compat";
+import { isSymbol, rtest } from "@blazetrails/ruby-compat";
 import { wrap } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -131,7 +131,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
     const options = this.columnOptions(column);
 
-    if (options["collation"]) {
+    if (rtest(options["collation"])) {
       sql += ` COLLATE ${this.conn.quoteColumnName(String(options["collation"]))}`;
     }
     if (options["using"]) {
@@ -169,23 +169,24 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
-    const opts = options as Record<string, unknown>;
-    if (opts["collation"]) {
-      sql += ` COLLATE "${opts["collation"]}"`;
+  protected override addColumnOptionsBang(
+    sql: string,
+    options: AddColumnOptions & Record<string, unknown>,
+  ): Promise<string> {
+    if (rtest(options["collation"])) {
+      sql += ` COLLATE "${options["collation"]}"`;
     }
 
-    const col = opts["column"] as { name?: string };
-    const as = opts["as"];
-    if (as != null && as !== false) {
+    const as = options["as"];
+    if (rtest(as)) {
       sql += ` GENERATED ALWAYS AS (${as})`;
 
-      if (opts["stored"] != null && opts["stored"] !== false) {
+      if (rtest(options["stored"])) {
         sql += " STORED";
       } else {
         throw new ArgumentError(
           `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
-            `Specify 'stored: true' option for '${col.name}'\n`,
+            `Specify 'stored: true' option for '${(options["column"] as { name?: string }).name}'\n`,
         );
       }
     }

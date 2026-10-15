@@ -673,10 +673,10 @@ export class ReferenceDefinition {
 
   /** @internal */
   protected indexOptions(tableName: string): AddIndexOptions {
-    const indexOptions: AddIndexOptions = merge(
-      this.asOptions(this.index),
-      this.conditionalOptions(),
-    );
+    const indexOptions: AddIndexOptions = {
+      ...this.asOptions(this.index),
+      ...this.conditionalOptions(),
+    };
 
     if (this.options._usesLegacyReferenceIndexName) return indexOptions;
 
@@ -686,10 +686,11 @@ export class ReferenceDefinition {
 
   /** @internal */
   private foreignKeyOptions(): ReferenceForeignKeyOptions {
-    return merge(this.asOptions(this.foreignKey), {
+    return {
+      ...this.asOptions(this.foreignKey),
       column: this.columnName(),
       ...this.conditionalOptions(),
-    }) as ReferenceForeignKeyOptions;
+    } as ReferenceForeignKeyOptions;
   }
 
   /** @internal */

@@ -24,7 +24,6 @@ import {
   except,
   fetch,
   hashDelete,
-  merge,
   rbFPublicSend,
   rbInspect,
   rbObjRespondTo,
@@ -810,7 +809,7 @@ export class FormBuilder {
   }
 
   private objectifyOptions(options: Record<string, unknown>): Record<string, unknown> {
-    const result = merge(this._defaultOptions, options);
+    const result = { ...this._defaultOptions, ...options };
     result["object"] = this.object;
     return result;
   }

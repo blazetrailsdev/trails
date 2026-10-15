@@ -16,7 +16,7 @@ import {
 } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
-import { Exception, merge, StandardError, throwDataP } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, throwDataP } from "@blazetrails/ruby-compat";
 import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
 import type { redirectTo as flashRedirectTo } from "./flash.js";
 
@@ -110,7 +110,7 @@ export function sendFile(
   path: string,
   options: SendFileOptions = {},
 ): void {
-  return Notifications.instrument("send_file.action_controller", merge(options, { path }), () =>
+  return Notifications.instrument("send_file.action_controller", { ...options, path }, () =>
     Instrumentation.superMethod(this, "sendFile")!(path, options),
   ) as void;
 }

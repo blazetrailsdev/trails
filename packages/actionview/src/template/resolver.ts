@@ -270,13 +270,13 @@ export class PathParser {
 
     return new RegExp(
       "^" +
-        "(?:(.*)\\/)?" +
-        "(_)?" +
-        "(.*?)" +
-        `(?:\\.(${locales}))??` +
-        `(?:\\.(${formats}))??` +
-        `(?:\\+(${variants}))??` +
-        `(?:\\.(${handlers}))?` +
+        "(?:(?<prefix>.*)\\/)?" +
+        "(?<partial>_)?" +
+        "(?<action>.*?)" +
+        `(?:\\.(?<locale>${locales}))??` +
+        `(?:\\.(?<format>${formats}))??` +
+        `(?:\\+(?<variant>${variants}))??` +
+        `(?:\\.(?<handler>${handlers}))?` +
         "$",
     );
   }
@@ -284,13 +284,16 @@ export class PathParser {
   parse(path: string): ParsedPath {
     this.regex ??= this.buildPathRegex();
     const match = this.regex.exec(path)!;
-    const [, prefix, partial, action, locale, format, variant, handler] = match;
-    const templatePath = TemplatePath.build(action, prefix ?? "", partial != null);
+    const templatePath = TemplatePath.build(
+      match.groups!["action"],
+      match.groups!["prefix"] ?? "",
+      match.groups!["partial"] != null,
+    );
     const details = new TemplateDetails(
-      locale != null ? `:${locale}` : null,
-      handler != null ? `:${handler}` : null,
-      format != null ? `:${format}` : null,
-      variant != null ? `:${variant}` : null,
+      match.groups!["locale"] != null ? `:${match.groups!["locale"]}` : null,
+      match.groups!["handler"] != null ? `:${match.groups!["handler"]}` : null,
+      match.groups!["format"] != null ? `:${match.groups!["format"]}` : null,
+      match.groups!["variant"] != null ? `:${match.groups!["variant"]}` : null,
     );
     return new ParsedPath(templatePath, details);
   }

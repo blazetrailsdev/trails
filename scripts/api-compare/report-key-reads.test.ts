@@ -7,6 +7,7 @@ import type { SkeletonRow } from "./report-arms.js";
 import {
   bodyKey,
   keyReadRows,
+  reexportSource,
   rubyBodyOf,
   tsBodyOf,
   tsKeyReads,
@@ -148,6 +149,14 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
     const bare = tsKeyReads("function call(o) { return o.c; }").get("call")!;
     expect(tsBodyOf({ ...ROW, tsOwner: "C" }, bare)).toBeUndefined();
     expect(tsBodyOf({ ...ROW, tsOwner: "C", rubyOwner: "A::C" }, bare)).toBe(bare[0]);
+  });
+
+  it("an owner the TS file re-exports is read from the module it names", () => {
+    const text =
+      'export { Store, WriteOptions } from "./cache/store.js";\nexport { x } from "pkg";';
+    expect(reexportSource(text, "Store")).toBe("./cache/store.js");
+    expect(reexportSource(text, "x")).toBeUndefined();
+    expect(reexportSource("export class Store {}", "Store")).toBeUndefined();
   });
 
   it("a nested function that is itself a compared pair reads for itself", () => {

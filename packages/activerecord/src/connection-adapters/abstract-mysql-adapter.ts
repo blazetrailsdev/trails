@@ -599,30 +599,30 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     const column = await this.columnFor(tableName, columnName);
     type ??= column.sqlType ?? "";
 
-    const opts: Record<string, unknown> = { ...options };
+    options = { ...options };
 
-    if (!Object.prototype.hasOwnProperty.call(opts, "default")) {
-      opts["default"] = column.defaultFunction ? () => column.defaultFunction : column.default;
+    if (!Object.prototype.hasOwnProperty.call(options, "default")) {
+      options["default"] = column.defaultFunction ? () => column.defaultFunction : column.default;
     }
-    if (!Object.prototype.hasOwnProperty.call(opts, "null")) {
-      opts["null"] = column.null;
+    if (!Object.prototype.hasOwnProperty.call(options, "null")) {
+      options["null"] = column.null;
     }
-    if (!Object.prototype.hasOwnProperty.call(opts, "comment")) {
-      opts["comment"] = column.comment ?? undefined;
+    if (!Object.prototype.hasOwnProperty.call(options, "comment")) {
+      options["comment"] = column.comment ?? undefined;
     }
 
-    if (opts["collation"] === "no_collation") {
-      delete opts["collation"];
+    if (options["collation"] === "no_collation") {
+      delete options["collation"];
     } else if (this.isTextType(type)) {
-      opts["collation"] ??= column.collation ?? undefined;
+      options["collation"] ??= column.collation ?? undefined;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(opts, "autoIncrement")) {
-      opts["autoIncrement"] = (column as MysqlColumn).isAutoIncrement();
+    if (!Object.prototype.hasOwnProperty.call(options, "autoIncrement")) {
+      options["autoIncrement"] = (column as MysqlColumn).isAutoIncrement();
     }
 
     const td = this.createTableDefinition(tableName);
-    const cd = td.newColumnDefinition(column.name, type as any, opts as any);
+    const cd = td.newColumnDefinition(column.name, type as any, options as any);
     return new ChangeColumnDefinition(cd, column.name);
   }
 

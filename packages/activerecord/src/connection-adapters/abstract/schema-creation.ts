@@ -16,7 +16,6 @@ import {
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
-import { merge } from "@blazetrails/ruby-compat";
 
 export interface SchemaCreationConn extends SchemaQuoter {
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
@@ -320,7 +319,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
-    return merge(o.options, { column: o });
+    return { ...o.options, column: o };
   }
 
   /** @internal */

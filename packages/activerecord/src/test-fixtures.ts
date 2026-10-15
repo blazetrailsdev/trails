@@ -8,7 +8,6 @@ import {
   StandardError,
   isEmpty,
   isSymbol,
-  merge,
   rbEql,
   rbObjClassname,
   strUminus,
@@ -46,7 +45,7 @@ interface TestFixturesClassHost {
 
 export const ClassMethods = {
   setFixtureClass(this: TestFixturesClassHost, classNames: Record<string, unknown> = {}): void {
-    this.fixtureClassNames = merge(this.fixtureClassNames, stringifyKeys(classNames));
+    this.fixtureClassNames = { ...this.fixtureClassNames, ...stringifyKeys(classNames) };
   },
 
   fixtures(this: TestFixturesClassHost, ...fixtureSetNames: unknown[]): void {
