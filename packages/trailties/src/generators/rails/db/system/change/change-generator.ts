@@ -1,5 +1,13 @@
 import { any } from "@blazetrails/activesupport";
-import { aryDelete, compact, File, FileUtils, flatten, Hash } from "@blazetrails/ruby-compat";
+import {
+  aryDelete,
+  compact,
+  File,
+  FileUtils,
+  flatten,
+  Hash,
+  hashDelete,
+} from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
@@ -178,8 +186,9 @@ export class ChangeGenerator extends GeneratorBase {
     const composeConfig = YAML.loadFile(composeYamlPath) as Hash<string, any>;
 
     for (const database of Database.all()) {
-      composeConfig.get("services").delete(database.name);
-      composeConfig.get("volumes")?.delete(database.volume!);
+      hashDelete(composeConfig.get("services"), database.name);
+      const volumes = composeConfig.get("volumes");
+      if (volumes != null) hashDelete(volumes, database.volume!);
       const dependsOn = composeConfig.get("services").get("rails-app").get("depends_on");
       if (dependsOn != null) aryDelete(dependsOn, database.name);
     }
@@ -206,9 +215,9 @@ export class ChangeGenerator extends GeneratorBase {
         );
     }
 
-    if (!any([...(composeConfig.get("volumes") ?? [])])) composeConfig.delete("volumes");
+    if (!any([...(composeConfig.get("volumes") ?? [])])) hashDelete(composeConfig, "volumes");
     if (!any(composeConfig.get("services").get("rails-app").get("depends_on") ?? [])) {
-      composeConfig.get("services").get("rails-app").delete("depends_on");
+      hashDelete(composeConfig.get("services").get("rails-app"), "depends_on");
     }
 
     File.write(composeYamlPath, toYaml(composeConfig));
