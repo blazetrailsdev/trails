@@ -139,9 +139,8 @@ export class YAMLTree {
         : this.visitObject(target);
     }
     if (target == null) return this.visitNilClass();
-    if (typeof target === "boolean") return new Scalar(String(target), null, null, true, false);
     if (typeof target === "number" && !Number.isInteger(target)) return this.visitFloat(target);
-    return new Scalar(String(target), null, null, true, false);
+    return this.visitInteger(target as number | boolean | bigint);
   }
 
   private visitFloat(o: number): Node {
@@ -255,11 +254,15 @@ export class YAMLTree {
     return this.register(o, new Scalar(this.formatTime(o), null, null, true, false));
   }
 
-  private visitInteger(o: { toS(): string } | PlainDate): Node {
+  private visitInteger(o: { toS(): string } | PlainDate | number | boolean | bigint): Node {
     return new Scalar(
-      temporalTag(o) === "Temporal.PlainDate"
-        ? (o as PlainDate).toString()
-        : (o as { toS(): string }).toS(),
+      typeof o === "number"
+        ? BigInt(o).toString()
+        : typeof o !== "object"
+          ? String(o)
+          : temporalTag(o) === "Temporal.PlainDate"
+            ? (o as PlainDate).toString()
+            : (o as { toS(): string }).toS(),
       null,
       null,
       true,

@@ -1,5 +1,6 @@
 import type * as Yaml from "yaml";
 import { NotImplementedError } from "../not-implemented-error.js";
+import { registerConstant } from "../variable.js";
 import { yaml as backend, type PsychIO } from "../psych-adapter.js";
 import { Mapping } from "./nodes/mapping.js";
 import { Scalar } from "./nodes/scalar.js";
@@ -184,11 +185,11 @@ export class Emitter {
   constructor(io: PsychIO, options: DumperOptions = {}) {
     this.io = io;
     this.options = options;
-    if (options.canonical) throw new NotImplementedError("canonical");
   }
 
   /** @noRailsEquivalent PERMANENT */
   startStream(_encoding: number): this {
+    if (this.options.canonical) throw new NotImplementedError("canonical");
     return this;
   }
 
@@ -217,7 +218,12 @@ export class Emitter {
   /** @noRailsEquivalent PERMANENT */
   endDocument(_implicitEnd: boolean): this {
     const doc = this.doc!;
-    const du: { indent?: number; lineWidth?: number; indentSeq: boolean } = { indentSeq: false };
+    const du: {
+      indent?: number;
+      lineWidth?: number;
+      indentSeq: boolean;
+      flowCollectionPadding: boolean;
+    } = { indentSeq: false, flowCollectionPadding: false };
     if ("indentation" in this.options) du.indent = this.options.indentation;
     if ("lineWidth" in this.options) du.lineWidth = this.options.lineWidth;
     const root = doc.contents;
@@ -328,3 +334,5 @@ export class Emitter {
     }
   }
 }
+
+registerConstant("Psych::Emitter", Emitter);
