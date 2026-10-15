@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { HashWithIndifferentAccess, isDuplicable } from "@blazetrails/activesupport";
-import { Hash, NoMethodError, rbEqual, TypeError } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbEqual, TypeError } from "@blazetrails/ruby-compat";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */
@@ -203,12 +203,12 @@ export class NullMutationTracker {
     return [];
   }
 
-  changedValues(): Hash<string, unknown> {
-    return new Hash();
+  changedValues(): Record<string, unknown> {
+    return {};
   }
 
-  changes(): Hash<string, [unknown, unknown]> {
-    return new Hash();
+  changes(): Record<string, [unknown, unknown]> {
+    return {};
   }
 
   changeToAttribute(_attrName: string): [unknown, unknown] | null {

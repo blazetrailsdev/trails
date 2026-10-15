@@ -58,7 +58,6 @@ import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
 import {
-  Hash,
   Range as ArRange,
   RuntimeError,
   sort,
@@ -343,7 +342,7 @@ describe("BasicsTest", async () => {
   it("previously changed", async () => {
     const topic = (await Topic.first()) as any;
     topic.title = "<3<3<3";
-    expect(topic.previousChanges).toEqual(new Hash());
+    expect(topic.previousChanges).toEqual({});
 
     await topic.saveBang();
     const expected = ["The First Topic", "<3<3<3"];

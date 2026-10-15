@@ -1,4 +1,4 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { hashAref, hasKey, keys } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
@@ -606,82 +606,105 @@ describe("DirtyTest", () => {
 
   it("previous changes", async () => {
     let pirate = new Pirate();
-    expect(pirate.previousChanges).toEqual(new Hash());
+    expect(pirate.previousChanges).toEqual({});
     pirate.catchphrase = "arrr";
     await pirate.saveBang();
 
     expect(pirate.previousChanges.size).toEqual(4);
-    expect(pirate.previousChanges.get("catchphrase")).toEqual([null, "arrr"]);
+    expect(hashAref(pirate.previousChanges, "catchphrase")).toEqual([null, "arrr"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBeNull();
-    expect(pirate.previousChanges.get("id")).toEqual([null, (pirate as any).id]);
-    expect(pirate.previousChanges.get("updated_on")![0]).toBeNull();
-    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
-    expect(pirate.previousChanges.get("created_on")![0]).toBeNull();
-    expect(pirate.previousChanges.get("created_on")![1]).not.toBeNull();
-    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
+    expect(hashAref(pirate.previousChanges, "id")).toEqual([null, (pirate as any).id]);
+    expect((hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[0]).toBeNull();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[1],
+    ).not.toBeNull();
+    expect((hashAref(pirate.previousChanges, "created_on") as [unknown, unknown])[0]).toBeNull();
+    expect(
+      (hashAref(pirate.previousChanges, "created_on") as [unknown, unknown])[1],
+    ).not.toBeNull();
+    expect(hasKey(pirate.previousChanges, "parrot_id")).toBeFalsy();
 
     pirate = new Pirate();
-    expect(pirate.previousChanges).toEqual(new Hash());
+    expect(pirate.previousChanges).toEqual({});
     pirate.catchphrase = "arrr";
     await pirate.save();
 
     expect(pirate.previousChanges.size).toEqual(4);
-    expect(pirate.previousChanges.get("catchphrase")).toEqual([null, "arrr"]);
+    expect(hashAref(pirate.previousChanges, "catchphrase")).toEqual([null, "arrr"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBeNull();
-    expect(pirate.previousChanges.get("id")).toEqual([null, (pirate as any).id]);
-    expect([...pirate.previousChanges.keys()]).toContain("updated_on");
-    expect([...pirate.previousChanges.keys()]).toContain("created_on");
-    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
+    expect(hashAref(pirate.previousChanges, "id")).toEqual([null, (pirate as any).id]);
+    expect([...keys(pirate.previousChanges)]).toContain("updated_on");
+    expect([...keys(pirate.previousChanges)]).toContain("created_on");
+    expect(hasKey(pirate.previousChanges, "parrot_id")).toBeFalsy();
 
     pirate.catchphrase = "Yar!!";
     await pirate.reload();
-    expect(pirate.previousChanges).toEqual(new Hash());
+    expect(pirate.previousChanges).toEqual({});
 
     pirate = (await (Pirate as any).findByCatchphrase("arrr"))!;
     pirate.catchphrase = "Me Maties!";
     await pirate.saveBang();
 
     expect(pirate.previousChanges.size).toEqual(2);
-    expect(pirate.previousChanges.get("catchphrase")).toEqual(["arrr", "Me Maties!"]);
+    expect(hashAref(pirate.previousChanges, "catchphrase")).toEqual(["arrr", "Me Maties!"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("arrr");
-    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
-    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
-    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
-    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[0],
+    ).not.toBeNull();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[1],
+    ).not.toBeNull();
+    expect(hasKey(pirate.previousChanges, "parrot_id")).toBeFalsy();
+    expect(hasKey(pirate.previousChanges, "created_on")).toBeFalsy();
 
     pirate = (await (Pirate as any).findByCatchphrase("Me Maties!"))!;
     pirate.catchphrase = "Thar She Blows!";
     await pirate.save();
 
     expect(pirate.previousChanges.size).toEqual(2);
-    expect(pirate.previousChanges.get("catchphrase")).toEqual(["Me Maties!", "Thar She Blows!"]);
+    expect(hashAref(pirate.previousChanges, "catchphrase")).toEqual([
+      "Me Maties!",
+      "Thar She Blows!",
+    ]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Me Maties!");
-    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
-    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
-    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
-    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[0],
+    ).not.toBeNull();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[1],
+    ).not.toBeNull();
+    expect(hasKey(pirate.previousChanges, "parrot_id")).toBeFalsy();
+    expect(hasKey(pirate.previousChanges, "created_on")).toBeFalsy();
 
     pirate = (await (Pirate as any).findByCatchphrase("Thar She Blows!"))!;
     await pirate.update({ catchphrase: "Ahoy!" });
 
     expect(pirate.previousChanges.size).toEqual(2);
-    expect(pirate.previousChanges.get("catchphrase")).toEqual(["Thar She Blows!", "Ahoy!"]);
+    expect(hashAref(pirate.previousChanges, "catchphrase")).toEqual(["Thar She Blows!", "Ahoy!"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Thar She Blows!");
-    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
-    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
-    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
-    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[0],
+    ).not.toBeNull();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[1],
+    ).not.toBeNull();
+    expect(hasKey(pirate.previousChanges, "parrot_id")).toBeFalsy();
+    expect(hasKey(pirate.previousChanges, "created_on")).toBeFalsy();
 
     pirate = (await (Pirate as any).findByCatchphrase("Ahoy!"))!;
     await pirate.updateAttribute("catchphrase", "Ninjas suck!");
 
     expect(pirate.previousChanges.size).toEqual(2);
-    expect(pirate.previousChanges.get("catchphrase")).toEqual(["Ahoy!", "Ninjas suck!"]);
+    expect(hashAref(pirate.previousChanges, "catchphrase")).toEqual(["Ahoy!", "Ninjas suck!"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Ahoy!");
-    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
-    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
-    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
-    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[0],
+    ).not.toBeNull();
+    expect(
+      (hashAref(pirate.previousChanges, "updated_on") as [unknown, unknown])[1],
+    ).not.toBeNull();
+    expect(hasKey(pirate.previousChanges, "parrot_id")).toBeFalsy();
+    expect(hasKey(pirate.previousChanges, "created_on")).toBeFalsy();
   });
 
   it("field named field", async () => {

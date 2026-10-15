@@ -1,6 +1,5 @@
 import { HashWithIndifferentAccess, included, kernelArray } from "@blazetrails/activesupport";
 import { include, Module, rbObjAsString } from "@blazetrails/ruby-compat";
-import type { Hash } from "@blazetrails/ruby-compat";
 
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -98,7 +97,9 @@ export class Dirty {
     return this.mutationsFromDatabase.changes();
   }
 
-  get previousChanges(): Hash<string, [unknown, unknown]> {
+  get previousChanges():
+    | HashWithIndifferentAccess<[unknown, unknown]>
+    | Record<string, [unknown, unknown]> {
     return this.mutationsBeforeLastSave.changes();
   }
 
