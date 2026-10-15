@@ -267,10 +267,15 @@ export function fixCitations(text: string, findings: readonly InlinedFromFinding
 async function main(fix: boolean): Promise<number> {
   const read = async (name: string) =>
     JSON.parse(await fs.readFile(path.join(OUTPUT_DIR, name), "utf-8")) as ApiManifest;
+  const pairsPath = path.join(OUTPUT_DIR, INLINED_FROM_PAIRS_FILE);
   const pairs = await fs
-    .readFile(path.join(OUTPUT_DIR, INLINED_FROM_PAIRS_FILE), "utf-8")
+    .readFile(pairsPath, "utf-8")
     .then((text) => JSON.parse(text) as InlinedFromPair[])
-    .catch(() => []);
+    .catch((error: unknown) => {
+      throw new Error(
+        `${TAG} gate cannot read ${pairsPath}: run \`pnpm parity:api --calls\` first (${String(error)})`,
+      );
+    });
   let findings = inlinedFromFindings(
     await read("rails-api.json"),
     await read("ts-api.json"),
