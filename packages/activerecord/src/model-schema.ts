@@ -200,6 +200,7 @@ export function contentColumns(this: typeof Base): any[] {
 }
 
 export interface SchemaHost {
+  isAbstractClass(): boolean;
   name: string;
   tableName: string | null;
   primaryKey: string | string[];
@@ -596,7 +597,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
  * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
-  if ((this as any).isAbstractClass()) return;
+  if (this.isAbstractClass()) return;
   let pool: ReturnType<typeof Base.connectionPool>;
   try {
     pool = (this as unknown as typeof Base).connectionPool();
