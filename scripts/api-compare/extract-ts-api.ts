@@ -3717,6 +3717,7 @@ function harvestDefineMethodSeat(
   const callSeq = extractCallSeq(body.body);
   const callArgs = extractCallArgs(body.body);
   const skeleton = extractSkeleton(body.body);
+  const noRailsEquivalent = noRailsEquivalentReason(node);
   return {
     name: name.text,
     visibility: "public",
@@ -3724,6 +3725,7 @@ function harvestDefineMethodSeat(
     isStatic: false,
     line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
     file,
+    ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
     ...(optionKeys !== undefined ? { optionKeys } : {}),
     ...(calls !== undefined ? { calls } : {}),
     ...(callSeq !== undefined ? { callSeq } : {}),
