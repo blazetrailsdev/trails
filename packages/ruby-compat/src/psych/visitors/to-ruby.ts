@@ -178,6 +178,8 @@ export class ToRuby {
         return new klass(endpoint(begin), endpoint(end), dots === "...");
       }
       default:
+        if (/^!(?:str|ruby\/string)(?::(.*))?$/.test(o.tag) || o.tag === "tag:yaml.org,2002:str")
+          return value;
         if (/^!ruby\/sym(bol)?:?(.*)?$/.test(o.tag)) return this.classLoader.symbolize(value);
         return this.ss.tokenize(o.source);
     }

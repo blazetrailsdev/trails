@@ -239,6 +239,7 @@ export const Struct = {
       });
     });
     structClasses.add(klass.prototype);
+    Object.defineProperty(klass, "name", { value: "" });
     return klass as unknown as new (...values: unknown[]) => StructInstance & Record<M, unknown>;
   },
 };

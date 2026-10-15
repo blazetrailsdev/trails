@@ -11,6 +11,7 @@ import {
   DisallowedClass as PsychDisallowedClass,
   Exception as PsychException,
 } from "./psych/exception.js";
+import { SyntaxError as PsychSyntaxError } from "./psych/syntax-error.js";
 import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { Omap as PsychOmap } from "./psych/omap.js";
@@ -69,6 +70,14 @@ export namespace Psych {
    */
   export const DisallowedClass = PsychDisallowedClass;
   export type DisallowedClass = PsychDisallowedClass;
+
+  /**
+   * `Psych::SyntaxError` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/syntax_error.rb:5`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const SyntaxError = PsychSyntaxError;
+  export type SyntaxError = PsychSyntaxError;
 
   /**
    * `Psych::Coder` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:9`).
@@ -237,17 +246,31 @@ export namespace Psych {
    * `Psych.parse` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:398`): the first
    * document's root node. libyaml reads the source's bytes
    * (`yaml_parser_set_input_string`, `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`),
-   * so a source held as its bytes is decoded here.
+   * so a source held as its bytes is decoded here. A malformed document raises
+   * `Psych::SyntaxError` as `make_exception` does (`psych_parser.c:80-100`).
    *
    * @noRailsEquivalent PERMANENT
    */
   export function parse(
     yamlString: string | Uint8Array | IO,
-    { filename: _filename = null as string | null } = {},
+    { filename = null as string | null } = {},
   ): PsychNode | false {
     if (yamlString instanceof IO) yamlString = yamlString.read();
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
-    return yaml.parseDocument(yamlString).contents ?? false;
+    const doc = yaml.parseDocument(yamlString);
+    if (doc.errors.length > 0) {
+      const [error] = doc.errors;
+      const mark = error.linePos?.[0] ?? { line: 0, col: 0 };
+      throw new PsychSyntaxError(
+        filename,
+        mark.line,
+        mark.col,
+        error.pos[0],
+        error.message.split(" at line ")[0],
+        null,
+      );
+    }
+    return doc.contents ?? false;
   }
 
   /**

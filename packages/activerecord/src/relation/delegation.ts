@@ -35,6 +35,7 @@ import {
   rbObjIvarSet,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
+import type { Psych } from "@blazetrails/ruby-compat/psych";
 import { ActiveRecord, Associations } from "../namespaces.js";
 
 type FamilyCtor = new (...args: any[]) => any;
@@ -252,6 +253,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   toFs: (records, format?: string) => toFsArray(records, format),
   toXml: (records, options?: ToXmlOptions, block?: (builder: XmlBuilder) => void) =>
     toXmlArray(records, options, block),
+  encodeWith: (records, coder: Psych.Coder) => rbFPublicSend(records, "encodeWith", coder),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
 
@@ -402,6 +404,12 @@ export class Delegation {
       this,
       (records) => RECORD_DELEGATES.toXml(records, options, block) as string,
     );
+  }
+
+  encodeWith(this: DelegationHost, coder: Psych.Coder): void | Promise<void> {
+    return withRecords(this, (records) => {
+      RECORD_DELEGATES.encodeWith(records, coder);
+    });
   }
 
   get connection(): Promise<DatabaseAdapter | null> {

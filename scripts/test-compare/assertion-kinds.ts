@@ -153,6 +153,8 @@ const MSPEC_MAP: Record<string, CanonicalKind> = {
   should_not_raise_error: "nothingRaised",
   should_be_an_instance_of: "instanceOf",
   should_be_kind_of: "instanceOf",
+  should_match_yaml: "equal",
+  should_be_true: "equal",
 };
 
 const RSPEC_MAP: Record<string, CanonicalKind> = {
