@@ -13,6 +13,7 @@
     { "path": "../date" },
     { "path": "../did-you-mean" },
     { "path": "../tse-compiler" },
-    { "path": "../html-sanitizer" }
+    { "path": "../html-sanitizer" },
+    { "path": "../nokogiri" }
   ]
 }

@@ -635,7 +635,7 @@ describe("Application::Configuration", () => {
     expect(c.yjit).toBe(true);
     expect(c.addAutoloadPathsToLoadPath).toBe(false);
     expect(c.precompileFilterParameters).toBe(true);
-    expect(c.domTestingDefaultHtmlVersion).toBe(":html4");
+    expect(c.domTestingDefaultHtmlVersion).toBe(":html5");
     expect(c.sslOptions).toEqual({ hsts: { subdomains: true } });
     expect((c.get("activeRecord") as Record<string, unknown>).belongsToRequiredByDefault).toBe(
       true,

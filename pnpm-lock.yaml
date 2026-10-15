@@ -195,6 +195,9 @@ importers:
       '@blazetrails/html-sanitizer':
         specifier: workspace:*
         version: link:../html-sanitizer
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -440,6 +443,9 @@ importers:
       libxml2-wasm:
         specifier: ^0.7.1
         version: 0.7.1
+      parse5:
+        specifier: ^8.0.0
+        version: 8.0.0
 
   packages/rack:
     dependencies:
