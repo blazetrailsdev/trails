@@ -301,6 +301,27 @@ describe("FormWithActsLikeFormForTest", () => {
     return txt + (block ? block() : "") + "</form>";
   }
 
+  it("fields with attributes not on model", () => {
+    formWith({ model: post() }, (f) => {
+      concat(
+        f.fields("comment", {}, (c) => {
+          concat(c.textField("dont_exist_on_model"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      null,
+      null,
+      { method: "patch" },
+      () =>
+        '<input type="text" name="post[comment][dont_exist_on_model]" id="post_comment_dont_exist_on_model" >',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
   it("form with when given nil model argument", () => {
     expect(() => formWith({ model: null }, () => {})).toThrow(ArgumentError);
   });
