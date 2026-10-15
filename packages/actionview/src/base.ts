@@ -10,6 +10,7 @@ import {
   initializeIncludedModules,
   jsonEscape,
   runLoadHooks,
+  TseUtil,
   xmlNameEscape,
   type SafeBuffer,
 } from "@blazetrails/activesupport";
@@ -390,11 +391,6 @@ export class Base {
   }
 }
 
-const TseUtil = { h, htmlEscape, htmlEscapeOnce, jsonEscape, xmlNameEscape };
-for (const [name, value] of Object.entries(TseUtil)) {
-  (Base.prototype as unknown as Record<string, unknown>)[name] = value;
-}
-
 installControllerInternals(Base.prototype);
 attrInternal.call(Base.prototype, "defaultFormBuilder");
 installControllerDelegates(Base.prototype);
@@ -419,6 +415,7 @@ export interface Base extends Context, Omit<HelperMethods, "logger">, TseUtilMet
 }
 
 include(Base, Context);
+include(Base, TseUtil);
 include(Base, Helpers);
 extend(Base, UrlHelperClassMethods);
 

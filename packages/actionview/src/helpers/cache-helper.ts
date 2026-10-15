@@ -10,6 +10,7 @@ import type { OutputBuffer } from "../buffers.js";
 import { Digestor } from "../digestor.js";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
+import { Module } from "@blazetrails/ruby-compat";
 
 export class UncacheableFragmentError extends Error {
   constructor(message: string) {
@@ -201,3 +202,10 @@ export const CachingRegistry = {
     }
   },
 };
+
+export const CacheHelper = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { cache, isCaching, uncacheableBang, cacheIf, cacheUnless });
+    Object.assign(m, { cacheFragmentName, digestPathFromTemplate });
+  });
+});

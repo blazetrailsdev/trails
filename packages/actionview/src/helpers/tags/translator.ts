@@ -18,7 +18,7 @@ export class Translator {
     methodAndValue: string,
     { scope }: { scope: string },
   ) {
-    this.objectName = objectName.replace(/\[(.*)_attributes\]\[\d+\]/g, ".$1");
+    this.objectName = objectName.replace(/\[(.*)Attributes\]\[\d+\]/g, ".$1");
     this.methodAndValue = methodAndValue;
     this.scope = scope;
     this.model = rbObjRespondTo(object, "toModel")

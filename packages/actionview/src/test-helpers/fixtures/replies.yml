@@ -1,0 +1,15 @@
+witty_retort:
+  id: 1
+  topic_id: 1
+  developer_id: 1
+  content: Birdman is better!
+  created_at: <%= new Date(Date.now() - 6 * 3600000).toISOString().slice(0, 19).replace("T", " ") %>
+  updated_at: nil
+
+another:
+  id: 2
+  topic_id: 2
+  developer_id: 1
+  content: Nuh uh!
+  created_at: <%= new Date(Date.now() - 3600000).toISOString().slice(0, 19).replace("T", " ") %>
+  updated_at: nil

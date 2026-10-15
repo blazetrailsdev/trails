@@ -1,0 +1,22 @@
+futurama:
+  id: 1
+  title: Isn't futurama awesome?
+  subtitle: It really is, isn't it.
+  content: I like futurama
+  created_at: <%= new Date(Date.now() - 86400000).toISOString().slice(0, 19).replace("T", " ") %>
+  updated_at:
+
+harvey_birdman:
+  id: 2
+  title: Harvey Birdman is the king of all men
+  subtitle: yup
+  content: It really is
+  created_at: <%= new Date(Date.now() - 2 * 3600000).toISOString().slice(0, 19).replace("T", " ") %>
+  updated_at:
+
+rails:
+  id: 3
+  title: Rails is nice
+  subtitle: It makes me happy
+  content: except when I have to hack internals to fix pagination. even then really.
+  created_at: <%= new Date(Date.now() - 20 * 60000).toISOString().slice(0, 19).replace("T", " ") %>

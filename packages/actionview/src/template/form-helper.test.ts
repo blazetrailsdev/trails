@@ -39,8 +39,8 @@ class Post {
   isPersisted(): unknown {
     return this.persisted;
   }
-  set comments_attributes(attributes: unknown) {}
-  set tags_attributes(attributes: unknown) {}
+  set commentsAttributes(attributes: unknown) {}
+  set tagsAttributes(attributes: unknown) {}
   toKey(): unknown[] {
     return [123];
   }
@@ -321,7 +321,7 @@ describe("FormHelperTest", () => {
         "create-post",
         "edit_post",
         { method: "patch" },
-        () => '<label for="post_comments_attributes_0_body">Write body here</label>',
+        () => '<label for="post_commentsAttributes_0_body">Write body here</label>',
       );
 
       assertDomEqual(expected, rendered);
@@ -339,7 +339,7 @@ describe("FormHelperTest", () => {
         "create-post",
         "edit_post",
         { method: "patch" },
-        () => '<label for="post_tags_attributes_0_value">Tag</label>',
+        () => '<label for="post_tagsAttributes_0_value">Tag</label>',
       );
 
       assertDomEqual(expected, rendered);

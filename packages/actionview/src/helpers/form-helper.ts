@@ -28,11 +28,12 @@ import {
   rbInspect,
   rbObjRespondTo,
   slice,
+  Module,
 } from "@blazetrails/ruby-compat";
 
-import { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
+import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
 export { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
-import { domClass, domId } from "../record-identifier.js";
+import { RecordIdentifier, domClass, domId } from "../record-identifier.js";
 export { domClass, domId } from "../record-identifier.js";
 import { ActionView } from "../namespaces.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
@@ -42,6 +43,7 @@ import {
   formTagWithBody,
   htmlOptionsForForm,
   type FormTagHelperHost,
+  FormTagHelper,
 } from "./form-tag-helper.js";
 import { Label, type LabelBuilder } from "./tags/label.js";
 import { PasswordField } from "./tags/password-field.js";
@@ -60,6 +62,7 @@ import { NumberField } from "./tags/number-field.js";
 import { RangeField } from "./tags/range-field.js";
 import { SearchField } from "./tags/search-field.js";
 import { TextField } from "./tags/text-field.js";
+import { UrlHelper } from "./url-helper.js";
 
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;
@@ -836,7 +839,7 @@ export class FormBuilder {
   }
 
   private isNestedAttributesAssociation(associationName: string): boolean {
-    return rbObjRespondTo(this.object, `${associationName}_attributes=`);
+    return rbObjRespondTo(this.object, `${associationName}Attributes=`);
   }
 
   private fieldsForWithNestedAttributes(
@@ -845,7 +848,7 @@ export class FormBuilder {
     options: Record<string, unknown>,
     block?: (builder: FormBuilder) => unknown,
   ): unknown {
-    const name = `${this.objectName}[${associationName}_attributes]`;
+    const name = `${this.objectName}[${associationName}Attributes]`;
     association = convertToModel(association);
 
     if (rbObjRespondTo(association, "isPersisted")) {
@@ -928,5 +931,21 @@ onLoad("action_view", (base: unknown) => {
     instanceWriter: false,
     instanceReader: false,
     default: () => FormBuilder,
+  });
+});
+
+export const FormHelper = new Module((mod) => {
+  mod.include(FormTagHelper);
+  mod.include(UrlHelper);
+  mod.include(ModelNaming);
+  mod.include(RecordIdentifier);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { formFor, applyFormForOptionsBang, formWith, fieldsFor, fields, label });
+    Object.assign(m, { textField, passwordField, hiddenField, textarea, textArea, colorField });
+    Object.assign(m, { searchField, telephoneField, phoneField, dateField, timeField });
+    Object.assign(m, { datetimeField, datetimeLocalField, monthField, weekField, urlField });
+    Object.assign(m, { emailField, numberField, rangeField, _objectForFormBuilder });
+    Object.assign(m, { htmlOptionsForFormWith, instantiateBuilder, defaultFormBuilderClass });
   });
 });

@@ -1,4 +1,5 @@
 import { I18n } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 
 const MINUTES_IN_YEAR = 525600;
 const MINUTES_IN_QUARTER_YEAR = 131400;
@@ -152,3 +153,9 @@ export function timeAgoInWords(
 }
 
 export const distanceOfTimeInWordsToNow = timeAgoInWords;
+
+export const DateHelper = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { distanceOfTimeInWords, distanceOfTimeInWordsToNow, timeAgoInWords });
+  });
+});
