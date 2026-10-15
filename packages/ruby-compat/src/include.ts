@@ -43,6 +43,7 @@ import {
   rbCDate,
   rbCNumeric,
   rbObjClass,
+  rbObjSingletonClass,
   rbCString,
   rbCTime,
   rbModAttrReader,
@@ -598,7 +599,8 @@ export class Module<I extends object = Record<never, never>> {
     }
     for (const mod of nestedModules.get(this) ?? []) Module.prototype.extendObject.call(mod, obj);
     trackIncludedModule(obj, this);
-    const parent = Object.getPrototypeOf(obj) as object | null;
+    const holder: object = typeof obj === "function" ? obj : rbObjSingletonClass(obj).prototype;
+    const parent = Object.getPrototypeOf(holder) as object | null;
     const link: object =
       typeof obj === "function" && typeof parent === "function" && parent !== Function.prototype
         ? class extends (parent as new (...args: never[]) => object) {}
@@ -612,7 +614,7 @@ export class Module<I extends object = Record<never, never>> {
     links.refs.add(ref);
     singletonReaper.register(link, { mod: this, ref });
     Object.defineProperty(link, T_ICLASS, { value: this });
-    Object.setPrototypeOf(obj, link);
+    Object.setPrototypeOf(holder, link);
   }
 
   /**

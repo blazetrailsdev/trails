@@ -122,3 +122,21 @@ describe("Ruby extractor included-hook test macros", () => {
     ]);
   });
 });
+
+describe("Ruby extractor zip loop expansion", () => {
+  it("binds each pair of a literal zip receiver, one case per pair", () => {
+    // msgpack spec/packer_spec.rb:545-552.
+    const { cases } = extract(`
+      [1, 2, 4].zip([0xd4, 0xd5, 0xd6]).each do |n,b|
+        it "msgpack fixext #{n} format" do
+          expect(1).to eq(1)
+        end
+      end
+    `);
+    expect(cases.map((c) => [c.description, c.style])).toEqual([
+      ["msgpack fixext 1 format", "it"],
+      ["msgpack fixext 2 format", "it"],
+      ["msgpack fixext 4 format", "it"],
+    ]);
+  });
+});

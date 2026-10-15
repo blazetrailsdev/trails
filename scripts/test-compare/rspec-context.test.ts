@@ -103,3 +103,24 @@ describe("an RSpec context name with an interpolation the loop does not expand",
     ).toEqual([["a", "with <expr>", "x"], null]);
   });
 });
+
+describe("a description-less RSpec example", () => {
+  it("is named from its is_expected matcher under its context", async () => {
+    expect(
+      await extractPaths(`
+        describe "#register_type" do
+          context "when it has no ext type but an included module has" do
+            subject { packer.pack(Value.new).to_s }
+            it { is_expected.to eq "\\xC7\\x0F\\x01value_msgpacked" }
+            it do
+              is_expected.not_to eq 1
+            end
+          end
+        end
+      `),
+    ).toEqual([
+      '#register_type > when it has no ext type but an included module has > is expected to eq "\\xC7\\x0F\\x01value_msgpacked"',
+      "#register_type > when it has no ext type but an included module has > is expected not to eq 1",
+    ]);
+  });
+});
