@@ -16,7 +16,6 @@ import {
   Dir,
   Module,
   type Generic,
-  Hash,
   hashAref,
   rbFSend,
   rbInspect,
@@ -503,7 +502,7 @@ type CookieAssertionsHost = {
   ): SetCookieAttributes;
   parseSetCookiesHeaders(
     setCookies: string | string[] | null | undefined,
-  ): Hash<string, SetCookieAttributes>;
+  ): Record<string, SetCookieAttributes>;
 };
 
 export const CookieAssertions = {
@@ -534,12 +533,12 @@ export const CookieAssertions = {
   parseSetCookiesHeaders(
     this: Pick<CookieAssertionsHost, "parseSetCookieAttributes">,
     setCookies: string | string[] | null | undefined,
-  ): Hash<string, SetCookieAttributes> {
+  ): Record<string, SetCookieAttributes> {
     if (typeof setCookies === "string") {
       setCookies = stringSplit(setCookies, "\n");
     }
 
-    const cookies = new Hash<string, SetCookieAttributes>();
+    const cookies: Record<string, SetCookieAttributes> = {};
 
     setCookies?.forEach((cookieString) => {
       const attributes: SetCookieAttributes = {};
@@ -550,7 +549,7 @@ export const CookieAssertions = {
 
       attributes["value"] = value;
 
-      cookies.set(name, this.parseSetCookieAttributes(fields, attributes));
+      cookies[name] = this.parseSetCookieAttributes(fields, attributes);
     });
 
     return cookies;
@@ -566,10 +565,10 @@ export const CookieAssertions = {
     if (typeof attributes === "string") attributes = this.parseSetCookieAttributes(attributes);
 
     assert(
-      cookies.has(name),
-      `No cookie found with the name '${name}', found cookies: ${[...cookies.keys()].join(", ")}`,
+      Object.hasOwn(cookies, name),
+      `No cookie found with the name '${name}', found cookies: ${Object.keys(cookies).join(", ")}`,
     );
-    const cookie = cookies.get(name)!;
+    const cookie = cookies[name];
 
     for (const [key, value] of Object.entries(attributes)) {
       assert(Object.hasOwn(cookie, key), `No attribute '${key}' found for cookie '${name}'`);
@@ -586,8 +585,8 @@ export const CookieAssertions = {
     const cookies = this.parseSetCookiesHeaders(header);
     if (typeof attributes === "string") attributes = this.parseSetCookieAttributes(attributes);
 
-    assert(cookies.has(name), `No cookie found with the name '${name}'`);
-    const cookie = cookies.get(name)!;
+    assert(Object.hasOwn(cookies, name), `No cookie found with the name '${name}'`);
+    const cookie = cookies[name];
 
     for (const [key, value] of Object.entries(attributes)) {
       if (value === true) {
@@ -600,12 +599,12 @@ export const CookieAssertions = {
 
   assertSetCookieHeader(
     this: CookieAssertionsHost,
-    expected: string | string[] | Hash<string, SetCookieAttributes>,
+    expected: string | string[] | Record<string, SetCookieAttributes>,
     header:
       | string
       | string[]
       | undefined
-      | Hash<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
+      | Record<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
   ): void {
     if (typeof header === "string") {
       header = stringSplit(header, "\n").sort();
@@ -618,8 +617,8 @@ export const CookieAssertions = {
     header = this.parseSetCookiesHeaders(header as string[] | undefined);
     expected = this.parseSetCookiesHeaders(expected as string[]);
 
-    for (const [key, value] of expected) {
-      assertEqual(value, header.get(key));
+    for (const [key, value] of Object.entries(expected)) {
+      assertEqual(value, header[key]);
     }
   },
 
@@ -630,7 +629,7 @@ export const CookieAssertions = {
       | string
       | string[]
       | undefined
-      | Hash<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
+      | Record<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
   ): void {
     if (typeof header === "string") {
       header = stringSplit(header, "\n").sort();

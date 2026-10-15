@@ -143,8 +143,8 @@ describe("CookieAssertions", () => {
 
   it("parses the set-cookie header into names and attributes", () => {
     const cookies = tc.parseSetCookiesHeaders(tc.response.headers.get("Set-Cookie"));
-    expect([...cookies.keys()]).toEqual(["user_name", "login"]);
-    expect(cookies.get("login")).toEqual({ value: "XJ-122", path: "/", httponly: true });
+    expect(Object.keys(cookies)).toEqual(["user_name", "login"]);
+    expect(cookies["login"]).toEqual({ value: "XJ-122", path: "/", httponly: true });
     expect(tc.parseSetCookieAttributes("Path=/; Secure")).toEqual({ path: "/", secure: true });
   });
 
