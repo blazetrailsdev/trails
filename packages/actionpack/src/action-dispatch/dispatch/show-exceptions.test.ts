@@ -1,194 +1,190 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import { Lint } from "@blazetrails/rack";
+import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import {
+  I18n,
+  assertEqual,
+  assertKindOf,
+  assertMatch,
+  assertRaise,
+} from "@blazetrails/activesupport";
+import { RuntimeError, StandardError } from "@blazetrails/ruby-compat";
+import { TemplateError } from "@blazetrails/actionview";
+import { ActionNotFound } from "../../abstract-controller/base.js";
+import { MethodNotAllowed, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import { X_CASCADE } from "../constants.js";
+import { InvalidType } from "../http/mime-negotiation.js";
+import { ParseError } from "../http/parameters.js";
+import { Request } from "../http/request.js";
+import { PublicExceptions } from "../middleware/public-exceptions.js";
 import { ShowExceptions } from "../middleware/show-exceptions.js";
-import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, bodyToString } from "@blazetrails/rack";
+import { IntegrationTest } from "../testing/integration.js";
+import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
 class Boomer {
   async call(env: RackEnv): Promise<RackResponse> {
-    const path = env["PATH_INFO"] as string;
-    if (path === "/not_found") {
-      const err = new Error("ActionNotFound");
-      err.name = "ActionController::RoutingError";
-      throw err;
+    const req = new Request(env);
+    switch (req.path) {
+      case "/not_found":
+        throw new ActionNotFound();
+      case "/invalid_mimetype":
+        throw new InvalidType();
+      case "/bad_params":
+      case "/bad_params.json":
+        try {
+          throw new StandardError();
+        } catch {
+          throw new ParseError();
+        }
+      case "/method_not_allowed":
+        throw new MethodNotAllowed("PUT");
+      case "/unknown_http_method":
+        throw new UnknownHttpMethod();
+      case "/not_found_original_exception":
+        try {
+          throw new ActionNotFound();
+        } catch (e) {
+          throw new TemplateError({ original: e as Error, template: "template" as never });
+        }
+      default:
+        throw new RuntimeError("puke!");
     }
-    if (path === "/bad_params") {
-      const err = new Error("bad params");
-      err.name = "ActionController::ParameterMissing";
-      throw err;
-    }
-    throw new Error("puke!");
   }
 }
 
-function publicExceptionsApp(env: RackEnv): Promise<RackResponse> {
-  const status = parseInt((env["PATH_INFO"] as string).slice(1), 10) || 500;
-  return Promise.resolve([
-    status,
-    { "content-type": "text/html; charset=utf-8" },
-    bodyFromString(`${status} error fixture\n`),
-  ]);
-}
-
-function buildApp(
-  exceptionsApp: (env: RackEnv) => Promise<RackResponse> = publicExceptionsApp,
-): ShowExceptions {
-  return new ShowExceptions((env: RackEnv) => new Boomer().call(env), exceptionsApp);
+function buildApp(exceptionsApp: unknown = null): RackApp {
+  exceptionsApp ??= new PublicExceptions(`${FIXTURE_LOAD_PATH}/public`);
+  return new Lint(
+    new ShowExceptions(new Lint(new Boomer() as never) as never, exceptionsApp as never) as never,
+  ) as unknown as RackApp;
 }
 
 describe("ShowExceptionsTest", () => {
+  let testCase: IntegrationTest;
+
+  beforeEach(({ task }) => {
+    testCase = new IntegrationTest(task.name);
+    testCase.app = buildApp();
+  });
+
   it("skip exceptions app if not showing exceptions", async () => {
-    const app = buildApp();
-    await expect(
-      app.call({
-        REQUEST_METHOD: "GET",
-        PATH_INFO: "/",
-        "action_dispatch.show_exceptions": "none",
-      }),
-    ).rejects.toThrow("puke!");
+    await assertRaise([RuntimeError], {}, async () => {
+      await testCase.get("/", { env: { "action_dispatch.show_exceptions": "none" } });
+    });
   });
 
   it("rescue with error page", async () => {
-    const app = buildApp();
-    const [status, , body] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_exceptions": "all",
-    });
-    expect(status).toBe(500);
-    expect(await bodyToString(body)).toContain("500");
+    await testCase.get("/", { env: { "action_dispatch.show_exceptions": "all" } });
+    testCase.assertResponse(500);
+    assertEqual("500 error fixture\n", testCase.body);
 
-    const [status2] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/bad_params",
-      "action_dispatch.show_exceptions": "all",
-    });
-    expect(status2).toBe(400);
+    await testCase.get("/bad_params", { env: { "action_dispatch.show_exceptions": "all" } });
+    testCase.assertResponse(400);
+    assertEqual("400 error fixture\n", testCase.body);
 
-    const [status3] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/not_found",
-      "action_dispatch.show_exceptions": "all",
+    await testCase.get("/not_found", { env: { "action_dispatch.show_exceptions": "all" } });
+    testCase.assertResponse(404);
+    assertEqual("404 error fixture\n", testCase.body);
+
+    await testCase.get("/method_not_allowed", {
+      env: { "action_dispatch.show_exceptions": "all" },
     });
-    expect(status3).toBe(404);
+    testCase.assertResponse(405);
+    assertEqual("", testCase.body);
+
+    await testCase.get("/unknown_http_method", {
+      env: { "action_dispatch.show_exceptions": "all" },
+    });
+    testCase.assertResponse(405);
+    assertEqual("", testCase.body);
+
+    await testCase.get("/invalid_mimetype", {
+      headers: { Accept: "text/html,*", "action_dispatch.show_exceptions": "all" },
+    });
+    testCase.assertResponse(406);
+    assertEqual("", testCase.body);
   });
 
   it("localize rescue error page", async () => {
-    const app = buildApp();
-    const [status, , body] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_exceptions": "all",
-    });
-    expect(status).toBe(500);
-    expect(await bodyToString(body)).toContain("500");
+    const oldLocale = I18n.locale();
+    I18n.setLocale("da");
+
+    try {
+      await testCase.get("/", { env: { "action_dispatch.show_exceptions": "all" } });
+      testCase.assertResponse(500);
+      assertEqual("500 localized error fixture\n", testCase.body);
+
+      await testCase.get("/not_found", { env: { "action_dispatch.show_exceptions": "all" } });
+      testCase.assertResponse(404);
+      assertEqual("404 error fixture\n", testCase.body);
+    } finally {
+      I18n.setLocale(oldLocale);
+    }
   });
 
   it("sets the HTTP charset parameter", async () => {
-    const app = buildApp();
-    const [, headers] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_exceptions": "all",
-    });
-    expect(headers["content-type"]).toContain("charset=utf-8");
+    await testCase.get("/", { env: { "action_dispatch.show_exceptions": "all" } });
+    assertEqual("text/html; charset=utf-8", testCase.response.headers.get("content-type"));
   });
 
   it("show registered original exception for wrapped exceptions", async () => {
-    const app = buildApp();
-    const [status, , body] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/not_found",
-      "action_dispatch.show_exceptions": "all",
+    await testCase.get("/not_found_original_exception", {
+      env: { "action_dispatch.show_exceptions": "all" },
     });
-    expect(status).toBe(404);
-    expect(await bodyToString(body)).toContain("404");
+    testCase.assertResponse(404);
+    assertMatch(/404 error/, testCase.body!);
   });
 
   it("calls custom exceptions app", async () => {
-    let receivedException: unknown = null;
-    let receivedPath: unknown = null;
-    let receivedOriginalPath: unknown = null;
-
-    const customApp = async (env: RackEnv): Promise<RackResponse> => {
-      receivedException = env["action_dispatch.exception"];
-      receivedPath = env["PATH_INFO"];
-      receivedOriginalPath = env["action_dispatch.original_path"];
-      return [404, { "content-type": "text/plain" }, bodyFromString("YOU FAILED")];
+    const exceptionsApp = (env: RackEnv): RackResponse => {
+      assertKindOf(ActionNotFound, env["action_dispatch.exception"]);
+      assertEqual("/404", env["PATH_INFO"]);
+      assertEqual("/not_found_original_exception", env["action_dispatch.original_path"]);
+      return [404, { "content-type": "text/plain" }, ["YOU FAILED"]] as unknown as RackResponse;
     };
 
-    const app = buildApp(customApp);
-    const [status, , body] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/not_found",
-      "action_dispatch.show_exceptions": "all",
+    testCase.app = buildApp(exceptionsApp);
+
+    await testCase.get("/not_found_original_exception", {
+      env: { "action_dispatch.show_exceptions": "all" },
     });
-    expect(status).toBe(404);
-    expect(await bodyToString(body)).toBe("YOU FAILED");
-    expect(receivedException).toBeInstanceOf(Error);
-    expect(receivedPath).toBe("/404");
-    expect(receivedOriginalPath).toBe("/not_found");
+    testCase.assertResponse(404);
+    assertEqual("YOU FAILED", testCase.body);
   });
 
   it("returns an empty response if custom exceptions app returns x-cascade pass", async () => {
-    const cascadeApp = async (): Promise<RackResponse> => {
-      return [404, { "x-cascade": "pass" }, bodyFromString("")];
-    };
+    const exceptionsApp = (_env: RackEnv): RackResponse =>
+      [404, { [X_CASCADE]: "pass" }, []] as unknown as RackResponse;
 
-    const app = buildApp(cascadeApp);
-    const [status, , body] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/not_found",
-      "action_dispatch.show_exceptions": "all",
+    testCase.app = buildApp(exceptionsApp);
+
+    await testCase.get("/method_not_allowed", {
+      env: { "action_dispatch.show_exceptions": "all" },
     });
-    expect(status).toBe(404);
-    expect(await bodyToString(body)).toBe("");
+    testCase.assertResponse(405);
+    assertEqual("", testCase.body);
   });
 
   it("bad params exception is returned in the correct format", async () => {
-    const app = buildApp();
-    const [status, headers] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/bad_params",
-      "action_dispatch.show_exceptions": "all",
-    });
-    expect(status).toBe(400);
-    expect(headers["content-type"]).toContain("charset=utf-8");
-  });
+    await testCase.get("/bad_params", { env: { "action_dispatch.show_exceptions": "all" } });
+    assertEqual("text/html; charset=utf-8", testCase.response.headers.get("content-type"));
+    testCase.assertResponse(400);
+    assertMatch(/400 error/, testCase.body!);
 
-  it("rewrites request method to GET and preserves original on env", async () => {
-    let seenMethod: string | undefined;
-    let seenOriginalMethod: string | undefined;
-    const captureApp = async (env: RackEnv): Promise<RackResponse> => {
-      seenMethod = env["REQUEST_METHOD"] as string;
-      seenOriginalMethod = env["action_dispatch.original_request_method"] as string;
-      return publicExceptionsApp(env);
-    };
-
-    const env: RackEnv = {
-      REQUEST_METHOD: "POST",
-      PATH_INFO: "/",
-      "action_dispatch.show_exceptions": "all",
-    };
-    const app = buildApp(captureApp);
-    await app.call(env);
-
-    expect(seenMethod).toBe("GET");
-    expect(seenOriginalMethod).toBe("POST");
-    expect(env["REQUEST_METHOD"]).toBe("POST");
+    await testCase.get("/bad_params.json", { env: { "action_dispatch.show_exceptions": "all" } });
+    assertEqual("application/json; charset=utf-8", testCase.response.headers.get("content-type"));
+    testCase.assertResponse(400);
+    assertEqual('{"status":400,"error":"Bad Request"}', testCase.body);
   });
 
   it("failsafe prevents raising if exceptions_app raises", async () => {
-    const failApp = async (): Promise<RackResponse> => {
-      throw new Error("exceptions app also failed");
-    };
-
-    const app = buildApp(failApp);
-    const [status, , body] = await app.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_exceptions": "all",
+    testCase.app = buildApp((_env: RackEnv) => {
+      throw new RuntimeError();
     });
-    expect(status).toBe(500);
-    expect(await bodyToString(body)).toContain("500 Internal Server Error");
+
+    await testCase.get("/");
+
+    testCase.assertResponse(500);
+    assertMatch(/500 Internal Server Error/, testCase.body!);
   });
 });

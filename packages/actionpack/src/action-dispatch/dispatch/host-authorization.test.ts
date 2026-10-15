@@ -1,15 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import {
   HostAuthorization,
   ALLOWED_HOSTS_IN_DEVELOPMENT,
   type HostPermission,
 } from "../middleware/host-authorization.js";
 import { IPAddr, StringIO } from "@blazetrails/ruby-compat";
-import { Logger } from "@blazetrails/activesupport";
+import { Logger, assertEmpty, assertEqual, assertMatch } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
-import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { Lint } from "@blazetrails/rack";
+import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import type { Request } from "../http/request.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
+import { IntegrationTest } from "../testing/integration.js";
+import "../../test-helpers/abstract-unit.js";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,
@@ -278,396 +281,473 @@ describe("HostAuthorizationTest", () => {
   });
 });
 
-const successApp = async (_env: RackEnv): Promise<RackResponse> => [
-  200,
-  { "content-type": "text/plain" },
-  bodyFromString("Success"),
-];
+const App = (_env: RackEnv): RackResponse => [200, {}, ["Success"]] as unknown as RackResponse;
 
 function buildApp(
-  hosts: HostPermission | HostPermission[] | null | undefined,
-  opts: {
+  hosts: HostPermission | HostPermission[] | null,
+  {
+    exclude = undefined,
+    responseApp = undefined,
+    lint = true,
+    app = App as unknown as RackApp,
+  }: {
     exclude?: (req: Request) => boolean;
-    responseApp?: (env: RackEnv) => Promise<RackResponse>;
+    responseApp?: (env: RackEnv) => RackResponse | Promise<RackResponse>;
+    lint?: boolean;
+    app?: RackApp;
   } = {},
-) {
-  const h: HostPermission[] = hosts == null ? [] : Array.isArray(hosts) ? hosts : [hosts];
-  return new HostAuthorization(successApp, { hosts: h, ...opts });
+): RackApp {
+  if (lint) {
+    app = new Lint(app) as unknown as RackApp;
+  }
+
+  app = new HostAuthorization(app, {
+    hosts: hosts as HostPermission[],
+    exclude,
+    responseApp: responseApp as never,
+  }) as unknown as RackApp;
+
+  if (lint) {
+    app = new Lint(app) as unknown as RackApp;
+  }
+
+  return app;
 }
 
 describe("HostAuthorizationTest", () => {
+  let testCase: IntegrationTest;
+
+  beforeEach(({ task }) => {
+    testCase = new IntegrationTest(task.name);
+  });
+
   it("blocks requests to unallowed host with empty body", async () => {
-    const mw = buildApp(["only.com"]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toBe("");
+    testCase.app = buildApp(["only.com"]);
+
+    await testCase.get("/");
+
+    testCase.assertResponse("forbidden");
+    assertEmpty(testCase.response.body);
   });
 
   it("renders debug info when all requests considered as local", async () => {
-    const mw = buildApp(["only.com"]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
-    });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: www.example.com");
+    testCase.app = buildApp(["only.com"]);
+
+    await testCase.get("/", { env: { "action_dispatch.show_detailed_exceptions": true } });
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
   it("allows all requests if hosts is empty", async () => {
-    const mw = buildApp(null);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+    testCase.app = buildApp(null);
+
+    await testCase.get("/");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("hosts can be a single element array", async () => {
-    const mw = buildApp(["www.example.com"]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+    testCase.app = buildApp(["www.example.com"]);
+
+    await testCase.get("/");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("hosts can be a string", async () => {
-    const mw = buildApp("www.example.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+    testCase.app = buildApp("www.example.com");
+
+    await testCase.get("/");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("hosts are matched case insensitive", async () => {
-    const mw = buildApp("Example.local");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "example.local",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp("Example.local");
+
+    await testCase.get("/", {
+      env: {
+        HOST: "example.local",
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("hosts are matched case insensitive with titlecased host", async () => {
-    const mw = buildApp("example.local");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "Example.local",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp("example.local");
+
+    await testCase.get("/", {
+      env: {
+        HOST: "Example.local",
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("hosts are matched case insensitive with hosts array", async () => {
-    const mw = buildApp(["Example.local"]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "example.local",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(["Example.local"]);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "example.local",
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("regex matches are not title cased", async () => {
-    const mw = buildApp([/www.Example.local/]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.local",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp([/www.Example.local/]);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "www.example.local",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: www.example.local");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: www.example.local", testCase.response.body);
   });
 
   it("passes requests to allowed hosts with domain name notation", async () => {
-    const mw = buildApp(".example.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+    testCase.app = buildApp(".example.com");
+
+    await testCase.get("/");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("does not allow domain name notation in the HOST header itself", async () => {
-    const mw = buildApp(".example.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: ".example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp(".example.com");
+
+    await testCase.get("/", {
+      env: {
+        HOST: ".example.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: .example.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: .example.com", testCase.response.body);
   });
 
   it("checks for requests with #=== to support wider range of host checks", async () => {
-    const mw = buildApp([(input: string) => input === "www.example.com"]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+    testCase.app = buildApp([(input: string) => input === "www.example.com"]);
+
+    await testCase.get("/");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("mark the host when authorized", async () => {
-    const env: RackEnv = { HTTP_HOST: "www.example.com", REQUEST_METHOD: "GET", PATH_INFO: "/" };
-    const mw = buildApp(".example.com");
-    await mw.call(env);
-    expect(env["action_dispatch.authorized_host"]).toBe("www.example.com");
+    testCase.app = buildApp(".example.com");
+
+    await testCase.get("/");
+
+    assertEqual("www.example.com", testCase.request.getHeader("action_dispatch.authorized_host"));
   });
 
   it("sanitizes regular expressions to prevent accidental matches", async () => {
-    const mw = buildApp([/w.example.co/]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
-    });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: www.example.com");
+    testCase.app = buildApp([/w.example.co/]);
+
+    await testCase.get("/", { env: { "action_dispatch.show_detailed_exceptions": true } });
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
   it("blocks requests to unallowed host supporting custom responses", async () => {
-    const mw = buildApp(["w.example.co"], {
-      responseApp: async (_env) => [401, {}, bodyFromString("Custom")],
+    testCase.app = buildApp(["w.example.co"], {
+      responseApp: (_env: RackEnv) => [401, {}, ["Custom"]] as unknown as RackResponse,
     });
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(401);
-    expect(await bodyToString(body)).toBe("Custom");
+
+    await testCase.get("/");
+
+    testCase.assertResponse("unauthorized");
+    assertEqual("Custom", testCase.body);
   });
 
   it("localhost works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "localhost:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "localhost:3000",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV4 works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "127.0.0.1",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "127.0.0.1",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV4 with port works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status] = await mw.call({
-      HTTP_HOST: "127.0.0.1:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "127.0.0.1:3000",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(200);
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV4 binding in all addresses works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status] = await mw.call({ HTTP_HOST: "0.0.0.0", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(status).toBe(200);
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "0.0.0.0",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
+    });
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV4 with port binding in all addresses works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status] = await mw.call({
-      HTTP_HOST: "0.0.0.0:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "0.0.0.0:3000",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(200);
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV6 works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status] = await mw.call({ HTTP_HOST: "[::1]", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(status).toBe(200);
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "[::1]",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
+    });
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV6 with port works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status] = await mw.call({
-      HTTP_HOST: "[::1]:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "[::1]:3000",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(200);
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV6 binding in all addresses works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status] = await mw.call({ HTTP_HOST: "[::]", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(status).toBe(200);
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "[::]",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
+    });
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("localhost using IPV6 with port binding in all addresses works in dev", async () => {
-    const mw = new HostAuthorization(successApp, { hosts: ALLOWED_HOSTS_IN_DEVELOPMENT });
-    const [status] = await mw.call({
-      HTTP_HOST: "[::]:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "[::]:3000",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(200);
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("hosts with port works", async () => {
-    const mw = buildApp(["host.test"]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "host.test:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp(["host.test"]);
+
+    await testCase.get("/", {
+      env: {
+        HOST: "host.test:3000",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertMatch("Success", testCase.response.body);
   });
 
   it("blocks requests with spoofed X-FORWARDED-HOST", async () => {
-    const mw = buildApp([new IPAddr("127.0.0.1")]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      HTTP_X_FORWARDED_HOST: "127.0.0.1",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp([new IPAddr("127.0.0.1")]);
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "127.0.0.1",
+        HOST: "www.example.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: www.example.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
   it("blocks requests with spoofed relative X-FORWARDED-HOST", async () => {
-    const mw = buildApp(["www.example.com"]);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      HTTP_X_FORWARDED_HOST: "//randomhost.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp(["www.example.com"]);
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "//randomhost.com",
+        HOST: "www.example.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: //randomhost.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: //randomhost.com", testCase.response.body);
   });
 
   it("forwarded secondary hosts are allowed when permitted", async () => {
-    const mw = buildApp(".domain.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "domain.com",
-      HTTP_X_FORWARDED_HOST: "example.com, my-sub.domain.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(".domain.com");
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "example.com, my-sub.domain.com",
+        HOST: "domain.com",
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("forwarded secondary hosts are blocked when mismatch", async () => {
-    const mw = buildApp("domain.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "domain.com",
-      HTTP_X_FORWARDED_HOST: "domain.com, evil.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp("domain.com");
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "domain.com, evil.com",
+        HOST: "domain.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: evil.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: evil.com", testCase.response.body);
   });
 
   it("does not consider IP addresses in X-FORWARDED-HOST spoofed when disabled", async () => {
-    const mw = buildApp(null);
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      HTTP_X_FORWARDED_HOST: "127.0.0.1",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(null);
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "127.0.0.1",
+        HOST: "www.example.com",
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("detects localhost domain spoofing", async () => {
-    const mw = buildApp("localhost");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      HTTP_X_FORWARDED_HOST: "localhost",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp("localhost");
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "localhost",
+        HOST: "www.example.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: www.example.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
   it("forwarded hosts should be permitted", async () => {
-    const mw = buildApp("domain.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "domain.com",
-      HTTP_X_FORWARDED_HOST: "sub.domain.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp("domain.com");
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "sub.domain.com",
+        HOST: "domain.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: sub.domain.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: sub.domain.com", testCase.response.body);
   });
 
   it("sub-sub domains should not be permitted", async () => {
-    const mw = buildApp(".domain.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "secondary.sub.domain.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp(".domain.com");
+
+    await testCase.get("/", {
+      env: {
+        HOST: "secondary.sub.domain.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: secondary.sub.domain.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: secondary.sub.domain.com", testCase.response.body);
   });
 
   it("forwarded hosts are allowed when permitted", async () => {
-    const mw = buildApp(".domain.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "domain.com",
-      HTTP_X_FORWARDED_HOST: "my-sub.domain.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
+    testCase.app = buildApp(".domain.com");
+
+    await testCase.get("/", {
+      env: {
+        HTTP_X_FORWARDED_HOST: "my-sub.domain.com",
+        HOST: "domain.com",
+      },
     });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("lots of NG hosts", async () => {
@@ -678,112 +758,109 @@ describe("HostAuthorizationTest", () => {
       "hacker.com/test/",
       "hacker%252ecom",
       ".hacker.com",
-      "/\\/\\/hacker.com/",
+      "///hacker.com/",
       "/hacker.com",
       "../hacker.com",
+      ".hacker.com",
       "@hacker.com",
       "hacker.com",
       "hacker.com%23@example.com",
       "hacker.com/.jpg",
       "hacker.com\texample.com/",
       "hacker.com/example.com",
-      "hacker.com\\@example.com",
+      "hacker.com@example.com",
+      "hacker.com/example.com",
       "hacker.com/",
     ];
-    const mw = buildApp("example.com");
+
+    testCase.app = buildApp("example.com");
+
     for (const host of ngHosts) {
-      const [status, , body] = await mw.call({
-        HTTP_HOST: "example.com",
-        HTTP_X_FORWARDED_HOST: host,
-        REQUEST_METHOD: "GET",
-        PATH_INFO: "/",
-        "action_dispatch.show_detailed_exceptions": true,
+      await testCase.get("/", {
+        env: {
+          HTTP_X_FORWARDED_HOST: host,
+          HOST: "example.com",
+          "action_dispatch.show_detailed_exceptions": true,
+        },
       });
-      expect(status).toBe(403);
-      expect(await bodyToString(body)).toContain(`Blocked hosts: ${host}`);
+
+      testCase.assertResponse("forbidden");
+      assertMatch(`Blocked hosts: ${host}`, testCase.response.body);
     }
   });
 
   it("exclude matches allow any host", async () => {
-    const mw = buildApp("only.com", { exclude: (req) => req.path === "/foo" });
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/foo",
-    });
-    expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("Success");
+    testCase.app = buildApp("only.com", { exclude: (req: Request) => req.path === "/foo" });
+
+    await testCase.get("/foo");
+
+    testCase.assertResponse("ok");
+    assertEqual("Success", testCase.body);
   });
 
   it("exclude misses block unallowed hosts", async () => {
-    const mw = buildApp("only.com", { exclude: (req) => req.path === "/bar" });
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/foo",
-      "action_dispatch.show_detailed_exceptions": true,
-    });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: www.example.com");
+    testCase.app = buildApp("only.com", { exclude: (req: Request) => req.path === "/bar" });
+
+    await testCase.get("/foo", { env: { "action_dispatch.show_detailed_exceptions": true } });
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
   it("blocks requests with invalid hostnames", async () => {
-    const mw = buildApp(".example.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "attacker.com#x.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp(".example.com", { lint: false });
+
+    await testCase.get("/", {
+      env: {
+        HOST: "attacker.com#x.example.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: attacker.com#x.example.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: attacker.com#x.example.com", testCase.response.body);
   });
 
   it("blocks requests to similar host", async () => {
-    const mw = buildApp("sub.example.com");
-    const [status, , body] = await mw.call({
-      HTTP_HOST: "sub-example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
+    testCase.app = buildApp("sub.example.com");
+
+    await testCase.get("/", {
+      env: {
+        HOST: "sub-example.com",
+        "action_dispatch.show_detailed_exceptions": true,
+      },
     });
-    expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked hosts: sub-example.com");
+
+    testCase.assertResponse("forbidden");
+    assertMatch("Blocked hosts: sub-example.com", testCase.response.body);
   });
 
   it("uses logger from the env", async () => {
-    const mw = buildApp(["only.com"]);
-    const messages: string[] = [];
-    const [status] = await mw.call({
-      HTTP_HOST: "www.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.logger": { error: (msg: string) => messages.push(msg) },
-    });
-    expect(status).toBe(403);
-    expect(messages.join("")).toContain("Blocked hosts: www.example.com");
+    testCase.app = buildApp(["only.com"]);
+    const output = new StringIO();
+
+    await testCase.get("/", { env: { "action_dispatch.logger": new Logger(output) } });
+
+    testCase.assertResponse("forbidden");
+    output.rewind();
+    assertMatch("Blocked hosts: www.example.com", output.read());
   });
 
   it("uses ActionView::Base logger when no logger in the env", async () => {
-    const mw = buildApp(["only.com"]);
+    testCase.app = buildApp(["only.com"]);
     const output = new StringIO();
     const logger = new Logger(output);
 
-    const old = Base.logger;
+    const _old = Base.logger;
     Base.logger = logger;
-    let status: number;
     try {
-      [status] = await mw.call({
-        HTTP_HOST: "www.example.com",
-        REQUEST_METHOD: "GET",
-        PATH_INFO: "/",
-      });
+      await testCase.get("/");
     } finally {
-      Base.logger = old;
+      Base.logger = _old;
     }
 
-    expect(status).toBe(403);
+    testCase.assertResponse("forbidden");
     output.rewind();
-    expect(output.read()).toContain("Blocked hosts: www.example.com");
+    assertMatch("Blocked hosts: www.example.com", output.read());
   });
 });
