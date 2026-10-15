@@ -34,7 +34,6 @@ export class Pathname {
     return this.path;
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:50` */
   private chopBasename(path: string): [string, string] | null {
     const base = File.basename(path);
     if (/^\/?$/.test(base)) {
@@ -55,7 +54,6 @@ export class Pathname {
     return new Pathname(this.plus(this.path, other.toString()));
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:362` */
   private plus(path1: string, path2: string): string {
     let prefix2 = path2;
     const indexList2: number[] = [];
