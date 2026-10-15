@@ -963,6 +963,20 @@ describe("virtualize — onMissingTable", () => {
     expect(text).toMatch(/get title\(\): string;/);
   });
 
+  test("does not warn for a model whose tableName is not a literal", () => {
+    expect(
+      missing(
+        'export class Stat extends Base {\n  static {\n    this.tableName = prefix + "stats";\n  }\n}\n',
+      ),
+    ).toEqual([]);
+  });
+
+  test("ignores Object.prototype keys when looking up a table", () => {
+    expect(
+      missing('export class Constructor extends Base {\n  static tableName = "constructor";\n}\n'),
+    ).toEqual(["Constructor:constructor:m.ts"]);
+  });
+
   test("does not warn for an STI subclass of a model whose table is known", () => {
     expect(
       missing("export class Post extends Base {}\nexport class Draft extends Post {}\n"),
@@ -1014,6 +1028,14 @@ describe("virtualize — aliasAttribute", () => {
 
   test("an alias of an unknown attribute synthesizes nothing", () => {
     expect(run('    this.aliasAttribute("ghost", "missing");\n')).not.toMatch(/get ghost/);
+  });
+
+  test("an alias of an alias resolves regardless of source order", () => {
+    const text = run(
+      '    this.aliasAttribute("prNo", "prNumber");\n' +
+        '    this.aliasAttribute("prNumber", "pr_number");\n',
+    );
+    expect(text).toMatch(/get prNo\(\): number;/);
   });
 
   test("an existing member wins over the alias", () => {

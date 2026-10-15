@@ -8,6 +8,7 @@ import type {
   AttributeCall,
   ScopeCall,
   EnumCall,
+  AliasAttributeCall,
 } from "./walker.js";
 import { tsTypeFor } from "./type-registry.js";
 
@@ -101,18 +102,24 @@ export function synthesizeDeclares(
   for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
     emit(line);
   }
-  for (const call of info.calls) {
-    if (call.kind !== "aliasAttribute") continue;
-    if (info.existingMembers.has(call.name) || synthesizedInstanceNames.has(call.name)) continue;
-    const target = attributeTypes.get(call.target);
-    const readerType = target?.readerType ?? info.existingMemberTypes.get(call.target);
-    if (!readerType) continue;
-    const memberName = renderDeclaredMemberName(call.name);
-    emit({
-      ...attributeLine(memberName, readerType, call.name),
-      attribute: { memberName, readerType, writerType: target?.writerType },
-    });
-    synthesizedInstanceNames.add(call.name);
+  const pendingAliases = info.calls.filter(
+    (c): c is AliasAttributeCall => c.kind === "aliasAttribute",
+  );
+  for (let progressed = true; progressed; ) {
+    progressed = false;
+    for (const call of pendingAliases) {
+      if (info.existingMembers.has(call.name) || synthesizedInstanceNames.has(call.name)) continue;
+      const target = attributeTypes.get(call.target);
+      const readerType = target?.readerType ?? info.existingMemberTypes.get(call.target);
+      if (!readerType) continue;
+      const memberName = renderDeclaredMemberName(call.name);
+      emit({
+        ...attributeLine(memberName, readerType, call.name),
+        attribute: { memberName, readerType, writerType: target?.writerType },
+      });
+      synthesizedInstanceNames.add(call.name);
+      progressed = true;
+    }
   }
   return { classLines: out, interfaceLines, relationScopeLines };
 }

@@ -62,6 +62,7 @@ export interface ClassInfo {
   skip: boolean;
   noSchema: boolean;
   abstract: boolean;
+  dynamicTableName: boolean;
   skipSchemaColumns: Set<string>;
   tableName?: string;
 }
@@ -166,6 +167,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     skip: hasSkipMarker(cls, sourceFile),
     noSchema: hasMarker(cls, sourceFile, /@trails-typegen\s+no-schema\b/),
     abstract: false,
+    dynamicTableName: false,
     skipSchemaColumns: parseSkipColumns(cls, sourceFile),
   };
 
@@ -226,7 +228,11 @@ function readStaticAssignment(stmt: ts.Statement, info: ClassInfo): void {
 }
 
 function readStaticValue(name: string, value: ts.Expression, info: ClassInfo): void {
-  if (name === "tableName" && ts.isStringLiteralLikeNode(value)) info.tableName = value.text;
+  if (name === "tableName") {
+    const literal = ts.isStringLiteralLikeNode(value);
+    info.tableName = literal ? value.text : undefined;
+    info.dynamicTableName = !literal;
+  }
   if (name === "abstractClass" && value.kind === ts.SyntaxKind.TrueKeyword) info.abstract = true;
 }
 

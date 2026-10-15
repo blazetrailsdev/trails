@@ -73,7 +73,7 @@ export function virtualize(
     for (const info of classes) {
       const tableName = tableNameFor(info);
       if (info.skip || info.noSchema || info.abstract) continue;
-      if (tableName in options.schemaColumnsByTable) continue;
+      if (info.dynamicTableName || Object.hasOwn(options.schemaColumnsByTable, tableName)) continue;
       if (inheritsKnownTable(info, classes, superNameOf, options.schemaColumnsByTable)) continue;
       options.onMissingTable({ className: info.name, tableName, fileName });
     }
@@ -268,7 +268,7 @@ function inheritsKnownTable(
     seen.add(name);
     const anc = classes.find((c) => c.name === name);
     const table = anc ? tableNameFor(anc) : tableNameFor({ name } as ClassInfo);
-    if (table in schema) return true;
+    if (anc?.dynamicTableName || Object.hasOwn(schema, table)) return true;
   }
   return false;
 }
