@@ -1,4 +1,3 @@
-import { Hash } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Attribute } from "./attribute.js";
@@ -232,7 +231,7 @@ describe("NullMutationTracker", () => {
     const tracker = new NullMutationTracker();
     expect(tracker.anyChanges()).toBe(false);
     expect(tracker.changedAttributeNames()).toEqual([]);
-    expect(tracker.changes()).toEqual(new Hash());
+    expect(tracker.changes()).toEqual({});
     expect(tracker.isChanged("anything")).toBe(false);
     expect(tracker.originalValue("anything")).toBeUndefined();
     expect(tracker.changeToAttribute("anything")).toBeNull();

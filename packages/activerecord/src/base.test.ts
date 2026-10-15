@@ -343,7 +343,7 @@ describe("BasicsTest", async () => {
   it("previously changed", async () => {
     const topic = (await Topic.first()) as any;
     topic.title = "<3<3<3";
-    expect(topic.previousChanges).toEqual(new Hash());
+    expect(topic.previousChanges).toEqual({});
 
     await topic.saveBang();
     const expected = ["The First Topic", "<3<3<3"];

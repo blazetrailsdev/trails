@@ -1,9 +1,9 @@
-import { validateApp } from "./uri/gid.js";
+import { GID } from "./uri/gid.js";
 
 let _app: string | undefined;
 
 export function setApp(name: string): void {
-  _app = validateApp(name);
+  _app = GID.validateApp(name);
 }
 
 export function getApp(): string | undefined {

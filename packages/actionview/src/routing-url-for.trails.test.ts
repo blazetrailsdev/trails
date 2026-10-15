@@ -115,15 +115,15 @@ describe("ActionView::RoutingUrlFor#url_for", () => {
   it("defaults :only_path through the Parameters writer, not a bare property", () => {
     const params = new Parameters({ action: "index" });
     host.urlFor(params);
-    expect(params.hasKey("only_path")).toBe(true);
-    expect(params.get("only_path")).toBe(true);
-    expect(params.toH()).toEqual({ action: "index", only_path: true });
+    expect(params.hasKey("onlyPath")).toBe(true);
+    expect(params.get("onlyPath")).toBe(true);
+    expect(params.toH()).toEqual({ action: "index", onlyPath: true });
   });
 
   it("leaves :only_path alone on Parameters carrying a :host", () => {
     const params = new Parameters({ action: "index", host: "example.com" });
     host.urlFor(params);
-    expect(params.hasKey("only_path")).toBe(false);
+    expect(params.hasKey("onlyPath")).toBe(false);
   });
 
   it("routes a Symbol through handle_string_call", () => {

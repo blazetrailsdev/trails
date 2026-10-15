@@ -1,4 +1,6 @@
 import { b } from "../string/b.js";
+import { ArgumentError } from "../argument-error.js";
+import { rbEqual } from "../rb-equal.js";
 import { BadURIError, DEFAULT_PARSER, InvalidComponentError, InvalidURIError } from "./common.js";
 import type { RFC2396Parser } from "./rfc2396-parser.js";
 import type { RFC3986Parser } from "./rfc3986-parser.js";
@@ -8,27 +10,18 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * scheme class and what `URI.parse` answers for a scheme it does not know.
  * Only the members trails sends are ported: the component readers and their
  * mutable setters, `merge` and the private helpers it reaches through. The
- * unsent ones are not, and the list is exhaustive: `build` / `build2`
- * (`generic.rb:78,116`), `COMPONENT` / `component` (`generic.rb:46,313`),
+ * unsent ones are not, and the list is exhaustive: `build2` (`generic.rb:78`),
  * `registry` and its `check_` / `set_` / `=` trio
- * (`generic.rb:252,750,755,760`), `check_userinfo` / `check_user` / `check_password`
- * and the `userinfo=` / `user=` / `password=` setters
- * (`generic.rb:375,393,417,441,471,498`), `set_user` / `set_password`
+ * (`generic.rb:252,750,755,760`), the `user=` / `password=` setters
+ * (`generic.rb:471,498`), `set_user` / `set_password`
  * (`generic.rb:524,534`), `escape_userpass` (`generic.rb:551`),
- * `decoded_user` / `decoded_password` (`generic.rb:584,589`), `hostname=`
- * (`generic.rb:685`),
+ * `decoded_user` / `decoded_password` (`generic.rb:584,589`),
  * `hierarchical?` (`generic.rb:976`), `merge!` (`generic.rb:1096`), `route_from_path` / `route_from0` /
  * `route_from` / `route_to` (`generic.rb:1167,1206,1274,1314`), `normalize` /
- * `normalize!` (`generic.rb:1331,1340`), `==` / `hash` / `eql?` /
- * `component_ary` (`generic.rb:1396,1404,1408,1428`), `select`
- * (`generic.rb:1452`), `inspect` (`generic.rb:1463`), `coerce`
+ * `hash` / `eql?` (`generic.rb:1404,1408`), `select`
+ * (`generic.rb:1452`), `coerce`
  * (`generic.rb:1486`), `replace!` (`generic.rb:299`), and `find_proxy` /
  * `use_proxy?` (`generic.rb:1512,1578`).
- *
- * `initialize`'s `arg_check` branch (`generic.rb:190-198`) is not ported with
- * it: its only callers are `build` / `build2` (`generic.rb:78,116`), which are
- * not ported either, and it runs through five `check_*` privates no other
- * ported body reaches.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::Generic`
  * (`vendor/ruby/v3.3.11/lib/uri/generic.rb:21`) ships with the interpreter.
@@ -36,6 +29,57 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
 export class Generic {
   /** `DEFAULT_PORT` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:27`). */
   static readonly DEFAULT_PORT: number | null = null;
+
+  /**
+   * `COMPONENT` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:46-52`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static readonly COMPONENT: readonly string[] = Object.freeze([
+    "scheme",
+    "userinfo",
+    "host",
+    "port",
+    "registry",
+    "path",
+    "opaque",
+    "query",
+    "fragment",
+  ]);
+
+  /**
+   * `self.component` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:57`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static component(): readonly string[] {
+    return this.COMPONENT;
+  }
+
+  /**
+   * `self.build` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:116-137`): the
+   * components as an Array in `COMPONENT` order or a Hash keyed by them,
+   * passed to `new` with the default parser and `arg_check` on.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static build(args: unknown[] | Record<string, unknown>): Generic {
+    let tmp: unknown[];
+    if (Array.isArray(args) && args.length === Generic.COMPONENT.length) {
+      tmp = [...args];
+    } else if (args != null && typeof args === "object" && !Array.isArray(args)) {
+      tmp = Generic.COMPONENT.map((c) => (Object.hasOwn(args, c) ? args[c] : null));
+    } else {
+      const component = Generic.COMPONENT;
+      throw new ArgumentError(
+        `expected Array of or Hash of components of Class (${component.join(", ")})`,
+      );
+    }
+
+    tmp.push(null);
+    tmp.push(true);
+    return new (this as unknown as new (...a: unknown[]) => Generic)(...tmp);
+  }
 
   /** `self.default_port` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:32`). */
   static get defaultPort(): number | null {
@@ -70,17 +114,29 @@ export class Generic {
     query: string | null,
     fragment: string | null,
     parser: RFC2396Parser | RFC3986Parser = DEFAULT_PARSER,
+    argCheck: boolean = false,
   ) {
     this._parser = parser === DEFAULT_PARSER ? null : parser;
 
-    this.setScheme(scheme);
-    this.setHost(host);
-    this.setPort(port);
-    this.setUserinfo(userinfo);
-    this.setPath(path);
-    this.query = query;
-    this.setOpaque(opaque);
-    this.fragment = fragment;
+    if (argCheck) {
+      this.scheme = scheme;
+      this.hostname = host;
+      this.port = port;
+      this.userinfo = userinfo;
+      this.path = path;
+      this.query = query;
+      this.opaque = opaque;
+      this.fragment = fragment;
+    } else {
+      this.setScheme(scheme);
+      this.setHost(host);
+      this.setPort(port);
+      this.setUserinfo(userinfo);
+      this.setPath(path);
+      this.query = query;
+      this.setOpaque(opaque);
+      this.fragment = fragment;
+    }
 
     if (registry != null) {
       throw new InvalidURIError(
@@ -151,8 +207,11 @@ export class Generic {
     return this._parser ?? DEFAULT_PARSER;
   }
 
-  /** `check_scheme` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:320`). */
-  private checkScheme(v: string | null): boolean {
+  /**
+   * `check_scheme` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:320`).
+   * @internal
+   */
+  protected checkScheme(v: string | null): boolean {
     if (v != null && !this.parser.regexp.SCHEME.test(v)) {
       throw new InvalidComponentError(`bad component(expected scheme component): ${v}`);
     }
@@ -169,6 +228,74 @@ export class Generic {
   set scheme(v: string | null) {
     this.checkScheme(v);
     this.setScheme(v);
+  }
+
+  /**
+   * `check_userinfo` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:375`).
+   * @internal
+   */
+  private checkUserinfo(user: string | null, password: string | null = null): true {
+    if (password == null) {
+      [user, password] = this.splitUserinfo(user);
+    }
+    this.checkUser(user);
+    this.checkPassword(password, user);
+
+    return true;
+  }
+
+  /**
+   * `check_user` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:393`).
+   * @internal
+   */
+  private checkUser(v: string | null): boolean | null {
+    if (this._opaque != null) {
+      throw new InvalidURIError("can not set user with opaque");
+    }
+
+    if (v == null) return v;
+
+    if (!this.parser.regexp.USERINFO.test(v)) {
+      throw new InvalidComponentError(
+        `bad component(expected userinfo component or user component): ${v}`,
+      );
+    }
+
+    return true;
+  }
+
+  /**
+   * `check_password` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:417`).
+   * @internal
+   */
+  private checkPassword(v: string | null, user: string | null = this._user): boolean | null {
+    if (this._opaque != null) {
+      throw new InvalidURIError("can not set password with opaque");
+    }
+    if (v == null) return v;
+
+    if (user == null) {
+      throw new InvalidURIError("password component depends user component");
+    }
+
+    if (!this.parser.regexp.USERINFO.test(v)) {
+      throw new InvalidComponentError("bad password component");
+    }
+
+    return true;
+  }
+
+  /**
+   * `userinfo=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:441`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  set userinfo(userinfo: string | null) {
+    if (userinfo == null) {
+      return;
+    }
+    this.checkUserinfo(userinfo);
+    this.setUserinfo(userinfo);
   }
 
   /** `set_userinfo` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:509`). */
@@ -238,8 +365,11 @@ export class Generic {
     return null;
   }
 
-  /** `check_host` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:600`). */
-  private checkHost(v: string | null): boolean | null {
+  /**
+   * `check_host` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:600`).
+   * @internal
+   */
+  protected checkHost(v: string | null): boolean | null {
     if (v == null) return v;
 
     if (this._opaque != null) {
@@ -269,6 +399,16 @@ export class Generic {
       host,
       port ?? this.defaultPort,
     ];
+  }
+
+  /**
+   * `hostname=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:685`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  set hostname(v: string | null) {
+    if (!(v?.startsWith("[") && v?.endsWith("]")) && v != null && v.includes(":")) v = `[${v}]`;
+    this.host = v;
   }
 
   /** `host=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:652`). */
@@ -315,8 +455,11 @@ export class Generic {
     this.setUserinfo(null);
   }
 
-  /** `check_path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:772`). */
-  private checkPath(v: string | null): boolean {
+  /**
+   * `check_path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:772`).
+   * @internal
+   */
+  protected checkPath(v: string | null): unknown {
     if (v != null && this._opaque != null) {
       throw new InvalidURIError("path conflicts with opaque");
     }
@@ -413,6 +556,75 @@ export class Generic {
       }
       return out;
     });
+  }
+
+  /**
+   * `component` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:313`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  component(): readonly string[] {
+    return (this.constructor as typeof Generic).component();
+  }
+
+  /**
+   * `normalize` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1331`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  normalize(): this {
+    const uri = this.dup();
+    uri.normalizeBang();
+    return uri;
+  }
+
+  /**
+   * `normalize!` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1340`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  normalizeBang(): void {
+    if (this.path === "") {
+      this.setPath("/");
+    }
+    if (this.scheme != null && this.scheme !== this.scheme.toLowerCase()) {
+      this.setScheme(this.scheme.toLowerCase());
+    }
+    if (this.host != null && this.host !== this.host.toLowerCase()) {
+      this.setHost(this.host.toLowerCase());
+    }
+  }
+
+  /**
+   * `==` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1396`): the same class, and equal
+   * `component_ary`s once both sides are normalized.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  equals(oth: unknown): boolean {
+    if (this.constructor === (oth as object | null)?.constructor) {
+      return rbEqual(this.normalize().componentAry(), (oth as Generic).normalize().componentAry());
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * `component_ary` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1428`).
+   * @internal
+   */
+  protected componentAry(): unknown[] {
+    return this.component().map((x) => (this as unknown as Record<string, unknown>)[x]);
+  }
+
+  /**
+   * `inspect` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1463`). Every scheme class
+   * lives under `URI`, so the class is named with that prefix.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  inspect(): string {
+    return `#<URI::${this.constructor.name} ${this.toString()}>`;
   }
 
   /**

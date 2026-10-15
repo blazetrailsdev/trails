@@ -1,6 +1,6 @@
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
-import { validateApp } from "./uri/gid.js";
+import { GID } from "./uri/gid.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError, except, rbObjMethod } from "@blazetrails/ruby-compat";
@@ -235,7 +235,7 @@ export class Locator {
       );
     }
 
-    validateApp(app);
+    GID.validateApp(app);
 
     _appLocators.set(
       Locator.normalizeApp(app),

@@ -289,7 +289,7 @@ describe("clearChangesInformation", () => {
 
     p.clearChangesInformation();
     expect(p.isChanged).toBe(false);
-    expect(p.previousChanges.size).toBe(0);
+    expect(p.previousChanges).toEqual({});
   });
 });
 describe("clearAttributeChanges clears forced-dirty state", () => {

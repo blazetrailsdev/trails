@@ -1,5 +1,5 @@
 import { getApp } from "./config.js";
-import { GID, validateApp, type GidComponents } from "./uri/gid.js";
+import { GID, type GidComponents } from "./uri/gid.js";
 import type { Identification as IdentificationModule } from "./identification.js";
 import type {
   LocateOptions,
@@ -10,6 +10,7 @@ import type {
 import type { Verifier as VerifierClass } from "./verifier.js";
 import {
   Autoload,
+  type HashWithIndifferentAccess,
   constantize,
   Deprecation,
   extend,
@@ -51,7 +52,7 @@ export class GlobalID {
   get modelId(): string | string[] {
     return this.uri.modelId;
   }
-  get params(): Record<string, string> {
+  get params(): HashWithIndifferentAccess<string> | null {
     return this.uri.params;
   }
 
@@ -140,7 +141,7 @@ export class GlobalID {
   }
 
   static validateApp(app: string | null | undefined): string {
-    return validateApp(app);
+    return GID.validateApp(app);
   }
 
   get modelClass(): LocatorModel {

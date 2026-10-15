@@ -1,4 +1,6 @@
+import { ArgumentError } from "../argument-error.js";
 import { Encoding } from "../encoding.js";
+import { rbObjClone } from "../include.js";
 import { bytes } from "../string/bytes.js";
 import { encode } from "../string/encode.js";
 import { forceEncoding, rbObjEncoding } from "../string/force-encoding.js";
@@ -93,7 +95,7 @@ export class BadURIError extends Error {
 /** The `URI::Generic` initializer every registered scheme class answers to
  *  (`vendor/ruby/v3.3.11/lib/uri/generic.rb:169`). */
 export type GenericClass = new (
-  ...args: [...SplitComponents, (RFC2396Parser | RFC3986Parser)?]
+  ...args: [...SplitComponents, (RFC2396Parser | RFC3986Parser)?, boolean?]
 ) => Generic;
 
 /** `URI::Schemes` (`vendor/ruby/v3.3.11/lib/uri/common.rb:69`), the namespace
@@ -113,6 +115,63 @@ for (let i = 0; i < 256; i++) {
   TBLENCWWWCOMP_[String.fromCharCode(i)] = `%${i.toString(16).toUpperCase().padStart(2, "0")}`;
 }
 TBLENCWWWCOMP_[" "] = "+";
+
+/**
+ * `URI::TBLDECWWWCOMP_` (`vendor/ruby/v3.3.11/lib/uri/common.rb:290-299`), the
+ * table `decode_www_form` substitutes `+` and each `%XX` through, in all four
+ * hex-digit cases.
+ */
+const TBLDECWWWCOMP_: Record<string, string> = {};
+for (let i = 0; i < 256; i++) {
+  const [h, l] = [(i >> 4).toString(16), (i & 15).toString(16)];
+  for (const hh of [h.toUpperCase(), h]) {
+    for (const ll of [l.toUpperCase(), l]) TBLDECWWWCOMP_[`%${hh}${ll}`] = String.fromCharCode(i);
+  }
+}
+TBLDECWWWCOMP_["+"] = " ";
+
+/**
+ * `URI::Util` (`vendor/ruby/v3.3.11/lib/uri/common.rb:36-67`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::Util`
+ * (`vendor/ruby/v3.3.11/lib/uri/common.rb:36`) ships with the interpreter.
+ */
+export const Util = {
+  /**
+   * `make_components_hash` (`vendor/ruby/v3.3.11/lib/uri/common.rb:38-65`): an
+   * Array of every component but the scheme, in `klass.component` order, or a
+   * Hash of them, copied into a new Hash with `scheme` set to the class's
+   * downcased short name.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
+   * `URI::Util.make_components_hash` (`vendor/ruby/v3.3.11/lib/uri/common.rb:38`).
+   */
+  makeComponentsHash(
+    klass: { name: string; component(): readonly string[] },
+    arrayHash: unknown[] | Record<string, unknown>,
+  ): Record<string, unknown> {
+    const tmp: Record<string, unknown> = {};
+    if (Array.isArray(arrayHash) && arrayHash.length === klass.component().length - 1) {
+      klass
+        .component()
+        .slice(1)
+        .forEach((c, i) => {
+          tmp[c] = rbObjClone(arrayHash[i]);
+        });
+    } else if (arrayHash != null && typeof arrayHash === "object" && !Array.isArray(arrayHash)) {
+      for (const [key, value] of Object.entries(arrayHash)) {
+        tmp[key] = rbObjClone(value);
+      }
+    } else {
+      throw new ArgumentError(
+        `expected Array of or Hash of components of ${klass.name} (${klass.component().slice(1).join(", ")})`,
+      );
+    }
+    tmp["scheme"] = klass.name.replace(/^.*::/, "").toLowerCase();
+
+    return tmp;
+  },
+};
 
 /**
  * `URI` (`vendor/ruby/v3.3.11/lib/uri/common.rb:15`), the module `parse` and the
@@ -192,6 +251,82 @@ export class URI {
       b += String.fromCharCode(byte);
     }
     return b.replace(regexp, (c) => table[c]);
+  }
+
+  /**
+   * `URI.split` (`vendor/ruby/v3.3.11/lib/uri/common.rb:172`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI.split`
+   * (`vendor/ruby/v3.3.11/lib/uri/common.rb:172`).
+   */
+  static split(uri: string): SplitComponents {
+    return RFC3986_PARSER.split(uri);
+  }
+
+  /**
+   * `URI.encode_www_form` (`vendor/ruby/v3.3.11/lib/uri/common.rb:503-521`): each
+   * pair as `key=value`, a `nil` value as the bare key and an Array value as
+   * one pair per element, joined by `&`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI.encode_www_form`
+   * (`vendor/ruby/v3.3.11/lib/uri/common.rb:503`).
+   */
+  static encodeWwwForm(enum_: Record<string, unknown>, enc: Encoding | null = null): string {
+    return Object.entries(enum_)
+      .map(([k, v]) => {
+        if (v == null) {
+          return URI.encodeWwwFormComponent(k, enc);
+        } else if (Array.isArray(v)) {
+          return v
+            .map((w) => {
+              let str = URI.encodeWwwFormComponent(k, enc);
+              if (w != null) {
+                str += "=";
+                str += URI.encodeWwwFormComponent(w as string, enc);
+              }
+              return str;
+            })
+            .join("&");
+        } else {
+          let str = URI.encodeWwwFormComponent(k, enc);
+          str += "=";
+          str += URI.encodeWwwFormComponent(v as string, enc);
+          return str;
+        }
+      })
+      .join("&");
+  }
+
+  /**
+   * `URI.decode_www_form` (`vendor/ruby/v3.3.11/lib/uri/common.rb:556-596`), its
+   * default `separator: '&'` arm: the `[key, value]` pairs of an ASCII
+   * query string, `+` and each `%XX` decoded and the bytes read as UTF-8 with
+   * invalid sequences scrubbed. The `enc`, `use__charset_` and `isindex`
+   * arms have no caller and are not ported.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI.decode_www_form`
+   * (`vendor/ruby/v3.3.11/lib/uri/common.rb:556`).
+   */
+  static decodeWwwForm(str: string): [string, string][] {
+    // eslint-disable-next-line no-control-regex
+    if (!/^[\x00-\x7f]*$/.test(str)) {
+      throw new ArgumentError("the input of URI.decode_www_form must be ASCII only string");
+    }
+    const ary: [string, string][] = [];
+    if (str === "") return ary;
+    const decoder = new TextDecoder("utf-8");
+    const scrub = (s: string): string => decoder.decode(Uint8Array.from(s, (c) => c.charCodeAt(0)));
+    for (const string of str.split(/(?<=&)/)) {
+      const field = string.endsWith("&") ? string.slice(0, -1) : string;
+      const i = field.indexOf("=");
+      const key = i < 0 ? field : field.slice(0, i);
+      const val = i < 0 ? "" : field.slice(i + 1);
+      ary.push([
+        scrub(key.replace(/\+|%[0-9a-fA-F]{2}/g, (c) => TBLDECWWWCOMP_[c])),
+        scrub(val.replace(/\+|%[0-9a-fA-F]{2}/g, (c) => TBLDECWWWCOMP_[c])),
+      ]);
+    }
+    return ary;
   }
 
   /** `URI.parse` (`vendor/ruby/v3.3.11/lib/uri/common.rb:186`). */

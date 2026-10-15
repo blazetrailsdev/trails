@@ -1,4 +1,4 @@
-import { Module, RuntimeError, rbObjAsString, type Hash } from "@blazetrails/ruby-compat";
+import { Module, RuntimeError, rbObjAsString } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   type HashWithIndifferentAccess,
@@ -71,7 +71,9 @@ interface DirtyIncludeHost {
 
 export const Dirty: Module & { [included]?: (base: DirtyIncludeHost) => void } =
   new Module().include({
-    get savedChanges(): Hash<string, [unknown, unknown]> {
+    get savedChanges():
+      | HashWithIndifferentAccess<[unknown, unknown]>
+      | Record<string, [unknown, unknown]> {
       return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
     },
 

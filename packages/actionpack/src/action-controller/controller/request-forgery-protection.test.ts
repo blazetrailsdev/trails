@@ -1460,7 +1460,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     await tc().get("cookie");
 
     const cookies = tc().parseSetCookiesHeaders(tc().response.headers.get("Set-Cookie"));
-    const csrfTokenCookie = cookies.get("csrf_token")!;
+    const csrfTokenCookie = cookies["csrf_token"];
     expect(csrfTokenCookie["httponly"]).toBeTruthy();
   });
 

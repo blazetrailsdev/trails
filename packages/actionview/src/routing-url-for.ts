@@ -4,7 +4,15 @@ import {
   extractOptionsBang,
   isPlainObject,
 } from "@blazetrails/activesupport";
-import { Module, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  hasKey,
+  hashAref,
+  hashAset,
+  isSymbol,
+  rtest,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 import type { UrlHelperHost } from "./helpers/url-helper.js";
 
@@ -110,17 +118,9 @@ export function ensureOnlyPathOption(
   this: Host,
   options: Record<string, unknown> | Parameters,
 ): void {
-  const params = options instanceof TopLevel.ActionController!.Parameters ? options : null;
-  const hash = params ? null : (options as Record<string, unknown>);
-  if (
-    !(params ? params.hasKey("only_path") : Object.prototype.hasOwnProperty.call(hash!, "onlyPath"))
-  ) {
-    const host = params ? params.get("host") : hash!["host"];
-    if (!(host != null && host !== false)) {
-      const onlyPath = this._generatePathsByDefault();
-      if (params) params.set("only_path", onlyPath);
-      else hash!["onlyPath"] = onlyPath;
-    }
+  if (!hasKey(options, "onlyPath")) {
+    if (!rtest(hashAref(options, "host")))
+      hashAset(options, "onlyPath", this._generatePathsByDefault());
   }
 }
 

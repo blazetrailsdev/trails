@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { travelBack, travelTo, assertNil, assertNotNil } from "@blazetrails/activesupport";
+import {
+  travelBack,
+  travelTo,
+  assertNil,
+  assertNotNil,
+  assertEqual,
+} from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
@@ -38,7 +44,7 @@ describe("SignedGlobalIDTest", () => {
   it("as string", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(), { verifier });
-    expect(SignedGlobalID.parse(sgid.toString(), { verifier })!.uri).toEqual(sgid.uri);
+    assertEqual(sgid.uri, SignedGlobalID.parse(sgid.toString(), { verifier })!.uri);
   });
 
   it("model id", () => {
@@ -81,8 +87,9 @@ describe("SignedGlobalIDPurposeTest", () => {
     const verifier = makeVerifier();
     const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
     const likeSgid = SignedGlobalID.create(person(5), { verifier, for: "like-button" });
-    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "login" })!.uri).toEqual(
+    assertEqual(
       loginSgid.uri,
+      SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "login" })!.uri,
     );
     expect(loginSgid.equals(likeSgid)).not.toBe(true);
   });
@@ -305,20 +312,20 @@ describe("SignedGlobalIDCustomParamsTest", () => {
   it("create custom params", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, hello: "world" });
-    expect(sgid.params["hello"]).toBe("world");
+    expect(sgid.params!.get("hello")).toBe("world");
   });
 
   it("parse custom params", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, hello: "world" });
     const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
-    expect(parsed!.params["hello"]).toBe("world");
+    expect(parsed!.params!.get("hello")).toBe("world");
   });
 
   it("purpose key flows through as a URI param (not reserved)", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, purpose: "vip" });
-    expect(sgid.params["purpose"]).toBe("vip");
+    expect(sgid.params!.get("purpose")).toBe("vip");
     expect(sgid.purpose).toBe("default");
   });
 });

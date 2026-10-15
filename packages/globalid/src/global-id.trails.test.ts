@@ -12,12 +12,9 @@ describe("GlobalID (trails)", () => {
   it("deconstruct_keys delegates to the uri", () => {
     setApp("bcx");
     const gid = GlobalID.create({ id: 5, constructor: { name: "Person" } }, { db: "primary" });
-    expect(gid.deconstructKeys()).toEqual({
-      app: "bcx",
-      modelName: "Person",
-      modelId: "5",
-      params: { db: "primary" },
-    });
+    const keys = gid.deconstructKeys();
+    expect([keys.app, keys.modelName, keys.modelId]).toEqual(["bcx", "Person", "5"]);
+    expect(keys.params!.get("db")).toBe("primary");
   });
 
   it("default_locator sets Locator.default_locator", async () => {

@@ -1,4 +1,4 @@
-import { Hash, rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, rbEqual } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
@@ -141,7 +141,7 @@ describe("AttributesDirtyTest", () => {
   it("saving should preserve previous changes", () => {
     model.name = "Jericho Cane";
     model.save();
-    expect(model.previousChanges.get("name")).toEqual([null, "Jericho Cane"]);
+    expect(hashAref(model.previousChanges, "name")).toEqual([null, "Jericho Cane"]);
   });
 
   it("setting new attributes should not affect previous changes", () => {
@@ -188,12 +188,12 @@ describe("AttributesDirtyTest", () => {
     model.save();
     model.name = "Bob";
 
-    expect(model.previousChanges.get("name")).toEqual([null, "Dmitry"]);
+    expect(hashAref(model.previousChanges, "name")).toEqual([null, "Dmitry"]);
     expect(model.changedAttributes.get("name")).toBe("Dmitry");
 
     model.clearChangesInformation();
 
-    expect(model.previousChanges).toEqual(new HashWithIndifferentAccess());
+    expect(model.previousChanges).toEqual({});
     expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
   });
 
