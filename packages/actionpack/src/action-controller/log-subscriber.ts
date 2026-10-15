@@ -26,7 +26,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     return Base.logger as BaseLogSubscriber["logger"];
   }
 
-  /** @missingRailsArgs each_pair — PERMANENT */
   startProcessing(event: Event): void {
     if (!this.logger?.["info?"]) return;
 
