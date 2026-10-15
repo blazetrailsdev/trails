@@ -148,7 +148,7 @@ describe("default_extensions", () => {
 
   it("falls back to the default scope, then to no extensions", () => {
     const host = {
-      abstractClass: true,
+      isAbstractClass: () => true,
       currentScope: () => ({ isEmptyScope: true }),
       relation: () => undefined,
     };

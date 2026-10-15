@@ -319,6 +319,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     const host = {
       adapter: firstAdapter,
       tableName: "posts",
+      isAbstractClass: () => false,
       prototype: {},
     };
 
