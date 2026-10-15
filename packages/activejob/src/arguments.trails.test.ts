@@ -54,7 +54,8 @@ describe("ActiveJob::Arguments", () => {
 
   it("deserializes a Map hash, including a custom-serialized one", async () => {
     const plain = new Hash<string, unknown>().set("a", 1).set("_aj_symbol_keys", ["a"]);
-    expect(await deserialize([plain])).toEqual([new Hash<string, unknown>().set(":a", 1)]);
+    const [restored] = await deserialize([plain]);
+    expect([...(restored as Map<string, unknown>)]).toEqual([[":a", 1]]);
     const custom = new Hash<string, unknown>().set("_aj_serialized", "Nope::Missing");
     await expect(deserialize([custom])).rejects.toThrow("Serializer Nope::Missing is not known");
   });
