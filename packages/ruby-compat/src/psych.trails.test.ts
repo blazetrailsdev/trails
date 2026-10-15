@@ -215,6 +215,13 @@ describe("ToRuby sequences and keys", () => {
     ]);
   });
 
+  it("revives a self-aliased mapping with a non-String key as one Hash", async () => {
+    const { Psych } = await import("./psych.js");
+    const hash = Psych.unsafeLoad("&a\nx: *a\n1: y\n") as Map<unknown, unknown>;
+    expect(hash.get("x")).toBe(hash);
+    expect(hash.get(1)).toBe("y");
+  });
+
   it("hands a load-tagged scalar's value to init_with through Coder#scalar", async () => {
     const { Psych } = await import("./psych.js");
     const { registerConstant } = await import("./variable.js");

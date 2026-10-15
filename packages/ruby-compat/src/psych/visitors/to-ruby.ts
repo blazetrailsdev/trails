@@ -264,21 +264,26 @@ export class ToRuby {
     o: YAMLMap,
     tagged = false,
   ): Record<string, unknown> {
+    const items = o.items as { key: ParsedNode; value: ParsedNode }[];
+    const keys = items.map(({ key: k }) => (yaml.isScalar(k) ? this.accept(k) : k));
     let hash = h;
+    const widen = () => {
+      const upgraded = new Hash<unknown, unknown>();
+      for (const [k, v] of Object.entries(hash)) upgraded.set(k, v);
+      hash = this.register(o, upgraded as unknown as Record<string, unknown>);
+    };
+    const widenable = () => !tagged && Object.getPrototypeOf(hash) === null;
+    if (widenable() && keys.some((key) => typeof key !== "string")) widen();
     const aset = (key: unknown, val: unknown) => {
-      if (!tagged && typeof key !== "string" && Object.getPrototypeOf(hash) === null) {
-        const upgraded = new Hash<unknown, unknown>();
-        for (const [k, v] of Object.entries(hash)) upgraded.set(k, v);
-        hash = this.register(o, upgraded as unknown as Record<string, unknown>);
-      }
+      if (typeof key !== "string" && widenable()) widen();
       if (hash instanceof Map) hash.set(key, val);
       else hash[String(key)] = val;
     };
     const mergeBang = (val: object) => {
       for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(k, v);
     };
-    for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
-      const key = this.accept(k);
+    for (const [i, { key: k, value: v }] of items.entries()) {
+      const key = yaml.isScalar(k) ? keys[i] : this.accept(k);
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
         if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") mergeBang(val as object);
