@@ -1205,6 +1205,13 @@ describe("Kernel#send to a method on a core class seat", () => {
     unseat(Hash);
     unseat(rbCArray);
   });
+
+  it("leaves Hash's class body off a plain record, so a plain record or an array does not respond to toJSON", () => {
+    expect(basicObjRespondTo({}, "toJSON")).toBe(false);
+    expect(basicObjRespondTo([], "toJSON")).toBe(false);
+    expect(basicObjRespondTo({}, "each")).toBe(true);
+    expect(basicObjRespondTo(new Hash(), "toJSON")).toBe(true);
+  });
 });
 
 describe("rbClassNewInstance", () => {
