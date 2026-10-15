@@ -11,6 +11,7 @@ export function cspMetaTag(
   this: CspHelperHost,
   options: Record<string, unknown> = {},
 ): SafeBuffer | TagBuilder | null {
+  options = { ...options };
   if (this.isContentSecurityPolicy()) {
     options.name = "csp-nonce";
     options.content = this.contentSecurityPolicyNonce();

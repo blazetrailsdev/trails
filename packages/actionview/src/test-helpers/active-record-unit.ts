@@ -86,6 +86,7 @@ export class ActiveRecordTestConnector {
 
 type ControllerClass = Parameters<typeof ActionController.TestCase.tests>[0];
 
+/** @missingRailsCall after_fork_hook — CONVERGEABLE active-record-unit-registers-parallelization-after-fork-hook */
 export class ActiveRecordTestCase extends ActionController.TestCase {
   declare static fixturePaths: string[];
   declare static useTransactionalTests: boolean;
@@ -96,11 +97,11 @@ export class ActiveRecordTestCase extends ActionController.TestCase {
 
   static override tests(controller: ControllerClass): void {
     super.tests(controller);
-    if (typeof controller !== "string" && "ROUTES" in controller) {
+    if ((controller as unknown as { ROUTES?: unknown }).ROUTES !== undefined) {
       const mod = new Module();
       mod.defineMethod("setup", function (this: { routes: unknown }) {
         mod.superMethod(this, "setup")!();
-        this.routes = (controller as { ROUTES: unknown }).ROUTES;
+        this.routes = (controller as unknown as { ROUTES: unknown }).ROUTES;
       });
       include(this, mod);
     }
@@ -124,7 +125,7 @@ export class ActiveRecordTestCase extends ActionController.TestCase {
 
   override async run(): Promise<this> {
     if (ActiveRecordTestConnector.connected) return super.run();
-    return this;
+    return undefined as unknown as this;
   }
 
   async captureSql(block: () => unknown): Promise<string[]> {
