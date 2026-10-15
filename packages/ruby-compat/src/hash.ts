@@ -404,6 +404,9 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
       return val;
     }
   } else {
+    if (Object.isFrozen(hash)) {
+      throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
+    }
     if (Object.hasOwn(hash, key as string)) {
       const val = (hash as Record<string, unknown>)[key as string];
       delete (hash as Record<string, unknown>)[key as string];

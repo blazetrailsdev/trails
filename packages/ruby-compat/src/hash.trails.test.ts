@@ -812,6 +812,12 @@ describe("hashReplace", () => {
 });
 
 describe("hashDelete", () => {
+  it("raises FrozenError on a frozen receiver, hit or miss, as rb_hash_modify_check does", () => {
+    const hash = Object.freeze({ foo: 0 });
+    expect(() => hashDelete(hash, "foo")).toThrow(FrozenError);
+    expect(() => hashDelete(hash, "missing")).toThrow(FrozenError);
+  });
+
   it("removes the entry and returns its stored value, including a stored nil", () => {
     const hash: Record<string, number | null> = { foo: 0, bar: null };
     expect(hashDelete(hash, "foo")).toBe(0);

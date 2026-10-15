@@ -156,21 +156,11 @@ export const Util = {
         .component()
         .slice(1)
         .forEach((c, i) => {
-          try {
-            tmp[c] = rbObjClone(arrayHash[i]);
-          } catch (error) {
-            if (!(error instanceof TypeError)) throw error;
-            tmp[c] = arrayHash[i];
-          }
+          tmp[c] = rbObjClone(arrayHash[i]);
         });
     } else if (arrayHash != null && typeof arrayHash === "object" && !Array.isArray(arrayHash)) {
       for (const [key, value] of Object.entries(arrayHash)) {
-        try {
-          tmp[key] = rbObjClone(value);
-        } catch (error) {
-          if (!(error instanceof TypeError)) throw error;
-          tmp[key] = value;
-        }
+        tmp[key] = rbObjClone(value);
       }
     } else {
       throw new ArgumentError(
