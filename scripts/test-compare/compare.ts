@@ -268,7 +268,7 @@ export function aliasKey(key: string): string | undefined {
   return at === -1 ? ` ${desc}` : `${key.slice(0, at + 3)} ${desc}`;
 }
 
-// Rails uses ERB, RuboCop and Capybara; we use TSE, ESLint and Vitest — normalize class/test names to match
+// Rails uses ERB and RuboCop; we use TSE and ESLint — normalize class/test names to match
 function normalizeErb(s: string): string {
   return normalize(s)
     .replace(/erb/g, "tse")
