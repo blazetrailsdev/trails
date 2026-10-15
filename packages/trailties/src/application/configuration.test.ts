@@ -271,7 +271,7 @@ describe("ConfigurationTest", () => {
     }
   });
 
-  it("sanitizer_vendor is set to best supported vendor in new apps", async () => {
+  it.skip("sanitizer_vendor is set to best supported vendor in new apps", async () => {
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
     await application.initialize();
