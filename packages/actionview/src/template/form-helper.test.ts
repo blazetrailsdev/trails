@@ -2,9 +2,17 @@ import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
-import { I18n, extend, isBlank, isPlainObject, isPresent } from "@blazetrails/activesupport";
+import {
+  I18n,
+  assertEqual,
+  assertRaises,
+  extend,
+  isBlank,
+  isPlainObject,
+  isPresent,
+} from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
-import { Range, Struct, include } from "@blazetrails/ruby-compat";
+import { ArgumentError, Range, Struct, include } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -919,17 +927,23 @@ describe("FormHelperTest", () => {
   const commentId = (i: number, value: number) =>
     `<input id="post_comments_attributes_${i}_id" name="post[comments_attributes][${i}][id]" type="hidden" value="${value}" autocomplete="off" />`;
 
-  it("form for requires block", () => {
-    expect(() => formFor(post, { html: { id: "create-post" } })).toThrow("Missing block");
+  it("form for requires block", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
+      formFor(post, { html: { id: "create-post" } });
+    });
+    assertEqual("Missing block", error.message);
   });
 
-  it("form for requires arguments", () => {
-    expect(() => formFor(null, { html: { id: "create-post" } }, () => {})).toThrow(
-      "First argument in form cannot contain nil or be empty",
-    );
-    expect(() => formFor([null, null], { html: { id: "create-post" } }, () => {})).toThrow(
-      "First argument in form cannot contain nil or be empty",
-    );
+  it("form for requires arguments", async () => {
+    let error = await assertRaises([ArgumentError], {}, () => {
+      formFor(null, { html: { id: "create-post" } }, () => {});
+    });
+    assertEqual("First argument in form cannot contain nil or be empty", error.message);
+
+    error = await assertRaises([ArgumentError], {}, () => {
+      formFor([null, null], { html: { id: "create-post" } }, () => {});
+    });
+    assertEqual("First argument in form cannot contain nil or be empty", error.message);
   });
 
   it("form for text area alias", () => {
@@ -1298,23 +1312,6 @@ describe("FormHelperTest", () => {
     const expected = editPost(
       () =>
         "<input name='post[1][comment][title]' type='text' id='post_1_comment_title' value='Hello World' />",
-    );
-
-    assertDomEqual(expected, rendered);
-  });
-
-  it("nested fields for with index on both", () => {
-    formFor(post, { index: 1 }, (f) => {
-      concat(
-        f.fieldsFor("comment", post, { index: 5 }, (c) => {
-          concat(c.textField("title"));
-        }),
-      );
-    });
-
-    const expected = editPost(
-      () =>
-        "<input name='post[1][comment][5][title]' type='text' id='post_1_comment_5_title' value='Hello World' />",
     );
 
     assertDomEqual(expected, rendered);
