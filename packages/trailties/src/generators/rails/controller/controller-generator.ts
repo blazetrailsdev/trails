@@ -38,6 +38,7 @@ export class ControllerGenerator extends GeneratorBase {
     this.actions = actions;
     const paths = controllerPathHelpers(name);
     this.name = name;
+    this._fileName = undefined;
     const ts = this.isTypeScript();
     const ext = this.ext();
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
