@@ -598,8 +598,8 @@ export class Module<I extends object = Record<never, never>> {
       proto = Object.getPrototypeOf(proto) as object | null;
     }
     for (const mod of nestedModules.get(this) ?? []) Module.prototype.extendObject.call(mod, obj);
-    trackIncludedModule(obj, this);
     const holder: object = typeof obj === "function" ? obj : rbObjSingletonClass(obj).prototype;
+    trackIncludedModule(holder, this);
     const parent = Object.getPrototypeOf(holder) as object | null;
     const link: object =
       typeof obj === "function" && typeof parent === "function" && parent !== Function.prototype

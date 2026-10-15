@@ -339,12 +339,13 @@ function dumpFuncall(obj: object, sym: string, name: string): unknown {
 
 /**
  * `SINGLETON_DUMP_UNABLE_P` (`vendor/ruby/v3.3.11/marshal.c:545`): `klass` is
- * the singleton class's method table, its prototype, whose `constructor` and
- * `FL_SINGLETON` seats `rbObjSingletonClass` writes are not methods.
+ * the singleton class's method table, its prototype, whose `constructor` seat
+ * `rbObjSingletonClass` writes is not a method, nor is any Symbol-keyed seat
+ * (`FL_SINGLETON`, the modules an `extend` tracks there).
  */
 function singletonDumpUnableP(klass: object): boolean {
   return (
-    Reflect.ownKeys(klass).some((mid) => mid !== "constructor" && mid !== FL_SINGLETON) ||
+    Object.getOwnPropertyNames(klass).some((mid) => mid !== "constructor") ||
     Object.keys((klass as Record<symbol, object>)[FL_SINGLETON]).length > 0
   );
 }

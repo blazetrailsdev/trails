@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ArgumentError, StringIO, rbCString, rbFSend, rbObjClass } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Module,
+  StringIO,
+  extend,
+  include,
+  rbCString,
+  rbFSend,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 import { Array as ArrayExt, Hash } from "./core-ext.js";
 import { ExtensionValue, MessagePack, Packer } from "./index.js";
 
@@ -191,6 +200,102 @@ describe("MessagePack::Packer", () => {
       expect(two.type).toEqual(0x02);
       expect(two.class).toEqual(ValueTwo);
       expect(two.packer).toBeInstanceOf(Function);
+    });
+    const valueMsgpacked = Uint8Array.of(
+      0xc7,
+      0x0f,
+      0x01,
+      ...new TextEncoder().encode("value_msgpacked"),
+    );
+
+    describe("when it has no ext type but a super class has", () => {
+      class Value {
+        toMsgpackExt(): string {
+          return "value_msgpacked";
+        }
+      }
+      beforeEach(() => {
+        packer.registerType(0x01, Value, "toMsgpackExt");
+      });
+
+      describe("when it is a child class", () => {
+        class InheritedValue extends Value {}
+
+        it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+          expect(packer.pack(new InheritedValue()).toS()).toEqual(valueMsgpacked);
+        });
+
+        describe("when it is a grandchild class", () => {
+          class InheritedTwiceValue extends InheritedValue {}
+
+          it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+            expect(packer.pack(new InheritedTwiceValue()).toS()).toEqual(valueMsgpacked);
+          });
+        });
+      });
+    });
+
+    describe("when it and its super class has an ext type", () => {
+      class Value {
+        toMsgpackExt(): string {
+          return "value_msgpacked";
+        }
+      }
+      class InheritedValue extends Value {
+        override toMsgpackExt(): string {
+          return "inherited_value_msgpacked";
+        }
+      }
+      beforeEach(() => {
+        packer.registerType(0x01, Value, "toMsgpackExt");
+        packer.registerType(0x02, InheritedValue, "toMsgpackExt");
+      });
+
+      describe("when it is a child class", () => {
+        it('is expected to eq "\\xC7\\x19\\x02inherited_value_msgpacked"', () => {
+          expect(packer.pack(new InheritedValue()).toS()).toEqual(
+            Uint8Array.of(
+              0xc7,
+              0x19,
+              0x02,
+              ...new TextEncoder().encode("inherited_value_msgpacked"),
+            ),
+          );
+        });
+      });
+
+      describe("even when it is a child class", () => {
+        it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+          expect(packer.pack(new Value()).toS()).toEqual(valueMsgpacked);
+        });
+      });
+    });
+
+    describe("when it has no ext type but an included module has", () => {
+      it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+        const Mod = new Module().include({
+          toMsgpackExt(): string {
+            return "value_msgpacked";
+          },
+        });
+        packer.registerType(0x01, Mod, "toMsgpackExt");
+        class Value {}
+        include(Value, Mod);
+        expect(packer.pack(new Value()).toS()).toEqual(valueMsgpacked);
+      });
+    });
+
+    describe("when it has no ext type but it was extended by a module which has one", () => {
+      it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+        const Mod = new Module().include({
+          toMsgpackExt(): string {
+            return "value_msgpacked";
+          },
+        });
+        const object = extend({}, Mod);
+        packer.registerType(0x01, Mod, "toMsgpackExt");
+        expect(packer.pack(object).toS()).toEqual(valueMsgpacked);
+      });
     });
   });
 
