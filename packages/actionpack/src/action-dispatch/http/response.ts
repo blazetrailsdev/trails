@@ -211,8 +211,11 @@ export class RackBody {
     yield* this._response.each();
   }
 
-  call(...args: unknown[]): unknown {
-    return (this._response.stream as unknown as { call(...a: unknown[]): unknown }).call(...args);
+  call(arguments_: unknown[] = [], block?: (...args: unknown[]) => unknown): unknown {
+    return (this._response.stream as unknown as { call(...a: unknown[]): unknown }).call(
+      ...arguments_,
+      block,
+    );
   }
 
   toPath(): string {
