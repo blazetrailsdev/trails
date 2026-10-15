@@ -42,3 +42,7 @@ packages/actionpack/src/test-helpers/fixtures/
 # Byte-for-byte copies of vendor/thor/v1.3.2/spec/fixtures; the `.ts` beside them are the ported `.thor` files.
 packages/trailties/src/thor/test-helpers/fixtures/*
 !packages/trailties/src/thor/test-helpers/fixtures/*.ts
+
+# Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
+packages/actionpack/src/test-helpers/fixtures/public/
+packages/actionpack/src/test-helpers/fixtures/公共/

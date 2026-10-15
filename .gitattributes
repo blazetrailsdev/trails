@@ -7,3 +7,9 @@ packages/actionpack/src/test-helpers/fixtures/multipart/* binary
 *.sh text eol=lf
 packages/activerecord/src/test-helpers/support/schema_cache_fixtures/*.dump binary
 packages/activerecord/src/test-helpers/support/marshal_compatibility_fixtures/**/*.dump binary
+
+# Precompressed copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
+packages/actionpack/src/test-helpers/fixtures/public/**/*.gz binary
+packages/actionpack/src/test-helpers/fixtures/public/**/*.br binary
+packages/actionpack/src/test-helpers/fixtures/公共/**/*.gz binary
+packages/actionpack/src/test-helpers/fixtures/公共/**/*.br binary

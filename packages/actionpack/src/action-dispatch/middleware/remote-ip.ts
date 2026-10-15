@@ -89,8 +89,8 @@ function cidrContains(cidr: ParsedCidr, ip: ParsedIp): boolean {
   return cidr.value >> shift === ip.value >> shift;
 }
 
-function proxyMatches(proxy: Proxy | null, ipStr: string): boolean {
-  if (proxy == null) return false;
+function proxyMatches(proxy: Proxy | null, ipStr: string | undefined): boolean {
+  if (proxy == null || ipStr == null) return false;
   if (proxy instanceof RegExp) return proxy.test(ipStr);
   const cidr = parseCidr(proxy);
   const ip = parseIp(ipStr);
@@ -130,8 +130,7 @@ export class GetIp {
     }
 
     const ips = [...forwardedIps, ...clientIps];
-    const withRemote = remoteAddr ? [...ips, remoteAddr] : ips;
-    return this.filterProxies(withRemote)[0] ?? ips[ips.length - 1] ?? remoteAddr ?? null;
+    return this.filterProxies([...ips, remoteAddr])[0] ?? ips[ips.length - 1] ?? remoteAddr ?? null;
   }
 
   private ipsFrom(header: string | undefined): string[] {
@@ -150,7 +149,7 @@ export class GetIp {
   }
 
   /** @internal */
-  private filterProxies(ips: string[]): string[] {
+  private filterProxies(ips: Array<string | undefined>): Array<string | undefined> {
     return ips.filter((ip) => !this.proxies.some((proxy) => proxyMatches(proxy, ip)));
   }
 }
