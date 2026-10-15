@@ -4,7 +4,6 @@ import type { Thread } from "@blazetrails/ruby-compat";
 export class Interlock {
   private lock: ShareLock;
 
-  /** @internal */
   constructor() {
     this.lock = new ShareLock();
   }
@@ -47,7 +46,6 @@ export class Interlock {
     return this.lock.yieldShares({ compatible: ["load"] }, block);
   }
 
-  /** @internal */
   rawState<T>(block: (data: Map<Thread, ShareLockThreadInfo>) => T): T {
     return this.lock.rawState(block);
   }

@@ -1,23 +1,23 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { Dependencies, type Interlock, type ShareLockThreadInfo } from "@blazetrails/activesupport";
+import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
 import type { Thread } from "@blazetrails/ruby-compat";
 import { DebugLocks } from "./debug-locks.js";
 import { Response } from "../http/response.js";
 
 const passthrough = async (_env: RackEnv): Promise<RackResponse> => [200, {}, bodyFromString("ok")];
 
-const realInterlock = Dependencies.interlock;
-
 type ThreadLike = { id: number; status: string | false | null; backtrace(): string[] | null };
 
 function setInterlock(threads: Array<[ThreadLike, Partial<ShareLockThreadInfo>]>): void {
-  const map = new Map(threads) as unknown as Map<Thread, ShareLockThreadInfo>;
-  for (const info of map.values()) info.sharing ??= 0;
-  Dependencies.interlock = {
-    rawState: (block: (data: Map<Thread, ShareLockThreadInfo>) => unknown) => block(map),
-  } as unknown as Interlock;
+  const map = new Map(
+    threads.map(([thread, info]) => [
+      thread as Thread,
+      { sharing: 0, ...info } as ShareLockThreadInfo,
+    ]),
+  );
+  vi.spyOn(Dependencies.interlock, "rawState").mockImplementation((block) => block(map));
 }
 
 function thread(id: number, status: string | null = "run", backtrace: string[] = []): ThreadLike {
@@ -29,7 +29,7 @@ describe("DebugLocks", () => {
     setInterlock([]);
   });
   afterEach(() => {
-    Dependencies.interlock = realInterlock;
+    vi.restoreAllMocks();
   });
 
   it("passes non-matching paths to the inner app", async () => {

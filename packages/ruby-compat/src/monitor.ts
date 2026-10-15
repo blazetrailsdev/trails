@@ -123,8 +123,17 @@ export class MonitorConditionVariable {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#wait`
    * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:105`).
    */
-  wait(): Promise<void> {
-    return new Promise((resolve) => this.#waiters.push(resolve));
+  wait(timeout: number | null = null): Promise<void> {
+    return new Promise((resolve) => {
+      this.#waiters.push(resolve);
+      if (timeout != null) {
+        setTimeout(() => {
+          const index = this.#waiters.indexOf(resolve);
+          if (index >= 0) this.#waiters.splice(index, 1);
+          resolve();
+        }, timeout * 1000);
+      }
+    });
   }
 
   /**
