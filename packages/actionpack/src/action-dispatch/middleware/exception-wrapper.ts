@@ -362,20 +362,13 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE exception-wrapper-clean-backtrace-passes-kind-to-cleaner
-   */
+  /** @internal */
   cleanBacktrace(args: "silent" | "noise" | "all"): Array<BacktraceLine | string> {
     if (this.backtraceCleaner) {
       return this.backtraceCleaner.clean(this.backtrace, args);
+    } else {
+      return this.backtrace;
     }
-    const lines = this.backtrace;
-    return args === "silent"
-      ? lines.filter((l) => !String(l).includes("node_modules"))
-      : args === "noise"
-        ? lines.filter((l) => String(l).includes("node_modules"))
-        : lines;
   }
 
   /** @internal */
