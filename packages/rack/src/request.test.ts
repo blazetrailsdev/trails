@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Request } from "./request.js";
 import { EmptyContentError } from "./multipart/parser.js";
 import { MockRequest } from "./mock-request.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, strNew } from "@blazetrails/ruby-compat";
 import { setMultipartFileLimit, setMultipartTotalPartLimit } from "./utils.js";
 import { MultipartPartLimitError, MultipartTotalPartLimitError } from "./multipart.js";
 
@@ -430,13 +430,17 @@ describe("RackRequestTest", () => {
   it("handles invalid unicode in query string value", () => {
     const req = makeReq("/?foo=%81E");
     expect(req.queryString).toBe("foo=%81E");
-    expect(() => req.GET).toThrow();
+    expect(req.GET).toEqual({ foo: strNew([0x81, 0x45]) });
+    expect(req.POST).toEqual({});
+    expect(req.params).toEqual({ foo: strNew([0x81, 0x45]) });
   });
 
   it("handles invalid unicode in query string key", () => {
     const req = makeReq("/?foo%81E=1");
     expect(req.queryString).toBe("foo%81E=1");
-    expect(() => req.GET).toThrow();
+    expect(req.GET).toEqual({ [strNew([0x66, 0x6f, 0x6f, 0x81, 0x45])]: "1" });
+    expect(req.POST).toEqual({});
+    expect(req.params).toEqual({ [strNew([0x66, 0x6f, 0x6f, 0x81, 0x45])]: "1" });
   });
 
   it("not truncate query strings containing semi-colons #543 only in POST", () => {

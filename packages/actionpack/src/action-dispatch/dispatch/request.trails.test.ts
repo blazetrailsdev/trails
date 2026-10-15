@@ -4,7 +4,8 @@ import { Encoding } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { ParamBuilder } from "../http/param-builder.js";
 import { InvalidParameterError } from "@blazetrails/rack";
-import { Request, controllerConstants } from "../request.js";
+import { Request, PASS_NOT_FOUND, controllerConstants } from "../request.js";
+import { X_CASCADE } from "../constants.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 
 describe("Request", () => {
@@ -149,5 +150,236 @@ describe("Request", () => {
       expect(ReposController.actionEncodingTemplate("raw")!.get("any")).toBe(Encoding.ASCII_8BIT);
       expect(ChildReposController.actionEncodingTemplate("show")).toBeNull();
     });
+  });
+});
+
+describe("RequestParamsParsing", () => {
+  it("content length", () => {
+    const req = new Request({ CONTENT_LENGTH: "42" });
+    expect(req.contentLength).toBe(42);
+  });
+
+  it("content length when missing", () => {
+    const req = new Request({});
+    expect(req.contentLength).toBe(0);
+  });
+});
+
+describe("RequestParameters", () => {
+  it("path parameters", () => {
+    const req = new Request({
+      "action_dispatch.request.path_parameters": { controller: "posts", action: "show", id: "1" },
+    });
+    expect(req.pathParameters).toEqual({ controller: "posts", action: "show", id: "1" });
+  });
+
+  it("path parameters default empty", () => {
+    const req = new Request({});
+    expect(req.pathParameters).toEqual({});
+  });
+
+  it("merges request, query, and path parameters with Rails precedence", () => {
+    const req = new Request({
+      QUERY_STRING: "k=query",
+      "action_dispatch.request.request_parameters": { k: "body", b: "body-only" },
+      "action_dispatch.request.path_parameters": { k: "path", p: "path-only" },
+    });
+    expect(req.params).toEqual({ k: "path", b: "body-only", p: "path-only" });
+  });
+
+  it("pathParameters= invalidates the merged params cache and feeds future params reads", () => {
+    const req = new Request({ QUERY_STRING: "view=print" });
+    expect(req.params).toEqual({ view: "print" });
+    req.pathParameters = { controller: "items", action: "show", id: "1" };
+    expect(req.params).toEqual({
+      view: "print",
+      controller: "items",
+      action: "show",
+      id: "1",
+    });
+    req.pathParameters = { view: "edit" };
+    expect(req.params).toEqual({ view: "edit" });
+  });
+});
+
+describe("RequestHeaderEnvAccess", () => {
+  it("hasHeader/setHeader/deleteHeader/fetchHeader operate on env for non-HTTP keys", () => {
+    const req = new Request({});
+    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(false);
+    req.setHeader("action_dispatch.parameter_filter", ["password"]);
+    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(true);
+    expect(req.env["action_dispatch.parameter_filter"]).toEqual(["password"]);
+    expect(req.fetchHeader("action_dispatch.parameter_filter")).toEqual(["password"]);
+    req.deleteHeader("action_dispatch.parameter_filter");
+    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(false);
+  });
+
+  it("fetchHeader invokes fallback on miss", () => {
+    const req = new Request({});
+    expect(req.fetchHeader("missing", () => "fallback")).toBe("fallback");
+  });
+
+  it("getHeader maps HTTP-style names to HTTP_* env keys", () => {
+    const req = new Request({ HTTP_IF_NONE_MATCH: '"abc"' });
+    expect(req.getHeader("If-None-Match")).toBe('"abc"');
+  });
+
+  it("getHeader maps CGI-variable names without HTTP_ prefix", () => {
+    const req = new Request({ CONTENT_TYPE: "text/html" });
+    expect(req.getHeader("Content-Type")).toBe("text/html");
+  });
+});
+
+describe("RequestFilterParameters", () => {
+  it("filteredParameters replaces sensitive params with [FILTERED]", () => {
+    const req = new Request({
+      "action_dispatch.request.parameters": { password: "hunter2", name: "alice" },
+      "action_dispatch.parameter_filter": ["password"],
+    });
+    expect(req.filteredParameters()).toEqual({ password: "[FILTERED]", name: "alice" });
+  });
+
+  it("filteredPath replaces sensitive query params", () => {
+    const req = new Request({
+      PATH_INFO: "/users",
+      QUERY_STRING: "password=hunter2&name=alice",
+      "action_dispatch.parameter_filter": ["password"],
+    });
+    expect(req.filteredPath()).toBe("/users?password=[FILTERED]&name=alice");
+  });
+
+  it("filteredEnv strips RAW_POST_DATA by default", () => {
+    const req = new Request({ RAW_POST_DATA: "secret" });
+    expect(req.filteredEnv()["RAW_POST_DATA"]).toBe("[FILTERED]");
+  });
+
+  it("parameterFilter returns NULL_PARAM_FILTER when no header is configured", () => {
+    const req = new Request({});
+    expect(req.parameterFilter().filter({ password: "x" })).toEqual({ password: "x" });
+  });
+});
+
+describe("RequestContentSecurityPolicy", () => {
+  it("reads and writes the policy under the env header", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicy).toBeUndefined();
+    const policy = { build: () => "default-src 'self'" };
+
+    req.contentSecurityPolicy = policy as any;
+    expect(req.env["action_dispatch.content_security_policy"]).toBe(policy);
+    expect(req.contentSecurityPolicy).toBe(policy);
+  });
+
+  it("reportOnly toggles the report-only env flag", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyReportOnly).toBeUndefined();
+    req.contentSecurityPolicyReportOnly = true;
+    expect(req.contentSecurityPolicyReportOnly).toBe(true);
+  });
+
+  it("nonce is undefined without a generator and memoizes on read", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyNonce).toBeUndefined();
+    let calls = 0;
+    req.contentSecurityPolicyNonceGenerator = () => `nonce-${++calls}`;
+    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
+    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
+  });
+
+  it("nonce directives default to undefined and round-trip arrays", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyNonceDirectives).toBeUndefined();
+    req.contentSecurityPolicyNonceDirectives = ["script-src"];
+    expect(req.contentSecurityPolicyNonceDirectives).toEqual(["script-src"]);
+  });
+
+  it("null assignments persist as null on the env (matches Rails setter)", () => {
+    const req = new Request({});
+    req.contentSecurityPolicyNonceGenerator = null;
+    expect(req.env["action_dispatch.content_security_policy_nonce_generator"]).toBeNull();
+    expect(req.contentSecurityPolicyNonceGenerator).toBeNull();
+  });
+});
+
+describe("RequestControllerClass", () => {
+  it("controllerClassFor returns PASS_NOT_FOUND when name is absent", () => {
+    const req = new Request({});
+    expect(req.controllerClassFor(null)).toBe(PASS_NOT_FOUND);
+    expect(req.controllerClassFor(undefined)).toBe(PASS_NOT_FOUND);
+  });
+
+  it("controllerClassFor throws when a controller name is supplied", () => {
+    const req = new Request({});
+    expect(() => req.controllerClassFor("posts")).toThrow(/uninitialized constant PostsController/);
+  });
+
+  it("controllerClassFor resolves the registered controller constant", () => {
+    class PostsController {}
+    controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
+    try {
+      expect(new Request({}).controllerClassFor("posts")).toBe(PostsController);
+    } finally {
+      controllerConstants.delete("posts");
+    }
+  });
+
+  it("controllerClass defaults action to 'index' and returns PASS_NOT_FOUND without a controller", () => {
+    const req = new Request({});
+    expect(req.controllerClass()).toBe(PASS_NOT_FOUND);
+    expect(req.pathParameters["action"]).toBe("index");
+  });
+
+  it("PASS_NOT_FOUND.call returns 404 with x-cascade pass", async () => {
+    const [status, headers, body] = PASS_NOT_FOUND.call({});
+    expect(status).toBe(404);
+    expect(headers[X_CASCADE]).toBe("pass");
+    const chunks: unknown[] = [];
+    for await (const c of body) chunks.push(c);
+    expect(chunks).toEqual([]);
+  });
+
+  it("PASS_NOT_FOUND.action returns the sentinel itself", () => {
+    expect(PASS_NOT_FOUND.action("show")).toBe(PASS_NOT_FOUND);
+    expect(PASS_NOT_FOUND.actionEncodingTemplate("show")).toBe(false);
+  });
+});
+
+describe("RequestParametersList", () => {
+  it("returns rack.request.form_pairs verbatim when present", () => {
+    const pairs: Array<[string, unknown]> = [["a", "1"]];
+    const req = new Request({ "rack.request.form_pairs": pairs });
+    expect(req.requestParametersList()).toBe(pairs);
+  });
+
+  it("parses rack.request.form_vars via QueryParser.eachPair", () => {
+    const req = new Request({ "rack.request.form_vars": "a=1&b=2" });
+    expect(req.requestParametersList()).toEqual([
+      ["a", "1"],
+      ["b", "2"],
+    ]);
+  });
+
+  it("returns [] when no body has been parsed", () => {
+    const req = new Request({});
+    expect(req.requestParametersList()).toEqual([]);
+  });
+});
+
+describe("RequestPermissionsPolicy", () => {
+  it("round-trips through the env header", () => {
+    const req = new Request({});
+    expect(req.permissionsPolicy).toBeUndefined();
+    const policy = { build: () => "geolocation=()" };
+
+    req.permissionsPolicy = policy as any;
+    expect(req.env["action_dispatch.permissions_policy"]).toBe(policy);
+    expect(req.permissionsPolicy).toBe(policy);
+  });
+});
+
+describe("RequestMimeType", () => {
+  it("has_content_type?", () => {
+    expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe(true);
+    expect(new Request({}).hasContentType()).toBe(false);
   });
 });

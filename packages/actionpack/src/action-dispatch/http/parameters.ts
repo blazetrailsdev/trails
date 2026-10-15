@@ -1,5 +1,11 @@
 import { Logger } from "@blazetrails/activesupport";
-import { EOFError, Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
+import {
+  EOFError,
+  Exception,
+  StandardError,
+  excSetupMessage,
+  stderr,
+} from "@blazetrails/ruby-compat";
 
 import { merge, type Hash } from "@blazetrails/ruby-compat";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
@@ -101,7 +107,7 @@ export class Parameters {
       this.setHeader(PARAMETERS_KEY, parameters);
     } catch (e) {
       if (e instanceof ParameterTypeError || e instanceof InvalidParameterError) {
-        throw new BadRequest(`Invalid path parameters: ${e.message}`);
+        throw excSetupMessage(new BadRequest(`Invalid path parameters: ${e.message}`, e), e);
       }
       throw e;
     }

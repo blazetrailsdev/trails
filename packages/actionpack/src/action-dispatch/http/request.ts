@@ -14,6 +14,7 @@ import {
   rbRegMatchP,
   rbStrDump,
   toI,
+  excSetupMessage,
 } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -645,7 +646,7 @@ export class Request {
       }) as Record<string, unknown>;
     } catch (e) {
       if (e instanceof ParamError) {
-        throw new BadRequest(`Invalid query parameters: ${e.message}`);
+        throw excSetupMessage(new BadRequest(`Invalid query parameters: ${e.message}`, e), e);
       }
       throw e;
     }
@@ -677,7 +678,7 @@ export class Request {
       }) as Record<string, unknown>;
     } catch (e) {
       if (e instanceof ParamError || e instanceof EOFError) {
-        throw new BadRequest(`Invalid request parameters: ${e.message}`);
+        throw excSetupMessage(new BadRequest(`Invalid request parameters: ${e.message}`, e), e);
       }
       throw e;
     }
