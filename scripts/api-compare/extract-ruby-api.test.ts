@@ -3953,6 +3953,11 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
           def each(options)
             each { |name| options.delete(name) }
           end
+
+          def memoized(option, result)
+            (@assigns[option.human_name] ||= {}).merge!(result)
+            (@assigns[option.human_name] &&= {}).merge!(result)
+          end
         end
       `,
     };
@@ -3984,6 +3989,9 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched_last"]).toEqual({
       delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#memoized"]).toEqual({
+      "merge!": ["?", "@assigns"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#class_variable"]).toEqual({
       "key?": ["@@responses"],

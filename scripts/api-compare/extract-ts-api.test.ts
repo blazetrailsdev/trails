@@ -2108,6 +2108,21 @@ describe("body call capture", () => {
     );
   });
 
+  it("names a memoized element receiver by the collection it indexes", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        assigns: Record<string, object> = {};
+        assign(k: string, r: object) {
+          Object.assign((this.assigns[k] ??= {}), r);
+          Object.assign((this.other[k] ||= {}), r);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "assign")!;
+    expect(m.calls).toContain("@assign:assigns");
+    expect(m.calls).not.toContain("@assign:other");
+  });
+
   it("marks the native hash forms with the receiver each one ends in", () => {
     const cls = extractFromSource(
       `class Foo {

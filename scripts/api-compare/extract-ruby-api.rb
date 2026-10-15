@@ -3061,6 +3061,9 @@ class ApiExtractor
     when :const_path_ref then const_name(recv[2])
     when :top_const_ref then const_name(recv[1])
     when :aref then symbol_key_name(recv[2])
+    when :opassign
+      target = recv[1]
+      target.is_a?(Array) && target[0] == :aref_field && recv[2] == [:@op, "||=", recv[2][2]] ? receiver_tail_name(target[1]) : nil
     when :paren
       stmts = recv[1]
       stmts.is_a?(Array) && stmts.length == 1 ? or_operand_names(stmts[0]) : nil

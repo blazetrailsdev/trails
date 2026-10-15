@@ -5,7 +5,6 @@ import {
   isEmpty,
   keys,
   matchOperator,
-  mergeBang,
   rbFSend,
   rbInspect,
   rbModName,
@@ -265,7 +264,7 @@ export class Options extends Arguments {
   /** @internal */
   protected assignResultBang(option: Option, result: unknown): void {
     if (rtest(option.repeatable) && option.type === "hash") {
-      mergeBang(
+      Object.assign(
         (this.assigns[option.humanName] ??= Object.create(null)) as Record<string, unknown>,
         result as Record<string, unknown>,
       );

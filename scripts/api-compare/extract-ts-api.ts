@@ -7067,6 +7067,13 @@ function receiverTailName(receiver: ts.Expression): string | undefined {
     e = e.expression;
   }
   if (ts.isCallExpression(e)) e = e.expression;
+  if (
+    ts.isBinaryExpression(e) &&
+    e.operatorToken.kind === ts.SyntaxKind.QuestionQuestionEqualsToken &&
+    ts.isElementAccessExpression(e.left)
+  ) {
+    return receiverTailName(e.left.expression);
+  }
   if (ts.isIdentifier(e)) return e.text;
   if (ts.isPropertyAccessExpression(e)) return e.name.text;
   return undefined;
