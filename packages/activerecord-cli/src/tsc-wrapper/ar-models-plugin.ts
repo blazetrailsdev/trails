@@ -1,5 +1,5 @@
 import type { TscPlugin, VirtualizeOutput } from "@blazetrails/trails-tsc";
-import { virtualize } from "../type-virtualization/virtualize.js";
+import { virtualize, type MissingTable } from "../type-virtualization/virtualize.js";
 import { resolveAutoImports } from "../type-virtualization/auto-import.js";
 import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
 
@@ -12,10 +12,11 @@ export interface ArModelsPluginOptions {
   baseNames: readonly string[];
   modelRegistry: ReadonlyMap<string, string>;
   schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, SchemaColumnValue>>>>;
+  onMissingTable?: (missing: MissingTable) => void;
 }
 
 export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
-  const { baseNames, modelRegistry, schemaColumnsByTable } = opts;
+  const { baseNames, modelRegistry, schemaColumnsByTable, onMissingTable } = opts;
   const baseNameSet = new Set(baseNames);
   const hasSchemaColumns = schemaColumnsByTable && Object.keys(schemaColumnsByTable).length > 0;
   const EXTENDS_IDENT = /\bextends\s+([\w$]+)/g;
@@ -43,6 +44,7 @@ export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
         baseNames,
         prependImports,
         schemaColumnsByTable,
+        onMissingTable,
       });
       return { ts: result.text, deltas: result.deltas };
     },

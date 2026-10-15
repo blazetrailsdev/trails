@@ -666,6 +666,26 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(combined).toMatch(/`arrayElementType` is only valid when `type` is "array"/);
   });
 
+  it("loadSchemaColumns: merges tables from more than one --schema file", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const a = writeSchemaJson({ users: { name: "string" } });
+    const b = writeSchemaJson({ repositories: { slug: "string" } });
+    expect(loadSchemaColumns(["--schema", a, `--schema=${b}`])).toEqual({
+      users: { name: "string" },
+      repositories: { slug: "string" },
+    });
+  });
+
+  it("loadSchemaColumns: refuses a table defined in two --schema files", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const a = writeSchemaJson({ users: { name: "string" } });
+    const b = writeSchemaJson({ users: { email: "string" } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", a, "--schema", b])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toContain(`table "users" is defined in both ${a} and ${b}`);
+  });
+
   it("loadSchemaColumns: --schema <path>.ts parses TypeScript schema file", async () => {
     const { loadSchemaColumns } = await import("./cli.js");
     const schemaSrc = [

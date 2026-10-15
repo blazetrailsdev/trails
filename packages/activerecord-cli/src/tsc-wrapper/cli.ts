@@ -10,7 +10,7 @@ import {
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { tsApi } from "../type-virtualization/ts-api.js";
-import { virtualize } from "../type-virtualization/virtualize.js";
+import { virtualize, type MissingTable } from "../type-virtualization/virtualize.js";
 import {
   createArTrailsProgram,
   createArSolutionBuilder,
@@ -26,36 +26,44 @@ import type { TseSourceMap } from "./ar-program.js";
 
 type RichColumnValue = Extract<SchemaColumnValue, object>;
 
-export function loadSchemaColumns(
-  args: string[],
-): Record<string, Record<string, SchemaColumnValue>> | undefined {
-  let schemaPath: string | undefined;
-  let schemaProvided = false;
+type SchemaColumns = Record<string, Record<string, SchemaColumnValue>>;
+
+export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
+  const schemaPaths: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--schema") {
-      schemaProvided = true;
-      const nextArg = args[i + 1];
-      if (!nextArg || nextArg.startsWith("-")) {
+    if (a === "--schema" || a.startsWith("--schema=")) {
+      const value = a === "--schema" ? args[++i] : a.slice("--schema=".length);
+      if (!value || value.startsWith("-")) {
         process.stderr.write("trails-tsc: --schema expects a file path.\n");
         process.exit(1);
       }
-      schemaPath = nextArg;
-      break;
-    }
-    if (a.startsWith("--schema=")) {
-      schemaProvided = true;
-      const value = a.slice("--schema=".length);
-      if (!value) {
-        process.stderr.write("trails-tsc: --schema expects a file path.\n");
-        process.exit(1);
-      }
-      schemaPath = value;
-      break;
+      schemaPaths.push(path.resolve(value));
     }
   }
-  if (!schemaProvided || !schemaPath) return undefined;
-  const resolved = path.resolve(schemaPath);
+  let merged: SchemaColumns | undefined;
+  const sourceOf = new Map<string, string>();
+  for (const resolved of schemaPaths) {
+    const tables = loadSchemaFile(resolved);
+    if (!tables) continue;
+    merged ??= Object.create(null) as SchemaColumns;
+    for (const table of Object.keys(tables)) {
+      const first = sourceOf.get(table);
+      if (first !== undefined) {
+        process.stderr.write(
+          `trails-tsc: table "${table}" is defined in both ${first} and ${resolved}; ` +
+            `a model cannot be typed against two schemas.\n`,
+        );
+        process.exit(1);
+      }
+      sourceOf.set(table, resolved);
+      merged[table] = tables[table];
+    }
+  }
+  return merged;
+}
+
+function loadSchemaFile(resolved: string): SchemaColumns | undefined {
   if (!fs.existsSync(resolved)) {
     process.stderr.write(
       `trails-tsc: --schema file not found: ${resolved}; ` +
@@ -170,12 +178,27 @@ function validateColumnValue(
   return out;
 }
 
+export function warnMissingTable(): (missing: MissingTable) => void {
+  const warned = new Set<string>();
+  return ({ className, tableName, fileName }) => {
+    const key = `${fileName}#${className}`;
+    if (warned.has(key)) return;
+    warned.add(key);
+    process.stderr.write(
+      `trails-tsc: warning: ${className} (${fileName}) reads table "${tableName}", ` +
+        `which is in no --schema file; mark it @trails-typegen no-schema if that is intended.\n`,
+    );
+  };
+}
+
 export function handleHelp(args: string[]): void {
   if (!args.includes("--help") && !args.includes("-h")) return;
   process.stdout.write(
-    "Usage: trails-tsc [tsc-options] [--schema <path>]\n\n" +
+    "Usage: trails-tsc [tsc-options] [--schema <path>]...\n\n" +
       "  --schema <path>  Schema source: db/schema.ts (TypeScript) or a legacy .json\n" +
-      "                   column-dump. Drives attribute virtualization.\n\n" +
+      "                   column-dump. Drives attribute virtualization. Repeat it\n" +
+      "                   for a multi-database app (--schema db/schema.ts\n" +
+      "                   --schema db/hub_schema.ts); a table in two files is an error.\n\n" +
       "  All other options are passed through to tsc. Run tsc --help for the full list.\n",
   );
   process.exit(0);
@@ -196,7 +219,10 @@ function handlePrintVirtualized(args: string[]): void {
   }
   const text = fs.readFileSync(resolved, "utf8");
   const schemaColumnsByTable = loadSchemaColumns(args);
-  const { text: virtualized } = virtualize(text, resolved, { schemaColumnsByTable });
+  const { text: virtualized } = virtualize(text, resolved, {
+    schemaColumnsByTable,
+    onMissingTable: warnMissingTable(),
+  });
   process.stdout.write(virtualized);
   process.exit(0);
 }
@@ -290,6 +316,7 @@ async function handleBuildMode(args: string[]): Promise<void> {
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
+    onMissingTable: warnMissingTable(),
     onDiagnostic: (d) => {
       const out = pretty
         ? formatDiagnosticsWithColorAndContext([d], fh)
@@ -382,6 +409,7 @@ export async function main(): Promise<void> {
   await buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
+    onMissingTable: warnMissingTable(),
   });
 
   const fh = formatHost();

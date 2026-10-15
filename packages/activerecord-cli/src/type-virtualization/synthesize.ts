@@ -50,9 +50,11 @@ export function synthesizeDeclares(
   const relationScopeLines: string[] = [];
   const mergeAttributeInterface = opts.mergeAttributeInterface ?? true;
   const enumKeys = enumKeyUnions(info);
+  const attributeTypes = new Map<string, NonNullable<RenderedLine["attribute"]>>();
   const emit = (l: RenderedLine): void => {
     const keys = l.attribute && enumKeys.get(l.declaredName);
     if (keys) l = enumAttributeLine(l, keys);
+    if (l.attribute) attributeTypes.set(l.declaredName, l.attribute);
     if (l.relationScope) relationScopeLines.push(l.relationScope);
     if (mergeAttributeInterface && l.attribute) {
       interfaceLines.push(
@@ -99,6 +101,19 @@ export function synthesizeDeclares(
   for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
     emit(line);
   }
+  for (const call of info.calls) {
+    if (call.kind !== "aliasAttribute") continue;
+    if (info.existingMembers.has(call.name) || synthesizedInstanceNames.has(call.name)) continue;
+    const target = attributeTypes.get(call.target);
+    const readerType = target?.readerType ?? info.existingMemberTypes.get(call.target);
+    if (!readerType) continue;
+    const memberName = renderDeclaredMemberName(call.name);
+    emit({
+      ...attributeLine(memberName, readerType, call.name),
+      attribute: { memberName, readerType, writerType: target?.writerType },
+    });
+    synthesizedInstanceNames.add(call.name);
+  }
   return { classLines: out, interfaceLines, relationScopeLines };
 }
 
@@ -133,8 +148,7 @@ function renderSchemaColumnDeclares(
 ): RenderedLine[] {
   const map = opts.schemaColumnsByTable;
   if (!map) return [];
-  const table = info.tableName ?? pluralize(underscore(info.name));
-  const cols = map[table];
+  const cols = map[tableNameFor(info)];
   if (!cols) return [];
   const out: RenderedLine[] = [];
   const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
@@ -151,6 +165,10 @@ function renderSchemaColumnDeclares(
     out.push(attributeLine(renderDeclaredMemberName(col), tsType, col));
   }
   return out;
+}
+
+export function tableNameFor(info: ClassInfo): string {
+  return info.tableName ?? pluralize(underscore(info.name));
 }
 
 function isForeignKeyColumn(col: string, value: SchemaColumnValue): boolean {
@@ -283,6 +301,8 @@ function renderCall(
       return renderScope(info, call);
     case "enum":
       return renderEnum(info, call);
+    case "aliasAttribute":
+      return [];
   }
 }
 

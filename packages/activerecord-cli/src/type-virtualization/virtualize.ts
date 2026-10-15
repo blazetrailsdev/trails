@@ -1,6 +1,6 @@
 import * as ts from "typescript/unstable/ast";
 import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walker.js";
-import { synthesizeDeclares } from "./synthesize.js";
+import { synthesizeDeclares, tableNameFor } from "./synthesize.js";
 import { tsApi } from "./ts-api.js";
 
 const INCLUDED_ALIAS = "__TrailsIncluded";
@@ -27,6 +27,13 @@ export interface VirtualizeOptions extends WalkOptions {
   globalSuperNameOf?: ReadonlyMap<string, string>;
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
   isKnownTarget?: (name: string, host: import("./walker.js").ClassInfo) => boolean;
+  onMissingTable?: (missing: MissingTable) => void;
+}
+
+export interface MissingTable {
+  className: string;
+  tableName: string;
+  fileName: string;
 }
 
 export function virtualize(
@@ -61,6 +68,16 @@ export function virtualize(
         (m) => m.kind === ts.SyntaxKind.ExportKeyword,
       ),
   );
+
+  if (options.onMissingTable && options.schemaColumnsByTable) {
+    for (const info of classes) {
+      const tableName = tableNameFor(info);
+      if (info.skip || info.noSchema || info.abstract) continue;
+      if (tableName in options.schemaColumnsByTable) continue;
+      if (inheritsKnownTable(info, classes, superNameOf, options.schemaColumnsByTable)) continue;
+      options.onMissingTable({ className: info.name, tableName, fileName });
+    }
+  }
 
   for (const info of classes) {
     if (info.skip) continue;
@@ -234,6 +251,26 @@ function buildInheritance(classes: readonly ClassInfo[]): {
     ancestorsOf.set(info, chain);
   }
   return { superNameOf, ancestorsOf };
+}
+
+function inheritsKnownTable(
+  info: ClassInfo,
+  classes: readonly ClassInfo[],
+  superNameOf: ReadonlyMap<string, string>,
+  schema: Readonly<Record<string, unknown>>,
+): boolean {
+  const seen = new Set<string>([info.name]);
+  for (
+    let name = superNameOf.get(info.name);
+    name && !seen.has(name);
+    name = superNameOf.get(name)
+  ) {
+    seen.add(name);
+    const anc = classes.find((c) => c.name === name);
+    const table = anc ? tableNameFor(anc) : tableNameFor({ name } as ClassInfo);
+    if (table in schema) return true;
+  }
+  return false;
 }
 
 function directSuperName(cls: ts.ClassDeclaration): string | undefined {
