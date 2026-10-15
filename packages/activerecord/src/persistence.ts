@@ -321,7 +321,7 @@ export async function _insertRecord(
 
 export async function _updateRecord(
   this: PersistenceHost,
-  values: Map<string, unknown>,
+  values: Map<string, unknown> | Record<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
   const klass = this as unknown as typeof Base;
@@ -619,7 +619,7 @@ interface UpdateColumnsRecord {
   constructor: {
     attributeAliases: Record<string, string>;
     _updateRecord(
-      values: Map<string, unknown>,
+      values: Record<string, unknown>,
       constraints: Record<string, unknown>,
     ): Promise<number>;
   };
@@ -649,9 +649,9 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   });
 
   const updateConstraints = this._queryConstraintsHash();
-  const h = new Hash<string, unknown>();
+  const h: Record<string, unknown> = {};
   eachPair(attributes, (k, v) => {
-    h.set(k, this._attributes.writeCastValue(k, v));
+    h[k] = this._attributes.writeCastValue(k, v);
     this.clearAttributeChange(k);
   });
   attributes = h;

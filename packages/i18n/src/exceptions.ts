@@ -6,6 +6,7 @@ import {
   NoMethodError,
   include,
   rbInspect,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
@@ -68,8 +69,6 @@ export interface MissingTranslationOptions {
   [key: string]: unknown;
 }
 
-const PERMITTED_KEYS = ["scope", "default"] as const;
-
 interface BaseHost extends Base {
   _keys?: TranslationKey[];
 }
@@ -85,7 +84,7 @@ export interface Base {
   toException(): MissingTranslationData;
 }
 
-export const Base: Module = new Module().include({
+export const Base = new Module().include({
   keys(this: BaseHost): TranslationKey[] {
     if (!this._keys) {
       const keys = normalizeKeys(this.locale, this.key, this.options.scope);
@@ -111,13 +110,13 @@ export const Base: Module = new Module().include({
     return normalizeKeys(this.locale, key, this.options.scope).join(".");
   },
 
-  toString(this: Base): string {
-    return this.message;
-  },
-
   toException(this: Base): MissingTranslationData {
     return new MissingTranslationData(this.locale, this.key, this.options);
   },
+}) as Module & { PERMITTED_KEYS: readonly string[] };
+rbModConstSet(Base, "PERMITTED_KEYS", Object.freeze(["scope", "default"]));
+Base.moduleEval((mod) => {
+  mod.toString = Object.getOwnPropertyDescriptor(mod, "message")!.get as () => string;
 });
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is `include Base` on the type side.
@@ -138,7 +137,7 @@ export class MissingTranslation extends ArgumentError {
     this.locale = locale;
     this.options = {};
     const slice = this.options as Record<string, unknown>;
-    for (const permitted of PERMITTED_KEYS) {
+    for (const permitted of Base.PERMITTED_KEYS) {
       if (permitted in options) slice[permitted] = options[permitted];
     }
     for (const [k, v] of Object.entries(options)) {
@@ -164,7 +163,7 @@ export class MissingTranslationData extends ArgumentError {
     this.locale = locale;
     this.options = {};
     const slice = this.options as Record<string, unknown>;
-    for (const permitted of PERMITTED_KEYS) {
+    for (const permitted of Base.PERMITTED_KEYS) {
       if (permitted in options) slice[permitted] = options[permitted];
     }
     for (const [k, v] of Object.entries(options)) {
