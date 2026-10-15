@@ -13,8 +13,9 @@ export type { AttrNode } from "./xml/node.js";
 export type { SyntaxError };
 export type { Readable } from "./readable.js";
 import {
+  Document as Html5Document,
   DocumentFragment as Html5DocumentFragment,
   Node as Html5Node,
 } from "./html5/document-fragment.js";
-export const HTML5 = { DocumentFragment: Html5DocumentFragment };
-export type { Html5DocumentFragment, Html5Node };
+export const HTML5 = { Document: Html5Document, DocumentFragment: Html5DocumentFragment };
+export type { Html5Document, Html5DocumentFragment, Html5Node };

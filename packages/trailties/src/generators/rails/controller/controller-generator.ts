@@ -16,7 +16,7 @@ export interface ControllerRunOptions {
 
 export class ControllerGenerator extends GeneratorBase {
   private actions: string[] = [];
-  private namespaceParts: string[] = [];
+  private name = "";
 
   constructor(options: GeneratorOptions) {
     super(options);
@@ -36,7 +36,7 @@ export class ControllerGenerator extends GeneratorBase {
     this.options = { ...this.options, skipRoutes } as GeneratorOptions;
     this.actions = actions;
     const paths = controllerPathHelpers(name);
-    this.namespaceParts = paths.namespaceParts;
+    this.name = name;
     const ts = this.isTypeScript();
     const ext = this.ext();
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
@@ -87,11 +87,19 @@ ${cases}
   private async addRoutes(): Promise<void> {
     if ((this.options as ControllerRunOptions).skipRoutes) return;
     if (this.actions.length === 0) return;
-    const fileName = underscore(this.namespaceParts[this.namespaceParts.length - 1]);
     const routingCode = this.actions
-      .map((action) => `this.get(${JSON.stringify(`${fileName}/${action}`)});`)
+      .map((action) => `this.get(${JSON.stringify(`${this.fileName()}/${action}`)});`)
       .join("\n");
-    const regularClassPath = this.namespaceParts.slice(0, -1).map((p) => underscore(p));
-    await this.route(routingCode, { namespace: regularClassPath });
+    await this.route(routingCode, { namespace: this.regularClassPath() });
+  }
+
+  private regularClassPath(): string[] {
+    return controllerPathHelpers(this.name)
+      .namespaceParts.slice(0, -1)
+      .map((p) => underscore(p));
+  }
+
+  private fileName(): string {
+    return underscore(controllerPathHelpers(this.name).namespaceParts.at(-1)!);
   }
 }

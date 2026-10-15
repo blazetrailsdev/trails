@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { assertDomEqual, assertDomNotEqual } from "./dom-assertions.js";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { Testing } from "../testing.js";
 
 describe("DomAssertions", () => {
   it("ignores attribute order and entity spelling", () => {
@@ -75,5 +76,12 @@ describe("Rails::Dom::Testing.html_document_fragment inspect", () => {
     expect(() => assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: "html6" })).toThrow(
       'received "html6"',
     );
+  });
+});
+
+describe("Rails::Dom::Testing.html_document", () => {
+  it("parses with the HTML5 document parser", () => {
+    const root = Testing.htmlDocument().parse("<p>hi</p>").root;
+    expect(root?.name).toBe("html");
   });
 });

@@ -68,6 +68,8 @@ export class DevcontainerGenerator extends GeneratorBase {
   }
 
   readonly opts: ResolvedOptions;
+  private _dependencies?: string[];
+  private _volumes?: string[];
   /** @internal */
   readonly database: Database;
 
@@ -216,23 +218,27 @@ services:
   }
 
   private dependencies(): string[] {
-    const dependencies: string[] = [];
+    if (this._dependencies) return this._dependencies;
+
+    this._dependencies = [];
 
     const options = this.options as DevcontainerGeneratorOptions;
-    if (options.systemTest) dependencies.push("selenium");
-    if (options.redis) dependencies.push("redis");
-    if (this.database.service) dependencies.push(this.database.name);
-    return dependencies;
+    if (options.systemTest) this._dependencies.push("selenium");
+    if (options.redis) this._dependencies.push("redis");
+    if (this.database.service) this._dependencies.push(this.database.name);
+    return this._dependencies;
   }
 
   private volumes(): string[] {
-    const volumes: string[] = [];
+    if (this._volumes) return this._volumes;
+
+    this._volumes = [];
 
     const options = this.options as DevcontainerGeneratorOptions;
-    if (options.redis) volumes.push("redis-data");
-    if (this.database.volume) volumes.push(this.database.volume);
+    if (options.redis) this._volumes.push("redis-data");
+    if (this.database.volume) this._volumes.push(this.database.volume);
 
-    return volumes;
+    return this._volumes;
   }
 
   private devcontainerDbServiceYaml(

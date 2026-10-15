@@ -3,18 +3,29 @@ import { ArgumentError, NotImplementedError, rbInspect } from "@blazetrails/ruby
 import { HTML5 } from "@blazetrails/nokogiri";
 import * as Nokogiri from "@blazetrails/nokogiri";
 
+type HtmlDocument = (typeof HTML5)["Document"];
 type HtmlDocumentFragment = (typeof HTML5)["DocumentFragment"];
 
 export const Testing = {} as {
   defaultHtmlVersion: string;
   isHtml5Support(): boolean;
+  htmlDocument(options?: { htmlVersion?: string | null }): HtmlDocument;
   htmlDocumentFragment(options?: { htmlVersion?: string | null }): HtmlDocumentFragment;
 };
 
-mattrAccessor.call(Testing, "defaultHtmlVersion", { default: ":html4" });
+mattrAccessor.call(Testing, "defaultHtmlVersion", { default: ":html5" });
 
 Testing.isHtml5Support = function isHtml5Support(): boolean {
   return "HTML5" in Nokogiri;
+};
+
+Testing.htmlDocument = function htmlDocument({
+  htmlVersion = null,
+}: { htmlVersion?: string | null } = {}): HtmlDocument {
+  const parserClasses: Record<string, HtmlDocument | undefined> = { html4: undefined };
+  if (Testing.isHtml5Support()) parserClasses.html5 = HTML5.Document;
+
+  return chooseHtmlParser(parserClasses, { htmlVersion });
 };
 
 Testing.htmlDocumentFragment = function htmlDocumentFragment({
@@ -26,11 +37,11 @@ Testing.htmlDocumentFragment = function htmlDocumentFragment({
   return chooseHtmlParser(parserClasses, { htmlVersion });
 };
 
-/** @inventedArm if — CONVERGEABLE dom-assertions-fragment-parses-with-nokogiri-html4 */
-function chooseHtmlParser(
-  parserClasses: Record<string, HtmlDocumentFragment | undefined>,
+/** @inventedArm if — PERMANENT */
+function chooseHtmlParser<T>(
+  parserClasses: Record<string, T | undefined>,
   { htmlVersion = null }: { htmlVersion?: string | null } = {},
-): HtmlDocumentFragment {
+): T {
   htmlVersion ||= Testing.defaultHtmlVersion;
 
   switch (htmlVersion) {
