@@ -62,9 +62,9 @@ function isEqualChildren(child: Html4Node, otherChild: Html4Node, strict: boolea
 
 function isEqualChild(child: Html4Node, otherChild: Html4Node, strict: boolean): boolean {
   if (strict) {
-    return child.toS() === otherChild.toS();
+    return child.toString() === otherChild.toString();
   } else {
-    return split(child.toS()).join(" ") === split(otherChild.toS()).join(" ");
+    return split(child.toString()).join(" ") === split(otherChild.toString()).join(" ");
   }
 }
 

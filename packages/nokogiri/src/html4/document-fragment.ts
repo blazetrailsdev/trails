@@ -50,7 +50,7 @@ export class Node {
     return attrs.map(({ name, value }) => ({ name, value }));
   }
 
-  toS(): string {
+  toString(): string {
     return serializeOuter(this._node);
   }
 }
@@ -71,7 +71,7 @@ export class DocumentFragment {
     return childNodes(this._fragment);
   }
 
-  toS(): string {
-    return this.children.map((child) => child.toS()).join("");
+  toString(): string {
+    return this.children.map((child) => child.toString()).join("");
   }
 }
