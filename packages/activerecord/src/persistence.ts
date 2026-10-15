@@ -798,7 +798,7 @@ type PersistenceInternalHost = PersistencePrivateHost & {
   currentTimeFromProperTimezone(): Promise<RubyTime>;
   constructor: PersistencePrivateHost["constructor"] & {
     columnNames?(): string[];
-    _counterCacheColumns?: string[];
+    _counterCacheColumns: string[];
   };
 };
 

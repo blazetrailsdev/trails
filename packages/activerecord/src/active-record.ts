@@ -14,75 +14,80 @@ type AnyClass = abstract new (...args: never[]) => object;
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
 
-let _disablePreparedStatements = false;
-let _lazilyLoadSchemaCache = false;
-let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
-let _databaseCli: Record<string, string | string[]> = {
+rbObjIvarSet(ActiveRecord, "@disable_prepared_statements", false);
+rbObjIvarSet(ActiveRecord, "@lazily_load_schema_cache", false);
+rbObjIvarSet(ActiveRecord, "@schema_cache_ignored_tables", []);
+rbObjIvarSet(ActiveRecord, "@database_cli", {
   postgresql: "psql",
   mysql: ["mysql", "mysql5"],
   sqlite: "sqlite3",
-};
-let _defaultTimezone: "utc" | "local" = "utc";
-let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
-let _dbWarningsIgnore: (string | RegExp)[] = [];
-let _writingRole = "writing";
-let _readingRole = "reading";
-let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
-let _globalExecutorConcurrency: number | null | undefined;
-let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
-let _indexNestedAttributeErrors = false;
-let _verboseQueryLogs = false;
-let _queues: Record<string, unknown> = {};
-let _maintainTestSchema: boolean | null = null;
-let _raiseOnAssignToAttrReadonly = false;
-let _belongsToRequiredValidatesForeignKey = true;
-let _beforeCommittedOnAllRecords = false;
-let _runAfterTransactionCallbacksInOrderDefined = false;
-let _applicationRecordClass: AnyClass | null = null;
-let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
-let _schemaFormat: SchemaFormat = "ts";
-let _errorOnIgnoredOrder = false;
-let _timestampedMigrations = true;
-let _validateMigrationTimestamps = false;
-let _migrationStrategy: AnyClass = DefaultStrategy;
-let _dumpSchemaAfterMigration = true;
-let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
-let _verifyForeignKeysForFixtures = false;
-let _queryTransformers: QueryTransformer[] = [];
-let _useYamlUnsafeLoad = false;
-let _raiseIntWiderThan64bit = true;
-let _yamlColumnPermittedClasses: unknown[] = [Symbol];
-let _generateSecureTokenOn: "create" | "initialize" = "create";
-let _protocolAdapters: InheritableOptions = new InheritableOptions({
-  sqlite: "sqlite3",
-  mysql: "mysql2",
-  postgres: "postgresql",
 });
+rbObjIvarSet(ActiveRecord, "@default_timezone", "utc");
+setDbWarningsAction("ignore");
+rbObjIvarSet(ActiveRecord, "@db_warnings_ignore", []);
+rbObjIvarSet(ActiveRecord, "@writing_role", "writing");
+rbObjIvarSet(ActiveRecord, "@reading_role", "reading");
+rbObjIvarSet(ActiveRecord, "@async_query_executor", null);
+rbObjIvarSet(ActiveRecord, "@permanent_connection_checkout", true);
+rbObjIvarSet(ActiveRecord, "@index_nested_attribute_errors", false);
+rbObjIvarSet(ActiveRecord, "@verbose_query_logs", false);
+rbObjIvarSet(ActiveRecord, "@queues", {});
+rbObjIvarSet(ActiveRecord, "@maintain_test_schema", null);
+rbObjIvarSet(ActiveRecord, "@raise_on_assign_to_attr_readonly", false);
+rbObjIvarSet(ActiveRecord, "@belongs_to_required_validates_foreign_key", true);
+rbObjIvarSet(ActiveRecord, "@before_committed_on_all_records", false);
+rbObjIvarSet(ActiveRecord, "@run_after_transaction_callbacks_in_order_defined", false);
+rbObjIvarSet(ActiveRecord, "@application_record_class", null);
+rbObjIvarSet(ActiveRecord, "@action_on_strict_loading_violation", "raise");
+rbObjIvarSet(ActiveRecord, "@schema_format", "ts");
+rbObjIvarSet(ActiveRecord, "@error_on_ignored_order", false);
+rbObjIvarSet(ActiveRecord, "@timestamped_migrations", true);
+rbObjIvarSet(ActiveRecord, "@validate_migration_timestamps", false);
+rbObjIvarSet(ActiveRecord, "@migration_strategy", DefaultStrategy);
+rbObjIvarSet(ActiveRecord, "@dump_schema_after_migration", true);
+rbObjIvarSet(ActiveRecord, "@dump_schemas", "schema_search_path");
+rbObjIvarSet(ActiveRecord, "@verify_foreign_keys_for_fixtures", false);
+rbObjIvarSet(ActiveRecord, "@query_transformers", []);
+rbObjIvarSet(ActiveRecord, "@use_yaml_unsafe_load", false);
+rbObjIvarSet(ActiveRecord, "@raise_int_wider_than_64bit", true);
+rbObjIvarSet(ActiveRecord, "@yaml_column_permitted_classes", [Symbol]);
+rbObjIvarSet(ActiveRecord, "@generate_secure_token_on", "create");
+rbObjIvarSet(
+  ActiveRecord,
+  "@protocol_adapters",
+  new InheritableOptions({
+    sqlite: "sqlite3",
+    mysql: "mysql2",
+    postgres: "postgresql",
+  }),
+);
 
 export function disablePreparedStatements(): boolean {
-  return _disablePreparedStatements;
+  return rbObjIvarGet(ActiveRecord, "@disable_prepared_statements") as boolean;
 }
 
 export function setDisablePreparedStatements(disablePreparedStatements: boolean): void {
-  _disablePreparedStatements = disablePreparedStatements;
+  rbObjIvarSet(ActiveRecord, "@disable_prepared_statements", disablePreparedStatements);
 }
 
 export function lazilyLoadSchemaCache(): boolean {
-  return _lazilyLoadSchemaCache;
+  return rbObjIvarGet(ActiveRecord, "@lazily_load_schema_cache") as boolean;
 }
 
 export function setLazilyLoadSchemaCache(lazilyLoadSchemaCache: boolean): void {
-  _lazilyLoadSchemaCache = lazilyLoadSchemaCache;
+  rbObjIvarSet(ActiveRecord, "@lazily_load_schema_cache", lazilyLoadSchemaCache);
 }
 
 export function schemaCacheIgnoredTables(): ReadonlyArray<string | RegExp> {
-  return _schemaCacheIgnoredTables;
+  return rbObjIvarGet(ActiveRecord, "@schema_cache_ignored_tables") as ReadonlyArray<
+    string | RegExp
+  >;
 }
 
 export function setSchemaCacheIgnoredTables(
   schemaCacheIgnoredTables: ReadonlyArray<string | RegExp>,
 ): void {
-  _schemaCacheIgnoredTables = schemaCacheIgnoredTables;
+  rbObjIvarSet(ActiveRecord, "@schema_cache_ignored_tables", schemaCacheIgnoredTables);
 }
 
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
@@ -90,15 +95,15 @@ export function isSchemaCacheIgnoredTable(tableName: string): boolean {
 }
 
 export function databaseCli(): Record<string, string | string[]> {
-  return _databaseCli;
+  return rbObjIvarGet(ActiveRecord, "@database_cli") as Record<string, string | string[]>;
 }
 
 export function setDatabaseCli(databaseCli: Record<string, string | string[]>): void {
-  _databaseCli = databaseCli;
+  rbObjIvarSet(ActiveRecord, "@database_cli", databaseCli);
 }
 
 export function defaultTimezone(): "utc" | "local" {
-  return _defaultTimezone;
+  return rbObjIvarGet(ActiveRecord, "@default_timezone") as "utc" | "local";
 }
 
 export function setDefaultTimezone(defaultTimezone: "utc" | "local"): void {
@@ -106,38 +111,40 @@ export function setDefaultTimezone(defaultTimezone: "utc" | "local"): void {
     throw new ArgumentError("default_timezone must be either :utc (default) or :local.");
   }
 
-  _defaultTimezone = defaultTimezone;
+  rbObjIvarSet(ActiveRecord, "@default_timezone", defaultTimezone);
 }
 
 export function dbWarningsAction(): ((warning: SQLWarning) => void) | null {
-  return _dbWarningsAction;
+  return rbObjIvarGet(ActiveRecord, "@db_warnings_action") as
+    | ((warning: SQLWarning) => void)
+    | null;
 }
 
 export function setDbWarningsAction(action: DbWarningsAction): void {
   switch (action) {
     case "ignore":
-      _dbWarningsAction = null;
+      rbObjIvarSet(ActiveRecord, "@db_warnings_action", null);
       break;
     case "log":
-      _dbWarningsAction = (warning) => {
+      rbObjIvarSet(ActiveRecord, "@db_warnings_action", (warning: SQLWarning) => {
         let warningMessage = `[${warning.name}] ${warning.message}`;
         if (warning.code) warningMessage += ` (${warning.code})`;
         (ActiveRecord.Base.logger as { warn: (msg: string) => void }).warn(warningMessage);
-      };
+      });
       break;
     case "raise":
-      _dbWarningsAction = (warning) => {
+      rbObjIvarSet(ActiveRecord, "@db_warnings_action", (warning: SQLWarning) => {
         throw warning;
-      };
+      });
       break;
     case "report":
-      _dbWarningsAction = (warning) => {
+      rbObjIvarSet(ActiveRecord, "@db_warnings_action", (warning: SQLWarning) => {
         ActiveSupport.errorReporter.report(warning, { handled: true });
-      };
+      });
       break;
     default:
       if (typeof action === "function") {
-        _dbWarningsAction = action;
+        rbObjIvarSet(ActiveRecord, "@db_warnings_action", action);
         break;
       }
       throw new ArgumentError(
@@ -147,37 +154,40 @@ export function setDbWarningsAction(action: DbWarningsAction): void {
 }
 
 export function dbWarningsIgnore(): (string | RegExp)[] {
-  return _dbWarningsIgnore;
+  return rbObjIvarGet(ActiveRecord, "@db_warnings_ignore") as (string | RegExp)[];
 }
 
 export function setDbWarningsIgnore(dbWarningsIgnore: (string | RegExp)[]): void {
-  _dbWarningsIgnore = dbWarningsIgnore;
+  rbObjIvarSet(ActiveRecord, "@db_warnings_ignore", dbWarningsIgnore);
 }
 
 export function writingRole(): string {
-  return _writingRole;
+  return rbObjIvarGet(ActiveRecord, "@writing_role") as string;
 }
 
 export function setWritingRole(writingRole: string): void {
-  _writingRole = writingRole;
+  rbObjIvarSet(ActiveRecord, "@writing_role", writingRole);
 }
 
 export function readingRole(): string {
-  return _readingRole;
+  return rbObjIvarGet(ActiveRecord, "@reading_role") as string;
 }
 
 export function setReadingRole(readingRole: string): void {
-  _readingRole = readingRole;
+  rbObjIvarSet(ActiveRecord, "@reading_role", readingRole);
 }
 
 export function asyncQueryExecutor(): "global_thread_pool" | "multi_thread_pool" | null {
-  return _asyncQueryExecutor;
+  return rbObjIvarGet(ActiveRecord, "@async_query_executor") as
+    | "global_thread_pool"
+    | "multi_thread_pool"
+    | null;
 }
 
 export function setAsyncQueryExecutor(
   asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null,
 ): void {
-  _asyncQueryExecutor = asyncQueryExecutor;
+  rbObjIvarSet(ActiveRecord, "@async_query_executor", asyncQueryExecutor);
 }
 
 export function globalThreadPoolAsyncQueryExecutor(): ThreadPoolExecutor {
@@ -202,15 +212,19 @@ export function setGlobalExecutorConcurrency(globalExecutorConcurrency: number |
     );
   }
 
-  _globalExecutorConcurrency = globalExecutorConcurrency;
+  rbObjIvarSet(ActiveRecord, "@global_executor_concurrency", globalExecutorConcurrency);
 }
 
 export function globalExecutorConcurrency(): number | null {
-  return (_globalExecutorConcurrency ??= null);
+  return (rbObjIvarGet(ActiveRecord, "@global_executor_concurrency") ??
+    rbObjIvarSet(ActiveRecord, "@global_executor_concurrency", null)) as number | null;
 }
 
 export function permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
-  return _permanentConnectionCheckout;
+  return rbObjIvarGet(ActiveRecord, "@permanent_connection_checkout") as
+    | true
+    | "deprecated"
+    | "disallowed";
 }
 
 export function setPermanentConnectionCheckout(value: true | "deprecated" | "disallowed"): void {
@@ -219,197 +233,208 @@ export function setPermanentConnectionCheckout(value: true | "deprecated" | "dis
       "permanent_connection_checkout must be one of: `true`, `:deprecated` or `:disallowed`",
     );
   }
-  _permanentConnectionCheckout = value;
+  rbObjIvarSet(ActiveRecord, "@permanent_connection_checkout", value);
 }
 
 export function indexNestedAttributeErrors(): boolean {
-  return _indexNestedAttributeErrors;
+  return rbObjIvarGet(ActiveRecord, "@index_nested_attribute_errors") as boolean;
 }
 
 export function setIndexNestedAttributeErrors(indexNestedAttributeErrors: boolean): void {
-  _indexNestedAttributeErrors = indexNestedAttributeErrors;
+  rbObjIvarSet(ActiveRecord, "@index_nested_attribute_errors", indexNestedAttributeErrors);
 }
 
 export function verboseQueryLogs(): boolean {
-  return _verboseQueryLogs;
+  return rbObjIvarGet(ActiveRecord, "@verbose_query_logs") as boolean;
 }
 
 export function setVerboseQueryLogs(verboseQueryLogs: boolean): void {
-  _verboseQueryLogs = verboseQueryLogs;
+  rbObjIvarSet(ActiveRecord, "@verbose_query_logs", verboseQueryLogs);
 }
 
 export function queues(): Record<string, unknown> {
-  return _queues;
+  return rbObjIvarGet(ActiveRecord, "@queues") as Record<string, unknown>;
 }
 
 export function setQueues(queues: Record<string, unknown>): void {
-  _queues = queues;
+  rbObjIvarSet(ActiveRecord, "@queues", queues);
 }
 
 export function maintainTestSchema(): boolean | null {
-  return _maintainTestSchema;
+  return rbObjIvarGet(ActiveRecord, "@maintain_test_schema") as boolean | null;
 }
 
 export function setMaintainTestSchema(maintainTestSchema: boolean | null): void {
-  _maintainTestSchema = maintainTestSchema;
+  rbObjIvarSet(ActiveRecord, "@maintain_test_schema", maintainTestSchema);
 }
 
 export function raiseOnAssignToAttrReadonly(): boolean {
-  return _raiseOnAssignToAttrReadonly;
+  return rbObjIvarGet(ActiveRecord, "@raise_on_assign_to_attr_readonly") as boolean;
 }
 
 export function setRaiseOnAssignToAttrReadonly(raiseOnAssignToAttrReadonly: boolean): void {
-  _raiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly;
+  rbObjIvarSet(ActiveRecord, "@raise_on_assign_to_attr_readonly", raiseOnAssignToAttrReadonly);
 }
 
 export function belongsToRequiredValidatesForeignKey(): boolean {
-  return _belongsToRequiredValidatesForeignKey;
+  return rbObjIvarGet(ActiveRecord, "@belongs_to_required_validates_foreign_key") as boolean;
 }
 
 export function setBelongsToRequiredValidatesForeignKey(
   belongsToRequiredValidatesForeignKey: boolean,
 ): void {
-  _belongsToRequiredValidatesForeignKey = belongsToRequiredValidatesForeignKey;
+  rbObjIvarSet(
+    ActiveRecord,
+    "@belongs_to_required_validates_foreign_key",
+    belongsToRequiredValidatesForeignKey,
+  );
 }
 
 export function beforeCommittedOnAllRecords(): boolean {
-  return _beforeCommittedOnAllRecords;
+  return rbObjIvarGet(ActiveRecord, "@before_committed_on_all_records") as boolean;
 }
 
 export function setBeforeCommittedOnAllRecords(beforeCommittedOnAllRecords: boolean): void {
-  _beforeCommittedOnAllRecords = beforeCommittedOnAllRecords;
+  rbObjIvarSet(ActiveRecord, "@before_committed_on_all_records", beforeCommittedOnAllRecords);
 }
 
 export function runAfterTransactionCallbacksInOrderDefined(): boolean {
-  return _runAfterTransactionCallbacksInOrderDefined;
+  return rbObjIvarGet(ActiveRecord, "@run_after_transaction_callbacks_in_order_defined") as boolean;
 }
 
 export function setRunAfterTransactionCallbacksInOrderDefined(
   runAfterTransactionCallbacksInOrderDefined: boolean,
 ): void {
-  _runAfterTransactionCallbacksInOrderDefined = runAfterTransactionCallbacksInOrderDefined;
+  rbObjIvarSet(
+    ActiveRecord,
+    "@run_after_transaction_callbacks_in_order_defined",
+    runAfterTransactionCallbacksInOrderDefined,
+  );
 }
 
 export function applicationRecordClass(): AnyClass | null {
-  return _applicationRecordClass;
+  return rbObjIvarGet(ActiveRecord, "@application_record_class") as AnyClass | null;
 }
 
 export function setApplicationRecordClass(applicationRecordClass: AnyClass | null): void {
-  _applicationRecordClass = applicationRecordClass;
+  rbObjIvarSet(ActiveRecord, "@application_record_class", applicationRecordClass);
 }
 
 export function actionOnStrictLoadingViolation(): "raise" | "log" {
-  return _actionOnStrictLoadingViolation;
+  return rbObjIvarGet(ActiveRecord, "@action_on_strict_loading_violation") as "raise" | "log";
 }
 
 export function setActionOnStrictLoadingViolation(
   actionOnStrictLoadingViolation: "raise" | "log",
 ): void {
-  _actionOnStrictLoadingViolation = actionOnStrictLoadingViolation;
+  rbObjIvarSet(ActiveRecord, "@action_on_strict_loading_violation", actionOnStrictLoadingViolation);
 }
 
 export function schemaFormat(): SchemaFormat {
-  return _schemaFormat;
+  return rbObjIvarGet(ActiveRecord, "@schema_format") as SchemaFormat;
 }
 
 export function setSchemaFormat(schemaFormat: SchemaFormat): void {
-  _schemaFormat = schemaFormat;
+  rbObjIvarSet(ActiveRecord, "@schema_format", schemaFormat);
 }
 
 export function errorOnIgnoredOrder(): boolean {
-  return _errorOnIgnoredOrder;
+  return rbObjIvarGet(ActiveRecord, "@error_on_ignored_order") as boolean;
 }
 
 export function setErrorOnIgnoredOrder(errorOnIgnoredOrder: boolean): void {
-  _errorOnIgnoredOrder = errorOnIgnoredOrder;
+  rbObjIvarSet(ActiveRecord, "@error_on_ignored_order", errorOnIgnoredOrder);
 }
 
 export function timestampedMigrations(): boolean {
-  return _timestampedMigrations;
+  return rbObjIvarGet(ActiveRecord, "@timestamped_migrations") as boolean;
 }
 
 export function setTimestampedMigrations(timestampedMigrations: boolean): void {
-  _timestampedMigrations = timestampedMigrations;
+  rbObjIvarSet(ActiveRecord, "@timestamped_migrations", timestampedMigrations);
 }
 
 export function validateMigrationTimestamps(): boolean {
-  return _validateMigrationTimestamps;
+  return rbObjIvarGet(ActiveRecord, "@validate_migration_timestamps") as boolean;
 }
 
 export function setValidateMigrationTimestamps(validateMigrationTimestamps: boolean): void {
-  _validateMigrationTimestamps = validateMigrationTimestamps;
+  rbObjIvarSet(ActiveRecord, "@validate_migration_timestamps", validateMigrationTimestamps);
 }
 
 export function migrationStrategy(): AnyClass {
-  return _migrationStrategy;
+  return rbObjIvarGet(ActiveRecord, "@migration_strategy") as AnyClass;
 }
 
 export function setMigrationStrategy(migrationStrategy: AnyClass): void {
-  _migrationStrategy = migrationStrategy;
+  rbObjIvarSet(ActiveRecord, "@migration_strategy", migrationStrategy);
 }
 
 export function dumpSchemaAfterMigration(): boolean {
-  return _dumpSchemaAfterMigration;
+  return rbObjIvarGet(ActiveRecord, "@dump_schema_after_migration") as boolean;
 }
 
 export function setDumpSchemaAfterMigration(dumpSchemaAfterMigration: boolean): void {
-  _dumpSchemaAfterMigration = dumpSchemaAfterMigration;
+  rbObjIvarSet(ActiveRecord, "@dump_schema_after_migration", dumpSchemaAfterMigration);
 }
 
 export function dumpSchemas(): "schema_search_path" | "all" | (string & {}) {
-  return _dumpSchemas;
+  return rbObjIvarGet(ActiveRecord, "@dump_schemas") as
+    | "schema_search_path"
+    | "all"
+    | (string & {});
 }
 
 export function setDumpSchemas(dumpSchemas: "schema_search_path" | "all" | (string & {})): void {
-  _dumpSchemas = dumpSchemas;
+  rbObjIvarSet(ActiveRecord, "@dump_schemas", dumpSchemas);
 }
 
 export function verifyForeignKeysForFixtures(): boolean {
-  return _verifyForeignKeysForFixtures;
+  return rbObjIvarGet(ActiveRecord, "@verify_foreign_keys_for_fixtures") as boolean;
 }
 
 export function setVerifyForeignKeysForFixtures(verifyForeignKeysForFixtures: boolean): void {
-  _verifyForeignKeysForFixtures = verifyForeignKeysForFixtures;
+  rbObjIvarSet(ActiveRecord, "@verify_foreign_keys_for_fixtures", verifyForeignKeysForFixtures);
 }
 
 export function queryTransformers(): QueryTransformer[] {
-  return _queryTransformers;
+  return rbObjIvarGet(ActiveRecord, "@query_transformers") as QueryTransformer[];
 }
 
 export function setQueryTransformers(queryTransformers: QueryTransformer[]): void {
-  _queryTransformers = queryTransformers;
+  rbObjIvarSet(ActiveRecord, "@query_transformers", queryTransformers);
 }
 
 export function useYamlUnsafeLoad(): boolean {
-  return _useYamlUnsafeLoad;
+  return rbObjIvarGet(ActiveRecord, "@use_yaml_unsafe_load") as boolean;
 }
 
 export function setUseYamlUnsafeLoad(useYamlUnsafeLoad: boolean): void {
-  _useYamlUnsafeLoad = useYamlUnsafeLoad;
+  rbObjIvarSet(ActiveRecord, "@use_yaml_unsafe_load", useYamlUnsafeLoad);
 }
 
 export function raiseIntWiderThan64bit(): boolean {
-  return _raiseIntWiderThan64bit;
+  return rbObjIvarGet(ActiveRecord, "@raise_int_wider_than_64bit") as boolean;
 }
 
 export function setRaiseIntWiderThan64bit(raiseIntWiderThan64bit: boolean): void {
-  _raiseIntWiderThan64bit = raiseIntWiderThan64bit;
+  rbObjIvarSet(ActiveRecord, "@raise_int_wider_than_64bit", raiseIntWiderThan64bit);
 }
 
 export function yamlColumnPermittedClasses(): unknown[] {
-  return _yamlColumnPermittedClasses;
+  return rbObjIvarGet(ActiveRecord, "@yaml_column_permitted_classes") as unknown[];
 }
 
 export function setYamlColumnPermittedClasses(yamlColumnPermittedClasses: unknown[]): void {
-  _yamlColumnPermittedClasses = yamlColumnPermittedClasses;
+  rbObjIvarSet(ActiveRecord, "@yaml_column_permitted_classes", yamlColumnPermittedClasses);
 }
 
 export function generateSecureTokenOn(): "create" | "initialize" {
-  return _generateSecureTokenOn;
+  return rbObjIvarGet(ActiveRecord, "@generate_secure_token_on") as "create" | "initialize";
 }
 
 export function setGenerateSecureTokenOn(generateSecureTokenOn: "create" | "initialize"): void {
-  _generateSecureTokenOn = generateSecureTokenOn;
+  rbObjIvarSet(ActiveRecord, "@generate_secure_token_on", generateSecureTokenOn);
 }
 
 export function marshallingFormatVersion(): 6.1 | 7.1 {
@@ -421,11 +446,11 @@ export function setMarshallingFormatVersion(value: unknown): void {
 }
 
 export function protocolAdapters(): InheritableOptions {
-  return _protocolAdapters;
+  return rbObjIvarGet(ActiveRecord, "@protocol_adapters") as InheritableOptions;
 }
 
 export function setProtocolAdapters(protocolAdapters: InheritableOptions): void {
-  _protocolAdapters = protocolAdapters;
+  rbObjIvarSet(ActiveRecord, "@protocol_adapters", protocolAdapters);
 }
 
 export async function eagerLoadBang(): Promise<void> {

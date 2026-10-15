@@ -133,4 +133,11 @@ describe("NullColumn", () => {
     expect(Column.registry()).toBe(Column.registry());
     expect(Column.registry()).not.toBe(SqlTypeMetadata.registry());
   });
+
+  it("gives a subclass its own registry", () => {
+    const parent = Column.registry();
+    class SubColumn extends Column {}
+    expect(SubColumn.registry()).not.toBe(parent);
+    expect(Column.registry()).toBe(parent);
+  });
 });

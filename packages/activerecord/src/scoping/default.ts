@@ -25,7 +25,7 @@ export class Default {
     relation: any = this.relation(),
     { allQueries }: { allQueries?: boolean | null } = {},
   ): any {
-    if (this.abstractClass) return undefined;
+    if (this.isAbstractClass()) return undefined;
 
     if (this.defaultScopeOverride == null) {
       this.defaultScopeOverride = !rbObjIsKindOf(

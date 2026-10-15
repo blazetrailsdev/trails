@@ -94,7 +94,7 @@ export class UniquenessValidator extends EachValidator {
     let currentClass = record.constructor;
     let foundClass = null;
     for (;;) {
-      if (!currentClass.abstractClass) foundClass = currentClass;
+      if (!currentClass.isAbstractClass()) foundClass = currentClass;
       if (currentClass === this._klass) break;
       currentClass = rbClassSuperclass(currentClass);
     }

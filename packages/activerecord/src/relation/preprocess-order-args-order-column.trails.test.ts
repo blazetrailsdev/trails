@@ -49,8 +49,8 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
   });
   it("quotes the fallback through quote_table_name, as Rails' order_column does", () => {
     const adapterClass = Topic.adapterClass();
-    const quoteTableName = vi.spyOn(adapterClass as never, "quoteTableName");
-    const quoteColumnName = vi.spyOn(adapterClass as never, "quoteColumnName");
+    const quoteTableName = vi.spyOn(adapterClass, "quoteTableName");
+    const quoteColumnName = vi.spyOn(adapterClass, "quoteColumnName");
     try {
       preprocess(Topic.all(), [":nonexistent"]);
       expect(quoteTableName).toHaveBeenCalledWith("nonexistent");

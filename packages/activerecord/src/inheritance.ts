@@ -78,7 +78,7 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   if (this === ActiveRecord.Base) {
     return false;
-  } else if (rbClassSuperclass(this)!.abstractClass) {
+  } else if (rbClassSuperclass(this)!.isAbstractClass()) {
     return rbClassSuperclass(this)!.isDescendsFromActiveRecord();
   } else {
     return (
@@ -105,7 +105,7 @@ export function setBaseClass(modelClass: typeof Base): void {
     }
 
     const superclass = rbClassSuperclass(modelClass)!;
-    if (superclass === ActiveRecord.Base || superclass.abstractClass) {
+    if (superclass === ActiveRecord.Base || superclass.isAbstractClass()) {
       klass._computedBaseClass = modelClass;
     } else {
       klass._computedBaseClass = baseClass.call(superclass);
@@ -143,6 +143,12 @@ export const ClassMethods = new Module().include({
 
   set abstractClass(value: boolean) {
     (this as any)._abstractClass = value;
+  },
+
+  isAbstractClass(this: object): boolean {
+    const field = Object.getOwnPropertyDescriptor(this, "abstractClass");
+    if (field && "value" in field) return field.value === true;
+    return Object.hasOwn(this, "_abstractClass") && (this as any)._abstractClass === true;
   },
 });
 

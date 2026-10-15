@@ -43,6 +43,7 @@ describe("ReadTest", () => {
       static defineProxyCall = Base.defineProxyCall;
       static buildMangledName = Base.buildMangledName;
       static defineCall = Base.defineCall;
+      static isAbstractClass = Base.isAbstractClass;
     }
     Object.setPrototypeOf(Klass, Base);
     return Klass;
