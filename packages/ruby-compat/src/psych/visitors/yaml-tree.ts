@@ -354,9 +354,9 @@ export class YAMLTree {
       tag = "tag:yaml.org,2002:str";
     } else if (o === "y" || o === "n") {
       style = yaml.Scalar.QUOTE_DOUBLE;
-    } else if (this.lineWidth != null && o.length > this.lineWidth) {
+    } else if (this.lineWidth != null && Array.from(o).length > this.lineWidth) {
       style = yaml.Scalar.BLOCK_FOLDED;
-    } else if (/^[^\p{L}\p{M}\p{Nd}\p{Pc}][^"]*$/mu.test(o)) {
+    } else if (/^[^\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}][^"]*$/mu.test(o)) {
       style = yaml.Scalar.QUOTE_DOUBLE;
     } else if (typeof this.ss.tokenize(o) !== "string" || /^0[0-7]*[89]/.test(o)) {
       style = yaml.Scalar.QUOTE_SINGLE;

@@ -191,7 +191,12 @@ export class ToRuby {
       return this.revive(this.resolveClass(this.loadTags[o.tag]), o);
     const hash = () =>
       (o.items as { key: ParsedNode }[]).every(
-        ({ key: k }) => yaml.isScalar(k) && typeof this.accept(k) === "string",
+        ({ key: k }) =>
+          yaml.isScalar(k) &&
+          (k.tag
+            ? /^(?:tag:yaml\.org,2002:str|!(?:str|ruby\/string)(?::.*)?)$/.test(k.tag)
+            : k.type !== yaml.Scalar.PLAIN ||
+              typeof this.ss.tokenize(String(k.source)) === "string"),
       )
         ? (Object.create(null) as Record<string, unknown>)
         : (new Hash() as unknown as Record<string, unknown>);
