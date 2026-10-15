@@ -106,6 +106,43 @@ describe("Monitor#new_cond", () => {
   });
 });
 
+describe("Monitor#new_cond with a sibling queued under the waiter", () => {
+  it("restores the waiter's holds before the sibling is served", async () => {
+    const monitor = new Monitor();
+    const cond = newCond.call(monitor);
+    const log: string[] = [];
+    let ready = false;
+
+    const waiter = new Thread(() =>
+      monitor.synchronize(() =>
+        Promise.all([
+          monitor.synchronize(async () => {
+            log.push("inner:enter");
+            await Thread.pass();
+            await cond.waitWhile(() => !ready);
+            log.push("inner:exit");
+          }),
+          monitor.synchronize(() => {
+            log.push("sibling");
+          }),
+        ]),
+      ),
+    );
+    await Thread.pass();
+
+    await new Thread(() =>
+      monitor.synchronize(() => {
+        log.push("signaller");
+        ready = true;
+        cond.broadcast();
+      }),
+    ).join();
+    await waiter.join();
+
+    expect(log).toEqual(["inner:enter", "signaller", "inner:exit", "sibling"]);
+  });
+});
+
 describe("Monitor#synchronize after the holder's block returns", () => {
   it("still serves a queued sibling re-entry", async () => {
     const monitor = new Monitor();

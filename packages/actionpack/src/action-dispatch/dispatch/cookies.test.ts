@@ -931,9 +931,46 @@ describe("CookiesTest", () => {
 
   it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {});
 
-  it.skip("legacy hmac aes cbc encrypted cookie using 64 byte key is upgraded to authenticated encrypted cookie", () => {});
+  it.skip("legacy hmac aes cbc encrypted cookie using 64 byte key is upgraded to authenticated encrypted cookie", () => {
+    const message = Buffer.from(
+      "566d4e75536d686e633246564e6b493062557079626c566d51574d30515430394c53315665564a694e4563786555744f57537454576b396a5a31566a626e52525054303d2d2d34663234333330623130623261306163363562316266323335396164666364613564643134623131",
+      "hex",
+    ).toString("latin1");
+    const request = cookieRequest({
+      "action_dispatch.secret_key_base": "c3b95688f35581fad38df788add315ff",
+      "action_dispatch.encrypted_cookie_salt": "b3c631c314c0bbca50c1b2843150fe33",
+      "action_dispatch.encrypted_signed_cookie_salt": "b3c631c314c0bbca50c1b2843150fe33",
+    });
+    const cookies = CookieJar.build(request, { foo: message });
 
-  it.skip("cookie with hash value not modified by rotation", () => {});
+    assertNotEqual("bar", cookies.get("foo"));
+    assertEqual("bar", cookies.encrypted.get("foo"));
+
+    const salt = request.env["action_dispatch.authenticated_encrypted_cookie_salt"] as string;
+    const secret = (request.env["action_dispatch.key_generator"] as KeyGenerator).generateKey(
+      salt,
+      MessageEncryptor.keyLen("aes-256-gcm"),
+    ) as Buffer;
+    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm", serializer: Marshal });
+
+    assertEqual("bar", encryptor.decryptAndVerify(responseCookies(cookies)["foo"]));
+  });
+
+  it.skip("cookie with hash value not modified by rotation", () => {
+    const request = cookieRequest({ "action_dispatch.signed_cookie_digest": "SHA256" });
+    (request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate("signed", {
+      digest: "SHA1",
+    });
+
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const oldSecret = keyGenerator.generateKey(
+      request.env["action_dispatch.signed_cookie_salt"] as string,
+    );
+    const oldValue = new MessageVerifier(oldSecret).generate({ bar: "baz" });
+
+    const cookies = CookieJar.build(request, { foo: oldValue });
+    assertEqual({ bar: "baz" }, cookies.signed.get("foo"));
+  });
 
   it("cookie with all domain option", () => {
     const cookies = new CookieJar(cookieRequest({}));

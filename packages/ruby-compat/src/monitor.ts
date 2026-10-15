@@ -61,16 +61,20 @@ function wakeWaiter(data: MonData): void {
   waiter.grant();
 }
 
-function acquire(data: MonData, parent: Owner | null, entry: MonEntry): Promise<void> | void {
+function acquire(
+  data: MonData,
+  parent: Owner | null,
+  ...entries: MonEntry[]
+): Promise<void> | void {
   if (topOwner(data) === parent && !data.waiters.some((waiter) => waiter.parent === parent)) {
-    data.entries.push(entry);
+    data.entries.push(...entries);
     return;
   }
   return new Promise<void>((resolve) => {
     data.waiters.push({
       parent,
       grant: () => {
-        data.entries.push(entry);
+        data.entries.push(...entries);
         resolve();
       },
     });
@@ -237,8 +241,8 @@ export class MonitorConditionVariable {
         }
       });
     } finally {
-      await acquire(data, parent, held[0]);
-      data.entries.push(...held.slice(1));
+      await acquire(data, parent, ...held);
+      wakeWaiter(data);
     }
   }
 

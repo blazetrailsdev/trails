@@ -86,7 +86,7 @@ export interface SetCookieOptions {
 /** @noRailsEquivalent PERMANENT */
 export interface CookieResponse {
   setCookie(name: string, value: SetCookieOptions): void;
-  deleteCookie(name: string, options: { path?: string; domain?: string }): void;
+  deleteCookie(name: string, options: Partial<SetCookieOptions>): void;
 }
 
 export class ChainedCookieJars {
@@ -159,7 +159,7 @@ export class CookieJar implements Iterable<[string, string]> {
   declare isPrepareUpgradeLegacyHmacAesCbcCookies: () => boolean;
   private _cookies: Map<string, string> = new Map();
   private _setCookies: Map<string, SetCookieOptions> = new Map();
-  private _deletedCookies: Map<string, { path?: string; domain?: string }> = new Map();
+  private _deletedCookies: Map<string, Partial<SetCookieOptions>> = new Map();
   private _committed = false;
   private _request: RequestCookieMethodsHost;
 
@@ -311,7 +311,7 @@ export class CookieJar implements Iterable<[string, string]> {
 
     const value = this._cookies.get(name);
     this._cookies.delete(name);
-    this._deletedCookies.set(name, options as { path?: string; domain?: string });
+    this._deletedCookies.set(name, options);
     return value;
   }
 
