@@ -394,6 +394,17 @@ describe("the chain follows the class's ancestor order", () => {
     });
   });
 
+  it("orders by statement, a later include first and one statement's first argument ahead", () => {
+    const pool = {
+      ...entity("pool.rb", ["A", "B", "C"], []),
+      mixinOrder: [
+        { kind: "include" as const, names: ["A", "B"] },
+        { kind: "include" as const, names: ["C"] },
+      ],
+    };
+    expect(moduleAncestors(pool, "Pool", modules, resolve).included).toEqual(["C", "A", "B"]);
+  });
+
   it("runs a prepended same-file module ahead of the class's own body", () => {
     const { ancestors, sameFile } = sameFileBodies(entity("pool.rb", ["Lock"], [], ["Dirties"]));
     const segments = inlinedSegments(own, ancestors, sameFile, []);

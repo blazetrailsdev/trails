@@ -34,7 +34,11 @@ import type { ApiManifest, ClassInfo, InlinedFrom, MethodInfo } from "@blazetrai
 import { rubyFileToTs } from "@blazetrails/parity/conventions";
 import { resolveModuleName } from "./compare.js";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
-import { moduleAncestors } from "./inlined-bodies.js";
+import {
+  INLINED_FROM_PAIRS_FILE,
+  moduleAncestors,
+  type InlinedFromPair,
+} from "./inlined-bodies.js";
 import { TAG } from "./inlined-from-tags.js";
 
 /**
@@ -141,11 +145,17 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   return reached;
 }
 
-/** Every finding over the two manifests; `enrolled` gates the missing-tag arm. */
+/**
+ * Every finding over the two manifests; `enrolled` gates the missing-tag arm.
+ * A constructor in `pairs` takes the Rails class compare.ts compared it
+ * against, so the two gates never pair it differently; any other is paired by
+ * file and short name.
+ */
 export function inlinedFromFindings(
   ruby: ApiManifest,
   ts: ApiManifest,
   enrolled: readonly string[] = MISSING_TAG_PACKAGES,
+  pairs: readonly InlinedFromPair[] = [],
 ): InlinedFromFinding[] {
   const modules = new Map(entities(ruby, "modules").map((mod) => [mod.fqn, mod]));
   const rubyEntities = [...entities(ruby, "classes"), ...modules.values()];
@@ -174,7 +184,20 @@ export function inlinedFromFindings(
       const declared = Object.values(pkg.classes).filter(
         (other) => (other as unknown as ClassInfo).file === tsFile,
       );
+      const pairedWith = pairs.filter(
+        (pair) =>
+          pair.package === name && pair.tsFile === tsFile && pair.owner === (klass.name ?? owner),
+      );
+      const paired =
+        pairedWith.length > 1
+          ? pairedWith.find((pair) => pair.rubyModule.split("::").pop() === short)
+          : pairedWith[0];
+      if (pairedWith.length > 1 && paired === undefined) {
+        const fqns = pairedWith.map((pair) => pair.rubyModule).join(", ");
+        throw new Error(`${TAG} on ${name}/${tsFile} ${owner} was compared against ${fqns}`);
+      }
       const counterpart =
+        (paired && rubyEntities.find((e) => e.package === name && e.fqn === paired.rubyModule)) ??
         mirrored.find((entity) => entity.fqn.split("::").pop() === short) ??
         (classes.length === 1 && declared.length === 1 ? classes[0] : undefined);
       const reached = counterpart && reachedHooks(counterpart, modules);
@@ -244,7 +267,21 @@ export function fixCitations(text: string, findings: readonly InlinedFromFinding
 async function main(fix: boolean): Promise<number> {
   const read = async (name: string) =>
     JSON.parse(await fs.readFile(path.join(OUTPUT_DIR, name), "utf-8")) as ApiManifest;
-  let findings = inlinedFromFindings(await read("rails-api.json"), await read("ts-api.json"));
+  const pairsPath = path.join(OUTPUT_DIR, INLINED_FROM_PAIRS_FILE);
+  const pairs = await fs
+    .readFile(pairsPath, "utf-8")
+    .then((text) => JSON.parse(text) as InlinedFromPair[])
+    .catch((error: unknown) => {
+      throw new Error(
+        `${TAG} gate cannot read ${pairsPath}: run \`pnpm parity:api --calls\` first (${String(error)})`,
+      );
+    });
+  let findings = inlinedFromFindings(
+    await read("rails-api.json"),
+    await read("ts-api.json"),
+    MISSING_TAG_PACKAGES,
+    pairs,
+  );
   if (fix) {
     const files = new Set(findings.filter((f) => f.fix).map((f) => `${f.package}\0${f.tsFile}`));
     for (const key of files) {
