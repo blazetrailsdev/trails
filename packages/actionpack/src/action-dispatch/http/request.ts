@@ -1,5 +1,6 @@
 import { camelize, NameError, toSentence, underscore } from "@blazetrails/activesupport";
 import {
+  EOFError,
   Encoding,
   StringIO,
   forceEncoding,
@@ -198,6 +199,7 @@ export const ENV_METHODS: readonly string[] = Object.freeze([
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Request {
   declare static Utils: typeof Utils;
+  static HTTP_METHOD_LOOKUP = HTTP_METHOD_LOOKUP;
 
   static {
     for (const env of ENV_METHODS) {
@@ -691,7 +693,7 @@ export class Request {
         return this.setHeader(k, pr);
       }) as Record<string, unknown>;
     } catch (e) {
-      if (e instanceof ParamError) {
+      if (e instanceof ParamError || e instanceof EOFError) {
         throw new BadRequest(`Invalid request parameters: ${e.message}`);
       }
       throw e;

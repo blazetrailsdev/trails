@@ -89,7 +89,8 @@ function cidrContains(cidr: ParsedCidr, ip: ParsedIp): boolean {
   return cidr.value >> shift === ip.value >> shift;
 }
 
-function proxyMatches(proxy: Proxy, ipStr: string): boolean {
+function proxyMatches(proxy: Proxy | null, ipStr: string): boolean {
+  if (proxy == null) return false;
   if (proxy instanceof RegExp) return proxy.test(ipStr);
   const cidr = parseCidr(proxy);
   const ip = parseIp(ipStr);

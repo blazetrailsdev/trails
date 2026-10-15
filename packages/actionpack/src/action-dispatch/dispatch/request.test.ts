@@ -1,12 +1,47 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { Request, PASS_NOT_FOUND, controllerConstants } from "../request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import { Mime, MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
-import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { assertNil, assertNotPredicate } from "@blazetrails/activesupport";
+import { BadRequest, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import { ArgumentError, StringIO, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  I18n,
+  Logger,
+  assert,
+  assertEqual,
+  assertMatch,
+  assertPredicate,
+  assertRaises,
+  inflections,
+  underscore,
+  assertNil,
+  assertNotPredicate,
+  assertRaise,
+} from "@blazetrails/activesupport";
+import { MockRequest } from "@blazetrails/rack";
+import { IpSpoofAttackError, RemoteIp, type Proxy } from "../middleware/remote-ip.js";
+
+let additionalTrustedProxy: string | RegExp | null = null;
+
+async function stubRequest(env: Record<string, unknown> = {}): Promise<Request> {
+  const ipSpoofingCheck = ":ip_spoofing_check" in env ? env[":ip_spoofing_check"] : true;
+  delete env[":ip_spoofing_check"];
+
+  const uri = env["HTTPS"] === "on" ? "https://www.example.org" : "http://www.example.org";
+
+  env = MockRequest.envFor(uri, env);
+  const trustedProxies = [
+    ...RemoteIp.TRUSTED_PROXIES,
+    additionalTrustedProxy,
+  ] as Array<Proxy | null>;
+
+  const ipApp = new RemoteIp(async () => [200, {}, []], ipSpoofingCheck as boolean, trustedProxies);
+  await ipApp.call(env);
+
+  return new Request(env);
+}
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -20,6 +55,10 @@ describe("RequestUrlFor", () => {
 });
 
 describe("RequestIP", () => {
+  afterEach(() => {
+    additionalTrustedProxy = null;
+  });
+
   it("remote ip", () => {
     const req = new Request({ REMOTE_ADDR: "1.2.3.4" });
     expect(req.remoteIp).toBe("1.2.3.4");
@@ -35,15 +74,150 @@ describe("RequestIP", () => {
     expect(req.remoteIp).toBe("::1");
   });
 
-  it.skip("remote ip spoof detection", () => {});
-  it.skip("remote ip with spoof detection disabled", () => {});
-  it.skip("remote ip spoof protection ignores private addresses", () => {});
-  it.skip("remote ip v6 spoof detection", () => {});
-  it.skip("remote ip v6 spoof detection disabled", () => {});
-  it.skip("remote ip with user specified trusted proxies String", () => {});
-  it.skip("remote ip v6 with user specified trusted proxies String", () => {});
-  it.skip("remote ip with user specified trusted proxies Regexp", () => {});
-  it.skip("remote ip v6 with user specified trusted proxies Regexp", () => {});
+  it("remote ip spoof detection", async () => {
+    const request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "1.1.1.1",
+      HTTP_CLIENT_IP: "2.2.2.2",
+    });
+    const e = await assertRaise([IpSpoofAttackError], {}, () => request.remoteIp);
+    assertMatch(/IP spoofing attack/, e.message);
+    assertMatch(/HTTP_X_FORWARDED_FOR="1\.1\.1\.1"/, e.message);
+    assertMatch(/HTTP_CLIENT_IP="2\.2\.2\.2"/, e.message);
+  });
+
+  it("remote ip with spoof detection disabled", async () => {
+    const request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "1.1.1.1",
+      HTTP_CLIENT_IP: "2.2.2.2",
+      ":ip_spoofing_check": false,
+    });
+    assertEqual("1.1.1.1", request.remoteIp);
+  });
+
+  it("remote ip spoof protection ignores private addresses", async () => {
+    const request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "172.17.19.51",
+      HTTP_CLIENT_IP: "172.17.19.51",
+      REMOTE_ADDR: "1.1.1.1",
+      HTTP_X_BLUECOAT_VIA: "de462e07a2db325e",
+    });
+    assertEqual("1.1.1.1", request.remoteIp);
+  });
+
+  it("remote ip v6 spoof detection", async () => {
+    const request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+      HTTP_CLIENT_IP: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+    });
+    const e = await assertRaise([IpSpoofAttackError], {}, () => request.remoteIp);
+    assertMatch(/IP spoofing attack/, e.message);
+    assertMatch(/HTTP_X_FORWARDED_FOR="fe80:0000:0000:0000:0202:b3ff:fe1e:8329"/, e.message);
+    assertMatch(/HTTP_CLIENT_IP="2001:0db8:85a3:0000:0000:8a2e:0370:7334"/, e.message);
+  });
+
+  it("remote ip v6 spoof detection disabled", async () => {
+    const request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+      HTTP_CLIENT_IP: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+      ":ip_spoofing_check": false,
+    });
+    assertEqual("fe80:0000:0000:0000:0202:b3ff:fe1e:8329", request.remoteIp);
+  });
+
+  it("remote ip with user specified trusted proxies String", async () => {
+    additionalTrustedProxy = "67.205.106.73";
+
+    let request = await stubRequest({
+      REMOTE_ADDR: "3.4.5.6",
+      HTTP_X_FORWARDED_FOR: "67.205.106.73",
+    });
+    assertEqual("3.4.5.6", request.remoteIp);
+
+    request = await stubRequest({
+      REMOTE_ADDR: "172.16.0.1,67.205.106.73",
+      HTTP_X_FORWARDED_FOR: "67.205.106.73",
+    });
+    assertEqual("67.205.106.73", request.remoteIp);
+
+    request = await stubRequest({
+      REMOTE_ADDR: "67.205.106.73,3.4.5.6",
+      HTTP_X_FORWARDED_FOR: "67.205.106.73",
+    });
+    assertEqual("3.4.5.6", request.remoteIp);
+
+    request = await stubRequest({ HTTP_X_FORWARDED_FOR: "67.205.106.73,unknown" });
+    assertEqual("67.205.106.73", request.remoteIp);
+
+    request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "9.9.9.9, 3.4.5.6, 10.0.0.1, 67.205.106.73",
+    });
+    assertEqual("3.4.5.6", request.remoteIp);
+  });
+
+  it("remote ip v6 with user specified trusted proxies String", async () => {
+    additionalTrustedProxy = "fe80:0000:0000:0000:0202:b3ff:fe1e:8329";
+
+    let request = await stubRequest({
+      REMOTE_ADDR: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+      HTTP_X_FORWARDED_FOR: "fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+    });
+    assertEqual("2001:0db8:85a3:0000:0000:8a2e:0370:7334", request.remoteIp);
+
+    request = await stubRequest({
+      REMOTE_ADDR:
+        "fe80:0000:0000:0000:0202:b3ff:fe1e:8329,2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+      HTTP_X_FORWARDED_FOR: "fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+    });
+    assertEqual("2001:0db8:85a3:0000:0000:8a2e:0370:7334", request.remoteIp);
+
+    request = await stubRequest({
+      REMOTE_ADDR: "fe80:0000:0000:0000:0202:b3ff:fe1e:8329,::1",
+      HTTP_X_FORWARDED_FOR: "fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+    });
+    assertEqual("fe80:0000:0000:0000:0202:b3ff:fe1e:8329", request.remoteIp);
+
+    request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "unknown,fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+    });
+    assertEqual("fe80:0000:0000:0000:0202:b3ff:fe1e:8329", request.remoteIp);
+
+    request = await stubRequest({
+      HTTP_X_FORWARDED_FOR:
+        "fe80:0000:0000:0000:0202:b3ff:fe1e:8329,2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+    });
+    assertEqual("2001:0db8:85a3:0000:0000:8a2e:0370:7334", request.remoteIp);
+  });
+
+  it("remote ip with user specified trusted proxies Regexp", async () => {
+    additionalTrustedProxy = /^67\.205\.106\.73$/i;
+
+    let request = await stubRequest({
+      REMOTE_ADDR: "67.205.106.73",
+      HTTP_X_FORWARDED_FOR: "3.4.5.6",
+    });
+    assertEqual("3.4.5.6", request.remoteIp);
+
+    request = await stubRequest({
+      HTTP_X_FORWARDED_FOR: "10.0.0.1, 9.9.9.9, 3.4.5.6, 67.205.106.73",
+    });
+    assertEqual("3.4.5.6", request.remoteIp);
+  });
+
+  it("remote ip v6 with user specified trusted proxies Regexp", async () => {
+    additionalTrustedProxy = /^fe80:0000:0000:0000:0202:b3ff:fe1e:8329$/i;
+
+    let request = await stubRequest({
+      REMOTE_ADDR: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+      HTTP_X_FORWARDED_FOR: "fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+    });
+    assertEqual("2001:0db8:85a3:0000:0000:8a2e:0370:7334", request.remoteIp);
+
+    request = await stubRequest({
+      HTTP_X_FORWARDED_FOR:
+        "2001:0db8:85a3:0000:0000:8a2e:0370:7334, fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+    });
+    assertEqual("2001:0db8:85a3:0000:0000:8a2e:0370:7334", request.remoteIp);
+  });
 });
 
 describe("RequestDomain", () => {
@@ -261,8 +435,39 @@ describe("RequestMethod", () => {
       UnknownHttpMethod,
     );
   });
-  it.skip("exception on invalid HTTP method unaffected by I18n settings", () => {});
-  it.skip("post uneffected by local inflections", () => {});
+  it("exception on invalid HTTP method unaffected by I18n settings", async () => {
+    const oldLocales = I18n.availableLocales();
+    const oldEnforce = I18n.enforceAvailableLocales();
+
+    try {
+      I18n.setAvailableLocales(["nl"]);
+      I18n.setEnforceAvailableLocales(true);
+      const request = await stubRequest({ REQUEST_METHOD: "_RANDOM_METHOD" });
+      await assertRaise([UnknownHttpMethod], {}, () => request.method);
+    } finally {
+      I18n.setAvailableLocales(oldLocales);
+      I18n.setEnforceAvailableLocales(oldEnforce);
+    }
+  });
+
+  it("post uneffected by local inflections", async () => {
+    const existingAcronyms = new Map(inflections().acronyms);
+    try {
+      inflections(undefined, (inflect) => {
+        inflect.acronym("POS");
+      });
+      assertEqual("pos_t", underscore("POST"));
+      const request = await stubRequest({ REQUEST_METHOD: "POST" });
+      assertEqual("post", Request.HTTP_METHOD_LOOKUP["POST"]);
+      assertEqual("post", request.methodSymbol);
+      assertPredicate(request, (r) => r.isPost());
+    } finally {
+      inflections(undefined, (inflect) => {
+        inflect.acronyms = existingAcronyms;
+        rbFSend(inflect, "defineAcronymRegexPatterns");
+      });
+    }
+  });
   it.skip("delegates to Object#method if an argument is passed", () => {});
 });
 
@@ -350,8 +555,31 @@ describe("RequestParamsParsing", () => {
     expect(req.contentLength).toBe(0);
   });
 
-  it.skip("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", () => {});
-  it.skip("request_parameters raises BadRequest when content length is higher than actual data length", () => {});
+  it("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", async () => {
+    const request = await stubRequest({
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+      CONTENT_LENGTH: "9",
+      REQUEST_METHOD: "POST",
+      ":input": "0123456789",
+    });
+
+    const err = await assertRaises([BadRequest], {}, () => request.requestParameters);
+
+    assertMatch("Invalid request parameters:", err.message);
+  });
+
+  it("request_parameters raises BadRequest when content length is higher than actual data length", async () => {
+    const request = await stubRequest({
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+      CONTENT_LENGTH: "11",
+      REQUEST_METHOD: "POST",
+      ":input": "0123456789",
+    });
+
+    const err = await assertRaises([BadRequest], {}, () => request.requestParameters);
+
+    assertEqual("Invalid request parameters: bad content body", err.message);
+  });
 });
 
 describe("RequestFormat", () => {
@@ -455,8 +683,30 @@ describe("RequestFormat", () => {
     expect(req.format.symbol).toBeNull();
   });
 
-  it.skip("format does not throw exceptions when malformed GET parameters", () => {});
-  it.skip("format does not throw exceptions when invalid POST parameters", () => {});
+  it("format does not throw exceptions when malformed GET parameters", async () => {
+    const request = await stubRequest({ QUERY_STRING: "x[y]=1&x[y][][w]=2" });
+    assert(request.formats);
+    assertPredicate(request.format, (f) => f.isHtml!());
+  });
+
+  it("format does not throw exceptions when invalid POST parameters", async () => {
+    const body = "{record:{content:127.0.0.1}}";
+
+    const output = new StringIO();
+    const request = await stubRequest({
+      REQUEST_METHOD: "POST",
+      CONTENT_LENGTH: String(body.length),
+      CONTENT_TYPE: "application/json",
+      ":input": body,
+      "action_dispatch.logger": new Logger(output),
+    });
+    assert(request.formats);
+    assertPredicate(request.format, (f) => f.isHtml!());
+
+    output.rewind();
+    const err = output.read();
+    assertMatch(/Error occurred while parsing request parameters/, err);
+  });
 
   it("ignore_accept_header", () => {
     const prev = Request.ignoreAcceptHeader;
