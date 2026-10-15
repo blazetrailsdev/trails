@@ -21,9 +21,6 @@
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
-  "optionalDependencies": {
-    "yaml": "^2.8.3"
-  },
   "engines": {
     "node": ">=24"
   }

@@ -237,7 +237,8 @@ export namespace Psych {
    * `Psych.parse` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:398`): the first
    * document's root node. libyaml reads the source's bytes
    * (`yaml_parser_set_input_string`, `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`),
-   * so a source held as its bytes is decoded here.
+   * so a source held as its bytes is decoded here. A malformed document raises
+   * `SyntaxError` (`Psych::SyntaxError`, `psych_parser.c:85-110`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -247,7 +248,9 @@ export namespace Psych {
   ): PsychNode | false {
     if (yamlString instanceof IO) yamlString = yamlString.read();
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
-    return yaml.parseDocument(yamlString).contents ?? false;
+    const doc = yaml.parseDocument(yamlString);
+    if (doc.errors.length > 0) throw new SyntaxError(doc.errors[0].message);
+    return doc.contents ?? false;
   }
 
   /**

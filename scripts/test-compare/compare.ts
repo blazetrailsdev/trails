@@ -126,6 +126,8 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
 const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
   "core/kernel/catch_spec.rb": "kernel-catch.test.ts",
   "core/kernel/throw_spec.rb": "kernel-catch.test.ts",
+  "library/yaml/dump_spec.rb": "psych-dump.test.ts",
+  "library/yaml/to_yaml_spec.rb": "psych-to-yaml.test.ts",
 };
 
 /**

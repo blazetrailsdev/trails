@@ -351,7 +351,9 @@ export class YAMLTree {
    * continuation lines indented (`YAML.dump(Object.new)` is
    * `"--- !ruby/object {}\n"`, `YAML.dump("a\nb")` is `"--- |-\n  a\n  b\n"`,
    * `YAML.dump(nil)` is `"---\n"`) where the backend breaks the line, so that
-   * document start is written here.
+   * document start is written here. libyaml does not indent a block sequence
+   * under a mapping key and writes `nil` as an empty plain scalar
+   * (`{"a" => [nil]}.to_yaml` is `"---\na:\n-\n"`), so the backend is told so.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -359,7 +361,10 @@ export class YAMLTree {
     const doc = this.doc;
     return {
       yaml(io = null, options = {}) {
-        const du: { indent?: number; lineWidth?: number } = {};
+        const du: { indent?: number; lineWidth?: number; indentSeq: boolean; nullStr: string } = {
+          indentSeq: false,
+          nullStr: "",
+        };
         if ("indentation" in options) du.indent = options.indentation;
         if (options.canonical) throw new NotImplementedError("canonical");
         if ("lineWidth" in options) du.lineWidth = options.lineWidth;
@@ -373,7 +378,7 @@ export class YAMLTree {
               ? "---\n"
               : `--- ${doc.toString(du).replace(/\n(?=.)/g, `\n${indent}`)}`;
         } else {
-          string = doc.toString({ directives: true, ...du });
+          string = doc.toString({ directives: true, ...du }).replace(/^( *)- $/gm, "$1-");
         }
         if (!io) return string;
         io.write(string);

@@ -28,6 +28,7 @@ import {
   kernelThrow,
   rbInspect,
 } from "@blazetrails/ruby-compat";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import {
@@ -43,7 +44,6 @@ export type TranslateOptions = { [key: string]: unknown };
 export type FileReader = (filename: string) => Promise<string>;
 
 let fileReader: FileReader | undefined;
-let yamlParse: ((source: string) => unknown) | undefined;
 const fileContents = new Map<string, string>();
 const localeModules = new Map<string, unknown>();
 
@@ -59,13 +59,6 @@ export function registerLocaleModule(filename: string, translations: unknown): v
 
 /** @noRailsEquivalent PERMANENT */
 export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
-  yamlParse ??= (
-    await import("yaml").catch(() => {
-      throw new Error(
-        "I18n cannot read YAML locale files without the `yaml` package. Install it with `npm install yaml`.",
-      );
-    })
-  ).parse;
   const paths = filenames.length === 0 ? config().loadPath : filenames;
   for (const filename of paths.flat()) {
     fileContents.set(filename, await readTranslationFile(filename));
@@ -95,15 +88,6 @@ function readLocaleModule(filename: string): unknown {
     );
   }
   return localeModules.get(filename);
-}
-
-function readYaml(source: string): unknown {
-  if (!yamlParse) {
-    throw new Error(
-      "I18n cannot parse YAML: resolving the `yaml` package is async, so await I18n.preloadTranslationFiles() before loading a .yml file.",
-    );
-  }
-  return yamlParse(source);
 }
 
 function deepFreeze(value: unknown): unknown {
@@ -525,7 +509,7 @@ export abstract class Base {
   /** @missingRailsCall load_file — PERMANENT */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [deepFreeze(readYaml(readFile(filename))), true];
+      return [YAML.unsafeLoad(readFile(filename), { freeze: true }), true];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }

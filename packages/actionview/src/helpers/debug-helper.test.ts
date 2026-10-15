@@ -6,7 +6,8 @@ import { Base } from "../base.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const debug = _debug.bind(view);
-import * as yaml from "@blazetrails/ruby-compat/psych-adapter";
+import { Psych } from "@blazetrails/ruby-compat/psych";
+import { LoadError } from "@blazetrails/ruby-compat";
 
 describe("DebugHelperTest", () => {
   afterEach(() => {
@@ -35,7 +36,7 @@ describe("DebugHelperTest", () => {
   });
 
   it("test_debug_with_marshal_error falls back to inspect inside code", () => {
-    vi.spyOn(yaml, "stringify").mockImplementation(() => {
+    vi.spyOn(Psych, "dump").mockImplementation(() => {
       throw new Error("boom");
     });
     const out = debug({ html: "<b>x</b>" }).toString();
@@ -45,7 +46,7 @@ describe("DebugHelperTest", () => {
   });
 
   it("falls back to inspect when Marshal.dump refuses the object", () => {
-    const stringify = vi.spyOn(yaml, "stringify");
+    const stringify = vi.spyOn(Psych, "dump");
     expect(debug(() => {}).toString()).toContain('<code class="debug_dump">');
 
     class Company {
@@ -60,7 +61,7 @@ describe("DebugHelperTest", () => {
   });
 
   it("fallback inspect renders shared (non-cyclic) refs normally, not as Circular", () => {
-    vi.spyOn(yaml, "stringify").mockImplementation(() => {
+    vi.spyOn(Psych, "dump").mockImplementation(() => {
       throw new Error("boom");
     });
     const shared = { id: 1 };
@@ -71,7 +72,7 @@ describe("DebugHelperTest", () => {
   });
 
   it("fallback inspect renders circular references as [Circular]", () => {
-    vi.spyOn(yaml, "stringify").mockImplementation(() => {
+    vi.spyOn(Psych, "dump").mockImplementation(() => {
       throw new Error("boom");
     });
     const circular: Record<string, unknown> = { name: "x" };
@@ -79,5 +80,12 @@ describe("DebugHelperTest", () => {
     const out = debug(circular).toString();
     expect(out).toContain("[Circular]");
     expect(out).toContain("name:");
+  });
+
+  it("raises a LoadError from to_yaml instead of falling back to inspect", () => {
+    vi.spyOn(Psych, "dump").mockImplementation(() => {
+      throw new LoadError("cannot load such file -- yaml");
+    });
+    expect(() => debug({ a: 1 })).toThrow(LoadError);
   });
 });

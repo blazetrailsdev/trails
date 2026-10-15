@@ -64,7 +64,7 @@ describe("Psych with a Struct and the safe paths", () => {
     const { Psych } = await import("./psych.js");
     class Widget {}
     expect(() => Psych.safeDump(new Widget())).toThrow(Psych.DisallowedClass);
-    expect(Psych.safeDump({ a: [1, "x"] }, { aliases: true })).toBe("---\na:\n  - 1\n  - x\n");
+    expect(Psych.safeDump({ a: [1, "x"] }, { aliases: true })).toBe("---\na:\n- 1\n- x\n");
     expect(() => Psych.safeLoad("--- !ruby/object:Widget {}\n")).toThrow(Psych.DisallowedClass);
     expect(Psych.safeLoad("--- {a: 1}\n")).toEqual({ a: 1 });
   });
@@ -273,7 +273,7 @@ describe("Psych.safe_dump", () => {
   it("permits the default classes and refuses an alias unless aliases is true", async () => {
     const { Psych } = await import("./psych.js");
     expect(Psych.safeDump({ a: [1, 1.5, "x", true, null] })).toBe(
-      "---\na:\n  - 1\n  - 1.5\n  - x\n  - true\n  - null\n",
+      "---\na:\n- 1\n- 1.5\n- x\n- true\n-\n",
     );
     const shared = ["x"];
     expect(() => Psych.safeDump([shared, shared])).toThrow(Psych.BadAlias);

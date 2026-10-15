@@ -422,10 +422,6 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
-    optionalDependencies:
-      yaml:
-        specifier: ^2.8.3
-        version: 2.8.3
 
   packages/msgpack:
     dependencies:

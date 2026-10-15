@@ -100,6 +100,11 @@ RUBY_COMPAT_SPECS = {
   "symbol" => %w[name to_s],
 }.freeze
 
+# ruby/spec's `library/<name>/` specs ruby-compat enrolls, by stdlib library.
+RUBY_COMPAT_LIBRARY_SPECS = {
+  "yaml" => %w[dump to_yaml],
+}.freeze
+
 # Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
 # TS isAssertionCallee (extract-ts-core.ts), so both sides count the full breadth
 # of Rails assertions: the `assert_*`/`refute_*` families incl. custom helpers
@@ -2690,6 +2695,9 @@ def run
         Dir.glob(File.join(pkg_dir, "core", type, "shared", "*.rb")) +
           Dir.glob(File.join(pkg_dir, "shared", type, "*.rb")) +
           members.map { |m| File.join(pkg_dir, "core", type, "#{m}_spec.rb") }
+      end
+      test_files += RUBY_COMPAT_LIBRARY_SPECS.flat_map do |library, members|
+        members.map { |m| File.join(pkg_dir, "library", library, "#{m}_spec.rb") }
       end
       test_files.uniq!
     end

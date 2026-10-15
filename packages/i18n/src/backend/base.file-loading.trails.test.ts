@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
+import { psychAdapterConfig } from "@blazetrails/ruby-compat/psych-adapter";
 import { Simple } from "./simple.js";
 import { config, eagerLoadBang, reloadBang, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
@@ -47,6 +48,17 @@ describe("I18n::Backend::Base file loading", () => {
     expect(keysSymbolized).toBe(true);
     expect(Object.isFrozen(data)).toBe(true);
     expect(Object.isFrozen((data as { en: { foo: unknown } }).en.foo)).toBe(true);
+  });
+
+  it("raises InvalidLocaleData when no YAML backend loads", () => {
+    psychAdapterConfig.adapter = "missing-yaml-backend";
+    try {
+      expect(() => backend.loadTranslations(`${localesDir()}/en.yml`)).toThrow(
+        /can not load translations from .*en\.yml: #<LoadError: cannot load such file -- missing-yaml-backend>/,
+      );
+    } finally {
+      psychAdapterConfig.adapter = null;
+    }
   });
 
   it("raises InvalidLocaleData given a YAML file that is empty", () => {

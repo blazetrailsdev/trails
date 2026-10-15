@@ -1,4 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 import { Generators } from "../../../generators.js";
@@ -162,34 +163,83 @@ export class DevcontainerGenerator extends GeneratorBase {
   }
 
   private composeYaml(): string {
-    const { systemTest, redis, appName } = this.opts;
-    const { name: dbName, service: dbService, volume: dbVolume } = this.database;
-    const deps: string[] = [];
-    if (systemTest) deps.push("selenium");
-    if (redis) deps.push("redis");
-    if (dbService) deps.push(dbName);
-    const railsApp: JsonObject = {
-      build: { context: "..", dockerfile: ".devcontainer/Dockerfile" },
-      volumes: ["../..:/workspaces:cached"],
-      command: "sleep infinity",
-    };
-    if (deps.length > 0) railsApp.depends_on = deps;
-    const services: JsonObject = { "rails-app": railsApp };
-    if (systemTest)
-      services.selenium = { image: "selenium/standalone-chromium", restart: "unless-stopped" };
-    if (redis)
-      services.redis = {
-        image: "redis:7.2",
-        restart: "unless-stopped",
-        volumes: ["redis-data:/data"],
-      };
-    if (dbService) services[dbName] = dbService as unknown as JsonObject;
-    const yaml: JsonObject = { name: appName, services };
-    const volumes: JsonObject = {};
-    if (redis) volumes["redis-data"] = null;
-    if (dbVolume) volumes[dbVolume] = null;
-    if (Object.keys(volumes).length > 0) yaml.volumes = volumes;
-    return JSON.stringify(yaml, null, 2) + "\n";
+    const { appName, systemTest, redis } = this.opts;
+    const dependencies = this.dependencies();
+    const volumes = this.volumes();
+    let out = `name: "${appName}"
+
+services:
+  rails-app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+
+    volumes:
+    - ../..:/workspaces:cached
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    # Uncomment the next line to use a non-root user for all processes.
+    # user: vscode
+
+    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
+    # (Adding the "ports" property to this file will not forward from a Codespace.)
+`;
+    if (dependencies.length > 0) {
+      out += "    depends_on:\n";
+      for (const dependency of dependencies) out += `    - ${dependency}\n`;
+    }
+    if (systemTest) {
+      out += `
+  selenium:
+    image: selenium/standalone-chromium
+    restart: unless-stopped
+`;
+    }
+    out += "\n";
+    if (redis) {
+      out += `  redis:
+    image: redis:7.2
+    restart: unless-stopped
+    volumes:
+    - redis-data:/data
+
+`;
+    }
+    out += `  ${this.devcontainerDbServiceYaml({ indentation: 4 }) ?? ""}\n`;
+    if (volumes.length > 0) {
+      out += "volumes:\n";
+      for (const volume of volumes) out += `  ${volume}:\n`;
+    }
+    return out;
+  }
+
+  private dependencies(): string[] {
+    const dependencies: string[] = [];
+
+    if (this.opts.systemTest) dependencies.push("selenium");
+    if (this.opts.redis) dependencies.push("redis");
+    if (this.database.service) dependencies.push(this.database.name);
+    return dependencies;
+  }
+
+  private volumes(): string[] {
+    const volumes: string[] = [];
+
+    if (this.opts.redis) volumes.push("redis-data");
+    if (this.database.volume) volumes.push(this.database.volume);
+
+    return volumes;
+  }
+
+  private devcontainerDbServiceYaml(
+    options: Parameters<typeof toYaml>[1] = {},
+  ): string | undefined {
+    const service = this.database.service;
+    if (!service) return;
+
+    return toYaml({ [this.database.name]: service }, options).slice(4);
   }
 
   private systemTestConfiguration(): string {

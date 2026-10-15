@@ -24,6 +24,7 @@ import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { ARRAY_METHOD_TABLE, fetch, first } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
+import type { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
@@ -569,7 +570,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return toYaml(this);
   }
 
-  encodeWith(coder: { representSeq(tag: string | null, list: unknown[]): void }): void {
+  encodeWith(coder: Psych.Coder): void {
     coder.representSeq(null, this._records);
   }
 
