@@ -1586,12 +1586,10 @@ export class Mapper {
     const targetAs = this.nameForAction(hashAref(options!, "as") as string | null, path);
     if (!rtest(hashAref(options!, "via"))) hashAset(options!, "via", ":all");
 
-    this.match(path, {
-      to: app as MountableApp,
-      anchor: false,
-      format: false,
-      ...(options as RouteOptions),
-    });
+    this.match(
+      path,
+      merge({ to: app as MountableApp, anchor: false, format: false }, options as RouteOptions),
+    );
 
     if (railsApp) this.defineGeneratePrefix(app as RailsApp, targetAs!);
     return this;
