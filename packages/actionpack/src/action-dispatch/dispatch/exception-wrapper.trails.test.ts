@@ -73,7 +73,7 @@ describe("ExceptionWrapper tables keyed on qualified class names", () => {
 
   it("wrapper_exceptions unwraps a raised ActionView::Template::Error to its cause", () => {
     const original = new RoutingError("");
-    const error = new TemplateError({ original, template: {} as Template });
+    const error = new TemplateError({} as Template, original);
     const wrapper = new ExceptionWrapper(null, error);
     expect(wrapper.unwrappedException).toBe(original);
     expect(wrapper.statusCode).toBe(404);

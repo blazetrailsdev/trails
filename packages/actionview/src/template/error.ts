@@ -197,11 +197,6 @@ export class MissingTemplate extends ActionViewError {
   }
 }
 
-export interface TemplateErrorOptions {
-  original: Error;
-  template: Template;
-}
-
 export class TemplateError extends Error {
   static readonly SOURCE_CODE_RADIUS = 3;
 
@@ -210,11 +205,11 @@ export class TemplateError extends Error {
   private subTemplates?: Template[];
   private _lineNumber?: number | null;
 
-  constructor(opts: TemplateErrorOptions) {
-    super(opts.original.message, { cause: opts.original });
+  constructor(template: Template, errinfo: Error) {
+    super(errinfo.message, { cause: errinfo });
     this.name = "ActionView::Template::Error";
-    this.original = opts.original;
-    this.template = opts.template;
+    this.original = errinfo;
+    this.template = template;
   }
 
   backtrace(): string[] {
@@ -296,7 +291,7 @@ export class SyntaxErrorInTemplate extends TemplateError {
   private readonly offendingCodeString: string;
 
   constructor(template: Template, offendingCodeString: string, original: Error) {
-    super({ original, template });
+    super(template, original);
     this.offendingCodeString = offendingCodeString;
     this.name = "ActionView::SyntaxErrorInTemplate";
     this.message = `Encountered a syntax error while rendering template: check ${this.offendingCodeString}\n`;

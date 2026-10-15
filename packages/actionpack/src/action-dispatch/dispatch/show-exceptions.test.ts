@@ -9,7 +9,7 @@ import {
   assertRaise,
 } from "@blazetrails/activesupport";
 import { RuntimeError, StandardError } from "@blazetrails/ruby-compat";
-import { TemplateError } from "@blazetrails/actionview";
+import { TemplateError, type Template } from "@blazetrails/actionview";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { MethodNotAllowed, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { X_CASCADE } from "../constants.js";
@@ -23,7 +23,6 @@ import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
 class Boomer {
-  /** @missingRailsArgs new — CONVERGEABLE template-error-constructor-takes-template-and-errinfo */
   async call(env: RackEnv): Promise<RackResponse> {
     const req = new Request(env);
     switch (req.path) {
@@ -46,7 +45,7 @@ class Boomer {
         try {
           throw new ActionNotFound();
         } catch (e) {
-          throw new TemplateError({ original: e as Error, template: "template" as never });
+          throw new TemplateError("template" as unknown as Template, e as Error);
         }
       default:
         throw new RuntimeError("puke!");

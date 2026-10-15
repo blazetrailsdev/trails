@@ -124,7 +124,7 @@ describe("ActionView::Template (smoke)", () => {
     });
     const original = new Error("boom");
     original.message = "posts/show.html.tse:2: boom";
-    const error = new TemplateError({ original, template: t });
+    const error = new TemplateError(t, original);
     expect(error.lineNumber()).toBe(2);
     expect(error.annotatedSourceCode()).toEqual(["    1: one", "    2: two", "    3: three"]);
   });
