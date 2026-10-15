@@ -16,5 +16,5 @@ import {
   DocumentFragment as Html5DocumentFragment,
   Node as Html5Node,
 } from "./html5/document-fragment.js";
-export const HTML5 = { DocumentFragment: Html5DocumentFragment, Node: Html5Node };
+export const HTML5 = { DocumentFragment: Html5DocumentFragment };
 export type { Html5DocumentFragment, Html5Node };
