@@ -67,7 +67,7 @@ class TestController extends Base {
   }
 
   async setFlashNow() {
-    this.flash.now("test_now", `>${this.flash.get("test_now") ?? ""}<`);
+    this.flash.now.set("test_now", `>${this.flash.get("test_now") ?? ""}<`);
     await this.render({ plain: "ignore me" });
   }
 

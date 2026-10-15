@@ -59,9 +59,6 @@ function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unk
   );
 }
 
-/** @internal */
-export const COOKIES_SAME_SITE_PROTECTION = "action_dispatch.cookies_same_site_protection";
-
 export interface SetCookieOptions {
   value: string;
   path?: string;
@@ -620,6 +617,24 @@ type CookiesRequest = RequestCookieMethodsHost & {
 };
 
 export class Cookies {
+  static readonly HTTP_HEADER = "Set-Cookie";
+  static readonly GENERATOR_KEY = "action_dispatch.key_generator";
+  static readonly SIGNED_COOKIE_SALT = "action_dispatch.signed_cookie_salt";
+  static readonly ENCRYPTED_COOKIE_SALT = "action_dispatch.encrypted_cookie_salt";
+  static readonly ENCRYPTED_SIGNED_COOKIE_SALT = "action_dispatch.encrypted_signed_cookie_salt";
+  static readonly AUTHENTICATED_ENCRYPTED_COOKIE_SALT =
+    "action_dispatch.authenticated_encrypted_cookie_salt";
+  static readonly USE_AUTHENTICATED_COOKIE_ENCRYPTION =
+    "action_dispatch.use_authenticated_cookie_encryption";
+  static readonly ENCRYPTED_COOKIE_CIPHER = "action_dispatch.encrypted_cookie_cipher";
+  static readonly SIGNED_COOKIE_DIGEST = "action_dispatch.signed_cookie_digest";
+  static readonly SECRET_KEY_BASE = "action_dispatch.secret_key_base";
+  static readonly COOKIES_SERIALIZER = "action_dispatch.cookies_serializer";
+  static readonly COOKIES_DIGEST = "action_dispatch.cookies_digest";
+  static readonly COOKIES_ROTATIONS = "action_dispatch.cookies_rotations";
+  static readonly COOKIES_SAME_SITE_PROTECTION = "action_dispatch.cookies_same_site_protection";
+  static readonly USE_COOKIES_WITH_METADATA = "action_dispatch.use_cookies_with_metadata";
+
   private app: RackApp;
 
   constructor(app: RackApp) {
@@ -679,55 +694,49 @@ const requestEnvAccessor = <T>(key: string) =>
 /** @internal */
 export const keyGenerator = requestEnvAccessor<{
   generateKey(salt: string, keySize?: number): Buffer | string;
-}>("action_dispatch.key_generator");
+}>(Cookies.GENERATOR_KEY);
 /** @internal */
-export const signedCookieSalt = requestEnvAccessor<string>("action_dispatch.signed_cookie_salt");
+export const signedCookieSalt = requestEnvAccessor<string>(Cookies.SIGNED_COOKIE_SALT);
 /** @internal */
-export const encryptedCookieSalt = requestEnvAccessor<string>(
-  "action_dispatch.encrypted_cookie_salt",
-);
+export const encryptedCookieSalt = requestEnvAccessor<string>(Cookies.ENCRYPTED_COOKIE_SALT);
 /** @internal */
 export const encryptedSignedCookieSalt = requestEnvAccessor<string>(
-  "action_dispatch.encrypted_signed_cookie_salt",
+  Cookies.ENCRYPTED_SIGNED_COOKIE_SALT,
 );
 /** @internal */
 export const authenticatedEncryptedCookieSalt = requestEnvAccessor<string>(
-  "action_dispatch.authenticated_encrypted_cookie_salt",
+  Cookies.AUTHENTICATED_ENCRYPTED_COOKIE_SALT,
 );
 /** @internal */
 export const useAuthenticatedCookieEncryption = requestEnvAccessor<boolean>(
-  "action_dispatch.use_authenticated_cookie_encryption",
+  Cookies.USE_AUTHENTICATED_COOKIE_ENCRYPTION,
 );
 /** @internal */
-export const encryptedCookieCipher = requestEnvAccessor<string>(
-  "action_dispatch.encrypted_cookie_cipher",
-);
+export const encryptedCookieCipher = requestEnvAccessor<string>(Cookies.ENCRYPTED_COOKIE_CIPHER);
 /** @internal */
-export const signedCookieDigest = requestEnvAccessor<string>(
-  "action_dispatch.signed_cookie_digest",
-);
+export const signedCookieDigest = requestEnvAccessor<string>(Cookies.SIGNED_COOKIE_DIGEST);
 /** @internal */
-export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
+export const secretKeyBase = requestEnvAccessor<string>(Cookies.SECRET_KEY_BASE);
 /** @internal */
-export const cookiesSerializer = requestEnvAccessor<unknown>("action_dispatch.cookies_serializer");
+export const cookiesSerializer = requestEnvAccessor<unknown>(Cookies.COOKIES_SERIALIZER);
 /** @internal */
 export function cookiesSameSiteProtection(this: RequestCookieMethodsHost): unknown {
   return (
-    this.getHeader(COOKIES_SAME_SITE_PROTECTION) as
+    this.getHeader(Cookies.COOKIES_SAME_SITE_PROTECTION) as
       | ((request: unknown) => unknown)
       | undefined
       | null
   )?.(this);
 }
 /** @internal */
-export const cookiesDigest = requestEnvAccessor<string>("action_dispatch.cookies_digest");
+export const cookiesDigest = requestEnvAccessor<string>(Cookies.COOKIES_DIGEST);
 /** @internal */
 export const cookiesRotations = requestEnvAccessor<RotationConfiguration>(
-  "action_dispatch.cookies_rotations",
+  Cookies.COOKIES_ROTATIONS,
 );
 /** @internal */
 export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
-  "action_dispatch.use_cookies_with_metadata",
+  Cookies.USE_COOKIES_WITH_METADATA,
 );
 
 export const RequestCookieMethods = {

@@ -5,6 +5,7 @@ import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotat
 import { Base } from "../base.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { Flash } from "../../action-dispatch/middleware/flash.js";
+import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../action-dispatch/middleware/show-exceptions.js";
 import type { MiddlewareFactory } from "../../action-dispatch/middleware/stack.js";
@@ -90,7 +91,7 @@ describe("FlashTest", () => {
 
   it("flash now", () => {
     const flash = new FlashHash();
-    flash.now("notice", "immediate");
+    flash.now.set("notice", "immediate");
     expect(flash.get("notice")).toBe("immediate");
     flash.sweep();
     expect(flash.get("notice")).toBeUndefined();
@@ -133,13 +134,13 @@ describe("FlashTest", () => {
 
   it("render with flash now alert", () => {
     const flash = new FlashHash();
-    flash.now("alert", "immediate alert");
+    flash.now.set("alert", "immediate alert");
     expect(flash.alert).toBe("immediate alert");
   });
 
   it("render with flash now notice", () => {
     const flash = new FlashHash();
-    flash.now("notice", "immediate notice");
+    flash.now.set("notice", "immediate notice");
     expect(flash.notice).toBe("immediate notice");
   });
 
@@ -211,7 +212,7 @@ class FlashIntegrationTestController extends Base {
   }
 
   async setFlashOptionally(): Promise<void> {
-    this.flash.now("notice", this.params.get("flash"));
+    this.flash.now.set("notice", this.params.get("flash"));
     if (await this.isStale(null, { etag: "abe" })) {
       await this.render({ inline: "maybe flash" });
     }
@@ -234,8 +235,8 @@ class FlashIntegrationTestSession extends IntegrationTest {
     options: Parameters<IntegrationTest["get"]>[1] = {},
   ): Promise<void> {
     const env: Record<string, unknown> = { ...(options.env ?? {}) };
-    env["action_dispatch.key_generator"] ??= Generator;
-    env["action_dispatch.cookies_rotations"] = Rotations;
+    env[Cookies.GENERATOR_KEY] ??= Generator;
+    env[Cookies.COOKIES_ROTATIONS] = Rotations;
     env["action_dispatch.signed_cookie_salt"] = SIGNED_COOKIE_SALT;
     return super.get(path, { ...options, env });
   }
@@ -289,7 +290,7 @@ describe("FlashIntegrationTest", () => {
 
   it("setting flash now does not raise in following requests", () => {
     const flash = new FlashHash();
-    flash.now("notice", "now");
+    flash.now.set("notice", "now");
     expect(flash.get("notice")).toBe("now");
   });
 

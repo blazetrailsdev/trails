@@ -1,4 +1,4 @@
-import { rbInspect, rbObjRespondTo, rtest, stderr, rbFSend } from "@blazetrails/ruby-compat";
+import { fetch, rbInspect, rbObjRespondTo, rtest, stderr, rbFSend } from "@blazetrails/ruby-compat";
 import {
   camelize,
   HASH_CONVERSIONS,
@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
+import { bodyFromString, HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { X_CASCADE } from "../constants.js";
 import { Mime, type MimeType } from "../http/mime-type.js";
@@ -62,7 +62,7 @@ export class DebugExceptions {
   renderForApiRequest(contentType: MimeType | undefined, wrapper: ExceptionWrapper): RackResponse {
     const body = {
       status: wrapper.statusCode,
-      error: wrapper.statusText,
+      error: fetch(HTTP_STATUS_CODES, String(wrapper.statusCode), HTTP_STATUS_CODES[500]),
       exception: wrapper.exceptionInspect(),
       traces: wrapper.traces,
     };
