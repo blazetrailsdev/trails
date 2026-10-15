@@ -55,7 +55,7 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
     expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/2_x\.png$/);
   });
 
-  it("image path uses the Capybara.save_path to set a custom directory", () => {
+  it("image path uses the Vitest.save_path to set a custom directory", () => {
     vi.stubEnv("CAPYBARA_SAVE_PATH", "custom_dir");
     expect(imagePath.call(host)).toMatch(/custom_dir\/0_x\.png$/);
   });

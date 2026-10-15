@@ -49,6 +49,12 @@ export const TOKEN_RENAMES: Record<string, string> = {
   rubocop: "eslint",
   RuboCop: "ESLint",
   Rubocop: "Eslint",
+  // trails system testing runs on Vitest, not Capybara (repo-owner ruling,
+  // 2026-10-15; RFC 0166): `test "image path uses the Capybara.save_path to set
+  // a custom directory"` (actionpack/test/dispatch/system_testing/screenshot_helper_test.rb:39)
+  // credits at the Vitest spelling.
+  capybara: "vitest",
+  Capybara: "Vitest",
 };
 
 /**
