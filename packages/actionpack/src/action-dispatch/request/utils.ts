@@ -6,6 +6,7 @@ import {
   eachValue,
   forceEncoding,
   Hash,
+  hasKey,
   isValidEncoding,
   rbObjIsKindOf,
   scrub,
@@ -31,14 +32,11 @@ export class ParamEncoder {
     if (Array.isArray(params)) {
       return this.handleArray(params);
     } else if (rbObjIsKindOf(params, Hash)) {
-      const hash = params as ParamHash | Hash<string, ParamValue>;
-      if (hash instanceof Hash ? hash.has("tempfile") : Object.hasOwn(hash, "tempfile")) {
-        return new UploadedFile(
-          (hash instanceof Hash ? Object.fromEntries(hash) : hash) as UploadedFileOptions,
-        ) as unknown as ParamValue;
+      if (hasKey(params as object, "tempfile")) {
+        return new UploadedFile(params as UploadedFileOptions) as unknown as ParamValue;
       } else {
         const hwia: ParamHash = Object.create(null);
-        eachPair(hash as ParamHash, (key, val) => {
+        eachPair(params as ParamHash, (key, val) => {
           hwia[key] = this.normalizeEncodeParams(val);
         });
         return hwia;
