@@ -1,6 +1,6 @@
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, Module, rbInspect } from "@blazetrails/ruby-compat";
 
-import { convertToModel, modelNameFromRecordOrClass } from "./model-naming.js";
+import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "./model-naming.js";
 
 export { convertToModel, modelNameFromRecordOrClass };
 
@@ -33,3 +33,11 @@ export function recordKeyForDomId(record: unknown): string | null {
   const key = (convertToModel(record) as { toKey: () => unknown[] | null }).toKey();
   return key && key.every((k) => k != null && k !== false) ? key.join(JOIN) : null;
 }
+
+export const RecordIdentifier = new Module((mod) => {
+  mod.include(ModelNaming);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { domClass, domId, recordKeyForDomId });
+  });
+});

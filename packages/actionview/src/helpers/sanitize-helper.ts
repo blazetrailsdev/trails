@@ -30,7 +30,7 @@ export const SanitizeHelper = new Module((mod) => {
 }) as Module & { sanitizerVendor: SanitizerVendor };
 mattrAccessor.call(SanitizeHelper, "sanitizerVendor", { default: HTML4.Sanitizer });
 
-/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
+/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
 export function getSanitizerVendor(): SanitizerVendor {
   return SanitizeHelper.sanitizerVendor;
 }
@@ -46,7 +46,7 @@ let _fullSanitizer: Sanitizer | null = null;
 let _linkSanitizer: Sanitizer | null = null;
 let _safeListSanitizer: Sanitizer | null = null;
 
-/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
+/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
 export function getFullSanitizer(): Sanitizer {
   if (!_fullSanitizer) {
     _fullSanitizer = new SanitizeHelper.sanitizerVendor.fullSanitizer();
@@ -58,7 +58,7 @@ export function setFullSanitizer(sanitizer: Sanitizer): void {
   _fullSanitizer = sanitizer;
 }
 
-/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
+/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
 export function getLinkSanitizer(): Sanitizer {
   if (!_linkSanitizer) {
     _linkSanitizer = new SanitizeHelper.sanitizerVendor.linkSanitizer();
@@ -70,7 +70,7 @@ export function setLinkSanitizer(sanitizer: Sanitizer): void {
   _linkSanitizer = sanitizer;
 }
 
-/** @noRailsEquivalent CONVERGEABLE actionview-remaining-helper-namespaces-as-live-modules */
+/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
 export function getSafeListSanitizer(): Sanitizer {
   if (!_safeListSanitizer) {
     _safeListSanitizer = new SanitizeHelper.sanitizerVendor.safeListSanitizer();

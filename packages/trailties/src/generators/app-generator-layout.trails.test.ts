@@ -28,6 +28,7 @@ async function generatedLayout(): Promise<string> {
 }
 
 function render(view: Base, source: string, identifier: string): string {
+  (view as unknown as Record<string, unknown>)["isContentSecurityPolicy"] = () => false;
   return new Template(source, identifier, new TseHandler(), { locals: [], format: ":html" })
     .render(view, {}, null, undefined, (...name) => view._layoutFor(...(name as [string])))
     .toString();

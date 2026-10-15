@@ -15,6 +15,7 @@ import {
   rtest,
   stringToSym,
   symbolToS,
+  Module,
 } from "@blazetrails/ruby-compat";
 import { Template } from "../template.js";
 import {
@@ -24,10 +25,11 @@ import {
   pathToStylesheet,
   type AssetPathOptions,
   type AssetUrlHelperHost,
+  AssetUrlHelper,
 } from "./asset-url-helper.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import { safeJoin } from "./output-safety-helper.js";
-import { contentTag, tag, type TagBuilder, type TagHelperHost } from "./tag-helper.js";
+import { contentTag, tag, type TagBuilder, type TagHelperHost, TagHelper } from "./tag-helper.js";
 
 export let imageLoading: string | null = null;
 
@@ -517,3 +519,15 @@ function deleteKey(hash: Record<string, unknown>, key: string): unknown {
   delete hash[key];
   return value;
 }
+
+export const AssetTagHelper = new Module((mod) => {
+  mod.include(AssetUrlHelper);
+  mod.include(TagHelper);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { javascriptIncludeTag, stylesheetLinkTag, autoDiscoveryLinkTag });
+    Object.assign(m, { faviconLinkTag, preloadLinkTag, imageTag, pictureTag, videoTag, audioTag });
+    Object.assign(m, { multipleSourcesTagBuilder, resolveAssetSource, extractDimensions });
+    Object.assign(m, { checkForImageTagErrors, resolveLinkAs, sendPreloadLinksHeader });
+  });
+});

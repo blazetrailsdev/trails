@@ -1089,6 +1089,8 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <%= csrfMetaTags() %>
+    <%= cspMetaTag() %>
 
     <%= yield("head") %>
 

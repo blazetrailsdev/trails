@@ -1,8 +1,15 @@
 import "./abstract-unit.js";
 import { Base } from "@blazetrails/activerecord";
-import { cattrAccessor, isBlank } from "@blazetrails/activesupport";
+import {
+  ClassMethods as TestFixturesClassMethods,
+  TestFixtures,
+} from "@blazetrails/activerecord/test-fixtures";
+import { Notifications, cattrAccessor, isBlank } from "@blazetrails/activesupport";
+import { ActionController } from "@blazetrails/actionpack";
 import {
   Dir,
+  Module,
+  include,
   File,
   RuntimeError,
   getFs,
@@ -12,6 +19,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 const __dir__ = new URL(".", import.meta.url).pathname;
+const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);
 
 export class ActiveRecordTestConnector {
   declare static ableToConnect: boolean;
@@ -73,6 +81,90 @@ export class ActiveRecordTestConnector {
 
   private static async requireFixtureModels(): Promise<void> {
     for (const f of Dir.glob(File.expandPath("fixtures/*.ts", __dir__))) await import(f);
+  }
+}
+
+type ControllerClass = Parameters<typeof ActionController.TestCase.tests>[0];
+
+/** @missingRailsCall after_fork_hook — CONVERGEABLE active-record-unit-registers-parallelization-after-fork-hook */
+export class ActiveRecordTestCase extends ActionController.TestCase {
+  declare static fixturePaths: string[];
+  declare static useTransactionalTests: boolean;
+
+  static {
+    include(this, TestFixtures);
+  }
+
+  static override tests(controller: ControllerClass & { ROUTES?: unknown }): void {
+    super.tests(controller);
+    if (controller.ROUTES !== undefined) {
+      const mod = new Module();
+      mod.defineMethod("setup", function (this: { routes: unknown }) {
+        mod.superMethod(this, "setup")!();
+        this.routes = controller.ROUTES;
+      });
+      include(this, mod);
+    }
+  }
+
+  static {
+    if (ActiveRecordTestConnector.ableToConnect) {
+      this.fixturePaths = [FIXTURE_LOAD_PATH];
+      this.useTransactionalTests = false;
+    }
+  }
+
+  static fixtures(...args: unknown[]): void {
+    if (ActiveRecordTestConnector.connected) {
+      TestFixturesClassMethods.fixtures.call(
+        this as unknown as ThisParameterType<typeof TestFixturesClassMethods.fixtures>,
+        ...args,
+      );
+    }
+  }
+
+  override async run(): Promise<this> {
+    if (ActiveRecordTestConnector.connected) return super.run();
+    return undefined as unknown as this;
+  }
+
+  async captureSql(block: () => unknown): Promise<string[]> {
+    await (await Base.leaseConnection()).materializeTransactions();
+    ActiveRecordTestCase.SQLCounter.clearLog();
+    await block();
+    return [...ActiveRecordTestCase.SQLCounter.log];
+  }
+
+  static SQLCounter = class SQLCounter {
+    static log: string[];
+    static logAll: string[];
+
+    static clearLog(): void {
+      this.log = [];
+      this.logAll = [];
+    }
+
+    static {
+      this.clearLog();
+    }
+
+    call(
+      _name: string,
+      _start: unknown,
+      _finish: unknown,
+      _messageId: string,
+      values: Record<string, unknown>,
+    ): void {
+      if (values.cached) return;
+
+      const sql = values.sql as string;
+      SQLCounter.logAll.push(sql);
+      if (!["SCHEMA", "TRANSACTION"].includes(values.name as string)) SQLCounter.log.push(sql);
+    }
+  };
+
+  static {
+    Notifications.subscribe("sql.active_record", new ActiveRecordTestCase.SQLCounter());
   }
 }
 

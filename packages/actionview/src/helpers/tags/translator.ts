@@ -12,13 +12,14 @@ export class Translator {
   private scope: string;
   private model: TranslatorModel | null;
 
+  /** @missingRailsArgs gsub — CONVERGEABLE nested-attributes-writer-uses-rails-snake-attributes-spelling */
   constructor(
     object: unknown,
     objectName: string,
     methodAndValue: string,
     { scope }: { scope: string },
   ) {
-    this.objectName = objectName.replace(/\[(.*)_attributes\]\[\d+\]/g, ".$1");
+    this.objectName = objectName.replace(/\[(.*)Attributes\]\[\d+\]/g, ".$1");
     this.methodAndValue = methodAndValue;
     this.scope = scope;
     this.model = rbObjRespondTo(object, "toModel")

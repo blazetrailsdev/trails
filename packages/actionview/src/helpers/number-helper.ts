@@ -1,10 +1,11 @@
 import {
-  NumberHelper,
+  NumberHelper as ActiveSupportNumberHelper,
   SafeBuffer,
   htmlEscape,
   htmlSafe,
   isHtmlSafe,
 } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 
 export class InvalidNumberError extends Error {
   number: unknown;
@@ -45,31 +46,31 @@ export function numberToPhone(
   if (raiseOnInvalid) parseFloat(number, true);
   const opts: Record<string, unknown> = { ...rest };
   if (opts.delimiter instanceof SafeBuffer) opts.delimiter = opts.delimiter.toString();
-  return htmlEscape(NumberHelper.numberToPhone(asArg(number), opts));
+  return htmlEscape(ActiveSupportNumberHelper.numberToPhone(asArg(number), opts));
 }
 
 export function numberToCurrency(number: NumberLike, options: NumberHelperOptions = {}) {
-  return delegateNumberHelperMethod(NumberHelper.numberToCurrency, number, options);
+  return delegateNumberHelperMethod(ActiveSupportNumberHelper.numberToCurrency, number, options);
 }
 
 export function numberToPercentage(number: NumberLike, options: NumberHelperOptions = {}) {
-  return delegateNumberHelperMethod(NumberHelper.numberToPercentage, number, options);
+  return delegateNumberHelperMethod(ActiveSupportNumberHelper.numberToPercentage, number, options);
 }
 
 export function numberWithDelimiter(number: NumberLike, options: NumberHelperOptions = {}) {
-  return delegateNumberHelperMethod(NumberHelper.numberWithDelimiter, number, options);
+  return delegateNumberHelperMethod(ActiveSupportNumberHelper.numberToDelimited, number, options);
 }
 
 export function numberWithPrecision(number: NumberLike, options: NumberHelperOptions = {}) {
-  return delegateNumberHelperMethod(NumberHelper.numberToRounded, number, options);
+  return delegateNumberHelperMethod(ActiveSupportNumberHelper.numberToRounded, number, options);
 }
 
 export function numberToHumanSize(number: NumberLike, options: NumberHelperOptions = {}) {
-  return delegateNumberHelperMethod(NumberHelper.numberToHumanSize, number, options);
+  return delegateNumberHelperMethod(ActiveSupportNumberHelper.numberToHumanSize, number, options);
 }
 
 export function numberToHuman(number: NumberLike, options: NumberHelperOptions = {}) {
-  return delegateNumberHelperMethod(NumberHelper.numberToHuman, number, options);
+  return delegateNumberHelperMethod(ActiveSupportNumberHelper.numberToHuman, number, options);
 }
 
 /** @internal */
@@ -137,3 +138,12 @@ export function parseFloat(number: unknown, raiseError: boolean): number | null 
   if (raiseError) throw new InvalidNumberError(number);
   return null;
 }
+
+export const NumberHelper = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { numberToPhone, numberToCurrency, numberToPercentage, numberWithDelimiter });
+    Object.assign(m, { numberWithPrecision, numberToHumanSize, numberToHuman });
+    Object.assign(m, { delegateNumberHelperMethod, escapeUnsafeOptions, escapeUnits });
+    Object.assign(m, { wrapWithOutputSafetyHandling, validFloat, parseFloat });
+  });
+});

@@ -41,6 +41,7 @@ function renderLayout(root: string): string {
   );
   const view = new (Base.withEmptyTemplateCache())(null, {}, null);
   (view as unknown as Record<string, unknown>)["computeAssetPath"] = computeAssetPath;
+  (view as unknown as Record<string, unknown>)["isContentSecurityPolicy"] = () => false;
   return new Template(source, "application.html.tse", new TseHandler(), {
     locals: [],
     format: ":html",

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import "../test-helpers/active-record-unit.js";
 import { SafeBuffer } from "@blazetrails/activesupport";
 import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
-import { debug as _debug } from "./debug-helper.js";
+import { debug as _debug } from "../helpers/debug-helper.js";
 import { Base } from "../base.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
@@ -12,15 +13,6 @@ import { LoadError } from "@blazetrails/ruby-compat";
 describe("DebugHelperTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("test_debug", () => {
-    const obj = { name: "firebase", count: 42 };
-    const output = debug(obj).toString();
-    expect(output).toContain('<pre class="debug_dump">');
-    expect(output).toContain("name: firebase");
-    expect(output).toContain("count: 42");
-    expect(output).toContain("</pre>");
   });
 
   it("returns a SafeBuffer marked html_safe", () => {

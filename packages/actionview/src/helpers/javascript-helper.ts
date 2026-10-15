@@ -2,6 +2,7 @@ import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
 
 import { capture } from "./capture-helper.js";
 import { cdataSection, contentTag, type TagHelperHost } from "./tag-helper.js";
+import { Module } from "@blazetrails/ruby-compat";
 
 export const JS_ESCAPE_MAP: Record<string, string> = {
   "\\": "\\\\",
@@ -68,3 +69,9 @@ export function javascriptTag(
 
   return contentTag.call(this, "script", javascriptCdataSection(content), opts);
 }
+
+export const JavaScriptHelper = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { escapeJavascript, j, javascriptCdataSection, javascriptTag });
+  });
+});
