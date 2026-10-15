@@ -18,4 +18,11 @@ describe("Pathname (trails)", () => {
     expect(() => new Pathname("a\0b")).toThrow(ArgumentError);
     expect(() => new Pathname("a\0b")).toThrow("pathname contains null byte");
   });
+
+  it("join answers an absolute argument unchanged and resolves a relative one", () => {
+    expect(new Pathname("/usr").join("bin/ruby").toString()).toBe("/usr/bin/ruby");
+    expect(new Pathname("/app").join("/abs/x.rb").toString()).toBe("/abs/x.rb");
+    expect(new Pathname("/usr/lib").join("../bin").toString()).toBe("/usr/bin");
+    expect(new Pathname("a").join("b", "c").toString()).toBe("a/b/c");
+  });
 });

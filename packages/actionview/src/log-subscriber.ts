@@ -94,7 +94,6 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     return logger();
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   renderTemplate(event: Event): void {
     this._info(() => {
       let message = `  Rendered ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
@@ -110,7 +109,6 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_template", "debug");
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   renderPartial(event: Event): void {
     this._debug(() => {
       let message = `  Rendered ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
@@ -129,7 +127,6 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_partial", "debug");
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   renderLayout(event: Event): void {
     this._info(() => {
       let message = `  Rendered layout ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
@@ -142,7 +139,6 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_layout", "info");
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   renderCollection(event: Event): void {
     const identifier =
       event.payload["identifier"] != null && event.payload["identifier"] !== false

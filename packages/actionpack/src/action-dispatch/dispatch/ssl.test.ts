@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SSL, type SSLOptions } from "../middleware/ssl.js";
+import type { Request } from "../http/request.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 
@@ -28,7 +29,7 @@ function makeEnv(url: string, method = "GET", extra: Record<string, string> = {}
 describe("RedirectSSLTest", () => {
   it("exclude can avoid redirect", async () => {
     const excluding = {
-      exclude: (env: RackEnv) => /healthcheck/.test(env["PATH_INFO"] as string),
+      exclude: (request: Request) => /healthcheck/.test(request.path),
     };
     const app = buildApp({}, { redirect: excluding });
 
@@ -273,7 +274,7 @@ describe("SecureCookiesTest", () => {
 
   it("cookies as not secure with exclude", async () => {
     const excluding = {
-      exclude: (env: RackEnv) => /example/.test(env["HTTP_HOST"] as string),
+      exclude: (request: Request) => /example/.test(request.domain() ?? ""),
     };
     const [status, headers] = await get({ "set-cookie": DEFAULT_COOKIES }, { redirect: excluding });
     assertCookies(headers["set-cookie"], "id=1; path=/", "token=abc; path=/; secure; HttpOnly");

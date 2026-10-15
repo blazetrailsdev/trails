@@ -2,16 +2,24 @@ import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
+  TopLevel,
 } from "@blazetrails/activesupport";
+import { rbObjAsString, round } from "@blazetrails/ruby-compat";
 
 export class LogSubscriber extends BaseLogSubscriber {
   redirect(event: Event): void {
-    const payload = event.payload as { location?: string; status?: number };
-    this._info(`Redirected to ${payload.location ?? ""}`);
+    const payload = event.payload;
 
-    const status = payload.status ?? 302;
-    const statusText = HTTP_STATUS_CODES[status] ?? "";
-    this._info(`Completed ${status} ${statusText} in ${Math.round(event.duration)}ms`);
+    this._info(() => `Redirected to ${rbObjAsString(payload.location)}`);
+
+    this._info(() => {
+      const status = payload.status as number;
+
+      let message = `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status])} in ${round(event.duration)}ms`;
+      if (TopLevel.Trails !== undefined && TopLevel.Trails.env["development?"]()) message += "\n\n";
+
+      return message;
+    });
   }
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { BacktraceCleaner } from "@blazetrails/activesupport";
+import { BacktraceCleaner, TopLevel } from "@blazetrails/activesupport";
 import {
   Base,
   MissingTemplate,
@@ -118,5 +118,19 @@ describe("ExceptionWrapper#clean_backtrace", () => {
     const wrapper = new ExceptionWrapper(new BacktraceCleaner().removeFilters(), error);
     expect(wrapper.fullTrace[0]).toBe(wrapper.backtrace[0]);
     expect(wrapper.traces["Full Trace"][0].trace).toBe("at index (/app/lib/file.js:42:7)");
+  });
+});
+
+describe("ExceptionWrapper#sourceFragment", () => {
+  it("reads an absolute backtrace path as is, ignoring Rails.root", () => {
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => "/nonexistent-root" } as unknown as typeof trails;
+    try {
+      const wrapper = new ExceptionWrapper(null, new Error("boom"));
+      const fragment = wrapper.sourceFragment(new URL(import.meta.url).pathname, 1);
+      expect(fragment?.[1]).toBe('import { afterEach, describe, expect, it } from "vitest";\n');
+    } finally {
+      TopLevel.Trails = trails;
+    }
   });
 });

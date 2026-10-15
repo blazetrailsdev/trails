@@ -583,6 +583,31 @@ export function deleteAt<T>(ary: T[], pos: number): T | null {
 }
 
 /**
+ * Ruby `Array#insert` (`vendor/ruby/v3.3.11/array.c:2454` `rb_ary_insert`): inserts,
+ * in place, `objects` before the element at `pos` and answers the array. `-1`
+ * appends, any other negative `pos` inserts after the element it counts back
+ * to, and a `pos` past the end pads with `nil` (`rb_ary_splice`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function insert<T>(ary: (T | null)[], pos: number, ...objects: T[]): (T | null)[] {
+  pos = num2long(pos);
+  if (objects.length === 0) return ary;
+  if (pos === -1) {
+    pos = ary.length;
+  } else if (pos < 0) {
+    const minpos = -ary.length - 1;
+    if (pos < minpos) {
+      throw new IndexError(`index ${pos} too small for array; minimum: ${minpos}`);
+    }
+    pos++;
+  }
+  while (ary.length < pos) ary.push(null);
+  ary.splice(pos, 0, ...objects);
+  return ary;
+}
+
+/**
  * Ruby `Array#pop(n)` (`vendor/ruby/v3.3.11/array.c:1437` `rb_ary_pop_m`): removes, in
  * place, the last `n` elements and answers them in order. `n` past the length
  * takes them all, and a negative `n` raises (`ary_take_first_or_last_n`,

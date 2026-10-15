@@ -58,6 +58,7 @@ export { Response, ResponseRaw, Helpers as ResponseHelpers } from "./response.js
 export {
   CONTENT_TYPE,
   CONTENT_LENGTH,
+  SET_COOKIE,
   RACK_ERRORS,
   RACK_SESSION,
   RACK_SESSION_OPTIONS,

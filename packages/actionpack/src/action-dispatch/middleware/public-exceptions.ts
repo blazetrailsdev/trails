@@ -1,5 +1,5 @@
 import { I18n } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { fetch, File } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
@@ -40,7 +40,7 @@ export class PublicExceptions {
 
     const body: ErrorBody = {
       status,
-      error: HTTP_STATUS_CODES[status] ?? HTTP_STATUS_CODES[500],
+      error: fetch<string>(HTTP_STATUS_CODES, String(status), HTTP_STATUS_CODES[500]),
     };
 
     return this.render(status, contentType, body);
@@ -57,7 +57,7 @@ export class PublicExceptions {
     return this.renderHtml(status);
   }
 
-  private renderFormat(status: number, contentType: MimeType, body: string): RackResponse {
+  private renderFormat(status: number, contentType: MimeType | string, body: string): RackResponse {
     const encoded = Buffer.from(body, "utf-8");
     return [
       status,
@@ -83,9 +83,7 @@ export class PublicExceptions {
     }
 
     if (found && file != null) {
-      const html = File.read(file);
-      const htmlType = MimeType.lookupByExtension("html") ?? MimeType.lookup("text/html");
-      return this.renderFormat(status, htmlType, html);
+      return this.renderFormat(status, "text/html", File.read(file));
     }
     return [404, { [X_CASCADE]: "pass" }, emptyBody()];
   }

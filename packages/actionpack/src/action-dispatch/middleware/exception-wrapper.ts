@@ -1,6 +1,17 @@
-import { excBacktraceLocations, File, type Location } from "@blazetrails/ruby-compat";
+import {
+  excBacktraceLocations,
+  File,
+  Pathname,
+  rbObjRespondTo,
+  type Location,
+} from "@blazetrails/ruby-compat";
 
-import { ActionableError, cattrAccessor, type BacktraceCleaner } from "@blazetrails/activesupport";
+import {
+  ActionableError,
+  cattrAccessor,
+  TopLevel,
+  type BacktraceCleaner,
+} from "@blazetrails/activesupport";
 import { statusCode } from "@blazetrails/rack";
 import { PathRegistry, type Spot, type Template } from "@blazetrails/actionview";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
@@ -409,22 +420,19 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall open — CONVERGEABLE source-fragment-resolves-against-cwd-not-rails-root
-   */
+  /** @internal */
   sourceFragment(
     path: string,
     line: number,
   ): Record<number, string | [string, string, string]> | null {
-    const full = File.expandPath(path);
-    if (!File.isExist(full)) return null;
-    try {
-      const lines = File.read(full).split(/\r?\n/);
-      return this.extractSourceFragmentLines(lines, line);
-    } catch {
-      return null;
+    if (!(rbObjRespondTo(TopLevel.Trails, "root") && TopLevel.Trails!.root() != null)) return null;
+    const fullPath = new Pathname(TopLevel.Trails!.root()!).join(path).toString();
+    if (File.isExist(fullPath)) {
+      return File.open(fullPath, "r", (file) =>
+        this.extractSourceFragmentLines(file.read().split(/(?<=\n)/), line),
+      );
     }
+    return null;
   }
 
   /** @internal */

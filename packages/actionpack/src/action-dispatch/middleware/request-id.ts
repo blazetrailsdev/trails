@@ -1,5 +1,6 @@
 import { SecureRandom, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { Request } from "../http/request.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -10,21 +11,21 @@ export interface RequestIdOptions {
 export class RequestId {
   private app: RackApp;
   private header: string;
+  private envHeader: string;
 
   constructor(app: RackApp, options: RequestIdOptions = {}) {
     this.app = app;
     this.header = options.header ?? "X-Request-Id";
+    this.envHeader = `HTTP_${this.header.toUpperCase().replaceAll("-", "_")}`;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const headerKey = `HTTP_${this.header.toUpperCase().replace(/-/g, "_")}`;
-    const requestId = this.makeRequestId(env[headerKey] as string | undefined);
-    env["action_dispatch.request_id"] = requestId;
-
+    const req = new Request(env);
+    req.requestId = this.makeRequestId(req.getHeader(this.envHeader) as string | undefined);
     const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
       typeof this.app
     >);
-    headers[this.header.toLowerCase()] = requestId;
+    headers[this.header.toLowerCase()] = req.requestId!;
     return [status, headers, body];
   }
 

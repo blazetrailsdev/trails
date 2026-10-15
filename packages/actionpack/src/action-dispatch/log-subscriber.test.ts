@@ -4,8 +4,8 @@ import { LogSubscriber } from "./log-subscriber.js";
 
 class CaptureLogger {
   messages: string[] = [];
-  info(msg: string): void {
-    this.messages.push(msg);
+  info(msg: string | (() => string)): void {
+    this.messages.push(typeof msg === "function" ? msg() : msg);
   }
 }
 
@@ -30,11 +30,6 @@ describe("ActionDispatch::LogSubscriber#redirect", () => {
   it("emits Redirected-to and Completed-status lines", () => {
     subscriber.redirect(makeEvent({ location: "/posts", status: 302 }, 12));
     expect(logger.messages).toEqual(["Redirected to /posts", "Completed 302 Found in 12ms"]);
-  });
-
-  it("defaults status to 302 Found when missing", () => {
-    subscriber.redirect(makeEvent({ location: "/x" }, 8));
-    expect(logger.messages[1]).toBe("Completed 302 Found in 8ms");
   });
 
   it("handles permanent redirect (301)", () => {

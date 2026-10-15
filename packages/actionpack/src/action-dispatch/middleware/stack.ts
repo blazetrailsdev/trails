@@ -1,4 +1,4 @@
-import { rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
+import { deleteAt, insert, rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -162,10 +162,10 @@ export class MiddlewareStack implements Iterable<Middleware> {
 
   move(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
     const sourceIndex = this.assertIndex(source, "before");
-    const [sourceMiddleware] = this.entries.splice(sourceIndex, 1);
+    const sourceMiddleware = deleteAt(this.middlewares, sourceIndex)!;
 
     const targetIndex = this.assertIndex(target, "before");
-    this.entries.splice(targetIndex, 0, sourceMiddleware);
+    insert(this.middlewares, targetIndex, sourceMiddleware);
   }
 
   moveBefore(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
@@ -174,10 +174,10 @@ export class MiddlewareStack implements Iterable<Middleware> {
 
   moveAfter(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
     const sourceIndex = this.assertIndex(source, "after");
-    const [sourceMiddleware] = this.entries.splice(sourceIndex, 1);
+    const sourceMiddleware = deleteAt(this.middlewares, sourceIndex)!;
 
     const targetIndex = this.assertIndex(target, "after");
-    this.entries.splice(targetIndex + 1, 0, sourceMiddleware);
+    insert(this.middlewares, targetIndex + 1, sourceMiddleware);
   }
 
   use(klass: MiddlewareFactory, ...args: unknown[]): void {
