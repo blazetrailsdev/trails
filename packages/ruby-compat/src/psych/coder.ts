@@ -84,6 +84,18 @@ export class Coder {
   }
 
   /**
+   * `Psych::Coder#map=` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:73-76`). The
+   * map's pairs are the coder's own string-keyed properties, so `@map = map` replaces them.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  setMap(map: Record<string, unknown>): void {
+    this[coderType] = ":map";
+    for (const k of Object.keys(this)) delete this[k];
+    Object.assign(this, map);
+  }
+
+  /**
    * `Psych::Coder#seq=` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:91-94`).
    *
    * @noRailsEquivalent PERMANENT

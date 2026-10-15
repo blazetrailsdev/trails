@@ -10,6 +10,7 @@ import {
   lessThanOrEqual,
   NoMethodError,
   PROTOCOL_PROBES,
+  rbModConstSet,
   rbObjClassname,
   rubyClass,
 } from "@blazetrails/ruby-compat";
@@ -18,6 +19,8 @@ import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
 import { DateTime, Temporal } from "@blazetrails/date";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { ActiveSupport } from "./namespaces.js";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
 import {
@@ -555,6 +558,18 @@ export class TimeWithZone {
     return this.asJson();
   }
 
+  initWith(coder: YAML.Coder): void {
+    this.initialize(
+      coder["utc"] as TimeLike | null,
+      coder["zone"] as TimeZone | Timezone,
+      coder["time"] as TimeLike | null,
+    );
+  }
+
+  encodeWith(coder: YAML.Coder): void {
+    coder.setMap({ utc: this.utc(), zone: this.timeZone, time: this.time });
+  }
+
   plus(other: number | Duration | TimeWithZone | Time): TimeWithZone {
     if (this.durationOfVariableLength(other)) {
       return this.methodMissing("plus", other) as TimeWithZone;
@@ -926,3 +941,7 @@ rbDefineAllocFunc(
   TimeWithZone,
   (klass) => new Proxy(Object.create(klass.prototype) as TimeWithZone, METHOD_MISSING_HANDLER),
 );
+
+YAML.loadTags["!ruby/object:ActiveSupport::TimeWithZone"] = "ActiveSupport::TimeWithZone";
+YAML.dumpTags.set(TimeWithZone, "!ruby/object:ActiveSupport::TimeWithZone");
+rbModConstSet(ActiveSupport, "TimeWithZone", TimeWithZone);

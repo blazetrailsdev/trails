@@ -22,7 +22,8 @@ import { toTime as dateToTime } from "./date/conversions.js";
 import { current } from "../time-ext.js";
 import "./time/calculations.js";
 import { setPreserveTimezone } from "./date-and-time/compatibility.js";
-import { Rational, rational, rbInspect } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbEqual, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { YAML, toYaml } from "@blazetrails/ruby-compat/yaml";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 import { assertNotCalled } from "../testing/method-call-assertions.js";
 import { toTimePreservesTimezone } from "../active-support.js";
@@ -322,6 +323,58 @@ describe("TimeWithZoneTest", () => {
   it("rfc3339 with fractional seconds", () => {
     const twz = maketwz().plus(0.125);
     expect(twz.rfc3339(3)).toBe("1999-12-31T19:00:00.125-05:00");
+  });
+
+  it("to yaml", async () => {
+    const yaml = `--- !ruby/object:ActiveSupport::TimeWithZone
+utc: 2000-01-01 00:00:00.000000000 Z
+zone: !ruby/object:ActiveSupport::TimeZone
+  name: America/New_York
+time: 1999-12-31 19:00:00.000000000 Z
+`;
+
+    await assertNotDeprecated(deprecator(), () => {
+      expect(toYaml(twz)).toBe(yaml);
+    });
+  });
+
+  it("ruby to yaml", async () => {
+    const yaml = `---
+twz: !ruby/object:ActiveSupport::TimeWithZone
+  utc: 2000-01-01 00:00:00.000000000 Z
+  zone: !ruby/object:ActiveSupport::TimeZone
+    name: America/New_York
+  time: 1999-12-31 19:00:00.000000000 Z
+`;
+
+    await assertNotDeprecated(deprecator(), () => {
+      expect(toYaml({ twz: twz })).toBe(yaml);
+    });
+  });
+
+  it("yaml load", () => {
+    const yaml = `--- !ruby/object:ActiveSupport::TimeWithZone
+utc: 2000-01-01 00:00:00.000000000 Z
+zone: !ruby/object:ActiveSupport::TimeZone
+  name: America/New_York
+time: 1999-12-31 19:00:00.000000000 Z
+`;
+
+    const loaded = rbObjRespondTo(YAML, "unsafeLoad") ? YAML.unsafeLoad(yaml) : YAML.load(yaml);
+    expect(rbEqual(twz, loaded)).toBe(true);
+  });
+
+  it("ruby yaml load", () => {
+    const yaml = `---
+twz: !ruby/object:ActiveSupport::TimeWithZone
+  utc: 2000-01-01 00:00:00.000000000 Z
+  zone: !ruby/object:ActiveSupport::TimeZone
+    name: America/New_York
+  time: 1999-12-31 19:00:00.000000000 Z
+`;
+
+    const loaded = rbObjRespondTo(YAML, "unsafeLoad") ? YAML.unsafeLoad(yaml) : YAML.load(yaml);
+    expect(rbEqual({ twz: twz }, loaded)).toBe(true);
   });
 
   it("httpdate", () => {
