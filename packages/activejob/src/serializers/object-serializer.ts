@@ -4,7 +4,8 @@ import {
   rbModName,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, Serializers } from "../namespaces.js";
+import { ActiveJob } from "../namespaces.js";
+import { Serializers } from "../serializers.js";
 
 export class ObjectSerializer {
   /** @noRailsEquivalent PERMANENT */
