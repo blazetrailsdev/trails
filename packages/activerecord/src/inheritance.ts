@@ -145,19 +145,10 @@ export const ClassMethods = new Module().include({
     (this as any)._abstractClass = value;
   },
 
-  isAbstractClass(this: { abstractClass: boolean }): boolean {
-    for (
-      let klass: any = this;
-      klass && klass !== ActiveRecord.Base;
-      klass = Object.getPrototypeOf(klass)
-    ) {
-      const field = Object.getOwnPropertyDescriptor(klass, "abstractClass");
-      if (field && "value" in field) {
-        delete klass.abstractClass;
-        klass.abstractClass = field.value;
-      }
-    }
-    return this.abstractClass === true;
+  isAbstractClass(this: object): boolean {
+    const field = Object.getOwnPropertyDescriptor(this, "abstractClass");
+    if (field && "value" in field) return field.value === true;
+    return Object.hasOwn(this, "_abstractClass") && (this as any)._abstractClass === true;
   },
 });
 

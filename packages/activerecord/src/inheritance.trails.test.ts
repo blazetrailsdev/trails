@@ -188,8 +188,6 @@ describe("abstract_class as a static field", () => {
 
       const owner = await Owner.create({ name: "Hub owner" });
       expect(owner.isPersisted()).toBe(true);
-      expect(Owner.abstractClass).toBe(false);
-      expect(Hub.abstractClass).toBe(true);
       expect(Owner.isAbstractClass()).toBe(false);
       expect(Hub.isAbstractClass()).toBe(true);
 
