@@ -113,9 +113,9 @@ export abstract class Store {
   }
 
   static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {
-    let poolOptions: unknown;
+    let poolOptions: StoreOptions | boolean | null | undefined;
     if ("pool" in options) {
-      poolOptions = options["pool"];
+      poolOptions = options["pool"] as StoreOptions | boolean | null | undefined;
       delete options["pool"];
     } else {
       poolOptions = true;
@@ -126,16 +126,14 @@ export abstract class Store {
     } else if (poolOptions === true) {
       poolOptions = DEFAULT_POOL_OPTIONS;
     } else if (typeof poolOptions === "object" && !Array.isArray(poolOptions)) {
-      const hash = poolOptions as StoreOptions;
-      if ("size" in hash) hash["size"] = kernelInteger(hash["size"]);
-      if ("timeout" in hash) hash["timeout"] = kernelFloat(hash["timeout"]);
-      poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
+      if ("size" in poolOptions) poolOptions["size"] = kernelInteger(poolOptions["size"]);
+      if ("timeout" in poolOptions) poolOptions["timeout"] = kernelFloat(poolOptions["timeout"]);
+      poolOptions = { ...DEFAULT_POOL_OPTIONS, ...poolOptions };
     } else {
       throw new TypeError(`Invalid :pool argument, expected Hash, got: ${rbInspect(poolOptions)}`);
     }
 
-    const result = poolOptions as StoreOptions;
-    return Object.keys(result).length > 0 ? result : undefined;
+    return Object.keys(poolOptions).length > 0 ? poolOptions : undefined;
   }
 
   silence = false;
@@ -544,37 +542,37 @@ export abstract class Store {
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
     if (!callOptions) return this.options;
 
-    const call = Store.normalizeOptions({ ...callOptions });
+    callOptions = Store.normalizeOptions({ ...callOptions });
 
-    if (call.expiresIn != null && call.expiresAt != null) {
+    if (callOptions.expiresIn != null && callOptions.expiresAt != null) {
       throw new ArgumentError("Either :expires_in or :expires_at can be supplied, but not both");
     }
 
-    const expiresAt = call.expiresAt as number | undefined;
+    const expiresAt = callOptions.expiresAt as number | undefined;
     if (expiresAt != null) {
-      call.expiresIn = (expiresAt - Time.now().toF() * 1000) / 1000;
-      delete call.expiresAt;
+      callOptions.expiresIn = (expiresAt - Time.now().toF() * 1000) / 1000;
+      delete callOptions.expiresAt;
     }
 
     // boundary: mirrors cache.rb:871–874 — raises when expires_in is accidentally a Time/Date object.
-    if (call.expiresIn instanceof Date) {
+    if (callOptions.expiresIn instanceof Date) {
       throw new ArgumentError(
-        `expires_in parameter should not be a Date. Did you mean to use expiresAt? Got: ${call.expiresIn}`,
+        `expires_in parameter should not be a Date. Did you mean to use expiresAt? Got: ${callOptions.expiresIn}`,
       );
     }
 
-    if (call.expiresIn != null && (call.expiresIn as number) < 0) {
-      const expiresIn = call.expiresIn;
-      delete call.expiresIn;
+    if (callOptions.expiresIn != null && (callOptions.expiresIn as number) < 0) {
+      const expiresIn = callOptions.expiresIn;
+      delete callOptions.expiresIn;
       this.handleInvalidExpiresIn(
         `Cache expiration time is invalid, cannot be negative: ${expiresIn}`,
       );
     }
 
     if (isEmpty(this.options)) {
-      return call;
+      return callOptions;
     } else {
-      return { ...this.options, ...call };
+      return { ...this.options, ...callOptions };
     }
   }
 

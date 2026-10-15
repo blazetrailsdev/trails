@@ -1100,7 +1100,7 @@ export class RouteSet {
     methodName: string | null = null,
     reserved: readonly string[] = RESERVED_OPTIONS,
   ): string {
-    options = { ...this.defaultUrlOptions, ...options } as Record<string, unknown>;
+    options = merge(this.defaultUrlOptions, options) as Record<string, unknown>;
 
     let user: unknown = null;
     let password: unknown = null;
