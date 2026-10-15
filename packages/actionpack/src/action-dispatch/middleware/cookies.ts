@@ -90,7 +90,7 @@ export interface CookieResponse {
 }
 
 export class ChainedCookieJars {
-  declare request: RequestCookieMethodsHost;
+  declare protected request: RequestCookieMethodsHost;
   declare _permanent?: PermanentCookieJar;
   declare _signed?: SignedKeyRotatingCookieJar;
   declare _encrypted?: EncryptedKeyRotatingCookieJar;
@@ -210,22 +210,6 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 
   declare hasKey: CookieJar["isKey"];
-
-  get keys(): string[] {
-    return [...this._cookies.keys()];
-  }
-
-  get values(): string[] {
-    return [...this._cookies.values()];
-  }
-
-  get size(): number {
-    return this._cookies.size;
-  }
-
-  get empty(): boolean {
-    return this._cookies.size === 0;
-  }
 
   toHash(): Record<string, string> {
     const result: Record<string, string> = {};
@@ -664,26 +648,26 @@ export interface RequestCookieMethodsHost {
   env: RackEnv;
   getHeader(name: string): any;
   hasHeader(name: string): boolean;
+  fetchHeader(name: string, block: (name: string) => unknown): unknown;
+  setHeader(name: string, value: unknown): unknown;
   cookies: Record<string, string>;
   cookiesSameSiteProtection?(): unknown;
 }
 
-const COOKIE_JAR_ENV = COOKIES_KEY;
-
-export function cookieJar(this: RequestCookieMethodsHost, jar?: CookieJar): CookieJar {
-  if (jar !== undefined) {
-    this.env[COOKIE_JAR_ENV] = jar;
+export function cookieJar(this: RequestCookieMethodsHost): CookieJar {
+  return this.fetchHeader("action_dispatch.cookies", () => {
+    const jar = CookieJar.build(this, this.cookies);
+    setCookieJar.call(this, jar);
     return jar;
-  }
-  const existing = this.env[COOKIE_JAR_ENV] as CookieJar | undefined;
-  if (existing) return existing;
-  const built = CookieJar.build(this, this.cookies);
-  this.env[COOKIE_JAR_ENV] = built;
-  return built;
+  }) as CookieJar;
 }
 
 export function isHaveCookieJar(this: RequestCookieMethodsHost): boolean {
   return this.hasHeader("action_dispatch.cookies");
+}
+
+export function setCookieJar(this: RequestCookieMethodsHost, jar: CookieJar): void {
+  this.setHeader("action_dispatch.cookies", jar);
 }
 
 const requestEnvAccessor = <T>(key: string) =>
@@ -742,6 +726,7 @@ export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
 export const RequestCookieMethods = {
   cookieJar,
   isHaveCookieJar,
+  setCookieJar,
   keyGenerator,
   signedCookieSalt,
   encryptedCookieSalt,

@@ -1,5 +1,15 @@
 import type { RackApp, RackEnv } from "@blazetrails/rack";
-import { Enumerable, include, rbObjDup } from "@blazetrails/ruby-compat";
+import { exceptBang, isPlainObject, stringifyKeys } from "@blazetrails/activesupport";
+import {
+  Enumerable,
+  Set,
+  except,
+  hashReplace,
+  include,
+  rbDeclareIvar,
+  rbObjDup,
+  rbObjIvarGet,
+} from "@blazetrails/ruby-compat";
 
 /** @internal */
 export const KEY = "action_dispatch.request.flash_hash";
@@ -49,7 +59,7 @@ export function commitFlash(this: FlashRequestHost): void {
   const hash = this.flashHash();
   if (hash && (!hash.isEmpty() || session.isKey("flash"))) {
     session.set("flash", hash.toSessionValue());
-    this.env[KEY] = hash.dup();
+    this.env[KEY] = rbObjDup(hash);
   }
 
   if (session.isLoaded()) {
@@ -94,71 +104,145 @@ export class FlashNow {
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (`actionpack/lib/action_dispatch/middleware/flash.rb:120`); the class/interface merge is how a mixin surfaces on the type side. */
 export class FlashHash {
-  private _flashes: Map<string, unknown> = new Map();
   private _discard: Set<string>;
-  private _keep: Set<string> = new Set();
-  private _now: FlashNow | null = null;
+  private _flashes: Record<string, unknown>;
+  private _now: FlashNow | null;
 
-  constructor(flashes: Record<string, unknown> = {}, discard: readonly string[] = []) {
-    this._discard = new Set(discard);
-    for (const [k, v] of Object.entries(flashes)) {
-      this._flashes.set(k, v);
+  /** @internal */
+  static fromSessionValue(value: unknown): FlashHash {
+    let flashes: Record<string, unknown>;
+    let discard: unknown;
+    if (value instanceof FlashHash) {
+      flashes = rbObjIvarGet(value, "@flashes") as Record<string, unknown>;
+      if ((discard = rbObjIvarGet(value, "@used")) != null) {
+        exceptBang(flashes, ...(discard as Iterable<string>));
+      }
+      return new this(flashes, Object.keys(flashes));
+    } else if (isPlainObject(value)) {
+      flashes = (value as Record<string, unknown>)["flashes"] as Record<string, unknown>;
+      if ((discard = (value as Record<string, unknown>)["discard"]) != null) {
+        exceptBang(flashes, ...(discard as string[]));
+      }
+      return new this(flashes, Object.keys(flashes));
+    } else {
+      return new this();
     }
   }
 
-  get(key: string): unknown {
-    return this._flashes.get(key);
+  /** @internal */
+  toSessionValue(): { discard: string[]; flashes: Record<string, unknown> } | null {
+    const flashesToKeep = except(this._flashes, ...this._discard);
+    if (Object.keys(flashesToKeep).length === 0) return null;
+    return { discard: [], flashes: flashesToKeep };
   }
 
-  set(key: string, value: unknown): void {
-    this._discard.delete(key);
-    this._flashes.set(key, value);
+  /** @internal */
+  constructor(flashes: Record<string, unknown> = {}, discard: readonly string[] = []) {
+    this._discard = new Set(this.stringifyArray(discard));
+    this._flashes = stringifyKeys(flashes);
+    this._now = null;
   }
 
-  has(key: string): boolean {
-    return this._flashes.has(key);
+  initializeCopy(other: FlashHash): void {
+    if (other.isNowIsLoaded()) {
+      this._now = rbObjDup(other.now);
+      this._now.flash = this;
+    }
   }
 
-  delete(key: string): unknown {
-    const val = this._flashes.get(key);
-    this._flashes.delete(key);
-    return val;
+  set(k: string, v: unknown): unknown {
+    k = String(k);
+    this._discard.delete(k);
+    return (this._flashes[k] = v);
+  }
+
+  get(k: string): unknown {
+    return this._flashes[String(k)];
+  }
+
+  /** @internal */
+  update(h: Record<string, unknown>): this {
+    this._discard.subtract(this.stringifyArray(Object.keys(h)));
+    Object.assign(this._flashes, stringifyKeys(h));
+    return this;
   }
 
   get keys(): string[] {
-    return [...this._flashes.keys()];
+    return Object.keys(this._flashes);
   }
 
-  isEmpty(): boolean {
-    return this._flashes.size === 0;
+  isKey(name: string): boolean {
+    return Object.hasOwn(this._flashes, String(name));
   }
 
-  each(block: (pair: [string, unknown]) => void): void {
-    for (const [k, v] of this._flashes) block([k, v]);
+  delete(key: string): this {
+    key = String(key);
+    this._discard.delete(key);
+    delete this._flashes[key];
+    return this;
   }
 
   toHash(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of this._flashes) result[k] = v;
-    return result;
+    return { ...this._flashes };
+  }
+
+  isEmpty(): boolean {
+    return Object.keys(this._flashes).length === 0;
+  }
+
+  clear(): void {
+    this._discard.clear();
+    for (const k of Object.keys(this._flashes)) delete this._flashes[k];
+  }
+
+  each(block: (pair: [string, unknown]) => void): this {
+    for (const pair of Object.entries(this._flashes)) block(pair);
+    return this;
+  }
+
+  declare mergeBang: FlashHash["update"];
+
+  /** @internal */
+  replace(h: Record<string, unknown>): this {
+    this._discard.clear();
+    hashReplace(this._flashes, stringifyKeys(h));
+    return this;
+  }
+
+  get now(): FlashNow {
+    return (this._now ??= new FlashNow(this));
+  }
+
+  keep(k?: string | null): unknown {
+    if (k != null) k = String(k);
+    this._discard.subtract(k != null ? [k] : this.keys);
+    return k != null ? this.get(k) : this;
+  }
+
+  discard(k?: string | null): unknown {
+    if (k != null) k = String(k);
+    this._discard.merge(k != null ? [k] : this.keys);
+    return k != null ? this.get(k) : this;
+  }
+
+  /** @internal */
+  sweep(): void {
+    for (const k of this._discard) delete this._flashes[k];
+    this._discard.replace(this.keys);
   }
 
   get alert(): unknown {
     return this.get("alert");
   }
-  set alert(value: unknown) {
-    this.set("alert", value);
+  set alert(message: unknown) {
+    this.set("alert", message);
   }
 
   get notice(): unknown {
     return this.get("notice");
   }
-  set notice(value: unknown) {
-    this.set("notice", value);
-  }
-
-  get now(): FlashNow {
-    return (this._now ??= new FlashNow(this));
+  set notice(message: unknown) {
+    this.set("notice", message);
   }
 
   /** @internal */
@@ -166,106 +250,9 @@ export class FlashHash {
     return this._now != null;
   }
 
-  keep(k?: string): Record<string, unknown> {
-    if (k) {
-      this._keep.add(k);
-      this._discard.delete(k);
-    } else {
-      for (const k of this._flashes.keys()) {
-        this._keep.add(k);
-        this._discard.delete(k);
-      }
-    }
-    return this.toHash();
-  }
-
-  discard(k?: string): Record<string, unknown> {
-    if (k) {
-      this._discard.add(k);
-      this._keep.delete(k);
-    } else {
-      for (const k of this._flashes.keys()) {
-        this._discard.add(k);
-      }
-    }
-    return this.toHash();
-  }
-
-  sweep(): void {
-    for (const k of this._discard) {
-      if (!this._keep.has(k)) {
-        this._flashes.delete(k);
-      }
-    }
-    this._discard.clear();
-    this._keep.clear();
-
-    for (const k of this._flashes.keys()) {
-      this._discard.add(k);
-    }
-  }
-
-  clear(): void {
-    this._flashes.clear();
-    this._discard.clear();
-    this._keep.clear();
-  }
-
-  replace(h: Record<string, unknown>): void {
-    this._flashes.clear();
-    for (const [k, v] of Object.entries(h)) {
-      this._flashes.set(k, v);
-    }
-  }
-
-  update(h: Record<string, unknown>): void {
-    for (const [k, v] of Object.entries(h)) {
-      this.set(k, v);
-    }
-  }
-
   /** @internal */
-  toSessionValue(): { discard: string[]; flashes: Record<string, unknown> } | null {
-    const flashesToKeep: Record<string, unknown> = {};
-    for (const [k, v] of this._flashes) {
-      if (!this._discard.has(k)) flashesToKeep[k] = v;
-    }
-    if (Object.keys(flashesToKeep).length === 0) return null;
-    return { discard: [], flashes: flashesToKeep };
-  }
-
-  dup(): FlashHash {
-    const copy = new FlashHash();
-    if (this.isNowIsLoaded()) {
-      copy._now = rbObjDup(this.now);
-      copy._now.flash = copy;
-    }
-    for (const [k, v] of this._flashes) copy._flashes.set(k, v);
-    for (const k of this._discard) copy._discard.add(k);
-    for (const k of this._keep) copy._keep.add(k);
-    return copy;
-  }
-
-  static fromSessionValue(value: unknown): FlashHash {
-    if (value === null || value === undefined) return new FlashHash();
-    if (value instanceof FlashHash) return value.dup();
-    if (typeof value !== "object") return new FlashHash();
-    const obj = value as Record<string, unknown>;
-    const flashesRaw = obj["flashes"];
-    const flashes = (flashesRaw && typeof flashesRaw === "object" ? flashesRaw : obj) as Record<
-      string,
-      unknown
-    >;
-    const discardRaw = obj["discard"];
-    const discard = Array.isArray(discardRaw) ? (discardRaw as string[]) : [];
-    const discardSet = new Set(discard);
-    const out = new FlashHash();
-    for (const [k, v] of Object.entries(flashes)) {
-      if (discardSet.has(k)) continue;
-      out._flashes.set(k, v);
-      out._discard.add(k);
-    }
-    return out;
+  private stringifyArray<T>(array: readonly T[]): T[] {
+    return array.map((item) => item);
   }
 }
 
@@ -274,9 +261,18 @@ export interface FlashHash {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
+FlashHash.prototype.mergeBang = FlashHash.prototype.update;
+rbDeclareIvar(FlashHash, "@flashes", "_flashes");
+rbDeclareIvar(FlashHash, "@discard", "_discard");
+rbDeclareIvar(FlashHash, "@now", "_now");
 include(FlashHash, Enumerable);
 
 export class Flash {
+  static readonly KEY = KEY;
+  static readonly RequestMethods = RequestMethods;
+  static readonly FlashNow = FlashNow;
+  static readonly FlashHash = FlashHash;
+
   constructor(app: RackApp) {
     return app as unknown as Flash;
   }

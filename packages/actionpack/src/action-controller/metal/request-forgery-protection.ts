@@ -22,7 +22,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   CookieJar,
-  cookieJar,
+  setCookieJar,
   type RequestCookieMethodsHost,
 } from "../../action-dispatch/middleware/cookies.js";
 import { SessionHash } from "@blazetrails/rack-session";
@@ -99,7 +99,7 @@ export class NullSession implements ProtectionMethods {
     request.session = new NullSessionHash(request);
     request.flash = null;
     request.sessionOptions = { skip: true };
-    cookieJar.call(request, NullCookieJar.build(request, {}));
+    setCookieJar.call(request, NullCookieJar.build(request, {}));
   }
 }
 

@@ -44,6 +44,9 @@ function cookieRequest(env: Record<string, unknown> = {}): RequestCookieMethodsH
     env: e,
     getHeader: (name: string) => e[name],
     hasHeader: (name: string) => Object.hasOwn(e, name),
+    fetchHeader: (name: string, block: (name: string) => unknown) =>
+      Object.hasOwn(e, name) ? e[name] : block(name),
+    setHeader: (name: string, value: unknown) => (e[name] = value),
     cookies: {},
   };
 }
@@ -108,11 +111,13 @@ describe("CookieJarTest", () => {
   });
 
   it("key methods", () => {
-    const jar = CookieJar.build(cookieRequest(), { foo: "bar" });
+    const jar = new CookieJar(cookieRequest());
+    expect(jar.isKey("foo")).toBe(false);
+    expect(jar.hasKey("foo")).toBe(false);
+
+    jar.set("foo", "bar");
     expect(jar.isKey("foo")).toBe(true);
-    expect(jar.isKey("baz")).toBe(false);
-    expect(jar.keys).toEqual(["foo"]);
-    expect(jar.values).toEqual(["bar"]);
+    expect(jar.hasKey("foo")).toBe(true);
   });
 
   it("write doesnt set a nil header", () => {
@@ -173,14 +178,14 @@ describe("CookiesTest", () => {
     const jar = new CookieJar(cookieRequest());
     jar.set("user_name", "david");
     jar.set("user_name", "david");
-    expect(jar.size).toBe(1);
+    expect([...jar].length).toBe(1);
   });
 
   it("setting the same value to permanent cookie", () => {
     const jar = new CookieJar(cookieRequest());
     jar.permanent.set("user_name", "david");
     jar.permanent.set("user_name", "david");
-    expect(jar.size).toBe(1);
+    expect([...jar].length).toBe(1);
   });
 
   it("setting cookie for fourteen days", () => {

@@ -77,15 +77,15 @@ export class Set<T> extends JsSet<T> {
    * `Set#do_with_enum` (`vendor/ruby/v3.3.11/lib/set.rb:272`). A JS iterable
    * answers `each` through its iterator.
    */
-  private doWithEnum<E>(enumerable: Iterable<E>, block: (o: E) => void): void {
+  private doWithEnum<E>(enumerable: Iterable<E>, block?: (o: E) => void): void {
     if (typeof (enumerable as Partial<EachEntry<E>> | null)?.eachEntry === "function") {
-      (enumerable as unknown as EachEntry<E>).eachEntry(block);
+      if (block) (enumerable as unknown as EachEntry<E>).eachEntry(block);
     } else if (typeof (enumerable as Partial<Each<E>> | null)?.each === "function") {
-      (enumerable as unknown as Each<E>).each(block);
+      if (block) (enumerable as unknown as Each<E>).each(block);
     } else if (
       typeof (enumerable as Partial<Iterable<E>> | null)?.[Symbol.iterator] === "function"
     ) {
-      for (const o of enumerable) block(o);
+      if (block) for (const o of enumerable) block(o);
     } else {
       throw new ArgumentError("value must be enumerable");
     }
@@ -113,6 +113,21 @@ export class Set<T> extends JsSet<T> {
    */
   override clear(): void {
     this._hash.clear();
+  }
+
+  /**
+   * `Set#replace` (`vendor/ruby/v3.3.11/lib/set.rb:327`).
+   * @noRailsEquivalent PERMANENT
+   */
+  replace(enumerable: Iterable<T>): this {
+    if (rbObjClass(enumerable) === rbObjClass(this)) {
+      this._hash.replace((enumerable as Set<T>)._hash);
+      return this;
+    } else {
+      this.doWithEnum(enumerable);
+      this.clear();
+      return this.merge(enumerable);
+    }
   }
 
   /**

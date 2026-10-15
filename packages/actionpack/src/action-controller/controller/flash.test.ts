@@ -115,11 +115,27 @@ describe("FlashTest", () => {
   });
 
   it("keep and discard return values", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    const kept = flash.keep();
-    expect(kept).toEqual({ a: "1", b: "2" });
-    const discarded = flash.discard("a");
-    expect(discarded).toEqual({ a: "1", b: "2" });
+    const flash = new FlashHash();
+    flash.update({ foo: "foo_indeed", bar: "bar_indeed" });
+
+    expect(flash.discard("foo")).toBe("foo_indeed");
+    assertNil(flash.discard("unknown"));
+    expect((flash.discard() as FlashHash).toHash()).toEqual({
+      foo: "foo_indeed",
+      bar: "bar_indeed",
+    });
+    expect((flash.discard(null) as FlashHash).toHash()).toEqual({
+      foo: "foo_indeed",
+      bar: "bar_indeed",
+    });
+
+    expect(flash.keep("foo")).toBe("foo_indeed");
+    assertNil(flash.keep("unknown"));
+    expect((flash.keep() as FlashHash).toHash()).toEqual({ foo: "foo_indeed", bar: "bar_indeed" });
+    expect((flash.keep(null) as FlashHash).toHash()).toEqual({
+      foo: "foo_indeed",
+      bar: "bar_indeed",
+    });
   });
 
   it("redirect to with alert", async () => {
