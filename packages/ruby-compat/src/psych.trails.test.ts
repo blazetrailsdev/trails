@@ -312,7 +312,7 @@ describe("Psych.load_file and Psych.unsafe_load_file", () => {
       File.write(yamlPath, "\uFEFFa: 1\n");
       File.write(emptyPath, "");
       expect(Psych.loadFile(yamlPath)).toEqual({ a: 1 });
-      expect(Psych.unsafeLoadFile(yamlPath)).toEqual({ a: 1 });
+      expect(Psych.unsafeLoadFile(yamlPath, { symbolizeNames: true })).toEqual({ ":a": 1 });
       expect(Psych.unsafeLoadFile(emptyPath)).toBe(false);
       expect(Psych.loadFile(emptyPath)).toBeNull();
     });

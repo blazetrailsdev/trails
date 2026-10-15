@@ -217,11 +217,17 @@ export namespace Psych {
    */
   export function unsafeLoad(
     yamlString: string | Uint8Array | IO,
-    { filename = null as string | null, fallback = false as unknown } = {},
+    {
+      filename = null as string | null,
+      fallback = false as unknown,
+      symbolizeNames = false,
+      freeze = false,
+      strictInteger = false,
+    } = {},
   ): unknown {
     const result = parse(yamlString, { filename });
     if (!result) return fallback;
-    return ToRuby.create().accept(result);
+    return ToRuby.create({ symbolizeNames, freeze, strictInteger }).accept(result);
   }
 
   /**
