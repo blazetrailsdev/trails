@@ -1,6 +1,7 @@
 import type * as Yaml from "yaml";
 import { NotImplementedError } from "../not-implemented-error.js";
 import { yaml as backend, type PsychIO } from "../psych-adapter.js";
+import { Mapping } from "./nodes/mapping.js";
 import { Scalar } from "./nodes/scalar.js";
 
 const yaml = backend as unknown as typeof Yaml;
@@ -307,7 +308,7 @@ export class Emitter {
   private start(node: Collection, anchor: string | null, tag: string | null, style: number): this {
     if (tag != null) node.tag = tag;
     if (anchor != null) node.anchor = anchor;
-    if (style === 2) node.flow = true;
+    if (style === Mapping.FLOW) node.flow = true;
     this.add(node);
     this.stack.push({ node });
     return this;
