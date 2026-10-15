@@ -1,4 +1,10 @@
-import { camelize, NameError, toSentence, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  NameError,
+  toSentence,
+  underscore,
+  type Logger,
+} from "@blazetrails/activesupport";
 import {
   EOFError,
   Encoding,
@@ -41,7 +47,6 @@ import {
   accepts as _accepts,
   contentMimeType as _contentMimeType,
   format as _format,
-  formats as _formats,
   formatFromPathExtension as _formatFromPathExtension,
   hasContentType as _hasContentType,
   MimeNegotiation as _MimeNegotiation,
@@ -51,7 +56,6 @@ import {
   shouldApplyVaryHeader as _shouldApplyVaryHeader,
   useAcceptHeader as _useAcceptHeader,
   validAcceptHeader as _validAcceptHeader,
-  variant as _variant,
 } from "./mime-negotiation.js";
 import {
   include,
@@ -84,7 +88,6 @@ import {
   paramsParsers as _paramsParsers,
   parseFormattedParameters as _parseFormattedParameters,
   parameters as _parameters,
-  pathParameters as _pathParameters,
   logParseErrorOnce as _logParseErrorOnce,
   type ParameterParser,
   type ParameterParsers,
@@ -302,18 +305,6 @@ export class Request {
     return _format.call(this);
   }
   declare setFormat: (extension: unknown) => void;
-  get formats(): MimeType[] {
-    return _formats.call(this);
-  }
-  set formats(extensions: unknown[]) {
-    Reflect.set(_MimeNegotiation.prototype, "formats", extensions, this);
-  }
-  get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
-    return _variant.call(this);
-  }
-  set variant(value: string | string[] | null | undefined) {
-    Reflect.set(_MimeNegotiation.prototype, "variant", value, this);
-  }
 
   declare static ignoreAcceptHeader: boolean;
   declare ignoreAcceptHeader: boolean;
@@ -385,14 +376,6 @@ export class Request {
 
   get requestParameters(): Record<string, unknown> {
     return this.POST();
-  }
-
-  get pathParameters(): Record<string, unknown> {
-    return _pathParameters.call(this);
-  }
-
-  set pathParameters(params: Record<string, unknown>) {
-    Reflect.set(_Parameters.prototype, "pathParameters", params, this);
   }
 
   static get parameterParsers(): ParameterParsers {
@@ -545,8 +528,8 @@ export class Request {
     return this.requestId;
   }
 
-  get logger(): unknown {
-    return this.getHeader("action_dispatch.logger");
+  get logger(): Logger | undefined {
+    return this.getHeader("action_dispatch.logger") as Logger | undefined;
   }
 
   isKey(key: string): boolean {
@@ -887,6 +870,12 @@ include(Request, FlashRequestMethods);
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {
   dup(): Request;
+  get formats(): MimeType[];
+  set formats(extensions: unknown[]);
+  get variant(): ArrayInquirer<string> & Record<string, () => boolean>;
+  set variant(value: string | string[] | null | undefined);
+  get pathParameters(): Record<string, unknown>;
+  set pathParameters(parameters: Record<string, unknown>);
 }
 Request.prototype.dup = RackRequest.prototype.dup as unknown as () => Request;
 

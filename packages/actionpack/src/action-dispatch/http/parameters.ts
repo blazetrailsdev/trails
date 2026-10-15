@@ -1,5 +1,5 @@
 import { Logger } from "@blazetrails/activesupport";
-import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
+import { EOFError, Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
 
 import { merge, type Hash } from "@blazetrails/ruby-compat";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
@@ -41,7 +41,7 @@ export interface ParametersHost {
   contentLength: number;
   contentMimeType: MimeType | null;
   rawPost: string;
-  logger?: unknown;
+  logger?: { debug(message: string): void } | null;
 }
 
 export class Parameters {
@@ -82,6 +82,10 @@ export class Parameters {
     return parameters.call(this as unknown as ParametersHost);
   }
 
+  get pathParameters(): Record<string, unknown> {
+    return pathParameters.call(this as unknown as ParametersHost);
+  }
+
   set pathParameters(parameters: Record<string, unknown>) {
     try {
       this.deleteHeader("action_dispatch.request.parameters");
@@ -108,7 +112,13 @@ export function parameters(this: ParametersHost): Record<string, unknown> {
   const cached = this.getHeader("action_dispatch.request.parameters");
   if (cached) return cached as Record<string, unknown>;
 
-  const params: Record<string, unknown> = merge(this.requestParameters, this.queryParameters);
+  let params: Record<string, unknown>;
+  try {
+    params = merge(this.requestParameters, this.queryParameters);
+  } catch (e) {
+    if (!(e instanceof EOFError)) throw e;
+    params = { ...this.queryParameters };
+  }
   Object.assign(params, pathParameters.call(this));
   this.setHeader("action_dispatch.request.parameters", params);
   return params;
@@ -149,7 +159,7 @@ export function logParseErrorOnce(this: ParametersHost): void {
   this.setHeader(PARSE_ERROR_LOGGED_KEY, true);
   const msg = `Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`;
   if (this.logger) {
-    (this.logger as { debug(message: string): void }).debug(msg);
+    this.logger.debug(msg);
     return;
   }
   try {

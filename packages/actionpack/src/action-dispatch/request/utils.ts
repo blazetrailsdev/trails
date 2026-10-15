@@ -1,11 +1,13 @@
 import { mattrAccessor } from "@blazetrails/activesupport";
 import {
   bytes,
+  compactBang,
   eachPair,
   eachValue,
   forceEncoding,
   Hash,
   isValidEncoding,
+  rbObjIsKindOf,
   scrub,
   toS,
 } from "@blazetrails/ruby-compat";
@@ -28,34 +30,37 @@ export class ParamEncoder {
   static normalizeEncodeParams(params: ParamInput): ParamValue {
     if (Array.isArray(params)) {
       return this.handleArray(params);
-    } else if (params !== null && typeof params === "object") {
-      const proto = Object.getPrototypeOf(params);
-      if (!(params instanceof Hash) && proto !== null && proto !== Object.prototype) return params;
-      if (params instanceof Hash ? params.has("tempfile") : Object.hasOwn(params, "tempfile")) {
+    } else if (rbObjIsKindOf(params, Hash)) {
+      const hash = params as ParamHash | Hash<string, ParamValue>;
+      if (hash instanceof Hash ? hash.has("tempfile") : Object.hasOwn(hash, "tempfile")) {
         return new UploadedFile(
-          (params instanceof Hash ? Object.fromEntries(params) : params) as UploadedFileOptions,
+          (hash instanceof Hash ? Object.fromEntries(hash) : hash) as UploadedFileOptions,
         ) as unknown as ParamValue;
       } else {
         const hwia: ParamHash = Object.create(null);
-        eachPair(params as ParamHash, (key, val) => {
+        eachPair(hash as ParamHash, (key, val) => {
           hwia[key] = this.normalizeEncodeParams(val);
         });
         return hwia;
       }
     } else {
-      return params;
+      return params as ParamValue;
     }
   }
 
   static handleArray(params: ParamValue[]): ParamValue[] {
-    return params.map((el) => this.normalizeEncodeParams(el));
+    params.forEach((el, i) => {
+      params[i] = this.normalizeEncodeParams(el);
+    });
+    return params;
   }
 }
 
 export class NoNilParamEncoder extends ParamEncoder {
   static override handleArray(params: ParamValue[]): ParamValue[] {
     const list = super.handleArray(params);
-    return list.filter((el) => el != null);
+    compactBang(list);
+    return list;
   }
 }
 
@@ -132,6 +137,7 @@ export class Utils {
     mattrAccessor.call(this, "performDeepMunge", { default: true });
   }
 
+  /** @inventedArm if — PERMANENT */
   static eachParamValue<P extends ParamInput>(
     params: P,
     block: (param: string) => string | void,
