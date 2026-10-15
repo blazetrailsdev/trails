@@ -992,6 +992,10 @@ describe("virtualize — missingTables", () => {
     expect(missing(sub, base)).toEqual([]);
   });
 
+  test("does not warn when the base class is in no processed file", () => {
+    expect(missing("export class Draft extends Article {}\n")).toEqual([]);
+  });
+
   test("resolves the table below an abstract class in another file", () => {
     const abstract =
       "export class ApplicationRecord extends Base {\n  static {\n    this.abstractClass = true;\n  }\n}\n";

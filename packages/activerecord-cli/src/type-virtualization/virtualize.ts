@@ -50,6 +50,7 @@ export interface MissingTable {
 export function missingTables(
   models: readonly ModelTable[],
   schema: Readonly<Record<string, unknown>>,
+  rootNames: ReadonlySet<string> = new Set(["Base"]),
 ): MissingTable[] {
   const byName = new Map<string, ModelTable>();
   for (const m of models) if (!byName.has(m.className)) byName.set(m.className, m);
@@ -57,6 +58,7 @@ export function missingTables(
   for (const m of models) {
     if (m.abstract || m.optedOut) continue;
     const base = baseClassOf(m, byName);
+    if (base.superName && !byName.has(base.superName) && !rootNames.has(base.superName)) continue;
     if (base !== m && base.optedOut) continue;
     if (m.dynamicTableName || base.dynamicTableName) continue;
     const tableName = m.tableName ?? base.tableName ?? pluralize(underscore(base.className));
