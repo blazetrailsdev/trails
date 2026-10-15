@@ -16,7 +16,8 @@ export interface ControllerRunOptions {
 
 export class ControllerGenerator extends GeneratorBase {
   private actions: string[] = [];
-  private name = "";
+  private classPath: string[] = [];
+  private _namedBaseFileName = "";
   private _fileName?: string;
 
   constructor(options: GeneratorOptions) {
@@ -37,8 +38,7 @@ export class ControllerGenerator extends GeneratorBase {
     this.options = { ...this.options, skipRoutes } as GeneratorOptions;
     this.actions = actions;
     const paths = controllerPathHelpers(name);
-    this.name = name;
-    this._fileName = undefined;
+    this.assignNamesBang(name);
     const ts = this.isTypeScript();
     const ext = this.ext();
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
@@ -95,13 +95,22 @@ ${cases}
     await this.route(routingCode, { namespace: this.regularClassPath() });
   }
 
+  private assignNamesBang(name: string): void {
+    this.classPath = name.includes("/") ? name.split("/") : name.split("::");
+    this.classPath = this.classPath.map((p) => underscore(p));
+    this._namedBaseFileName = this.classPath.pop()!;
+    this._fileName = undefined;
+  }
+
   private regularClassPath(): string[] {
-    return controllerPathHelpers(this.name)
-      .namespaceParts.slice(0, -1)
-      .map((p) => underscore(p));
+    return this.classPath;
   }
 
   private fileName(): string {
-    return (this._fileName ??= underscore(controllerPathHelpers(this.name).namespaceParts.at(-1)!));
+    return (this._fileName ??= this.removePossibleSuffix(this._namedBaseFileName));
+  }
+
+  private removePossibleSuffix(name: string): string {
+    return name.replace(/_?controller$/i, "");
   }
 }
