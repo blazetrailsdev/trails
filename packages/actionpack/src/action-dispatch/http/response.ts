@@ -125,7 +125,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
+  /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
     if (this._strBody !== null) {
       yield this._strBody;
@@ -224,12 +224,12 @@ export class RackBody {
     return (this._response.stream as { toPath(): string }).toPath();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): Iterator<unknown> {
     return (this.each() as Iterable<unknown>)[Symbol.iterator]();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
+  /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
     const stream = this._response.stream as Partial<AsyncIterable<unknown>> & {
       each(): unknown;

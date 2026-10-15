@@ -245,14 +245,20 @@ export class ParamBuilder {
     return params;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall new — PERMANENT
+   */
   makeParams(): ParamHash {
     return Object.create(null) as ParamHash;
   }
 
   /** @internal */
   newDepthLimit(paramDepthLimit: number): ParamBuilder {
-    return new (this.constructor as typeof ParamBuilder)(paramDepthLimit);
+    return new (this.constructor as new (...args: unknown[]) => ParamBuilder)(
+      (this as { paramsClass?: unknown }).paramsClass,
+      paramDepthLimit,
+    );
   }
 
   /** @internal */

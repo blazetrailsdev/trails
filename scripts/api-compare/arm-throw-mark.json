@@ -8,10 +8,8 @@
     "byFile": {}
   },
   "actiondispatch": {
-    "total": 1,
-    "byFile": {
-      "http/request.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "actionpackversion": {
     "total": 0,

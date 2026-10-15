@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RackEnv } from "@blazetrails/rack";
-import { Encoding } from "@blazetrails/ruby-compat";
+import { Encoding, StringIO } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { ParamBuilder } from "../http/param-builder.js";
 import { InvalidParameterError } from "@blazetrails/rack";
@@ -12,7 +12,7 @@ describe("Request", () => {
   it("content_length measures the body when the request is chunked", () => {
     const req = new Request({
       HTTP_TRANSFER_ENCODING: "chunked",
-      "rack.input": "héllo",
+      "rack.input": new StringIO("héllo"),
     });
     expect(req.contentLength).toBe(6);
   });

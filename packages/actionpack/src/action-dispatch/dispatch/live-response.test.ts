@@ -42,7 +42,7 @@ describe("ActionController", () => {
         assertEqual("g", headers.get("omg"));
       });
 
-      /** @missingRailsCall each — CONVERGEABLE response-async-each-and-bad-request-errinfo */
+      /** @missingRailsCall each — PERMANENT */
       it("parallel", async () => {
         const latch = new Concurrent.CountDownLatch();
 

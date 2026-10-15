@@ -1,5 +1,6 @@
 import {
   camelize,
+  constantize,
   NameError,
   toSentence,
   underscore,
@@ -558,14 +559,16 @@ export class Request {
   }
 
   /** @internal */
-  protected readBodyStream(): string {
-    const input = this.bodyStream;
-    if (typeof input === "string") return input;
-    const stream = input as { read?: (n?: number) => string; rewind?: () => void } | undefined;
-    if (!stream || typeof stream.read !== "function") return "";
-    return this.resetStream(stream, () =>
-      this.hasHeader(TRANSFER_ENCODING) ? stream.read!() : stream.read!(this.contentLength),
-    );
+  protected readBodyStream(): string | null | undefined {
+    if (this.bodyStream != null) {
+      return this.resetStream(this.bodyStream, () => {
+        if (this.hasHeader(TRANSFER_ENCODING)) {
+          return this.bodyStream.read();
+        } else {
+          return this.bodyStream.read(this.contentLength);
+        }
+      });
+    }
   }
 
   /** @internal */
@@ -722,9 +725,19 @@ export class Request {
     if (name != null) {
       const controllerParam = underscore(name);
       const constName = `${camelize(controllerParam)}Controller`;
-      const klass = controllerConstants.get(controllerParam);
-      if (!klass) throw new MissingController(`uninitialized constant ${constName}`, constName);
-      return klass;
+      try {
+        return (
+          controllerConstants.get(controllerParam) ??
+          (constantize(constName) as DispatchableControllerClass)
+        );
+      } catch (error) {
+        if (!(error instanceof NameError)) throw error;
+        if (error.missingName() === constName || constName.startsWith(`${error.missingName()}::`)) {
+          throw new MissingController(error.message, error.constantName);
+        } else {
+          throw error;
+        }
+      }
     }
     return PASS_NOT_FOUND;
   }
