@@ -1,4 +1,4 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { aryDelete, compact, File, FileUtils, flatten } from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
@@ -184,11 +184,7 @@ export class ChangeGenerator extends GeneratorBase {
       delete composeConfig["services"][database.name];
       if (composeConfig["volumes"] != null) delete composeConfig["volumes"][database.volume!];
       const dependsOn = composeConfig["services"]["rails-app"]["depends_on"] as string[] | null;
-      if (dependsOn != null) {
-        for (let i = dependsOn.length - 1; i >= 0; i--) {
-          if (dependsOn[i] === database.name) dependsOn.splice(i, 1);
-        }
-      }
+      if (dependsOn != null) aryDelete(dependsOn, database.name);
     }
 
     if (this.database.service) {
@@ -200,12 +196,9 @@ export class ChangeGenerator extends GeneratorBase {
         [this.database.volume!]: null,
         ...(composeConfig["volumes"] ?? {}),
       };
-      composeConfig["services"]["rails-app"]["depends_on"] = [
-        this.database.name,
-        composeConfig["services"]["rails-app"]["depends_on"],
-      ]
-        .flat()
-        .filter((dependency) => dependency != null);
+      composeConfig["services"]["rails-app"]["depends_on"] = compact(
+        flatten([this.database.name, composeConfig["services"]["rails-app"]["depends_on"]]),
+      );
     }
 
     if (!(composeConfig["volumes"] != null && Object.keys(composeConfig["volumes"]).length > 0)) {
