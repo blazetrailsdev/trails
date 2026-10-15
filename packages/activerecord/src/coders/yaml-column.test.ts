@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Hash } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
+import { assertRaises } from "@blazetrails/activesupport";
 import { YAMLColumn } from "./yaml-column.js";
 import { Time } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/ruby-compat";
@@ -71,15 +72,17 @@ describe("YAMLColumnTest", () => {
     const coder = new YAMLColumn("attr_name", Object as never);
     expect(coder.objectClass).toBe(Object);
   });
-  it("type mismatch on different classes on dump", () => {
+  it("type mismatch on different classes on dump", async () => {
     const coder = new YAMLColumn("tags", Array as never);
-    expect(() => coder.dump("a")).toThrow(
+    const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.dump("a"));
+    expect(error.message).toEqual(
       'can\'t dump `tags`: was supposed to be a Array, but was a String. -- "a"',
     );
   });
-  it("type mismatch on different classes", () => {
+  it("type mismatch on different classes", async () => {
     const coder = new YAMLColumn("tags", Array as never);
-    expect(() => coder.load("--- foo")).toThrow(
+    const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.load("--- foo"));
+    expect(error.message).toEqual(
       'can\'t load `tags`: was supposed to be a Array, but was a String. -- "foo"',
     );
   });
