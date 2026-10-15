@@ -30,6 +30,7 @@ import { ClassLoader } from "../class-loader.js";
 import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
 import { NotImplementedError } from "../../not-implemented-error.js";
+import { Omap } from "../omap.js";
 
 const yaml = backend as unknown as typeof Yaml;
 
@@ -114,6 +115,7 @@ export class YAMLTree {
     if (target instanceof Range) return this.visitRange(target);
     if (target instanceof RegExp) return this.visitRegexp(target);
     if (Array.isArray(target)) return this.visitArray(target);
+    if (target instanceof Omap) return this.visitPsychOmap(target);
     if (target instanceof Map) return this.visitHash(target);
     if (isStruct(target)) return this.visitStruct(target);
     if (target !== null && typeof target === "object") {
@@ -158,6 +160,15 @@ export class YAMLTree {
     this.dumpIvars(o, map);
 
     return map;
+  }
+
+  private visitPsychOmap(o: Omap): Node {
+    const seq = new yaml.YAMLSeq();
+    seq.tag = "tag:yaml.org,2002:omap";
+    this.register(o, seq);
+
+    for (const [k, v] of o) seq.items.push(this.visitHash(new Map([[k, v]])));
+    return seq;
   }
 
   private visitClass(o: { name?: string }): Node {
@@ -336,22 +347,37 @@ export class YAMLTree {
    * Its `yaml` is `Psych::Nodes::Node#yaml` (`nodes/node.rb:58-64`) over
    * `Visitors::Emitter#initialize`'s options (`visitors/emitter.rb:5-17`); the
    * backend has no canonical style, so `canonical: true` raises.
-   * libyaml writes a tagged root node on the `---` line
-   * (`YAML.dump(Object.new)` is `"--- !ruby/object {}\n"`) where the backend
-   * breaks the line, so a tagged root's document start is written here.
+   * libyaml writes a tagged or scalar root node on the `---` line, its
+   * continuation lines indented (`YAML.dump(Object.new)` is
+   * `"--- !ruby/object {}\n"`, `YAML.dump("a\nb")` is `"--- |-\n  a\n  b\n"`,
+   * `YAML.dump(nil)` is `"---\n"`) where the backend breaks the line, so that
+   * document start is written here.
    *
    * @noRailsEquivalent PERMANENT
    */
   get tree(): PsychDocument {
     const doc = this.doc;
     return {
-      yaml(_io = null, options = {}) {
+      yaml(io = null, options = {}) {
         const du: { indent?: number; lineWidth?: number } = {};
         if ("indentation" in options) du.indent = options.indentation;
         if (options.canonical) throw new NotImplementedError("canonical");
         if ("lineWidth" in options) du.lineWidth = options.lineWidth;
-        if (!doc.contents?.tag) return doc.toString({ directives: true, ...du });
-        return `--- ${doc.toString(du)}`;
+        let string: string;
+        if (doc.contents?.tag) {
+          string = `--- ${doc.toString(du)}`;
+        } else if (yaml.isScalar(doc.contents)) {
+          const indent = " ".repeat(du.indent ?? 2);
+          string =
+            doc.contents.value === null
+              ? "---\n"
+              : `--- ${doc.toString(du).replace(/\n(?=.)/g, `\n${indent}`)}`;
+        } else {
+          string = doc.toString({ directives: true, ...du });
+        }
+        if (!io) return string;
+        io.write(string);
+        return io;
       },
     };
   }

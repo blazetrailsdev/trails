@@ -67,6 +67,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#throw", "kernelThrow"],
   ["Kernel#Rational", "rational"],
   ["Module#define_method", "rbModDefineMethod"],
+  ["Object#to_yaml", "toYaml"],
   ["Range#cover?", "cover"],
   ["Regexp.escape", "regexpEscape"],
   ["Regexp.union", "rbRegSUnion"],

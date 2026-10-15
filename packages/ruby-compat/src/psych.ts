@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `Psych` module is a
    namespace of module functions and classes; ESM syntax cannot spell `Psych.dump`. */
 import type * as Yaml from "yaml";
-import { yaml as backend, type PsychNode } from "./psych-adapter.js";
+import { yaml as backend, type PsychIO, type PsychNode } from "./psych-adapter.js";
 import { Coder as PsychCoder } from "./psych/coder.js";
 import { ClassLoader as PsychClassLoader } from "./psych/class-loader.js";
 import {
@@ -15,6 +15,9 @@ import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { Omap as PsychOmap } from "./psych/omap.js";
 import { isPlainHash, rbModToS } from "./object.js";
+import { File } from "./file.js";
+import { IO } from "./io.js";
+import { registerConstant } from "./variable.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
 const yaml = backend as unknown as typeof Yaml;
@@ -163,48 +166,51 @@ export namespace Psych {
   }
 
   /**
-   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505`). There is no
-   * `IO` to write to, so the `io` slot only ever carries the options Hash.
+   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505-514`).
    *
    * @noRailsEquivalent PERMANENT
    */
+  export function dump(o: unknown, io?: YAMLTreeOptions | null, options?: YAMLTreeOptions): string;
+  export function dump<T extends PsychIO>(o: unknown, io: T, options?: YAMLTreeOptions): T;
   export function dump(
     o: unknown,
-    io: YAMLTreeOptions | null = null,
+    io: PsychIO | YAMLTreeOptions | null = null,
     options: YAMLTreeOptions = {},
-  ): string {
-    if (isPlainHash(io)) options = io as YAMLTreeOptions;
+  ): string | PsychIO {
+    if (isPlainHash(io)) {
+      options = io as YAMLTreeOptions;
+      io = null;
+    }
 
     const visitor = YAMLTree.create(options);
     visitor.push(o);
-    return visitor.tree.yaml(null, options);
+    return visitor.tree.yaml(io as PsychIO | null, options);
   }
 
   /**
-   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578`). There is
-   * no `IO` to write to, so the `io` slot only ever carries the options Hash.
+   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578-587`).
    *
    * @noRailsEquivalent PERMANENT
    */
   export function safeDump(
     o: unknown,
-    io: YAMLTreeOptions | null = null,
+    io?: YAMLTreeOptions | null,
+    options?: YAMLTreeOptions,
+  ): string;
+  export function safeDump<T extends PsychIO>(o: unknown, io: T, options?: YAMLTreeOptions): T;
+  export function safeDump(
+    o: unknown,
+    io: PsychIO | YAMLTreeOptions | null = null,
     options: YAMLTreeOptions = {},
-  ): string {
-    if (isPlainHash(io)) options = io as YAMLTreeOptions;
+  ): string | PsychIO {
+    if (isPlainHash(io)) {
+      options = io as YAMLTreeOptions;
+      io = null;
+    }
 
     const visitor = RestrictedYAMLTree.create(options);
     visitor.push(o);
-    return visitor.tree.yaml(null, options);
-  }
-
-  /**
-   * `Object#to_yaml` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/core_ext.rb:12-14`).
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  export function toYaml(o: unknown): string {
-    return dump(o);
+    return visitor.tree.yaml(io as PsychIO | null, options);
   }
 
   /**
@@ -213,12 +219,18 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function unsafeLoad(
-    yamlString: string | Uint8Array,
-    { filename = null as string | null, fallback = false as unknown } = {},
+    yamlString: string | Uint8Array | IO,
+    {
+      filename = null as string | null,
+      fallback = false as unknown,
+      symbolizeNames = false,
+      freeze = false,
+      strictInteger = false,
+    } = {},
   ): unknown {
     const result = parse(yamlString, { filename });
     if (!result) return fallback;
-    return ToRuby.create().accept(result);
+    return ToRuby.create({ symbolizeNames, freeze, strictInteger }).accept(result);
   }
 
   /**
@@ -230,9 +242,10 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function parse(
-    yamlString: string | Uint8Array,
+    yamlString: string | Uint8Array | IO,
     { filename: _filename = null as string | null } = {},
   ): PsychNode | false {
+    if (yamlString instanceof IO) yamlString = yamlString.read();
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
     return yaml.parseDocument(yamlString).contents ?? false;
   }
@@ -243,7 +256,7 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function safeLoad(
-    yamlString: string | Uint8Array,
+    yamlString: string | Uint8Array | IO,
     {
       permittedClasses = [] as unknown[],
       permittedSymbols = [] as string[],
@@ -279,7 +292,7 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function load(
-    yamlString: string | Uint8Array,
+    yamlString: string | Uint8Array | IO,
     {
       permittedClasses = ["Symbol"] as unknown[],
       permittedSymbols = [] as string[],
@@ -302,4 +315,30 @@ export namespace Psych {
       strictInteger,
     });
   }
+
+  /**
+   * `Psych.unsafe_load_file` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:647-651`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function unsafeLoadFile(
+    filename: string,
+    kwargs: Omit<NonNullable<Parameters<typeof unsafeLoad>[1]>, "filename"> = {},
+  ): unknown {
+    return File.open(filename, "r:bom|utf-8", (f) => unsafeLoad(f, { filename, ...kwargs }));
+  }
+
+  /**
+   * `Psych.load_file` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:669-673`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function loadFile(
+    filename: string,
+    kwargs: Omit<NonNullable<Parameters<typeof load>[1]>, "filename"> = {},
+  ): unknown {
+    return File.open(filename, "r:bom|utf-8", (f) => load(f, { filename, ...kwargs }));
+  }
 }
+
+registerConstant("Psych", Psych);
