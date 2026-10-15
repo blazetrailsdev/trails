@@ -1,5 +1,6 @@
 import { fetch, LoadError, rbInspect, rbModToS, rbObjClass } from "@blazetrails/ruby-compat";
 
+import { Module, extend, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Store } from "./store.js";
@@ -44,49 +45,54 @@ export interface Serializer {
   isAvailable?(): boolean;
 }
 
-function load(dumped: unknown): unknown {
-  if (typeof dumped === "string") {
-    if (messagePackWithFallback.dumped(dumped)) {
-      return messagePackWithFallback._load(dumped);
-    } else if (marshal71WithFallback.dumped(dumped)) {
-      return marshal71WithFallback._load(dumped);
-    } else if (marshal70WithFallback.dumped(dumped)) {
-      return marshal70WithFallback._load(dumped);
+/** @internal */
+export const SerializerWithFallback = new Module().include({
+  load(dumped: unknown): unknown {
+    if (typeof dumped === "string") {
+      if (messagePackWithFallback.dumped(dumped)) {
+        return messagePackWithFallback._load(dumped);
+      } else if (marshal71WithFallback.dumped(dumped)) {
+        return marshal71WithFallback._load(dumped);
+      } else if (marshal70WithFallback.dumped(dumped)) {
+        return marshal70WithFallback._load(dumped);
+      } else {
+        Store.logger?.warn(
+          `Unrecognized payload prefix ${rbInspect(dumped.slice(0, 1))}; deserializing as nil`,
+        );
+        return null;
+      }
+    } else if (passthroughWithFallback.dumped(dumped as Entry)) {
+      return passthroughWithFallback._load(dumped as Entry);
     } else {
       Store.logger?.warn(
-        `Unrecognized payload prefix ${rbInspect(dumped.slice(0, 1))}; deserializing as nil`,
+        `Unrecognized payload class ${rbModToS(rbObjClass(dumped))}; deserializing as nil`,
       );
       return null;
     }
-  } else if (passthroughWithFallback.dumped(dumped as Entry)) {
-    return passthroughWithFallback._load(dumped as Entry);
-  } else {
-    Store.logger?.warn(
-      `Unrecognized payload class ${rbModToS(rbObjClass(dumped))}; deserializing as nil`,
-    );
-    return null;
-  }
-}
+  },
 
-/** @internal */
-function marshalLoad(payload: string): unknown {
-  try {
-    return coder.load(payload);
-  } catch (error) {
-    throw new DeserializationError(error instanceof Error ? error.message : String(error));
-  }
-}
-
-const serializerWithFallback = { load, marshalLoad };
+  /** @internal */
+  marshalLoad(payload: string): unknown {
+    try {
+      return coder.load(payload);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      throw new DeserializationError(error.message);
+    }
+  },
+}) as Module & {
+  load(dumped: unknown): unknown;
+  marshalLoad(payload: string): unknown;
+  SERIALIZERS: Record<string, Serializer>;
+  get(format: string): Serializer;
+};
 
 const MARK_UNCOMPRESSED = "\x00";
 const MARK_COMPRESSED = "\x01";
 
 const MARSHAL_SIGNATURE = "\x04\x08";
 
-const passthroughWithFallback: Serializer = {
-  ...serializerWithFallback,
-
+const passthroughWithFallback = new Module().include(SerializerWithFallback).include({
   dump(entry: Entry | unknown): Entry {
     return entry as Entry;
   },
@@ -102,11 +108,10 @@ const passthroughWithFallback: Serializer = {
   dumped(dumped: string | Entry): boolean {
     return dumped instanceof Entry;
   },
-};
+}) as Module & Serializer;
+extend(passthroughWithFallback, passthroughWithFallback);
 
-const marshal70WithFallback: Serializer = {
-  ...serializerWithFallback,
-
+const marshal70WithFallback = new Module().include(SerializerWithFallback).include({
   dump(entry: Entry | unknown): string {
     return MARK_UNCOMPRESSED + toBinary(coder.dump((entry as Entry).pack()));
   },
@@ -123,7 +128,7 @@ const marshal70WithFallback: Serializer = {
     return MARK_UNCOMPRESSED + toBinary(serialized);
   },
 
-  _load(marked: string | Entry): Entry {
+  _load(this: Serializer, marked: string | Entry): Entry {
     const s = marked as string;
     const compressed = s[0] === MARK_COMPRESSED;
     const rest = s.slice(1);
@@ -137,27 +142,25 @@ const marshal70WithFallback: Serializer = {
       (dumped as string).startsWith(MARK_COMPRESSED)
     );
   },
-};
+}) as Module & Serializer;
+extend(marshal70WithFallback, marshal70WithFallback);
 
-const marshal71WithFallback: Serializer = {
-  ...serializerWithFallback,
-
+const marshal71WithFallback = new Module().include(SerializerWithFallback).include({
   dump(value: Entry | unknown): string {
     return MARSHAL_SIGNATURE + toBinary(coder.dump(value));
   },
 
-  _load(dumped: string | Entry): unknown {
+  _load(this: Serializer, dumped: string | Entry): unknown {
     return this.marshalLoad(fromBinary((dumped as string).slice(MARSHAL_SIGNATURE.length)));
   },
 
   dumped(dumped: string | Entry): boolean {
     return (dumped as string).startsWith(MARSHAL_SIGNATURE);
   },
-};
+}) as Module & Serializer;
+extend(marshal71WithFallback, marshal71WithFallback);
 
-const messagePackWithFallback: Serializer = {
-  ...serializerWithFallback,
-
+const messagePackWithFallback = new Module().include(SerializerWithFallback).include({
   dump(value: Entry | unknown): string {
     return Buffer.from(ActiveSupport.MessagePack!.CacheSerializer.dump(value)).toString("latin1");
   },
@@ -169,7 +172,7 @@ const messagePackWithFallback: Serializer = {
     return result === undefined ? null : result;
   },
 
-  dumped(dumped: string | Entry): boolean {
+  dumped(this: Serializer, dumped: string | Entry): boolean {
     return (
       this.isAvailable!() &&
       ActiveSupport.MessagePack!.isSignature(Buffer.from(dumped as string, "latin1"))
@@ -180,7 +183,8 @@ const messagePackWithFallback: Serializer = {
   isAvailable(): boolean {
     return ActiveSupport.MessagePack !== undefined;
   },
-};
+}) as Module & Serializer;
+extend(messagePackWithFallback, messagePackWithFallback);
 
 const SERIALIZERS: Record<string, Serializer> = {
   passthrough: passthroughWithFallback,
@@ -189,10 +193,8 @@ const SERIALIZERS: Record<string, Serializer> = {
   message_pack: messagePackWithFallback,
 };
 
-/** @internal */
-export const SerializerWithFallback = {
-  SERIALIZERS,
-
+rbModConstSet(SerializerWithFallback, "SERIALIZERS", SERIALIZERS);
+extend(SerializerWithFallback, {
   /** @missingRailsCall require — PERMANENT */
   get(format: string): Serializer {
     if (format.includes("message_pack") && ActiveSupport.MessagePack === undefined) {
@@ -201,4 +203,4 @@ export const SerializerWithFallback = {
 
     return fetch(SERIALIZERS, format);
   },
-};
+});
