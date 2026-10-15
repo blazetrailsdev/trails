@@ -95,13 +95,13 @@ export class ActiveRecordTestCase extends ActionController.TestCase {
     include(this, TestFixtures);
   }
 
-  static override tests(controller: ControllerClass): void {
+  static override tests(controller: ControllerClass & { ROUTES?: unknown }): void {
     super.tests(controller);
-    if ((controller as unknown as { ROUTES?: unknown }).ROUTES !== undefined) {
+    if (controller.ROUTES !== undefined) {
       const mod = new Module();
       mod.defineMethod("setup", function (this: { routes: unknown }) {
         mod.superMethod(this, "setup")!();
-        this.routes = (controller as unknown as { ROUTES: unknown }).ROUTES;
+        this.routes = controller.ROUTES;
       });
       include(this, mod);
     }
