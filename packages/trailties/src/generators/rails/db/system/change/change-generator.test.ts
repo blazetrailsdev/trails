@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ChangeGenerator } from "./change-generator.js";
+import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 
 let tmpDir: string;
 
@@ -193,7 +194,7 @@ describe("ChangeGeneratorTest", () => {
       }
       const compose: Record<string, unknown> = { name: "tmp", services };
       if (hasService) compose.volumes = { [`${dbName}-data`]: null };
-      write(".devcontainer/compose.yaml", JSON.stringify(compose, null, 2) + "\n");
+      write(".devcontainer/compose.yaml", toYaml(compose));
     }
 
     it("editDevcontainerFiles skipped when no .devcontainer dir", () => {
@@ -214,7 +215,7 @@ describe("ChangeGeneratorTest", () => {
       expect(
         (dc.features as Record<string, unknown>)["ghcr.io/rails/devcontainer/features/sqlite3"],
       ).toBeUndefined();
-      const cm = JSON.parse(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+      const cm = YAML.load(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
       expect((cm.services as Record<string, unknown>)["postgres"]).toBeDefined();
       expect((cm.volumes as Record<string, unknown>)["postgres-data"]).toBeDefined();
       const railsApp = (cm.services as Record<string, Record<string, unknown>>)["rails-app"];
@@ -234,7 +235,7 @@ describe("ChangeGeneratorTest", () => {
           "ghcr.io/rails/devcontainer/features/postgres-client"
         ],
       ).toBeUndefined();
-      const cm = JSON.parse(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+      const cm = YAML.load(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
       expect((cm.services as Record<string, unknown>)["postgres"]).toBeUndefined();
       expect(cm.volumes).toBeUndefined();
       const railsApp = (cm.services as Record<string, Record<string, unknown>>)["rails-app"];
@@ -246,23 +247,17 @@ describe("ChangeGeneratorTest", () => {
       expect(() => run("postgresql")).toThrow(/Could not parse .*devcontainer\.json/);
     });
 
-    it("editComposeYaml throws on unparseable JSON", () => {
-      seedDevcontainer("sqlite3", false);
-      write(".devcontainer/compose.yaml", "{ not json");
-      expect(() => run("postgresql")).toThrow(/Could not parse .*compose\.yaml/);
-    });
-
     it("non-DB depends_on entries are preserved when swapping database", () => {
       seedDevcontainer("postgres", true);
       const composePath = ".devcontainer/compose.yaml";
-      const compose = JSON.parse(read(composePath)) as {
+      const compose = YAML.load(read(composePath)) as {
         services: Record<string, { depends_on?: string[]; [k: string]: unknown }>;
         [k: string]: unknown;
       };
       (compose.services["rails-app"].depends_on ??= []).push("selenium", "redis");
-      write(composePath, JSON.stringify(compose, null, 2) + "\n");
+      write(composePath, toYaml(compose));
       run("mysql");
-      const cm = JSON.parse(read(composePath)) as Record<string, unknown>;
+      const cm = YAML.load(read(composePath)) as Record<string, unknown>;
       const railsApp = (cm.services as Record<string, Record<string, unknown>>)["rails-app"];
       expect(railsApp.depends_on).toContain("mysql");
       expect(railsApp.depends_on).toContain("selenium");
@@ -273,7 +268,7 @@ describe("ChangeGeneratorTest", () => {
     it("change from mysql to postgresql swaps service and feature", () => {
       seedDevcontainer("mysql", true);
       run("postgresql");
-      const cm = JSON.parse(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+      const cm = YAML.load(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
       expect((cm.services as Record<string, unknown>)["mysql"]).toBeUndefined();
       expect((cm.services as Record<string, unknown>)["postgres"]).toBeDefined();
       const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;

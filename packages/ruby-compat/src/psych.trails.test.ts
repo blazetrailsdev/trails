@@ -80,9 +80,11 @@ describe("Psych with a Struct and the safe paths", () => {
 describe("psych-adapter parse on a source held as its bytes", () => {
   it("decodes UTF-8 and raises SyntaxError for malformed bytes", async () => {
     const { parse } = await import("./psych-adapter.js");
+    const { SyntaxError: PsychSyntaxError } = await import("./psych/syntax-error.js");
     const load = parse as (src: unknown) => unknown;
     expect(load(new TextEncoder().encode("a: é\n"))).toEqual({ a: "é" });
-    expect(() => load(Uint8Array.from([0x61, 0x3a, 0x20, 0xff]))).toThrow(SyntaxError);
+    expect(() => load(Uint8Array.from([0x61, 0x3a, 0x20, 0xff]))).toThrow(PsychSyntaxError);
+    expect(() => load("a: [b\n")).toThrow(PsychSyntaxError);
   });
 });
 

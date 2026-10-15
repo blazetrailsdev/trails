@@ -102,7 +102,7 @@ RUBY_COMPAT_SPECS = {
 
 # ruby/spec's `library/<name>/` specs ruby-compat enrolls, by stdlib library.
 RUBY_COMPAT_LIBRARY_SPECS = {
-  "yaml" => %w[dump to_yaml],
+  "yaml" => %w[dump load load_file to_yaml unsafe_load],
 }.freeze
 
 # Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
@@ -2747,7 +2747,8 @@ def run
           members.map { |m| File.join(pkg_dir, "core", type, "#{m}_spec.rb") }
       end
       test_files += RUBY_COMPAT_LIBRARY_SPECS.flat_map do |library, members|
-        members.map { |m| File.join(pkg_dir, "library", library, "#{m}_spec.rb") }
+        Dir.glob(File.join(pkg_dir, "library", library, "shared", "*.rb")) +
+          members.map { |m| File.join(pkg_dir, "library", library, "#{m}_spec.rb") }
       end
       test_files.uniq!
     end
