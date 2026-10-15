@@ -353,11 +353,11 @@ describe("GlobalIDCustomParamsTest", () => {
 
   it("create custom params", () => {
     const gid = GlobalID.create(fakeModel(5), { hello: "world" });
-    expect(gid.params["hello"]).toBe("world");
+    expect(gid.params!.get("hello")).toBe("world");
   });
 
   it("parse custom params", () => {
     const gid = GlobalID.parse("gid://bcx/Person/5?hello=world");
-    expect(gid!.params["hello"]).toBe("world");
+    expect(gid!.params!.get("hello")).toBe("world");
   });
 });

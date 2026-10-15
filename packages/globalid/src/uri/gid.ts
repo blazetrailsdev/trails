@@ -1,7 +1,8 @@
-import { isBlank } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   BadURIError,
+  CGI,
   Error as URIError,
   Generic,
   InvalidComponentError,
@@ -17,7 +18,7 @@ export interface GidComponents {
   app: string;
   modelName: string;
   modelId: string | string[];
-  params: Record<string, string>;
+  params: HashWithIndifferentAccess<string> | null;
 }
 
 export class MissingModelIdError extends InvalidComponentError {}
@@ -31,31 +32,6 @@ const COMPOSITE_MODEL_ID_DELIMITER = "/";
 /** @internal */
 const URI_PARSER = new RFC2396Parser();
 
-/** @internal */
-function cgiEscape(s: string): string {
-  return URI.encodeWwwFormComponent(s);
-}
-
-/** @internal */
-function cgiUnescape(s: string): string {
-  return decodeURIComponent(s.replace(/\+/g, "%20"));
-}
-
-function modelIdEquals(a: string | string[], b: string | string[]): boolean {
-  if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    return a.every((segment, i) => segment === b[i]);
-  }
-  return a === b;
-}
-
-/** @internal */
-function paramsEquals(a: Record<string, string>, b: Record<string, string>): boolean {
-  const keys = Object.keys(a);
-  if (keys.length !== Object.keys(b).length) return false;
-  return keys.every((key) => Object.prototype.hasOwnProperty.call(b, key) && a[key] === b[key]);
-}
-
 export class GID extends Generic {
   static override readonly COMPONENT: readonly string[] = Object.freeze([
     "scheme",
@@ -67,7 +43,7 @@ export class GID extends Generic {
 
   declare private _modelName: string;
   declare private _modelId: string | string[];
-  declare private _params: Record<string, string> | null;
+  declare private _params: HashWithIndifferentAccess<string> | null;
 
   get app(): string {
     return this.host!;
@@ -78,8 +54,8 @@ export class GID extends Generic {
   get modelId(): string | string[] {
     return this._modelId;
   }
-  get params(): Record<string, string> {
-    return this._params!;
+  get params(): HashWithIndifferentAccess<string> | null {
+    return this._params;
   }
 
   static validateApp(app: string | null | undefined): string {
@@ -115,7 +91,7 @@ export class GID extends Generic {
     const parts = Util.makeComponentsHash(this, args);
     parts["host"] = parts["app"];
     const modelIdSegment = (Array.isArray(parts["modelId"]) ? parts["modelId"] : [parts["modelId"]])
-      .map((p) => cgiEscape(String(p ?? "")))
+      .map((p) => CGI.escape(String(p ?? "")))
       .join(COMPOSITE_MODEL_ID_DELIMITER);
     parts["path"] = `/${parts["modelName"] as string}/${modelIdSegment}`;
 
@@ -131,25 +107,8 @@ export class GID extends Generic {
     return `gid://${this.host ?? ""}${this.path ?? ""}${this.query != null ? "?" + this.query : ""}`;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  equals(oth: GID): boolean {
-    if (oth == null) return false;
-    return (
-      this.app.toLowerCase() === oth.app.toLowerCase() &&
-      this.modelName === oth.modelName &&
-      modelIdEquals(this.modelId, oth.modelId) &&
-      paramsEquals(this.params ?? {}, oth.params ?? {})
-    );
-  }
-
-  deconstructKeys(_keys: readonly string[] | null = null): GidComponents {
-    const { modelId } = this;
-    return {
-      app: this.app,
-      modelName: this.modelName,
-      modelId: Array.isArray(modelId) ? [...modelId] : modelId,
-      params: { ...this.params },
-    };
+  deconstructKeys(_keys: readonly string[] | null): GidComponents {
+    return { app: this.app, modelName: this.modelName, modelId: this.modelId, params: this.params };
   }
 
   /** @internal */
@@ -175,7 +134,7 @@ export class GID extends Generic {
   }
 
   /** @internal */
-  protected setParams(params: Record<string, string> | null): void {
+  protected setParams(params: HashWithIndifferentAccess<string> | null): void {
     this._params = params;
   }
 
@@ -186,10 +145,9 @@ export class GID extends Generic {
   }
 
   /** @internal */
-  protected override checkPath(path: string | null): boolean {
+  protected override checkPath(path: string | null): unknown {
     this.validateComponent(path);
-    this.setModelComponents(path!, true);
-    return true;
+    return this.setModelComponents(path!, true);
   }
 
   /** @internal */
@@ -202,11 +160,10 @@ export class GID extends Generic {
   }
 
   /** @internal */
-  private setModelComponents(path: string, validate = false): void {
+  private setModelComponents(path: string, validate = false): string | string[] | null {
     const [, modelName, modelId] = stringSplit(path, "/", 3);
 
-    if (validate) {
-      this.validateComponent(modelName);
+    if (validate && !isBlank(this.validateComponent(modelName))) {
       this.validateModelIdSection(modelId, modelName);
     }
     this._modelName = modelName!;
@@ -220,11 +177,12 @@ export class GID extends Generic {
         .filter((part) => !isBlank(part))
         .map((id) => {
           this.validateModelId(id);
-          return cgiUnescape(id);
+          return CGI.unescape(id);
         });
 
-      this._modelId = modelIdParts.length === 1 ? modelIdParts[0] : modelIdParts;
+      return (this._modelId = modelIdParts.length === 1 ? modelIdParts[0] : modelIdParts);
     }
+    return null;
   }
 
   /** @internal */
@@ -256,9 +214,9 @@ export class GID extends Generic {
   }
 
   /** @internal */
-  private parseQueryParams(query: string | null): Record<string, string> | null {
+  private parseQueryParams(query: string | null): HashWithIndifferentAccess<string> | null {
     if (query == null) return null;
-    return Object.fromEntries(URI.decodeWwwForm(query));
+    return new HashWithIndifferentAccess(Object.fromEntries(URI.decodeWwwForm(query)));
   }
 }
 

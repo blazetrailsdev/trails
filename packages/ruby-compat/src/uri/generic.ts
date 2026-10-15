@@ -1,5 +1,6 @@
 import { b } from "../string/b.js";
 import { ArgumentError } from "../argument-error.js";
+import { rbEqual } from "../rb-equal.js";
 import { BadURIError, DEFAULT_PARSER, InvalidComponentError, InvalidURIError } from "./common.js";
 import type { RFC2396Parser } from "./rfc2396-parser.js";
 import type { RFC3986Parser } from "./rfc3986-parser.js";
@@ -10,7 +11,6 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * Only the members trails sends are ported: the component readers and their
  * mutable setters, `merge` and the private helpers it reaches through. The
  * unsent ones are not, and the list is exhaustive: `build2` (`generic.rb:78`),
- * the instance `component` (`generic.rb:313`),
  * `registry` and its `check_` / `set_` / `=` trio
  * (`generic.rb:252,750,755,760`), the `user=` / `password=` setters
  * (`generic.rb:471,498`), `set_user` / `set_password`
@@ -18,8 +18,7 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * `decoded_user` / `decoded_password` (`generic.rb:584,589`),
  * `hierarchical?` (`generic.rb:976`), `merge!` (`generic.rb:1096`), `route_from_path` / `route_from0` /
  * `route_from` / `route_to` (`generic.rb:1167,1206,1274,1314`), `normalize` /
- * `normalize!` (`generic.rb:1331,1340`), `==` / `hash` / `eql?` /
- * `component_ary` (`generic.rb:1396,1404,1408,1428`), `select`
+ * `hash` / `eql?` (`generic.rb:1404,1408`), `select`
  * (`generic.rb:1452`), `coerce`
  * (`generic.rb:1486`), `replace!` (`generic.rb:299`), and `find_proxy` /
  * `use_proxy?` (`generic.rb:1512,1578`).
@@ -460,7 +459,7 @@ export class Generic {
    * `check_path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:772`).
    * @internal
    */
-  protected checkPath(v: string | null): boolean {
+  protected checkPath(v: string | null): unknown {
     if (v != null && this._opaque != null) {
       throw new InvalidURIError("path conflicts with opaque");
     }
@@ -557,6 +556,65 @@ export class Generic {
       }
       return out;
     });
+  }
+
+  /**
+   * `component` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:313`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  component(): readonly string[] {
+    return (this.constructor as typeof Generic).component();
+  }
+
+  /**
+   * `normalize` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1331`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  normalize(): this {
+    const uri = this.dup();
+    uri.normalizeBang();
+    return uri;
+  }
+
+  /**
+   * `normalize!` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1340`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  normalizeBang(): void {
+    if (this.path === "") {
+      this.setPath("/");
+    }
+    if (this.scheme != null && this.scheme !== this.scheme.toLowerCase()) {
+      this.setScheme(this.scheme.toLowerCase());
+    }
+    if (this.host != null && this.host !== this.host.toLowerCase()) {
+      this.setHost(this.host.toLowerCase());
+    }
+  }
+
+  /**
+   * `==` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1396`): the same class, and equal
+   * `component_ary`s once both sides are normalized.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  equals(oth: unknown): boolean {
+    if (this.constructor === (oth as object | null)?.constructor) {
+      return rbEqual(this.normalize().componentAry(), (oth as Generic).normalize().componentAry());
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * `component_ary` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1428`).
+   * @internal
+   */
+  protected componentAry(): unknown[] {
+    return this.component().map((x) => (this as unknown as Record<string, unknown>)[x]);
   }
 
   /**

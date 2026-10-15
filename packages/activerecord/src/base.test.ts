@@ -58,6 +58,7 @@ import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
 import {
+  Hash,
   Range as ArRange,
   RuntimeError,
   sort,

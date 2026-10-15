@@ -1,4 +1,4 @@
-import { hashAref, hasKey, keys } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, hasKey, keys } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";

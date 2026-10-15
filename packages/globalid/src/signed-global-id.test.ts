@@ -312,20 +312,20 @@ describe("SignedGlobalIDCustomParamsTest", () => {
   it("create custom params", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, hello: "world" });
-    expect(sgid.params["hello"]).toBe("world");
+    expect(sgid.params!.get("hello")).toBe("world");
   });
 
   it("parse custom params", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, hello: "world" });
     const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
-    expect(parsed!.params["hello"]).toBe("world");
+    expect(parsed!.params!.get("hello")).toBe("world");
   });
 
   it("purpose key flows through as a URI param (not reserved)", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, purpose: "vip" });
-    expect(sgid.params["purpose"]).toBe("vip");
+    expect(sgid.params!.get("purpose")).toBe("vip");
     expect(sgid.purpose).toBe("default");
   });
 });

@@ -10,6 +10,7 @@ import type {
 import type { Verifier as VerifierClass } from "./verifier.js";
 import {
   Autoload,
+  type HashWithIndifferentAccess,
   constantize,
   Deprecation,
   extend,
@@ -51,7 +52,7 @@ export class GlobalID {
   get modelId(): string | string[] {
     return this.uri.modelId;
   }
-  get params(): Record<string, string> {
+  get params(): HashWithIndifferentAccess<string> | null {
     return this.uri.params;
   }
 

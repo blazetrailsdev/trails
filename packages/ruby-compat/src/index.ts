@@ -9,6 +9,7 @@ export { EOFError } from "./eof-error.js";
 export { Errno, SystemCallError } from "./errno.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";
+export { CGI } from "./cgi.js";
 export { IO, STDOUT, print, printf, puts } from "./io.js";
 export { IOError } from "./io-error.js";
 export {

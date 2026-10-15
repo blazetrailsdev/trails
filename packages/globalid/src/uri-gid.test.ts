@@ -207,8 +207,8 @@ describe("URI::GIDParamsTest", () => {
       params: { hello: "world" },
     }).toString();
     const gid = GID.parse(uri);
-    expect(gid.params["hello"]).toBe("world");
-    expect(gid.params["hello"]).toBe("world");
+    expect(gid.params!.get("hello")).toBe("world");
+    expect(gid.params!.get("hello")).toBe("world");
   });
 
   it("integer option", () => {
@@ -219,12 +219,12 @@ describe("URI::GIDParamsTest", () => {
       params: { integer: "20" },
     }).toString();
     const gid = GID.parse(uri);
-    expect(gid.params["integer"]).toBe("20");
+    expect(gid.params!.get("integer")).toBe("20");
   });
 
   it("multi value params returns last value", () => {
     const gid = GID.parse("gid://bcx/Person/5?multi=one&multi=two");
-    expect(gid.params["multi"]).toBe("two");
+    expect(gid.params!.get("multi")).toBe("two");
   });
 
   it("as String", () => {
@@ -239,7 +239,7 @@ describe("URI::GIDParamsTest", () => {
 
   it("immutable params", () => {
     const gid = GID.parse("gid://bcx/Person/5?hello=world");
-    gid.params["param"] = "value";
+    gid.params!.set("param", "value");
     expect(gid.toString()).not.toBe("gid://bcx/Person/5?hello=world&param=value");
   });
 });
@@ -250,12 +250,17 @@ describe("URI::GID class wrapper", () => {
     expect(gid.app).toBe("bcx");
     expect(gid.modelName).toBe("Person");
     expect(gid.modelId).toBe("5");
-    expect(gid.params).toEqual({ hello: "world" });
+    expect(gid.params!.get("hello")).toBe("world");
     expect(gid.toString()).toBe("gid://bcx/Person/5?hello=world");
   });
 
   it("GID.create builds from app + model instance", () => {
-    const gid = GID.create("bcx", { id: 5, constructor: { name: "Person" } });
+    const gid = GID.create(
+      "bcx",
+      new (class Person {
+        id = 5;
+      })(),
+    );
     expect(gid.toString()).toBe("gid://bcx/Person/5");
   });
 
@@ -276,21 +281,9 @@ describe("URI::GID class wrapper", () => {
     expect(GID.validateApp("foo-bar")).toBe("foo-bar");
   });
 
-  it("GID#deconstructKeys returns a deep-enough copy of the component hash", () => {
+  it("GID#deconstructKeys answers the live components", () => {
     const gid = GID.parse("gid://bcx/Person/5?k=v");
-    const a = gid.deconstructKeys();
-    expect(a).toEqual({ app: "bcx", modelName: "Person", modelId: "5", params: { k: "v" } });
-    (a as { app: string }).app = "evil";
-    a.params["k"] = "evil";
-    expect(gid.app).toBe("bcx");
-    expect(gid.params).toEqual({ k: "v" });
-  });
-
-  it("GID#deconstructKeys also copies composite modelId arrays", () => {
-    const gid = GID.parse("gid://bcx/CompositePrimaryKeyModel/tenant/id");
-    const a = gid.deconstructKeys();
-    expect(a.modelId).toEqual(["tenant", "id"]);
-    (a.modelId as string[]).push("evil");
-    expect(gid.modelId).toEqual(["tenant", "id"]);
+    const a = gid.deconstructKeys(null);
+    expect([a.app, a.modelName, a.modelId, a.params]).toEqual(["bcx", "Person", "5", gid.params]);
   });
 });
