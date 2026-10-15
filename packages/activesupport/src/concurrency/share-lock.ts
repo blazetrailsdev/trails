@@ -1,4 +1,5 @@
 import {
+  monSynchronize,
   newCond,
   RuntimeError,
   Thread,
@@ -20,8 +21,12 @@ export interface ShareLockThreadInfo {
   backtrace?: string[] | null;
 }
 
-/** @missingRailsCall synchronize — PERMANENT */
 export class ShareLock {
+  /** @noRailsEquivalent PERMANENT */
+  synchronize = monSynchronize;
+  /** @noRailsEquivalent PERMANENT */
+  newCond = newCond;
+
   private cv: MonitorConditionVariable;
   private _sharing: Map<Thread, number>;
   private waiting: Map<Thread, [Purpose, Compatible]>;
@@ -29,33 +34,35 @@ export class ShareLock {
   private exclusiveThread: Thread | null;
   private exclusiveDepth: number;
 
-  rawState<T>(block: (data: Map<Thread, ShareLockThreadInfo>) => T): T {
-    let threads = [
-      ...new Set([...this.sleeping.keys(), ...this._sharing.keys(), ...this.waiting.keys()]),
-    ];
-    if (this.exclusiveThread) threads = [...new Set([...threads, this.exclusiveThread])];
+  rawState<T>(block: (data: Map<Thread, ShareLockThreadInfo>) => T): Promise<T> {
+    return this.synchronize(() => {
+      let threads = [
+        ...new Set([...this.sleeping.keys(), ...this._sharing.keys(), ...this.waiting.keys()]),
+      ];
+      if (this.exclusiveThread) threads = [...new Set([...threads, this.exclusiveThread])];
 
-    const data = new Map<Thread, ShareLockThreadInfo>();
+      const data = new Map<Thread, ShareLockThreadInfo>();
 
-    for (const thread of threads) {
-      const [purpose = null, compatible = null] = this.waiting.get(thread) ?? [];
+      for (const thread of threads) {
+        const [purpose = null, compatible = null] = this.waiting.get(thread) ?? [];
 
-      data.set(thread, {
-        thread: thread,
-        sharing: this._sharing.get(thread) ?? 0,
-        exclusive: this.exclusiveThread === thread,
-        purpose: purpose,
-        compatible: compatible,
-        waiting: this.waiting.has(thread),
-        sleeper: this.sleeping.get(thread) ?? null,
-      });
-    }
+        data.set(thread, {
+          thread: thread,
+          sharing: this._sharing.get(thread) ?? 0,
+          exclusive: this.exclusiveThread === thread,
+          purpose: purpose,
+          compatible: compatible,
+          waiting: !!this.waiting.get(thread),
+          sleeper: this.sleeping.get(thread) ?? null,
+        });
+      }
 
-    return block(data);
+      return block(data);
+    });
   }
 
   constructor() {
-    this.cv = newCond.call(this);
+    this.cv = this.newCond();
 
     this._sharing = new Map();
     this.waiting = new Map();
@@ -64,65 +71,74 @@ export class ShareLock {
     this.exclusiveDepth = 0;
   }
 
-  async startExclusive({
+  startExclusive({
     purpose = null,
     compatible = [],
     noWait = false,
   }: { purpose?: Purpose; compatible?: Compatible; noWait?: boolean } = {}): Promise<boolean> {
-    if (this.exclusiveThread !== Thread.current()) {
-      if (this.isBusyForExclusive(purpose)) {
-        if (noWait) return false;
+    return this.synchronize(async () => {
+      if (this.exclusiveThread !== Thread.current()) {
+        if (this.isBusyForExclusive(purpose)) {
+          if (noWait) return false;
 
-        await this.yieldShares({ purpose: purpose, compatible: compatible, blockShare: true }, () =>
-          this.waitFor("start_exclusive", () => this.isBusyForExclusive(purpose)),
-        );
+          await this.yieldShares(
+            { purpose: purpose, compatible: compatible, blockShare: true },
+            () => this.waitFor("start_exclusive", () => this.isBusyForExclusive(purpose)),
+          );
+        }
+        this.exclusiveThread = Thread.current();
       }
-      this.exclusiveThread = Thread.current();
-    }
-    this.exclusiveDepth += 1;
+      this.exclusiveDepth += 1;
 
-    return true;
+      return true;
+    });
   }
 
-  async stopExclusive({ compatible = [] }: { compatible?: Compatible } = {}): Promise<void> {
-    if (this.exclusiveThread !== Thread.current()) throw new RuntimeError("invalid unlock");
+  stopExclusive({ compatible = [] }: { compatible?: Compatible } = {}): Promise<void> {
+    return this.synchronize(async () => {
+      if (this.exclusiveThread !== Thread.current()) throw new RuntimeError("invalid unlock");
 
-    this.exclusiveDepth -= 1;
-    if (this.exclusiveDepth === 0) {
-      this.exclusiveThread = null;
+      this.exclusiveDepth -= 1;
+      if (this.exclusiveDepth === 0) {
+        this.exclusiveThread = null;
 
-      if (this.hasEligibleWaiters(compatible)) {
-        await this.yieldShares({ compatible: compatible, blockShare: true }, () =>
-          this.waitFor(
-            "stop_exclusive",
-            () => this.exclusiveThread || this.hasEligibleWaiters(compatible),
-          ),
-        );
+        if (this.hasEligibleWaiters(compatible)) {
+          await this.yieldShares({ compatible: compatible, blockShare: true }, () =>
+            this.waitFor(
+              "stop_exclusive",
+              () => this.exclusiveThread || this.hasEligibleWaiters(compatible),
+            ),
+          );
+        }
+        this.cv.broadcast();
       }
-      this.cv.broadcast();
-    }
+    });
   }
 
-  async startSharing(): Promise<void> {
-    if (
-      (this._sharing.get(Thread.current()) ?? 0) > 0 ||
-      this.exclusiveThread === Thread.current()
-    ) {
-    } else if (this.waiting.get(Thread.current())) {
-      await this.waitFor("start_sharing", () => this.exclusiveThread);
-    } else {
-      await this.waitFor("start_sharing", () => this.isBusyForSharing(false));
-    }
-    this._sharing.set(Thread.current(), (this._sharing.get(Thread.current()) ?? 0) + 1);
+  startSharing(): Promise<void> {
+    return this.synchronize(async () => {
+      if (
+        (this._sharing.get(Thread.current()) ?? 0) > 0 ||
+        this.exclusiveThread === Thread.current()
+      ) {
+      } else if (this.waiting.get(Thread.current())) {
+        await this.waitFor("start_sharing", () => this.exclusiveThread);
+      } else {
+        await this.waitFor("start_sharing", () => this.isBusyForSharing(false));
+      }
+      this._sharing.set(Thread.current(), (this._sharing.get(Thread.current()) ?? 0) + 1);
+    });
   }
 
-  stopSharing(): void {
-    if ((this._sharing.get(Thread.current()) ?? 0) > 1) {
-      this._sharing.set(Thread.current(), this._sharing.get(Thread.current())! - 1);
-    } else {
-      this._sharing.delete(Thread.current());
-      this.cv.broadcast();
-    }
+  stopSharing(): Promise<void> {
+    return this.synchronize(() => {
+      if ((this._sharing.get(Thread.current()) ?? 0) > 1) {
+        this._sharing.set(Thread.current(), this._sharing.get(Thread.current())! - 1);
+      } else {
+        this._sharing.delete(Thread.current());
+        this.cv.broadcast();
+      }
+    });
   }
 
   async exclusive<T>(
@@ -154,7 +170,7 @@ export class ShareLock {
     try {
       return await block();
     } finally {
-      this.stopSharing();
+      await this.stopSharing();
     }
   }
 
@@ -168,32 +184,36 @@ export class ShareLock {
   ): Promise<T> {
     let looseShares: number | undefined;
     let previousWait: [Purpose, Compatible] | undefined;
-    if ((looseShares = this._sharing.get(Thread.current())) !== undefined) {
-      this._sharing.delete(Thread.current());
-      if ((previousWait = this.waiting.get(Thread.current()))) {
-        if (purpose !== previousWait[0]) purpose = null;
-        compatible = compatible.filter((c) => previousWait![1].includes(c));
+    await this.synchronize(() => {
+      if ((looseShares = this._sharing.get(Thread.current())) !== undefined) {
+        this._sharing.delete(Thread.current());
+        if ((previousWait = this.waiting.get(Thread.current()))) {
+          if (purpose !== previousWait[0]) purpose = null;
+          compatible = compatible.filter((c) => previousWait![1].includes(c));
+        }
+        if (!blockShare && !compatible.includes(false)) compatible = [...compatible, false];
+        this.waiting.set(Thread.current(), [purpose, compatible]);
       }
-      if (!blockShare && !compatible.includes(false)) compatible = [...compatible, false];
-      this.waiting.set(Thread.current(), [purpose, compatible]);
-    }
 
-    this.cv.broadcast();
+      this.cv.broadcast();
+    });
 
     try {
       return await block();
     } finally {
-      await this.waitFor(
-        "yield_shares",
-        () => this.exclusiveThread && this.exclusiveThread !== Thread.current(),
-      );
+      await this.synchronize(async () => {
+        await this.waitFor(
+          "yield_shares",
+          () => this.exclusiveThread && this.exclusiveThread !== Thread.current(),
+        );
 
-      if (previousWait) {
-        this.waiting.set(Thread.current(), previousWait);
-      } else {
-        this.waiting.delete(Thread.current());
-      }
-      if (looseShares) this._sharing.set(Thread.current(), looseShares);
+        if (previousWait) {
+          this.waiting.set(Thread.current(), previousWait);
+        } else {
+          this.waiting.delete(Thread.current());
+        }
+        if (looseShares) this._sharing.set(Thread.current(), looseShares);
+      });
     }
   }
 

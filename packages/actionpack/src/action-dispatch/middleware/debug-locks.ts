@@ -28,8 +28,8 @@ export class DebugLocks {
   }
 
   /** @internal */
-  private renderDetails(req: Request): RackResponse {
-    const threads = Dependencies.interlock.rawState((rawThreads) => {
+  private async renderDetails(req: Request): Promise<RackResponse> {
+    const threads = await Dependencies.interlock.rawState((rawThreads) => {
       let idx = 0;
       for (const [thread, info] of rawThreads) {
         info.index = idx++;

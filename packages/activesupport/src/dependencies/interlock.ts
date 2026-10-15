@@ -34,8 +34,8 @@ export class Interlock {
     return this.lock.startSharing();
   }
 
-  doneRunning(): void {
-    this.lock.stopSharing();
+  doneRunning(): Promise<void> {
+    return this.lock.stopSharing();
   }
 
   running<T>(block: () => T | Promise<T>): Promise<T> {
@@ -46,7 +46,7 @@ export class Interlock {
     return this.lock.yieldShares({ compatible: ["load"] }, block);
   }
 
-  rawState<T>(block: (data: Map<Thread, ShareLockThreadInfo>) => T): T {
+  rawState<T>(block: (data: Map<Thread, ShareLockThreadInfo>) => T): Promise<T> {
     return this.lock.rawState(block);
   }
 }

@@ -17,7 +17,7 @@ function setInterlock(threads: Array<[ThreadLike, Partial<ShareLockThreadInfo>]>
       { sharing: 0, ...info } as ShareLockThreadInfo,
     ]),
   );
-  vi.spyOn(Dependencies.interlock, "rawState").mockImplementation((block) => block(map));
+  vi.spyOn(Dependencies.interlock, "rawState").mockImplementation(async (block) => block(map));
 }
 
 function thread(id: number, status: string | null = "run", backtrace: string[] = []): ThreadLike {
