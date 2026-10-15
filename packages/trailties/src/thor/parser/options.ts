@@ -1,7 +1,6 @@
 import {
   aryDelete,
   compact,
-  eachPair,
   isEmpty,
   keys,
   matchOperator,
@@ -91,10 +90,10 @@ export class Options extends Arguments {
     this.atLeastOnes = (relations.atLeastOneOptionNames ?? []).filter((array) => !isEmpty(array));
     this.disableRequiredCheck = disableRequiredCheck;
 
-    eachPair(defaults, (key, value) => {
+    for (const [key, value] of Object.entries(defaults)) {
       this.assigns[rbObjAsString(key)] = value;
       aryDelete(this.nonAssignedRequired, hashOptions[key]);
-    });
+    }
 
     this.shorts = Object.create(null) as Record<string, string>;
     this.switches = Object.create(null) as Record<string, Option>;

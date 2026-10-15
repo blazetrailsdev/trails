@@ -338,9 +338,9 @@ export class Thor {
       configurable: true,
     });
     this.methodAdded(subcommand);
-    eachPair(subcommandClass.commands(), (_meth, command) => {
+    for (const [, command] of Object.entries(subcommandClass.commands())) {
       command.ancestorName = subcommand;
-    });
+    }
   }
   declare static subtask: typeof Thor.subcommand;
 
@@ -348,13 +348,13 @@ export class Thor {
     if (!Object.hasOwn(this, "_checkUnknownOptions") || !rtest(this._checkUnknownOptions)) {
       this._checkUnknownOptions = {};
     }
-    eachPair(options, (key, value) => {
+    for (const [key, value] of Object.entries(options)) {
       if (rtest(value)) {
         (this._checkUnknownOptions as CheckUnknownOptions)[key] = rbFArray(value);
       } else {
         delete (this._checkUnknownOptions as CheckUnknownOptions)[key];
       }
-    });
+    }
     return this._checkUnknownOptions;
   }
 
