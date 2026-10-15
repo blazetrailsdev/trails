@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import type { ArgumentError as ArgumentErrorClass } from "./argument-error.js";
+import type { Hash } from "./hash.js";
 import type { Psych as PsychModule } from "./psych.js";
 
 describe("Psych with Date, DateTime and Time unseated", () => {
@@ -35,7 +36,9 @@ describe("Psych with Date, DateTime and Time unseated", () => {
 
   it("round-trips plain data", () => {
     const yaml = Psych.dump({ a: [1, "x", null] });
-    expect(Psych.unsafeLoad(yaml)).toEqual({ a: [1, "x", null] });
+    expect(Object.fromEntries(Psych.unsafeLoad(yaml) as Map<string, unknown>)).toEqual({
+      a: [1, "x", null],
+    });
   });
 });
 
@@ -66,7 +69,9 @@ describe("Psych with a Struct and the safe paths", () => {
     expect(() => Psych.safeDump(new Widget())).toThrow(Psych.DisallowedClass);
     expect(Psych.safeDump({ a: [1, "x"] }, { aliases: true })).toBe("---\na:\n- 1\n- x\n");
     expect(() => Psych.safeLoad("--- !ruby/object:Widget {}\n")).toThrow(Psych.DisallowedClass);
-    expect(Psych.safeLoad("--- {a: 1}\n")).toEqual({ a: 1 });
+    expect(Object.fromEntries(Psych.safeLoad("--- {a: 1}\n") as Map<string, unknown>)).toEqual({
+      a: 1,
+    });
   });
 
   it("answers the fallback for an empty document", async () => {
@@ -102,7 +107,9 @@ describe("Psych.load and Psych.safe_load", () => {
     const { Psych } = await import("./psych.js");
     const yaml = "a: &x 1\nb: *x\n";
     expect(() => Psych.load(yaml)).toThrow(Psych.AliasesNotEnabled);
-    expect(Psych.load(yaml, { aliases: true })).toEqual({ a: 1, b: 1 });
+    expect(Object.fromEntries(Psych.load(yaml, { aliases: true }) as Map<string, unknown>)).toEqual(
+      { a: 1, b: 1 },
+    );
   });
 
   it("answers fallback only for an empty document", async () => {
@@ -114,10 +121,12 @@ describe("Psych.load and Psych.safe_load", () => {
 
   it("honours symbolize_names and freeze", async () => {
     const { Psych } = await import("./psych.js");
-    expect(Psych.load("foo: bar\n", { symbolizeNames: true })).toEqual({ ":foo": "bar" });
-    const frozen = Psych.load("a: [1]\n", { freeze: true }) as { a: unknown[] };
-    expect(Object.isFrozen(frozen)).toBe(true);
-    expect(Object.isFrozen(frozen.a)).toBe(true);
+    expect([
+      ...(Psych.load("foo: bar\n", { symbolizeNames: true }) as Map<unknown, unknown>),
+    ]).toEqual([[":foo", "bar"]]);
+    const frozen = Psych.load("a: [1]\n", { freeze: true }) as Hash<string, unknown[]>;
+    expect(frozen.isFrozen()).toBe(true);
+    expect(Object.isFrozen(frozen.get("a"))).toBe(true);
   });
 });
 
@@ -204,6 +213,11 @@ describe("ToRuby sequences and keys", () => {
     const list = Psych.unsafeLoad("--- !ruby/array:PsychTrailsList\n- 1\n- 2\n");
     expect(list).toBeInstanceOf(PsychTrailsList);
     expect([...(list as number[])]).toEqual([1, 2]);
+  });
+
+  it('keeps an Integer key an Integer, as ruby -ryaml loads 1: a as {1=>"a"}', async () => {
+    const { Psych } = await import("./psych.js");
+    expect([...(Psych.unsafeLoad("1: a\n") as Map<unknown, unknown>)]).toEqual([[1, "a"]]);
   });
 
   it("symbolizes only String keys", async () => {
@@ -331,8 +345,10 @@ describe("Psych.load_file and Psych.unsafe_load_file", () => {
       const emptyPath = File.join(dir, "empty.yml");
       File.write(yamlPath, "\uFEFFa: 1\n");
       File.write(emptyPath, "");
-      expect(Psych.loadFile(yamlPath)).toEqual({ a: 1 });
-      expect(Psych.unsafeLoadFile(yamlPath, { symbolizeNames: true })).toEqual({ ":a": 1 });
+      expect([...(Psych.loadFile(yamlPath) as Map<unknown, unknown>)]).toEqual([["a", 1]]);
+      expect([
+        ...(Psych.unsafeLoadFile(yamlPath, { symbolizeNames: true }) as Map<unknown, unknown>),
+      ]).toEqual([[":a", 1]]);
       expect(Psych.unsafeLoadFile(emptyPath)).toBe(false);
       expect(Psych.loadFile(emptyPath)).toBeNull();
     });

@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { DateTime } from "@blazetrails/date";
 import { assertRaises } from "@blazetrails/activesupport";
-import { File as RubyFile, RuntimeError } from "@blazetrails/ruby-compat";
+import { File as RubyFile, Hash, RuntimeError } from "@blazetrails/ruby-compat";
 import { TEST_ROOT } from "./config.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -47,7 +47,7 @@ describe("YamlSerializationTest", () => {
 
   it("roundtrip serialized column", () => {
     const topic = new Topic({ content: { omg: "lol" } });
-    expect(yamlLoad(YAML.dump(topic)).content).toEqual({ omg: "lol" });
+    expect(yamlLoad(YAML.dump(topic)).content).toEqual(new Hash().set("omg", "lol"));
   });
 
   it("psych roundtrip", async () => {

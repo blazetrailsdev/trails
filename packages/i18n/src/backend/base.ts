@@ -493,7 +493,7 @@ export abstract class Base {
     if (!isHash(data)) {
       throw new InvalidLocaleData(filename, "expects it to return a hash, but does not");
     }
-    for (const [locale, d] of Object.entries(data)) {
+    for (const [locale, d] of data instanceof Map ? data : Object.entries(data)) {
       this.storeTranslations(locale, (truthy(d) ? d : {}) as TranslationData, {
         skipSymbolizeKeys: keysSymbolized,
       });
@@ -512,7 +512,7 @@ export abstract class Base {
    */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [YAML.unsafeLoad(readFile(filename), { filename, freeze: true }), true];
+      return [YAML.unsafeLoad(readFile(filename), { filename, freeze: true }), false];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }

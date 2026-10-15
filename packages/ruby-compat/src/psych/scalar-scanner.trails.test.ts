@@ -175,7 +175,12 @@ describe("Psych::ScalarScanner#tokenize arms", () => {
 describe("Psych.unsafeLoad through ScalarScanner", () => {
   it("resolves plain scalars as Psych does, not as YAML 1.2 core", () => {
     expect(
-      Psych.unsafeLoad("a: yes\nb: off\nc: 0o17\nd: 017\ne: 1,000\nf: ~\ng:\nh: :sym"),
+      Object.fromEntries(
+        Psych.unsafeLoad("a: yes\nb: off\nc: 0o17\nd: 017\ne: 1,000\nf: ~\ng:\nh: :sym") as Map<
+          string,
+          unknown
+        >,
+      ),
     ).toEqual({
       a: true,
       b: false,
@@ -189,7 +194,11 @@ describe("Psych.unsafeLoad through ScalarScanner", () => {
   });
 
   it("keeps quoted and block scalars Strings", () => {
-    expect(Psych.unsafeLoad("a: 'yes'\nb: \"12\"\nc: |-\n  12\nd: >-\n  no")).toEqual({
+    expect(
+      Object.fromEntries(
+        Psych.unsafeLoad("a: 'yes'\nb: \"12\"\nc: |-\n  12\nd: >-\n  no") as Map<string, unknown>,
+      ),
+    ).toEqual({
       a: "yes",
       b: "12",
       c: "12",

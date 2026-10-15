@@ -1216,7 +1216,7 @@ describe("Kernel#send to a method on a core class seat", () => {
 
 describe("rbClassNewInstance", () => {
   it("answers the value trails carries for a Hash and a String, and constructs any other class", () => {
-    expect(rbClassNewInstance(Hash)).toEqual({});
+    expect(rbClassNewInstance(Hash)).toEqual(new Hash());
     expect(rbClassNewInstance(rbCString)).toBe("");
     expect(rbClassNewInstance(Array)).toEqual([]);
     expect(rbObjClass(rbClassNewInstance(rbCClass))).toBe(rbCClass);

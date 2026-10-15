@@ -40,10 +40,10 @@ export function deepMergeBang(
   return hash;
 }
 
-export function deepSymbolizeKeys(hash: TranslationData): TranslationData {
+export function deepSymbolizeKeys(hash: TranslationData | Map<unknown, unknown>): TranslationData {
   const result: TranslationData = {};
-  for (const [key, value] of Object.entries(hash)) {
-    result[key] = deepSymbolizeKeysInObject(value);
+  for (const [key, value] of hash instanceof Map ? hash : Object.entries(hash)) {
+    result[key as string] = deepSymbolizeKeysInObject(value);
   }
   return result;
 }
