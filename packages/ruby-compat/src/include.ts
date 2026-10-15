@@ -28,6 +28,7 @@ import { temporalTag } from "./temporal-tag.js";
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
 import { TypeError } from "./type-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { BigDecimal } from "./big-decimal.js";
 import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
@@ -44,6 +45,7 @@ import {
   rbCNumeric,
   rbObjClass,
   rbObjSingletonClass,
+  rbInspect,
   rbCString,
   rbCTime,
   rbModAttrReader,
@@ -579,7 +581,9 @@ export class Module<I extends object = Record<never, never>> {
    * spliced between `obj` and its class, so a later `extend` sits above it and
    * `superMethod` resumes the lookup at the next link. A module already in
    * `obj`'s ancestry is skipped, as `include_modules_at` skips one
-   * (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
+   * (vendor/ruby/v3.3.11/class.c:1281,1291,1296). A frozen object's singleton
+   * class is frozen, so `rb_class_modify_check` (vendor/ruby/v3.3.11/eval.c:429)
+   * raises `FrozenError` first.
    *
    * One link is made per extended object, so singleton links are held through
    * `WeakRef`s that `relinkIncluders` still walks, keeping a later
@@ -593,6 +597,9 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   extendObject(obj: object): void {
+    if (typeof obj !== "function" && Object.isFrozen(obj)) {
+      throw new FrozenError(`can't modify frozen object: ${rbInspect(obj)}`, { receiver: obj });
+    }
     for (let proto = Object.getPrototypeOf(obj) as object | null; proto; ) {
       if (isLinkOf(this, proto)) return;
       proto = Object.getPrototypeOf(proto) as object | null;

@@ -1,4 +1,11 @@
-import { fetch, LoadError, rbInspect, rbModToS, rbObjClass } from "@blazetrails/ruby-compat";
+import {
+  byteslice,
+  fetch,
+  LoadError,
+  rbInspect,
+  rbModToS,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 
 import { Module, extend, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Entry } from "./entry.js";
@@ -57,7 +64,7 @@ export const SerializerWithFallback = new Module().include({
         return marshal70WithFallback._load(dumped);
       } else {
         Store.logger?.warn(
-          `Unrecognized payload prefix ${rbInspect(dumped.slice(0, 1))}; deserializing as nil`,
+          `Unrecognized payload prefix ${rbInspect(byteslice(dumped, 0))}; deserializing as nil`,
         );
         return null;
       }
