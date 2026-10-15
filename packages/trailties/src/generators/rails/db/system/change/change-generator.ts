@@ -1,3 +1,4 @@
+import { any } from "@blazetrails/activesupport";
 import { aryDelete, compact, File, FileUtils, flatten } from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
@@ -208,7 +209,7 @@ export class ChangeGenerator extends GeneratorBase {
       | unknown[]
       | null
       | undefined;
-    if (!(railsAppDependsOn != null && railsAppDependsOn.length > 0)) {
+    if (!(railsAppDependsOn != null && any(railsAppDependsOn))) {
       delete composeConfig["services"]["rails-app"]["depends_on"];
     }
 
