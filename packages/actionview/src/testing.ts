@@ -37,7 +37,6 @@ Testing.htmlDocumentFragment = function htmlDocumentFragment({
   return chooseHtmlParser(parserClasses, { htmlVersion });
 };
 
-/** @inventedArm if — PERMANENT */
 function chooseHtmlParser<T>(
   parserClasses: Record<string, T | undefined>,
   { htmlVersion = null }: { htmlVersion?: string | null } = {},
