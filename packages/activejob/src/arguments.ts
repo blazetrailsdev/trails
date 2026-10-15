@@ -172,13 +172,13 @@ function serializeHash(argument: AnyHash): Record<string, unknown> {
 
 /** @internal */
 async function deserializeHash(serializedHash: Record<string, unknown>): Promise<unknown> {
-  let result: Record<string, unknown> = transformValues(serializedHash, (v) =>
-    deserializeArgument(v),
+  const pending = transformValues(serializedHash, (v) => deserializeArgument(v));
+  let result: Record<string, unknown> = Object.fromEntries(
+    await Promise.all(Object.entries(pending).map(async ([k, v]) => [k, await v])),
   );
-  for (const [key, value] of Object.entries(result)) result[key] = await value;
   let symbolKeys: unknown;
   if (rtest(hashDelete(result, WITH_INDIFFERENT_ACCESS_KEY))) {
-    return withIndifferentAccess(result);
+    result = withIndifferentAccess(result) as unknown as Record<string, unknown>;
   } else if ((symbolKeys = hashDelete(result, SYMBOL_KEYS_KEY)) != null) {
     result = transformSymbolKeys(result, symbolKeys as string[]);
   } else if ((symbolKeys = hashDelete(result, RUBY2_KEYWORDS_KEY)) != null) {
