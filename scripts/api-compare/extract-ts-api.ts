@@ -732,6 +732,10 @@ export function extractFromProgram(
           }
         }
       } else if (ts.isExpressionStatement(node)) {
+        if (defineMethodSeat(node.expression)) {
+          fileFunctions.push(harvestDefineMethodSeat(node, checker, relPath));
+          return;
+        }
         const seated = seatedClassExpression(node);
         if (!seated) return;
         const classInfo = extractClass(seated.cls, checker, relPath, srcDir);
@@ -3684,6 +3688,48 @@ export function harvestModuleInstanceMethods(
   };
   visit(block.body);
   return out;
+}
+
+/**
+ * A top-level `rbModDefineMethod(Klass, "name", function () {})`: Ruby's
+ * `class Klass; def name; end; end` reopening a core class
+ * (msgpack's core_ext.rb), seated on the class the call names.
+ */
+function defineMethodSeat(
+  expr: ts.Expression,
+): { name: ts.StringLiteralLike; body: ts.FunctionExpression | ts.ArrowFunction } | undefined {
+  if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  if (expr.expression.text !== "rbModDefineMethod") return undefined;
+  const [, name, body] = expr.arguments;
+  if (!name || !ts.isStringLiteralLike(name) || !body) return undefined;
+  if (!ts.isFunctionExpression(body) && !ts.isArrowFunction(body)) return undefined;
+  return { name, body };
+}
+
+function harvestDefineMethodSeat(
+  node: ts.ExpressionStatement,
+  checker: ts.TypeChecker,
+  file: string,
+): MethodInfo {
+  const { name, body } = defineMethodSeat(node.expression)!;
+  const optionKeys = extractOptionKeys(body.parameters, checker);
+  const calls = extractCalls(body.body);
+  const callSeq = extractCallSeq(body.body);
+  const callArgs = extractCallArgs(body.body);
+  const skeleton = extractSkeleton(body.body);
+  return {
+    name: name.text,
+    visibility: "public",
+    params: extractParameters(body.parameters),
+    isStatic: false,
+    line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    file,
+    ...(optionKeys !== undefined ? { optionKeys } : {}),
+    ...(calls !== undefined ? { calls } : {}),
+    ...(callSeq !== undefined ? { callSeq } : {}),
+    ...(callArgs !== undefined ? { callArgs } : {}),
+    ...(skeleton !== undefined ? { skeleton } : {}),
+  };
 }
 
 function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {
