@@ -8,7 +8,7 @@ import { DebugLocks } from "../middleware/debug-locks.js";
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [200, {}, bodyFromString("ok")];
 
 describe("DebugLocksTest", () => {
-  it("test_render_threads_status", async () => {
+  it("render threads status", async () => {
     const app = new DebugLocks(okApp);
     const threadReady = new Concurrent.CountDownLatch();
     const testTerminated = new Concurrent.CountDownLatch();
