@@ -3,7 +3,7 @@ import { bodyFromString } from "@blazetrails/rack";
 import { isBlank, type Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
-import { IPAddr, regexpEscape, rbFSend } from "@blazetrails/ruby-compat";
+import { IPAddr, regexpEscape, rbEqq, rbFSend } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export const PORT_REGEX = "(?::\\d+)";
@@ -30,11 +30,11 @@ export const ALLOWED_HOSTS_IN_DEVELOPMENT: (string | RegExp | IPAddr)[] = [
   new IPAddr("::/0"),
 ];
 
-export type HostPermission = string | RegExp | IPAddr;
+export type HostPermission = string | RegExp | IPAddr | ((host: string) => unknown);
 
 /** @internal */
 export class Permissions {
-  private readonly hosts: (RegExp | IPAddr)[];
+  private readonly hosts: Exclude<HostPermission, string>[];
 
   constructor(hosts: HostPermission[] | HostPermission | undefined | null) {
     this.hosts = sanitizeHosts(hosts);
@@ -45,30 +45,29 @@ export class Permissions {
   }
 
   allows(host: string): boolean {
-    for (const allowed of this.hosts) {
+    return this.hosts.some((allowed) => {
       if (allowed instanceof IPAddr) {
         try {
-          if (allowed.includes(extractHostname(host))) return true;
+          return allowed.includes(extractHostname(host));
         } catch {
-          continue;
+          return false;
         }
-      } else if (allowed.test(host)) {
-        return true;
+      } else {
+        return rbEqq(allowed, host);
       }
-    }
-    return false;
+    });
   }
 }
 
 /** @internal */
 function sanitizeHosts(
   hosts: HostPermission[] | HostPermission | undefined | null,
-): (RegExp | IPAddr)[] {
+): Exclude<HostPermission, string>[] {
   const arr = hosts == null ? [] : Array.isArray(hosts) ? hosts : [hosts];
-  return arr.map((h) => {
-    if (h instanceof IPAddr) return h;
-    if (h instanceof RegExp) return sanitizeRegexp(h);
-    return sanitizeString(h);
+  return arr.map((host) => {
+    if (host instanceof RegExp) return sanitizeRegexp(host);
+    if (typeof host === "string") return sanitizeString(host);
+    return host;
   });
 }
 

@@ -85,11 +85,11 @@ export type SourceExtract = TraceEntry & {
 };
 
 export class ExceptionWrapper {
-  declare static rescueResponses: Record<string, string>;
+  declare static rescueResponses: Record<string, string | number>;
   declare static rescueTemplates: Record<string, string>;
   declare static wrapperExceptions: string[];
   declare static silentExceptions: string[];
-  declare rescueResponses: Record<string, string>;
+  declare rescueResponses: Record<string, string | number>;
   declare rescueTemplates: Record<string, string>;
   declare wrapperExceptions: string[];
   declare silentExceptions: string[];
@@ -307,7 +307,7 @@ export class ExceptionWrapper {
     const status = Object.hasOwn(this.rescueResponses, className)
       ? this.rescueResponses[className]
       : ":internal_server_error";
-    return statusCode(status.slice(1));
+    return statusCode(status);
   }
 
   isShow(request: ShowExceptionsRequest): boolean {
