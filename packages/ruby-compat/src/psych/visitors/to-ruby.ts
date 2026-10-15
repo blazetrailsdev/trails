@@ -189,18 +189,8 @@ export class ToRuby {
   private visitMapping(o: YAMLMap): unknown {
     if (o.tag && this.loadTags[o.tag])
       return this.revive(this.resolveClass(this.loadTags[o.tag]), o);
-    const hash = () =>
-      (o.items as { key: ParsedNode }[]).every(
-        ({ key: k }) =>
-          yaml.isScalar(k) &&
-          (k.tag
-            ? /^(?:tag:yaml\.org,2002:str|!(?:str|ruby\/string)(?::.*)?)$/.test(k.tag)
-            : k.type !== yaml.Scalar.PLAIN ||
-              typeof this.ss.tokenize(String(k.source)) === "string"),
-      )
-        ? (Object.create(null) as Record<string, unknown>)
-        : (new Hash() as unknown as Record<string, unknown>);
-    if (!o.tag) return this.reviveHash(this.register(o, hash()), o);
+    if (!o.tag)
+      return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
 
     let match: RegExpExecArray | null;
     if ((match = /^!ruby\/struct:?(.*)?$/.exec(o.tag))) {
@@ -255,7 +245,7 @@ export class ToRuby {
       }
       return map;
     }
-    return this.reviveHash(this.register(o, hash()), o);
+    return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
   }
 
   private register<T>(node: Node, object: T): T {
@@ -270,11 +260,17 @@ export class ToRuby {
   }
 
   private reviveHash(
-    hash: Record<string, unknown>,
+    h: Record<string, unknown>,
     o: YAMLMap,
     tagged = false,
   ): Record<string, unknown> {
+    let hash = h;
     const aset = (key: unknown, val: unknown) => {
+      if (!tagged && typeof key !== "string" && Object.getPrototypeOf(hash) === null) {
+        const upgraded = new Hash<unknown, unknown>();
+        for (const [k, v] of Object.entries(hash)) upgraded.set(k, v);
+        hash = this.register(o, upgraded as unknown as Record<string, unknown>);
+      }
       if (hash instanceof Map) hash.set(key, val);
       else hash[String(key)] = val;
     };
