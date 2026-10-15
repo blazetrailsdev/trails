@@ -87,10 +87,7 @@ import {
   typeCastedBinds as abstractTypeCastedBinds,
   quoteString as abstractQuoteString,
   ClassMethods as QuotingClassMethods,
-  columnNameMatcher as abstractColumnNameMatcher,
-  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
   quoteColumnName as abstractQuoteColumnName,
-  quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
   quotedTrue as abstractQuotedTrue,
   quotedFalse as abstractQuotedFalse,
@@ -105,7 +102,13 @@ import {
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
-import { Callbacks, include, type Extended, type Included } from "@blazetrails/activesupport";
+import {
+  Callbacks,
+  extend,
+  include,
+  type Extended,
+  type Included,
+} from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
@@ -793,9 +796,16 @@ export class AbstractAdapter implements Quoting {
 
   declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
   declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
+  declare static columnNameMatcher: Extended<typeof QuotingClassMethods>["columnNameMatcher"];
+  declare static columnNameWithOrderMatcher: Extended<
+    typeof QuotingClassMethods
+  >["columnNameWithOrderMatcher"];
+  declare static quoteColumnName: Extended<typeof QuotingClassMethods>["quoteColumnName"];
+  declare static quoteTableName: Extended<typeof QuotingClassMethods>["quoteTableName"];
 
   static {
     include(this, Callbacks);
+    extend(this, QuotingClassMethods);
     this.defineCallbacks("checkout", "checkin");
   }
 
@@ -1976,18 +1986,6 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
-  static columnNameMatcher(): RegExp {
-    return abstractColumnNameMatcher();
-  }
-
-  static columnNameWithOrderMatcher(): RegExp {
-    return abstractColumnNameWithOrderMatcher();
-  }
-
-  static quoteColumnName(columnName: unknown): string {
-    return QuotingClassMethods.quoteColumnName(columnName);
-  }
-
   private static readonly DEFAULT_READ_QUERY = [
     "begin",
     "commit",
@@ -1998,10 +1996,6 @@ export class AbstractAdapter implements Quoting {
     "select",
     "with",
   ];
-
-  static quoteTableName(tableName: unknown): string {
-    return abstractQuoteTableName.call(this, tableName);
-  }
 
   quoteTableName(tableName: unknown): string {
     return (this.constructor as typeof AbstractAdapter).quoteTableName(tableName);

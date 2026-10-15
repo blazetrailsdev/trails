@@ -185,7 +185,7 @@ export class ClassMethods {
   /** @missingRailsCall table_exists? — PERMANENT */
   static inspect(
     this: (abstract new (...args: never) => unknown) & {
-      abstractClass: boolean;
+      isAbstractClass(): boolean;
       isConnected(): boolean;
       attributeTypes():
         | Record<string, { type(): string | null | undefined } | null>
@@ -195,7 +195,7 @@ export class ClassMethods {
     const name = rbModToS(this);
     if (this === ActiveRecord.Base || rbModSingletonP(this)) {
       return name;
-    } else if (this.abstractClass) {
+    } else if (this.isAbstractClass()) {
       return `${name}(abstract)`;
     } else if (!isSchemaLoaded.call(this as never) && !this.isConnected()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;

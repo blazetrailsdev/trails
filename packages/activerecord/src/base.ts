@@ -581,6 +581,7 @@ export class Base extends Model {
   }
 
   declare static abstractClass: boolean;
+  declare static isAbstractClass: () => boolean;
 
   declare static signedIdVerifier: _MessageVerifier;
 
@@ -1426,7 +1427,7 @@ export class Base extends Model {
     if (allocating) _Core._allocation.klass = null;
     if (!allocating) {
       const klass = new.target;
-      if ((klass.abstractClass || klass === Base) && !klass._suppressAbstractCheck) {
+      if ((klass.isAbstractClass() || klass === Base) && !klass._suppressAbstractCheck) {
         // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
         throw new NotImplementedError(
           `${rbModName(klass)} is an abstract class and cannot be instantiated.`,

@@ -201,7 +201,7 @@ export interface AttributeMethodsHost {
   prototype: any;
   isBaseClass(): boolean;
   attributeNames(): string[];
-  abstractClass?: boolean;
+  isAbstractClass(): boolean;
   aliasAttribute(newName: string, oldName: string): void;
   hasAttribute(attrName: string): boolean;
   _hasAttribute(attrName: string): boolean;
@@ -346,7 +346,7 @@ export function aliasAttributeMethodDefinition(
   oldName = String(oldName);
 
   if (
-    this.abstractClass !== true &&
+    !this.isAbstractClass() &&
     !this.hasAttribute(oldName) &&
     isSchemaLoaded.call(this as never)
   ) {
@@ -384,7 +384,7 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
 
     if (!this.isBaseClass()) rbClassSuperclass(this)!.defineAttributeMethods!();
 
-    if (!this.abstractClass) {
+    if (!this.isAbstractClass()) {
       loadSchema.call(this as never);
       AttributeMethods.ClassMethods.defineAttributeMethods.call(
         this as never,
@@ -605,7 +605,7 @@ export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
 
 interface AttributeNamesHost {
   attributeTypes(): Record<string, unknown> | Hash<string, unknown>;
-  abstractClass?: boolean;
+  isAbstractClass(): boolean;
 }
 
 /** @internal */
@@ -631,13 +631,13 @@ export const ClassMethods = {
    */
   attributeNames(this: AttributeNamesHost): string[] {
     return (rbObjIvarGet(this, "@attribute_names") ??
-      (!this.abstractClass && cachedTableExists.call(this as never) === undefined
+      (!this.isAbstractClass() && cachedTableExists.call(this as never) === undefined
         ? hashKeys(this.attributeTypes())
         : rbObjIvarSet(
             this,
             "@attribute_names",
             Object.freeze(
-              !this.abstractClass && cachedTableExists.call(this as never)
+              !this.isAbstractClass() && cachedTableExists.call(this as never)
                 ? hashKeys(this.attributeTypes())
                 : [],
             ),

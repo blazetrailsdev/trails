@@ -5,6 +5,8 @@ import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import { rbClassSuperclass, rbObjClone } from "@blazetrails/ruby-compat";
 import { Author } from "./test-helpers/models/author.js";
+import { Base } from "./base.js";
+import { NotImplementedError } from "./errors.js";
 
 describe("_instantiate STI dispatch", () => {
   fixtures([]);
@@ -157,4 +159,47 @@ describe("subclass_from_attributes with permitted parameters", () => {
   it("reads the inheritance column from a Map", () => {
     expect(Company.subclassFromAttributes(new Map([["type", "Client"]]) as never)).toBe(Client);
   });
+});
+
+describe("abstract_class as a static field", () => {
+  fixtures(["authors"]);
+
+  function buildHierarchy(field: boolean) {
+    class FieldHub extends Base {
+      static abstractClass = true;
+    }
+    class BlockHub extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    const Hub = field ? FieldHub : BlockHub;
+    class Owner extends Hub {
+      static {
+        this.tableName = "authors";
+      }
+    }
+    return { Hub, Owner };
+  }
+
+  for (const field of [true, false]) {
+    it(`belongs only to the class that set it (${field ? "field" : "static block"})`, async () => {
+      const { Hub, Owner } = buildHierarchy(field);
+
+      expect(Hub.isAbstractClass()).toBe(true);
+      expect(Owner.isAbstractClass()).toBe(false);
+      expect(Owner.abstractClass).toBe(false);
+      expect(Hub.abstractClass).toBe(true);
+
+      expect(Owner.isDescendsFromActiveRecord()).toBe(true);
+      expect(Owner.baseClass).toBe(Owner);
+      await expect(Owner.connectsTo({ database: { writing: "primary" } })).rejects.toThrow(
+        NotImplementedError,
+      );
+      expect(() => Owner.connectedTo({ role: "reading" }, () => null)).toThrow(NotImplementedError);
+
+      const owner = await Owner.create({ name: "Hub owner" });
+      expect(owner.isPersisted()).toBe(true);
+    });
+  }
 });

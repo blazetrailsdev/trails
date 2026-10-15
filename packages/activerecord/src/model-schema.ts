@@ -68,7 +68,7 @@ function undecoratedTableName(modelName: string, pluralizes = true): string {
 function containedTableNamePrefix(this: typeof Base): string {
   const parent = moduleParent(this) as typeof Base;
   if (!(typeof parent === "function" && parent.prototype instanceof ActiveRecord.Base)) return "";
-  if (parent.abstractClass) return "";
+  if (parent.isAbstractClass()) return "";
   const contained =
     ((parent as any).pluralizeTableNames ?? true)
       ? singularize(parent.tableName!)
@@ -255,9 +255,9 @@ export function resetTableName(this: SchemaHost): string | null {
     this,
     klass === ActiveRecord.Base
       ? null
-      : klass.abstractClass
+      : klass.isAbstractClass()
         ? superclass.tableName
-        : superclass.abstractClass
+        : superclass.isAbstractClass()
           ? superclass.tableName || computeTableName.call(klass)
           : computeTableName.call(klass),
   );
@@ -596,7 +596,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
  * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
-  if ((this as any).abstractClass) return;
+  if ((this as any).isAbstractClass()) return;
   let pool: ReturnType<typeof Base.connectionPool>;
   try {
     pool = (this as unknown as typeof Base).connectionPool();

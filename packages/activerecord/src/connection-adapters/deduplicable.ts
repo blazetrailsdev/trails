@@ -10,8 +10,6 @@ export const Deduplicable = new Module() as Module<{
 }> & { ClassMethods: typeof ClassMethods };
 extend(Deduplicable, Concern);
 
-const registries = new WeakMap<object, Hash<object, object>>();
-
 export function deduplicate<T extends object & { deduplicated(): T }>(this: T): T {
   const registry = (this.constructor as unknown as DeduplicableClass).registry();
   return (hashAref(registry, this) ?? hashAset(registry, this, this.deduplicated())) as T;
@@ -24,9 +22,9 @@ export function deduplicated<T extends object>(this: T): T {
 }
 
 export function registry(this: object): Hash<object, object> {
-  const registry = registries.get(this) ?? new Hash<object, object>();
-  registries.set(this, registry);
-  return registry;
+  const klass = this as { _registry?: Hash<object, object> };
+  if (!Object.prototype.hasOwnProperty.call(klass, "_registry")) klass._registry = new Hash();
+  return klass._registry!;
 }
 
 export const ClassMethods = {

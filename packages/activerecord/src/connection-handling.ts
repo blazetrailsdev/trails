@@ -29,7 +29,7 @@ export async function connectsTo(
     shards?: Record<string, Record<string, string | Record<string, unknown>>>;
   },
 ): Promise<ConnectionPool[]> {
-  if (!(this === ActiveRecord.Base || this.abstractClass)) {
+  if (!(this === ActiveRecord.Base || this.isAbstractClass())) {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:82 cluster=connection-pool
     throw new NotImplementedError(
       "`connects_to` can only be called on ActiveRecord::Base or abstract classes",
@@ -75,7 +75,7 @@ export function connectedTo<T>(
   options: { role?: string; shard?: string; preventWrites?: boolean },
   fn: () => T,
 ): T {
-  if (!(this === ActiveRecord.Base || this.abstractClass)) {
+  if (!(this === ActiveRecord.Base || this.isAbstractClass())) {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:138 cluster=connection-pool
     throw new NotImplementedError(
       "calling `connected_to` is only allowed on ActiveRecord::Base or abstract classes.",
