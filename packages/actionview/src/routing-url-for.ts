@@ -41,10 +41,10 @@ export function urlFor(this: Host, options: UrlForOptions = null): string {
       onlyPath: this._generatePathsByDefault(),
     }) as string;
   } else if (isPlainObject(options)) {
-    const hash = { ...(options as Record<string, unknown>) };
-    this.ensureOnlyPathOption(hash);
+    options = { ...(options as Record<string, unknown>) };
+    this.ensureOnlyPathOption(options as Record<string, unknown>);
 
-    return RoutingUrlFor.superMethod(this, "urlFor")!(hash) as string;
+    return RoutingUrlFor.superMethod(this, "urlFor")!(options) as string;
   } else if (options instanceof TopLevel.ActionController!.Parameters) {
     this.ensureOnlyPathOption(options);
 
@@ -53,13 +53,16 @@ export function urlFor(this: Host, options: UrlForOptions = null): string {
     return this._backUrl();
   } else if (Array.isArray(options)) {
     const components = [...options];
-    const opts = extractOptionsBang(components) as Record<string, unknown>;
-    this.ensureOnlyPathOption(opts);
+    options = extractOptionsBang(components) as Record<string, unknown>;
+    this.ensureOnlyPathOption(options as Record<string, unknown>);
 
-    if (opts["onlyPath"] != null && opts["onlyPath"] !== false) {
-      return this.polymorphicPath(components, opts);
+    if (
+      (options as Record<string, unknown>)["onlyPath"] != null &&
+      (options as Record<string, unknown>)["onlyPath"] !== false
+    ) {
+      return this.polymorphicPath(components, options as Record<string, unknown>);
     } else {
-      return this.polymorphicUrl(components, opts);
+      return this.polymorphicUrl(components, options as Record<string, unknown>);
     }
   } else {
     const method = this._generatePathsByDefault() ? "path" : "url";

@@ -3081,9 +3081,35 @@ class ApiExtractor
 
   def or_operand_names(node)
     return receiver_tail_name(node) unless node.is_a?(Array) && node[0] == :binary && node[2] == :"||"
+    return or_operand_names(node[1]) if empty_hash_literal?(node[3])
 
     names = [or_operand_names(node[1]), or_operand_names(node[3])]
     names.all? ? names.join("|") : nil
+  end
+
+  def empty_hash_literal?(node)
+    node.is_a?(Array) && node[0] == :hash && node[1].nil?
+  end
+
+  # The receiver name a `merge` spread credits against: `receiver_tail_name`,
+  # plus `super` (`super.merge(...)`, `locking/optimistic.rb:151`) and the
+  # leftmost receiver of a chained `merge`, which a port flattens into one
+  # literal (`as_options(polymorphic).merge(conditional_options).merge(...)`,
+  # `connection_adapters/abstract/schema_definitions.rb:259`, is
+  # `{ ...this.asOptions(this.polymorphic), ...this.conditionalOptions(), ... }`).
+  # A `(x || {})` operand names `x` alone (`persistence.rb:746`), and
+  # `Hash[pairs]` (`rb_hash_s_create`, `vendor/ruby/v3.3.11/hash.c:1843`) names
+  # `from_entries`, its `Object.fromEntries(pairs)` port (`routing/mapper.rb:153-155`).
+  def merge_receiver_name(recv)
+    return "super" if recv.is_a?(Array) && %i[zsuper super].include?(recv[0])
+    return "from_entries" if recv.is_a?(Array) && recv[0] == :aref && const_name(recv[1]) == "Hash"
+
+    if recv.is_a?(Array) && recv[0] == :method_add_arg && recv[1].is_a?(Array) &&
+       recv[1][0] == :call && ident_name(recv[1][3]) == "merge"
+      return merge_receiver_name(recv[1][1])
+    end
+
+    receiver_tail_name(recv)
   end
 
   def symbol_key_name(args)
@@ -4156,7 +4182,16 @@ class ApiExtractor
     no_args = args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] }
     return "literal-new" if no_args && LITERAL_NEW_CONSTANTS.include?(const)
 
-    "string-new" if !no_args && const == "String"
+    return "string-new" if !no_args && const == "String"
+
+    "hwia-new" if const.split("::").last == "HashWithIndifferentAccess" && positional_arg_count(args) <= 1
+  end
+
+  def positional_arg_count(args)
+    args.sum do |arg|
+      arg = arg[1] if arg.is_a?(Array) && arg[0] == :arg_paren
+      arg.is_a?(Array) && arg[0] == :args_add_block && arg[1].is_a?(Array) ? arg[1].length : 0
+    end
   end
 
   # `weak` collects the occurrences whose receiver was inert; a name only
@@ -4259,7 +4294,8 @@ class ApiExtractor
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
         formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||
                    (value_used && name == "delete")
-        (@call_receiver_names[name] ||= Set.new) << ((!formless && receiver_tail_name(recv)) || "?")
+        recv_name = name == "merge" ? merge_receiver_name(recv) : receiver_tail_name(recv)
+        (@call_receiver_names[name] ||= Set.new) << ((!formless && recv_name) || "?")
       end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
       if STRING_EVAL_CALLS.include?(name) && string_literal_arg?(args)

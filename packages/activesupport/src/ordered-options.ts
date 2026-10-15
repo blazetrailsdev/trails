@@ -1,5 +1,5 @@
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError, merge, rbObjClassname } from "@blazetrails/ruby-compat";
+import { KeyError, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
   static name = "ActiveSupport::OrderedOptions";
@@ -188,10 +188,10 @@ export class InheritableOptions extends OrderedOptions {
   }
 
   override toH(): Record<string, unknown> {
-    return merge(
-      this.parent instanceof OrderedOptions ? this.parent.toH() : this.parent,
-      super.toH(),
-    );
+    return {
+      ...(this.parent instanceof OrderedOptions ? this.parent.toH() : this.parent),
+      ...super.toH(),
+    };
   }
 
   override inspect(): string {

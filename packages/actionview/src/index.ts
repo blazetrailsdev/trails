@@ -7,7 +7,7 @@ export {
 } from "./template/handlers/tse.js";
 
 export { Template } from "./template.js";
-export type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
+export type { BacktraceLocation, Spot } from "./template/handlers/tse.js";
 
 export { FileSystemResolver, Resolver } from "./template/resolver.js";
 export { FixtureResolver, NullResolver } from "./testing/resolvers.js";

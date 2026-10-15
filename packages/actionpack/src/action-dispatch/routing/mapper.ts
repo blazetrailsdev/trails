@@ -483,7 +483,7 @@ export class Mapping {
       optionsConstraints,
       anchor,
       scopeParams,
-      options: merge(scopeParams.options, options),
+      options: { ...scopeParams.options, ...options },
     });
   }
 
@@ -560,10 +560,10 @@ export class Mapping {
 
     const splitOptions = this.constraints(options, this.ast.pathParams);
 
-    const constraints: Record<string, unknown> = merge(
-      scopeParams.constraints,
-      Object.fromEntries(splitOptions.constraints ?? []),
-    );
+    const constraints: Record<string, unknown> = {
+      ...scopeParams.constraints,
+      ...Object.fromEntries(splitOptions.constraints ?? []),
+    };
 
     if (isPlainObject(optionsConstraints)) {
       defaults = {

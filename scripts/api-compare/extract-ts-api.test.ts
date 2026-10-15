@@ -2174,6 +2174,57 @@ describe("body call capture", () => {
     expect(marks("eachPair")).toEqual(["@entries", "@entries:options"]);
   });
 
+  it("names a leading spread through super, superFn, `x || {}`, a string-keyed index and a conditional", () => {
+    const cls = extractFromSource(
+      `class Foo extends Bar {
+        sup() {
+          return { ...super.toH(), a: 1 };
+        }
+        fn(superFn: () => object) {
+          return { ...superFn(), a: 1 };
+        }
+        ored(options: object | null) {
+          return { ...(options || {}), allQueries: true };
+        }
+        keyed(result: Record<string, object>) {
+          return { ...((result["path_params"] as object) ?? {}), ...result };
+        }
+        cond(parent: Foo | object) {
+          return { ...(parent instanceof Foo ? parent.toH() : parent), ...this };
+        }
+      }`,
+    );
+    const marks = (name: string): string[] =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .calls!.filter((c) => /^@spread\b/.test(c))
+        .sort();
+    expect(marks("sup")).toEqual(["@spread", "@spread:super"]);
+    expect(marks("fn")).toEqual(["@spread", "@spread:super"]);
+    expect(marks("ored")).toEqual(["@spread", "@spread:options"]);
+    expect(marks("keyed")).toEqual(["@spread", "@spread:pathParams"]);
+    expect(marks("cond")).toEqual(["@spread", "@spread:parent", "@spread:toH"]);
+  });
+
+  it("marks a plain-object construction for HashWithIndifferentAccess.new, and nothing for new Foo()", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        empty() { return {}; }
+        nullProto() { return Object.create(null); }
+        hwia() { return new HashWithIndifferentAccess(); }
+        other() { return new Foo(); }
+        filled() { return { a: 1 }; }
+      }`,
+    );
+    const object = (name: string): boolean =>
+      cls.instanceMethods.find((m) => m.name === name)!.calls?.includes("@object") ?? false;
+    expect(object("empty")).toBe(true);
+    expect(object("nullProto")).toBe(true);
+    expect(object("hwia")).toBe(true);
+    expect(object("other")).toBe(false);
+    expect(object("filled")).toBe(false);
+  });
+
   it("names no receiver for a native hash form over an element access", () => {
     const cls = extractFromSource(
       `class Foo {

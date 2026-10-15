@@ -247,20 +247,21 @@ export type CacheControlHash = Record<string, unknown> & { extras?: string[] };
 
 /** @internal */
 export function cacheControlHeaders(this: ResponseCacheHost): CacheControlHash {
-  const result: CacheControlHash = {};
+  const cacheControl: CacheControlHash = {};
   const segments = cacheControlSegments.call(this);
-  if (!segments) return result;
+  if (!segments) return cacheControl;
   for (const segment of segments) {
     const eq = segment.indexOf("=");
     const directive = eq === -1 ? segment : segment.slice(0, eq);
     const argument = eq === -1 ? undefined : segment.slice(eq + 1);
     if (SPECIAL_KEYS.has(directive)) {
-      result[directive.replace(/-(.)/g, (_, c: string) => c.toUpperCase())] = argument ?? true;
+      cacheControl[directive.replace(/-(.)/g, (_, c: string) => c.toUpperCase())] =
+        argument ?? true;
     } else {
-      (result.extras ??= []).push(segment);
+      (cacheControl.extras ??= []).push(segment);
     }
   }
-  return result;
+  return cacheControl;
 }
 
 /** @internal */

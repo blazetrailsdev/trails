@@ -65,6 +65,7 @@ export const TopLevel: {
         paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
       };
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
+      envConfig(): Record<string, unknown>;
       executor: { wrap<T>(block: () => T): T };
     } | null;
     Application: abstract new (...args: never[]) => unknown;

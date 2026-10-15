@@ -187,15 +187,16 @@ export class Errors<TBase extends object = object> {
       message?: string | ((record: TBase | null, options: Record<string, unknown>) => string);
     } & Record<string, unknown>,
   ): ActiveModelError {
-    const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
-    const error = new ActiveModelError(this._base, normAttr, normType, normOpts);
-    const strict = normOpts.strict;
-    if (strict) {
-      const ExceptionClass: new (message?: string) => globalThis.Error =
-        strict === true
-          ? StrictValidationFailed
-          : (strict as new (message?: string) => globalThis.Error);
-      throw new ExceptionClass(error.fullMessage ?? undefined);
+    [attribute, type, options] = this.normalizeArguments(attribute, type, options);
+    const error = new ActiveModelError(this._base, attribute, type, options);
+
+    let exception = options.strict as
+      | (new (message?: string) => globalThis.Error)
+      | true
+      | undefined;
+    if (exception) {
+      if (exception === true) exception = StrictValidationFailed;
+      throw new exception(error.fullMessage ?? undefined);
     }
     this._errors.push(error);
     return error;

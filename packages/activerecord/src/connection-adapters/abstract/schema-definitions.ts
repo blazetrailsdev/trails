@@ -6,7 +6,6 @@ import {
   included,
   isSymbol,
   keywordSplat,
-  merge,
   Module,
   rbRegMatchP,
   registerConstant,
@@ -660,10 +659,11 @@ export class ReferenceDefinition {
 
   /** @internal */
   private polymorphicOptions(): ColumnOptions {
-    return merge(
-      merge(this.asOptions(this.polymorphic), this.conditionalOptions()),
-      slice(this.options as Record<string, unknown>, "null", "first", "after"),
-    );
+    return {
+      ...this.asOptions(this.polymorphic),
+      ...this.conditionalOptions(),
+      ...slice(this.options as Record<string, unknown>, "null", "first", "after"),
+    };
   }
 
   /** @internal */

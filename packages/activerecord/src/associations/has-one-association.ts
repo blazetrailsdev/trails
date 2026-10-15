@@ -16,7 +16,7 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   async handleDependency(): Promise<void> {
-    switch (this.reflection.options.dependent) {
+    switch (this.options.dependent) {
       case "restrictWithException":
         if (await this.loadTarget()) {
           throw new DeleteRestrictionError(this.reflection.name);

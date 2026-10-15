@@ -499,7 +499,9 @@ export function toFormParams(
     params.push({ name: namespace ?? "", value: toParam(attribute) });
   }
 
-  return params.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return params.sort((pair, other) =>
+    pair.name < other.name ? -1 : pair.name > other.name ? 1 : 0,
+  );
 }
 
 /** @internal */

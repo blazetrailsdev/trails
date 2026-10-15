@@ -3549,6 +3549,60 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("names HashWithIndifferentAccess.new with at most one argument an hwia-new", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core.rb": `
+        class Core
+          def bare
+            ActiveSupport::HashWithIndifferentAccess.new
+          end
+
+          def wrapped(h)
+            HashWithIndifferentAccess.new(h)
+          end
+
+          def blocked
+            HashWithIndifferentAccess.new { |h, k| h[k] = 1 }
+          end
+        end
+      `,
+    });
+    expect(c["Core#bare"]).toEqual({ new: ["hwia-new"] });
+    expect(c["Core#wrapped"]).toEqual({ new: ["hwia-new"] });
+    expect(c["Core#blocked"]).toEqual({ new: ["const"] });
+  });
+
+  it("names a merge receiver through super, a chained merge, (x || {}) and Hash[pairs]", () => {
+    const names = rubyCallReceivers(
+      {
+        "lib/active_support/core.rb": `
+          class Core
+            def sup
+              super.merge(a: 1)
+            end
+
+            def chained
+              as_options(x).merge(conditional_options).merge(slice)
+            end
+
+            def ored(options)
+              (options || {}).merge(all_queries: true)
+            end
+
+            def pairs(list)
+              Hash[list].merge(@defaults)
+            end
+          end
+        `,
+      },
+      "callReceiverNames",
+    );
+    expect(names["Core#sup"]).toEqual({ merge: ["super"] });
+    expect(names["Core#chained"]).toEqual({ merge: ["as_options"] });
+    expect(names["Core#ored"]).toEqual({ merge: ["options"] });
+    expect(names["Core#pairs"]).toEqual({ merge: ["from_entries"] });
+  });
+
   it("names an argument-less Hash.new / Array.new a literal and String.new(x) a conversion", () => {
     const c = rubyCallReceivers({
       "lib/active_support/core.rb": `

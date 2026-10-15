@@ -11,7 +11,11 @@ import {
 } from "../helpers/javascript-helper.js";
 
 function host() {
-  return { outputBuffer: null as OutputBuffer | null, viewFlow: new OutputFlow() };
+  return {
+    outputBuffer: null as OutputBuffer | null,
+    viewFlow: new OutputFlow(),
+    contentSecurityPolicyNonce: () => null,
+  };
 }
 
 describe("JavaScriptHelperTest", () => {
