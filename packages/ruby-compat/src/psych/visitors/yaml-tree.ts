@@ -343,12 +343,6 @@ export class YAMLTree {
     return this.register(o, scalar);
   }
 
-  /**
-   * `visit_String` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:254-301`),
-   * with the style libyaml's `yaml_emitter_select_scalar_style` resolves from it:
-   * a plain request the analysis refuses becomes single-quoted, and a
-   * single-quoted one it refuses becomes double-quoted.
-   */
   private visitString(o: string): Node {
     let style: Scalar.Type = yaml.Scalar.PLAIN;
     let tag: string | null = null;
@@ -388,10 +382,6 @@ export class YAMLTree {
     return scalar;
   }
 
-  /**
-   * `visit_Symbol` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:368-374`):
-   * a Symbol is its leading-colon string here, emitted in the `ANY` style.
-   */
   private visitSymbol(o: string): Node {
     const scalar = this.doc.createNode(o) as Scalar;
     scalar.type = analyzeScalar(o).blockPlainAllowed ? yaml.Scalar.PLAIN : yaml.Scalar.QUOTE_SINGLE;
