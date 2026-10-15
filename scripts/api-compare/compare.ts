@@ -5600,9 +5600,11 @@ export function main() {
           byOwner === undefined
             ? undefined
             : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
-        if (byOwner?.has(tsClass ?? "") && !inlinedTagsCompared.has(`${tsFile} ${tsClass}`)) {
+        if (tsClass !== undefined && byOwner?.has(tsClass)) {
           inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
-          inlinedFromPairs.push({ package: pkg, tsFile, owner: tsClass!, rubyModule });
+          const pair = { package: pkg, tsFile, owner: tsClass, rubyModule };
+          if (!inlinedFromPairs.some((p) => JSON.stringify(p) === JSON.stringify(pair)))
+            inlinedFromPairs.push(pair);
         }
         return inlinedSegments(
           klass.instanceMethods.find((m) => m.name === "initialize"),

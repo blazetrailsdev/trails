@@ -184,10 +184,18 @@ export function inlinedFromFindings(
       const declared = Object.values(pkg.classes).filter(
         (other) => (other as unknown as ClassInfo).file === tsFile,
       );
-      const paired = pairs.find(
+      const pairedWith = pairs.filter(
         (pair) =>
           pair.package === name && pair.tsFile === tsFile && pair.owner === (klass.name ?? owner),
       );
+      const paired =
+        pairedWith.length > 1
+          ? pairedWith.find((pair) => pair.rubyModule.split("::").pop() === short)
+          : pairedWith[0];
+      if (pairedWith.length > 1 && paired === undefined) {
+        const fqns = pairedWith.map((pair) => pair.rubyModule).join(", ");
+        throw new Error(`${TAG} on ${name}/${tsFile} ${owner} was compared against ${fqns}`);
+      }
       const counterpart =
         (paired && rubyEntities.find((e) => e.package === name && e.fqn === paired.rubyModule)) ??
         mirrored.find((entity) => entity.fqn.split("::").pop() === short) ??
