@@ -7,10 +7,16 @@ type ClassLike = new (...args: unknown[]) => unknown;
 
 /** @internal */
 class SafeCoder {
-  constructor(
-    private readonly permittedClasses: unknown[] = [],
-    private readonly unsafeLoad: boolean | null = null,
-  ) {}
+  private readonly permittedClasses: unknown[];
+  private readonly unsafeLoad: boolean | null;
+
+  constructor({
+    permittedClasses = [],
+    unsafeLoad = null,
+  }: { permittedClasses?: unknown[]; unsafeLoad?: boolean | null } = {}) {
+    this.permittedClasses = permittedClasses;
+    this.unsafeLoad = unsafeLoad;
+  }
 
   dump(object: unknown): string {
     if (this.unsafeLoad == null ? useYamlUnsafeLoad() : this.unsafeLoad) {
@@ -42,14 +48,21 @@ export class YAMLColumn extends ColumnSerializer {
     objectClass: ClassLike = Object as unknown as ClassLike,
     { permittedClasses = [], unsafeLoad = null }: YamlColumnOptions = {},
   ) {
-    super(attrName, new SafeCoder(permittedClasses ?? [], unsafeLoad), objectClass);
+    super(
+      attrName,
+      new SafeCoder({ permittedClasses: permittedClasses ?? [], unsafeLoad: unsafeLoad }),
+      objectClass,
+    );
   }
 
   override initWith(coder: Record<string, unknown>): void {
     if (coder["coder"] == null || coder["coder"] === false) {
       const permittedClasses = (coder["permitted_classes"] as unknown[] | undefined) ?? [];
       const unsafeLoad = (coder["unsafe_load"] as boolean | undefined) ?? false;
-      coder["coder"] = new SafeCoder(permittedClasses, unsafeLoad);
+      coder["coder"] = new SafeCoder({
+        permittedClasses: permittedClasses,
+        unsafeLoad: unsafeLoad,
+      });
     }
     super.initWith(coder);
   }
