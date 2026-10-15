@@ -46,7 +46,6 @@ packages/trailties/src/thor/test-helpers/fixtures/*
 # Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
 packages/actionpack/src/test-helpers/fixtures/public/
 packages/actionpack/src/test-helpers/fixtures/公共/
-||||||| parent of 7af170a78e (feat(actionview): ActiveRecordTestCase/SQLCounter, CspHelper, live helper Modules, TSE::Util include)
 
 # Copies of vendor/rails/v8.0.2/actionview/test/fixtures/*.yml; developers, replies and
 # topics are TSE templates, not YAML.
