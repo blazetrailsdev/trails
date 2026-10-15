@@ -17,7 +17,7 @@ describe("Context", () => {
   it("_layoutFor defaults to the layout flow and returns an html-safe buffer", () => {
     const view = new Base();
     view.viewFlow.set("layout", "<b>");
-    expect(view._layoutFor().toString()).toBe("<b>");
-    expect(view._layoutFor("missing").toString()).toBe("");
+    expect(view._layoutFor()!.toString()).toBe("<b>");
+    expect(view._layoutFor("missing")!.toString()).toBe("");
   });
 });

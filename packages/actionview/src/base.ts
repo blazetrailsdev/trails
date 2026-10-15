@@ -396,7 +396,7 @@ attrInternal.call(Base.prototype, "defaultFormBuilder");
 installControllerDelegates(Base.prototype);
 
 Object.defineProperty(Base.prototype, "yield", {
-  get(this: Base): SafeBuffer | Promise<SafeBuffer> {
+  get(this: Base): SafeBuffer | Promise<SafeBuffer> | null {
     return this._layoutFor();
   },
   enumerable: false,
@@ -404,7 +404,9 @@ Object.defineProperty(Base.prototype, "yield", {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface Base extends Context, Omit<HelperMethods, "logger">, TseUtilMethods {
+export interface Base
+  extends Omit<Context, "_layoutFor">, Omit<HelperMethods, "logger">, TseUtilMethods {
+  _layoutFor: (typeof HelperExports)["_layoutFor"];
   controller: Parameters<typeof assignController>[0];
   request: unknown;
   _backUrl: typeof _backUrl;
