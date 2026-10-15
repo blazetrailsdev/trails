@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FlashHash } from "../../action-dispatch/flash.js";
 import { assertNil } from "@blazetrails/activesupport";
+import { rbObjDup, rbObjIvarSet } from "@blazetrails/ruby-compat";
 
 describe("FlashHashTest", () => {
   it("set get", () => {
@@ -22,15 +23,20 @@ describe("FlashHashTest", () => {
   });
 
   it("key", () => {
-    const flash = new FlashHash({ notice: "hello" });
-    expect(flash.has("notice")).toBe(true);
-    expect(flash.has("missing")).toBe(false);
+    const flash = new FlashHash();
+    flash.set("foo", "bar");
+
+    expect(flash.isKey("foo")).toBe(true);
+    expect(flash.isKey("bar")).toBe(false);
   });
 
   it("delete", () => {
-    const flash = new FlashHash({ notice: "hello" });
-    expect(flash.delete("notice")).toBe("hello");
-    expect(flash.has("notice")).toBe(false);
+    const flash = new FlashHash();
+    flash.set("foo", "bar");
+    flash.delete("foo");
+
+    expect(flash.isKey("foo")).toBe(false);
+    assertNil(flash.get("foo"));
   });
 
   it("to hash", () => {
@@ -53,13 +59,23 @@ describe("FlashHashTest", () => {
   });
 
   it("from session value", () => {
-    const flash = FlashHash.fromSessionValue({ notice: "hello" });
-    expect(flash.get("notice")).toBe("hello");
+    const legacy = new FlashHash({ greeting: "Hello", farewell: "Goodbye" });
+    rbObjIvarSet(legacy, "@used", new Set(["farewell"]));
+    const hash = FlashHash.fromSessionValue(legacy);
+    expect(hash.toHash()).toEqual({ greeting: "Hello" });
+    assertNil(hash.toSessionValue());
   });
 
   it("from session value on json serializer", () => {
-    const flash = FlashHash.fromSessionValue({ notice: "test" });
-    expect(flash.get("notice")).toBe("test");
+    const decryptedData =
+      '{ "session_id":"d98bdf6d129618fc2548c354c161cfb5", "flash":{"discard":["farewell"], "flashes":{"greeting":"Hello","farewell":"Goodbye"}} }';
+    const session = JSON.parse(decryptedData);
+    const hash = FlashHash.fromSessionValue(session["flash"]);
+
+    expect(hash.toHash()).toEqual({ greeting: "Hello" });
+    assertNil(hash.toSessionValue());
+    expect(hash.get("greeting")).toBe("Hello");
+    expect(hash.get("greeting")).toBe("Hello");
   });
 
   it("empty?", () => {
@@ -80,7 +96,7 @@ describe("FlashHashTest", () => {
   it("replace", () => {
     const flash = new FlashHash({ old: "value" });
     flash.replace({ new: "value" });
-    expect(flash.has("old")).toBe(false);
+    expect(flash.isKey("old")).toBe(false);
     expect(flash.get("new")).toBe("value");
   });
 
@@ -95,8 +111,8 @@ describe("FlashHashTest", () => {
     const flash = new FlashHash({ a: "1", b: "2" });
     flash.discard("a");
     flash.sweep();
-    expect(flash.has("a")).toBe(false);
-    expect(flash.has("b")).toBe(true);
+    expect(flash.isKey("a")).toBe(false);
+    expect(flash.isKey("b")).toBe(true);
   });
 
   it("keep sweep", () => {
@@ -105,16 +121,16 @@ describe("FlashHashTest", () => {
     flash.sweep();
     expect(flash.get("a")).toBe("1");
     flash.sweep();
-    expect(flash.has("a")).toBe(false);
+    expect(flash.isKey("a")).toBe(false);
   });
 
   it("update sweep", () => {
     const flash = new FlashHash();
     flash.update({ a: "1" });
     flash.sweep();
-    expect(flash.has("a")).toBe(true);
+    expect(flash.isKey("a")).toBe(true);
     flash.sweep();
-    expect(flash.has("a")).toBe(false);
+    expect(flash.isKey("a")).toBe(false);
   });
 
   it("update delete sweep", () => {
@@ -122,14 +138,14 @@ describe("FlashHashTest", () => {
     flash.update({ a: "1" });
     flash.delete("a");
     flash.sweep();
-    expect(flash.has("a")).toBe(false);
+    expect(flash.isKey("a")).toBe(false);
   });
 
   it("delete sweep", () => {
     const flash = new FlashHash({ a: "1" });
     flash.delete("a");
     flash.sweep();
-    expect(flash.has("a")).toBe(false);
+    expect(flash.isKey("a")).toBe(false);
   });
 
   it("clear sweep", () => {
@@ -142,9 +158,9 @@ describe("FlashHashTest", () => {
     const flash = new FlashHash({ old: "1" });
     flash.replace({ new: "2" });
     flash.sweep();
-    expect(flash.has("new")).toBe(true);
+    expect(flash.isKey("new")).toBe(true);
     flash.sweep();
-    expect(flash.has("new")).toBe(false);
+    expect(flash.isKey("new")).toBe(false);
   });
 
   it("discard then add", () => {
@@ -167,7 +183,7 @@ describe("FlashHashTest", () => {
     const flash = new FlashHash({ a: "1" });
     flash.sweep();
     flash.sweep();
-    expect(flash.has("a")).toBe(false);
+    expect(flash.isKey("a")).toBe(false);
   });
 
   it("fromSessionValue loads Rails-shaped { flashes, discard } payload", () => {
@@ -176,7 +192,7 @@ describe("FlashHashTest", () => {
       discard: ["dropped"],
     });
     expect(loaded.get("kept")).toBe("yes");
-    expect(loaded.has("dropped")).toBe(false);
+    expect(loaded.isKey("dropped")).toBe(false);
   });
 
   it("fromSessionValue marks all surviving keys for next-sweep discard", () => {
@@ -186,21 +202,13 @@ describe("FlashHashTest", () => {
     });
     expect(loaded.get("kept")).toBe("yes");
     loaded.sweep();
-    expect(loaded.has("kept")).toBe(false);
-  });
-
-  it("dup returns an independent copy", () => {
-    const original = new FlashHash({ notice: "hi" });
-    const copy = original.dup();
-    copy.set("notice", "changed");
-    expect(original.get("notice")).toBe("hi");
-    expect(copy.get("notice")).toBe("changed");
+    expect(loaded.isKey("kept")).toBe(false);
   });
 
   it("dup carries over the discard set so sweep behaves identically", () => {
     const original = FlashHash.fromSessionValue({ flashes: { a: "1" }, discard: [] });
-    const copy = original.dup();
+    const copy = rbObjDup(original);
     copy.sweep();
-    expect(copy.has("a")).toBe(false);
+    expect(copy.isKey("a")).toBe(false);
   });
 });

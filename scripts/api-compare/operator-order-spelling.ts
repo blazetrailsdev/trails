@@ -73,6 +73,15 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // action_dispatch/http/headers.rb:63 `def [](key)` → http/headers.ts
   // `Headers#get`, and :68 `def []=(key, value)` → `set`.
   "ActionDispatch::Http::Headers": { "[]": ["get"], "[]=": ["set"] },
+  // action_dispatch/middleware/cookies.rb:345 `def [](name)` → middleware/cookies.ts
+  // `CookieJar#get`, :379 `def []=(name, options)` → `set`; :513 / :525 on
+  // `AbstractCookieJar` likewise.
+  "ActionDispatch::Cookies::CookieJar": { "[]": ["get"], "[]=": ["set"] },
+  "ActionDispatch::Cookies::AbstractCookieJar": { "[]": ["get"], "[]=": ["set"] },
+  // action_dispatch/middleware/flash.rb:97 / :104 `FlashNow#[]=` / `#[]`, and
+  // :163 / :169 `FlashHash#[]=` / `#[]` → middleware/flash.ts `set` / `get`.
+  "ActionDispatch::Flash::FlashNow": { "[]": ["get"], "[]=": ["set"] },
+  "ActionDispatch::Flash::FlashHash": { "[]": ["get"], "[]=": ["set"] },
   // action_dispatch/http/mime_type.rb:51 `def [](type)` inside `class << self`
   // → http/mime-type.ts `Mime.get`.
   Mime: { "self.[]": ["get"] },

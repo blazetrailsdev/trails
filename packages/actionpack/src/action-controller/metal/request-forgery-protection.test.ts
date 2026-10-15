@@ -58,6 +58,9 @@ const cookieJar = () => {
     env,
     getHeader: (name: string) => env[name],
     hasHeader: (name: string) => Object.hasOwn(env, name),
+    fetchHeader: (name: string, block: (name: string) => unknown) =>
+      Object.hasOwn(env, name) ? env[name] : block(name),
+    setHeader: (name: string, value: unknown) => (env[name] = value),
     cookies: {},
   });
 };

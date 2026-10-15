@@ -43,6 +43,9 @@ function cookieRequest(env: Record<string, unknown> = {}): RequestCookieMethodsH
     env: e,
     getHeader: (name: string) => e[name],
     hasHeader: (name: string) => Object.hasOwn(e, name),
+    fetchHeader: (name: string, block: (name: string) => unknown) =>
+      Object.hasOwn(e, name) ? e[name] : block(name),
+    setHeader: (name: string, value: unknown) => (e[name] = value),
     cookies: {},
   };
 }
@@ -143,6 +146,9 @@ function chainedHost(env: Record<string, unknown>): ChainedCookieJars {
     env,
     getHeader: (k: string) => env[k],
     hasHeader: (k: string) => Object.hasOwn(env, k),
+    fetchHeader: (k: string, block: (k: string) => unknown) =>
+      Object.hasOwn(env, k) ? env[k] : block(k),
+    setHeader: (k: string, value: unknown) => (env[k] = value),
     cookies: {},
   }) as unknown as ChainedCookieJars;
 }

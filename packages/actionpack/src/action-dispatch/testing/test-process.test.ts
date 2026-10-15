@@ -23,6 +23,8 @@ function makeHost(overrides: Partial<TestProcessHost> = {}): TestProcessHost {
       env: {},
       getHeader: () => undefined,
       hasHeader: () => false,
+      fetchHeader: (_name: string, block: (name: string) => unknown) => block(_name),
+      setHeader: () => undefined,
       session: new Session(null, { env: {} }),
       flash: new FlashHash(),
       cookies: { a: "1" },

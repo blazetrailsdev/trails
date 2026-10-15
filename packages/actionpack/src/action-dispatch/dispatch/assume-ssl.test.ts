@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { bodyFromString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { AssumeSSL } from "./assume-ssl.js";
+import { AssumeSSL } from "../middleware/assume-ssl.js";
 
 describe("AssumeSSLTest", () => {
   it("sets expected headers", async () => {
