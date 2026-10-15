@@ -4,7 +4,7 @@ import * as ActiveRecord from "@blazetrails/activerecord";
 import { SafeBuffer, assertMatch } from "@blazetrails/activesupport";
 import { Company } from "../test-helpers/fixtures/company.js";
 import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
-import { debug as _debug } from "./debug-helper.js";
+import { debug as _debug } from "../helpers/debug-helper.js";
 import { Base } from "../base.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
@@ -17,7 +17,7 @@ describe("DebugHelperTest", () => {
     vi.restoreAllMocks();
   });
 
-  it("test_debug", async () => {
+  it("debug", async () => {
     const pool = ActiveRecord.Base.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
     const company = new Company({ name: "firebase" });
@@ -25,6 +25,11 @@ describe("DebugHelperTest", () => {
     assertMatch("name: name", output);
     assertMatch("value_before_type_cast: firebase", output);
     assertMatch("active_record_yaml_version: 2", output);
+  });
+
+  it("debug with marshal error", () => {
+    const obj = () => {};
+    assertMatch("[Function: obj]", debug(obj).toString());
   });
 
   it("returns a SafeBuffer marked html_safe", () => {
