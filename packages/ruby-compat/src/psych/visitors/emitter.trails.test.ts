@@ -42,7 +42,7 @@ describe("YAMLTree#tree emitted by Visitors::Emitter", () => {
   });
 
   it("writes integers and booleans through visit_Integer", () => {
-    expect(Psych.dump(1e21)).toBe("--- 1000000000000000000000\n");
+    expect(Psych.dump(Number.MAX_SAFE_INTEGER)).toBe("--- 9007199254740991\n");
     expect(Psych.dump([true, false])).toBe("---\n- true\n- false\n");
   });
 
@@ -63,5 +63,14 @@ describe("YAMLTree#tree emitted by Visitors::Emitter", () => {
     document.children.push(mapping);
     stream.children.push(document);
     expect(stream.yaml()).toBe("--- {a: 1}\n");
+  });
+
+  it("writes a Float the integer-safe range cannot hold as Float#to_s", () => {
+    expect(Psych.dump(1e300)).toBe("--- 1.0e+300\n");
+  });
+
+  it("indents a root block scalar's continuation lines", () => {
+    expect(Psych.dump("a\n\nb")).toBe("--- |-\n  a\n\n  b\n");
+    expect(Psych.dump("a\n  b\nc")).toBe("--- |-\n  a\n    b\n  c\n");
   });
 });

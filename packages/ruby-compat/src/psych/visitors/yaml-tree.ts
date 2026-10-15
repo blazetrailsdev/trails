@@ -15,6 +15,7 @@ import {
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjRespondTo,
+  rbObjAsString,
 } from "../../object.js";
 import { Range } from "../../range.js";
 import { type StructInstance, isStruct } from "../../struct.js";
@@ -139,7 +140,7 @@ export class YAMLTree {
         : this.visitObject(target);
     }
     if (target == null) return this.visitNilClass();
-    if (typeof target === "number" && !Number.isInteger(target)) return this.visitFloat(target);
+    if (typeof target === "number" && !Number.isSafeInteger(target)) return this.visitFloat(target);
     return this.visitInteger(target as number | boolean | bigint);
   }
 
@@ -149,7 +150,7 @@ export class YAMLTree {
     } else if (!Number.isFinite(o)) {
       return new Scalar(o > 0 ? ".inf" : "-.inf", null, null, true, false);
     } else {
-      return new Scalar(String(o), null, null, true, false);
+      return new Scalar(rbObjAsString(new Number(o)), null, null, true, false);
     }
   }
 
@@ -256,13 +257,11 @@ export class YAMLTree {
 
   private visitInteger(o: { toS(): string } | PlainDate | number | boolean | bigint): Node {
     return new Scalar(
-      typeof o === "number"
-        ? BigInt(o).toString()
-        : typeof o !== "object"
-          ? String(o)
-          : temporalTag(o) === "Temporal.PlainDate"
-            ? (o as PlainDate).toString()
-            : (o as { toS(): string }).toS(),
+      typeof o !== "object"
+        ? String(o)
+        : temporalTag(o) === "Temporal.PlainDate"
+          ? (o as PlainDate).toString()
+          : (o as { toS(): string }).toS(),
       null,
       null,
       true,
