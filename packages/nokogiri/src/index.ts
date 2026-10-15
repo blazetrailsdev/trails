@@ -12,3 +12,9 @@ export type { XmlNode, XmlDocument };
 export type { AttrNode } from "./xml/node.js";
 export type { SyntaxError };
 export type { Readable } from "./readable.js";
+import {
+  DocumentFragment as Html4DocumentFragment,
+  Node as Html4Node,
+} from "./html4/document-fragment.js";
+export const HTML4 = { DocumentFragment: Html4DocumentFragment, Node: Html4Node };
+export type { Html4DocumentFragment, Html4Node };

@@ -19,7 +19,8 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "libxml2-wasm": "^0.7.1"
+    "libxml2-wasm": "^0.7.1",
+    "parse5": "8.0.0"
   },
   "engines": {
     "node": ">=24"

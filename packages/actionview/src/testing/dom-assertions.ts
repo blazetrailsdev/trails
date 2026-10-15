@@ -1,11 +1,8 @@
-import { assert, assertNot } from "@blazetrails/activesupport";
+import { assert, assertNot, isBlank } from "@blazetrails/activesupport";
+import { HTML4, type Html4DocumentFragment, type Html4Node } from "@blazetrails/nokogiri";
 
-type Node =
-  | { type: "element"; name: string; attributeNodes: [string, string][]; children: Node[] }
-  | { type: "text"; text: string }
-  | { type: "comment"; text: string };
-
-type Fragment = { children: Node[] };
+type Fragment = Html4DocumentFragment | Html4Node;
+type Attr = Html4Node["attributeNodes"][number];
 
 export function assertDomEqual(
   expected: unknown,
@@ -41,18 +38,18 @@ function compareDoms(expected: Fragment, actual: Fragment, strict: boolean): boo
   return true;
 }
 
-function extractChildren(node: Fragment, strict: boolean): Node[] {
+function extractChildren(node: Fragment, strict: boolean): Html4Node[] {
   if (strict) {
     return node.children;
   } else {
-    return node.children.filter((n) => !(n.type === "text" && n.text.trim() === ""));
+    return node.children.filter((n) => !(n.isText() && isBlank(n.text)));
   }
 }
 
-function isEqualChildren(child: Node, otherChild: Node, strict: boolean): boolean {
+function isEqualChildren(child: Html4Node, otherChild: Html4Node, strict: boolean): boolean {
   if (child.type !== otherChild.type) return false;
 
-  if (child.type === "element" && otherChild.type === "element") {
+  if (child.isElement()) {
     return (
       child.name === otherChild.name &&
       isEqualAttributeNodes(child.attributeNodes, otherChild.attributeNodes) &&
@@ -63,18 +60,18 @@ function isEqualChildren(child: Node, otherChild: Node, strict: boolean): boolea
   }
 }
 
-function isEqualChild(child: Node, otherChild: Node, strict: boolean): boolean {
+function isEqualChild(child: Html4Node, otherChild: Html4Node, strict: boolean): boolean {
   if (strict) {
-    return toS(child) === toS(otherChild);
+    return child.toS() === otherChild.toS();
   } else {
-    return split(toS(child)).join(" ") === split(toS(otherChild)).join(" ");
+    return split(child.toS()).join(" ") === split(otherChild.toS()).join(" ");
   }
 }
 
-function isEqualAttributeNodes(nodes: [string, string][], otherNodes: [string, string][]): boolean {
+function isEqualAttributeNodes(nodes: Attr[], otherNodes: Attr[]): boolean {
   if (nodes.length !== otherNodes.length) return false;
 
-  const byName = ([a]: [string, string], [b]: [string, string]) => (a < b ? -1 : a > b ? 1 : 0);
+  const byName = (a: Attr, b: Attr) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   nodes = [...nodes].sort(byName);
   otherNodes = [...otherNodes].sort(byName);
 
@@ -85,77 +82,14 @@ function isEqualAttributeNodes(nodes: [string, string][], otherNodes: [string, s
   return true;
 }
 
-function isEqualAttribute(attr: [string, string], otherAttr: [string, string]): boolean {
-  return attr[0] === otherAttr[0] && attr[1] === otherAttr[1];
+function isEqualAttribute(attr: Attr, otherAttr: Attr): boolean {
+  return attr.name === otherAttr.name && attr.value === otherAttr.value;
 }
 
 function split(string: string): string[] {
   return string.trim() === "" ? [] : string.trim().split(/\s+/);
 }
 
-function toS(node: Node): string {
-  if (node.type === "comment") return `<!--${node.text}-->`;
-  if (node.type === "text") {
-    return node.text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  }
-  return "";
-}
-
-const VOID_ELEMENTS = new Set(
-  "area base basefont br col embed frame hr img input isindex link meta param source track wbr".split(
-    " ",
-  ),
-);
-
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
-
-const TOKEN =
-  /<!--([\s\S]*?)(?:-->|$)|<\/([a-zA-Z][^\s>]*)[^>]*>?|<([a-zA-Z][^\s/>]*)((?:\s*[^\s=/>]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?|\s*\/(?!>))*)\s*(\/?)>|[^<]+|</g;
-
-const ATTRIBUTE = /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*)))?/g;
-
-function decodeEntities(string: string): string {
-  return string.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (match, ref: string) => {
-    if (ref[0] !== "#") return ENTITIES[ref] ?? match;
-    return String.fromCodePoint(
-      /^#x/i.test(ref) ? parseInt(ref.slice(2), 16) : Number(ref.slice(1)),
-    );
-  });
-}
-
-function fragment(text: unknown): Fragment {
-  const root: Fragment = { children: [] };
-  const stack: (Fragment & { name?: string })[] = [root];
-  for (const [token, comment, endName, name, attributes, selfClosing] of String(
-    text ?? "",
-  ).matchAll(TOKEN)) {
-    const children = stack[stack.length - 1].children;
-    const last = children[children.length - 1];
-    if (comment !== undefined) {
-      children.push({ type: "comment", text: comment });
-    } else if (endName !== undefined) {
-      const index = stack.map((node) => node.name).lastIndexOf(endName.toLowerCase());
-      if (index > 0) stack.length = index;
-    } else if (name !== undefined) {
-      const attributeNodes = [...attributes.matchAll(ATTRIBUTE)].map(
-        ([, key, ...values]): [string, string] => [
-          key.toLowerCase(),
-          decodeEntities(values.find((value) => value !== undefined) ?? ""),
-        ],
-      );
-      const node = {
-        type: "element" as const,
-        name: name.toLowerCase(),
-        attributeNodes,
-        children: [] as Node[],
-      };
-      children.push(node);
-      if (selfClosing === "" && !VOID_ELEMENTS.has(node.name)) stack.push(node);
-    } else if (last?.type === "text") {
-      last.text += decodeEntities(token);
-    } else {
-      children.push({ type: "text", text: decodeEntities(token) });
-    }
-  }
-  return root;
+function fragment(text: unknown): Html4DocumentFragment {
+  return HTML4.DocumentFragment.parse(text);
 }
