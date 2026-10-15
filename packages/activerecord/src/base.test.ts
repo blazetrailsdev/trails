@@ -268,7 +268,7 @@ describe("BasicsTest", async () => {
     await assertRaises([RuntimeError], {}, () => (Topic as any).columnsHash());
     vi.restoreAllMocks();
 
-    expect(((await Topic.first()) as any).content).toEqual(payload);
+    expect(((await Topic.first()) as any).content).toEqual(new Hash().set("foo", payload.foo));
   });
 
   it("column names are escaped", async () => {

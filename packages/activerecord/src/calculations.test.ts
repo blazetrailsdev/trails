@@ -2,7 +2,7 @@ import { Time as RubyTime, Temporal } from "@blazetrails/date";
 import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
-import { TypeError } from "@blazetrails/ruby-compat";
+import { Hash, TypeError } from "@blazetrails/ruby-compat";
 import { assertCalled } from "@blazetrails/activesupport";
 import { Result } from "./result.js";
 import {
@@ -1249,7 +1249,9 @@ describe("CalculationsTest", () => {
 
   it("pluck with serialization", async () => {
     const t = await Topic.createBang({ content: { foo: "bar" } });
-    expect(await Topic.where({ id: t.id }).pluck("content")).toEqual([{ foo: "bar" }]);
+    expect(await Topic.where({ id: t.id }).pluck("content")).toEqual([
+      new Hash().set("foo", "bar"),
+    ]);
   });
 
   it("pluck with qualified column name", async () => {

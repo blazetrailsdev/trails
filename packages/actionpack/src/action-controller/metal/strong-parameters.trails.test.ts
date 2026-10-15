@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import { ArgumentError, NoMethodError, rbObjDup } from "@blazetrails/ruby-compat";
+import { ArgumentError, Hash, NoMethodError, rbObjDup } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import {
   HashWithIndifferentAccess,
@@ -123,8 +123,8 @@ describe("ActionController::Parameters", () => {
     expect([legacy.get("key"), legacy.isPermitted()]).toEqual([":value", false]);
 
     const withIvars = allocate("!ruby/hash-with-ivars:ActionController::Parameters", {
-      elements: { key: ":value" },
-      ivars: { ":@permitted": true },
+      elements: new Hash().set("key", ":value"),
+      ivars: new Hash().set(":@permitted", true),
     });
     expect([withIvars.get("key"), withIvars.isPermitted()]).toEqual([":value", true]);
 
