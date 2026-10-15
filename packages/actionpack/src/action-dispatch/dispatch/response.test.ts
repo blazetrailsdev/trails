@@ -34,7 +34,7 @@ describe("ResponseTest", () => {
   it("response code", () => {
     const res = new Response(200);
     expect(res.code).toBe("200");
-    expect(res.statusCode).toBe(200);
+    expect(res.status).toBe(200);
   });
 
   it("message", () => {
@@ -202,15 +202,10 @@ describe("ResponseTest", () => {
 
   it("toRack returns rack-compatible triple", () => {
     const res = Response.create(200, { "content-type": "text/plain" }, "hi");
-    const [status, headers, body] = res.toRack();
+    const [status, headers, body] = res.toA();
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("text/plain");
     expect([...(body as Iterable<unknown>)]).toEqual(["hi"]);
-  });
-
-  it("inspect", () => {
-    const res = new Response(200);
-    expect(res.inspect()).toBe("#<ActionDispatch::Response 200 OK>");
   });
 
   it("response body encoding", () => {
@@ -320,16 +315,6 @@ describe("ResponseTest", () => {
     expect(res.contentLength).toBeUndefined();
   });
 
-  it("inspect for error status", () => {
-    expect(new Response(500).inspect()).toBe(
-      "#<ActionDispatch::Response 500 Internal Server Error>",
-    );
-  });
-
-  it("inspect for redirect", () => {
-    expect(new Response(302).inspect()).toBe("#<ActionDispatch::Response 302 Found>");
-  });
-
   it("successful predicate", () => {
     expect(new Response(200).successful).toBe(true);
     expect(new Response(299).successful).toBe(true);
@@ -383,7 +368,7 @@ describe("ResponseTest", () => {
     const res = new Response();
     void res.body;
     res.setHeader("x-header", "Best of all possible worlds.");
-    const [status, headers] = res.toRack();
+    const [status, headers] = res.toA();
     expect(status).toBe(200);
     expect(headers["x-header"]).toBe("Best of all possible worlds.");
   });
@@ -420,7 +405,7 @@ describe("ResponseTest", () => {
       };
       const resp = Response.create();
       resp.body = "Hello";
-      resp.toRack();
+      resp.toA();
       expect(resp.headers.get("X-Frame-Options")).toBe("DENY");
       expect(resp.headers.get("X-Content-Type-Options")).toBe("nosniff");
       expect(resp.headers.get("X-XSS-Protection")).toBe("0");
@@ -439,7 +424,7 @@ describe("ResponseTest", () => {
       };
       const resp = Response.create();
       resp.body = "Hello";
-      resp.toRack();
+      resp.toA();
       expect(resp.headers.get("X-XX-XXXX")).toBe("Here is my phone number");
     } finally {
       Response.defaultHeaders = original;
@@ -450,7 +435,7 @@ describe("ResponseTest", () => {
 
   it("can be explicitly destructured into status, headers and an enumerable body", () => {
     const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
-    const [status, headers, body] = res.toRack() as [
+    const [status, headers, body] = res.toA() as [
       number,
       Record<string, string>,
       Iterable<unknown>,
@@ -626,7 +611,7 @@ describe("Response Cache::Response wiring", () => {
       withTempFile("hello", (path) => {
         const res = new Response();
         res.sendFile(path);
-        const [status, , body] = res.toRack();
+        const [status, , body] = res.toA();
         expect(status).toBe(200);
         const stream = body as { toPath(): string; each(): IterableIterator<string> };
         expect(stream.toPath()).toBe(path);

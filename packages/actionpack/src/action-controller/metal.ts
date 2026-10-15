@@ -307,7 +307,7 @@ export class Metal extends AbstractController {
     return this.response.contentType ?? null;
   }
 
-  get mediaType(): string | undefined {
+  get mediaType(): string | null {
     return this.response.mediaType;
   }
 
@@ -334,7 +334,7 @@ export class Metal extends AbstractController {
   }
 
   toA(): RackResponse {
-    return this.response.toRack() as RackResponse;
+    return this.response.toA() as RackResponse;
   }
 }
 

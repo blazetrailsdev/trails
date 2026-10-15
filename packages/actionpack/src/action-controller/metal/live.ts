@@ -4,7 +4,7 @@ import type { Request } from "../../action-dispatch/http/request.js";
 import type { CookieResponse } from "../../action-dispatch/middleware/cookies.js";
 import {
   Response as DispatchResponse,
-  ResponseBuffer,
+  Buffer as ResponseBuffer,
 } from "../../action-dispatch/http/response.js";
 import {
   CachedThreadPool,
@@ -33,6 +33,10 @@ type ErrorCallback = () => unknown;
 
 export class Buffer extends ResponseBuffer<Queue<string | null>> {
   static queueSize: number | null = 10;
+
+  static {
+    Object.defineProperty(this.prototype, "toAry", { value: undefined, configurable: true });
+  }
 
   ignoreDisconnect: boolean;
 

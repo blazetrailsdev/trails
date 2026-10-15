@@ -1,4 +1,4 @@
-import { ArgumentError, include, rbObjClassname } from "@blazetrails/ruby-compat";
+import { ArgumentError, bytes, include, rbObjClassname, strNew } from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {
@@ -152,7 +152,7 @@ export class QueryParser {
         this._normalizeParams(params, k, v, 0);
       }
     } catch (e) {
-      if (e instanceof URIError) {
+      if (e instanceof ArgumentError) {
         throw new InvalidParameterError((e as Error).message);
       }
       throw e;
@@ -293,7 +293,22 @@ export class QueryParser {
   }
 }
 
-/** @internal */
-function unescape(s: string): string {
-  return decodeURIComponent(s.replace(/\+/g, " "));
+/**
+ * `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370-372`, `:399-402`).
+ *
+ * @internal
+ */
+function unescape(string: string): string {
+  if (/%(?![0-9a-fA-F]{2})/.test(string)) throw new ArgumentError(`invalid %-encoding (${string})`);
+  const b = bytes(string.replace(/\+/g, " "));
+  const decoded: number[] = [];
+  for (let i = 0; i < b.length; i++) {
+    if (b[i] === 0x25) {
+      decoded.push(parseInt(String.fromCharCode(b[i + 1], b[i + 2]), 16));
+      i += 2;
+    } else {
+      decoded.push(b[i]);
+    }
+  }
+  return strNew(decoded);
 }

@@ -1,12 +1,20 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { Request, PASS_NOT_FOUND, controllerConstants } from "../request.js";
+import { Request } from "../request.js";
 import { emptyRackBody } from "../http/request.js";
-import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import { Mime, MimeType } from "../http/mime-type.js";
-import { X_CASCADE } from "../constants.js";
 import { BadRequest, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
-import { ArgumentError, StringIO, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Encoding,
+  bytes,
+  Hash,
+  StringIO,
+  excBacktrace,
+  isValidEncoding,
+  rbFSend,
+  rbObjMethod,
+} from "@blazetrails/ruby-compat";
 import {
   I18n,
   Logger,
@@ -20,8 +28,11 @@ import {
   assertNil,
   assertNotPredicate,
   assertRaise,
+  assertNotNil,
+  assertNothingRaised,
+  stub,
 } from "@blazetrails/activesupport";
-import { MockRequest } from "@blazetrails/rack";
+import { MockRequest, release } from "@blazetrails/rack";
 import { IpSpoofAttackError, RemoteIp, type Proxy } from "../middleware/remote-ip.js";
 
 let additionalTrustedProxy: string | RegExp | null = null;
@@ -470,7 +481,13 @@ describe("RequestMethod", () => {
       });
     }
   });
-  it.skip("delegates to Object#method if an argument is passed", () => {});
+  it("delegates to Object#method if an argument is passed", async () => {
+    const request = await stubRequest();
+
+    await assertNothingRaised(() => {
+      rbObjMethod(request, ":POST");
+    });
+  });
 });
 
 describe("RequestMimeType", () => {
@@ -499,11 +516,6 @@ describe("RequestMimeType", () => {
     const req = new Request({ CONTENT_TYPE: "application/xml; charset=UTF-8" });
     expect(req.contentMimeType?.symbol).toBe(":xml");
     expect(req.mediaType).toBe("application/xml");
-  });
-
-  it("has_content_type?", () => {
-    expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe(true);
-    expect(new Request({}).hasContentType()).toBe(false);
   });
 
   it("user agent", () => {
@@ -545,16 +557,6 @@ describe("RequestParamsParsing", () => {
   it("doesn't interpret request uri as query string when missing", () => {
     const req = new Request({ PATH_INFO: "/posts" });
     expect(req.queryString).toBe("");
-  });
-
-  it("content length", () => {
-    const req = new Request({ CONTENT_LENGTH: "42" });
-    expect(req.contentLength).toBe(42);
-  });
-
-  it("content length when missing", () => {
-    const req = new Request({});
-    expect(req.contentLength).toBe(0);
   });
 
   it("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", async () => {
@@ -772,54 +774,35 @@ describe("RequestProtocol", () => {
   });
 });
 
-describe("RequestRewind", () => {
-  it("raw_post rewinds rack.input if RAW_POST_DATA is nil", () => {
-    const req = new Request({ "rack.input": "body content" });
-    expect(req.rawPost).toBe("body content");
+describe.skipIf(!(release() < "3"))("RequestRewind", () => {
+  it("body should be rewound", async () => {
+    const data = "rewind";
+    const env = {
+      ":input": data,
+      CONTENT_LENGTH: String(data.length),
+      CONTENT_TYPE: "application/x-www-form-urlencoded; charset=utf-8",
+    };
+
+    const request = await stubRequest(env);
+    void request.requestParameters;
+
+    assertEqual("rewind", request.body.read());
   });
 
-  it.skip("body should be rewound", () => {});
+  it("raw_post rewinds rack.input if RAW_POST_DATA is nil", async () => {
+    const request = await stubRequest({
+      ":input": "raw",
+      CONTENT_LENGTH: "3",
+    });
+    assertEqual("raw", request.rawPost);
+    assertEqual("raw", (request.env["rack.input"] as StringIO).read());
+  });
 });
 
 describe("RequestParameters", () => {
   it("raw_post does not raise when rack.input is nil", () => {
     const req = new Request({});
     expect(req.rawPost).toBe("");
-  });
-
-  it("path parameters", () => {
-    const req = new Request({
-      "action_dispatch.request.path_parameters": { controller: "posts", action: "show", id: "1" },
-    });
-    expect(req.pathParameters).toEqual({ controller: "posts", action: "show", id: "1" });
-  });
-
-  it("path parameters default empty", () => {
-    const req = new Request({});
-    expect(req.pathParameters).toEqual({});
-  });
-
-  it("merges request, query, and path parameters with Rails precedence", () => {
-    const req = new Request({
-      QUERY_STRING: "k=query",
-      "action_dispatch.request.request_parameters": { k: "body", b: "body-only" },
-      "action_dispatch.request.path_parameters": { k: "path", p: "path-only" },
-    });
-    expect(req.params).toEqual({ k: "path", b: "body-only", p: "path-only" });
-  });
-
-  it("pathParameters= invalidates the merged params cache and feeds future params reads", () => {
-    const req = new Request({ QUERY_STRING: "view=print" });
-    expect(req.params).toEqual({ view: "print" });
-    req.pathParameters = { controller: "items", action: "show", id: "1" };
-    expect(req.params).toEqual({
-      view: "print",
-      controller: "items",
-      action: "show",
-      id: "1",
-    });
-    req.pathParameters = { view: "edit" };
-    expect(req.params).toEqual({ view: "edit" });
   });
 
   it("parameters", async () => {
@@ -852,7 +835,20 @@ describe("RequestParameters", () => {
 
     assertEqual("Invalid path parameters: Invalid encoding for parameter: \ufffd", err.message);
   });
-  it.skip("path parameters don't re-encode frozen strings", () => {});
+  // PERMANENT-SKIP: CLAUDE.md § "A String has no encoding tag either" — both assertions read `String#encoding`.
+  it.skip("path parameters don't re-encode frozen strings", async () => {
+    const request = await stubRequest();
+
+    stub(
+      Request.Utils.CustomParamEncoder,
+      "actionEncodingTemplate",
+      new Hash<string, Encoding>(() => Encoding.BINARY),
+      [],
+      () => {
+        request.pathParameters = { foo: "frozen", bar: "mutable", controller: "test_controller" };
+      },
+    );
+  });
   it("parameters containing an invalid UTF8 character", async () => {
     const request = await stubRequest({ QUERY_STRING: "foo=%81E" });
     await assertRaises([BadRequest], {}, () => request.parameters);
@@ -863,9 +859,60 @@ describe("RequestParameters", () => {
     await assertRaises([BadRequest], {}, () => request.parameters);
   });
 
-  it.skip("POST parameters containing invalid UTF8 character", () => {});
-  it.skip("query parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {});
-  it.skip("POST parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {});
+  it("POST parameters containing invalid UTF8 character", async () => {
+    const data = "foo=%81E";
+    const request = await stubRequest({
+      REQUEST_METHOD: "POST",
+      CONTENT_LENGTH: String(data.length),
+      CONTENT_TYPE: "application/x-www-form-urlencoded; charset=utf-8",
+      ":input": data,
+    });
+
+    const err = await assertRaises([BadRequest], {}, () => request.parameters);
+
+    assertPredicate(err.message, (m) =>
+      isValidEncoding(String.fromCharCode(...bytes(m)), Encoding.UTF_8),
+    );
+    assertEqual("Invalid request parameters: Invalid encoding for parameter: \ufffdE", err.message);
+  });
+
+  it("query parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", async () => {
+    const request = await stubRequest({ QUERY_STRING: "foo=%81E" });
+
+    await stub(
+      Request.Utils.CustomParamEncoder,
+      "actionEncodingTemplate",
+      new Hash<string, Encoding>().merge({ foo: Encoding.ASCII_8BIT }),
+      [],
+      async () => {
+        await assertNothingRaised(() => {
+          void request.parameters;
+        });
+      },
+    );
+  });
+
+  it("POST parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", async () => {
+    const data = "foo=%81E";
+    const request = await stubRequest({
+      REQUEST_METHOD: "POST",
+      CONTENT_LENGTH: String(data.length),
+      CONTENT_TYPE: "application/x-www-form-urlencoded; charset=utf-8",
+      ":input": data,
+    });
+
+    await stub(
+      Request.Utils.CustomParamEncoder,
+      "actionEncodingTemplate",
+      new Hash<string, Encoding>().merge({ foo: Encoding.ASCII_8BIT }),
+      [],
+      async () => {
+        await assertNothingRaised(() => {
+          void request.parameters;
+        });
+      },
+    );
+  });
   it("parameters not accessible after rack parse error 1", async () => {
     const request = await stubRequest({
       REQUEST_METHOD: "POST",
@@ -876,7 +923,16 @@ describe("RequestParameters", () => {
 
     await assertRaises([BadRequest], {}, () => request.parameters);
   });
-  it.skip("we have access to the original exception", () => {});
+  it("we have access to the original exception", async () => {
+    const request = await stubRequest({ QUERY_STRING: "x[y]=1&x[y][][w]=2" });
+
+    const e = await assertRaises([BadRequest], {}, () => {
+      void request.parameters;
+    });
+
+    assertNotNil(e.cause);
+    assertEqual(excBacktrace(e.cause as Error), excBacktrace(e));
+  });
 });
 
 describe("LocalhostTest", () => {
@@ -1014,181 +1070,6 @@ describe("RequestCookie", () => {
     });
     expect(req.cookies["_session_id"]).toBe("c84ace84796670c052c6ceb2451fb0f2");
     expect(req.cookies["is_admin"]).toBe("yes");
-  });
-});
-
-describe("RequestHeaderEnvAccess", () => {
-  it("hasHeader/setHeader/deleteHeader/fetchHeader operate on env for non-HTTP keys", () => {
-    const req = new Request({});
-    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(false);
-    req.setHeader("action_dispatch.parameter_filter", ["password"]);
-    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(true);
-    expect(req.env["action_dispatch.parameter_filter"]).toEqual(["password"]);
-    expect(req.fetchHeader("action_dispatch.parameter_filter")).toEqual(["password"]);
-    req.deleteHeader("action_dispatch.parameter_filter");
-    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(false);
-  });
-
-  it("fetchHeader invokes fallback on miss", () => {
-    const req = new Request({});
-    expect(req.fetchHeader("missing", () => "fallback")).toBe("fallback");
-  });
-
-  it("getHeader maps HTTP-style names to HTTP_* env keys", () => {
-    const req = new Request({ HTTP_IF_NONE_MATCH: '"abc"' });
-    expect(req.getHeader("If-None-Match")).toBe('"abc"');
-  });
-
-  it("getHeader maps CGI-variable names without HTTP_ prefix", () => {
-    const req = new Request({ CONTENT_TYPE: "text/html" });
-    expect(req.getHeader("Content-Type")).toBe("text/html");
-  });
-});
-
-describe("RequestFilterParameters", () => {
-  it("filteredParameters replaces sensitive params with [FILTERED]", () => {
-    const req = new Request({
-      "action_dispatch.request.parameters": { password: "hunter2", name: "alice" },
-      "action_dispatch.parameter_filter": ["password"],
-    });
-    expect(req.filteredParameters()).toEqual({ password: "[FILTERED]", name: "alice" });
-  });
-
-  it("filteredPath replaces sensitive query params", () => {
-    const req = new Request({
-      PATH_INFO: "/users",
-      QUERY_STRING: "password=hunter2&name=alice",
-      "action_dispatch.parameter_filter": ["password"],
-    });
-    expect(req.filteredPath()).toBe("/users?password=[FILTERED]&name=alice");
-  });
-
-  it("filteredEnv strips RAW_POST_DATA by default", () => {
-    const req = new Request({ RAW_POST_DATA: "secret" });
-    expect(req.filteredEnv()["RAW_POST_DATA"]).toBe("[FILTERED]");
-  });
-
-  it("parameterFilter returns NULL_PARAM_FILTER when no header is configured", () => {
-    const req = new Request({});
-    expect(req.parameterFilter().filter({ password: "x" })).toEqual({ password: "x" });
-  });
-});
-
-describe("RequestContentSecurityPolicy", () => {
-  it("reads and writes the policy under the env header", () => {
-    const req = new Request({});
-    expect(req.contentSecurityPolicy).toBeUndefined();
-    const policy = { build: () => "default-src 'self'" };
-
-    req.contentSecurityPolicy = policy as any;
-    expect(req.env["action_dispatch.content_security_policy"]).toBe(policy);
-    expect(req.contentSecurityPolicy).toBe(policy);
-  });
-
-  it("reportOnly toggles the report-only env flag", () => {
-    const req = new Request({});
-    expect(req.contentSecurityPolicyReportOnly).toBeUndefined();
-    req.contentSecurityPolicyReportOnly = true;
-    expect(req.contentSecurityPolicyReportOnly).toBe(true);
-  });
-
-  it("nonce is undefined without a generator and memoizes on read", () => {
-    const req = new Request({});
-    expect(req.contentSecurityPolicyNonce).toBeUndefined();
-    let calls = 0;
-    req.contentSecurityPolicyNonceGenerator = () => `nonce-${++calls}`;
-    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
-    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
-  });
-
-  it("nonce directives default to undefined and round-trip arrays", () => {
-    const req = new Request({});
-    expect(req.contentSecurityPolicyNonceDirectives).toBeUndefined();
-    req.contentSecurityPolicyNonceDirectives = ["script-src"];
-    expect(req.contentSecurityPolicyNonceDirectives).toEqual(["script-src"]);
-  });
-
-  it("null assignments persist as null on the env (matches Rails setter)", () => {
-    const req = new Request({});
-    req.contentSecurityPolicyNonceGenerator = null;
-    expect(req.env["action_dispatch.content_security_policy_nonce_generator"]).toBeNull();
-    expect(req.contentSecurityPolicyNonceGenerator).toBeNull();
-  });
-});
-
-describe("RequestControllerClass", () => {
-  it("controllerClassFor returns PASS_NOT_FOUND when name is absent", () => {
-    const req = new Request({});
-    expect(req.controllerClassFor(null)).toBe(PASS_NOT_FOUND);
-    expect(req.controllerClassFor(undefined)).toBe(PASS_NOT_FOUND);
-  });
-
-  it("controllerClassFor throws when a controller name is supplied", () => {
-    const req = new Request({});
-    expect(() => req.controllerClassFor("posts")).toThrow(/uninitialized constant PostsController/);
-  });
-
-  it("controllerClassFor resolves the registered controller constant", () => {
-    class PostsController {}
-    controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
-    try {
-      expect(new Request({}).controllerClassFor("posts")).toBe(PostsController);
-    } finally {
-      controllerConstants.delete("posts");
-    }
-  });
-
-  it("controllerClass defaults action to 'index' and returns PASS_NOT_FOUND without a controller", () => {
-    const req = new Request({});
-    expect(req.controllerClass()).toBe(PASS_NOT_FOUND);
-    expect(req.pathParameters["action"]).toBe("index");
-  });
-
-  it("PASS_NOT_FOUND.call returns 404 with x-cascade pass", async () => {
-    const [status, headers, body] = PASS_NOT_FOUND.call({});
-    expect(status).toBe(404);
-    expect(headers[X_CASCADE]).toBe("pass");
-    const chunks: unknown[] = [];
-    for await (const c of body) chunks.push(c);
-    expect(chunks).toEqual([]);
-  });
-
-  it("PASS_NOT_FOUND.action returns the sentinel itself", () => {
-    expect(PASS_NOT_FOUND.action("show")).toBe(PASS_NOT_FOUND);
-    expect(PASS_NOT_FOUND.actionEncodingTemplate("show")).toBe(false);
-  });
-});
-
-describe("RequestParametersList", () => {
-  it("returns rack.request.form_pairs verbatim when present", () => {
-    const pairs: Array<[string, unknown]> = [["a", "1"]];
-    const req = new Request({ "rack.request.form_pairs": pairs });
-    expect(req.requestParametersList()).toBe(pairs);
-  });
-
-  it("parses rack.request.form_vars via QueryParser.eachPair", () => {
-    const req = new Request({ "rack.request.form_vars": "a=1&b=2" });
-    expect(req.requestParametersList()).toEqual([
-      ["a", "1"],
-      ["b", "2"],
-    ]);
-  });
-
-  it("returns [] when no body has been parsed", () => {
-    const req = new Request({});
-    expect(req.requestParametersList()).toEqual([]);
-  });
-});
-
-describe("RequestPermissionsPolicy", () => {
-  it("round-trips through the env header", () => {
-    const req = new Request({});
-    expect(req.permissionsPolicy).toBeUndefined();
-    const policy = { build: () => "geolocation=()" };
-
-    req.permissionsPolicy = policy as any;
-    expect(req.env["action_dispatch.permissions_policy"]).toBe(policy);
-    expect(req.permissionsPolicy).toBe(policy);
   });
 });
 

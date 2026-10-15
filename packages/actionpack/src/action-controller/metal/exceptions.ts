@@ -1,6 +1,6 @@
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { toSentence } from "@blazetrails/activesupport";
-import { StandardError, include } from "@blazetrails/ruby-compat";
+import { StandardError, excBacktrace, excSetBacktrace, include } from "@blazetrails/ruby-compat";
 
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
@@ -12,9 +12,10 @@ export class ActionControllerError extends StandardError {
 }
 
 export class BadRequest extends ActionControllerError {
-  constructor(msg?: string) {
+  constructor(msg?: string, errinfo?: Error | null) {
     super(msg);
     this.name = "ActionController::BadRequest";
+    if (errinfo) excSetBacktrace(this, excBacktrace(errinfo)!);
   }
 }
 

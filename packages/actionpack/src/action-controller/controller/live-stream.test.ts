@@ -558,7 +558,7 @@ describe("LiveStreamTest", () => {
         const t = new Thread(async () => {
           const resp = tc.response;
           await resp.awaitCommit();
-          const [, , body] = resp.toRack() as [number, unknown, RackBody];
+          const [, , body] = resp.toA() as [number, unknown, RackBody];
           for await (const _ of body) {
             await tc.controller.latch.wait();
             body.close();
@@ -585,7 +585,7 @@ describe("LiveStreamTest", () => {
       const t = new Thread(async () => {
         const resp = tc.response;
         await resp.awaitCommit();
-        const [, , body] = resp.toRack() as [number, unknown, RackBody];
+        const [, , body] = resp.toA() as [number, unknown, RackBody];
         for await (const _ of body) {
           body.close();
           break;
@@ -737,7 +737,7 @@ describe("LiveStreamTest", () => {
 
   it("response buffer do not respond to to ary", async () => {
     await tc.get("basicStream");
-    assertNot(rbObjRespondTo(tc.response.toRack().at(-1), "toAry"));
+    assertNot(rbObjRespondTo(tc.response.toA().at(-1), "toAry"));
   });
 });
 
