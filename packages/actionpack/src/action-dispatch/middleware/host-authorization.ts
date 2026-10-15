@@ -30,7 +30,12 @@ export const ALLOWED_HOSTS_IN_DEVELOPMENT: (string | RegExp | IPAddr)[] = [
   new IPAddr("::/0"),
 ];
 
-export type HostPermission = string | RegExp | IPAddr | ((host: string) => unknown);
+export type HostPermission =
+  | string
+  | RegExp
+  | IPAddr
+  | ((host: string) => unknown)
+  | { caseEquals(host: string): unknown };
 
 /** @internal */
 export class Permissions {
@@ -48,7 +53,7 @@ export class Permissions {
     return this.hosts.some((allowed) => {
       if (allowed instanceof IPAddr) {
         try {
-          return allowed.includes(extractHostname(host));
+          return rbEqq(allowed, extractHostname(host));
         } catch {
           return false;
         }
