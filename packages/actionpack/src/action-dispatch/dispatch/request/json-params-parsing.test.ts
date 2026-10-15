@@ -1,5 +1,5 @@
-import { describe, it, afterEach, beforeEach } from "vitest";
-import { registerConstant, StringIO } from "@blazetrails/ruby-compat";
+import { describe, it, afterEach, beforeEach, vi } from "vitest";
+import { registerConstant, stderr, StringIO } from "@blazetrails/ruby-compat";
 import { assert, assertEqual, assertRaise, Logger } from "@blazetrails/activesupport";
 import { Base } from "../../../action-controller/base.js";
 import { ParseError } from "../../http/parameters.js";
@@ -95,15 +95,23 @@ describe("JsonParamsParsingTest", () => {
 
   it("occurring a parse error if parsing unsuccessful", async () => {
     await withTestRouting(async () => {
-      const json = '["person]": {"name": "David"}}';
-      const exception = await assertRaise([ParseError], {}, () =>
-        t.post("/parse", {
-          params: json,
-          headers: { CONTENT_TYPE: "application/json", "action_dispatch.show_exceptions": "none" },
-        }),
-      );
-      assertEqual(SyntaxError, (exception.cause as Error).constructor);
-      assertEqual("Error occurred while parsing request parameters", exception.message);
+      const suppress = vi.spyOn(stderr, "write").mockImplementation(() => true);
+      try {
+        const json = '["person]": {"name": "David"}}';
+        const exception = await assertRaise([ParseError], {}, () =>
+          t.post("/parse", {
+            params: json,
+            headers: {
+              CONTENT_TYPE: "application/json",
+              "action_dispatch.show_exceptions": "none",
+            },
+          }),
+        );
+        assertEqual(SyntaxError, (exception.cause as Error).constructor);
+        assertEqual("Error occurred while parsing request parameters", exception.message);
+      } finally {
+        suppress.mockRestore();
+      }
     });
   });
 

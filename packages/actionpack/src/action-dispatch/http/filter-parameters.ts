@@ -88,8 +88,8 @@ export function envFilter(this: FilterParametersHost): ParameterFilter {
     | string
     | RegExp
     | ParameterFilter;
-  if (userKey instanceof ParameterFilter) return userKey;
-  const arr = Array.isArray(userKey) ? userKey : [userKey];
+  if (userKey === NULL_ENV_FILTER) return NULL_ENV_FILTER;
+  const arr = (Array.isArray(userKey) ? userKey : [userKey]) as Array<string | RegExp>;
   return parameterFilterFor([...arr, ...ENV_MATCH]);
 }
 
