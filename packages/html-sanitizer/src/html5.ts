@@ -4,10 +4,13 @@ import { LinkSanitizer as Html4LinkSanitizer } from "./link-sanitizer.js";
 import { SafeListSanitizer as Html4SafeListSanitizer } from "./safe-list-sanitizer.js";
 import { HTML5, type VendorMethods } from "./namespaces.js";
 
+/** @noRailsEquivalent CONVERGEABLE html-sanitizer-parser-concerns */
 class FullSanitizer extends Html4FullSanitizer {}
 
+/** @noRailsEquivalent CONVERGEABLE html-sanitizer-parser-concerns */
 class LinkSanitizer extends Html4LinkSanitizer {}
 
+/** @noRailsEquivalent CONVERGEABLE html-sanitizer-parser-concerns */
 class SafeListSanitizer extends Html4SafeListSanitizer {}
 
 const VendorMethods: VendorMethods = {
