@@ -69,3 +69,11 @@ describe("Rails::Dom::Testing.html_document_fragment", () => {
     assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html5" });
   });
 });
+
+describe("Rails::Dom::Testing.html_document_fragment inspect", () => {
+  it("inspects a String html_version", () => {
+    expect(() => assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: "html6" })).toThrow(
+      'received "html6"',
+    );
+  });
+});
