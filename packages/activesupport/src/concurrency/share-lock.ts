@@ -189,9 +189,9 @@ export class ShareLock {
         this._sharing.delete(Thread.current());
         if ((previousWait = this.waiting.get(Thread.current()))) {
           if (purpose !== previousWait[0]) purpose = null;
-          compatible = compatible.filter((c) => previousWait![1].includes(c));
+          compatible = [...new Set(compatible)].filter((c) => previousWait![1].includes(c));
         }
-        if (!blockShare && !compatible.includes(false)) compatible = [...compatible, false];
+        if (!blockShare) compatible = [...new Set<Purpose | false>([...compatible, false])];
         this.waiting.set(Thread.current(), [purpose, compatible]);
       }
 

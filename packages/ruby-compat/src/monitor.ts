@@ -200,10 +200,15 @@ export class MonitorConditionVariable {
     core.mutex.unlock();
     try {
       await new Promise<void>((resolve) => {
-        this.#waiters.push(resolve);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        this.#waiters.push(wake);
         if (timeout != null) {
-          setTimeout(() => {
-            const index = this.#waiters.indexOf(resolve);
+          timer = setTimeout(() => {
+            const index = this.#waiters.indexOf(wake);
             if (index >= 0) this.#waiters.splice(index, 1);
             resolve();
           }, timeout * 1000);
