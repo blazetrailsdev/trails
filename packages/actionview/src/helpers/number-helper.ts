@@ -79,7 +79,7 @@ export function delegateNumberHelperMethod(
   options: NumberHelperOptions,
 ): unknown {
   if (number == null) return null;
-  const { raise: raiseOnInvalid, ...rest } = escapeUnsafeOptions(options);
+  const { raise: raiseOnInvalid, ...rest } = escapeUnsafeOptions({ ...options });
   return wrapWithOutputSafetyHandling(
     number,
     !!raiseOnInvalid,
@@ -92,14 +92,16 @@ export function delegateNumberHelperMethod(
  * @missingRailsArgs html_safe? — PERMANENT
  */
 export function escapeUnsafeOptions(options: NumberHelperOptions): NumberHelperOptions {
-  const out: NumberHelperOptions = { ...options };
-  if (out.format != null) out.format = htmlEscape(out.format).toString();
-  if (out.negativeFormat != null) out.negativeFormat = htmlEscape(out.negativeFormat).toString();
-  if (out.separator != null) out.separator = htmlEscape(out.separator).toString();
-  if (out.delimiter != null) out.delimiter = htmlEscape(out.delimiter).toString();
-  if (out.unit != null && !isHtmlSafe(out.unit)) out.unit = htmlEscape(out.unit).toString();
-  if (out.units != null && typeof out.units === "object") out.units = escapeUnits(out.units);
-  return out;
+  if (options.format != null) options.format = htmlEscape(options.format).toString();
+  if (options.negativeFormat != null)
+    options.negativeFormat = htmlEscape(options.negativeFormat).toString();
+  if (options.separator != null) options.separator = htmlEscape(options.separator).toString();
+  if (options.delimiter != null) options.delimiter = htmlEscape(options.delimiter).toString();
+  if (options.unit != null && !isHtmlSafe(options.unit))
+    options.unit = htmlEscape(options.unit).toString();
+  if (options.units != null && typeof options.units === "object")
+    options.units = escapeUnits(options.units);
+  return options;
 }
 
 /** @internal */
