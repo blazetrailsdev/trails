@@ -1,7 +1,7 @@
-import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
 import { ContentSecurityPolicy, MAPPINGS } from "../content-security-policy.js";
 import { IntegrationTest } from "../testing/integration.js";
+import "../../test-helpers/abstract-unit.js";
 import { Base } from "../../action-controller/base.js";
 import type { AbstractController } from "../../abstract-controller/base.js";
 import {
@@ -14,24 +14,12 @@ import {
 } from "@blazetrails/rack";
 import { Middleware } from "../http/content-security-policy.js";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
-import type { RouteSet } from "../routing/route-set.js";
 import { controllerConstants } from "../http/request.js";
-import { Cookies } from "../middleware/cookies.js";
-import { CookieStore } from "../middleware/session/cookie-store.js";
-import { assertNil } from "@blazetrails/activesupport";
-import { rbObjDup } from "@blazetrails/ruby-compat";
-
-function buildApp(routes: RouteSet): RackApp {
-  const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
-  const cookies = new Cookies((e: RackEnv) => store.call(e));
-  return (e: RackEnv) => {
-    e["action_dispatch.key_generator"] = new KeyGenerator("a".repeat(64), { iterations: 2 });
-    e["action_dispatch.signed_cookie_salt"] = "signed cookie";
-    e["action_dispatch.encrypted_cookie_salt"] = "encrypted cookie";
-    e["action_dispatch.encrypted_signed_cookie_salt"] = "signed encrypted cookie";
-    return cookies.call(e);
-  };
-}
+import { assertMatch, assertNil } from "@blazetrails/activesupport";
+import { rbObjDup, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
+import type { MiddlewareFactory } from "../middleware/stack.js";
+import { RouteSet } from "../routing/route-set.js";
 
 describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
@@ -463,7 +451,7 @@ function buildCspApp() {
     this.get("/api", { to: "csp#api" });
     this.get("/not-modified", { to: "csp#notModified" });
   });
-  app.app = buildApp(app.routes);
+  app.app = IntegrationTest.buildApp(app.routes);
   controllerConstants.set("csp", CspIntegrationController);
   return app;
 }
@@ -643,7 +631,7 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
       this.get("/redirect", { to: "csp#redirect" });
       this.get("/", { to: "csp#index" });
     });
-    app.app = buildApp(app.routes);
+    app.app = IntegrationTest.buildApp(app.routes);
 
     class RedirectController extends Base {
       async redirect() {
@@ -674,7 +662,7 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
     app.routes.draw(function () {
       this.get("/", { to: "csp#index" });
     });
-    app.app = buildApp(app.routes);
+    app.app = IntegrationTest.buildApp(app.routes);
 
     class NdController extends Base {
       async index() {
@@ -696,5 +684,87 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
 });
 
 describe("HelpersContentSecurityPolicyIntegrationTest", () => {
-  it.skip("can call helper methods in csp", () => {});
+  type Probe = Record<string, () => boolean>;
+
+  const ApplicationHelper = new Module().include({
+    isPigsCanFly() {
+      return false;
+    },
+  });
+  registerConstant("ApplicationHelper", ApplicationHelper);
+  afterAll(() => unregisterConstant("ApplicationHelper", ApplicationHelper));
+
+  class ApplicationController extends Base {
+    static {
+      this.helperMethod("isSkyIsBlue");
+    }
+    isSkyIsBlue() {
+      return true;
+    }
+  }
+
+  class PolicyController extends ApplicationController {
+    static {
+      this.contentSecurityPolicy(function (this: PolicyController, p) {
+        p.defaultSrc("https://example.com");
+        if ((this.helpers() as unknown as Probe).isSkyIsBlue()) p.scriptSrc("https://example.com");
+        if (!(this.helpers() as unknown as Probe).isPigsCanFly()) p.styleSrc("https://example.com");
+      });
+    }
+
+    async index() {
+      this.head("ok");
+    }
+  }
+
+  const ROUTES = new RouteSet();
+  ROUTES.draw(function () {
+    this.scope({ module: "helpers_content_security_policy_integration_test" }, () => {
+      this.get("/", { to: "policy#index" });
+    });
+  });
+  controllerConstants.set(
+    "helpers_content_security_policy_integration_test/policy",
+    PolicyController,
+  );
+
+  const POLICY = new ContentSecurityPolicy((p) => {
+    p.defaultSrc(() => ":self");
+    p.scriptSrc(() => ":https");
+    p.styleSrc(() => ":https");
+  });
+
+  class PolicyConfigMiddleware {
+    constructor(private app: { call(env: RackEnv): Promise<RackResponse> | RackResponse }) {}
+
+    call(env: RackEnv): Promise<RackResponse> | RackResponse {
+      env["action_dispatch.content_security_policy"] = POLICY;
+      env["action_dispatch.content_security_policy_nonce_generator"] = () => "iyhD0Yc0W+c=";
+      env["action_dispatch.content_security_policy_report_only"] = false;
+      env["action_dispatch.show_exceptions"] = "none";
+
+      return this.app.call(env);
+    }
+  }
+
+  const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
+    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
+    middleware.use(Middleware as unknown as MiddlewareFactory);
+    middleware.use(Lint as unknown as MiddlewareFactory);
+  });
+
+  it("can call helper methods in csp", async ({ task }) => {
+    const t = new IntegrationTest(task.name);
+    t.app = APP;
+    await t.get("/");
+
+    t.assertResponse("success");
+    assertMatch(
+      "default-src https://example.com",
+      t.response.headers.get(CONTENT_SECURITY_POLICY)!,
+    );
+    assertMatch("script-src https://example.com", t.response.headers.get(CONTENT_SECURITY_POLICY)!);
+    assertMatch("style-src https://example.com", t.response.headers.get(CONTENT_SECURITY_POLICY)!);
+  });
 });

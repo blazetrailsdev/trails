@@ -271,6 +271,8 @@ export class FileBody {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
+  static Headers = Headers;
+
   declare static defaultCharset: string | null;
   declare defaultCharset: string | null;
   declare static defaultHeaders: Record<string, string> | undefined;
