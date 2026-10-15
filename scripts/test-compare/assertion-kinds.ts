@@ -153,7 +153,6 @@ const MSPEC_MAP: Record<string, CanonicalKind> = {
   should_not_raise_error: "nothingRaised",
   should_be_an_instance_of: "instanceOf",
   should_be_kind_of: "instanceOf",
-  // mspec's `match_yaml` compares two YAML strings with trailing whitespace stripped.
   should_match_yaml: "equal",
   should_be_true: "equal",
 };

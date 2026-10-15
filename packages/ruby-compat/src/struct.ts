@@ -239,7 +239,6 @@ export const Struct = {
       });
     });
     structClasses.add(klass.prototype);
-    // `anonymous_struct` (`vendor/ruby/v3.3.11/struct.c:252-256`) builds a nameless class; JS names a class expression after its binding.
     Object.defineProperty(klass, "name", { value: "" });
     return klass as unknown as new (...values: unknown[]) => StructInstance & Record<M, unknown>;
   },
