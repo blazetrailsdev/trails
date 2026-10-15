@@ -719,6 +719,7 @@ export class Request {
     return this.controllerClassFor(params["controller"] as string | undefined);
   }
 
+  /** @inventedArm get — CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize */
   controllerClassFor(
     name: string | undefined | null,
   ): DispatchableControllerClass | typeof PASS_NOT_FOUND {

@@ -255,10 +255,7 @@ export class ParamBuilder {
 
   /** @internal */
   newDepthLimit(paramDepthLimit: number): ParamBuilder {
-    return new (this.constructor as new (...args: unknown[]) => ParamBuilder)(
-      (this as { paramsClass?: unknown }).paramsClass,
-      paramDepthLimit,
-    );
+    return new (this.constructor as typeof ParamBuilder)(paramDepthLimit);
   }
 
   /** @internal */
