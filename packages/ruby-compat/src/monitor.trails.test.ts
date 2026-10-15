@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Monitor } from "./monitor.js";
+import { Monitor, newCond } from "./monitor.js";
+import { Thread } from "./thread.js";
 
 describe("Monitor#mon_owned?", () => {
   it("is true only inside the owning synchronize", async () => {
@@ -47,5 +48,35 @@ describe("Monitor#synchronize", () => {
       ),
     );
     expect(served).toEqual(Array.from({ length: 10 }, (_unused, i) => i));
+  });
+});
+
+describe("Monitor#new_cond", () => {
+  it("gives a synchronize block's hold up for the wait, to another thread's synchronize", async () => {
+    const monitor = new Monitor();
+    const cond = newCond.call(monitor);
+    const log: string[] = [];
+    let ready = false;
+
+    const waiter = new Thread(() =>
+      monitor.synchronize(async () => {
+        log.push("waiter:enter");
+        await cond.waitWhile(() => !ready);
+        log.push("waiter:woken");
+      }),
+    );
+    await Thread.pass();
+
+    await new Thread(() =>
+      monitor.synchronize(() => {
+        log.push("signaller:enter");
+        ready = true;
+        cond.broadcast();
+        log.push("signaller:exit");
+      }),
+    ).join();
+    await waiter.join();
+
+    expect(log).toEqual(["waiter:enter", "signaller:enter", "signaller:exit", "waiter:woken"]);
   });
 });

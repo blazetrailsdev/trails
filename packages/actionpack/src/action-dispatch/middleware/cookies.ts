@@ -304,23 +304,23 @@ export class CookieJar implements Iterable<[string, string]> {
     }
   }
 
-  delete(name: string, options: { path?: string; domain?: string } = {}): string | undefined {
+  delete(name: string, options: Partial<SetCookieOptions> = {}): string | undefined {
     if (!this._cookies.has(name)) return undefined;
 
     this.handleOptions(options);
 
     const value = this._cookies.get(name);
     this._cookies.delete(name);
-    this._deletedCookies.set(name, options);
+    this._deletedCookies.set(name, options as { path?: string; domain?: string });
     return value;
   }
 
-  isDeleted(name: string, options: { path?: string; domain?: string } = {}): boolean {
+  isDeleted(name: string, options: Partial<SetCookieOptions> = {}): boolean {
     this.handleOptions(options);
     return hashEqual(this._deletedCookies.get(name), options);
   }
 
-  clear(options: { path?: string; domain?: string } = {}): void {
+  clear(options: Partial<SetCookieOptions> = {}): void {
     for (const k of [...this._cookies.keys()]) this.delete(k, options);
   }
 

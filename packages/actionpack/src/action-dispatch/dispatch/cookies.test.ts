@@ -19,6 +19,7 @@ import {
 import { ArgumentError, JSON, Marshal } from "@blazetrails/ruby-compat";
 import { unescape } from "@blazetrails/rack";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
+import { TestRequest } from "../testing/test-request.js";
 
 function jarWithSameSiteProtection(
   proc: (request: { userAgent?: string }) => unknown,
@@ -60,18 +61,9 @@ function cookieRequest(
   env: Record<string, unknown> = {},
   host = "www.nextangle.com",
 ): RequestCookieMethodsHost {
-  const e = cookieEnv(env);
-  return {
-    env: e,
-    host,
-    cookiesSameSiteProtection,
-    getHeader: (name: string) => e[name],
-    hasHeader: (name: string) => Object.hasOwn(e, name),
-    fetchHeader: (name: string, block: (name: string) => unknown) =>
-      Object.hasOwn(e, name) ? e[name] : block(name),
-    setHeader: (name: string, value: unknown) => (e[name] = value),
-    cookies: {},
-  } as RequestCookieMethodsHost;
+  const request = TestRequest.create(cookieEnv(env));
+  request.host = host;
+  return request as unknown as RequestCookieMethodsHost;
 }
 
 function setCookieHeaders(jar: CookieJar): string[] {
@@ -938,4 +930,260 @@ describe("CookiesTest", () => {
   it.skip("legacy hmac aes cbc encrypted marshal cookie is upgraded to authenticated encrypted cookie", () => {});
 
   it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {});
+
+  it.skip("legacy hmac aes cbc encrypted cookie using 64 byte key is upgraded to authenticated encrypted cookie", () => {});
+
+  it.skip("cookie with hash value not modified by rotation", () => {});
+
+  it("cookie with all domain option", () => {
+    const cookies = new CookieJar(cookieRequest({}));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using a non standard tld", () => {
+    const cookies = new CookieJar(cookieRequest({}, "two.subdomains.nextangle.local"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using australian style tld", () => {
+    const cookies = new CookieJar(cookieRequest({}, "nextangle.com.au"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using australian style tld and two subdomains", () => {
+    const cookies = new CookieJar(cookieRequest({}, "x.nextangle.com.au"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using uk style tld", () => {
+    const cookies = new CookieJar(cookieRequest({}, "nextangle.co.uk"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using two letter one level tld", () => {
+    const cookies = new CookieJar(cookieRequest({}, "hawth.ca"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with all domain option using two letter one level tld and subdomain", () => {
+    const cookies = new CookieJar(cookieRequest({}, "x.hawth.ca"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with all domain option using uk style tld and two subdomains", () => {
+    const cookies = new CookieJar(cookieRequest({}, "x.nextangle.co.uk"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using host with port", () => {
+    const cookies = new CookieJar(cookieRequest({}, "nextangle.local:3000"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using localhost", () => {
+    const cookies = new CookieJar(cookieRequest({}, "localhost"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with all domain option using ipv4 address", () => {
+    const cookies = new CookieJar(cookieRequest({}, "192.168.1.1"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with all domain option using ipv6 address", () => {
+    const cookies = new CookieJar(cookieRequest({}, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
+    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  });
+
+  it("deleting cookie with all domain option", () => {
+    const cookies = CookieJar.build(cookieRequest({}), { user_name: "Joe" });
+    cookies.delete("user_name", { domain: ":all" });
+    assertSetCookieHeader(
+      "user_name=; domain=nextangle.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option and tld length", () => {
+    const cookies = new CookieJar(cookieRequest({}));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using a non standard tld and tld length", () => {
+    const cookies = new CookieJar(cookieRequest({}, "two.subdomains.nextangle.local"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using a non standard 2 letter tld", () => {
+    const cookies = new CookieJar(cookieRequest({}, "admin.lvh.me"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
+    assertSetCookieHeader("user_name=rizwanreza; domain=lvh.me; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with all domain option using host with port and tld length", () => {
+    const cookies = new CookieJar(cookieRequest({}, "nextangle.local:3000"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with all domain option using longer tld length", () => {
+    const cookies = new CookieJar(cookieRequest({}, "x.y.z.t.com"));
+    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 4 });
+    assertSetCookieHeader("user_name=rizwanreza; domain=y.z.t.com; path=/; SameSite=Lax", cookies);
+  });
+
+  it("deleting cookie with all domain option and tld length", () => {
+    const cookies = CookieJar.build(cookieRequest({}), { user_name: "Joe" });
+    cookies.delete("user_name", { domain: ":all", tldLength: 2 });
+    assertSetCookieHeader(
+      "user_name=; domain=nextangle.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with several preset domains using one of these domains", () => {
+    const cookies = new CookieJar(cookieRequest({}, "example1.com"));
+    cookies.set("user_name", {
+      value: "rizwanreza",
+      domain: ["example1.com", "example2.com", ".example3.com"],
+    });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with several preset domains using subdomain", () => {
+    const cookies = new CookieJar(cookieRequest({}, "subdomain.example1.com"));
+    cookies.set("user_name", {
+      value: "rizwanreza",
+      domain: ["example1.com", "example2.com", ".example3.com"],
+    });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with several preset domains using similar tld", () => {
+    const cookies = new CookieJar(cookieRequest({}, "example1.com.au"));
+    cookies.set("user_name", {
+      value: "rizwanreza",
+      domain: ["example1.com", "example2.com", ".example3.com"],
+    });
+    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with several preset domains using similar domain", () => {
+    const cookies = new CookieJar(cookieRequest({}, "myexample1.com"));
+    cookies.set("user_name", {
+      value: "rizwanreza",
+      domain: ["example1.com", "example2.com", ".example3.com"],
+    });
+    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with several preset domains using other domain", () => {
+    const cookies = new CookieJar(cookieRequest({}, "other-domain.com"));
+    cookies.set("user_name", {
+      value: "rizwanreza",
+      domain: ["example1.com", "example2.com", ".example3.com"],
+    });
+    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  });
+
+  it("cookie with several preset domains using shared domain", () => {
+    const cookies = new CookieJar(cookieRequest({}, "example3.com"));
+    cookies.set("user_name", {
+      value: "rizwanreza",
+      domain: ["example1.com", "example2.com", ".example3.com"],
+    });
+    assertSetCookieHeader(
+      "user_name=rizwanreza; domain=.example3.com; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with domain proc", () => {
+    const cookies = new CookieJar(cookieRequest({}));
+    cookies.set("user_name", { value: "braindeaf", domain: () => ".sub.www.nextangle.com" });
+    assertSetCookieHeader(
+      "user_name=braindeaf; domain=.sub.www.nextangle.com; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("cookie with domain proc with request", () => {
+    const cookies = new CookieJar(cookieRequest({}));
+    cookies.set("user_name", {
+      value: "braindeaf",
+      domain: (req) => `.sub.${(req as { host: string }).host}`,
+    });
+    assertSetCookieHeader(
+      "user_name=braindeaf; domain=.sub.www.nextangle.com; path=/; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("deleting cookie with several preset domains using one of these domains", () => {
+    const cookies = CookieJar.build(cookieRequest({}, "example2.com"), { user_name: "Joe" });
+    cookies.delete("user_name", { domain: ["example1.com", "example2.com", ".example3.com"] });
+    assertSetCookieHeader(
+      "user_name=; domain=example2.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
+      cookies,
+    );
+  });
+
+  it("deleting cookie with several preset domains using other domain", () => {
+    const cookies = CookieJar.build(cookieRequest({}, "other-domain.com"), { user_name: "Joe" });
+    cookies.delete("user_name", { domain: ["example1.com", "example2.com", ".example3.com"] });
+    assertSetCookieHeader(
+      "user_name=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
+      cookies,
+    );
+  });
 });
