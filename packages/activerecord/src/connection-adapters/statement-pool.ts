@@ -39,7 +39,7 @@ export class StatementPool<T = unknown> {
   }
 
   get length(): number {
-    return Object.keys(this.cache).length;
+    return size(this.cache);
   }
 
   set(sql: string, stmt: T): T {
