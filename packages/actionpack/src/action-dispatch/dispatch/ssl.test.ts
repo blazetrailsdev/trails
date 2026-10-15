@@ -1,145 +1,148 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import { Lint, SET_COOKIE } from "@blazetrails/rack";
+import type { RackEnv } from "@blazetrails/rack";
+import { assertEqual, assertNil, years } from "@blazetrails/activesupport";
 import { SSL, type SSLOptions } from "../middleware/ssl.js";
 import type { Request } from "../http/request.js";
-import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
-import { years } from "@blazetrails/activesupport";
+import { STRICT_TRANSPORT_SECURITY } from "../constants.js";
+import { IntegrationTest } from "../testing/integration.js";
+import "../../test-helpers/abstract-unit.js";
 
-type App = (env: RackEnv) => Promise<RackResponse>;
-
-function buildApp(
-  responseHeaders: Record<string, string | string[]> = {},
-  sslOptions: SSLOptions = {},
-): SSL {
-  const inner: App = async (_env) => [200, { ...responseHeaders }, bodyFromString("")];
-  return new SSL(inner, { hsts: { subdomains: true }, ...sslOptions });
-}
-
-function makeEnv(url: string, method = "GET", extra: Record<string, string> = {}): RackEnv {
-  const u = new URL(url);
-  return {
-    "rack.url_scheme": u.protocol.replace(":", ""),
-    HTTP_HOST: u.host,
-    PATH_INFO: u.pathname,
-    QUERY_STRING: u.search.replace(/^\?/, ""),
-    REQUEST_METHOD: method,
-    ...extra,
-  };
+function buildApp({
+  headers = {},
+  sslOptions = {},
+}: { headers?: Record<string, unknown>; sslOptions?: SSLOptions } = {}): Lint {
+  const app = (_env: RackEnv): [number, Record<string, unknown>, unknown[]] => [200, headers, []];
+  return new Lint(new SSL(new Lint(app), { hsts: { subdomains: true }, ...sslOptions }));
 }
 
 describe("RedirectSSLTest", () => {
+  let testCase: IntegrationTest;
+
+  beforeEach(({ task }) => {
+    testCase = new IntegrationTest(task.name);
+  });
+
+  async function assertNotRedirected(
+    url: string,
+    {
+      headers = {},
+      redirect = {},
+    }: { headers?: Record<string, unknown>; redirect?: SSLOptions["redirect"] } = {},
+  ): Promise<void> {
+    testCase.app = buildApp({ sslOptions: { redirect } });
+    await testCase.get(url, { headers });
+    testCase.assertResponse("ok");
+  }
+
+  async function assertRedirected({
+    redirect = {},
+    from = "http://a/b?c=d",
+    to = from.replace("http", "https"),
+  }: { redirect?: Record<string, unknown>; from?: string; to?: string } = {}): Promise<void> {
+    redirect = { body: [], ...redirect };
+
+    testCase.app = buildApp({ sslOptions: { redirect } });
+
+    await testCase.get(from);
+    testCase.assertResponse((redirect.status as number | undefined) ?? 301);
+    testCase.assertRedirectedTo(to);
+    assertEqual((redirect.body as string[]).join(""), testCase.response.body);
+  }
+
+  async function assertPostRedirected({
+    redirect = {},
+    from = "http://a/b?c=d",
+    to = from.replace("http", "https"),
+  }: { redirect?: Record<string, unknown>; from?: string; to?: string } = {}): Promise<void> {
+    testCase.app = buildApp({ sslOptions: { redirect } });
+
+    await testCase.post(from);
+    testCase.assertResponse((redirect.status as number | undefined) ?? 307);
+    testCase.assertRedirectedTo(to);
+  }
+
   it("exclude can avoid redirect", async () => {
-    const excluding = {
-      exclude: (request: Request) => /healthcheck/.test(request.path),
-    };
-    const app = buildApp({}, { redirect: excluding });
+    const excluding = { exclude: (request: Request) => /healthcheck/.test(request.path) };
 
-    const [s1] = await app.call(makeEnv("http://example.org/healthcheck"));
-    expect(s1).toBe(200);
-
-    const [s2, h2] = await app.call(makeEnv("http://example.org/"));
-    expect(s2).toBe(301);
-    expect(h2.location).toBe("https://example.org/");
+    await assertNotRedirected("http://example.org/healthcheck", { redirect: excluding });
+    await assertRedirected({ from: "http://example.org/", redirect: excluding });
   });
 
   it("https is not redirected", async () => {
-    const [status] = await buildApp().call(makeEnv("https://example.org"));
-    expect(status).toBe(200);
+    await assertNotRedirected("https://example.org");
   });
 
   it("proxied https is not redirected", async () => {
-    const [status] = await buildApp().call(
-      makeEnv("http://example.org", "GET", { HTTP_X_FORWARDED_PROTO: "https" }),
-    );
-    expect(status).toBe(200);
+    await assertNotRedirected("http://example.org", {
+      headers: { HTTP_X_FORWARDED_PROTO: "https" },
+    });
   });
 
   it("http is redirected to https", async () => {
-    const [status, headers] = await buildApp({}, { redirect: {} }).call(makeEnv("http://a/b?c=d"));
-    expect(status).toBe(301);
-    expect(headers.location).toBe("https://a/b?c=d");
+    await assertRedirected();
   });
 
   it("http POST is redirected to https with status 307", async () => {
-    const [status, headers] = await buildApp({}, { redirect: {} }).call(
-      makeEnv("http://a/b?c=d", "POST"),
-    );
-    expect(status).toBe(307);
-    expect(headers.location).toBe("https://a/b?c=d");
+    await assertPostRedirected();
   });
 
   it("redirect with custom status", async () => {
-    const [status] = await buildApp({}, { redirect: { status: 308 } }).call(
-      makeEnv("http://a/b?c=d"),
-    );
-    expect(status).toBe(308);
+    await assertRedirected({ redirect: { status: 308 } });
   });
 
   it("redirect with unknown request method", async () => {
-    const [status, headers] = await buildApp().call(
-      makeEnv("http://a/b?c=d", "NOT_AN_HTTP_METHOD"),
-    );
-    expect(status).toBe(307);
-    expect(headers.location).toBe("https://a/b?c=d");
+    testCase.app = buildApp();
+
+    await testCase.process("not_an_http_method", "http://a/b?c=d");
+
+    testCase.assertResponse(307);
+    testCase.assertRedirectedTo("https://a/b?c=d");
   });
 
   it("redirect with ssl_default_redirect_status", async () => {
-    const app = buildApp({}, { sslDefaultRedirectStatus: 308 });
+    testCase.app = buildApp({ sslOptions: { sslDefaultRedirectStatus: 308 } });
 
-    const [s1] = await app.call(makeEnv("http://a/b?c=d", "GET"));
-    expect(s1).toBe(301);
+    await testCase.get("http://a/b?c=d");
 
-    const [s2] = await app.call(makeEnv("http://a/b?c=d", "POST"));
-    expect(s2).toBe(308);
+    testCase.assertResponse(301);
+    testCase.assertRedirectedTo("https://a/b?c=d");
+
+    await testCase.post("http://a/b?c=d");
+
+    testCase.assertResponse(308);
+    testCase.assertRedirectedTo("https://a/b?c=d");
   });
 
   it("redirect with custom body", async () => {
-    const [, , body] = await buildApp({}, { redirect: { body: ["foo"] } }).call(
-      makeEnv("http://a/b?c=d"),
-    );
-    const chunks: string[] = [];
-    for await (const chunk of body) chunks.push(chunk.toString());
-    expect(chunks.join("")).toBe("foo");
+    await assertRedirected({ redirect: { body: ["foo"] } });
   });
 
   it("redirect to specific host", async () => {
-    const [, headers] = await buildApp({}, { redirect: { host: "ssl" } }).call(
-      makeEnv("http://a/b?c=d"),
-    );
-    expect(headers.location).toBe("https://ssl/b?c=d");
+    await assertRedirected({ redirect: { host: "ssl" }, to: "https://ssl/b?c=d" });
   });
 
   it("redirect to default port", async () => {
-    const [, headers] = await buildApp({}, { redirect: { port: 443 } }).call(
-      makeEnv("http://a/b?c=d"),
-    );
-    expect(headers.location).toBe("https://a/b?c=d");
+    await assertRedirected({ redirect: { port: 443 } });
   });
 
   it("redirect to non-default port", async () => {
-    const [, headers] = await buildApp({}, { redirect: { port: 8443 } }).call(
-      makeEnv("http://a/b?c=d"),
-    );
-    expect(headers.location).toBe("https://a:8443/b?c=d");
+    await assertRedirected({ redirect: { port: 8443 }, to: "https://a:8443/b?c=d" });
   });
 
   it("redirect to different host and non-default port", async () => {
-    const [, headers] = await buildApp({}, { redirect: { host: "ssl", port: 8443 } }).call(
-      makeEnv("http://a/b?c=d"),
-    );
-    expect(headers.location).toBe("https://ssl:8443/b?c=d");
+    await assertRedirected({
+      redirect: { host: "ssl", port: 8443 },
+      to: "https://ssl:8443/b?c=d",
+    });
   });
 
   it("redirect to different host including port", async () => {
-    const [, headers] = await buildApp({}, { redirect: { host: "ssl:443" } }).call(
-      makeEnv("http://a/b?c=d"),
-    );
-    expect(headers.location).toBe("https://ssl:443/b?c=d");
+    await assertRedirected({ redirect: { host: "ssl:443" }, to: "https://ssl:443/b?c=d" });
   });
 
   it("no redirect with redirect set to false", async () => {
-    const [status] = await buildApp({}, { redirect: false }).call(makeEnv("http://example.org"));
-    expect(status).toBe(200);
+    await assertNotRedirected("http://example.org", { redirect: false });
   });
 });
 
@@ -147,25 +150,26 @@ const EXPECTED = "max-age=63072000";
 const EXPECTED_WITH_SUBDOMAINS = "max-age=63072000; includeSubDomains";
 
 describe("StrictTransportSecurityTest", () => {
+  let testCase: IntegrationTest;
+
+  beforeEach(({ task }) => {
+    testCase = new IntegrationTest(task.name);
+  });
+
   async function assertHsts(
     expected: string | null,
     {
       url = "https://example.org",
-      hsts,
+      hsts = { subdomains: true },
       headers = {},
-    }: {
-      url?: string;
-      hsts?: SSLOptions["hsts"];
-      headers?: Record<string, string>;
-    } = {},
-  ) {
-    const sslOpts = hsts !== undefined ? { hsts } : { hsts: { subdomains: true } as const };
-    const app = buildApp(headers, sslOpts);
-    const [, resHeaders] = await app.call(makeEnv(url));
-    if (expected === null) {
-      expect(resHeaders["strict-transport-security"]).toBeUndefined();
+    }: { url?: string; hsts?: SSLOptions["hsts"]; headers?: Record<string, unknown> } = {},
+  ): Promise<void> {
+    testCase.app = buildApp({ sslOptions: { hsts }, headers });
+    await testCase.get(url);
+    if (expected == null) {
+      assertNil(testCase.response.headers.get("strict-transport-security"));
     } else {
-      expect(resHeaders["strict-transport-security"]).toBe(expected);
+      assertEqual(expected, testCase.response.headers.get("strict-transport-security"));
     }
   }
 
@@ -178,9 +182,8 @@ describe("StrictTransportSecurityTest", () => {
   });
 
   it("defers to app-provided header", async () => {
-    await assertHsts("app-provided", {
-      headers: { "strict-transport-security": "app-provided" },
-    });
+    const headers = { [STRICT_TRANSPORT_SECURITY]: "app-provided" };
+    await assertHsts("app-provided", { headers });
   });
 
   it("hsts: true enables default settings", async () => {
@@ -216,91 +219,92 @@ describe("StrictTransportSecurityTest", () => {
   });
 });
 
-const DEFAULT_COOKIES = ["id=1; path=/", "token=abc; path=/; secure; HttpOnly"];
+const DEFAULT = ["id=1; path=/", "token=abc; path=/; secure; HttpOnly"];
 
 describe("SecureCookiesTest", () => {
+  let testCase: IntegrationTest;
+
+  beforeEach(({ task }) => {
+    testCase = new IntegrationTest(task.name);
+  });
+
   async function get(
-    responseHeaders: Record<string, string | string[]> = {},
-    sslOptions: SSLOptions = {},
-  ) {
-    const app = buildApp(responseHeaders, sslOptions);
-    return app.call(makeEnv("https://example.org"));
+    options: { headers?: Record<string, unknown>; sslOptions?: SSLOptions } = {},
+  ): Promise<void> {
+    testCase.app = buildApp(options);
+    await testCase.get("https://example.org");
   }
 
-  function assertCookies(setCookie: string | string[] | undefined, ...expected: string[]) {
-    expect(setCookie).toEqual(expected);
+  function assertCookies(...expected: string[]): void {
+    const cookies = testCase.response.headers.get(SET_COOKIE);
+    assertEqual(expected, cookies);
   }
 
   it("flag cookies as secure", async () => {
-    const [, headers] = await get({ "set-cookie": DEFAULT_COOKIES });
-    assertCookies(
-      headers["set-cookie"],
-      "id=1; path=/; secure",
-      "token=abc; path=/; secure; HttpOnly",
-    );
+    await get({ headers: { [SET_COOKIE]: DEFAULT } });
+    assertCookies("id=1; path=/; secure", "token=abc; path=/; secure; HttpOnly");
   });
 
   it("flag cookies as secure at end of line", async () => {
-    const [, headers] = await get({ "set-cookie": "problem=def; path=/; HttpOnly; secure" });
-    assertCookies(headers["set-cookie"], "problem=def; path=/; HttpOnly; secure");
+    await get({ headers: { [SET_COOKIE]: "problem=def; path=/; HttpOnly; secure" } });
+    assertCookies("problem=def; path=/; HttpOnly; secure");
   });
 
   it("flag cookies as secure with more spaces before", async () => {
-    const [, headers] = await get({ "set-cookie": "problem=def; path=/; HttpOnly;  secure" });
-    assertCookies(headers["set-cookie"], "problem=def; path=/; HttpOnly;  secure");
+    await get({ headers: { [SET_COOKIE]: "problem=def; path=/; HttpOnly;  secure" } });
+    assertCookies("problem=def; path=/; HttpOnly;  secure");
   });
 
   it("flag cookies as secure with more spaces after", async () => {
-    const [, headers] = await get({ "set-cookie": "problem=def; path=/; secure;  HttpOnly" });
-    assertCookies(headers["set-cookie"], "problem=def; path=/; secure;  HttpOnly");
+    await get({ headers: { [SET_COOKIE]: "problem=def; path=/; secure;  HttpOnly" } });
+    assertCookies("problem=def; path=/; secure;  HttpOnly");
   });
 
   it("flag cookies as secure with has not spaces before", async () => {
-    const [, headers] = await get({ "set-cookie": "problem=def; path=/;secure; HttpOnly" });
-    assertCookies(headers["set-cookie"], "problem=def; path=/;secure; HttpOnly");
+    await get({ headers: { [SET_COOKIE]: "problem=def; path=/;secure; HttpOnly" } });
+    assertCookies("problem=def; path=/;secure; HttpOnly");
   });
 
   it("flag cookies as secure with has not spaces after", async () => {
-    const [, headers] = await get({ "set-cookie": "problem=def; path=/; secure;HttpOnly" });
-    assertCookies(headers["set-cookie"], "problem=def; path=/; secure;HttpOnly");
+    await get({ headers: { [SET_COOKIE]: "problem=def; path=/; secure;HttpOnly" } });
+    assertCookies("problem=def; path=/; secure;HttpOnly");
   });
 
   it("flag cookies as secure with ignore case", async () => {
-    const [, headers] = await get({ "set-cookie": "problem=def; path=/; Secure; HttpOnly" });
-    assertCookies(headers["set-cookie"], "problem=def; path=/; Secure; HttpOnly");
+    await get({ headers: { [SET_COOKIE]: "problem=def; path=/; Secure; HttpOnly" } });
+    assertCookies("problem=def; path=/; Secure; HttpOnly");
   });
 
   it("cookies as not secure with secure cookies disabled", async () => {
-    const [, headers] = await get({ "set-cookie": DEFAULT_COOKIES }, { secureCookies: false });
-    assertCookies(headers["set-cookie"], "id=1; path=/", "token=abc; path=/; secure; HttpOnly");
+    await get({ headers: { [SET_COOKIE]: DEFAULT }, sslOptions: { secureCookies: false } });
+    assertCookies("id=1; path=/", "token=abc; path=/; secure; HttpOnly");
   });
 
   it("cookies as not secure with exclude", async () => {
-    const excluding = {
-      exclude: (request: Request) => /example/.test(request.domain() ?? ""),
-    };
-    const [status, headers] = await get({ "set-cookie": DEFAULT_COOKIES }, { redirect: excluding });
-    assertCookies(headers["set-cookie"], "id=1; path=/", "token=abc; path=/; secure; HttpOnly");
-    expect(status).toBe(200);
+    const excluding = { exclude: (request: Request) => /example/.test(request.domain() ?? "") };
+    await get({ headers: { [SET_COOKIE]: DEFAULT }, sslOptions: { redirect: excluding } });
+
+    assertCookies("id=1; path=/", "token=abc; path=/; secure; HttpOnly");
+    testCase.assertResponse("ok");
   });
 
   it("no cookies", async () => {
-    const [, headers] = await get();
-    expect(headers["set-cookie"]).toBeUndefined();
+    await get();
+    assertNil(testCase.response.headers.get(SET_COOKIE));
   });
 
   it("keeps original headers behavior", async () => {
-    const [, headers] = await get({ connection: "close" });
-    expect(headers.connection).toBe("close");
+    await get({ headers: { connection: "close" } });
+    assertEqual("close", testCase.response.headers.get("connection"));
   });
 
   it("flag cookies as secure with single cookie in array", async () => {
-    const [, headers] = await get({ "set-cookie": ["id=1"] });
-    assertCookies(headers["set-cookie"], "id=1; secure");
+    await get({ headers: { [SET_COOKIE]: ["id=1"] } });
+    assertCookies("id=1; secure");
   });
 
   it("flag cookies as secure with multiple cookies in array", async () => {
-    const [, headers] = await get({ "set-cookie": ["id=1", "problem=def"] });
-    assertCookies(headers["set-cookie"], "id=1; secure", "problem=def; secure");
+    await get({ headers: { [SET_COOKIE]: ["id=1", "problem=def"] } });
+    assertCookies("id=1; secure", "problem=def; secure");
   });
 });

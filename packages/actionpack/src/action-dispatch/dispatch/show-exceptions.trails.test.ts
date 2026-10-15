@@ -7,6 +7,12 @@ const boom = async (_env: RackEnv): Promise<RackResponse> => {
   throw new Error("puke!");
 };
 
+const publicExceptionsApp = async (env: RackEnv): Promise<RackResponse> => [
+  500,
+  { "content-type": "text/html; charset=utf-8" },
+  bodyFromString(`${String(env["PATH_INFO"])} error fixture\n`),
+];
+
 const exceptionsApp = async (env: RackEnv): Promise<RackResponse> => [
   500,
   { "content-type": "text/html; charset=utf-8" },
@@ -21,5 +27,27 @@ describe("ShowExceptions#call", () => {
     expect(await bodyToString(body)).toBe("/500 error fixture\n");
     expect(env["action_dispatch.report_exception"]).toBe(true);
     expect((env["action_dispatch.exception"] as Error).message).toBe("puke!");
+  });
+
+  it("rewrites request method to GET and preserves original on env", async () => {
+    let seenMethod: string | undefined;
+    let seenOriginalMethod: string | undefined;
+    const captureApp = async (env: RackEnv): Promise<RackResponse> => {
+      seenMethod = env["REQUEST_METHOD"] as string;
+      seenOriginalMethod = env["action_dispatch.original_request_method"] as string;
+      return publicExceptionsApp(env);
+    };
+
+    const env: RackEnv = {
+      REQUEST_METHOD: "POST",
+      PATH_INFO: "/",
+      "action_dispatch.show_exceptions": "all",
+    };
+    const app = new ShowExceptions(boom, captureApp);
+    await app.call(env);
+
+    expect(seenMethod).toBe("GET");
+    expect(seenOriginalMethod).toBe("POST");
+    expect(env["REQUEST_METHOD"]).toBe("POST");
   });
 });

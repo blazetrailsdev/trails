@@ -3,7 +3,7 @@ export { RELEASE as VERSION } from "./version.js";
 
 export type RackEnv = Record<string, unknown>;
 
-export type RackBody = AsyncIterable<string | Uint8Array>;
+export type RackBody = AsyncIterable<string | Uint8Array> | Iterable<string | Uint8Array>;
 
 export type RackResponse = [number, Record<string, string | string[]>, RackBody];
 

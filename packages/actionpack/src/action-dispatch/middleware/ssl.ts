@@ -25,7 +25,9 @@ export interface HSTSOptions {
   preload?: boolean;
 }
 
-type RackApp = (env: RackEnv) => Promise<RackResponse>;
+type RackApp =
+  | ((env: RackEnv) => Promise<RackResponse>)
+  | { call(env: RackEnv): Promise<RackResponse> };
 
 const HSTS_EXPIRES_IN = 63072000;
 const PERMANENT_REDIRECT_REQUEST_METHODS = ["GET", "HEAD"];
@@ -70,13 +72,17 @@ export class SSL {
     const request = new Request(env);
 
     if (request.ssl) {
-      const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+      const [status, headers, body] = await (rbFSend(
+        this.app,
+        "call",
+        env,
+      ) as Promise<RackResponse>);
       this.setHstsHeaderBang(headers);
       if (this.secureCookies && !this.exclude(request)) this.flagCookiesAsSecureBang(headers);
       return [status, headers, body];
     } else {
       if (!this.exclude(request)) return this.redirectToHttps(request);
-      return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
+      return rbFSend(this.app, "call", env) as Promise<RackResponse>;
     }
   }
 

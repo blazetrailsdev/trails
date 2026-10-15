@@ -23,7 +23,7 @@ describe("Template::Error#backtrace_locations", () => {
   it("answers the cause's backtrace locations", () => {
     const original = new Error("boom");
     original.stack = "Error: boom\n    at render (a.js:5:7)";
-    const e = new TemplateError({ original, template: {} as Template });
+    const e = new TemplateError({} as Template, original);
     expect(e.backtraceLocations()!.map((loc) => loc.toString())).toEqual(["at render (a.js:5:7)"]);
   });
 });

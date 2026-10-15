@@ -15,7 +15,6 @@ export { FixtureResolver, NullResolver } from "./testing/resolvers.js";
 export { LookupContext, DetailsKey } from "./lookup-context.js";
 
 export { MissingTemplate, StrictLocalsError, TemplateError } from "./template/error.js";
-export type { TemplateErrorOptions } from "./template/error.js";
 
 export { PathRegistry } from "./path-registry.js";
 export { ViewReloader } from "./cache-expiry.js";

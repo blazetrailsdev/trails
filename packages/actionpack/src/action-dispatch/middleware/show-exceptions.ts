@@ -7,17 +7,17 @@ import { Request } from "../http/request.js";
 import type { RackAppObject } from "./stack.js";
 
 export class ShowExceptions {
-  private app: RackApp;
+  private app: RackApp | RackAppObject;
   private exceptionsApp: RackApp | RackAppObject;
 
-  constructor(app: RackApp, exceptionsApp: RackApp | RackAppObject) {
+  constructor(app: RackApp | RackAppObject, exceptionsApp: RackApp | RackAppObject) {
     this.app = app;
     this.exceptionsApp = exceptionsApp;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
     try {
-      return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+      return await (rbFSend(this.app, "call", env) as Promise<RackResponse>);
     } catch (error) {
       const exception = error instanceof Error ? error : new Error(String(error));
       const request = new Request(env);

@@ -477,10 +477,7 @@ export class Template {
       e.subTemplateOf(this);
       throw e;
     } else {
-      throw new TemplateError({
-        original: e instanceof Error ? e : new Error(String(e)),
-        template: this,
-      });
+      throw new TemplateError(this, e instanceof Error ? e : new Error(String(e)));
     }
   }
 
