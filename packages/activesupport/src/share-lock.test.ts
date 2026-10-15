@@ -148,8 +148,56 @@ describe("ShareLockTest", () => {
     // PERMANENT-SKIP: ruby-compat's Thread#kill marks the thread dead but cannot unwind a JS body awaiting a promise, so the killed thread's ensure never runs and its share is never released (thread.ts, Thread#exit).
   });
 
-  it.skip("exclusive conflicting purpose", () => {
-    // PERMANENT-SKIP: the use_upgrading pass leaves both conflicting threads holding shares and relies on Thread#kill in its ensure to release them before the next pass; ruby-compat's Thread#kill cannot unwind a JS body (thread.ts, Thread#exit), so the next pass's sharing section never starts.
+  it("exclusive conflicting purpose", async () => {
+    for (const useUpgrading of [false, true]) {
+      let conflictingExclusiveThreads: Thread[] = [];
+      let noPurposeThread: Thread | undefined;
+      await withThreadWaitingInLockSection("sharing", async (sharingThreadReleaseLatch) => {
+        try {
+          const together = new Concurrent.CyclicBarrier(2);
+          const conflicting = (purpose: string, compatible: string[]) =>
+            new Thread(() => {
+              const block = async () => {
+                await together.wait();
+                await lock.exclusive({ purpose: purpose, compatible: compatible }, () => {});
+              };
+              return useUpgrading ? lock.sharing(block) : block();
+            });
+          conflictingExclusiveThreads = [
+            conflicting("red", ["green", "purple"]),
+            conflicting("blue", ["green"]),
+          ];
+
+          await assertThreadsStuck(conflictingExclusiveThreads);
+
+          noPurposeThread = new Thread(() => lock.exclusive({}, () => {}));
+          await assertThreadsStuck(noPurposeThread);
+
+          const compatibleThread = new Thread(() =>
+            lock.exclusive({ purpose: "green", compatible: [] }, () => {}),
+          );
+          await assertThreadsStuck(compatibleThread);
+
+          await assertThreadsStuck(conflictingExclusiveThreads);
+
+          sharingThreadReleaseLatch.countDown();
+
+          await assertThreadsNotStuck(compatibleThread);
+
+          if (useUpgrading) {
+            await assertThreadsStuck(conflictingExclusiveThreads);
+
+            await assertThreadsStuck(noPurposeThread);
+          } else {
+            await assertThreadsNotStuck(conflictingExclusiveThreads);
+            await assertThreadsNotStuck(noPurposeThread);
+          }
+        } finally {
+          conflictingExclusiveThreads.forEach((t) => t.kill());
+          noPurposeThread?.kill();
+        }
+      });
+    }
   });
 
   it("exclusive ordering", async () => {

@@ -1,3 +1,4 @@
+import { ArgumentError } from "../argument-error.js";
 import { rbModConstSet } from "../include.js";
 import { Concurrent } from "./map.js";
 
@@ -16,13 +17,28 @@ export class CyclicBarrier {
 
   /** @noRailsEquivalent PERMANENT */
   constructor(parties: number) {
+    if (!(Number.isInteger(parties) && parties >= 1)) {
+      throw new ArgumentError("count must be in integer greater than or equal one");
+    }
     this.parties = parties;
   }
 
   /** @noRailsEquivalent PERMANENT */
-  wait(): Promise<boolean> {
+  wait(timeout: number | null = null): Promise<boolean> {
     return new Promise((resolve) => {
-      this.waiters.push(() => resolve(true));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const wake = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      this.waiters.push(wake);
+      if (timeout != null) {
+        timer = setTimeout(() => {
+          const index = this.waiters.indexOf(wake);
+          if (index >= 0) this.waiters.splice(index, 1);
+          resolve(false);
+        }, timeout * 1000);
+      }
       if (this.waiters.length === this.parties) {
         const waiters = this.waiters;
         this.waiters = [];
