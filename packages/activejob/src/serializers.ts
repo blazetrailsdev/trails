@@ -1,6 +1,7 @@
 import { Autoload, extend, mattrAccessor, safeConstantize } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  hashAref,
   rtest,
   rbInspect,
   rbModConstSet,
@@ -35,15 +36,15 @@ export function serialize(argument: unknown): unknown {
   return serializer.serialize(argument);
 }
 
-export function deserialize(argument: Record<string, unknown>): unknown {
-  const serializerName = argument[ActiveJob.Arguments.OBJECT_SERIALIZER_KEY] as string | null;
+export function deserialize(argument: Record<string, unknown> | Map<string, unknown>): unknown {
+  const serializerName = hashAref(argument, ActiveJob.Arguments.OBJECT_SERIALIZER_KEY);
   if (!rtest(serializerName)) {
     throw new ArgumentError(
       `Serializer name is not present in the argument: ${rbInspect(argument)}`,
     );
   }
 
-  const serializer = safeConstantize(serializerName) as SerializerLike | null;
+  const serializer = safeConstantize(serializerName as string) as SerializerLike | null;
   if (serializer == null) throw new ArgumentError(`Serializer ${serializerName} is not known`);
 
   return serializer.deserialize(argument);
