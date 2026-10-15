@@ -1,15 +1,30 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
+import type * as ArgumentsModule from "./arguments.js";
+import type * as SerializersFunctions from "./serializers.js";
+import type { ObjectSerializer } from "./serializers/object-serializer.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_job/base": () => import("./base.js"),
+  "active_job/arguments": () => import("./arguments.js"),
+  "active_job/serializers": () => import("./serializers.js"),
+  "active_job/serializers/object_serializer": () => import("./serializers/object-serializer.js"),
 };
+
+export interface SerializerLike {
+  isSerialize(argument: unknown): boolean;
+  serialize(argument: unknown): unknown;
+  deserialize(argument: Record<string, unknown>): unknown;
+}
 
 export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   Base: typeof Base;
+  Arguments: typeof ArgumentsModule.Arguments;
+  DeserializationError: typeof ArgumentsModule.DeserializationError;
+  SerializationError: typeof ArgumentsModule.SerializationError;
   QueueAdapters: typeof QueueAdapters;
   Serializers: typeof Serializers;
 };
@@ -31,5 +46,13 @@ ActiveJob.autoload("TestHelper");
 export const QueueAdapters = { name: "ActiveJob::QueueAdapters", loadPath } as AutoloadModule;
 extend(QueueAdapters, Autoload);
 
-export const Serializers = { name: "ActiveJob::Serializers", loadPath } as AutoloadModule;
+export const Serializers = { name: "ActiveJob::Serializers", loadPath } as AutoloadModule & {
+  _additionalSerializers: Set<SerializerLike>;
+  serialize: typeof SerializersFunctions.serialize;
+  deserialize: typeof SerializersFunctions.deserialize;
+  serializers: typeof SerializersFunctions.serializers;
+  addSerializers: typeof SerializersFunctions.addSerializers;
+  ObjectSerializer: typeof ObjectSerializer;
+};
 extend(Serializers, Autoload);
+Serializers.autoload("ObjectSerializer");

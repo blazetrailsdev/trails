@@ -1,0 +1,50 @@
+import {
+  NotImplementedError,
+  rbModConstSet,
+  rbModName,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat";
+import { ActiveJob, Serializers } from "../namespaces.js";
+
+export class ObjectSerializer {
+  /** @noRailsEquivalent PERMANENT */
+  static instance<T extends ObjectSerializer>(this: new () => T): T {
+    if (!Object.hasOwn(this, "_instance")) {
+      Object.defineProperty(this, "_instance", { value: new this() });
+    }
+    return (this as unknown as { _instance: T })._instance;
+  }
+
+  static isSerialize(argument: unknown): boolean {
+    return this.instance().isSerialize(argument);
+  }
+
+  static serialize(argument: unknown): Record<string, unknown> {
+    return this.instance().serialize(argument);
+  }
+
+  static deserialize(argument: Record<string, unknown>): unknown {
+    return this.instance().deserialize(argument);
+  }
+
+  isSerialize(argument: unknown): boolean {
+    return rbObjIsKindOf(argument, this.klass());
+  }
+
+  serialize(hash: unknown): Record<string, unknown> {
+    return Object.assign(
+      { [ActiveJob.Arguments.OBJECT_SERIALIZER_KEY]: rbModName(this.constructor) },
+      hash as Record<string, unknown>,
+    );
+  }
+
+  deserialize(_json: Record<string, unknown>): unknown {
+    throw new NotImplementedError();
+  }
+
+  /** @internal */
+  protected klass(): unknown {
+    throw new NotImplementedError();
+  }
+}
+rbModConstSet(Serializers, "ObjectSerializer", ObjectSerializer);
