@@ -178,6 +178,7 @@ export class RackBody {
   /** @internal */
   private _response: Response;
 
+  /** @inventedArm loop — CONVERGEABLE response-async-each-and-bad-request-errinfo */
   constructor(response: Response) {
     this._response = response;
     for (const method of Object.keys(BODY_METHODS)) {
