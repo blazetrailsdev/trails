@@ -53,6 +53,7 @@ export {
   rbClassSuperclass,
   rbCDate,
   rbCDateTime,
+  rbCArray,
   rbCFalseClass,
   rbCFloat,
   rbCInteger,

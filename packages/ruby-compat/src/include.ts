@@ -2049,3 +2049,6 @@ include(rbCString, rbMComparable);
 include(rbCTime, rbMComparable);
 include(rbCDate, rbMComparable);
 include(Hash, Enumerable);
+Object.defineProperty(Hash.prototype, Symbol.for("@blazetrails/ruby-compat:HASH_CLASS_BODY"), {
+  value: new Set(Object.getOwnPropertyNames(Hash.prototype)),
+});

@@ -340,6 +340,14 @@ rbModDefineMethod(rbCInteger, "isInteger", () => true);
  * @noRailsEquivalent PERMANENT
  */
 export const rbCFloat = rbDefineClass("Float", rbCNumeric);
+
+/**
+ * `rb_cArray` (`vendor/ruby/v3.3.11/array.c:8605`): the seat a reopened
+ * `class Array` defines its methods on, since a JS array's prototype is the
+ * global `Array.prototype`.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCArray = rbDefineClass("Array");
 const rbCProc = rbDefineClass("Proc");
 
 const SPECIAL_CONST_CLASSES: ReadonlySet<unknown> = new Set([
@@ -359,6 +367,30 @@ function classSeatMethodTable(recv: unknown): object | null {
   if (isSymbol(recv)) return rbCSymbol.prototype;
   const klass = rbObjClass(recv);
   return SPECIAL_CONST_CLASSES.has(klass) ? (klass.prototype as object) : null;
+}
+
+const HASH_CLASS_BODY = Symbol.for("@blazetrails/ruby-compat:HASH_CLASS_BODY");
+
+function reopenedSeatMethod(
+  recv: unknown,
+  mid: string,
+): ((...args: unknown[]) => unknown) | undefined {
+  if (Array.isArray(recv)) {
+    for (
+      let o: object | null = rbCArray.prototype;
+      o && o !== Object.prototype;
+      o = Object.getPrototypeOf(o) as object | null
+    ) {
+      const desc = Object.getOwnPropertyDescriptor(o, mid);
+      if (typeof desc?.value === "function") return desc.value as (...args: unknown[]) => unknown;
+    }
+  } else if (isPlainHash(recv)) {
+    const classBody = (Hash.prototype as { [HASH_CLASS_BODY]?: Set<string> })[HASH_CLASS_BODY];
+    if (classBody?.has(mid) !== false) return undefined;
+    const desc = Object.getOwnPropertyDescriptor(Hash.prototype, mid);
+    if (typeof desc?.value === "function") return desc.value as (...args: unknown[]) => unknown;
+  }
+  return undefined;
 }
 
 /**
@@ -631,6 +663,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
+  if (reopenedSeatMethod(obj, mid) !== undefined) return true;
   let cme: PropertyDescriptor | undefined;
   for (
     let o: object | null = Object(obj);
@@ -1058,6 +1091,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
     return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);
   }
+  const seated = reopenedSeatMethod(recv, mid);
+  if (seated !== undefined) return seated.apply(recv, args);
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
   }

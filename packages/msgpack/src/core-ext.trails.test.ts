@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Hash, NoMethodError, TypeError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, TypeError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ExtensionValue, Packer } from "./index.js";
 
 describe("MessagePack::CoreExt", () => {
@@ -31,9 +31,13 @@ describe("MessagePack::CoreExt", () => {
     expect(rbFSend(":foo", "toMsgpackExt")).toBe("foo");
   });
 
-  it("leaves the global Array and a plain record without a to_msgpack of their own", () => {
-    expect(() => rbFSend([], "toMsgpack")).toThrow(NoMethodError);
-    expect(() => rbFSend({}, "toMsgpack")).toThrow(NoMethodError);
+  it("reaches to_msgpack on a JS array and a plain record through the Array and Hash seats", () => {
+    expect(rbFSend([1], "toMsgpack")).toEqual(Uint8Array.of(0x91, 0x01));
+    expect(rbFSend({ a: 1 }, "toMsgpack")).toEqual(Uint8Array.of(0x81, 0xa1, 0x61, 0x01));
+    expect(rbObjRespondTo([], "toMsgpack")).toBe(true);
+    expect(rbObjRespondTo({}, "toMsgpack")).toBe(true);
+    expect(Object.hasOwn(Array.prototype, "toMsgpack")).toBe(false);
+    expect(rbObjRespondTo({}, "toJSON")).toBe(false);
   });
 
   it("write_int packs a whole number past 2**53 as an Integer, never a Float", () => {
