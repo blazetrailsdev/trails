@@ -1,5 +1,5 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModConstSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vitest";
 import {
   NullLogger,
@@ -39,6 +39,7 @@ import {
   SSL,
   Static,
   Session,
+  ActionDispatch,
   ActionController,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
@@ -551,13 +552,13 @@ describe("Application::Configuration", () => {
 
   it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
     class MyCustomStore extends Session.CookieStore {}
-    Session.sessionStoreConstants.set("MyCustomStore", MyCustomStore);
+    rbModConstSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
     try {
       const c = new Configuration();
       c.sessionStore(":my_custom_store");
       expect(c.sessionStore()).toBe(MyCustomStore);
     } finally {
-      Session.sessionStoreConstants.delete("MyCustomStore");
+      rbModRemoveConst(ActionDispatch.Session, "MyCustomStore");
     }
   });
 

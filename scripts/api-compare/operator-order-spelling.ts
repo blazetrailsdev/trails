@@ -137,6 +137,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // reflection.rb:440 `def ==(other_aggregation)` → reflection.ts `equals`
   // (on `MacroReflection`, declared reflection.rb:369).
   "ActiveRecord::Reflection::MacroReflection": { "==": ["equals"] },
+  // middleware/stack.rb:93 `def [](i)` → middleware/stack.ts `get`, the
+  // `Arel::Table#[]` spelling.
+  "ActionDispatch::MiddlewareStack": { "[]": ["get"] },
   // relation/predicate_builder.rb:53 `def [](attr_name, value, operator = nil)`
   // → relation/predicate-builder.ts `get`, the `Arel::Table#[]` spelling.
   "ActiveRecord::PredicateBuilder": { "[]": ["get"] },

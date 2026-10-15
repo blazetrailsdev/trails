@@ -82,7 +82,9 @@ describe("ExceptionWrapper tables keyed on qualified class names", () => {
   it("silent_exceptions keeps a raised ActionController::RoutingError off the framework trace", () => {
     const error = new RoutingError("");
     error.stack = "RoutingError\n    at x (/app/node_modules/pkg/index.js:1:1)";
-    const wrapper = new ExceptionWrapper(null, error);
+    const cleaner = new BacktraceCleaner();
+    cleaner.addSilencer((line) => line.includes("node_modules"));
+    const wrapper = new ExceptionWrapper(cleaner, error);
     expect(wrapper.exceptionTrace()).toEqual([]);
   });
 });
@@ -92,7 +94,9 @@ describe("ExceptionWrapper#backtrace", () => {
     const error = new Error("boom");
     error.stack =
       "Error: boom\n    at index (/app/lib/file.js:42:7)\n    at x (/app/node_modules/rack.js:43:1)";
-    const wrapper = new ExceptionWrapper(null, error);
+    const cleaner = new BacktraceCleaner();
+    cleaner.addSilencer((line) => line.includes("node_modules"));
+    const wrapper = new ExceptionWrapper(cleaner, error);
     expect(wrapper.backtrace).toBe(wrapper.backtrace);
     expect(wrapper.backtrace.map((loc) => [loc.path, loc.lineno])).toEqual([
       ["/app/lib/file.js", 42],

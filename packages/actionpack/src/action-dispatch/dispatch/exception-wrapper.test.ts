@@ -2,7 +2,18 @@ import { describe, it, expect } from "vitest";
 import { ParameterTypeError } from "@blazetrails/rack";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
+import { BacktraceCleaner } from "@blazetrails/activesupport";
 import { ExceptionWrapper } from "../exception-wrapper.js";
+
+const BACKTRACE =
+  "TestError\n    at index (lib/file.ts:42:1)\n    at run (node_modules/vitest/index.js:7:3)";
+
+function makeCleaner(): BacktraceCleaner {
+  const cleaner = new BacktraceCleaner();
+  cleaner.removeFilters();
+  cleaner.addSilencer((line) => !line.includes("lib/"));
+  return cleaner;
+}
 
 describe("ExceptionWrapperTest", () => {
   it("#source_extracts fetches source fragments for every backtrace entry", () => {
@@ -54,10 +65,10 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#application_trace returns traces only from the application", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    for (const line of wrapper.applicationTrace.map(String)) {
-      expect(line).not.toContain("node_modules");
-    }
+    const exception = new Error("test");
+    exception.stack = BACKTRACE;
+    const wrapper = new ExceptionWrapper(makeCleaner(), exception);
+    expect(wrapper.applicationTrace.map(String)).toEqual(["at index (lib/file.ts:42:1)"]);
   });
 
   it("#status_code returns 400 for Rack::Utils::ParameterTypeError", () => {
@@ -84,10 +95,12 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#framework_trace returns traces outside the application", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    for (const line of wrapper.frameworkTrace.map(String)) {
-      expect(line).toContain("node_modules");
-    }
+    const exception = new Error("test");
+    exception.stack = BACKTRACE;
+    const wrapper = new ExceptionWrapper(makeCleaner(), exception);
+    expect(wrapper.frameworkTrace.map(String)).toEqual([
+      "at run (node_modules/vitest/index.js:7:3)",
+    ]);
   });
 
   it("#framework_trace cannot be nil", () => {
@@ -98,9 +111,10 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#full_trace returns application and framework traces", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    const total = wrapper.applicationTrace.length + wrapper.frameworkTrace.length;
-    expect(wrapper.fullTrace.length).toBe(total);
+    const exception = new Error("test");
+    exception.stack = BACKTRACE;
+    const wrapper = new ExceptionWrapper(makeCleaner(), exception);
+    expect(wrapper.fullTrace.map(String)).toEqual(wrapper.backtrace.map(String));
   });
 
   it("#full_trace cannot be nil", () => {

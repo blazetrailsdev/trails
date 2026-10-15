@@ -2,6 +2,8 @@ import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
 import { SessionId } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "./abstract-store.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Session } from "../../../namespaces.js";
 
 export interface CacheStoreSessionOptions {
   cache?: CacheStoreLike;
@@ -80,8 +82,6 @@ export class CacheStore extends AbstractSecureStore {
     const fromPublic = this.cache.read(this.cacheKey(sid.publicId));
     return fromPublic ? (fromPublic as Record<string, unknown>) : undefined;
   }
-
-  override generateSid(): SessionId {
-    return super.generateSid();
-  }
 }
+
+rbModConstSet(Session, "CacheStore", CacheStore);

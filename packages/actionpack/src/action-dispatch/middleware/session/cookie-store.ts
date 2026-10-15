@@ -2,6 +2,8 @@ import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { SessionId as RackSessionId } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "./abstract-store.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Session } from "../../../namespaces.js";
 
 /** @internal */
 export interface CookieStoreRequest {
@@ -152,3 +154,5 @@ export class CookieStore extends AbstractSecureStore {
   /** @internal */
   declare staleSessionCheckBang: <T>(block: () => T) => T;
 }
+
+rbModConstSet(Session, "CookieStore", CookieStore);

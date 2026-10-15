@@ -1,12 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
-import { Logger } from "@blazetrails/activesupport";
+import { BacktraceCleaner, Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { MimeType } from "../http/mime-type.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
-import { RoutingError as RoutingErrorClass } from "../../action-controller/metal/exceptions.js";
+import {
+  BadRequest,
+  RoutingError as RoutingErrorClass,
+} from "../../action-controller/metal/exceptions.js";
+import { ParameterMissing } from "../../action-controller/metal/strong-parameters.js";
+import { InvalidType } from "../http/mime-negotiation.js";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,
@@ -24,6 +29,27 @@ class RoutingError extends Error {
 
 const routingErrorApp = async (_env: RackEnv): Promise<RackResponse> => {
   throw new RoutingError("No route matches");
+};
+
+const boomer = async (env: RackEnv): Promise<RackResponse> => {
+  switch (env["PATH_INFO"]) {
+    case "/pass":
+      return [404, { "x-cascade": "pass" }, bodyFromString("")];
+    case "/invalid_mimetype":
+      throw new InvalidType();
+    case "/cause_mapped_to_rescue_responses":
+      try {
+        throw new ParameterMissing("missing_param_key");
+      } catch {
+        throw new Error("uninitialized constant Userr");
+      }
+    case "/bad_request":
+      throw new BadRequest();
+    case "/parameter_missing":
+      throw new ParameterMissing("invalid_param_key", ["valid_param_key"]);
+    default:
+      throw new Error("puke!");
+  }
 };
 
 function makeEnv(overrides: Partial<RackEnv> = {}): RackEnv {
@@ -83,6 +109,22 @@ describe("DebugExceptionsTest", () => {
     expect(json.exception).toBeDefined();
   });
 
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("rescue with suggestions", async () => {
+    const mw = new DebugExceptions(boomer);
+    let [status, , body] = await mw.call(makeEnv({ PATH_INFO: "/not_found" }));
+    expect(status).toBe(404);
+    let html = await bodyToString(body);
+    expect(html).toMatch(/<b>Did you mean\?/);
+    expect(html).toMatch(/<li>hello<\/li>/);
+
+    [status, , body] = await mw.call(makeEnv({ PATH_INFO: "/parameter_missing" }));
+    expect(status).toBe(400);
+    html = await bodyToString(body);
+    expect(html).toMatch(/<b>Did you mean\?/);
+    expect(html).toMatch(/<li>valid_param_key<\/li>/);
+  });
+
   it("rescue with HTML format for HTML API request", async () => {
     const mw = new DebugExceptions(errorApp);
     const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "text/html" }));
@@ -112,6 +154,42 @@ describe("DebugExceptionsTest", () => {
     } finally {
       MimeType.unregister(":wibble");
     }
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("does not show filtered parameters", async () => {
+    const mw = new DebugExceptions(boomer);
+    const [status, , body] = await mw.call(
+      makeEnv({
+        PATH_INFO: "/",
+        QUERY_STRING: "foo=bar",
+        "action_dispatch.parameter_filter": ["foo"],
+      }),
+    );
+    expect(status).toBe(500);
+    expect(await bodyToString(body)).toContain("&quot;foo&quot; =&gt; &quot;[FILTERED]&quot;");
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("show registered original exception if the last exception is TemplateError", async () => {
+    const mw = new DebugExceptions(boomer);
+    const [status, , body] = await mw.call(makeEnv({ PATH_INFO: "/not_found_original_exception" }));
+    expect(status).toBe(404);
+    const html = await bodyToString(body);
+    expect(html).toMatch(/AbstractController::ActionNotFound/);
+    expect(html).toMatch(/Showing <i>.*dispatch\/debug-exceptions.test.ts<\/i>/);
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("show the last exception and cause even when the cause is mapped to resque_responses", async () => {
+    const mw = new DebugExceptions(boomer);
+    const [status, , body] = await mw.call(
+      makeEnv({ PATH_INFO: "/cause_mapped_to_rescue_responses" }),
+    );
+    expect(status).toBe(500);
+    const html = await bodyToString(body);
+    expect(html).toMatch(/ActionController::ParameterMissing/);
+    expect(html).toMatch(/NameError/);
   });
 
   it("sets the HTTP charset parameter", async () => {
@@ -186,6 +264,79 @@ describe("DebugExceptionsTest", () => {
     expect(io.read()).toMatch(/Something went wrong/);
   });
 
+  it("uses backtrace cleaner from env", async () => {
+    const backtraceCleaner = new BacktraceCleaner();
+    vi.spyOn(backtraceCleaner, "clean").mockReturnValue(["passed backtrace cleaner"]);
+    const [, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({ PATH_INFO: "/", "action_dispatch.backtrace_cleaner": backtraceCleaner }),
+    );
+    expect(await bodyToString(body)).toMatch(/passed backtrace cleaner/);
+  });
+
+  it("logs exception backtrace when all lines silenced", async () => {
+    const output = new StringIO();
+    const backtraceCleaner = new BacktraceCleaner();
+    backtraceCleaner.addSilencer(() => true);
+
+    const env = makeEnv({
+      PATH_INFO: "/",
+      "action_dispatch.logger": new Logger(output),
+      "action_dispatch.backtrace_cleaner": backtraceCleaner,
+    });
+
+    await new DebugExceptions(boomer).call(env);
+    output.rewind();
+    expect(output.read().split(/(?<=\n)/).length).toBeGreaterThan(10);
+  });
+
+  it("doesn't log the framework backtrace when error type is a routing error", async () => {
+    const output = new StringIO();
+    const backtraceCleaner = new BacktraceCleaner();
+    backtraceCleaner.addSilencer(() => true);
+
+    const env = makeEnv({
+      PATH_INFO: "/pass",
+      "action_dispatch.show_detailed_exceptions": false,
+      "action_dispatch.logger": new Logger(output),
+      "action_dispatch.log_rescued_responses": true,
+      "action_dispatch.backtrace_cleaner": backtraceCleaner,
+    });
+
+    await expect(new DebugExceptions(boomer).call(env)).rejects.toThrow(RoutingErrorClass);
+
+    output.rewind();
+    const log = output.read();
+
+    expect(log).toContain('ActionController::RoutingError (No route matches [GET] "/pass")');
+    expect(log.split(/(?<=\n)/).length).toBe(3);
+  });
+
+  // BLOCKED: exception-without-message-reads-class-name
+  it.skip("doesn't log the framework backtrace when error type is a invalid mime type", async () => {
+    const output = new StringIO();
+    const backtraceCleaner = new BacktraceCleaner();
+    backtraceCleaner.addSilencer(() => true);
+
+    const env = makeEnv({
+      PATH_INFO: "/invalid_mimetype",
+      HTTP_ACCEPT: "text/html,*",
+      "action_dispatch.show_detailed_exceptions": false,
+      "action_dispatch.logger": new Logger(output),
+      "action_dispatch.log_rescued_responses": true,
+      "action_dispatch.backtrace_cleaner": backtraceCleaner,
+    });
+
+    await expect(new DebugExceptions(boomer).call(env)).rejects.toThrow(InvalidType);
+
+    output.rewind();
+    const log = output.read();
+
+    expect(log).toContain(
+      "ActionDispatch::Http::MimeNegotiation::InvalidType (ActionDispatch::Http::MimeNegotiation::InvalidType)",
+    );
+    expect(log.split(/(?<=\n)/).length).toBe(3);
+  });
+
   it("skips logging when rescued and log_rescued_responses is false", async () => {
     const output = new StringIO();
     const mw = new DebugExceptions(routingErrorApp);
@@ -242,6 +393,51 @@ describe("DebugExceptionsTest", () => {
     expect(html).toContain("SyntaxError");
   });
 
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("display backtrace on template missing errors", async () => {
+    const [, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({ PATH_INFO: "/missing_template" }),
+    );
+    const html = await bodyToString(body);
+    expect(html).toMatch(/<header>[\s\S]*<h1>Template is missing/);
+    expect(html).toMatch(/<h2[^>]*>\s*Missing template/);
+    expect(html).toContain('id="Application-Trace-0"');
+    expect(html).toContain('id="Framework-Trace-0"');
+    expect(html).toContain('id="Full-Trace-0"');
+    expect(html).toMatch(/<h2[^>]*>Request<\/h2>/);
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("display backtrace when error type is SyntaxError wrapped by ActionView::Template::Error", async () => {
+    const [status, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({
+        PATH_INFO: "/syntax_error_into_view",
+        "action_dispatch.backtrace_cleaner": new BacktraceCleaner(),
+      }),
+    );
+    expect(status).toBe(500);
+    const html = await bodyToString(body);
+    expect(html).toMatch(/id="Application-Trace-0"[\s\S]*<code>[\s\S]*SyntaxError/);
+    expect(html).toMatch(/Showing <i>.*dispatch\/debug-exceptions.test.ts<\/i>/);
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("debug exceptions app shows user code that caused the error in source view", async () => {
+    const cleaner = new BacktraceCleaner();
+    cleaner.addSilencer((line) => /methodThatRaises/.test(line));
+    cleaner.addSilencer((line) => !/dispatch\/debug-exceptions.test.ts/.test(line));
+
+    const [status, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({ PATH_INFO: "/framework_raises", "action_dispatch.backtrace_cleaner": cleaner }),
+    );
+    expect(status).toBe(500);
+    const html = await bodyToString(body);
+    expect(html).toMatch(/class="exception-message"[\s\S]*error in framework/);
+    expect(html).toMatch(/class="source "[\s\S]*class="line active"[^<]*methodThatRaises/);
+    expect(html).toMatch(/id="Application-Trace-0"[\s\S]*debug-exceptions.test.ts:\d+/);
+    expect(html).toMatch(/id="Framework-Trace-0"[\s\S]*methodThatRaises/);
+  });
+
   it("invoke interceptors before rendering", async () => {
     let intercepted = false;
     const mw = new DebugExceptions(errorApp, null, "default", [
@@ -253,7 +449,7 @@ describe("DebugExceptionsTest", () => {
     expect(intercepted).toBe(true);
   });
 
-  it("bad interceptors doesnt debug exceptions", async () => {
+  it("bad interceptors doesn't debug exceptions", async () => {
     const mw = new DebugExceptions(errorApp, null, "default", [
       () => {
         throw new Error("interceptor broke");
@@ -261,6 +457,65 @@ describe("DebugExceptionsTest", () => {
     ]);
     const [status] = await mw.call(makeEnv());
     expect(status).toBe(500);
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("debug exceptions app shows all the nested exceptions in source view", async () => {
+    const cleaner = new BacktraceCleaner();
+    cleaner.addSilencer((line) => !/dispatch\/debug-exceptions.test.ts/.test(line));
+
+    const [status, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({ PATH_INFO: "/nested_exceptions", "action_dispatch.backtrace_cleaner": cleaner }),
+    );
+    expect(status).toBe(500);
+    const html = await bodyToString(body);
+    expect(html).toMatch(/class="exception-message"[\s\S]*Third error/);
+    expect(html).toMatch(/id="Application-Trace-0"[\s\S]*raiseNestedExceptionsThird/);
+    expect(html).toMatch(/id="Application-Trace-1"[\s\S]*raiseNestedExceptionsSecond/);
+    expect(html).toMatch(/id="Application-Trace-2"[\s\S]*raiseNestedExceptionsFirst/);
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("shows a buttons for every action in an actionable error", async () => {
+    const [status, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({ PATH_INFO: "/actionable_error" }),
+    );
+    expect(status).toBe(500);
+    const html = await bodyToString(body);
+    expect(html).toContain('<input type="submit" value="Action 1"');
+    expect(html).toContain('<input type="submit" value="Action 2"');
+  });
+
+  it("debug exceptions app shows diagnostics when malformed query parameters are provided", async () => {
+    const [status, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({ PATH_INFO: "/bad_request", QUERY_STRING: "x[y]=1&x[y][][w]=2" }),
+    );
+    expect(status).toBe(400);
+    expect(await bodyToString(body)).toContain("ActionController::BadRequest");
+  });
+
+  it("debug exceptions app shows diagnostics when malformed query parameters are provided by XHR", async () => {
+    const [status, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({
+        PATH_INFO: "/bad_request",
+        QUERY_STRING: "x[y]=1&x[y][][w]=2",
+        HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
+      }),
+    );
+    expect(status).toBe(400);
+    expect(await bodyToString(body)).toContain("ActionController::BadRequest");
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("debug exceptions app shows diagnostics for template errors that contain UTF-8 characters", async () => {
+    const io = new StringIO();
+    const [status, , body] = await new DebugExceptions(boomer).call(
+      makeEnv({ PATH_INFO: "/utf8_template_error", "action_dispatch.logger": new Logger(io) }),
+    );
+    expect(status).toBe(500);
+    const html = await bodyToString(body);
+    expect(html).toMatch(/Showing .*debug-exceptions.test.ts where line #\d+ raised/);
+    expect(html).toMatch(/string”/);
   });
 
   it("show the controller name in the diagnostics template when controller name is present", async () => {
@@ -306,6 +561,15 @@ describe("DebugExceptionsTest", () => {
       mw.call(makeEnv({ PATH_INFO: "/pass", "action_dispatch.show_exceptions": "none" })),
     ).rejects.toThrow(RoutingErrorClass);
     expect(closed).toBe(true);
+  });
+
+  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  it.skip("displays routes in a table when a RoutingError occurs", async () => {
+    const [, , body] = await new DebugExceptions(boomer).call(makeEnv({ PATH_INFO: "/pass" }));
+    const routingTable = (await bodyToString(body)).match(/route_table[\s\S]*<.table>/)![0];
+    expect(routingTable).toMatch("/:controller(/:action)(.:format)");
+    expect(routingTable).toMatch(":controller#:action");
+    expect(routingTable).not.toMatch(/&lt;|&gt;/);
   });
 
   it("displays request and response info when a RoutingError occurs", async () => {

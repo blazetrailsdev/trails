@@ -5,6 +5,8 @@ import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
 import { Request } from "../../request.js";
 import { Session as RequestSession } from "../../request/session.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Session } from "../../../namespaces.js";
 
 export class SessionRestoreError extends Error {
   constructor(cause?: Error) {
@@ -129,3 +131,6 @@ export class AbstractSecureStore extends PersistedSecure {
 includeMixin(AbstractSecureStore, Compatibility);
 includeMixin(AbstractSecureStore, StaleSessionCheck);
 includeMixin(AbstractSecureStore, SessionObject);
+
+rbModConstSet(Session, "AbstractStore", AbstractStore);
+rbModConstSet(Session, "AbstractSecureStore", AbstractSecureStore);

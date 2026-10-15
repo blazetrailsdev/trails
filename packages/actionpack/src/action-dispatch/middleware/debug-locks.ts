@@ -26,14 +26,8 @@ export interface InterlockLike {
 }
 
 export class DebugLocks {
+  /** @noRailsEquivalent CONVERGEABLE debug-locks-reads-dependencies-interlock */
   static interlock: InterlockLike | null = null;
-
-  static get defaultCharset(): string | null {
-    return Response.defaultCharset;
-  }
-  static set defaultCharset(value: string | null) {
-    Response.defaultCharset = value;
-  }
 
   private app: RackApp;
   private path: string;
@@ -129,7 +123,7 @@ export class DebugLocks {
     return [
       200,
       {
-        [CONTENT_TYPE]: `text/plain; charset=${DebugLocks.defaultCharset}`,
+        [CONTENT_TYPE]: `text/plain; charset=${Response.defaultCharset}`,
         [CONTENT_LENGTH]: Buffer.byteLength(str, "utf-8").toString(),
       },
       bodyFromString(str),

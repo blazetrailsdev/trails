@@ -335,9 +335,7 @@ export class Request {
   get remoteIp(): string | null {
     const v = this.getHeader("action_dispatch.remote_ip");
     if (v != null) {
-      if (typeof v === "object" && typeof (v as { calculate?: unknown }).calculate === "function") {
-        return (v as { calculate(): string | null }).calculate();
-      }
+      if (typeof v === "object") return (v as { toString(): string | null }).toString();
       return typeof v === "string" ? v : String(v);
     }
     return (this.getHeader("REMOTE_ADDR") as string) || "127.0.0.1";

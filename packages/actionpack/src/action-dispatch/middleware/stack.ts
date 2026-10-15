@@ -85,10 +85,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.entries = value;
   }
 
-  get length(): number {
-    return this.entries.length;
-  }
-
   get size(): number {
     return this.entries.length;
   }
@@ -195,8 +191,8 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.indexOf(klass) !== -1;
   }
 
-  get(index: number): Middleware | undefined {
-    return this.entries[index];
+  get(i: number): Middleware | undefined {
+    return this.entries[i];
   }
 
   toArray(): Middleware[] {
