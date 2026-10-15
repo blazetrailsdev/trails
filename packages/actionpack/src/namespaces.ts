@@ -6,7 +6,13 @@ import {
   onLoad,
   type Extended,
 } from "@blazetrails/activesupport";
-import { NameError, RuntimeError, rbModConstGet, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  NameError,
+  RuntimeError,
+  rbInspect,
+  rbModConstGet,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Base as ControllerBase } from "./action-controller/base.js";
@@ -101,18 +107,20 @@ Session.autoload("MemCacheStore", "action_dispatch/middleware/session/mem_cache_
 Session.autoload("CacheStore", "action_dispatch/middleware/session/cache_store");
 
 Session.resolveStore = function (sessionStore: string): unknown {
-  const name = sessionStore.startsWith(":") ? sessionStore.slice(1) : sessionStore;
+  const isSymbol = sessionStore.startsWith(":");
+  const camelized = camelize(isSymbol ? sessionStore.slice(1) : sessionStore);
+  const inspected = isSymbol ? sessionStore : rbInspect(sessionStore);
   try {
-    return rbModConstGet(this, camelize(name));
+    return rbModConstGet(this, camelized);
   } catch (e) {
     if (!(e instanceof NameError)) throw e;
     throw new RuntimeError(
-      `Unable to resolve session store ${sessionStore}.\n` +
+      `Unable to resolve session store ${inspected}.\n` +
         `\n` +
-        `${sessionStore} resolves to ActionDispatch::Session::${camelize(name)},\n` +
+        `${inspected} resolves to ActionDispatch::Session::${camelized},\n` +
         `but that class is undefined.\n` +
         `\n` +
-        `Is ${sessionStore} spelled correctly, and are any necessary gems installed?\n`,
+        `Is ${inspected} spelled correctly, and are any necessary gems installed?\n`,
     );
   }
 };

@@ -191,8 +191,8 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.indexOf(klass) !== -1;
   }
 
-  get(index: number): Middleware | undefined {
-    return this.entries[index];
+  get(i: number): Middleware | undefined {
+    return this.entries[i];
   }
 
   toArray(): Middleware[] {

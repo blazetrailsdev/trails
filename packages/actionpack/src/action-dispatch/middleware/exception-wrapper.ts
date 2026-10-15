@@ -362,7 +362,10 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE exception-wrapper-clean-backtrace-passes-kind-to-cleaner
+   */
   cleanBacktrace(args: "silent" | "noise" | "all"): Array<BacktraceLine | string> {
     if (this.backtraceCleaner) {
       return this.backtraceCleaner.clean(this.backtrace, args);
