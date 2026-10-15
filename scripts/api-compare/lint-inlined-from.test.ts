@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ApiManifest, ClassInfo, InlinedFrom, MethodInfo } from "@blazetrails/parity/types";
+import type { InlinedFromPair } from "./inlined-bodies.js";
 import { MISSING_TAG_PACKAGES, fixCitations, inlinedFromFindings } from "./lint-inlined-from.js";
 
 const def = (name: string, vendorFile: string, line: number, endLine: number): MethodInfo =>
@@ -49,6 +50,10 @@ const ruby = {
           ],
         }),
         "ActiveRecord::Relation": entity("relation.rb"),
+        "ActiveRecord::Multi": entity("multi.rb", [], {
+          includes: ["ActiveModel::API", "Core"],
+          mixinOrder: [{ kind: "include", names: ["ActiveModel::API", "Core"] }],
+        }),
         "ActiveRecord::Proxy": entity(
           "proxy.rb",
           [{ ...def("initialize", `${AR}/proxy.rb`, 2, 4), calls: [] }],
@@ -133,6 +138,7 @@ function messages(
     reexport = false,
     alias = undefined as string | undefined,
     sibling = false,
+    pairs = [] as InlinedFromPair[],
   } = {},
 ): string[] {
   const ctor = { ...def("constructor", "", 1, 1), file, inlinedFrom };
@@ -144,7 +150,7 @@ function messages(
     : { [owner]: entity(file, [ctor]) };
   if (sibling) Object.assign(classes, { Sibling: entity(file) });
   const ts = { packages: { activerecord: { classes, modules: {} } } } as unknown as ApiManifest;
-  return inlinedFromFindings(ruby, ts, enrolled).map((f) => `${f.hook} ${f.message}`);
+  return inlinedFromFindings(ruby, ts, enrolled, pairs).map((f) => `${f.hook} ${f.message}`);
 }
 
 describe("inlinedFromFindings", () => {
@@ -202,6 +208,28 @@ describe("inlinedFromFindings", () => {
     expect(messages([NEW, FIRST], batch)).toEqual([]);
     expect(messages([FIRST, NEW], batch)).toEqual([
       "ActiveRecord::Inheritance::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::First::ClassMethods#new",
+    ]);
+  });
+
+  it("pairs a constructor with the Rails class compare.ts compared it against", () => {
+    const pairs = [
+      {
+        package: "activerecord",
+        tsFile: "base.ts",
+        owner: "Helper",
+        rubyModule: "ActiveRecord::Base",
+      },
+    ];
+    const enrolled = ["activerecord"];
+    const tags = [LAST, NEW, FIRST, CORE, API];
+    expect(messages(tags, { owner: "Helper", sibling: true, enrolled, pairs })).toEqual([]);
+  });
+
+  it("orders one include statement's first argument ahead of its second", () => {
+    const multi = { owner: "Multi", file: "multi.ts" };
+    expect(messages([API, CORE], multi)).toEqual([]);
+    expect(messages([CORE, API], multi)).toEqual([
+      "ActiveModel::API#initialize is out of chain order: Rails runs it before ActiveRecord::Core#initialize",
     ]);
   });
 

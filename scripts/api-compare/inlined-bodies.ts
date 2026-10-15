@@ -47,6 +47,17 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
   throw new Error(`${TAG} names no Ruby body: ${where} — the manifest has no \`${name}\`.`);
 }
 
+/** The artifact compare.ts writes under `--calls`, in OUTPUT_DIR. */
+export const INLINED_FROM_PAIRS_FILE = "inlined-from-pairs.json";
+
+/** A tagged TS constructor and the Rails class compare.ts paired it with. */
+export interface InlinedFromPair {
+  package: string;
+  tsFile: string;
+  owner: string;
+  rubyModule: string;
+}
+
 export interface ModuleBody {
   module: string;
   body: MethodInfo;
@@ -58,8 +69,12 @@ export interface ModuleAncestors {
 }
 
 /**
- * The modules ahead of and behind a class in its ancestors, as FQNs: the last
- * `prepend` / `include` first, each module between its own prepends and includes.
+ * The modules ahead of and behind a class in its ancestors, as FQNs, each
+ * module between its own prepends and includes. A later `include` / `prepend`
+ * statement lands nearer the class than an earlier one, and the first argument
+ * of one statement ahead of its second: `Module#include` appends its arguments
+ * in reverse (`vendor/ruby/v3.3.11/eval.c:1139-1163`). Without `mixinOrder` the
+ * flat lists are read as one statement per name.
  */
 export function moduleAncestors(
   klass: ClassInfo,
@@ -68,20 +83,27 @@ export function moduleAncestors(
   resolve: (incName: string, contextFqn: string) => string,
 ): ModuleAncestors {
   const visited = new Set<string>();
-  const walk = (names: readonly string[] | undefined, contextFqn: string, into: string[]): void => {
-    for (const name of [...(names ?? [])].reverse()) {
+  const ordered = (mod: ClassInfo | undefined, kind: "include" | "prepend"): string[] =>
+    mod?.mixinOrder !== undefined
+      ? [...mod.mixinOrder]
+          .reverse()
+          .filter((statement) => statement.kind === kind)
+          .flatMap((statement) => statement.names)
+      : [...((kind === "include" ? mod?.includes : mod?.prepends) ?? [])].reverse();
+  const walk = (names: readonly string[], contextFqn: string, into: string[]): void => {
+    for (const name of names) {
       const fqn = resolve(name, contextFqn);
       if (visited.has(fqn)) continue;
       visited.add(fqn);
       const mod = modules[fqn] as ClassInfo | undefined;
-      walk(mod?.prepends, fqn, into);
+      walk(ordered(mod, "prepend"), fqn, into);
       into.push(fqn);
-      walk(mod?.includes, fqn, into);
+      walk(ordered(mod, "include"), fqn, into);
     }
   };
   const ancestors: ModuleAncestors = { prepended: [], included: [] };
-  walk(klass.prepends, klassFqn, ancestors.prepended);
-  walk(klass.includes, klassFqn, ancestors.included);
+  walk(ordered(klass, "prepend"), klassFqn, ancestors.prepended);
+  walk(ordered(klass, "include"), klassFqn, ancestors.included);
   return ancestors;
 }
 

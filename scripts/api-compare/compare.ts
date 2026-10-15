@@ -199,6 +199,8 @@ import {
   sameFileInitializeModules,
   taggedBodies,
   uncomparedInlinedTags,
+  INLINED_FROM_PAIRS_FILE,
+  type InlinedFromPair,
 } from "./inlined-bodies.js";
 import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 
@@ -4589,6 +4591,7 @@ export function main() {
   const appliedInheritanceExcludes = new Set<string>();
 
   const results: PackageResult[] = [];
+  const inlinedFromPairs: InlinedFromPair[] = [];
   const tsInlinedHookTags = inlinedHookTags(ts, ruby);
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
@@ -5597,7 +5600,10 @@ export function main() {
           byOwner === undefined
             ? undefined
             : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
-        if (byOwner?.has(tsClass ?? "")) inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
+        if (byOwner?.has(tsClass ?? "") && !inlinedTagsCompared.has(`${tsFile} ${tsClass}`)) {
+          inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
+          inlinedFromPairs.push({ package: pkg, tsFile, owner: tsClass!, rubyModule });
+        }
         return inlinedSegments(
           klass.instanceMethods.find((m) => m.name === "initialize"),
           ancestors,
@@ -7013,6 +7019,12 @@ export function main() {
   );
 
   if (callsGate) {
+    // The Rails class each tagged constructor was compared against, read by
+    // lint-inlined-from.ts so both gates pair a constructor the same way.
+    fs.writeFileSync(
+      path.join(OUTPUT_DIR, INLINED_FROM_PAIRS_FILE),
+      JSON.stringify(inlinedFromPairs, null, 2) + "\n",
+    );
     // Advisory calls-parity artifact (RFC 0047), flat across packages. Written
     // only under `--calls`, the mode that computes the call sets at all —
     // a plain run would otherwise overwrite it with an empty result.
