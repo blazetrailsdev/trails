@@ -28,6 +28,14 @@ describe("MessagePack::Packer", () => {
     packer = new Packer();
   });
 
+  it("initialize", () => {
+    new Packer();
+    new Packer(null);
+    new Packer(new StringIO());
+    new Packer({});
+    new Packer(new StringIO(), {});
+  });
+
   it("write", () => {
     packer.write([]);
     expect(packer.toS()).toEqual(Uint8Array.of(0x90));
@@ -307,6 +315,34 @@ describe("MessagePack::Packer", () => {
           Uint8Array.of(b, 1, ...new TextEncoder().encode("a".repeat(n))),
         );
       });
+    });
+
+    const ext = (header: number[], type: number, n: number): Uint8Array =>
+      Uint8Array.of(...header, type & 0xff, ...new Uint8Array(n).fill(0x61));
+
+    it("msgpack ext 8 format", () => {
+      expect(new ExtensionValue(1, "").toMsgpack()).toEqual(ext([0xc7, 0], 1, 0));
+      expect(new ExtensionValue(-1, "a".repeat(255)).toMsgpack()).toEqual(
+        ext([0xc7, 255], -1, 255),
+      );
+    });
+
+    it("msgpack ext 16 format", () => {
+      expect(new ExtensionValue(1, "a".repeat(256)).toMsgpack()).toEqual(
+        ext([0xc8, 0x01, 0x00], 1, 256),
+      );
+      expect(new ExtensionValue(-1, "a".repeat(65535)).toMsgpack()).toEqual(
+        ext([0xc8, 0xff, 0xff], -1, 65535),
+      );
+    });
+
+    it("msgpack ext 32 format", () => {
+      expect(new ExtensionValue(1, "a".repeat(65536)).toMsgpack()).toEqual(
+        ext([0xc9, 0, 0x01, 0x00, 0x00], 1, 65536),
+      );
+      expect(new ExtensionValue(-1, "a".repeat(65538)).toMsgpack()).toEqual(
+        ext([0xc9, 0, 0x01, 0x00, 0x02], -1, 65538),
+      );
     });
   });
 });
