@@ -30,6 +30,7 @@ import {
   NullSerializer,
 } from "@blazetrails/activesupport/message-encryptor";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Duration } from "@blazetrails/activesupport/duration";
 import { Response, escape as rackEscape } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionDispatch } from "../../namespaces.js";
@@ -38,7 +39,9 @@ export type CookieExpires = Date | Temporal.Instant | { toF(): number; httpdate(
 
 type MetadataOptions = NonNullable<Parameters<MessageVerifier["generate"]>[1]>;
 
-function isFromNow(expires: unknown): expires is { fromNow(): CookieExpires } {
+type FromNowExpires = { fromNow(): CookieExpires };
+
+function isFromNow(expires: unknown): expires is FromNowExpires {
   return expires != null && typeof (expires as { fromNow?: unknown }).fromNow === "function";
 }
 
@@ -64,7 +67,7 @@ export interface SetCookieOptions {
   path?: string;
   domain?: string | string[] | ((request: unknown) => string | undefined);
   tldLength?: number;
-  expires?: CookieExpires;
+  expires?: CookieExpires | FromNowExpires;
   maxAge?: number;
   secure?: boolean;
   httpOnly?: boolean;
@@ -429,7 +432,7 @@ export class AbstractCookieJar {
   /** @internal */
   protected expiryOptions(options: SerializedSetOptions): MetadataOptions {
     if (isFromNow(options.expires)) {
-      return { expiresIn: options.expires as unknown as number };
+      return { expiresIn: options.expires as Duration };
     } else {
       return { expiresAt: toInstant(options.expires) };
     }

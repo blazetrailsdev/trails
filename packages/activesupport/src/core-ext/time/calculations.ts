@@ -1,5 +1,5 @@
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { fetch, Rational, rbObjClassname, rbObjRespondTo, rbPlus } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../deprecator.js";
 import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
@@ -31,7 +31,7 @@ export interface AdvanceOptions {
   days?: number;
   hours?: number;
   minutes?: number;
-  seconds?: number;
+  seconds?: number | Duration;
 }
 
 export function current(): TimeWithZone | RubyTime {
@@ -201,10 +201,15 @@ export function advance(this: RubyTime, options: AdvanceOptions): RubyTime {
     month: d.month,
     day: d.day,
   });
-  const secondsToAdvance =
-    (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
+  const secondsToAdvance = rbPlus(
+    rbPlus(
+      fetch(options as Record<string, unknown>, "seconds", 0),
+      fetch<number>(options as Record<string, unknown>, "minutes", 0) * 60,
+    ),
+    fetch<number>(options as Record<string, unknown>, "hours", 0) * 3600,
+  ) as number | Duration;
 
-  if (secondsToAdvance === 0) {
+  if (secondsToAdvance instanceof Duration ? secondsToAdvance.isZero() : secondsToAdvance === 0) {
     return timeAdvancedByDate;
   } else {
     return since.call(timeAdvancedByDate, secondsToAdvance);
