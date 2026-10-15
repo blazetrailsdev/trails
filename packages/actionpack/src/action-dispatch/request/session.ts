@@ -1,4 +1,4 @@
-import { deleteIf, KeyError } from "@blazetrails/ruby-compat";
+import { block, deleteIf, fetch, KeyError } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 /** @noRailsEquivalent PERMANENT */
@@ -60,8 +60,11 @@ export class Options {
   }
 
   id(req: Req): unknown {
-    if (Object.hasOwn(this.delegate, "id")) return this.delegate["id"];
-    return this.by!.extractSessionId(req);
+    return fetch(
+      this.delegate,
+      "id",
+      block(() => this.by!.extractSessionId(req)),
+    );
   }
 
   set(k: string, v: unknown): void {

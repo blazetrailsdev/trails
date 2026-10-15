@@ -19,8 +19,8 @@ export class ContentDisposition {
     this.filename = filename;
   }
 
-  static format(options: ContentDispositionOptions): string {
-    return new ContentDisposition(options).toString();
+  static format({ disposition, filename }: ContentDispositionOptions): string {
+    return new ContentDisposition({ disposition: disposition, filename: filename }).toString();
   }
 
   asciiFilename(): string {

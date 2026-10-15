@@ -14,6 +14,7 @@ export const NULL_ENV_FILTER = new ParameterFilter([...ENV_MATCH]);
 
 export interface FilterParametersHost extends ParametersHost {
   hasHeader(key: string): boolean;
+  fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   env: Record<string, unknown>;
   path: string;
   queryString: string;
@@ -82,11 +83,12 @@ export function parameterFilter(this: FilterParametersHost): ParameterFilter {
 
 /** @internal */
 export function envFilter(this: FilterParametersHost): ParameterFilter {
-  if (!this.hasHeader("action_dispatch.parameter_filter")) return NULL_ENV_FILTER;
-  const userKey = this.getHeader("action_dispatch.parameter_filter") as
+  const userKey = this.fetchHeader("action_dispatch.parameter_filter", () => NULL_ENV_FILTER) as
     | Array<string | RegExp>
     | string
-    | RegExp;
+    | RegExp
+    | ParameterFilter;
+  if (userKey instanceof ParameterFilter) return userKey;
   const arr = Array.isArray(userKey) ? userKey : [userKey];
   return parameterFilterFor([...arr, ...ENV_MATCH]);
 }
@@ -103,11 +105,8 @@ export function filteredQueryString(this: FilterParametersHost): string {
   const filteredParts = parts.map((part) => {
     if (part.includes("=")) {
       const eq = part.indexOf("=");
-      const key = part.slice(0, eq);
-      const value = part.slice(eq + 1);
-      const filtered = filter.filter({ [key]: value });
-      const firstKey = Object.keys(filtered)[0];
-      return `${firstKey}=${filtered[firstKey] as string}`;
+      const [key, value] = [part.slice(0, eq), part.slice(eq + 1)];
+      return Object.entries(filter.filter({ [key]: value }))[0].join("=");
     }
     return part;
   });

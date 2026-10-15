@@ -687,8 +687,10 @@ export class Request {
   }
 
   sendEarlyHints(links: Record<string, string>): void {
-    const cb = this.env["rack.early_hints"] as ((l: Record<string, string>) => void) | undefined;
-    if (typeof cb === "function") cb(links);
+    (this.env["rack.early_hints"] as ((links: Record<string, string>) => void) | undefined)?.call(
+      null,
+      links,
+    );
   }
 
   get rackRequest(): RackRequest {
@@ -729,9 +731,9 @@ export class Request {
 
   requestParametersList(): Array<[string, unknown]> | null {
     const rackPost = this.rackRequest.POST;
-    const formPairs = this.env["rack.request.form_pairs"];
+    const formPairs = this.getHeader("rack.request.form_pairs");
     if (formPairs != null) return formPairs as Array<[string, unknown]>;
-    const formVars = this.env["rack.request.form_vars"];
+    const formVars = this.getHeader("rack.request.form_vars");
     if (formVars != null) return Array.from(QueryParser.eachPair(formVars as string));
     if (rackPost && typeof rackPost === "object" && Object.keys(rackPost as object).length > 0) {
       return null;

@@ -211,11 +211,11 @@ export function isLastModified(this: R) {
 export function isDate(this: R) {
   return this.hasHeader(DATE);
 }
-export function weakEtag(this: R, v: unknown) {
-  this.setHeader(ETAG, generateWeakEtag(v));
+export function weakEtag(this: R, weakValidators: unknown) {
+  this.setHeader("ETag", generateWeakEtag(weakValidators));
 }
-export function strongEtag(this: R, v: unknown) {
-  this.setHeader(ETAG, generateStrongEtag(v));
+export function strongEtag(this: R, strongValidators: unknown) {
+  this.setHeader("ETag", generateStrongEtag(strongValidators));
 }
 export function isEtag(this: R): string | undefined {
   return this.getHeader(ETAG);
