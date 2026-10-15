@@ -1733,7 +1733,39 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "new_projects")).toBe("/projects/new");
   });
 
-  it.skip("projects involvements", () => {});
+  it("projects involvements", async () => {
+    draw(function () {
+      this.resources("projects", { controller: "project" }, () => {
+        this.resources("involvements", "attachments");
+      });
+    });
+
+    await t.get("/projects/1/involvements");
+    expect(t.response.body).toBe("involvements#index");
+    expect(t.projectInvolvementsPath({ project_id: "1" })).toBe("/projects/1/involvements");
+
+    await t.get("/projects/1/involvements/new");
+    expect(t.response.body).toBe("involvements#new");
+    expect(t.newProjectInvolvementPath({ project_id: "1" })).toBe("/projects/1/involvements/new");
+
+    await t.get("/projects/1/involvements/1");
+    expect(t.response.body).toBe("involvements#show");
+    expect(t.projectInvolvementPath({ project_id: "1", id: "1" })).toBe(
+      "/projects/1/involvements/1",
+    );
+
+    await t.put("/projects/1/involvements/1");
+    expect(t.response.body).toBe("involvements#update");
+
+    await t.delete("/projects/1/involvements/1");
+    expect(t.response.body).toBe("involvements#destroy");
+
+    await t.get("/projects/1/involvements/1/edit");
+    expect(t.response.body).toBe("involvements#edit");
+    expect(t.editProjectInvolvementPath({ project_id: "1", id: "1" })).toBe(
+      "/projects/1/involvements/1/edit",
+    );
+  });
 
   it("projects posts", async () => {
     draw(function () {
