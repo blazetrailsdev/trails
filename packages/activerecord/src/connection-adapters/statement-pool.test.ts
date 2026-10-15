@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { ArgumentError, assertSame } from "@blazetrails/activesupport";
+import { describe, it } from "vitest";
+import { ArgumentError, assertNil, assertSame } from "@blazetrails/activesupport";
 import { StatementPool } from "./statement-pool.js";
 
 describe("StatementPoolTest", () => {
@@ -15,6 +15,6 @@ describe("StatementPoolTest", () => {
     pool.set(sql, stmt);
     assertSame(stmt, pool.get(sql));
     assertSame(stmt, pool.delete(sql));
-    expect(pool.delete(sql)).toBeUndefined();
+    assertNil(pool.delete(sql));
   });
 });

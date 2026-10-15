@@ -1,50 +1,54 @@
 import {
   eachValue,
   Hash,
+  hashAref,
+  hashAset,
+  hashDelete,
   last,
   NotImplementedError,
   Process,
   rtest,
+  size,
 } from "@blazetrails/ruby-compat";
 
 export class StatementPool<T = unknown> {
   static readonly DEFAULT_STATEMENT_LIMIT = 1000;
 
-  private _cache: Hash<number, Hash<string, T>>;
+  private _cache: Hash<number, Record<string, T>>;
   private _statementLimit: number;
 
   constructor(statementLimit?: number) {
-    this._cache = new Hash<number, Hash<string, T>>((h, pid) => {
-      const cache = new Hash<string, T>();
+    this._cache = new Hash<number, Record<string, T>>((h, pid) => {
+      const cache: Record<string, T> = {};
       h.set(pid, cache);
       return cache;
     });
     this._statementLimit = statementLimit ?? StatementPool.DEFAULT_STATEMENT_LIMIT;
   }
 
-  each(fn: (key: string, stmt: T) => void): void {
-    for (const [key, stmt] of this.cache) {
-      fn(key, stmt);
-    }
+  each(block: (key: string, stmt: T) => void): void {
+    for (const [key, stmt] of Object.entries(this.cache)) block(key, stmt);
   }
 
   isKey(key: string): boolean {
-    return this.cache.has(key);
+    return Object.hasOwn(this.cache, key);
   }
 
-  get(key: string): T | undefined {
-    return this.cache.get(key);
+  get(key: string): T | null {
+    return hashAref(this.cache, key) as T | null;
   }
 
   get length(): number {
-    return this.cache.size;
+    return size(this.cache);
   }
 
   set(sql: string, stmt: T): T {
-    while (this._statementLimit <= this.cache.size) {
-      void this.dealloc(last(this.cache.shift()!) as T);
+    while (this._statementLimit <= size(this.cache)) {
+      const shifted = Object.entries(this.cache)[0];
+      delete this.cache[shifted[0]];
+      void this.dealloc(last(shifted) as T);
     }
-    this.cache.set(sql, stmt);
+    hashAset(this.cache, sql, stmt);
     return stmt;
   }
 
@@ -52,22 +56,22 @@ export class StatementPool<T = unknown> {
     eachValue(this.cache, (stmt) => {
       void this.dealloc(stmt);
     });
-    this.cache.clear();
+    for (const key of Object.keys(this.cache)) delete this.cache[key];
   }
 
   reset(): void {
-    this.cache.clear();
+    for (const key of Object.keys(this.cache)) delete this.cache[key];
   }
 
-  delete(key: string): T | undefined {
-    const stmt = this.cache.delete(key) as T | undefined;
+  delete(key: string): T | null {
+    const stmt = hashDelete(this.cache, key);
     if (rtest(stmt)) {
       void this.dealloc(stmt);
     }
     return stmt;
   }
 
-  private get cache(): Hash<string, T> {
+  private get cache(): Record<string, T> {
     return this._cache.get(Process.pid)!;
   }
 
