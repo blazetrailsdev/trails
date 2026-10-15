@@ -27,6 +27,7 @@ import {
 } from "../../test-helpers/abstract-unit.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingError } from "../metal/exceptions.js";
 import { TestCase } from "../test-case.js";
 import type { Base } from "../base.js";
@@ -1380,56 +1381,270 @@ describe("ResourcesTest", () => {
     });
   });
 
-  it.skip("test_should_nest_resources_in_singleton_resource_with_path_scope — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
-
-  it.skip("test_should_nest_singleton_resource_in_resources — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
-
-  it("test_should_not_allow_delete_or_patch_or_put_on_collection_path", async () => {
+  it("should nest resources in singleton resource with path scope", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.resources("messages");
+        this.scope(":site_id", () => {
+          this.resource("account", () => {
+            this.resources("messages");
+          });
+        });
       });
-      await assertNotRecognizes(
-        { controller: "messages", action: "update" },
-        { path: "/messages", method: "patch" },
-      );
-      await assertNotRecognizes(
-        { controller: "messages", action: "update" },
-        { path: "/messages", method: "put" },
-      );
-      await assertNotRecognizes(
-        { controller: "messages", action: "destroy" },
-        { path: "/messages", method: "delete" },
-      );
+
+      await assertSingletonRestfulFor("account", { pathPrefix: "7/", options: { site_id: "7" } });
+      await assertSimplyRestfulFor("messages", {
+        namePrefix: "account_",
+        pathPrefix: "7/account/",
+        options: { site_id: "7" },
+      });
     });
   });
 
-  it.skip("test_new_style_named_routes_for_resource — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+  it("should nest singleton resource in resources", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("threads", () => {
+          this.resource("admin", { controller: "admin" });
+        });
+      });
 
-  it.skip("test_new_style_named_routes_for_singleton_resource — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+      await assertSimplyRestfulFor("threads");
+      await assertSingletonRestfulFor("admin", {
+        controller: "admin",
+        namePrefix: "thread_",
+        pathPrefix: "threads/5/",
+        options: { thread_id: "5" },
+      });
+    });
+  });
 
-  it.skip("test_resources_in_namespace — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+  it("should not allow delete or patch or put on collection path", async () => {
+    const controllerName = "messages";
+    await withRestfulRouting(controllerName, async () => {
+      const options = { controller: controllerName };
+      const collectionPath = `/${controllerName}`;
 
-  it.skip("test_resources_in_nested_namespace — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+      await assertRaises([Assertion], {}, () => {
+        assertRecognizes(
+          { ...options, action: "update" },
+          { path: collectionPath, method: "patch" },
+        );
+      });
 
-  it.skip("test_resources_using_namespace — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+      await assertRaises([Assertion], {}, () => {
+        assertRecognizes({ ...options, action: "update" }, { path: collectionPath, method: "put" });
+      });
 
-  it.skip("test_nested_resources_using_namespace — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+      await assertRaises([Assertion], {}, () => {
+        assertRecognizes(
+          { ...options, action: "destroy" },
+          { path: collectionPath, method: "delete" },
+        );
+      });
+    });
+  });
 
-  it.skip("test_nested_resources_in_nested_namespace — pending: assertSimplyRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+  it("new style named routes for resource", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.scope("/threads/:thread_id", () => {
+          this.resources("messages", { as: "thread_messages" }, () => {
+            this.get("search", { on: "collection" });
+            this.get("preview", { on: "new" });
+          });
+        });
+      });
 
-  it.skip("test_with_path_segment — pending: resources path: option not implemented", () => {});
+      await assertSimplyRestfulFor("messages", {
+        namePrefix: "thread_",
+        pathPrefix: "threads/1/",
+        options: { thread_id: "1" },
+      });
+      assertNamedRoute("/threads/1/messages/search", "search_thread_messages_path", {});
+      assertNamedRoute("/threads/1/messages/new", "new_thread_message_path", {});
+      assertNamedRoute("/threads/1/messages/new/preview", "preview_new_thread_message_path", {});
+    });
+  });
 
-  it.skip("test_multiple_with_path_segment_and_controller — pending: resources path: option not implemented", () => {});
+  it("new style named routes for singleton resource", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.scope("/admin", () => {
+          this.resource("account", { as: "admin_account" }, () => {
+            this.get("login", { on: "member" });
+            this.get("preview", { on: "new" });
+          });
+        });
+      });
+      await assertSingletonRestfulFor("account", { namePrefix: "admin_", pathPrefix: "admin/" });
+      assertNamedRoute("/admin/account/login", "login_admin_account_path", {});
+      assertNamedRoute("/admin/account/new", "new_admin_account_path", {});
+      assertNamedRoute("/admin/account/new/preview", "preview_new_admin_account_path", {});
+    });
+  });
 
-  it.skip("test_with_path_segment_path_prefix_constraints — pending: resources path: option not implemented", () => {});
+  it("resources in namespace", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("backoffice", () => {
+          this.resources("products");
+        });
+      });
 
-  it("test_resource_has_only_show_action", async () => {
+      await assertSimplyRestfulFor("products", {
+        controller: "backoffice/products",
+        namePrefix: "backoffice_",
+        pathPrefix: "backoffice/",
+      });
+    });
+  });
+
+  it("resources in nested namespace", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("backoffice", () => {
+          this.namespace("admin", () => {
+            this.resources("products");
+          });
+        });
+      });
+
+      await assertSimplyRestfulFor("products", {
+        controller: "backoffice/admin/products",
+        namePrefix: "backoffice_admin_",
+        pathPrefix: "backoffice/admin/",
+      });
+    });
+  });
+
+  it("resources using namespace", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("backoffice", { path: null, as: null }, () => {
+          this.resources("products");
+        });
+      });
+
+      await assertSimplyRestfulFor("products", { controller: "backoffice/products" });
+    });
+  });
+
+  it("nested resources using namespace", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("backoffice", () => {
+          this.resources("products", () => {
+            this.resources("images");
+          });
+        });
+      });
+
+      await assertSimplyRestfulFor("images", {
+        controller: "backoffice/images",
+        namePrefix: "backoffice_product_",
+        pathPrefix: "backoffice/products/1/",
+        options: { product_id: "1" },
+      });
+    });
+  });
+
+  it("nested resources in nested namespace", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("backoffice", () => {
+          this.namespace("admin", () => {
+            this.resources("products", () => {
+              this.resources("images");
+            });
+          });
+        });
+      });
+
+      await assertSimplyRestfulFor("images", {
+        controller: "backoffice/admin/images",
+        namePrefix: "backoffice_admin_product_",
+        pathPrefix: "backoffice/admin/products/1/",
+        options: { product_id: "1" },
+      });
+    });
+  });
+
+  it("with path segment", async () => {
+    await withRestfulRouting("messages", async () => {
+      await assertSimplyRestfulFor("messages");
+      assertRecognizes({ controller: "messages", action: "index" }, "/messages");
+      assertRecognizes({ controller: "messages", action: "index" }, "/messages/");
+    });
+
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("messages", { path: "reviews" });
+      });
+      await assertSimplyRestfulFor("messages", { as: "reviews" });
+      assertRecognizes({ controller: "messages", action: "index" }, "/reviews");
+      assertRecognizes({ controller: "messages", action: "index" }, "/reviews/");
+    });
+  });
+
+  it("multiple with path segment and controller", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", () => {
+          this.resources("product_reviews", { path: "reviews", controller: "messages" });
+        });
+        this.resources("tutors", () => {
+          this.resources("tutor_reviews", { path: "reviews", controller: "comments" });
+        });
+      });
+
+      await assertSimplyRestfulFor("product_reviews", {
+        controller: "messages",
+        as: "reviews",
+        namePrefix: "product_",
+        pathPrefix: "products/1/",
+        options: { product_id: "1" },
+      });
+      await assertSimplyRestfulFor("tutor_reviews", {
+        controller: "comments",
+        as: "reviews",
+        namePrefix: "tutor_",
+        pathPrefix: "tutors/1/",
+        options: { tutor_id: "1" },
+      });
+    });
+  });
+
+  it("with path segment path prefix constraints", async () => {
+    const expectedOptions = { controller: "messages", action: "show", thread_id: "1.1.1", id: "1" };
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.scope(
+          "/thread/:thread_id",
+          { constraints: { thread_id: /[0-9]\.[0-9]\.[0-9]/ } },
+          () => {
+            this.resources("messages", { path: "comments" });
+          },
+        );
+      });
+      assertRecognizes(expectedOptions, { path: "thread/1.1.1/comments/1", method: "get" });
+    });
+  });
+
+  it("resource has only show action", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resources("products", { only: "show" });
       });
+
       await assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1440,12 +1655,21 @@ describe("ResourcesTest", () => {
     });
   });
 
-  it("test_resource_has_only_show_action_with_string_value", async () => {
+  it("resource has only show action with string value", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resources("products", { only: "show" });
       });
+
       await assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1456,12 +1680,22 @@ describe("ResourcesTest", () => {
     });
   });
 
-  it("test_singleton_resource_has_only_show_action", async () => {
+  it("singleton resource has only show action", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resource("account", { only: "show" });
       });
+
       await assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
+        "index",
         "new",
         "create",
         "edit",
@@ -1471,12 +1705,22 @@ describe("ResourcesTest", () => {
     });
   });
 
-  it("test_singleton_resource_has_only_show_action_with_string_value", async () => {
+  it("singleton resource has only show action with string value", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resource("account", { only: "show" });
       });
+
       await assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
+        "index",
         "new",
         "create",
         "edit",
@@ -1486,11 +1730,12 @@ describe("ResourcesTest", () => {
     });
   });
 
-  it("test_resource_does_not_have_destroy_action", async () => {
+  it("resource does not have destroy action", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resources("products", { except: "destroy" });
       });
+
       await assertResourceAllowedRoutes(
         "products",
         {},
@@ -1498,54 +1743,389 @@ describe("ResourcesTest", () => {
         ["index", "new", "create", "show", "edit", "update"],
         "destroy",
       );
+      await assertResourceAllowedRoutes(
+        "products",
+        { format: "xml" },
+        { id: "1" },
+        ["index", "new", "create", "show", "edit", "update"],
+        "destroy",
+      );
     });
   });
 
-  it("test_singleton_resource_does_not_have_destroy_action", async () => {
+  it("singleton resource does not have destroy action", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resource("account", { except: "destroy" });
       });
+
       await assertSingletonResourceAllowedRoutes(
         "accounts",
         {},
         ["new", "create", "show", "edit", "update"],
         "destroy",
       );
+      await assertSingletonResourceAllowedRoutes(
+        "accounts",
+        { format: "xml" },
+        ["new", "create", "show", "edit", "update"],
+        "destroy",
+      );
     });
   });
 
-  it.skip("test_resource_has_show_action_but_does_not_have_destroy_action — pending: only+except combined not applied (only wins, except ignored)", () => {});
-
-  it.skip("test_singleton_resource_has_show_action_but_does_not_have_destroy_action — pending: only+except combined not applied (only wins, except ignored)", () => {});
-
-  it.skip("test_resource_has_only_create_action_and_named_route — pending: collection named route not registered when index action is excluded", () => {});
-
-  it.skip("test_resource_has_only_update_action_and_named_route — pending: member named route not registered when show action is excluded", () => {});
-
-  it.skip("test_resource_has_only_destroy_action_and_named_route — pending: member named route not registered when show action is excluded", () => {});
-
-  it.skip("test_singleton_resource_has_only_create_action_and_named_route — pending: singleton named route not registered when show action is excluded", () => {});
-
-  it.skip("test_singleton_resource_has_only_update_action_and_named_route — pending: singleton named route not registered when show action is excluded", () => {});
-
-  it.skip("test_singleton_resource_has_only_destroy_action_and_named_route — pending: singleton named route not registered when show action is excluded", () => {});
-
-  it.skip("test_resource_has_only_collection_action — pending: collection/member extra routes don't inherit controller from resources scope", () => {});
-
-  it.skip("test_resource_has_only_member_action — pending: collection/member extra routes don't inherit controller from resources scope", () => {});
-
-  it.skip("test_singleton_resource_has_only_member_action — pending: collection/member extra routes don't inherit controller from resources scope", () => {});
-
-  it.skip("test_nested_resource_has_only_show_and_member_action — pending: collection/member extra routes don't inherit controller from resources scope", () => {});
-
-  it("test_nested_resource_does_not_inherit_only_option", async () => {
+  it("resource has show action but does not have destroy action", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.resources("products", { only: "show" }, () =>
-          this.resources("images", { except: "destroy" }),
-        );
+        this.resources("products", { only: ["show", "destroy"], except: "destroy" });
       });
+
+      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
+        "index",
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+    });
+  });
+
+  it("singleton resource has show action but does not have destroy action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { only: ["show", "destroy"], except: "destroy" });
+      });
+
+      await assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
+        "new",
+        "create",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+    });
+  });
+
+  it("resource has only create action and named route", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "create" });
+      });
+
+      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "create", [
+        "index",
+        "new",
+        "show",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "create", [
+        "index",
+        "new",
+        "show",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+
+      expect(set.namedRoutes.get("products")).not.toBeUndefined();
+    });
+  });
+
+  it("resource has only update action and named route", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "update" });
+      });
+
+      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "update", [
+        "index",
+        "new",
+        "create",
+        "show",
+        "edit",
+        "destroy",
+      ]);
+      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "update", [
+        "index",
+        "new",
+        "create",
+        "show",
+        "edit",
+        "destroy",
+      ]);
+
+      expect(set.namedRoutes.get("product")).not.toBeUndefined();
+    });
+  });
+
+  it("resource has only destroy action and named route", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "destroy" });
+      });
+
+      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "destroy", [
+        "index",
+        "new",
+        "create",
+        "show",
+        "edit",
+        "update",
+      ]);
+      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "destroy", [
+        "index",
+        "new",
+        "create",
+        "show",
+        "edit",
+        "update",
+      ]);
+
+      expect(set.namedRoutes.get("product")).not.toBeUndefined();
+    });
+  });
+
+  it("singleton resource has only create action and named route", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { only: "create" });
+      });
+
+      await assertSingletonResourceAllowedRoutes("accounts", {}, "create", [
+        "new",
+        "show",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "create", [
+        "new",
+        "show",
+        "edit",
+        "update",
+        "destroy",
+      ]);
+
+      expect(set.namedRoutes.get("account")).not.toBeUndefined();
+    });
+  });
+
+  it("singleton resource has only update action and named route", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { only: "update" });
+      });
+
+      await assertSingletonResourceAllowedRoutes("accounts", {}, "update", [
+        "new",
+        "create",
+        "show",
+        "edit",
+        "destroy",
+      ]);
+      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "update", [
+        "new",
+        "create",
+        "show",
+        "edit",
+        "destroy",
+      ]);
+
+      expect(set.namedRoutes.get("account")).not.toBeUndefined();
+    });
+  });
+
+  it("singleton resource has only destroy action and named route", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { only: "destroy" });
+      });
+
+      await assertSingletonResourceAllowedRoutes("accounts", {}, "destroy", [
+        "new",
+        "create",
+        "show",
+        "edit",
+        "update",
+      ]);
+      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "destroy", [
+        "new",
+        "create",
+        "show",
+        "edit",
+        "update",
+      ]);
+
+      expect(set.namedRoutes.get("account")).not.toBeUndefined();
+    });
+  });
+
+  it("resource has only collection action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: [] }, () => {
+          this.get("sale", { on: "collection" });
+        });
+      });
+
+      await assertResourceAllowedRoutes(
+        "products",
+        {},
+        { id: "1" },
+        [],
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+      );
+      await assertResourceAllowedRoutes(
+        "products",
+        { format: "xml" },
+        { id: "1" },
+        [],
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+      );
+
+      assertRecognizes(
+        { controller: "products", action: "sale" },
+        { path: "products/sale", method: "get" },
+      );
+      assertRecognizes(
+        { controller: "products", action: "sale", format: "xml" },
+        { path: "products/sale.xml", method: "get" },
+      );
+    });
+  });
+
+  it("resource has only member action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: [] }, () => {
+          this.get("preview", { on: "member" });
+        });
+      });
+
+      await assertResourceAllowedRoutes(
+        "products",
+        {},
+        { id: "1" },
+        [],
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+      );
+      await assertResourceAllowedRoutes(
+        "products",
+        { format: "xml" },
+        { id: "1" },
+        [],
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+      );
+
+      assertRecognizes(
+        { controller: "products", action: "preview", id: "1" },
+        { path: "products/1/preview", method: "get" },
+      );
+      assertRecognizes(
+        { controller: "products", action: "preview", id: "1", format: "xml" },
+        { path: "products/1/preview.xml", method: "get" },
+      );
+    });
+  });
+
+  it("singleton resource has only member action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resource("account", { only: [] }, () => {
+          this.member(() => {
+            this.get("signup");
+          });
+        });
+      });
+
+      await assertSingletonResourceAllowedRoutes(
+        "accounts",
+        {},
+        [],
+        ["new", "create", "show", "edit", "update", "destroy"],
+      );
+      await assertSingletonResourceAllowedRoutes(
+        "accounts",
+        { format: "xml" },
+        [],
+        ["new", "create", "show", "edit", "update", "destroy"],
+      );
+
+      assertRecognizes(
+        { controller: "accounts", action: "signup" },
+        { path: "account/signup", method: "get" },
+      );
+      assertRecognizes(
+        { controller: "accounts", action: "signup", format: "xml" },
+        { path: "account/signup.xml", method: "get" },
+      );
+    });
+  });
+
+  it("nested resource has only show and member action", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: ["index", "show"] }, () => {
+          this.resources("images", { only: "show" }, () => {
+            this.get("thumbnail", { on: "member" });
+          });
+        });
+      });
+
+      await assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1" },
+        { id: "2" },
+        "show",
+        ["index", "new", "create", "edit", "update", "destroy"],
+        "products/1/images",
+      );
+      await assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1", format: "xml" },
+        { id: "2" },
+        "show",
+        ["index", "new", "create", "edit", "update", "destroy"],
+        "products/1/images",
+      );
+
+      assertRecognizes(
+        { controller: "images", action: "thumbnail", product_id: "1", id: "2" },
+        { path: "products/1/images/2/thumbnail", method: "get" },
+      );
+      assertRecognizes(
+        { controller: "images", action: "thumbnail", product_id: "1", id: "2", format: "jpg" },
+        { path: "products/1/images/2/thumbnail.jpg", method: "get" },
+      );
+    });
+  });
+
+  it("nested resource does not inherit only option", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.resources("products", { only: "show" }, () => {
+          this.resources("images", { except: "destroy" });
+        });
+      });
+
       await assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
@@ -1554,14 +2134,25 @@ describe("ResourcesTest", () => {
         "destroy",
         "products/1/images",
       );
+      await assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1", format: "xml" },
+        { id: "2" },
+        ["index", "new", "create", "show", "edit", "update"],
+        "destroy",
+        "products/1/images",
+      );
     });
   });
 
-  it("test_nested_resource_does_not_inherit_only_option_by_default", async () => {
+  it("nested resource does not inherit only option by default", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.resources("products", { only: "show" }, () => this.resources("images"));
+        this.resources("products", { only: "show" }, () => {
+          this.resources("images");
+        });
       });
+
       await assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
@@ -1570,16 +2161,25 @@ describe("ResourcesTest", () => {
         [],
         "products/1/images",
       );
+      await assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1", format: "xml" },
+        { id: "2" },
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+        [],
+        "products/1/images",
+      );
     });
   });
 
-  it("test_nested_resource_does_not_inherit_except_option", async () => {
+  it("nested resource does not inherit except option", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.resources("products", { except: "show" }, () =>
-          this.resources("images", { only: "destroy" }),
-        );
+        this.resources("products", { except: "show" }, () => {
+          this.resources("images", { only: "destroy" });
+        });
       });
+
       await assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
@@ -1588,14 +2188,25 @@ describe("ResourcesTest", () => {
         ["index", "new", "create", "show", "edit", "update"],
         "products/1/images",
       );
+      await assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1", format: "xml" },
+        { id: "2" },
+        "destroy",
+        ["index", "new", "create", "show", "edit", "update"],
+        "products/1/images",
+      );
     });
   });
 
-  it("test_nested_resource_does_not_inherit_except_option_by_default", async () => {
+  it("nested resource does not inherit except option by default", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.resources("products", { except: "show" }, () => this.resources("images"));
+        this.resources("products", { except: "show" }, () => {
+          this.resources("images");
+        });
       });
+
       await assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
@@ -1604,51 +2215,108 @@ describe("ResourcesTest", () => {
         [],
         "products/1/images",
       );
+      await assertResourceAllowedRoutes(
+        "images",
+        { product_id: "1", format: "xml" },
+        { id: "2" },
+        ["index", "new", "create", "show", "edit", "update", "destroy"],
+        [],
+        "products/1/images",
+      );
     });
   });
 
-  it("test_default_singleton_restful_route_uses_get", async () => {
+  it("default singleton restful route uses get", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resource("product");
       });
+
       assertRouting("/product", { controller: "products", action: "show" });
+      expect(set.recognizePath("/product", { method: "get" })).toBeTruthy();
     });
   });
 
-  it("test_assert_routing_accepts_all_as_a_valid_method", async () => {
+  it("assert routing accepts all as a valid method", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.match("/products", { to: "products#show", via: ":all" });
       });
+
       assertRouting(
-        { path: "/products", method: "all" },
+        { method: "all", path: "/products" },
         { controller: "products", action: "show" },
       );
     });
   });
 
-  it("test_assert_routing_fails_when_not_all_http_methods_are_recognized", async () => {
+  it("assert routing fails when not all http methods are recognized", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.match("/products", { to: "products#show", via: [":get", ":post", ":put"] });
       });
+
       await assertRaises([Assertion], {}, () => {
         assertRouting(
-          { path: "/products", method: "all" },
+          { method: "all", path: "/products" },
           { controller: "products", action: "show" },
         );
       });
     });
   });
 
-  it.skip("test_singleton_resource_name_is_not_singularized — pending: assertSingletonRestfulFor requires named-route URL helpers (#T-AC14)", () => {});
+  it("singleton resource name is not singularized", async () => {
+    await withSingletonResources("products", async () => {
+      await assertSingletonRestfulFor("products");
+    });
+  });
 
-  it.skip("test_invalid_only_option_for_resources — pending: mapper does not raise ArgumentError for invalid only/except", () => {});
+  it("invalid only option for resources", async () => {
+    const expectedMessage =
+      "Route `resources :products` - :only and :except must include only [:index, :create, :new, :show, :update, :destroy, :edit], but also included [:foo, :bar]";
+    await assertRaises([ArgumentError], { match: expectedMessage }, async () => {
+      await tc.withRouting(async (set: RouteSet) => {
+        set.draw(function () {
+          this.resources("products", { only: ["foo", "bar"] as never });
+        });
+      });
+    });
+  });
 
-  it.skip("test_invalid_only_option_for_singleton_resource — pending: mapper does not raise ArgumentError for invalid only/except", () => {});
+  it("invalid only option for singleton resource", async () => {
+    const expectedMessage =
+      "Route `resource :products` - :only and :except must include only [:show, :create, :update, :destroy, :new, :edit], but also included [:foo, :bar]";
+    await assertRaises([ArgumentError], { match: expectedMessage }, async () => {
+      await tc.withRouting(async (set: RouteSet) => {
+        set.draw(function () {
+          this.resource("products", { only: ["foo", "bar"] as never });
+        });
+      });
+    });
+  });
 
-  it.skip("test_invalid_except_option_for_resources — pending: mapper does not raise ArgumentError for invalid only/except", () => {});
+  it("invalid except option for resources", async () => {
+    const expectedMessage =
+      "Route `resources :products` - :only and :except must include only [:index, :create, :new, :show, :update, :destroy, :edit], but also included [:foo]";
 
-  it.skip("test_invalid_except_option_for_singleton_resource — pending: mapper does not raise ArgumentError for invalid only/except", () => {});
+    await assertRaises([ArgumentError], { match: expectedMessage }, async () => {
+      await tc.withRouting(async (set: RouteSet) => {
+        set.draw(function () {
+          this.resources("products", { except: "foo" as never });
+        });
+      });
+    });
+  });
+
+  it("invalid except option for singleton resource", async () => {
+    const expectedMessage =
+      "Route `resource :products` - :only and :except must include only [:show, :create, :update, :destroy, :new, :edit], but also included [:foo]";
+    await assertRaises([ArgumentError], { match: expectedMessage }, async () => {
+      await tc.withRouting(async (set: RouteSet) => {
+        set.draw(function () {
+          this.resource("products", { except: "foo" as never });
+        });
+      });
+    });
+  });
 });

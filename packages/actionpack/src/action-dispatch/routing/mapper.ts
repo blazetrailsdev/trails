@@ -1216,7 +1216,7 @@ export class Mapper {
 
   namespace(
     path: string,
-    options: (ScopeOptions & { path?: string }) | MapperCallback = {},
+    options: (ScopeOptions & { path?: string | null }) | MapperCallback = {},
     block?: MapperCallback,
   ): void {
     const opts: ScopeOptions & Record<string, unknown> =
@@ -1935,23 +1935,23 @@ export class Mapper {
   }
 
   /** @internal */
-  mergePathScope(parent: string | undefined, child: string): string {
-    return Mapper.normalizePath(`${parent ?? ""}/${child}`);
+  mergePathScope(parent: string | undefined, child: string | null): string {
+    return Mapper.normalizePath(`${parent ?? ""}/${child ?? ""}`);
   }
 
   /** @internal */
-  mergeShallowPathScope(parent: string | undefined, child: string): string {
-    return Mapper.normalizePath(`${parent ?? ""}/${child}`);
+  mergeShallowPathScope(parent: string | undefined, child: string | null): string {
+    return Mapper.normalizePath(`${parent ?? ""}/${child ?? ""}`);
   }
 
   /** @internal */
-  mergeAsScope(parent: string | undefined, child: string): string {
-    return parent ? `${parent}_${child}` : child;
+  mergeAsScope(parent: string | undefined, child: string | null): string | null {
+    return parent ? `${parent}_${child ?? ""}` : child;
   }
 
   /** @internal */
-  mergeShallowPrefixScope(parent: string | undefined, child: string): string {
-    return parent ? `${parent}_${child}` : child;
+  mergeShallowPrefixScope(parent: string | undefined, child: string | null): string | null {
+    return parent ? `${parent}_${child ?? ""}` : child;
   }
 
   /** @internal */
@@ -2137,7 +2137,7 @@ export class Mapper {
   }
 
   /** @internal */
-  pathScope<T>(path: string, fn: () => T): T {
+  pathScope<T>(path: string | null, fn: () => T): T {
     const previous = this._scope;
     const merged = this.mergePathScope(this._scope.get("path") as string | undefined, path);
     this._scope = this._scope.new({ path: merged });
@@ -2327,10 +2327,10 @@ function deleteWithDefault<T>(hash: Record<string, unknown>, key: string, defaul
 }
 
 interface ScopeOptions {
-  as?: string;
+  as?: string | null;
   module?: string;
-  shallowPath?: string;
-  shallowPrefix?: string;
+  shallowPath?: string | null;
+  shallowPrefix?: string | null;
   [key: string]: unknown;
 }
 
