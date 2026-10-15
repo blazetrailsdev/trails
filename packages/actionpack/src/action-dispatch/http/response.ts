@@ -4,6 +4,7 @@ import {
   File,
   IO,
   IOError,
+  rbCheckArrayType,
   rbObjAsString,
   rbObjRespondTo,
   strNew,
@@ -51,7 +52,7 @@ const CONTENT_TYPE = "Content-Type";
 const SET_COOKIE = "set-cookie";
 const NO_CONTENT_CODES = [100, 101, 102, 103, 204, 205, 304] as const;
 const CONTENT_TYPE_PARSER =
-  /^(?<mime_type>[^;\s]+\s*(?:;\s*(?!charset)[^;\s]+)*)?(?:;\s*charset="?(?<charset>[^;\s"]+)"?)?/;
+  /^(?<mime_type>[^;\s]+\s*(?:;\s*(?:(?!charset)[^;\s])+)*)?(?:;\s*charset=(?<quote>"?)(?<charset>[^;\s]+)\k<quote>)?/;
 
 /** @internal */
 export class ContentTypeHeader extends Struct.new("mimeType", "charset") {
@@ -78,7 +79,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
 
   toAry(): unknown {
     return rbObjRespondTo(this._buf, "toAry")
-      ? (this._buf as unknown as { toAry(): unknown }).toAry()
+      ? rbCheckArrayType(this._buf)
       : (this._buf as unknown as { each(): unknown }).each();
   }
 
