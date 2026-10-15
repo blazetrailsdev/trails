@@ -24,7 +24,7 @@ import { Mime } from "../http/mime-type.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { HeadersAssertions } from "../../test-helpers/abstract-unit.js";
 
-const h = { ...HeadersAssertions, response: { headers: {} } };
+const self = { ...HeadersAssertions, response: { headers: {} } };
 
 function newResponse(): Response {
   const response = Response.create();
@@ -247,7 +247,7 @@ describe("ResponseTest", () => {
 
     const [status, headers, body] = response.toA();
     assertEqual(200, status);
-    h.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
+    self.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
 
     const parts: unknown[] = [];
     (body as RackBody).each((part: unknown) => parts.push(part));
@@ -351,10 +351,10 @@ describe("ResponseTest", () => {
     const env = MockRequest.envFor("/");
 
     let [, headers] = await app(env);
-    h.assertNotHeader("content-length", headers);
+    self.assertNotHeader("content-length", headers);
 
     [, headers] = await new ContentLength(app).call(env);
-    h.assertHeader("content-length", "5", headers);
+    self.assertHeader("content-length", "5", headers);
   });
 });
 
@@ -392,26 +392,26 @@ describe("ResponseHeadersTest", () => {
     const response = Response.create();
     response.setHeader("Foo", "1");
 
-    h.assertHeaderValue("1,2", response.addHeader("Foo", "2"));
-    h.assertHeaderValue("1,2", response.getHeader("Foo"));
+    self.assertHeaderValue("1,2", response.addHeader("Foo", "2"));
+    self.assertHeaderValue("1,2", response.getHeader("Foo"));
 
-    h.assertHeaderValue("1,2", response.addHeader("Foo", null));
-    h.assertHeaderValue("1,2", response.getHeader("Foo"));
+    self.assertHeaderValue("1,2", response.addHeader("Foo", null));
+    self.assertHeaderValue("1,2", response.getHeader("Foo"));
 
     assertNil(response.addHeader("Bar", null));
     assertNot(response.hasHeader("Bar"));
     assertNil(response.getHeader("Bar"));
 
-    h.assertHeaderValue("1", response.addHeader("Bar", "1"));
+    self.assertHeaderValue("1", response.addHeader("Bar", "1"));
     assert(response.hasHeader("Bar"));
-    h.assertHeaderValue("1", response.getHeader("Bar"));
+    self.assertHeaderValue("1", response.getHeader("Bar"));
   });
 });
 
 describe("ResponseIntegrationTest", () => {
-  let t: IntegrationTest;
+  let testCase: IntegrationTest;
   beforeEach(({ task }) => {
-    t = new IntegrationTest(task.name);
+    testCase = new IntegrationTest(task.name);
   });
 
   function railsishApp(block: (resp: Response) => void) {
@@ -431,149 +431,155 @@ describe("ResponseIntegrationTest", () => {
   }
 
   it("response cache control from railsish app", async () => {
-    t.app = railsishApp((resp) => {
+    testCase.app = railsishApp((resp) => {
       resp.cacheControl.public = true;
       resp.etag = "123";
       resp.body = "Hello";
     });
 
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("public", t.response.headers.get("Cache-Control"));
-    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.headers.get("ETag"));
+    assertEqual("public", testCase.response.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
 
-    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.etag);
-    assertEqual({ public: true }, t.response.cacheControl);
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.etag);
+    assertEqual({ public: true }, testCase.response.cacheControl);
   });
 
   it("response cache control from rackish app", async () => {
-    t.app = rackishApp({
+    testCase.app = rackishApp({
       ETag: 'W/"202cb962ac59075b964b07152d234b70"',
       "Cache-Control": "public",
     });
 
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("public", t.response.headers.get("Cache-Control"));
-    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.headers.get("ETag"));
+    assertEqual("public", testCase.response.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
 
-    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.etag);
-    assertEqual({ public: true }, t.response.cacheControl);
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.etag);
+    assertEqual({ public: true }, testCase.response.cacheControl);
   });
 
   it("response charset and content type from railsish app", async () => {
-    t.app = railsishApp((resp) => {
+    testCase.app = railsishApp((resp) => {
       resp.charset = "utf-16";
       resp.contentType = Mime.get("xml")!;
       resp.body = "Hello";
     });
 
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("utf-16", t.response.charset);
-    assertEqual(Mime.get("xml"), t.response.mediaType);
-    assertEqual("application/xml; charset=utf-16", t.response.contentType);
-    assertEqual("application/xml; charset=utf-16", t.response.headers.get("Content-Type"));
+    assertEqual("utf-16", testCase.response.charset);
+    assertEqual(Mime.get("xml"), testCase.response.mediaType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.contentType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.headers.get("Content-Type"));
   });
 
   it("response charset and content type from rackish app", async () => {
-    t.app = rackishApp({ "Content-Type": "application/xml; charset=utf-16" });
+    testCase.app = rackishApp({ "Content-Type": "application/xml; charset=utf-16" });
 
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("utf-16", t.response.charset);
-    assertEqual(Mime.get("xml"), t.response.mediaType);
-    assertEqual("application/xml; charset=utf-16", t.response.contentType);
-    assertEqual("application/xml; charset=utf-16", t.response.headers.get("Content-Type"));
+    assertEqual("utf-16", testCase.response.charset);
+    assertEqual(Mime.get("xml"), testCase.response.mediaType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.contentType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.headers.get("Content-Type"));
   });
 
   it("strong ETag validator", async () => {
-    t.app = railsishApp((resp) => {
+    testCase.app = railsishApp((resp) => {
       resp.strongEtag("123");
       resp.body = "Hello";
     });
 
-    await t.get("/");
-    t.assertResponse("ok");
+    await testCase.get("/");
+    testCase.assertResponse("ok");
 
-    assertEqual('"202cb962ac59075b964b07152d234b70"', t.response.headers.get("ETag"));
-    assertEqual('"202cb962ac59075b964b07152d234b70"', t.response.etag);
+    assertEqual('"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
+    assertEqual('"202cb962ac59075b964b07152d234b70"', testCase.response.etag);
   });
 
   it("response Content-Type with optional parameters", async () => {
-    t.app = rackishApp({ "Content-Type": "text/csv; charset=utf-16; header=present" });
+    testCase.app = rackishApp({ "Content-Type": "text/csv; charset=utf-16; header=present" });
 
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("text/csv; charset=utf-16; header=present", t.response.headers.get("Content-Type"));
-    assertEqual("text/csv; charset=utf-16; header=present", t.response.contentType);
-    assertEqual("text/csv", t.response.mediaType);
-    assertEqual("utf-16", t.response.charset);
+    assertEqual(
+      "text/csv; charset=utf-16; header=present",
+      testCase.response.headers.get("Content-Type"),
+    );
+    assertEqual("text/csv; charset=utf-16; header=present", testCase.response.contentType);
+    assertEqual("text/csv", testCase.response.mediaType);
+    assertEqual("utf-16", testCase.response.charset);
   });
 
   it("response Content-Type with optional parameters that set before charset", async () => {
-    t.app = rackishApp({ "Content-Type": "text/csv; header=present; charset=utf-16" });
+    testCase.app = rackishApp({ "Content-Type": "text/csv; header=present; charset=utf-16" });
 
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("text/csv; header=present; charset=utf-16", t.response.headers.get("Content-Type"));
-    assertEqual("text/csv; header=present; charset=utf-16", t.response.contentType);
-    assertEqual("text/csv; header=present", t.response.mediaType);
-    assertEqual("utf-16", t.response.charset);
+    assertEqual(
+      "text/csv; header=present; charset=utf-16",
+      testCase.response.headers.get("Content-Type"),
+    );
+    assertEqual("text/csv; header=present; charset=utf-16", testCase.response.contentType);
+    assertEqual("text/csv; header=present", testCase.response.mediaType);
+    assertEqual("utf-16", testCase.response.charset);
   });
 
   it("response Content-Type with quoted-string", async () => {
-    t.app = rackishApp({ "Content-Type": 'text/csv; header=present; charset="utf-16"' });
+    testCase.app = rackishApp({ "Content-Type": 'text/csv; header=present; charset="utf-16"' });
 
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
     assertEqual(
       'text/csv; header=present; charset="utf-16"',
-      t.response.headers.get("Content-Type"),
+      testCase.response.headers.get("Content-Type"),
     );
-    assertEqual('text/csv; header=present; charset="utf-16"', t.response.contentType);
-    assertEqual("text/csv; header=present", t.response.mediaType);
-    assertEqual("utf-16", t.response.charset);
+    assertEqual('text/csv; header=present; charset="utf-16"', testCase.response.contentType);
+    assertEqual("text/csv; header=present", testCase.response.mediaType);
+    assertEqual("utf-16", testCase.response.charset);
   });
 
   it("response body with enumerator", async () => {
-    t.app = rackishApp(
+    testCase.app = rackishApp(
       { "Content-Type": "text/plain" },
       (async function* () {
         for (let n = 0; n < 10; n++) yield String(n);
       })(),
     );
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("text/plain", t.response.headers.get("Content-Type"));
-    assertEqual("text/plain", t.response.contentType);
-    assertEqual("text/plain", t.response.mediaType);
-    assertEqual("utf-8", t.response.charset);
-    assertEqual("0123456789", t.response.body);
+    assertEqual("text/plain", testCase.response.headers.get("Content-Type"));
+    assertEqual("text/plain", testCase.response.contentType);
+    assertEqual("text/plain", testCase.response.mediaType);
+    assertEqual("utf-8", testCase.response.charset);
+    assertEqual("0123456789", testCase.response.body);
   });
 
   it("response body with lazy enumerator", async () => {
-    t.app = rackishApp(
+    testCase.app = rackishApp(
       { "Content-Type": "text/plain" },
       (async function* () {
         for (let n = 0; n <= 10; n++) yield String(n);
       })(),
     );
-    await t.get("/");
-    t.assertResponse("success");
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-    assertEqual("text/plain", t.response.headers.get("Content-Type"));
-    assertEqual("text/plain", t.response.contentType);
-    assertEqual("text/plain", t.response.mediaType);
-    assertEqual("utf-8", t.response.charset);
-    assertEqual("012345678910", t.response.body);
+    assertEqual("text/plain", testCase.response.headers.get("Content-Type"));
+    assertEqual("text/plain", testCase.response.contentType);
+    assertEqual("text/plain", testCase.response.mediaType);
+    assertEqual("utf-8", testCase.response.charset);
+    assertEqual("012345678910", testCase.response.body);
   });
 });

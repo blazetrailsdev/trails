@@ -756,16 +756,22 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
   });
 
   it("can call helper methods in csp", async ({ task }) => {
-    const t = new IntegrationTest(task.name);
-    t.app = APP;
-    await t.get("/");
+    const testCase = new IntegrationTest(task.name);
+    testCase.app = APP;
+    await testCase.get("/");
 
-    t.assertResponse("success");
+    testCase.assertResponse("success");
     assertMatch(
       "default-src https://example.com",
-      t.response.headers.get(CONTENT_SECURITY_POLICY)!,
+      testCase.response.headers.get(CONTENT_SECURITY_POLICY)!,
     );
-    assertMatch("script-src https://example.com", t.response.headers.get(CONTENT_SECURITY_POLICY)!);
-    assertMatch("style-src https://example.com", t.response.headers.get(CONTENT_SECURITY_POLICY)!);
+    assertMatch(
+      "script-src https://example.com",
+      testCase.response.headers.get(CONTENT_SECURITY_POLICY)!,
+    );
+    assertMatch(
+      "style-src https://example.com",
+      testCase.response.headers.get(CONTENT_SECURITY_POLICY)!,
+    );
   });
 });
