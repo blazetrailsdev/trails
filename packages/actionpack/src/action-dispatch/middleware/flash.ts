@@ -1,5 +1,5 @@
 import type { RackApp, RackEnv } from "@blazetrails/rack";
-import { Enumerable, include } from "@blazetrails/ruby-compat";
+import { Enumerable, include, rbObjDup } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export const KEY = "action_dispatch.request.flash_hash";
@@ -162,7 +162,7 @@ export class FlashHash {
   }
 
   /** @internal */
-  isNowIsLoaded(): boolean {
+  private isNowIsLoaded(): boolean {
     return this._now != null;
   }
 
@@ -237,7 +237,8 @@ export class FlashHash {
   dup(): FlashHash {
     const copy = new FlashHash();
     if (this.isNowIsLoaded()) {
-      copy._now = new FlashNow(copy);
+      copy._now = rbObjDup(this.now);
+      copy._now.flash = copy;
     }
     for (const [k, v] of this._flashes) copy._flashes.set(k, v);
     for (const k of this._discard) copy._discard.add(k);
