@@ -1,3 +1,4 @@
+import type { Duration } from "../duration.js";
 import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
@@ -11,7 +12,7 @@ import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
 
 export interface MetadataOptions {
   expiresAt?: Temporal.Instant | null;
-  expiresIn?: number | null;
+  expiresIn?: number | Duration | null;
   purpose?: unknown;
 }
 
@@ -136,7 +137,7 @@ export abstract class Metadata {
 
   protected pickExpiry(
     expiresAt: Temporal.Instant | null | undefined,
-    expiresIn: number | null | undefined,
+    expiresIn: number | Duration | null | undefined,
   ): Time | string | undefined {
     let expiry: Time | undefined;
     if (isPresent(expiresAt)) {

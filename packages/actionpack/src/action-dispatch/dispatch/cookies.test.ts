@@ -1377,6 +1377,7 @@ describe("CookiesTest", () => {
       "user_name=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
     );
   });
+
   it("cookies hash is indifferent access", async () => {
     await tc.get("symbolKey");
     assertEqual("david", tc.cookies().get("user_name"));
