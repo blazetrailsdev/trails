@@ -23,11 +23,7 @@ import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
 import { SimpleType } from "./template/types.js";
 import { File as SourcesFile } from "./template/sources/file.js";
-import {
-  sourceLines,
-  type BacktraceLocation,
-  type Spot,
-} from "./template/handlers/tse-translate-location.js";
+import { sourceLines, type BacktraceLocation, type Spot } from "./template/handlers/tse.js";
 
 type LocationTranslatingHandler = TemplateHandler & {
   translateLocation?: (

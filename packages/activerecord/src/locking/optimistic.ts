@@ -1,4 +1,4 @@
-import { DelegateClass, type Hash, merge, Module, rtest, union } from "@blazetrails/ruby-compat";
+import { DelegateClass, type Hash, Module, rtest, union } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
@@ -234,7 +234,7 @@ export function _queryConstraintsHash(
   if (!this.constructor.lockingEnabled) return superFn();
 
   const lockingColumn = this.constructor.lockingColumn;
-  return merge(superFn(), { [lockingColumn]: _lockValueForDatabase.call(this, lockingColumn) });
+  return { ...superFn(), [lockingColumn]: _lockValueForDatabase.call(this, lockingColumn) };
 }
 
 /** @internal */

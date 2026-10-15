@@ -161,7 +161,7 @@ export abstract class AppBase extends GeneratorBase {
     return this.skip("ActiveStorage") && !this.sqlite3();
   }
   keeps(): boolean {
-    return !this.skip("Keeps");
+    return !this.options.skipKeeps;
   }
   /** @internal */
   devcontainer(): boolean {

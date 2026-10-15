@@ -6823,11 +6823,16 @@ function collectCalls(
   const addHashForm = (form: string, receiver: ts.Expression | undefined): void => {
     if (skipHoistedClosures || receiver === undefined) return;
     hashForms.add(`${NATIVE_FORM_PREFIX}${form}`);
-    const tail = receiverTailName(receiver);
-    if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    const tails = form === "spread" ? spreadReceiverNames(receiver) : [receiverTailName(receiver)];
+    for (const tail of tails) {
+      if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    }
   };
   const visit = (n: ts.Node): void => {
     for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
+    if (!skipHoistedClosures && isPlainObjectConstruction(n)) {
+      names.add(`${NATIVE_FORM_PREFIX}object`);
+    }
     if (ts.isNewExpression(n)) {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
       // call as `new`, which conventions.ts maps to the TS `constructor`; record
@@ -7049,6 +7054,63 @@ function nativeHashForms(
   }
   if (callee === "Object.assign") return [["assign", n.arguments[0]]];
   return [];
+}
+
+/**
+ * A `{}` literal, an `Object.create(null)` or a `new HashWithIndifferentAccess(…)`
+ * — the constructions a Rails `HashWithIndifferentAccess.new` /
+ * `with_indifferent_access` ports as (RFC 0190; compare.ts#isCoreNewWithNoNewExpression).
+ */
+function isPlainObjectConstruction(n: ts.Node): boolean {
+  if (ts.isObjectLiteralExpression(n)) return n.properties.length === 0;
+  if (ts.isNewExpression(n)) return n.expression.getText() === "HashWithIndifferentAccess";
+  return (
+    ts.isCallExpression(n) &&
+    n.expression.getText() === "Object.create" &&
+    n.arguments.length === 1 &&
+    n.arguments[0].kind === ts.SyntaxKind.NullKeyword
+  );
+}
+
+/**
+ * The names a leading spread's operand answers a Ruby `merge` receiver by, the
+ * TS half of extract-ruby-api.rb#merge_receiver_name: {@link receiverTailName},
+ * `super` for a `super.m()` / `superFn()` call (`super.merge(...)`), the
+ * left operand of `x || {}` / `x ?? {}` (`(options || {}).merge`), the
+ * camelized key of a string-keyed index read (`result["path_params"]`, Ruby
+ * `result[:path_params]`), and either branch of a conditional.
+ */
+function spreadReceiverNames(receiver: ts.Expression): (string | undefined)[] {
+  let e = receiver;
+  while (ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e)) {
+    e = e.expression;
+  }
+  if (ts.isConditionalExpression(e)) {
+    return [...spreadReceiverNames(e.whenTrue), ...spreadReceiverNames(e.whenFalse)];
+  }
+  if (
+    ts.isBinaryExpression(e) &&
+    (e.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+      e.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken) &&
+    ts.isObjectLiteralExpression(e.right) &&
+    e.right.properties.length === 0
+  ) {
+    return spreadReceiverNames(e.left);
+  }
+  if (ts.isCallExpression(e)) {
+    const callee = e.expression;
+    if (
+      (ts.isPropertyAccessExpression(callee) &&
+        callee.expression.kind === ts.SyntaxKind.SuperKeyword) ||
+      (ts.isIdentifier(callee) && callee.text === "superFn")
+    ) {
+      return ["super"];
+    }
+  }
+  if (ts.isElementAccessExpression(e) && ts.isStringLiteral(e.argumentExpression)) {
+    return [snakeToCamel(e.argumentExpression.text)];
+  }
+  return [receiverTailName(e)];
 }
 
 /**

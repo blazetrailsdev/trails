@@ -470,9 +470,9 @@ export class MacroReflection extends AbstractReflection {
       if (typeof counterCache === "string") {
         column = counterCache;
       } else if (typeof counterCache === "object") {
-        const cc = counterCache as Record<string, unknown>;
-        active = fetch(cc, "active", true);
-        column = cc.column != null ? String(cc.column) : null;
+        active = fetch(counterCache as Record<string, unknown>, "active", true);
+        const { column: counterCacheColumn } = counterCache as Record<string, unknown>;
+        column = counterCacheColumn != null ? String(counterCacheColumn) : null;
       }
 
       options.counterCache = { active, column };
@@ -1203,7 +1203,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get throughReflection(): AssociationReflection | ThroughReflection | null {
-    return this.activeRecord._reflectOnAssociation(this.through) ?? null;
+    return this.activeRecord._reflectOnAssociation(this.options.through as string) ?? null;
   }
 
   get joinTable(): string {

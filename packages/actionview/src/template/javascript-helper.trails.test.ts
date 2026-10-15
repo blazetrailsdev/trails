@@ -10,7 +10,7 @@ describe("JavaScriptHelperTest", () => {
   it("javascript tag with block", () => {
     const ctx = { outputBuffer: new OutputBuffer(), viewFlow: new OutputFlow() };
     const result = javascriptTag
-      .call(ctx, { type: "application/javascript" }, () => {
+      .call(ctx, { type: "application/javascript" }, undefined, () => {
         concat.call(ctx, htmlSafe("alert('hello')"));
       })
       .toString();

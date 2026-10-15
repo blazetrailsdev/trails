@@ -1,12 +1,12 @@
 import { tokenize } from "@blazetrails/activesupport";
 import { compileJs } from "@blazetrails/tse-compiler";
 import { describe, it, expect } from "vitest";
-import {
-  LocationParsingError,
-  findOffset,
-  sourceLines,
-  translateLocation,
-} from "./tse-translate-location.js";
+import { LocationParsingError, Tse, sourceLines } from "./tse.js";
+
+const tse = new Tse();
+const findOffset = (...args: [string, [string, string][], number]): number =>
+  (tse as unknown as { findOffset(...a: typeof args): number }).findOffset(...args);
+const translateLocation = tse.translateLocation.bind(tse);
 
 describe("sourceLines", () => {
   it("matches Ruby's String#lines (keeps trailing separators)", () => {

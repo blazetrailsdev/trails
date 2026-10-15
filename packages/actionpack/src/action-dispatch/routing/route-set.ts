@@ -392,10 +392,10 @@ export class UrlHelper {
 
       if (args.length < pathParamsSize) {
         pathParams = pathParams.filter((k) => !Object.hasOwn(controllerOptions, k));
-        const supplied = merge(
-          (result["path_params"] as Record<string, unknown> | undefined) ?? {},
-          result,
-        );
+        const supplied = {
+          ...((result["path_params"] as Record<string, unknown> | undefined) ?? {}),
+          ...result,
+        };
         pathParams = pathParams.filter((k) => !Object.hasOwn(supplied, k));
       } else {
         pathParams = [...pathParams];

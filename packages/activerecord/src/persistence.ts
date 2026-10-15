@@ -5,7 +5,6 @@ import {
   Hash,
   isEmpty,
   keys,
-  merge,
   Module,
   rbEqual,
   rbFPublicSend,
@@ -683,7 +682,7 @@ export async function reload<T extends ReloadRecord>(
   this.constructor.connectionPool().clearQueryCache();
 
   const freshObject = (await (this.isApplyScoping(options)
-    ? this._findRecord(merge(options || {}, { allQueries: true }))
+    ? this._findRecord({ ...(options || {}), allQueries: true })
     : this.constructor.unscoped(() => this._findRecord(options)))) as ReloadRecord;
 
   this._associationCache = freshObject._associationCache;

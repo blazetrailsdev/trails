@@ -1,4 +1,4 @@
-import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
+import { SafeBuffer, htmlSafe, isPlainObject } from "@blazetrails/activesupport";
 
 import { capture } from "./capture-helper.js";
 import { cdataSection, contentTag, type TagHelperHost } from "./tag-helper.js";
@@ -35,36 +35,24 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
 }
 
 export function javascriptTag(
-  this: TagHelperHost,
-  contentOrOptionsWithBlock?: unknown,
-  htmlOptions?: Record<string, unknown> | (() => unknown),
+  this: TagHelperHost & { contentSecurityPolicyNonce?(): string | null },
+  contentOrOptionsWithBlock: unknown = null,
+  htmlOptions: Record<string, unknown> = {},
   block?: () => unknown,
 ): SafeBuffer {
-  const resolvedBlock =
-    typeof htmlOptions === "function"
-      ? htmlOptions
-      : typeof block === "function"
-        ? block
-        : undefined;
-
-  let opts: Record<string, unknown>;
   let content: unknown;
-
-  if (resolvedBlock) {
-    const isHash =
-      contentOrOptionsWithBlock != null &&
-      typeof contentOrOptionsWithBlock === "object" &&
-      Object.getPrototypeOf(contentOrOptionsWithBlock) === Object.prototype;
-    opts = isHash
-      ? { ...(contentOrOptionsWithBlock as Record<string, unknown>) }
-      : typeof htmlOptions === "object" && htmlOptions !== null
-        ? { ...htmlOptions }
-        : {};
-    content = capture.call(this, resolvedBlock);
+  if (block) {
+    if (isPlainObject(contentOrOptionsWithBlock)) {
+      htmlOptions = contentOrOptionsWithBlock as Record<string, unknown>;
+    }
+    content = capture.call(this, block);
   } else {
     content = contentOrOptionsWithBlock;
-    opts = typeof htmlOptions === "object" && htmlOptions !== null ? { ...htmlOptions } : {};
   }
 
-  return contentTag.call(this, "script", javascriptCdataSection(content), opts);
+  if (htmlOptions.nonce === true) {
+    htmlOptions.nonce = this.contentSecurityPolicyNonce?.() ?? null;
+  }
+
+  return contentTag.call(this, "script", javascriptCdataSection(content), htmlOptions);
 }

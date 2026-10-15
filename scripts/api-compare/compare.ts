@@ -803,6 +803,7 @@ export function significantCallsForReceivers(
       if (value === "new" && isCoreNewWithNoNewExpression(receivers?.new, tsNativeForms)) {
         return false;
       }
+      if (value === "with_indifferent_access" && tsNativeForms.has("object")) return false;
       if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
       return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
@@ -847,6 +848,11 @@ export function invokeForms(calls: Iterable<string>): string[] {
  *   (`associations/foreign_association.rb:14`, `core.rb:220`).
  * - `string-new`: `String.new(x)`, credited only against a TS body that makes
  *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
+ * - `hwia-new`: `HashWithIndifferentAccess.new` with at most one argument,
+ *   credited against a TS body that builds a plain object (the `object` native
+ *   form: `{}` or `Object.create(null)`), the shape RFC 0190 settles for a hash
+ *   whose consumer reads literal string keys
+ *   (`action_dispatch/http/param_builder.rb:162-164`).
  *
  * One `Foo.new` in the body leaves `new` significant, the all-sites discipline
  * {@link POSITIONAL_ARRAY_ANALOGUES} has.
@@ -857,7 +863,10 @@ function isCoreNewWithNoNewExpression(
 ): boolean {
   if (kinds === undefined || kinds.length === 0) return false;
   return kinds.every(
-    (k) => k === "literal-new" || (k === "string-new" && tsNativeForms.has("String")),
+    (k) =>
+      k === "literal-new" ||
+      (k === "string-new" && tsNativeForms.has("String")) ||
+      (k === "hwia-new" && tsNativeForms.has("object")),
   );
 }
 

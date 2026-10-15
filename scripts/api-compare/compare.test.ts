@@ -472,6 +472,24 @@ describe("significantMissingCalls", () => {
     expect(significantCallsForReceivers(undefined).has("new")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits HashWithIndifferentAccess.new and with_indifferent_access only to a plain-object construction", () => {
+    const object = new Set(["object"]);
+    expect(significantCallsForReceivers({ new: ["hwia-new"] }, undefined, object).has("new")).toBe(
+      false,
+    );
+    expect(significantCallsForReceivers({ new: ["hwia-new"] }).has("new")).toBe(true);
+    expect(
+      significantCallsForReceivers({ new: ["const", "hwia-new"] }, undefined, object).has("new"),
+    ).toBe(true);
+    expect(significantCallsForReceivers({ new: ["const"] }, undefined, object).has("new")).toBe(
+      true,
+    );
+    expect(significantCallsForReceivers({}, undefined, object).has("with_indifferent_access")).toBe(
+      false,
+    );
+    expect(significantCallsForReceivers({}).has("with_indifferent_access")).toBe(true);
+  });
+
   it("significantCallsForReceivers credits String.new(x) only to a TS body making the String(x) conversion call", () => {
     const conversion = new Set(["String"]);
     expect(

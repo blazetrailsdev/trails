@@ -222,4 +222,36 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
       ]),
     ).toEqual(["options[:frozen?] matched", "options[:host] matched"]);
   });
+
+  it("a read off a self alias, a self-cast call or a static class name is a read off self", () => {
+    const reads = (text: string, name: string) =>
+      [...tsKeyReads(text).get(name)![0].reads].map(([r, ks]) => `${r}:${[...ks].join(",")}`);
+    expect(
+      reads(
+        `function clear(this: Base) { const r = this as any; return r._startTransactionState.level; }`,
+        "clear",
+      ),
+    ).toContain("startTransactionState:level");
+    expect(
+      reads(`class R { through() { return this._concrete().options.through; } }`, "through"),
+    ).toContain("options:through");
+    expect(
+      reads(
+        `class RequestEncoder { static encoder() { return RequestEncoder.encoders.get("identity"); } }`,
+        "encoder",
+      ),
+    ).toContain("encoders:identity,get");
+  });
+
+  it("a module's initialize hook is read as [initialize]", () => {
+    const out = tsKeyReads(
+      `const initialize = Symbol();
+       class Shell { static [initialize](config: { shell?: unknown }) { return config.shell; } }
+       mod[initialize] = function* (config: { invocations?: unknown }) { return config.invocations; };`,
+    );
+    expect(out.get("[initialize]")!.map((b) => [...b.reads.keys()])).toEqual([
+      ["config"],
+      ["config"],
+    ]);
+  });
 });

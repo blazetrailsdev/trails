@@ -570,10 +570,13 @@ export class TestRequest extends AbstractTestRequest {
   }
 
   static create(controllerClass: unknown): TestRequest {
-    const env: Record<string, unknown> = {};
+    let env: Record<string, unknown> = {};
+    if (TopLevel.Trails !== undefined && TopLevel.Trails.application) {
+      env = { ...TopLevel.Trails.application.envConfig(), ...env };
+    }
     env["rack.request.cookie_hash"] = {};
     return new TestRequest(
-      merge(TestRequest.defaultEnv(), env),
+      { ...TestRequest.defaultEnv(), ...env },
       TestRequest.newSession(),
       controllerClass as DispatchableControllerClass | null,
     );

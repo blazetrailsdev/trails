@@ -1,19 +1,33 @@
-import { chomp, classAttribute } from "@blazetrails/activesupport";
-import { rbEqual, registerConstant } from "@blazetrails/ruby-compat";
+import { chomp, classAttribute, tokenize } from "@blazetrails/activesupport";
+import { NotImplementedError, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
-import {
-  translateLocation as translateLocationImpl,
-  type BacktraceLocation,
-  type Spot,
-} from "./tse-translate-location.js";
+export class LocationParsingError extends Error {
+  override name = "LocationParsingError";
+}
 
-export {
-  LocationParsingError,
-  type BacktraceLocation,
-  type Spot,
-} from "./tse-translate-location.js";
+/** @noRailsEquivalent PERMANENT */
+export interface BacktraceLocation {
+  lineno: number;
+  column?: number;
+}
+
+export interface Spot {
+  snippet: string;
+  firstLineno: number;
+  lastLineno: number;
+  firstColumn: number;
+  lastColumn: number;
+  scriptLines?: string[];
+}
+
+type OffsetToken = [name: string, str: string | null, offset: number];
+
+export function sourceLines(source: string): string[] {
+  if (source.length === 0) return [];
+  return source.split(/(?<=\n)/);
+}
 
 export interface TseTemplate {
   type?: unknown;
@@ -55,7 +69,25 @@ export class Tse implements TemplateHandler {
   }
 
   translateLocation(spot: Spot, backtraceLocation: BacktraceLocation, source: string): Spot | null {
-    return translateLocationImpl(spot, backtraceLocation, source);
+    try {
+      const sourceLinesList = sourceLines(source);
+      if (sourceLinesList.length < backtraceLocation.lineno) return null;
+      const tokens = tokenize(sourceLinesList[backtraceLocation.lineno - 1]);
+      const newFirstColumn = this.findOffset(spot.snippet, tokens, spot.firstColumn);
+      const linenoDelta = spot.firstLineno - backtraceLocation.lineno;
+      spot.firstLineno -= linenoDelta;
+      spot.lastLineno -= linenoDelta;
+
+      const columnDelta = spot.firstColumn - newFirstColumn;
+      spot.firstColumn -= columnDelta;
+      spot.lastColumn -= columnDelta;
+      spot.scriptLines = sourceLinesList;
+
+      return spot;
+    } catch (e) {
+      if (e instanceof NotImplementedError || e instanceof LocationParsingError) return null;
+      throw e;
+    }
   }
 
   /** @missingRailsCall include? — PERMANENT */
@@ -83,6 +115,50 @@ export class Tse implements TemplateHandler {
         "const context = this;",
       )
       .replace(/\}\n$/u, "");
+  }
+
+  /** @internal */
+  private findOffset(
+    compiled: string,
+    sourceTokens: [string, string][],
+    errorColumn: number,
+  ): number {
+    const tokens = this.offsetSourceTokens(sourceTokens);
+    let pos = 0;
+
+    for (let i = 0; i < tokens.length - 1; i++) {
+      const [name, str, offset] = tokens[i] as [string, string, number];
+      const [, nextStr] = tokens[i + 1];
+      let matchedStr = false;
+
+      while (pos < compiled.length) {
+        if (matchedStr && nextStr != null && compiled.startsWith(nextStr, pos)) {
+          break;
+        } else if (compiled.startsWith(str, pos)) {
+          matchedStr = true;
+          if (name === ":CODE" && pos <= errorColumn && pos + str.length >= errorColumn) {
+            return errorColumn - pos + offset;
+          }
+          pos += str.length;
+        } else {
+          pos += 1;
+        }
+      }
+    }
+
+    throw new LocationParsingError("Couldn't find code snippet");
+  }
+
+  /** @internal */
+  private offsetSourceTokens(sourceTokens: [string, string][]): OffsetToken[] {
+    let sourceOffset = 0;
+    const withOffset: OffsetToken[] = [];
+    for (const [name, str] of sourceTokens) {
+      if (name === ":CODE" || name === ":TEXT") withOffset.push([name, str, sourceOffset]);
+      sourceOffset += str.length;
+    }
+    withOffset.push([":EOS", null, sourceOffset]);
+    return withOffset;
   }
 }
 

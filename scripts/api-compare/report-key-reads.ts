@@ -42,6 +42,7 @@ import ts from "typescript-5";
 import { snakeToCamel } from "@blazetrails/parity/conventions";
 import { libPathsManifest } from "../../vendor/sources.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR, packageSrcDir } from "./config.js";
+import { MODULE_INITIALIZE_HOOK } from "./compare.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import type { SkeletonArtifact, SkeletonRow } from "./report-arms.js";
 
@@ -111,17 +112,57 @@ function unwrap(node: ts.Expression): ts.Expression {
  * `options`, and `match.groups` is `match`: a MatchData named capture
  * (`match[:host]`) is read off the groups object.
  */
-function receiverName(node: ts.Expression): string | undefined {
+function receiverName(
+  node: ts.Expression,
+  selfAliases: ReadonlySet<string> = new Set(),
+): string | undefined {
   let expr = unwrap(node);
   if (ts.isPropertyAccessExpression(expr) && expr.name.text === "groups") {
     expr = unwrap(expr.expression);
   }
   if (ts.isCallExpression(expr) && expr.arguments.length === 0) expr = unwrap(expr.expression);
   if (ts.isIdentifier(expr)) return expr.text.replace(/^_+/, "");
-  if (ts.isPropertyAccessExpression(expr) && expr.expression.kind === ts.SyntaxKind.ThisKeyword) {
+  if (ts.isPropertyAccessExpression(expr) && isSelf(expr.expression, selfAliases)) {
     return expr.name.text.replace(/^_+/, "");
   }
   return undefined;
+}
+
+/**
+ * `this`, a local bound to it (`const r = this as any`), or a zero-argument
+ * call of one of its own methods (`this._concrete()`): a self-cast that
+ * answers `self`, so `this._concrete().options` is Rails' `options` on self
+ * (`reflection.rb:426-432`) and `r._startTransactionState` is
+ * `@_start_transaction_state` (`transactions.rb:440-464`).
+ */
+function isSelf(node: ts.Expression, selfAliases: ReadonlySet<string> = new Set()): boolean {
+  const expr = unwrap(node);
+  if (expr.kind === ts.SyntaxKind.ThisKeyword) return true;
+  if (ts.isIdentifier(expr) && selfAliases.has(expr.text)) return true;
+  if (ts.isIdentifier(expr) && isStaticSelf(expr)) return true;
+  return (
+    ts.isCallExpression(expr) &&
+    expr.arguments.length === 0 &&
+    ts.isPropertyAccessExpression(expr.expression) &&
+    unwrap(expr.expression.expression).kind === ts.SyntaxKind.ThisKeyword
+  );
+}
+
+/** A class's own name inside one of its static members: Ruby's class-seat `self`
+ *  (`RequestEncoder.encoders` is `@encoders`, `request_encoder.rb:49-51`). */
+function isStaticSelf(name: ts.Identifier): boolean {
+  for (let up: ts.Node | undefined = name.parent; up !== undefined; up = up.parent) {
+    if (ts.isClassLike(up)) return false;
+    const modifiers = ts.canHaveModifiers(up) ? ts.getModifiers(up) : undefined;
+    if (
+      ts.isClassLike(up.parent) &&
+      up.parent.name?.text === name.text &&
+      modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isWriteTarget(node: ts.Node): boolean {
@@ -133,8 +174,29 @@ function isWriteTarget(node: ts.Node): boolean {
   );
 }
 
+/**
+ * A module's `initialize` hook, seated under ruby-compat's `initialize` symbol
+ * (`static [initialize]() {}` or `mod[initialize] = function* () {}`), pairs
+ * as compare.ts#MODULE_INITIALIZE_HOOK.
+ */
+function isInitializeHook(node: ts.Node): boolean {
+  if (ts.isMethodDeclaration(node) && ts.isComputedPropertyName(node.name)) {
+    return node.name.expression.getText() === "initialize";
+  }
+  if (!ts.isFunctionExpression(node) && !ts.isArrowFunction(node)) return false;
+  const parent = node.parent;
+  return (
+    ts.isBinaryExpression(parent) &&
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    parent.right === node &&
+    ts.isElementAccessExpression(parent.left) &&
+    parent.left.argumentExpression.getText() === "initialize"
+  );
+}
+
 function functionName(node: ts.Node): string | undefined {
   if (ts.isConstructorDeclaration(node)) return "constructor";
+  if (isInitializeHook(node)) return MODULE_INITIALIZE_HOOK;
   if (
     ts.isFunctionDeclaration(node) ||
     ts.isMethodDeclaration(node) ||
@@ -204,15 +266,24 @@ export function tsKeyReads(
 ): TsKeyReads {
   const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const out: TsKeyReads = new Map();
+  const selfAliases = new Set<string>();
   const collect = (node: ts.Node, reads: Map<string, Set<string>>): void => {
     const add = (receiver: ts.Expression, key: string) => {
-      const name = receiverName(receiver);
+      const name = receiverName(receiver, selfAliases);
       if (name === undefined) return;
       if (!reads.has(name)) reads.set(name, new Set());
       reads.get(name)!.add(key === ANY_KEY ? key : tsKey(key));
     };
     const keyOf = (arg: ts.Expression | undefined) =>
       arg !== undefined && ts.isStringLiteralLike(arg) ? arg.text : ANY_KEY;
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      unwrap(node.initializer).kind === ts.SyntaxKind.ThisKeyword
+    ) {
+      selfAliases.add(node.name.text);
+    }
     if (ts.isPropertyAccessExpression(node) && !isWriteTarget(node)) {
       add(node.expression, node.name.text);
     } else if (ts.isElementAccessExpression(node) && !isWriteTarget(node)) {
