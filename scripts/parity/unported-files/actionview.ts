@@ -11,18 +11,7 @@
 
 import type { UnportedFile } from "./types.js";
 
-const FORM_HELPER_REASON =
-  "Form-builder HTML generation (tag/label/input rendering, `FormBuilder` object binding). " +
-  "Pre-1.0 scope: trails ports no view layer and the AR/AM closure never reaches it.";
-
 export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
-  {
-    pattern: "/helpers.rb",
-    package: "actionview",
-    reason:
-      "The `ActionView::Helpers` umbrella that includes every helper module; " +
-      "nothing under it is ported, so the barrel has no trails counterpart.",
-  },
   {
     pattern: "template/handlers/builder.rb",
     package: "actionview",
@@ -39,50 +28,5 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Minitest harness for rendering views (`ActionView::TestCase`) — a Rails test-suite " +
       "support class for a layer trails does not port.",
-  },
-  { pattern: "helpers/form_options_helper.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  {
-    pattern: "helpers/tags/collection_check_boxes.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  {
-    pattern: "helpers/tags/collection_radio_buttons.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  {
-    pattern: "helpers/tags/collection_select.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  {
-    pattern: "helpers/tags/grouped_collection_select.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  { pattern: "helpers/tags/select.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  {
-    pattern: "helpers/tags/time_zone_select.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  { pattern: "helpers/tags/weekday_select.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  {
-    pattern: "helpers/asset_tag_helper.rb",
-    package: "actionview",
-    reason: "Emits asset `<script>`/`<img>` tags off the asset pipeline; no trails view layer.",
-  },
-  {
-    pattern: "helpers/translation_helper.rb",
-    package: "actionview",
-    reason:
-      "View-side `translate`/`localize` wrappers that add HTML-safety and lazy `.key` lookup " +
-      "on top of I18n; trails ports the I18n gem itself, not the view wrappers.",
-  },
-  {
-    pattern: "/layouts.rb",
-    package: "actionview",
-    reason: "Layout resolution for rendered templates; no trails template renderer.",
   },
 ];
