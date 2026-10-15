@@ -133,8 +133,13 @@ describe("MessagePack::Unpacker", () => {
   });
 
   describe("ext formats", () => {
-    [1, 2, 4, 8, 16].forEach((n, i) => {
-      const b = [0xd4, 0xd5, 0xd6, 0xd7, 0xd8][i];
+    for (const [n, b] of [
+      [1, 0xd4],
+      [2, 0xd5],
+      [4, 0xd6],
+      [8, 0xd7],
+      [16, 0xd8],
+    ] as const) {
       it(`msgpack fixext ${n} format`, () => {
         const unpacker = new Unpacker({ allowUnknownExt: true });
         const a = new TextEncoder().encode("a".repeat(n));
@@ -143,7 +148,7 @@ describe("MessagePack::Unpacker", () => {
           new ExtensionValue(-1, a),
         );
       });
-    });
+    }
   });
 
   const buffer1 = MessagePack.pack({ foo: "bar" });

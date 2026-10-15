@@ -12,10 +12,9 @@ interface Extracted {
   unexpandedLoops: string[];
 }
 
-function extract(body: string): Extracted {
+function extract(body: string, rel = "cases/foo_test.rb"): Extracted {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-macro-loop-rb-"));
   try {
-    const rel = "cases/foo_test.rb";
     const p = path.join(dir, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, `class FooTest < ActiveSupport::TestCase\n${body}\nend\n`);
@@ -126,13 +125,16 @@ describe("Ruby extractor included-hook test macros", () => {
 describe("Ruby extractor zip loop expansion", () => {
   it("binds each pair of a literal zip receiver, one case per pair", () => {
     // msgpack spec/packer_spec.rb:545-552.
-    const { cases } = extract(`
+    const { cases } = extract(
+      `
       [1, 2, 4].zip([0xd4, 0xd5, 0xd6]).each do |n,b|
         it "msgpack fixext #{n} format" do
           expect(1).to eq(1)
         end
       end
-    `);
+    `,
+      "spec/packer_spec.rb",
+    );
     expect(cases.map((c) => [c.description, c.style])).toEqual([
       ["msgpack fixext 1 format", "it"],
       ["msgpack fixext 2 format", "it"],

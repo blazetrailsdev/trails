@@ -1055,6 +1055,9 @@ class TestExtractor
       # the ordinary walk's interpolation pattern records; leave it to that.
       return out << :group if %w[describe context].include?(name)
       style = TEST_MACRO_STYLES[name]
+      # A Minitest::Spec `it` loop in a `_test.rb` (arel's math_test.rb) stays
+      # one case, matched through its interpolation pattern as its TS twin is.
+      style = nil if style == "it" && @current_file.end_with?("_test.rb")
       if style && args
         name_node = string_literal_node(args)
         if name_node
@@ -2142,7 +2145,10 @@ class TestExtractor
     recv = node[1]
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_block
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
-    return nil unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
+    # `is_expected` is `expect(subject)` (rspec-core memoized_helpers.rb).
+    return nil unless recv.is_a?(Array) &&
+      ((recv[0] == :fcall && ident_name(recv[1]) == "expect") ||
+       (recv[0] == :vcall && ident_name(recv[1]) == "is_expected"))
     matcher = (positional_args(node[4]) || node[4])&.first
     matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_block
     if matcher.is_a?(Array) && matcher[0] == :binary && matcher[1].is_a?(Array) &&

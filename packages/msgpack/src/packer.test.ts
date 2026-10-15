@@ -308,14 +308,19 @@ describe("MessagePack::Packer", () => {
   });
 
   describe("ext formats", () => {
-    [1, 2, 4, 8, 16].forEach((n, i) => {
-      const b = [0xd4, 0xd5, 0xd6, 0xd7, 0xd8][i];
+    for (const [n, b] of [
+      [1, 0xd4],
+      [2, 0xd5],
+      [4, 0xd6],
+      [8, 0xd7],
+      [16, 0xd8],
+    ] as const) {
       it(`msgpack fixext ${n} format`, () => {
         expect(new ExtensionValue(1, "a".repeat(n)).toMsgpack()).toEqual(
           Uint8Array.of(b, 1, ...new TextEncoder().encode("a".repeat(n))),
         );
       });
-    });
+    }
 
     const ext = (header: number[], type: number, n: number): Uint8Array =>
       Uint8Array.of(...header, type & 0xff, ...new Uint8Array(n).fill(0x61));
