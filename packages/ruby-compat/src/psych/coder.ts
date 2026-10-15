@@ -84,6 +84,15 @@ export class Coder {
   }
 
   /**
+   * `Psych::Coder#tag=` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:10`, `attr_accessor :tag`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  setTag(tag: string | null): void {
+    this[coderTag] = tag;
+  }
+
+  /**
    * `Psych::Coder#map=` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/coder.rb:73-76`). The
    * map's pairs are the coder's own string-keyed properties, so `@map = map` replaces them.
    *

@@ -26,7 +26,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
-import { coderTag } from "@blazetrails/ruby-compat/psych";
 import { ActiveSupport } from "../namespaces.js";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -602,9 +601,9 @@ export class Timezone {
 }
 
 export class TimeZone {
-  declare readonly name: string;
-  declare readonly tzinfo: Timezone;
-  declare private readonly _utcOffset: number | null;
+  declare name: string;
+  declare tzinfo: Timezone;
+  declare private _utcOffset: number | null;
 
   /**
    * @inventedArm if — PERMANENT
@@ -613,6 +612,10 @@ export class TimeZone {
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
     if (!creating) return TimeZone.find(name) ?? TimeZone.create(name);
     creating = false;
+    this.initialize(name, utcOffset, tzinfo);
+  }
+
+  initialize(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null): void {
     this.name = name;
     this._utcOffset = utcOffset;
     this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
@@ -833,17 +836,11 @@ export class TimeZone {
   }
 
   initWith(coder: YAML.Coder): void {
-    const name = coder["name"] as string;
-    const self = this as { -readonly [K in "name" | "tzinfo"]: TimeZone[K] } & {
-      _utcOffset: number | null;
-    };
-    self.name = name;
-    self._utcOffset = null;
-    self.tzinfo = TimeZone.findTzinfo(name);
+    this.initialize(coder["name"] as string);
   }
 
   encodeWith(coder: YAML.Coder): void {
-    coder[coderTag] = `!ruby/object:${rbModName(rbObjClass(this))}`;
+    coder.setTag(`!ruby/object:${rbModName(rbObjClass(this))}`);
     coder.setMap({ name: this.tzinfo.name });
   }
 
