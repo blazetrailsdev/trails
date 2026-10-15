@@ -410,7 +410,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("habtm collection size from params", async () => {
-    const devel = new Developer({ projectsAttributes: { "0": {} } });
+    const devel = new Developer({ projects_attributes: { "0": {} } });
     expect(await devel.projects.size()).toBe(1);
   });
 

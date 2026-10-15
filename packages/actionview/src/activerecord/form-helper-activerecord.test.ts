@@ -73,8 +73,8 @@ describe("FormHelperActiveRecordTest", () => {
         method: "patch",
       },
       () =>
-        '<input id="developer_projectsAttributes_abc_name" name="developer[projectsAttributes][abc][name]" type="text" value="project #321" />' +
-        '<input id="developer_projectsAttributes_abc_id" name="developer[projectsAttributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
+        '<input id="developer_projects_attributes_abc_name" name="developer[projects_attributes][abc][name]" type="text" value="project #321" />' +
+        '<input id="developer_projects_attributes_abc_id" name="developer[projects_attributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
     );
 
     assertDomEqual(expected, rendered);

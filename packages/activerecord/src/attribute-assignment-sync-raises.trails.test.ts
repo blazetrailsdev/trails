@@ -31,7 +31,7 @@ describe("synchronous attribute assignment that owes a read", () => {
 
     expect(() => {
       (pirate as unknown as { attributes: Record<string, unknown> }).attributes = {
-        shipAttributes: { id: ship.id, name: "Davy Jones Gold Dagger" },
+        ship_attributes: { id: ship.id, name: "Davy Jones Gold Dagger" },
       };
     }).toThrow(/setAttributes/);
   });
@@ -44,7 +44,7 @@ describe("synchronous attribute assignment that owes a read", () => {
     })) as unknown as { id: number };
 
     await pirate.setAttributes({
-      shipAttributes: { id: ship.id, name: "Davy Jones Gold Dagger" },
+      ship_attributes: { id: ship.id, name: "Davy Jones Gold Dagger" },
     });
 
     const target = (await pirate.ship) as unknown as { name: string };

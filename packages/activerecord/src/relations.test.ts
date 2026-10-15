@@ -2094,7 +2094,7 @@ describe("RelationTest", () => {
       async () => {
         let developers = Developer.where({ name: "Aaron" });
         developers = developers.createWith({
-          projectsAttributes: [{ name: "p1" }],
+          projects_attributes: [{ name: "p1" }],
         });
         await developers.createBang();
       },

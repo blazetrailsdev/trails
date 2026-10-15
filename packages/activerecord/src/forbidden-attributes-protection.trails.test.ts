@@ -95,7 +95,7 @@ describe("ForbiddenAttributesProtectionHashReadersTest", () => {
     const pirate = await Pirate.create(
       new ProtectedParams({
         catchphrase: "Arr",
-        shipAttributes: { name: "Nights Dirty Lightning" },
+        ship_attributes: { name: "Nights Dirty Lightning" },
       }).permitBang(),
     );
 
@@ -103,7 +103,7 @@ describe("ForbiddenAttributesProtectionHashReadersTest", () => {
 
     const ship = (await pirate.ship)!;
     await pirate.update(
-      new ProtectedParams({ shipAttributes: { id: ship.id, name: "Mayflower" } }).permitBang(),
+      new ProtectedParams({ ship_attributes: { id: ship.id, name: "Mayflower" } }).permitBang(),
     );
     expect((await ship.reload()).name).toBe("Mayflower");
   });
@@ -112,7 +112,7 @@ describe("ForbiddenAttributesProtectionHashReadersTest", () => {
     const pirate = await Pirate.create(
       new ProtectedParams({
         catchphrase: "Arr",
-        birdsAttributes: { 0: { name: "Posideons Killer" }, 1: { name: "Killer bandita Dionne" } },
+        birds_attributes: { 0: { name: "Posideons Killer" }, 1: { name: "Killer bandita Dionne" } },
       }).permitBang(),
     );
 
@@ -124,7 +124,7 @@ describe("ForbiddenAttributesProtectionHashReadersTest", () => {
 
     await pirate.update(
       new ProtectedParams({
-        birdsAttributes: [{ id: birds[0].id, name: "Grace OMalley" }],
+        birds_attributes: [{ id: birds[0].id, name: "Grace OMalley" }],
       }).permitBang(),
     );
     expect((await birds[0].reload()).name).toBe("Grace OMalley");

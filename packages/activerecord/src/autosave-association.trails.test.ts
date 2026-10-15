@@ -36,7 +36,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("callbacks read a cold has_one cache", async () => {
-    const created = await Eye.create({ irisAttributes: { color: "honey" } });
+    const created = await Eye.create({ iris_attributes: { color: "honey" } });
     const eye = await Eye.find(created.id);
     expect(eye.association("iris").isLoaded()).toBe(false);
 

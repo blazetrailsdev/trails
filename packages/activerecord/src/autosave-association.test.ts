@@ -1189,21 +1189,21 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("callbacks firing order on create", async () => {
-    const eye = await Eye.create({ irisAttributes: { color: "honey" } });
+    const eye = await Eye.create({ iris_attributes: { color: "honey" } });
     expect(eye.afterCreateCallbacksStack).toEqual([true, false]);
   });
 
   it("callbacks firing order on update", async () => {
-    const eye = await Eye.create({ irisAttributes: { color: "honey" } });
-    await eye.update({ irisAttributes: { color: "green" } });
+    const eye = await Eye.create({ iris_attributes: { color: "honey" } });
+    await eye.update({ iris_attributes: { color: "green" } });
     expect(eye.afterUpdateCallbacksStack).toEqual([true, false]);
   });
 
   it("callbacks firing order on save", async () => {
-    const eye = await Eye.create({ irisAttributes: { color: "honey" } });
+    const eye = await Eye.create({ iris_attributes: { color: "honey" } });
     expect(eye.afterSaveCallbacksStack).toEqual([false, false]);
 
-    await eye.update({ irisAttributes: { color: "blue" } });
+    await eye.update({ iris_attributes: { color: "blue" } });
     expect(eye.afterSaveCallbacksStack).toEqual([false, false, false, false]);
   });
 
@@ -1280,7 +1280,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("foreign key attribute is not set unless changed", async () => {
     const eye = await Eye.createBang({
-      irisWithReadOnlyForeignKeyAttributes: { color: "honey" },
+      irisWithReadOnlyForeignKey_attributes: { color: "honey" },
     });
     await assertNothingRaised(() => {
       eye.overrideIrisWithReadOnlyForeignKeyColor = true;
@@ -2838,7 +2838,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAccep
     const agency = await Agency.createBang({ name: "Agency" });
     const validProject = await Project.createBang({ firm: agency, name: "Initial" });
     await agency.updateBang({
-      projectsAttributes: {
+      projects_attributes: {
         "0": {
           name: "Updated",
           id: validProject.id,
