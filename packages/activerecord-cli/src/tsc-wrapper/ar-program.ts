@@ -13,7 +13,7 @@ import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-pl
 
 export interface CreateArTrailsProgramOptions {
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
-  onMissingTable?: ArModelsPluginOptions["onMissingTable"];
+  onModel?: ArModelsPluginOptions["onModel"];
 }
 
 export interface ArRemapHost {
@@ -51,7 +51,7 @@ export function createArTrailsProgram(
     baseNames: [...baseNames],
     modelRegistry,
     schemaColumnsByTable: opts.schemaColumnsByTable,
-    onMissingTable: opts.onMissingTable,
+    onModel: opts.onModel,
   });
 
   const deltaMap = new Map<string, readonly LineDelta[]>();
@@ -251,7 +251,7 @@ export interface CreateArSolutionBuilderOptions {
   onDiagnostic?: (d: Diagnostic) => void;
   onStatus?: (d: Diagnostic) => void;
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
-  onMissingTable?: ArModelsPluginOptions["onMissingTable"];
+  onModel?: ArModelsPluginOptions["onModel"];
 }
 
 type Ts5Diagnostic = Parameters<NonNullable<TrailsBuildOptions["onDiagnostic"]>>[0];
@@ -273,7 +273,7 @@ export function createArSolutionBuilder(
           baseNames: [...baseNames],
           modelRegistry,
           schemaColumnsByTable: opts.schemaColumnsByTable,
-          onMissingTable: opts.onMissingTable,
+          onModel: opts.onModel,
         }),
       ];
     },

@@ -10,7 +10,7 @@ import {
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { tsApi } from "../type-virtualization/ts-api.js";
-import { virtualize, type MissingTable } from "../type-virtualization/virtualize.js";
+import { virtualize, missingTables, type ModelTable } from "../type-virtualization/virtualize.js";
 import {
   createArTrailsProgram,
   createArSolutionBuilder,
@@ -178,16 +178,32 @@ function validateColumnValue(
   return out;
 }
 
-export function warnMissingTable(): (missing: MissingTable) => void {
-  const warned = new Set<string>();
-  return ({ className, tableName, fileName }) => {
-    const key = `${fileName}#${className}`;
-    if (warned.has(key)) return;
-    warned.add(key);
-    process.stderr.write(
-      `trails-tsc: warning: ${className} (${fileName}) reads table "${tableName}", ` +
-        `which is in no --schema file; mark it @trails-typegen no-schema if that is intended.\n`,
-    );
+export interface MissingTableReporter {
+  onModel: (model: ModelTable) => void;
+  flush: () => void;
+}
+
+export function missingTableReporter(
+  schema: Readonly<Record<string, unknown>> | undefined,
+): MissingTableReporter {
+  const models = new Map<string, ModelTable>();
+  return {
+    onModel: (m) => {
+      if (schema) models.set(`${m.fileName}#${m.className}`, m);
+    },
+    flush: () => {
+      if (!schema) return;
+      for (const { className, tableName, fileName } of missingTables(
+        [...models.values()],
+        schema,
+      )) {
+        process.stderr.write(
+          `trails-tsc: warning: ${className} (${fileName}) reads table "${tableName}", ` +
+            `which is in no --schema file; mark it @trails-typegen no-schema if that is intended.\n`,
+        );
+      }
+      models.clear();
+    },
   };
 }
 
@@ -219,10 +235,12 @@ function handlePrintVirtualized(args: string[]): void {
   }
   const text = fs.readFileSync(resolved, "utf8");
   const schemaColumnsByTable = loadSchemaColumns(args);
+  const reporter = missingTableReporter(schemaColumnsByTable);
   const { text: virtualized } = virtualize(text, resolved, {
     schemaColumnsByTable,
-    onMissingTable: warnMissingTable(),
+    onModel: reporter.onModel,
   });
+  reporter.flush();
   process.stdout.write(virtualized);
   process.exit(0);
 }
@@ -309,6 +327,7 @@ async function handleBuildMode(args: string[]): Promise<void> {
   const fh = formatHost();
   const pretty = parsePretty(args, {});
   const schemaColumnsByTable = loadSchemaColumns(args);
+  const reporter = missingTableReporter(schemaColumnsByTable);
   for (const root of rootConfigs) {
     const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
     await buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
@@ -316,7 +335,7 @@ async function handleBuildMode(args: string[]): Promise<void> {
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
-    onMissingTable: warnMissingTable(),
+    onModel: reporter.onModel,
     onDiagnostic: (d) => {
       const out = pretty
         ? formatDiagnosticsWithColorAndContext([d], fh)
@@ -330,6 +349,7 @@ async function handleBuildMode(args: string[]): Promise<void> {
   });
 
   const status = clean ? builder.clean() : builder.build();
+  reporter.flush();
   process.exit(status);
 }
 
@@ -406,11 +426,13 @@ export async function main(): Promise<void> {
   }
 
   const schemaColumnsByTable = loadSchemaColumns(args);
+  const reporter = missingTableReporter(schemaColumnsByTable);
   await buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
-    onMissingTable: warnMissingTable(),
+    onModel: reporter.onModel,
   });
+  reporter.flush();
 
   const fh = formatHost();
 

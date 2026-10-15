@@ -666,13 +666,20 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(combined).toMatch(/`arrayElementType` is only valid when `type` is "array"/);
   });
 
-  it("warnMissingTable writes one stderr line per model", async () => {
-    const { warnMissingTable } = await import("./cli.js");
+  it("missingTableReporter writes one stderr line per model", async () => {
+    const { missingTableReporter } = await import("./cli.js");
     const { err } = spyExitAndStderr();
-    const warn = warnMissingTable();
-    const missing = { className: "PullRequest", tableName: "pull_requests", fileName: "pr.ts" };
-    warn(missing);
-    warn(missing);
+    const reporter = missingTableReporter({ posts: {} });
+    const model = {
+      className: "PullRequest",
+      dynamicTableName: false,
+      abstract: false,
+      optedOut: false,
+      fileName: "pr.ts",
+    };
+    reporter.onModel(model);
+    reporter.onModel(model);
+    reporter.flush();
     expect(err).toHaveBeenCalledTimes(1);
     expect(String(err.mock.calls[0][0])).toMatch(
       /PullRequest \(pr\.ts\) reads table "pull_requests"/,

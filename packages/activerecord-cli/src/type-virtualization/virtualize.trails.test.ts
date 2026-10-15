@@ -3,7 +3,7 @@ import * as ts from "typescript/unstable/ast";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { virtualize, remapLine } from "./virtualize.js";
+import { virtualize, remapLine, missingTables, type ModelTable } from "./virtualize.js";
 import { tsApi } from "./ts-api.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -919,15 +919,18 @@ describe("virtualize — idempotence", () => {
   });
 });
 
-describe("virtualize — onMissingTable", () => {
+describe("virtualize — missingTables", () => {
   const schema = { posts: { title: "string" } };
-  const missing = (src: string): string[] => {
-    const out: string[] = [];
-    virtualize(src, "m.ts", {
-      schemaColumnsByTable: schema,
-      onMissingTable: (m) => out.push(`${m.className}:${m.tableName}:${m.fileName}`),
-    });
-    return out;
+  const missing = (...files: string[]): string[] => {
+    const models: ModelTable[] = [];
+    files.forEach((src, i) =>
+      virtualize(src, i === 0 ? "m.ts" : `m${i}.ts`, {
+        baseNames: ["Base", "ApplicationRecord", "Article", "Post"],
+        schemaColumnsByTable: schema,
+        onModel: (m) => models.push(m),
+      }),
+    );
+    return missingTables(models, schema).map((m) => `${m.className}:${m.tableName}:${m.fileName}`);
   };
 
   test("warns for a model whose table is in no schema", () => {
@@ -981,6 +984,21 @@ describe("virtualize — onMissingTable", () => {
     expect(
       missing("export class Post extends Base {}\nexport class Draft extends Post {}\n"),
     ).toEqual([]);
+  });
+
+  test("resolves an STI subclass's table through a base class in another file", () => {
+    const base = 'export class Article extends Base {\n  static tableName = "posts";\n}\n';
+    const sub = "export class Draft extends Article {}\n";
+    expect(missing(sub, base)).toEqual([]);
+  });
+
+  test("resolves the table below an abstract class in another file", () => {
+    const abstract =
+      "export class ApplicationRecord extends Base {\n  static {\n    this.abstractClass = true;\n  }\n}\n";
+    expect(missing("export class Post extends ApplicationRecord {}\n", abstract)).toEqual([]);
+    expect(missing("export class Comment extends ApplicationRecord {}\n", abstract)).toEqual([
+      "Comment:comments:m.ts",
+    ]);
   });
 
   test("a no-schema model keeps its synthesized associations", () => {
