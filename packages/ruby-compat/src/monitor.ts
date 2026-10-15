@@ -105,3 +105,53 @@ export class Monitor implements MonitorMixin {
   isMonOwned = isMonOwned;
   synchronize = synchronize;
 }
+
+/**
+ * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:98` `MonitorMixin::ConditionVariable`.
+ *
+ * A waiter suspends at an `await`, and every caller trails gives one keeps the
+ * section around it synchronous, so no monitor is held across the wait and
+ * there is none to release and reacquire.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:98`).
+ */
+export class MonitorConditionVariable {
+  #waiters: Array<() => void> = [];
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#wait`
+   * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:105`).
+   */
+  wait(): Promise<void> {
+    return new Promise((resolve) => this.#waiters.push(resolve));
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#wait_while`
+   * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:113`).
+   */
+  async waitWhile(block: () => unknown): Promise<void> {
+    while (block()) {
+      await this.wait();
+    }
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#broadcast`
+   * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:139`).
+   */
+  broadcast(): void {
+    const waiters = this.#waiters;
+    this.#waiters = [];
+    for (const resolve of waiters) resolve();
+  }
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#new_cond`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:209`).
+ */
+export function newCond(this: object): MonitorConditionVariable {
+  return new MonitorConditionVariable();
+}

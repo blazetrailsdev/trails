@@ -1,34 +1,11 @@
+import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { bodyFromString, CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 
-export interface ThreadLike {
-  status: string | false | null;
-  backtrace(): string[] | null;
-  id: number;
-}
-
-export interface ThreadInfo {
-  exclusive?: boolean;
-  sharing?: number;
-  waiting?: boolean;
-  sleeper?: string | null;
-  purpose?: unknown;
-  compatible?: Array<unknown> | null;
-  index?: number;
-  backtrace?: string[] | null;
-}
-
-export interface InterlockLike {
-  rawState<T>(block: (threads: Map<ThreadLike, ThreadInfo>) => T): T;
-}
-
 export class DebugLocks {
-  /** @noRailsEquivalent CONVERGEABLE debug-locks-reads-dependencies-interlock */
-  static interlock: InterlockLike | null = null;
-
   private app: RackApp;
   private path: string;
 
@@ -52,13 +29,7 @@ export class DebugLocks {
 
   /** @internal */
   private renderDetails(req: Request): RackResponse {
-    const interlock = DebugLocks.interlock;
-    if (!interlock) {
-      throw new Error(
-        "ActionDispatch::DebugLocks.interlock is not configured (no autoload interlock port available)",
-      );
-    }
-    const threads = interlock.rawState<Map<ThreadLike, ThreadInfo>>((rawThreads) => {
+    const threads = Dependencies.interlock.rawState((rawThreads) => {
       let idx = 0;
       for (const [thread, info] of rawThreads) {
         info.index = idx++;
@@ -74,9 +45,9 @@ export class DebugLocks {
       let lockState: string;
       if (info.exclusive) {
         lockState = "Exclusive";
-      } else if ((info.sharing ?? 0) > 0) {
+      } else if (info.sharing > 0) {
         lockState = "Sharing";
-        if ((info.sharing ?? 0) > 1) lockState += ` x${info.sharing}`;
+        if (info.sharing > 1) lockState += ` x${info.sharing}`;
       } else {
         lockState = "No lock";
       }
@@ -131,7 +102,11 @@ export class DebugLocks {
   }
 
   /** @internal */
-  private blockedBy(victim: ThreadInfo, blocker: ThreadInfo, allThreads: ThreadInfo[]): boolean {
+  private blockedBy(
+    victim: ShareLockThreadInfo,
+    blocker: ShareLockThreadInfo,
+    allThreads: ShareLockThreadInfo[],
+  ): boolean {
     if (victim === blocker) return false;
 
     switch (victim.sleeper) {
@@ -142,7 +117,7 @@ export class DebugLocks {
         );
       case "start_exclusive":
         return (
-          (blocker.sharing ?? 0) > 0 ||
+          blocker.sharing > 0 ||
           !!blocker.exclusive ||
           (!!blocker.compatible && !blocker.compatible.includes(victim.purpose))
         );

@@ -1,19 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { DebugLocks, type InterlockLike, type ThreadLike, type ThreadInfo } from "./debug-locks.js";
+import { Dependencies, type Interlock, type ShareLockThreadInfo } from "@blazetrails/activesupport";
+import type { Thread } from "@blazetrails/ruby-compat";
+import { DebugLocks } from "./debug-locks.js";
 import { Response } from "../http/response.js";
 
 const passthrough = async (_env: RackEnv): Promise<RackResponse> => [200, {}, bodyFromString("ok")];
 
-function setInterlock(threads: Array<[ThreadLike, ThreadInfo]>): void {
-  const map = new Map(threads);
-  const interlock: InterlockLike = {
-    rawState(block) {
-      return block(map);
-    },
-  };
-  DebugLocks.interlock = interlock;
+const realInterlock = Dependencies.interlock;
+
+type ThreadLike = { id: number; status: string | false | null; backtrace(): string[] | null };
+
+function setInterlock(threads: Array<[ThreadLike, Partial<ShareLockThreadInfo>]>): void {
+  const map = new Map(threads) as unknown as Map<Thread, ShareLockThreadInfo>;
+  for (const info of map.values()) info.sharing ??= 0;
+  Dependencies.interlock = {
+    rawState: (block: (data: Map<Thread, ShareLockThreadInfo>) => unknown) => block(map),
+  } as unknown as Interlock;
 }
 
 function thread(id: number, status: string | null = "run", backtrace: string[] = []): ThreadLike {
@@ -25,7 +29,7 @@ describe("DebugLocks", () => {
     setInterlock([]);
   });
   afterEach(() => {
-    DebugLocks.interlock = null;
+    Dependencies.interlock = realInterlock;
   });
 
   it("passes non-matching paths to the inner app", async () => {
@@ -146,13 +150,5 @@ describe("DebugLocks", () => {
     } finally {
       Response.defaultCharset = prior;
     }
-  });
-
-  it("throws when no interlock is configured", async () => {
-    DebugLocks.interlock = null;
-    const mw = new DebugLocks(passthrough);
-    await expect(mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks" })).rejects.toThrow(
-      /interlock is not configured/,
-    );
   });
 });

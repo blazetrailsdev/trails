@@ -546,6 +546,10 @@ export {
 export type { ClassMethods } from "./callbacks.js";
 export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
 export * as Autoload from "./dependencies/autoload.js";
+export { Dependencies } from "./dependencies.js";
+export { Interlock } from "./dependencies/interlock.js";
+export { ShareLock } from "./concurrency/share-lock.js";
+export type { ShareLockThreadInfo } from "./concurrency/share-lock.js";
 export {
   include,
   extend,
