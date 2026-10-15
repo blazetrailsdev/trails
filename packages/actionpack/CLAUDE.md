@@ -137,17 +137,17 @@ mechanism that holds the same fact:
 
 | Rails fact                                           | trails carrier                                                  |
 | ---------------------------------------------------- | --------------------------------------------------------------- |
-| driver registration under `name` (`driver.rb:36-45`) | module-private launcher memo in `driver.ts`, keyed by `name`    |
-| current driver (`driver.rb:72-74`)                   | `SystemTestCase.driver` (`.name`)                               |
-| application (`system_test_case.rb:129-133`)          | Rack app mounted in an in-process Vite dev server               |
-| server choice and silence (`server.rb:22-24`)        | Vite dev server, `logLevel: "silent"` from `Server.silencePuma` |
-| always include port (`server.rb:26-28`)              | the Vite server's resolved URL                                  |
-| server host and port (`system_test_case.rb:166-169`) | Vite `server.host` / `server.port`                              |
-| app host (`system_test_case.rb:194-196`)             | configured host, else the Vite server URL, else `DEFAULT_HOST`  |
-| screenshot save path (`screenshot_helper.rb:94-96`)  | `ScreenshotHelper.screenshotDirectory`, seeded from `inject`    |
+| driver registration under `name` (`driver.rb:41`)    | module-private launcher memo in `driver.ts`, keyed by `name`    |
+| current driver (`driver.rb:81`)                      | `SystemTestCase.driver` (`.name`)                               |
+| application (`system_test_case.rb:129`)              | Rack app mounted in an in-process Vite dev server               |
+| server choice and silence (`server.rb:25`)           | Vite dev server, `logLevel: "silent"` from `Server.silencePuma` |
+| always include port (`server.rb:29`)                 | the Vite server's resolved URL                                  |
+| server host and port (`system_test_case.rb:168-169`) | Vite `server.host` / `server.port`                              |
+| app host (`system_test_case.rb:185`)                 | configured host, else the Vite server URL, else `DEFAULT_HOST`  |
+| screenshot save path (`screenshot_helper.rb:95`)     | `ScreenshotHelper.screenshotDirectory`, seeded from `inject`    |
 | inline screenshot env (`screenshot_helper.rb:122`)   | `RAILS_SYSTEM_TESTING_SCREENSHOT` only                          |
-| session reset (`setup_and_teardown.rb:15-19`)        | close the test's browser context in `afterTeardown`             |
-| test `metadata` (`screenshot_helper.rb:56-58`)       | the Vitest task's `meta`                                        |
+| session reset (`setup_and_teardown.rb:16`)           | close the test's browser context in `afterTeardown`             |
+| test `metadata` (`screenshot_helper.rb:57`)          | the Vitest task's `meta`                                        |
 
 Rules that follow:
 

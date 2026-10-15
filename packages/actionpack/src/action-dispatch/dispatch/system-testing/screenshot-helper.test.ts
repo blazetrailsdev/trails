@@ -29,9 +29,7 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   beforeEach(() => {
     host = makeHost("x");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
-    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
-    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
   });
 
   afterEach(() => {
