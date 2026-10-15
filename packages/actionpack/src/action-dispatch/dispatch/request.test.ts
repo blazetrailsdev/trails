@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect } from "vitest";
 import { Request, PASS_NOT_FOUND, controllerConstants } from "../request.js";
+import { emptyRackBody } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import { Mime, MimeType } from "../http/mime-type.js";
@@ -32,12 +33,13 @@ async function stubRequest(env: Record<string, unknown> = {}): Promise<Request> 
   const uri = env["HTTPS"] === "on" ? "https://www.example.org" : "http://www.example.org";
 
   env = MockRequest.envFor(uri, env);
-  const trustedProxies = [
-    ...RemoteIp.TRUSTED_PROXIES,
-    additionalTrustedProxy,
-  ] as Array<Proxy | null>;
+  const trustedProxies = [...RemoteIp.TRUSTED_PROXIES, additionalTrustedProxy] as Proxy[];
 
-  const ipApp = new RemoteIp(async () => [200, {}, []], ipSpoofingCheck as boolean, trustedProxies);
+  const ipApp = new RemoteIp(
+    async () => [200, {}, emptyRackBody()],
+    ipSpoofingCheck as boolean,
+    trustedProxies,
+  );
   await ipApp.call(env);
 
   return new Request(env);
