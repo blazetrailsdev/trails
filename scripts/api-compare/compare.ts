@@ -7019,8 +7019,6 @@ export function main() {
   );
 
   if (callsGate) {
-    // The Rails class each tagged constructor was compared against, read by
-    // lint-inlined-from.ts so both gates pair a constructor the same way.
     fs.writeFileSync(
       path.join(OUTPUT_DIR, INLINED_FROM_PAIRS_FILE),
       JSON.stringify(inlinedFromPairs, null, 2) + "\n",
