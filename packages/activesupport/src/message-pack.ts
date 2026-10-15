@@ -3,6 +3,11 @@ import { extend, Module, rbModConstSet } from "@blazetrails/ruby-compat/include"
 import { runLoadHooks } from "./lazy-load-hooks.js";
 import { CacheSerializer } from "./message-pack/cache-serializer.js";
 import { Serializer } from "./message-pack/serializer.js";
+import {
+  Extensions,
+  MissingClassError,
+  UnserializableObjectError,
+} from "./message-pack/extensions.js";
 import { ActiveSupport } from "./namespaces.js";
 
 export { Serializer } from "./message-pack/serializer.js";
@@ -18,8 +23,14 @@ export const MessagePack = new Module() as Module &
   Serializer & {
     Serializer: typeof Serializer;
     CacheSerializer: typeof CacheSerializer;
+    Extensions: typeof Extensions;
+    UnserializableObjectError: typeof UnserializableObjectError;
+    MissingClassError: typeof MissingClassError;
   };
 rbModConstSet(ActiveSupport, "MessagePack", MessagePack);
+rbModConstSet(MessagePack, "UnserializableObjectError", UnserializableObjectError);
+rbModConstSet(MessagePack, "MissingClassError", MissingClassError);
+rbModConstSet(MessagePack, "Extensions", Extensions);
 rbModConstSet(MessagePack, "CacheSerializer", CacheSerializer);
 rbModConstSet(MessagePack, "Serializer", Serializer);
 extend(MessagePack, Serializer);

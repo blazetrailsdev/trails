@@ -1,5 +1,5 @@
 import { RuntimeError, env as ENV, fetch, rbObjFrozenP, toI } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+import { Module, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Factory, type Pool } from "@blazetrails/msgpack";
 import { delegate } from "../module-ext.js";
 import { Extensions } from "./extensions.js";
@@ -82,3 +82,5 @@ export const Serializer = new Module((mod) => {
     Extensions.installUnregisteredTypeError(this.messagePackFactory);
   },
 }) as Module<Serializer>;
+rbModConstSet(Serializer, "SIGNATURE", SIGNATURE);
+rbModConstSet(Serializer, "SIGNATURE_INT", SIGNATURE_INT);

@@ -725,6 +725,7 @@ class TestExtractor
 
   def process_it_paren(node, outer_node = nil)
     desc = extract_string_from_arg_paren(node[2])
+    desc ||= generated_description(outer_node) if outer_node
     return unless desc
 
     line = extract_line(node)
@@ -745,6 +746,29 @@ class TestExtractor
       assertionKinds: assertion_kinds,
       assertionValues: assertion_values,
     }, body_node)
+  end
+
+  # A description-less RSpec example (`it { is_expected.to eq "x" }`) is named
+  # by RSpec from its matcher, `is expected to eq "x"`
+  # (rspec-core `RSpec::Matchers.generated_description`). The stand-in spells
+  # the matcher as its source text, which is what that description renders for
+  # a literal argument; nil when the body is not a single `is_expected` line.
+  def generated_description(node)
+    block = node[2]
+    return nil unless block.is_a?(Array) && %i[brace_block do_block].include?(block[0])
+    stmts = block[0] == :do_block ? block[2] && block[2][1] : block[2]
+    return nil unless stmts.is_a?(Array) && stmts.length == 1
+    stmt = stmts[0]
+    return nil unless stmt.is_a?(Array) && stmt[0] == :command_call
+    return nil unless stmt[1].is_a?(Array) && stmt[1][0] == :vcall && ident_name(stmt[1][1]) == "is_expected"
+    verb = { "to" => "to", "not_to" => "not to", "to_not" => "not to" }[ident_name(stmt[3])]
+    matcher = stmt[4].is_a?(Array) ? stmt[4][0] : nil
+    return nil unless verb && matcher.is_a?(Array) && matcher[0] == :command
+    line, col = matcher[1][2]
+    source = @source_lines[line - 1]
+    return nil unless source
+    text = source[col..].rstrip.sub(/\s*\}\z/, "")
+    "is expected #{verb} #{text}"
   end
 
   def process_test_macro(args, node)
@@ -990,46 +1014,52 @@ class TestExtractor
 
     macros = []
     collect_test_macros(block[2], macros)
-    return false if macros.empty?
+    return false if macros.empty? || macros.include?(:group)
 
     vars = block_var_names(block[1])
     elements = loop_elements(call[1])
     return false if vars.nil? || elements.nil?
 
     expanded = []
-    macros.each do |name_node, macro_node|
+    macros.each do |name_node, macro_node, style|
       elements.each do |value|
         bindings = loop_bindings(vars, value)
         return false if bindings.nil?
         desc = interpolated_name(name_node, bindings)
         return false if desc.nil?
-        expanded << [desc, macro_node]
+        expanded << [desc, macro_node, style]
       end
     end
 
-    expanded.each { |desc, macro_node| emit_test_macro_case(desc, macro_node) }
+    expanded.each { |desc, macro_node, style| emit_test_macro_case(desc, macro_node, style) }
     true
   end
 
-  # Every `test(<name>) do ... end` in a block body, as
-  # [name-argument string_literal node, method_add_block node].
+  # Every `test(<name>) do ... end`, and RSpec's `it` / `specify`, in a block
+  # body, as [name-argument string_literal node, method_add_block node, style].
+  TEST_MACRO_STYLES = { "test" => "test", "it" => "it", "specify" => "it" }.freeze
+
   def collect_test_macros(node, out)
     return unless node.is_a?(Array)
 
     if node[0] == :method_add_block
       inner = node[1]
-      args =
-        if inner.is_a?(Array) && inner[0] == :command && ident_name(inner[1]) == "test"
-          inner[2]
+      name, args =
+        if inner.is_a?(Array) && inner[0] == :command
+          [ident_name(inner[1]), inner[2]]
         elsif inner.is_a?(Array) && inner[0] == :method_add_arg &&
-              inner[1].is_a?(Array) && inner[1][0] == :fcall &&
-              ident_name(inner[1][1]) == "test"
-          inner[2]
+              inner[1].is_a?(Array) && inner[1][0] == :fcall
+          [ident_name(inner[1][1]), inner[2]]
         end
-      if args
+      return out << :group if %w[describe context].include?(name)
+      style = TEST_MACRO_STYLES[name]
+      style = nil if style == "it" && @current_file.end_with?("_test.rb")
+      if style && args
         name_node = string_literal_node(args)
-        out << [name_node, node] if name_node
-        return
+        if name_node
+          out << [name_node, node, style]
+          return
+        end
       end
     end
 
@@ -1058,10 +1088,28 @@ class TestExtractor
     return nil unless receiver.is_a?(Array)
     return array_literal_values(receiver[1]) if receiver[0] == :array
     return hash_literal_pairs(receiver) if %i[hash bare_assoc_hash].include?(receiver[0])
+    return zip_literal_pairs(receiver) if receiver[0] == :method_add_arg
 
     path = const_path(receiver)
     return nil unless path && path[:segments].length == 1
     @const_arrays[path[:segments].first]
+  end
+
+  # `[a, b].zip([c, d])`: Array#zip pairs each element with the one at the same
+  # index of the argument, nil past its end (`vendor/ruby/v3.3.11/array.c:4422`).
+  def zip_literal_pairs(receiver)
+    call = receiver[1]
+    return nil unless call.is_a?(Array) && call[0] == :call && ident_name(call[3]) == "zip"
+    return nil unless call[1].is_a?(Array) && call[1][0] == :array
+    paren = receiver[2]
+    return nil unless paren.is_a?(Array) && paren[0] == :arg_paren
+    args = paren[1].is_a?(Array) && paren[1][0] == :args_add_block ? paren[1][1] : nil
+    return nil unless args.is_a?(Array) && args.length == 1 && args[0].is_a?(Array) && args[0][0] == :array
+
+    left = array_literal_values(call[1][1])
+    right = array_literal_values(args[0][1])
+    return nil if left.nil? || right.nil?
+    left.each_with_index.map { |value, index| [value, right[index]] }
   end
 
   # Bind the block parameters to one element: a single parameter takes the whole
@@ -1151,7 +1199,7 @@ class TestExtractor
     out
   end
 
-  def emit_test_macro_case(desc, node)
+  def emit_test_macro_case(desc, node, style = "test")
     line = extract_line(node)
     assertion_kinds, assertion_values = collect_assertion_kinds(node)
 
@@ -1172,7 +1220,7 @@ class TestExtractor
       ancestors: @describe_stack.dup,
       file: @current_file,
       line: line,
-      style: "test",
+      style: style,
       assertions: assertion_kinds.uniq,
       assertionCount: assertion_kinds.length,
       assertionKinds: assertion_kinds,
@@ -2093,7 +2141,9 @@ class TestExtractor
     recv = node[1]
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_block
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
-    return nil unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
+    return nil unless recv.is_a?(Array) &&
+      ((recv[0] == :fcall && ident_name(recv[1]) == "expect") ||
+       (recv[0] == :vcall && ident_name(recv[1]) == "is_expected"))
     matcher = (positional_args(node[4]) || node[4])&.first
     matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_block
     if matcher.is_a?(Array) && matcher[0] == :binary && matcher[1].is_a?(Array) &&

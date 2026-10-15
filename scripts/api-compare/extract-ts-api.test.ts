@@ -7873,3 +7873,35 @@ describe("extractClass — @inlinedFrom on a constructor", () => {
     expect(got.map((m) => m.inlinedFrom)).toEqual([undefined, undefined]);
   });
 });
+
+describe("a top-level rbModDefineMethod seat", () => {
+  it("is recorded as a method of the file, with params and call set", () => {
+    const info = extractFromFiles("/p", {
+      "core-ext.ts": `
+        rbModDefineMethod(rbCNilClass, "toMsgpackWithPacker", function (this: null, packer: Packer) {
+          packer.writeNil();
+          return packer;
+        });
+      `,
+    });
+    const [seat] = fileFunctionsOf(info, "core-ext.ts");
+    expect(seat.name).toBe("toMsgpackWithPacker");
+    expect(seat.params.map((p) => p.name)).toEqual(["this", "packer"]);
+    expect(seat.callSeq).toEqual(["writeNil"]);
+    expect(seat.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("carries the @noRailsEquivalent receipt written above the call", () => {
+    const info = extractFromFiles("/p", {
+      "object.ts": `
+        /**
+         * Integer#integer?
+         * @noRailsEquivalent PERMANENT
+         */
+        rbModDefineMethod(rbCInteger, "isInteger", () => true);
+      `,
+    });
+    const [seat] = fileFunctionsOf(info, "object.ts");
+    expect(seat.noRailsEquivalent).toMatch(/^PERMANENT/);
+  });
+});

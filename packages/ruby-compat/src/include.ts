@@ -28,6 +28,7 @@ import { temporalTag } from "./temporal-tag.js";
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
 import { TypeError } from "./type-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { BigDecimal } from "./big-decimal.js";
 import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
@@ -43,6 +44,8 @@ import {
   rbCDate,
   rbCNumeric,
   rbObjClass,
+  rbObjSingletonClass,
+  rbInspect,
   rbCString,
   rbCTime,
   rbModAttrReader,
@@ -578,7 +581,9 @@ export class Module<I extends object = Record<never, never>> {
    * spliced between `obj` and its class, so a later `extend` sits above it and
    * `superMethod` resumes the lookup at the next link. A module already in
    * `obj`'s ancestry is skipped, as `include_modules_at` skips one
-   * (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
+   * (vendor/ruby/v3.3.11/class.c:1281,1291,1296). A frozen object's singleton
+   * class is frozen, so `rb_class_modify_check` (vendor/ruby/v3.3.11/eval.c:429)
+   * raises `FrozenError` first.
    *
    * One link is made per extended object, so singleton links are held through
    * `WeakRef`s that `relinkIncluders` still walks, keeping a later
@@ -592,13 +597,23 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   extendObject(obj: object): void {
+    if (Object.isFrozen(obj)) {
+      const desc =
+        obj instanceof Module
+          ? `Module: ${obj.inspect()}`
+          : typeof obj === "function"
+            ? `Class: ${rbModToS(obj as AnyClass)}`
+            : `object: ${rbInspect(obj)}`;
+      throw new FrozenError(`can't modify frozen ${desc}`, { receiver: obj });
+    }
     for (let proto = Object.getPrototypeOf(obj) as object | null; proto; ) {
       if (isLinkOf(this, proto)) return;
       proto = Object.getPrototypeOf(proto) as object | null;
     }
     for (const mod of nestedModules.get(this) ?? []) Module.prototype.extendObject.call(mod, obj);
-    trackIncludedModule(obj, this);
-    const parent = Object.getPrototypeOf(obj) as object | null;
+    const holder: object = typeof obj === "function" ? obj : rbObjSingletonClass(obj).prototype;
+    trackIncludedModule(holder, this);
+    const parent = Object.getPrototypeOf(holder) as object | null;
     const link: object =
       typeof obj === "function" && typeof parent === "function" && parent !== Function.prototype
         ? class extends (parent as new (...args: never[]) => object) {}
@@ -612,7 +627,7 @@ export class Module<I extends object = Record<never, never>> {
     links.refs.add(ref);
     singletonReaper.register(link, { mod: this, ref });
     Object.defineProperty(link, T_ICLASS, { value: this });
-    Object.setPrototypeOf(obj, link);
+    Object.setPrototypeOf(holder, link);
   }
 
   /**

@@ -732,6 +732,10 @@ export function extractFromProgram(
           }
         }
       } else if (ts.isExpressionStatement(node)) {
+        if (defineMethodSeat(node.expression)) {
+          fileFunctions.push(harvestDefineMethodSeat(node, checker, relPath));
+          return;
+        }
         const seated = seatedClassExpression(node);
         if (!seated) return;
         const classInfo = extractClass(seated.cls, checker, relPath, srcDir);
@@ -3599,8 +3603,8 @@ export function harvestModuleInstanceMethods(
     ts.isPropertyAccessExpression(cur.expression) &&
     cur.expression.name.text === "include"
   ) {
-    const arg = cur.arguments[0] && unwrapAssertions(cur.arguments[0]);
-    if (arg && ts.isObjectLiteralExpression(arg)) literals.unshift(arg);
+    const arg = cur.arguments[0] && sameFileObjectLiteral(unwrapAssertions(cur.arguments[0]));
+    if (arg) literals.unshift(arg);
     cur = unwrapAssertions(cur.expression.expression);
   }
   if (!ts.isNewExpression(cur) || !ts.isIdentifier(cur.expression)) return [];
@@ -3684,6 +3688,69 @@ export function harvestModuleInstanceMethods(
   };
   visit(block.body);
   return out;
+}
+
+/**
+ * A top-level `rbModDefineMethod(Klass, "name", function () {})`: Ruby's
+ * `class Klass; def name; end; end` reopening a core class
+ * (msgpack's core_ext.rb), seated on the class the call names.
+ */
+function defineMethodSeat(
+  expr: ts.Expression,
+): { name: ts.StringLiteralLike; body: ts.FunctionExpression | ts.ArrowFunction } | undefined {
+  if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  if (expr.expression.text !== "rbModDefineMethod") return undefined;
+  const [, name, body] = expr.arguments;
+  if (!name || !ts.isStringLiteralLike(name) || !body) return undefined;
+  if (!ts.isFunctionExpression(body) && !ts.isArrowFunction(body)) return undefined;
+  return { name, body };
+}
+
+function harvestDefineMethodSeat(
+  node: ts.ExpressionStatement,
+  checker: ts.TypeChecker,
+  file: string,
+): MethodInfo {
+  const { name, body } = defineMethodSeat(node.expression)!;
+  const optionKeys = extractOptionKeys(body.parameters, checker);
+  const calls = extractCalls(body.body);
+  const callSeq = extractCallSeq(body.body);
+  const callArgs = extractCallArgs(body.body);
+  const skeleton = extractSkeleton(body.body);
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+  return {
+    name: name.text,
+    visibility: "public",
+    params: extractParameters(body.parameters),
+    isStatic: false,
+    line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    file,
+    ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+    ...(optionKeys !== undefined ? { optionKeys } : {}),
+    ...(calls !== undefined ? { calls } : {}),
+    ...(callSeq !== undefined ? { callSeq } : {}),
+    ...(callArgs !== undefined ? { callArgs } : {}),
+    ...(skeleton !== undefined ? { skeleton } : {}),
+  };
+}
+
+/**
+ * An object literal, or a same-file `const` an identifier names whose
+ * initializer is one: `new Module().include(ExtensionsMethods)`.
+ */
+function sameFileObjectLiteral(expr: ts.Expression): ts.ObjectLiteralExpression | undefined {
+  if (ts.isObjectLiteralExpression(expr)) return expr;
+  if (!ts.isIdentifier(expr)) return undefined;
+  for (const statement of expr.getSourceFile().statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || decl.name.text !== expr.text || !decl.initializer)
+        continue;
+      const init = unwrapAssertions(decl.initializer);
+      return ts.isObjectLiteralExpression(init) ? init : undefined;
+    }
+  }
+  return undefined;
 }
 
 function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {

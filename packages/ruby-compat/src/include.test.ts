@@ -1964,3 +1964,26 @@ describe("Module#include of a Module with a named included", () => {
     expect(seen).toEqual([Outer]);
   });
 });
+
+describe("extend on an object", () => {
+  it("includes the module into the object's singleton class", async () => {
+    const { Module, extend, rbClassInheritedP } = await import("./include.js");
+    const { rbClassOf } = await import("./object.js");
+    const Mod = new Module().include({ m: () => 1 });
+    const obj = extend({}, Mod);
+    expect(rbClassOf(obj)).not.toBe(Object);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
+    expect(obj.constructor).toBe(Object);
+  });
+
+  it("raises FrozenError for a frozen object", async () => {
+    const { Module, extend } = await import("./include.js");
+    const { FrozenError } = await import("./frozen-error.js");
+    const Mod = new Module();
+    expect(() => extend(Object.freeze({}), Mod)).toThrow(FrozenError);
+    expect(() => extend(Object.freeze({}), Mod)).toThrow(/^can't modify frozen object: /);
+    class K {}
+    Object.freeze(K);
+    expect(() => extend(K, Mod)).toThrow(/^can't modify frozen Class: /);
+  });
+});
