@@ -7888,5 +7888,20 @@ describe("a top-level rbModDefineMethod seat", () => {
     expect(seat.name).toBe("toMsgpackWithPacker");
     expect(seat.params.map((p) => p.name)).toEqual(["this", "packer"]);
     expect(seat.callSeq).toEqual(["writeNil"]);
+    expect(seat.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("carries the @noRailsEquivalent receipt written above the call", () => {
+    const info = extractFromFiles("/p", {
+      "object.ts": `
+        /**
+         * Integer#integer?
+         * @noRailsEquivalent PERMANENT
+         */
+        rbModDefineMethod(rbCInteger, "isInteger", () => true);
+      `,
+    });
+    const [seat] = fileFunctionsOf(info, "object.ts");
+    expect(seat.noRailsEquivalent).toMatch(/^PERMANENT/);
   });
 });
