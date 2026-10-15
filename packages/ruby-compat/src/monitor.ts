@@ -1,4 +1,3 @@
-import { Mutex } from "./mutex.js";
 import { Thread } from "./thread.js";
 import { ThreadError } from "./thread-error.js";
 import {
@@ -7,8 +6,22 @@ import {
   type AsyncContextAdapter,
 } from "./async-context-adapter.js";
 
+type Owner = symbol | Thread;
+
+interface MonEntry {
+  owner: Owner;
+  count: number;
+  thread: Thread;
+}
+
+interface MonWaiter {
+  parent: Owner | null;
+  grant: () => void;
+}
+
 interface MonData {
-  holders: Map<symbol | null, Promise<void> | null>;
+  entries: MonEntry[];
+  waiters: MonWaiter[];
   storage: AsyncContext<symbol> | null;
   adapter: AsyncContextAdapter | null;
 }
@@ -18,7 +31,7 @@ const MON_DATA = new WeakMap<object, MonData>();
 function monData(self: object): MonData {
   let data = MON_DATA.get(self);
   if (!data) {
-    data = { holders: new Map([[null, null]]), storage: null, adapter: null };
+    data = { entries: [], waiters: [], storage: null, adapter: null };
     MON_DATA.set(self, data);
   }
   const adapter = getAsyncContext();
@@ -29,9 +42,58 @@ function monData(self: object): MonData {
   return data;
 }
 
-function heldBy(data: MonData): symbol | null {
+function currentOwner(data: MonData): Owner {
   const store = data.storage!.getStore();
-  return store !== undefined && data.holders.has(store) ? store : null;
+  const thread = Thread.current();
+  if (data.entries.some((entry) => entry.owner === store && entry.thread === thread)) return store!;
+  return thread;
+}
+
+function topOwner(data: MonData): Owner | null {
+  return data.entries.at(-1)?.owner ?? null;
+}
+
+function wakeWaiter(data: MonData): void {
+  const top = topOwner(data);
+  const index = data.waiters.findIndex((waiter) => waiter.parent === top);
+  if (index < 0) return;
+  const [waiter] = data.waiters.splice(index, 1);
+  waiter.grant();
+}
+
+function acquire(
+  data: MonData,
+  parent: Owner | null,
+  ...entries: MonEntry[]
+): Promise<void> | void {
+  if (topOwner(data) === parent && !data.waiters.some((waiter) => waiter.parent === parent)) {
+    data.entries.push(...entries);
+    return;
+  }
+  return new Promise<void>((resolve) => {
+    data.waiters.push({
+      parent,
+      grant: () => {
+        data.entries.push(...entries);
+        resolve();
+      },
+    });
+  });
+}
+
+function release(data: MonData, owner: Owner): MonEntry {
+  let index = data.entries.length - 1;
+  while (index >= 0 && data.entries[index].owner !== owner) index -= 1;
+  if (index < 0) throw new ThreadError("current thread not owner");
+  const [entry] = data.entries.splice(index, 1);
+  const parent = data.entries[index - 1]?.owner ?? null;
+  for (const waiter of data.waiters) if (waiter.parent === owner) waiter.parent = parent;
+  wakeWaiter(data);
+  return entry;
+}
+
+function parentFor(data: MonData, owner: Owner): Owner | null {
+  return data.entries.some((entry) => entry.owner === owner) ? owner : null;
 }
 
 /**
@@ -42,49 +104,68 @@ function heldBy(data: MonData): symbol | null {
  * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:191`).
  */
 export function isMonOwned(this: object): boolean {
-  return heldBy(monData(this)) !== null;
+  const data = monData(this);
+  const owner = currentOwner(data);
+  return data.entries.some((entry) => entry.owner === owner);
 }
 
 /**
- * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200` `mon_synchronize`, aliased
- * `synchronize` at `:203`.
- *
- * Ruby's monitor is owned by a thread, and one thread runs one call at a time,
- * so a re-entry is always nested inside the holder's own call. Concurrent
- * promises started inside a held block share its async context, so a
- * re-entry here is serialized against the other re-entries under the same
- * holder, each running under an owner of its own: a nested call re-enters at
- * once, and two sibling calls from one `Promise.all` take turns, as two
- * threads would.
- *
- * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#synchronize`
- * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200,203`).
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_enter`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:169`, `monitor_enter`, `ext/monitor/monitor.c:96`).
  */
-export async function synchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
+export async function monEnter(this: object): Promise<void> {
   const data = monData(this);
-  const parent = heldBy(data);
+  const owner = currentOwner(data);
+  const top = data.entries.at(-1);
+  if (top?.owner === owner) {
+    top.count += 1;
+    return;
+  }
+  await acquire(data, parentFor(data, owner), { owner, count: 1, thread: Thread.current() });
+}
 
-  const predecessor = data.holders.get(parent)!;
-  let monExit!: () => void;
-  const mine = new Promise<void>((resolve) => {
-    monExit = resolve;
-  });
-  const tail = predecessor ? predecessor.then(() => mine) : mine;
-  data.holders.set(parent, tail);
+/**
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_exit`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:176`, `monitor_exit`, `ext/monitor/monitor.c:134`).
+ */
+export function monExit(this: object): void {
+  const data = monData(this);
+  const owner = currentOwner(data);
+  const top = data.entries.at(-1);
+  if (top?.owner !== owner) throw new ThreadError("current thread not owner");
+  top.count -= 1;
+  if (top.count === 0) release(data, owner);
+}
 
-  if (predecessor) await predecessor;
-
+/**
+ * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200` `mon_synchronize`
+ * (`monitor_synchronize`, `ext/monitor/monitor.c:236`), aliased `synchronize`
+ * at `:203`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_synchronize`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200`).
+ */
+export async function monSynchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
+  const data = monData(this);
   const owner = Symbol("monitor");
-  data.holders.set(owner, null);
-
+  const acquired = acquire(data, parentFor(data, currentOwner(data)), {
+    owner,
+    count: 1,
+    thread: Thread.current(),
+  });
+  if (acquired) await acquired;
   try {
     return await data.storage!.run(owner, () => block());
   } finally {
-    data.holders.delete(owner);
-    if (data.holders.get(parent) === tail) data.holders.set(parent, null);
-    monExit();
+    release(data, owner);
   }
 }
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#synchronize`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:203`).
+ */
+export const synchronize = monSynchronize;
 
 /**
  * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:91` `module MonitorMixin`.
@@ -109,68 +190,6 @@ export class Monitor implements MonitorMixin {
   synchronize = synchronize;
 }
 
-interface MonCore {
-  owner: Thread | null;
-  count: number;
-  mutex: Mutex;
-}
-
-const MON_CORE = new WeakMap<object, MonCore>();
-
-function monCore(self: object): MonCore {
-  let core = MON_CORE.get(self);
-  if (!core) {
-    core = { owner: null, count: 0, mutex: new Mutex() };
-    MON_CORE.set(self, core);
-  }
-  return core;
-}
-
-/**
- * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_enter`
- * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:169`, `monitor_enter`, `ext/monitor/monitor.c:96`).
- */
-export async function monEnter(this: object): Promise<void> {
-  const core = monCore(this);
-  if (core.owner !== Thread.current()) {
-    await core.mutex.lock();
-    core.owner = Thread.current();
-  }
-  core.count += 1;
-}
-
-/**
- * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_exit`
- * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:176`, `monitor_exit`, `ext/monitor/monitor.c:134`).
- */
-export function monExit(this: object): void {
-  const core = monCore(this);
-  if (core.owner !== Thread.current()) throw new ThreadError("current thread not owner");
-  core.count -= 1;
-  if (core.count === 0) {
-    core.owner = null;
-    core.mutex.unlock();
-  }
-}
-
-/**
- * The monitor `ext/monitor/monitor.c` implements: reentrant per thread, and
- * released by `MonitorMixin::ConditionVariable#wait` for the length of the
- * wait, so a condition re-checked after a wake and the code after it run
- * under the monitor as one step.
- *
- * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_synchronize`
- * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200`, `monitor_synchronize`, `ext/monitor/monitor.c:236`).
- */
-export async function monSynchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
-  await monEnter.call(this);
-  try {
-    return await block();
-  } finally {
-    monExit.call(this);
-  }
-}
-
 /**
  * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable`
  * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:98`).
@@ -188,16 +207,23 @@ export class MonitorConditionVariable {
   }
 
   /**
+   * Gives the monitor up for the length of the wait, as `monitor_wait_for_cond`
+   * does, so a condition re-checked after a wake and the code after it run under
+   * the monitor as one step.
+   *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#wait`
    * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:105`, `monitor_wait_for_cond`, `ext/monitor/monitor.c:200`).
    */
   async wait(timeout: number | null = null): Promise<void> {
-    const core = monCore(this.#monitor);
-    if (core.owner !== Thread.current()) throw new ThreadError("current thread not owner");
-    const count = core.count;
-    core.owner = null;
-    core.count = 0;
-    core.mutex.unlock();
+    const data = monData(this.#monitor);
+    const owner = currentOwner(data);
+    if (topOwner(data) !== owner) throw new ThreadError("current thread not owner");
+    const thread = Thread.current();
+    let index = data.entries.length;
+    while (index > 0 && data.entries[index - 1].thread === thread) index -= 1;
+    const parent = data.entries[index - 1]?.owner ?? null;
+    const held = data.entries.splice(index);
+    wakeWaiter(data);
     try {
       await new Promise<void>((resolve) => {
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -215,9 +241,8 @@ export class MonitorConditionVariable {
         }
       });
     } finally {
-      await core.mutex.lock();
-      core.owner = Thread.current();
-      core.count = count;
+      await acquire(data, parent, ...held);
+      wakeWaiter(data);
     }
   }
 
@@ -236,8 +261,8 @@ export class MonitorConditionVariable {
    * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:139`).
    */
   broadcast(): void {
-    const core = monCore(this.#monitor);
-    if (core.owner !== Thread.current()) throw new ThreadError("current thread not owner");
+    const data = monData(this.#monitor);
+    if (topOwner(data) !== currentOwner(data)) throw new ThreadError("current thread not owner");
     const waiters = this.#waiters;
     this.#waiters = [];
     for (const resolve of waiters) resolve();
