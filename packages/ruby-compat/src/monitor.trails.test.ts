@@ -79,4 +79,55 @@ describe("Monitor#new_cond", () => {
 
     expect(log).toEqual(["waiter:enter", "signaller:enter", "signaller:exit", "waiter:woken"]);
   });
+
+  it("gives up every nested hold of the waiting thread", async () => {
+    const monitor = new Monitor();
+    const cond = newCond.call(monitor);
+    let ready = false;
+
+    const waiter = new Thread(() =>
+      monitor.synchronize(() =>
+        monitor.synchronize(async () => {
+          await cond.waitWhile(() => !ready);
+          return monitor.isMonOwned();
+        }),
+      ),
+    );
+    await Thread.pass();
+
+    await new Thread(() =>
+      monitor.synchronize(() => {
+        ready = true;
+        cond.broadcast();
+      }),
+    ).join();
+
+    expect(await waiter.value()).toBe(true);
+  });
+});
+
+describe("Monitor#synchronize after the holder's block returns", () => {
+  it("still serves a queued sibling re-entry", async () => {
+    const monitor = new Monitor();
+    let releaseFirst!: () => void;
+    const first = new Promise<void>((resolve) => (releaseFirst = resolve));
+    const served: string[] = [];
+    let children!: Promise<unknown>;
+
+    await monitor.synchronize(() => {
+      children = Promise.all([
+        monitor.synchronize(async () => {
+          await first;
+          served.push("first");
+        }),
+        monitor.synchronize(() => {
+          served.push("second");
+        }),
+      ]);
+    });
+    releaseFirst();
+    await children;
+
+    expect(served).toEqual(["first", "second"]);
+  });
 });

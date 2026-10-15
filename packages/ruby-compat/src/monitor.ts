@@ -82,6 +82,8 @@ function release(data: MonData, owner: Owner): MonEntry {
   while (index >= 0 && data.entries[index].owner !== owner) index -= 1;
   if (index < 0) throw new ThreadError("current thread not owner");
   const [entry] = data.entries.splice(index, 1);
+  const parent = data.entries[index - 1]?.owner ?? null;
+  for (const waiter of data.waiters) if (waiter.parent === owner) waiter.parent = parent;
   wakeWaiter(data);
   return entry;
 }
@@ -212,8 +214,12 @@ export class MonitorConditionVariable {
     const data = monData(this.#monitor);
     const owner = currentOwner(data);
     if (topOwner(data) !== owner) throw new ThreadError("current thread not owner");
-    const parent = data.entries.at(-2)?.owner ?? null;
-    const entry = release(data, owner);
+    const thread = Thread.current();
+    let index = data.entries.length;
+    while (index > 0 && data.entries[index - 1].thread === thread) index -= 1;
+    const parent = data.entries[index - 1]?.owner ?? null;
+    const held = data.entries.splice(index);
+    wakeWaiter(data);
     try {
       await new Promise<void>((resolve) => {
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -231,7 +237,8 @@ export class MonitorConditionVariable {
         }
       });
     } finally {
-      await acquire(data, parent, entry);
+      await acquire(data, parent, held[0]);
+      data.entries.push(...held.slice(1));
     }
   }
 
