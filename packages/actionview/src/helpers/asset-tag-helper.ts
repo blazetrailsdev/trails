@@ -320,7 +320,7 @@ export function imageTag(
 
 export function pictureTag(
   this: AssetTagHelperHost & CaptureHelperHost,
-  ...sources: unknown[]
+  ...sources: [...unknown[], () => unknown] | unknown[]
 ): SafeBuffer {
   const block =
     typeof sources[sources.length - 1] === "function"

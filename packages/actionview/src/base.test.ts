@@ -31,11 +31,11 @@ describe("ActionView::Base", () => {
   it("_layout_for returns the default layout section", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
     view.viewFlow.set("layout", "<p>body</p>");
-    expect(view._layoutFor().toString()).toBe("<p>body</p>");
+    expect(view._layoutFor()!.toString()).toBe("<p>body</p>");
   });
 
   it("_layout_for returns an empty buffer for an unwritten section", () => {
-    expect(new (Base.withEmptyTemplateCache())(null, {}, null)._layoutFor("nope").toString()).toBe(
+    expect(new (Base.withEmptyTemplateCache())(null, {}, null)._layoutFor("nope")!.toString()).toBe(
       "",
     );
   });
