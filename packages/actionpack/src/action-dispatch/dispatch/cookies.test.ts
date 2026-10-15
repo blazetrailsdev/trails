@@ -79,7 +79,9 @@ function setCookieHeaders(jar: CookieJar): string[] {
 
 function responseCookies(jar: CookieJar): Record<string, string> {
   const cookies: Record<string, string> = {};
-  for (const [name, attributes] of CookieAssertions.parseSetCookiesHeaders(setCookieHeaders(jar))) {
+  for (const [name, attributes] of Object.entries(
+    CookieAssertions.parseSetCookiesHeaders(setCookieHeaders(jar)),
+  )) {
     cookies[name] = unescape(attributes["value"] as string);
   }
   return cookies;
