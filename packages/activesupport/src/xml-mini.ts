@@ -9,6 +9,7 @@ import { utc as dateTimeUtc } from "./core-ext/date-time/calculations.js";
 import { ArgumentError } from "./hash-utils.js";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { toF, toI } from "./core-ext/string/conversions.js";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
 
 export const FileLike = {
@@ -118,14 +119,9 @@ export const PARSING: Record<
   },
   boolean: (boolean) => ["1", "true"].includes(String(boolean).trim()),
   string: (string) => toS(string),
-  yaml: async (yaml) => {
+  yaml: (yaml) => {
     try {
-      const { parse: parseYaml } = await import("@blazetrails/ruby-compat/psych-adapter");
-      if (typeof yaml !== "string") {
-        // eslint-disable-next-line blazetrails/rails-error-parity
-        throw new TypeError("no implicit conversion into String");
-      }
-      return parseYaml(yaml);
+      return Psych.load(yaml as string);
     } catch {
       return yaml;
     }

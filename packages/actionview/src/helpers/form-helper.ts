@@ -838,9 +838,8 @@ export class FormBuilder {
     return I18n.t(defaults.shift(), { model: model, default: defaults }) as string;
   }
 
-  /** @missingRailsArgs respond_to? — CONVERGEABLE nested-attributes-writer-uses-rails-snake-attributes-spelling */
   private isNestedAttributesAssociation(associationName: string): boolean {
-    return rbObjRespondTo(this.object, `${associationName}Attributes=`);
+    return rbObjRespondTo(this.object, `${associationName}_attributes=`);
   }
 
   private fieldsForWithNestedAttributes(
@@ -849,7 +848,7 @@ export class FormBuilder {
     options: Record<string, unknown>,
     block?: (builder: FormBuilder) => unknown,
   ): unknown {
-    const name = `${this.objectName}[${associationName}Attributes]`;
+    const name = `${this.objectName}[${associationName}_attributes]`;
     association = convertToModel(association);
 
     if (rbObjRespondTo(association, "isPersisted")) {

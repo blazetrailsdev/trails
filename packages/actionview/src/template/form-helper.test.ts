@@ -2,9 +2,17 @@ import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
-import { I18n, extend, isPresent } from "@blazetrails/activesupport";
+import {
+  I18n,
+  assertEqual,
+  assertRaises,
+  extend,
+  isBlank,
+  isPlainObject,
+  isPresent,
+} from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
-import { Range, Struct, include } from "@blazetrails/ruby-compat";
+import { ArgumentError, Range, Struct, include } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -30,7 +38,9 @@ class Post {
   persisted: unknown = false;
   written_on: unknown = null;
   cost: unknown = null;
+  author: unknown = null;
   comments: unknown = null;
+  comment_ids: unknown = null;
   tags: unknown = null;
   errors = { get: (field: string) => (field === "author_name" ? ["can't be empty"] : []) };
   get ["secret?"](): unknown {
@@ -39,14 +49,9 @@ class Post {
   isPersisted(): unknown {
     return this.persisted;
   }
-  set commentsAttributes(attributes: unknown) {}
-  set tagsAttributes(attributes: unknown) {}
-  toKey(): unknown[] {
-    return [123];
-  }
-  toParam(): string {
-    return "123";
-  }
+  set author_attributes(attributes: unknown) {}
+  set comments_attributes(attributes: unknown) {}
+  set tags_attributes(attributes: unknown) {}
 }
 
 class PostDelegator extends Post {
@@ -71,6 +76,7 @@ class Comment {
     include(this, Conversion);
   }
 
+  relevances: unknown = null;
   body: unknown = null;
 
   constructor(
@@ -81,12 +87,26 @@ class Comment {
   toKey(): unknown[] | null {
     return this.id != null && this.id !== false ? [this.id] : null;
   }
+  save(): void {
+    this.id = 1;
+    this.post_id = 1;
+  }
   isPersisted(): boolean {
     return isPresent(this.id);
   }
   toParam(): unknown {
     return this.id != null && this.id !== false ? String(this.id) : this.id;
   }
+  get name(): string {
+    const name = this.constructor.name.toLowerCase();
+    return this.id == null ? `new ${name}` : `${name} #${String(this.id)}`;
+  }
+  set relevances_attributes(attributes: unknown) {}
+}
+
+class Author extends Comment {
+  post: unknown = null;
+  set post_attributes(attributes: unknown) {}
 }
 
 class Tag {
@@ -123,6 +143,7 @@ Routes.draw(function () {
   this.resources("posts", () => {
     this.resources("comments");
   });
+  this.root({ to: "main#index" });
 });
 
 type View = Base &
@@ -135,6 +156,7 @@ type View = Base &
 describe("FormHelperTest", () => {
   let view: View;
   let post: Post;
+  let comment: Comment;
   let rendered: unknown;
 
   function formFor(...args: Parameters<Base["formFor"]>): unknown {
@@ -221,14 +243,24 @@ describe("FormHelperTest", () => {
     });
     view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null) as View;
     include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
+    const urlFor = view.urlFor;
+    view.urlFor = function (this: Base, object: unknown): string {
+      if (isPlainObject(object) && isBlank(object["useRoute"]) && isBlank(object["controller"])) {
+        object["controller"] = "main";
+        object["action"] = "index";
+      }
+      return urlFor.call(this, object);
+    } as typeof view.urlFor;
     post = new Post();
+    comment = new Comment();
+    Object.assign(post, { toKey: () => [123], id: 0, toParam: () => "123" });
     post.persisted = true;
     post.title = "Hello World";
     post.author_name = "";
     post.body = "Back to the hill and over it again!";
     post.secret = 1;
     post.written_on = RubyDate.civil(2004, 6, 15);
-    post.comments = [new Comment()];
+    post.comments = [comment];
     post.tags = [new Tag()];
     view.post = post;
     view.car = new Car("#000FFF");
@@ -321,7 +353,7 @@ describe("FormHelperTest", () => {
         "create-post",
         "edit_post",
         { method: "patch" },
-        () => '<label for="post_commentsAttributes_0_body">Write body here</label>',
+        () => '<label for="post_comments_attributes_0_body">Write body here</label>',
       );
 
       assertDomEqual(expected, rendered);
@@ -339,7 +371,7 @@ describe("FormHelperTest", () => {
         "create-post",
         "edit_post",
         { method: "patch" },
-        () => '<label for="post_tagsAttributes_0_value">Tag</label>',
+        () => '<label for="post_tags_attributes_0_value">Tag</label>',
       );
 
       assertDomEqual(expected, rendered);
@@ -877,5 +909,484 @@ describe("FormHelperTest", () => {
     const value = view.fieldId(new Post(), "secret?");
 
     expect(value).toBe("post_secret");
+  });
+
+  function tag(): { span(content: unknown, options: Record<string, unknown>): unknown } {
+    return view.tag() as unknown as ReturnType<typeof tag>;
+  }
+
+  const editPost = (block: () => string) =>
+    wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" }, block);
+  const titleInput = '<input name="post[title]" type="text" id="post_title" value="Hello World" />';
+  const authorName =
+    '<input id="post_author_attributes_name" name="post[author_attributes][name]" type="text" value="author #321" />';
+  const authorId =
+    '<input id="post_author_attributes_id" name="post[author_attributes][id]" type="hidden" value="321" autocomplete="off" />';
+  const commentName = (i: number, value: string) =>
+    `<input id="post_comments_attributes_${i}_name" name="post[comments_attributes][${i}][name]" type="text" value="${value}" />`;
+  const commentId = (i: number, value: number) =>
+    `<input id="post_comments_attributes_${i}_id" name="post[comments_attributes][${i}][id]" type="hidden" value="${value}" autocomplete="off" />`;
+
+  it("form for requires block", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
+      formFor(post, { html: { id: "create-post" } });
+    });
+    assertEqual("Missing block", error.message);
+  });
+
+  it("form for requires arguments", async () => {
+    let error = await assertRaises([ArgumentError], {}, () => {
+      formFor(null, { html: { id: "create-post" } }, () => {});
+    });
+    assertEqual("First argument in form cannot contain nil or be empty", error.message);
+
+    error = await assertRaises([ArgumentError], {}, () => {
+      formFor([null, null], { html: { id: "create-post" } }, () => {});
+    });
+    assertEqual("First argument in form cannot contain nil or be empty", error.message);
+  });
+
+  it("form for text area alias", () => {
+    formFor(post, { html: { id: "create-post" } }, (f) => {
+      concat(f.textArea("body"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for false url", () => {
+    formFor(new Post(), { url: false }, () => {});
+
+    assertDomEqual(wholeForm(null, "new_post", "new_post"), rendered);
+  });
+
+  it("form for false action", () => {
+    formFor(new Post(), { html: { action: false } }, () => {});
+
+    assertDomEqual(wholeForm(null, "new_post", "new_post"), rendered);
+  });
+
+  it("form for field id", () => {
+    formFor(new Post(), {}, (form) => {
+      concat(form.label("title"));
+      concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
+      concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        '<label for="post_title">Title</label>' +
+        '<input id="post_title" name="post[title]" type="text" aria-describedby="post_title_error">' +
+        '<span id="post_title_error">is blank</span>',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for field id with index", () => {
+    formFor(new Post(), { index: 1 }, (form) => {
+      concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
+      concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        '<input id="post_1_title" name="post[1][title]" type="text" aria-describedby="post_1_title_error">' +
+        '<span id="post_1_title_error">is blank</span>',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for field name with blank as", () => {
+    formFor(new Post(), { as: "" }, (form) => {
+      concat(form.textField("title", { name: form.fieldName("title") }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_",
+      "new_",
+      {},
+      () => '<input id="title" name="title" type="text">',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for field id with namespace", () => {
+    formFor(new Post(), { namespace: "special" }, (form) => {
+      concat(form.label("title"));
+      concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
+      concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "special_new_post",
+      "new_post",
+      {},
+      () =>
+        '<label for="special_post_title">Title</label>' +
+        '<input id="special_post_title" name="post[title]" type="text" aria-describedby="special_post_title_error">' +
+        '<span id="special_post_title_error">is blank</span>',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for field name with blank as and multiple", () => {
+    formFor(new Post(), { as: "" }, (form) => {
+      concat(form.textField("title", { name: form.fieldName("title", { multiple: true }) }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_",
+      "new_",
+      {},
+      () => '<input id="title" name="title[]" type="text">',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  function assertFieldNameForm(
+    options: Record<string, unknown>,
+    fieldName: (form: FormBuilder) => string,
+    expectedInput: string,
+  ): void {
+    formFor(new Post(), options, (form) => {
+      concat(form.textField("title", { name: fieldName(form) }));
+    });
+
+    assertDomEqual(
+      wholeForm("/posts", "new_post", "new_post", {}, () => expectedInput),
+      rendered,
+    );
+  }
+
+  it("form for field name without method names or multiple or index", () => {
+    assertFieldNameForm(
+      {},
+      (form) => form.fieldName("title"),
+      '<input id="post_title" name="post[title]" type="text">',
+    );
+  });
+
+  it("form for field name without method names and multiple", () => {
+    assertFieldNameForm(
+      {},
+      (form) => form.fieldName("title", { multiple: true }),
+      '<input id="post_title" name="post[title][]" type="text">',
+    );
+  });
+
+  it("form for field name without method names and index", () => {
+    assertFieldNameForm(
+      { index: 1 },
+      (form) => form.fieldName("title"),
+      '<input id="post_1_title" name="post[1][title]" type="text">',
+    );
+  });
+
+  it("form for field name without method names and index and multiple", () => {
+    assertFieldNameForm(
+      { index: 1 },
+      (form) => form.fieldName("title", { multiple: true }),
+      '<input id="post_1_title" name="post[1][title][]" type="text">',
+    );
+  });
+
+  it("form for field name with method names", () => {
+    assertFieldNameForm(
+      {},
+      (form) => form.fieldName("title", "subtitle"),
+      '<input id="post_title" name="post[title][subtitle]" type="text">',
+    );
+  });
+
+  it("form for field name with method names and index", () => {
+    assertFieldNameForm(
+      { index: 1 },
+      (form) => form.fieldName("title", "subtitle"),
+      '<input id="post_1_title" name="post[1][title][subtitle]" type="text">',
+    );
+  });
+
+  it("form for field name with method names and multiple", () => {
+    assertFieldNameForm(
+      {},
+      (form) => form.fieldName("title", "subtitle", { multiple: true }),
+      '<input id="post_title" name="post[title][subtitle][]" type="text">',
+    );
+  });
+
+  it("form for field name with method names and multiple and index", () => {
+    assertFieldNameForm(
+      { index: 1 },
+      (form) => form.fieldName("title", "subtitle", { multiple: true }),
+      '<input id="post_1_title" name="post[1][title][subtitle][]" type="text">',
+    );
+  });
+
+  it("form for field id with namespace and index", () => {
+    formFor(new Post(), { namespace: "special", index: 1 }, (form) => {
+      concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
+      concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "special_new_post",
+      "new_post",
+      {},
+      () =>
+        '<input id="special_post_1_title" name="post[1][title]" type="text" aria-describedby="special_post_1_title_error">' +
+        '<span id="special_post_1_title_error">is blank</span>',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  function assertNestedAttributesField(
+    call: (commentForm: FormBuilder) => unknown,
+    expectedText: string,
+  ): void {
+    const [post, comment, tag] = [new Post(), new Comment(), new Tag()];
+    comment.relevances = [tag];
+    post.comments = [comment];
+    formFor(post, {}, (form) => {
+      return form.fieldsFor("comments", null, null, (commentForm) => {
+        concat(call(commentForm));
+      });
+    });
+
+    assertDomEqual(
+      wholeForm("/posts", "new_post", "new_post", {}, () => expectedText),
+      rendered,
+    );
+  }
+
+  it("form for with nested attributes field id", () => {
+    assertNestedAttributesField(
+      (f) => f.fieldId("relevances_attributes"),
+      "post_comments_attributes_0_relevances_attributes",
+    );
+  });
+
+  it("form for with nested attributes field name", () => {
+    assertNestedAttributesField(
+      (f) => f.fieldName("relevances_attributes"),
+      "post[comments_attributes][0][relevances_attributes]",
+    );
+  });
+
+  it("form for with nested attributes field name multiple", () => {
+    assertNestedAttributesField(
+      (f) => f.fieldName("relevances_attributes", { multiple: true }),
+      "post[comments_attributes][0][relevances_attributes][]",
+    );
+  });
+
+  it("nested fields for", () => {
+    comment.body = "Hello World";
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor(comment, null, null, (c) => {
+          concat(c.textField("body"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        "<input name='post[comment][body]' type='text' id='post_comment_body' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for field id", () => {
+    formFor(post, {}, (form) => {
+      concat(
+        form.fieldsFor("comment_attributes", comment, null, (c) => {
+          concat(c.fieldId("body"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => "post_comment_attributes_body"),
+      rendered,
+    );
+  });
+
+  it("nested fields for field id with index override", () => {
+    formFor(post, {}, (form) => {
+      concat(
+        form.fieldsFor("comment_attributes", comment, { index: 1 }, (c) => {
+          concat(c.fieldId("body"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => "post_comment_attributes_1_body"),
+      rendered,
+    );
+  });
+
+  it("deep nested fields for", () => {
+    comment.save();
+    formFor("posts", {}, (f) => {
+      return f.fieldsFor("post[]", post, null, (f2) => {
+        f2.textField("id");
+        for (const comment of post.comments as Comment[]) {
+          concat(
+            f2.fieldsFor("comment[]", comment, null, (c) => {
+              concat(c.textField("name"));
+            }),
+          );
+        }
+      });
+    });
+
+    const expected = wholeForm(
+      "/",
+      null,
+      null,
+      {},
+      () =>
+        "<input name='posts[post][0][comment][1][name]' type='text' id='posts_post_0_comment_1_name' value='comment #1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with index and parent fields", () => {
+    formFor(post, { index: 1 }, (c) => {
+      concat(c.textField("title"));
+      concat(
+        c.fieldsFor("comment", comment, { index: 1 }, (r) => {
+          concat(r.textField("name"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        "<input name='post[1][title]' type='text' id='post_1_title' value='Hello World' />" +
+        "<input name='post[1][comment][1][name]' type='text' id='post_1_comment_1_name' value='new comment' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with index and nested fields for", () => {
+    rendered = formFor(post, { index: 1 }, (f) => {
+      concat(
+        f.fieldsFor("comment", post, null, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        "<input name='post[1][comment][title]' type='text' id='post_1_comment_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with a new record on a nested attributes one to one association", () => {
+    post.author = new Author();
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        '<input name="post[title]" type="text" id="post_title" value="Hello World" />' +
+        '<input id="post_author_attributes_name" name="post[author_attributes][name]" type="text" value="new author" />',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with explicitly passed object on a nested attributes one to one association", () => {
+    formFor(post, {}, (f) => {
+      f.fieldsFor("author", new Author(123), null, (af) => {
+        expect(af.object).not.toBeNull();
+        expect((af.object as Author).id).toBe(123);
+      });
+    });
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association", () => {
+    post.author = new Author(321);
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName + authorId),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    const expected = editPost(
+      () =>
+        titleInput +
+        commentName(0, "comment #1") +
+        commentId(0, 1) +
+        commentName(1, "comment #2") +
+        commentId(1, 2),
+    );
+
+    assertDomEqual(expected, rendered);
   });
 });

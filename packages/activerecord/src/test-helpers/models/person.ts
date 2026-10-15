@@ -310,7 +310,7 @@ export class NestedPerson extends Base {
   }
 
   setBestFriendFirstName(newName: string): Promise<void> | void {
-    return this.assignAttributes({ bestFriendAttributes: { first_name: newName } });
+    return this.assignAttributes({ bestFriend_attributes: { first_name: newName } });
   }
 }
 registerModel(NestedPerson);

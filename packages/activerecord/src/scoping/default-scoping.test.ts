@@ -711,7 +711,7 @@ describe("DefaultScopingTest", () => {
       1,
       null,
       async () => {
-        await (Developer.createWith({ projectsAttributes: [{ name: "p1" }] }) as any).scoping(() =>
+        await (Developer.createWith({ projects_attributes: [{ name: "p1" }] }) as any).scoping(() =>
           Developer.create({ name: "Aaron" }),
         );
       },

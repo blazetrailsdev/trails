@@ -153,7 +153,7 @@ describe("TouchLaterTest", () => {
       await owner.touch({ time });
       expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
 
-      await owner.update({ petsAttributes: { "0": { id: String(petId), name: "Alfred" } } });
+      await owner.update({ pets_attributes: { "0": { id: String(petId), name: "Alfred" } } });
 
       expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
     } finally {
@@ -171,7 +171,7 @@ describe("TouchLaterTest", () => {
       await owner.touch({ time });
       expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
 
-      await owner.update({ petsAttributes: { "0": { id: String(petId), name: "Alfred" } } });
+      await owner.update({ pets_attributes: { "0": { id: String(petId), name: "Alfred" } } });
 
       expect(toI((await owner.reload()).updated_at)).not.toBe(toI(time));
     } finally {

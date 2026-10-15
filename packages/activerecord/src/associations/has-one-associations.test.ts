@@ -976,7 +976,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("has one with touch option on create", async () => {
     await assertQueriesCount(5, false, async () => {
-      await Club.create({ name: "1000 Oaks", membershipAttributes: { favorite: true } });
+      await Club.create({ name: "1000 Oaks", membership_attributes: { favorite: true } });
     });
   });
 

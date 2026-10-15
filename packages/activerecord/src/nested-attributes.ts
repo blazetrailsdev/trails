@@ -211,7 +211,7 @@ export function generateAssociationWriter(
   associationName: string,
   type: "collection" | "one_to_one",
 ): void {
-  const attrName = `${associationName}Attributes`;
+  const attrName = `${associationName}_attributes`;
 
   this.generatedAssociationMethods().moduleEval((m) => {
     for (const methodName of [`set${camelize(attrName, true)}`, `${attrName}=`]) {
