@@ -1,5 +1,5 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { rbInspect, rbFSend } from "@blazetrails/ruby-compat";
+import { ArgumentError, IPAddr, rbInspect, rbFSend } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../../namespaces.js";
 import type { Request } from "../http/request.js";
 
@@ -136,10 +136,17 @@ export class GetIp {
 
   private ipsFrom(header: string | undefined): string[] {
     if (!header) return [];
-    return header
-      .trim()
-      .split(/[,\s]+/)
-      .filter((ip) => !!ip && parseIp(ip) !== null);
+    let ips = header.trim().split(/[,\s]+/);
+    ips = ips.filter((ip) => {
+      try {
+        const range = new IPAddr(ip).toRange();
+        return range.begin!.equals(range.end);
+      } catch (e) {
+        if (e instanceof ArgumentError) return false;
+        throw e;
+      }
+    });
+    return ips;
   }
 
   /** @internal */

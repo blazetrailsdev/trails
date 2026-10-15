@@ -187,6 +187,7 @@ export {
   compact,
   compactBang,
   deleteAt,
+  insert,
   drop,
   each,
   first,

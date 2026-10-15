@@ -47,7 +47,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (!isEmpty(params)) this._info(`  Parameters: ${inspect(params)}`);
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   processAction(event: Event): void {
     this._info(() => {
       const payload = event.payload as {
@@ -79,7 +78,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     );
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   sendFile(event: Event): void {
     this._info(
       () => `Sent file ${rbObjAsString(event.payload.path)} (${round(event.duration, 1)}ms)`,
@@ -90,7 +88,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     this._info(() => `Redirected to ${rbObjAsString(event.payload.location)}`);
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   sendData(event: Event): void {
     this._info(
       () => `Sent data ${rbObjAsString(event.payload.filename)} (${round(event.duration, 1)}ms)`,

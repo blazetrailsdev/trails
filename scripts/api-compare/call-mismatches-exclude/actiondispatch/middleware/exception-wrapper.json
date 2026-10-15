@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/exception-wrapper.ts",
-    "rubyName": "source_fragment",
-    "call": "root",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]
