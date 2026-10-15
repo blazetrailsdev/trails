@@ -138,3 +138,27 @@ describe("exceptions", () => {
     expect(() => handler.call(data, "de", "foo", {})).toThrow(data);
   });
 });
+
+describe("MissingTranslation::Base", () => {
+  it("holds PERMITTED_KEYS as its own constant", () => {
+    expect(
+      (MissingTranslation.Base as unknown as { PERMITTED_KEYS: string[] }).PERMITTED_KEYS,
+    ).toEqual(["scope", "default"]);
+    const data = new MissingTranslationData("en", "foo", { scope: "a", other: 1 });
+    expect(data.options).toEqual({ scope: "a" });
+  });
+
+  it("aliases to_s to message", () => {
+    const error = new MissingTranslation("en", "foo");
+    const reader = Object.getOwnPropertyDescriptor(findOwner(error, "message"), "message")!.get;
+    expect(error.toString).toBe(reader);
+    expect(error.toString()).toBe(error.message);
+  });
+});
+
+function findOwner(object: object, name: string): object {
+  let proto: object | null = object;
+  while (proto && !Object.prototype.hasOwnProperty.call(proto, name))
+    proto = Object.getPrototypeOf(proto);
+  return proto!;
+}
