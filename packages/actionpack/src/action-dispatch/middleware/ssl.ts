@@ -82,7 +82,7 @@ export class SSL {
 
   /** @internal */
   private setHstsHeaderBang(headers: Record<string, string | string[]>): void {
-    headers[STRICT_TRANSPORT_SECURITY] ||= this.hstsHeader;
+    headers[STRICT_TRANSPORT_SECURITY] ??= this.hstsHeader;
   }
 
   /** @internal */
@@ -113,7 +113,7 @@ export class SSL {
   /** @internal */
   private flagCookiesAsSecureBang(headers: Record<string, string | string[]>): void {
     const cookies = headers[SET_COOKIE];
-    if (!cookies) return;
+    if (cookies == null) return;
 
     headers[SET_COOKIE] = [cookies].flat().map((cookie) => {
       if (!/;\s*secure\s*(;|$)/i.test(cookie)) {
@@ -141,7 +141,7 @@ export class SSL {
   private redirectionStatus(request: Request): number {
     if (PERMANENT_REDIRECT_REQUEST_METHODS.includes(request.rawRequestMethod)) {
       return 301;
-    } else if (this.sslDefaultRedirectStatus) {
+    } else if (this.sslDefaultRedirectStatus != null) {
       return this.sslDefaultRedirectStatus;
     } else {
       return 307;
