@@ -3,7 +3,7 @@ import { sql as arelSql, Visitors } from "@blazetrails/arel";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { Hash, NotImplementedError, hashAset } from "@blazetrails/ruby-compat";
 import { Rollback, StatementInvalid } from "../../errors.js";
 import { FixtureError } from "../../fixtures.js";
 import { defaultInsertValue as sqliteDefaultInsertValue } from "../sqlite3/database-statements.js";
@@ -604,6 +604,9 @@ describe("DatabaseStatements", () => {
     it("with yaml fallback converts objects to YAML", () => {
       expect(withYamlFallback({ a: 1 })).toBe("---\na: 1\n");
       expect(withYamlFallback([1, 2])).toBe("---\n- 1\n- 2\n");
+      const hash = new Hash();
+      hashAset(hash, "a", 1);
+      expect(withYamlFallback(hash)).toBe("---\na: 1\n");
     });
 
     it("with yaml fallback passes Temporal values through unchanged (not serialized to '{}')", () => {

@@ -7,6 +7,7 @@ import {
   forceEncoding,
   isModuleIncluded,
   registerConstant,
+  rbObjRespondTo,
   sort,
   synchronize,
 } from "@blazetrails/ruby-compat";
@@ -376,7 +377,11 @@ export class SchemaCache {
         return Marshal.load(file) as SchemaCache;
       } else {
         file = forceEncoding(file, Encoding.UTF_8);
-        return YAML.unsafeLoad(file) as SchemaCache;
+        if (rbObjRespondTo(YAML, "unsafeLoad")) {
+          return YAML.unsafeLoad(file) as SchemaCache;
+        } else {
+          return YAML.load(file) as SchemaCache;
+        }
       }
     });
   }

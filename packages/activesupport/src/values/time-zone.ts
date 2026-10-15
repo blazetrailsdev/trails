@@ -17,11 +17,16 @@ import {
   equals as cmpEquals,
   fetch,
   KeyError,
+  rbModConstSet,
+  rbModName,
+  rbObjClass,
   Rational,
   sprintf,
   stringValue,
 } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { ActiveSupport } from "../namespaces.js";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
 import { utcToLocalReturnsUtcOffsetTimes } from "../core-ext/date-and-time/compatibility.js";
@@ -596,9 +601,9 @@ export class Timezone {
 }
 
 export class TimeZone {
-  declare readonly name: string;
-  declare readonly tzinfo: Timezone;
-  declare private readonly _utcOffset: number | null;
+  declare name: string;
+  declare tzinfo: Timezone;
+  declare private _utcOffset: number | null;
 
   /**
    * @inventedArm if — PERMANENT
@@ -607,6 +612,11 @@ export class TimeZone {
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
     if (!creating) return TimeZone.find(name) ?? TimeZone.create(name);
     creating = false;
+    this.initialize(name, utcOffset, tzinfo);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  initialize(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null): void {
     this.name = name;
     this._utcOffset = utcOffset;
     this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
@@ -826,6 +836,15 @@ export class TimeZone {
     return this.tzinfo.isDst(time);
   }
 
+  initWith(coder: YAML.Coder): void {
+    this.initialize(coder["name"] as string);
+  }
+
+  encodeWith(coder: YAML.Coder): void {
+    coder.setTag(`!ruby/object:${rbModName(rbObjClass(this))}`);
+    coder.setMap({ name: this.tzinfo.name });
+  }
+
   today(): Temporal.PlainDate {
     return this.now().toDate();
   }
@@ -1007,3 +1026,5 @@ export class TimeZone {
 }
 
 export { MAPPING as ZONES_MAP };
+
+rbModConstSet(ActiveSupport, "TimeZone", TimeZone);

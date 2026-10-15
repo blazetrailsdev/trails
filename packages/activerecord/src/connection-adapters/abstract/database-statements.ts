@@ -17,7 +17,7 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
   rbGetKwargs,
@@ -28,6 +28,7 @@ import {
   rtest,
   RuntimeError,
   rbObjRespondTo,
+  Hash,
 } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
@@ -623,8 +624,8 @@ export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
 }
 
 export function withYamlFallback(value: unknown): unknown {
-  if (isPlainObject(value) || Array.isArray(value)) {
-    return yamlStringify(value, { directives: true });
+  if (isPlainObject(value) || value instanceof Hash || Array.isArray(value)) {
+    return YAML.dump(value);
   } else {
     return value;
   }
