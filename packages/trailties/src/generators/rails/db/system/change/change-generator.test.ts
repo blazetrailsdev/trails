@@ -66,6 +66,7 @@ function run(to: string, opts: { appName?: string; output?: (m: string) => void 
   }).run();
 }
 
+type ComposeConfig = Hash<string, Hash<string, Hash<string, string[]>>>;
 describe("ChangeGeneratorTest", () => {
   it("change to invalid database", () => {
     expect(() => new ChangeGenerator({ cwd: tmpDir, output: () => {}, to: "invalid-db" })).toThrow(
@@ -216,10 +217,10 @@ describe("ChangeGeneratorTest", () => {
       expect(
         (dc.features as Record<string, unknown>)["ghcr.io/rails/devcontainer/features/sqlite3"],
       ).toBeUndefined();
-      const cm = YAML.load(read(".devcontainer/compose.yaml")) as Hash<string, any>;
-      expect(cm.get("services").get("postgres")).toBeDefined();
-      expect(cm.get("volumes").get("postgres-data")).toBeDefined();
-      const railsApp = cm.get("services").get("rails-app");
+      const cm = YAML.load(read(".devcontainer/compose.yaml")) as ComposeConfig;
+      expect(cm.get("services")!.get("postgres")).toBeDefined();
+      expect(cm.get("volumes")!.get("postgres-data")).toBeDefined();
+      const railsApp = cm.get("services")!.get("rails-app")!;
       expect(railsApp.get("depends_on")).toContain("postgres");
     });
 
@@ -236,10 +237,10 @@ describe("ChangeGeneratorTest", () => {
           "ghcr.io/rails/devcontainer/features/postgres-client"
         ],
       ).toBeUndefined();
-      const cm = YAML.load(read(".devcontainer/compose.yaml")) as Hash<string, any>;
-      expect(cm.get("services").get("postgres")).toBeUndefined();
+      const cm = YAML.load(read(".devcontainer/compose.yaml")) as ComposeConfig;
+      expect(cm.get("services")!.get("postgres")).toBeUndefined();
       expect(cm.get("volumes")).toBeUndefined();
-      const railsApp = cm.get("services").get("rails-app");
+      const railsApp = cm.get("services")!.get("rails-app")!;
       expect(railsApp.get("depends_on")).toBeUndefined();
     });
 
@@ -251,12 +252,12 @@ describe("ChangeGeneratorTest", () => {
     it("non-DB depends_on entries are preserved when swapping database", () => {
       seedDevcontainer("postgres", true);
       const composePath = ".devcontainer/compose.yaml";
-      const compose = YAML.load(read(composePath)) as Hash<string, any>;
-      compose.get("services").get("rails-app").get("depends_on").push("selenium", "redis");
+      const compose = YAML.load(read(composePath)) as ComposeConfig;
+      compose.get("services")!.get("rails-app")!.get("depends_on")!.push("selenium", "redis");
       write(composePath, toYaml(compose));
       run("mysql");
-      const cm = YAML.load(read(composePath)) as Hash<string, any>;
-      const railsApp = cm.get("services").get("rails-app");
+      const cm = YAML.load(read(composePath)) as ComposeConfig;
+      const railsApp = cm.get("services")!.get("rails-app")!;
       expect(railsApp.get("depends_on")).toContain("mysql");
       expect(railsApp.get("depends_on")).toContain("selenium");
       expect(railsApp.get("depends_on")).toContain("redis");
@@ -266,9 +267,9 @@ describe("ChangeGeneratorTest", () => {
     it("change from mysql to postgresql swaps service and feature", () => {
       seedDevcontainer("mysql", true);
       run("postgresql");
-      const cm = YAML.load(read(".devcontainer/compose.yaml")) as Hash<string, any>;
-      expect(cm.get("services").get("mysql")).toBeUndefined();
-      expect(cm.get("services").get("postgres")).toBeDefined();
+      const cm = YAML.load(read(".devcontainer/compose.yaml")) as ComposeConfig;
+      expect(cm.get("services")!.get("mysql")).toBeUndefined();
+      expect(cm.get("services")!.get("postgres")).toBeDefined();
       const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
       expect(
         (dc.features as Record<string, unknown>)[

@@ -220,6 +220,19 @@ describe("ToRuby sequences and keys", () => {
     expect([...(Psych.unsafeLoad("1: a\n") as Map<unknown, unknown>)]).toEqual([[1, "a"]]);
   });
 
+  it("stores a << value that is not a Hash under <<, as ruby -ryaml does", async () => {
+    const { Psych } = await import("./psych.js");
+    const aliased = Psych.unsafeLoad("a: &a 1\nb:\n  <<: *a\n  c: 2\n") as Map<string, unknown>;
+    expect([...(aliased.get("b") as Map<unknown, unknown>)]).toEqual([
+      ["<<", 1],
+      ["c", 2],
+    ]);
+    const sequence = Psych.unsafeLoad("a: &a {x: 1}\nb:\n  <<: [*a, 3]\n") as Map<string, unknown>;
+    const merged = sequence.get("b") as Map<unknown, unknown>;
+    expect([...merged.keys()]).toEqual(["<<"]);
+    expect(merged.get("<<")).toEqual([sequence.get("a"), 3]);
+  });
+
   it("symbolizes only String keys", async () => {
     const { Psych } = await import("./psych.js");
     const hash = Psych.load("1: a\nb: c\n", { symbolizeNames: true }) as Map<unknown, unknown>;

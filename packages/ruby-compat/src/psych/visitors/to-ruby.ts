@@ -267,16 +267,27 @@ export class ToRuby {
       if (hash instanceof Map) hash.set(key, val);
       else hash[String(key)] = val;
     };
-    const mergeBang = (val: object) => {
-      for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(k, v);
-    };
     for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
       const key = this.accept(k);
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
-        if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") mergeBang(val as object);
-        else if (yaml.isSeq(v)) (val as object[]).slice().reverse().forEach(mergeBang);
-        else aset(key, val);
+        if (yaml.isAlias(v) || yaml.isMap(v)) {
+          if (val instanceof Map) for (const [mk, mv] of val) aset(mk, mv);
+          else aset(key, val);
+        } else if (yaml.isSeq(v)) {
+          const values = val as unknown[];
+          if (values.every((value) => value instanceof Map)) {
+            const h = new Hash<unknown, unknown>();
+            for (const value of values.slice().reverse()) {
+              for (const [mk, mv] of value as Map<unknown, unknown>) h.set(mk, mv);
+            }
+            for (const [mk, mv] of h) aset(mk, mv);
+          } else {
+            aset(key, val);
+          }
+        } else {
+          aset(key, val);
+        }
       } else {
         aset(!tagged && this.symbolizeNames && typeof key === "string" ? `:${key}` : key, val);
       }
