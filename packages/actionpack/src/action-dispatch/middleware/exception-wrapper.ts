@@ -8,7 +8,8 @@ import { RoutingError } from "../../action-controller/metal/exceptions.js";
 /** @noRailsEquivalent PERMANENT */
 export type BacktraceLine = Location | SourceMapLocation;
 
-class SourceMapLocation {
+/** @internal */
+export class SourceMapLocation {
   private location: Location;
   private template: Template;
 
@@ -33,7 +34,6 @@ class SourceMapLocation {
     return this.location.toString();
   }
 
-  /** @missingRailsCall super — PERMANENT */
   spot(exc: Error): Spot | null {
     const location = this.template.spot(this.location);
 
@@ -132,7 +132,6 @@ export class ExceptionWrapper {
   readonly exceptionClassName: string;
   readonly wrappedCauses: ExceptionWrapper[];
   readonly statusCode: number;
-  readonly statusText: string;
   /** @internal */
   readonly backtrace: BacktraceLine[];
 
@@ -146,7 +145,6 @@ export class ExceptionWrapper {
     this.exceptionClassName = classNameOf(exception);
     this.wrappedCauses = this.wrappedCausesFor(exception, backtraceCleaner);
     this.statusCode = this.computeStatusCode();
-    this.statusText = STATUS_TEXTS[this.statusCode] ?? "Internal Server Error";
     this.backtrace = this.buildBacktrace();
   }
 
@@ -324,14 +322,6 @@ export class ExceptionWrapper {
     return this.backtrace.map((trace) => this.extractSource(trace));
   }
 
-  toResponse(): [number, Record<string, string>, string] {
-    return [
-      this.statusCode,
-      { "content-type": "text/plain; charset=utf-8" },
-      `${this.statusCode} ${this.statusText}\n${this.message}\n`,
-    ];
-  }
-
   /** @internal */
   buildBacktrace(): BacktraceLine[] {
     const builtMethods = new Map<string, Template>();
@@ -449,28 +439,3 @@ export class ExceptionWrapper {
     return ExceptionWrapper.statusCodeForException(classNameOf(this.unwrappedException));
   }
 }
-
-const STATUS_TEXTS: Record<number, string> = {
-  100: "Continue",
-  200: "OK",
-  201: "Created",
-  204: "No Content",
-  301: "Moved Permanently",
-  302: "Found",
-  304: "Not Modified",
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  405: "Method Not Allowed",
-  406: "Not Acceptable",
-  408: "Request Timeout",
-  409: "Conflict",
-  410: "Gone",
-  422: "Unprocessable Entity",
-  429: "Too Many Requests",
-  500: "Internal Server Error",
-  501: "Not Implemented",
-  502: "Bad Gateway",
-  503: "Service Unavailable",
-};

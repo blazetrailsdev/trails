@@ -166,16 +166,14 @@ export class DefaultResponseApp {
     const request = new Request(env);
     const format = request.xhr ? "text/plain" : "text/html";
     this.logError(request);
-    return this.response(format, this.responseBody(request, format));
+    return this.response(format, this.responseBody(request));
   }
 
   /** @internal */
-  private responseBody(request: Request, format: string): string {
-    if (!request.env["action_dispatch.show_detailed_exceptions"]) return "";
+  private responseBody(request: Request): string {
+    if (!request.getHeader("action_dispatch.show_detailed_exceptions")) return "";
     const blocked = (request.env["action_dispatch.blocked_hosts"] as string[]) ?? [];
-    return format === "text/plain"
-      ? renderBlockedHostText(blocked)
-      : renderBlockedHostHtml(blocked);
+    return request.xhr ? renderBlockedHostText(blocked) : renderBlockedHostHtml(blocked);
   }
 
   /** @internal */

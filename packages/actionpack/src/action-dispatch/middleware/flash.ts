@@ -162,7 +162,7 @@ export class FlashHash {
   }
 
   /** @internal */
-  isNowLoaded(): boolean {
+  isNowIsLoaded(): boolean {
     return this._now != null;
   }
 
@@ -236,7 +236,7 @@ export class FlashHash {
 
   dup(): FlashHash {
     const copy = new FlashHash();
-    if (this.isNowLoaded()) {
+    if (this.isNowIsLoaded()) {
       copy._now = new FlashNow(copy);
     }
     for (const [k, v] of this._flashes) copy._flashes.set(k, v);

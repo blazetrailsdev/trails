@@ -49,7 +49,7 @@ export class DebugLocks {
     if (req.isGet()) {
       const path = req.pathInfo.replace(/\/$/, "");
       if (path === this.path) {
-        return this.renderDetails();
+        return this.renderDetails(req);
       }
     }
 
@@ -57,7 +57,7 @@ export class DebugLocks {
   }
 
   /** @internal */
-  private renderDetails(): RackResponse {
+  private renderDetails(req: Request): RackResponse {
     const interlock = DebugLocks.interlock;
     if (!interlock) {
       throw new Error(

@@ -137,8 +137,7 @@ export class GetIp {
 
     const ips = [...forwardedIps, ...clientIps];
     const withRemote = remoteAddr ? [...ips, remoteAddr] : ips;
-    const filtered = withRemote.filter((ip) => !this.proxies.some((p) => proxyMatches(p, ip)));
-    return filtered[0] ?? ips[ips.length - 1] ?? remoteAddr ?? null;
+    return this.filterProxies(withRemote)[0] ?? ips[ips.length - 1] ?? remoteAddr ?? null;
   }
 
   private ipsFrom(header: string | undefined): string[] {
@@ -147,6 +146,11 @@ export class GetIp {
       .trim()
       .split(/[,\s]+/)
       .filter((ip) => !!ip && parseIp(ip) !== null);
+  }
+
+  /** @internal */
+  private filterProxies(ips: string[]): string[] {
+    return ips.filter((ip) => !this.proxies.some((proxy) => proxyMatches(proxy, ip)));
   }
 }
 

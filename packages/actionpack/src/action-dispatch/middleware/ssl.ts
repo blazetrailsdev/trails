@@ -34,7 +34,7 @@ export class SSL {
   private redirectHost: string | undefined;
   private redirectBody: string[] | undefined;
   private redirectExclude: (env: RackEnv) => boolean;
-  private hsts: Required<HSTSOptions>;
+  private hstsHeader: string;
   private secureCookies: boolean;
   private sslDefaultRedirectStatus: number | undefined;
   private redirectStatusOverride: number | undefined;
@@ -60,7 +60,7 @@ export class SSL {
       this.redirectExclude = () => false;
     }
 
-    this.hsts = this.normalizeHstsOptions(options.hsts);
+    this.hstsHeader = this.buildHstsHeader(this.normalizeHstsOptions(options.hsts));
   }
 
   /** @internal */
@@ -146,15 +146,15 @@ export class SSL {
   /** @internal */
   private setHstsHeaderBang(headers: Record<string, string | string[]>): void {
     if (headers["strict-transport-security"]) return;
-    headers["strict-transport-security"] = this.buildHstsHeader();
+    headers["strict-transport-security"] = this.hstsHeader;
   }
 
-  private buildHstsHeader(): string {
-    const opts = this.hsts;
-    let header = `max-age=${opts.expires}`;
-    if (opts.subdomains) header += "; includeSubDomains";
-    if (opts.preload) header += "; preload";
-    return header;
+  /** @internal */
+  private buildHstsHeader(hsts: Required<HSTSOptions>): string {
+    let value = `max-age=${hsts.expires}`;
+    if (hsts.subdomains) value += "; includeSubDomains";
+    if (hsts.preload) value += "; preload";
+    return value;
   }
 
   /** @internal */
