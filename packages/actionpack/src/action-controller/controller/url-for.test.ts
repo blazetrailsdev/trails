@@ -1,9 +1,40 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
+import { toQuery } from "@blazetrails/activesupport";
 import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { deprecator } from "../../action-dispatch/deprecator.js";
 import { URL } from "../../action-dispatch/http/url.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 
+class W {
+  static defaultUrlOptions: Record<string, unknown>;
+  declare urlFor: (options: Record<string, unknown>) => string;
+}
+include(
+  W,
+  (() => {
+    const r = new RouteSet();
+    r.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id(.:format)))");
+      });
+    });
+    return r;
+  })().urlHelpers(),
+);
+
+function addHost(app: { defaultUrlOptions: Record<string, unknown> } = W): void {
+  app.defaultUrlOptions["host"] = "www.basecamphq.com";
+}
+
+function extractParams(url: string): string[] {
+  return url.split("?", 2).at(-1)!.split("&").sort();
+}
+
 describe("UrlForTest", () => {
+  afterEach(() => {
+    for (const key of Object.keys(W.defaultUrlOptions)) delete W.defaultUrlOptions[key];
+  });
+
   it("exception is thrown without host", () => {
     expect(() => URL.urlFor({ path: "/posts" })).toThrow(/Missing host/);
   });
@@ -153,15 +184,65 @@ describe("UrlForTest", () => {
     ).toBe("http://openid.aol.com%2Fnextangler:one+two%3F@www.basecamphq.com/c/a/i");
   });
 
-  it.skip("trailing slash", () => {});
+  it("trailing slash", () => {
+    addHost();
+    const options = { controller: "foo", trailingSlash: true, action: "bar", id: "33" };
+    expect(new W().urlFor(options)).toBe("http://www.basecamphq.com/foo/bar/33/");
+  });
 
-  it.skip("trailing slash with protocol", () => {});
+  it("trailing slash with protocol", () => {
+    addHost();
+    const options = {
+      trailingSlash: true,
+      protocol: "https",
+      controller: "foo",
+      action: "bar",
+      id: "33",
+    };
+    expect(new W().urlFor(options)).toBe("https://www.basecamphq.com/foo/bar/33/");
+    expect(new W().urlFor({ ...options, query: "string" })).toBe(
+      "https://www.basecamphq.com/foo/bar/33/?query=string",
+    );
+  });
 
-  it.skip("trailing slash with only path", () => {});
+  it("trailing slash with only path", () => {
+    const options: Record<string, unknown> = { controller: "foo", trailingSlash: true };
+    expect(new W().urlFor({ ...options, onlyPath: true })).toBe("/foo/");
+    Object.assign(options, { action: "bar", id: "33" });
+    expect(new W().urlFor({ ...options, onlyPath: true })).toBe("/foo/bar/33/");
+    expect(new W().urlFor({ ...options, query: "string", onlyPath: true })).toBe(
+      "/foo/bar/33/?query=string",
+    );
+  });
 
-  it.skip("trailing slash with anchor", () => {});
+  it("trailing slash with anchor", () => {
+    const options = {
+      trailingSlash: true,
+      controller: "foo",
+      action: "bar",
+      id: "33",
+      onlyPath: true,
+      anchor: "chapter7",
+    };
+    expect(new W().urlFor(options)).toBe("/foo/bar/33/#chapter7");
+    expect(new W().urlFor({ ...options, query: "string" })).toBe(
+      "/foo/bar/33/?query=string#chapter7",
+    );
+  });
 
-  it.skip("trailing slash with params", () => {});
+  it("trailing slash with params", () => {
+    const url = new W().urlFor({
+      trailingSlash: true,
+      onlyPath: true,
+      controller: "cont",
+      action: "act",
+      p1: "cafe",
+      p2: "link",
+    });
+    const params = extractParams(url);
+    expect(params[0]).toBe(toQuery({ p1: "cafe" }));
+    expect(params[1]).toBe(toQuery({ p2: "link" }));
+  });
 
   it("relative url root is respected", () => {
     const url = URL.urlFor({ host: "example.com", path: "/posts", scriptName: "/app" });
@@ -229,7 +310,19 @@ describe("UrlForTest", () => {
     expect(true).toBe(true);
   });
 
-  it.skip("using nil script name properly concats with original script name", () => {});
+  it("using nil script name properly concats with original script name", () => {
+    addHost();
+    expect(
+      new W().urlFor({
+        controller: "c",
+        action: "a",
+        id: "i",
+        protocol: "https",
+        scriptName: null,
+        originalScriptName: "/subdir",
+      }),
+    ).toBe("https://www.basecamphq.com/subdir/c/a/i");
+  });
 
   it("only path", () => {
     expect(URL.urlFor({ path: "/posts", onlyPath: true })).toBe("/posts");
