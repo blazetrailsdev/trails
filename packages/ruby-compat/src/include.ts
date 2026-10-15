@@ -597,8 +597,14 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   extendObject(obj: object): void {
-    if (typeof obj !== "function" && Object.isFrozen(obj)) {
-      throw new FrozenError(`can't modify frozen object: ${rbInspect(obj)}`, { receiver: obj });
+    if (Object.isFrozen(obj)) {
+      const desc =
+        obj instanceof Module
+          ? `Module: ${obj.inspect()}`
+          : typeof obj === "function"
+            ? `Class: ${rbModToS(obj as AnyClass)}`
+            : `object: ${rbInspect(obj)}`;
+      throw new FrozenError(`can't modify frozen ${desc}`, { receiver: obj });
     }
     for (let proto = Object.getPrototypeOf(obj) as object | null; proto; ) {
       if (isLinkOf(this, proto)) return;

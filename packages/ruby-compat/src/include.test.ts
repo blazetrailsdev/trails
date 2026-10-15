@@ -1981,5 +1981,9 @@ describe("extend on an object", () => {
     const { FrozenError } = await import("./frozen-error.js");
     const Mod = new Module();
     expect(() => extend(Object.freeze({}), Mod)).toThrow(FrozenError);
+    expect(() => extend(Object.freeze({}), Mod)).toThrow(/^can't modify frozen object: /);
+    class K {}
+    Object.freeze(K);
+    expect(() => extend(K, Mod)).toThrow(/^can't modify frozen Class: /);
   });
 });
