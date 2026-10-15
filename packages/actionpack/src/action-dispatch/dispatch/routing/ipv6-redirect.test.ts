@@ -48,8 +48,10 @@ describe("IPv6IntegrationTest", () => {
   }
 
   let t: IPv6IntegrationTest;
-  beforeEach(({ task }) => {
+  beforeEach(async ({ task }) => {
     t = new IPv6IntegrationTest(task.name);
+    await t.beforeSetup();
+    t.setup();
   });
 
   it("bad IPv6 redirection", async () => {
