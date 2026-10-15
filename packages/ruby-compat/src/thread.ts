@@ -200,6 +200,17 @@ export class Thread<R = unknown> {
   }
 
   /**
+   * A dead thread answers `nil`, as Ruby's does. V8 exposes no stack for an
+   * async context other than the running one, so a live thread answers an
+   * empty backtrace.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#backtrace` (`vendor/ruby/v3.3.11/thread.c:5323`).
+   */
+  backtrace(): string[] | null {
+    return this.status === "dead" ? null : [];
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]` (`vendor/ruby/v3.3.11/thread.c:5408`).
    */
   get(key: string): unknown {

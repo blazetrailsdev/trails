@@ -1,3 +1,6 @@
+import { Mutex } from "./mutex.js";
+import { Thread } from "./thread.js";
+import { ThreadError } from "./thread-error.js";
 import {
   getAsyncContext,
   type AsyncContext,
@@ -104,4 +107,147 @@ export interface MonitorMixin {
 export class Monitor implements MonitorMixin {
   isMonOwned = isMonOwned;
   synchronize = synchronize;
+}
+
+interface MonCore {
+  owner: Thread | null;
+  count: number;
+  mutex: Mutex;
+}
+
+const MON_CORE = new WeakMap<object, MonCore>();
+
+function monCore(self: object): MonCore {
+  let core = MON_CORE.get(self);
+  if (!core) {
+    core = { owner: null, count: 0, mutex: new Mutex() };
+    MON_CORE.set(self, core);
+  }
+  return core;
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_enter`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:169`, `monitor_enter`, `ext/monitor/monitor.c:96`).
+ */
+export async function monEnter(this: object): Promise<void> {
+  const core = monCore(this);
+  if (core.owner !== Thread.current()) {
+    await core.mutex.lock();
+    core.owner = Thread.current();
+  }
+  core.count += 1;
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_exit`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:176`, `monitor_exit`, `ext/monitor/monitor.c:134`).
+ */
+export function monExit(this: object): void {
+  const core = monCore(this);
+  if (core.owner !== Thread.current()) throw new ThreadError("current thread not owner");
+  core.count -= 1;
+  if (core.count === 0) {
+    core.owner = null;
+    core.mutex.unlock();
+  }
+}
+
+/**
+ * The monitor `ext/monitor/monitor.c` implements: reentrant per thread, and
+ * released by `MonitorMixin::ConditionVariable#wait` for the length of the
+ * wait, so a condition re-checked after a wake and the code after it run
+ * under the monitor as one step.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_synchronize`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200`, `monitor_synchronize`, `ext/monitor/monitor.c:236`).
+ */
+export async function monSynchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
+  await monEnter.call(this);
+  try {
+    return await block();
+  } finally {
+    monExit.call(this);
+  }
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:98`).
+ */
+export class MonitorConditionVariable {
+  #monitor: object;
+  #waiters: Array<() => void> = [];
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#initialize`
+   * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:146`).
+   */
+  constructor(monitor: object) {
+    this.#monitor = monitor;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#wait`
+   * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:105`, `monitor_wait_for_cond`, `ext/monitor/monitor.c:200`).
+   */
+  async wait(timeout: number | null = null): Promise<void> {
+    const core = monCore(this.#monitor);
+    if (core.owner !== Thread.current()) throw new ThreadError("current thread not owner");
+    const count = core.count;
+    core.owner = null;
+    core.count = 0;
+    core.mutex.unlock();
+    try {
+      await new Promise<void>((resolve) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        this.#waiters.push(wake);
+        if (timeout != null) {
+          timer = setTimeout(() => {
+            const index = this.#waiters.indexOf(wake);
+            if (index >= 0) this.#waiters.splice(index, 1);
+            resolve();
+          }, timeout * 1000);
+        }
+      });
+    } finally {
+      await core.mutex.lock();
+      core.owner = Thread.current();
+      core.count = count;
+    }
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#wait_while`
+   * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:113`).
+   */
+  async waitWhile(block: () => unknown): Promise<void> {
+    while (block()) {
+      await this.wait();
+    }
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable#broadcast`
+   * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:139`).
+   */
+  broadcast(): void {
+    const core = monCore(this.#monitor);
+    if (core.owner !== Thread.current()) throw new ThreadError("current thread not owner");
+    const waiters = this.#waiters;
+    this.#waiters = [];
+    for (const resolve of waiters) resolve();
+  }
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#new_cond`
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:209`).
+ */
+export function newCond(this: object): MonitorConditionVariable {
+  return new MonitorConditionVariable(this);
 }

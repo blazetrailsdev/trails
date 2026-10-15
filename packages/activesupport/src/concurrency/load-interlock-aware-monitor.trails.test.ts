@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Fiber, Thread } from "@blazetrails/ruby-compat";
 import { ThreadLoadInterlockAwareMonitor } from "./load-interlock-aware-monitor.js";
+import { Dependencies } from "../dependencies.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
@@ -58,5 +59,27 @@ describe("ThreadLoadInterlockAwareMonitor", () => {
     await expect(fiber.resume()).rejects.toThrow(
       "Attempt to unlock a mutex which is locked by another thread/fiber",
     );
+  });
+});
+
+describe("ThreadLoadInterlockAwareMonitor and the interlock", () => {
+  it("restores a running thread's share once a contended monEnter returns", async () => {
+    const monitor = new ThreadLoadInterlockAwareMonitor();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const owner = new Thread(() => monitor.synchronize(() => held));
+    await tick();
+
+    const waiter = new Thread(() =>
+      Dependencies.interlock.running(async () => {
+        await monitor.synchronize(() => {});
+        return Dependencies.interlock.rawState((data) => data.get(Thread.current())?.sharing);
+      }),
+    );
+    await tick();
+    release();
+
+    expect(await waiter.value()).toBe(1);
+    await owner.join();
   });
 });

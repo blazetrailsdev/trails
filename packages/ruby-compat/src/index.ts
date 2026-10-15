@@ -412,7 +412,16 @@ export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
 export { succ } from "./string/succ.js";
 export { isSymbol, rbMethodName, stringToSym, symbolToS } from "./symbol.js";
-export { Monitor, isMonOwned, synchronize } from "./monitor.js";
+export {
+  Monitor,
+  MonitorConditionVariable,
+  isMonOwned,
+  monEnter,
+  monExit,
+  monSynchronize,
+  newCond,
+  synchronize,
+} from "./monitor.js";
 export { Mutex } from "./mutex.js";
 export { rbEnsure } from "./ensure.js";
 export { coreHashMergeKwd, keywordSplat, rbGetKwargs, rbScanArgs } from "./keyword-splat.js";
@@ -434,6 +443,7 @@ export { ImmediateExecutor } from "./immediate-executor.js";
 export { ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";
 import "./concurrent/count-down-latch.js";
+import "./concurrent/cyclic-barrier.js";
 import "./concurrent/event.js";
 export type { MonitorMixin } from "./monitor.js";
 

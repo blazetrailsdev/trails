@@ -1,4 +1,5 @@
 import { Mutex, prepend, Thread, ThreadError, type PrependMethod } from "@blazetrails/ruby-compat";
+import { Dependencies } from "../dependencies.js";
 import { Monitor, synchronize } from "./monitor.js";
 
 interface LoadInterlockAwareMonitorHost {
@@ -12,7 +13,7 @@ const EXCEPTION_IMMEDIATE = Object.freeze({ Exception: ":immediate" });
 
 export const LoadInterlockAwareMonitorMixin = {
   monEnter(this: LoadInterlockAwareMonitorHost, super_: () => unknown): unknown {
-    return this.monTryEnter() || super_();
+    return this.monTryEnter() || Dependencies.interlock.permitConcurrentLoads(() => super_());
   },
 
   synchronize<T>(

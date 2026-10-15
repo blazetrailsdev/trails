@@ -1,6 +1,7 @@
 import { Hash, rbBlockGivenP, type Block } from "../hash.js";
 import { rbModConstSet } from "../include.js";
 import type { CountDownLatch } from "./count-down-latch.js";
+import type { CyclicBarrier } from "./cyclic-barrier.js";
 import type { Event } from "./event.js";
 
 /**
@@ -12,6 +13,7 @@ export const Concurrent = { name: "Concurrent" } as {
   readonly name: string;
   Map: typeof Map;
   CountDownLatch: typeof CountDownLatch;
+  CyclicBarrier: typeof CyclicBarrier;
   Event: typeof Event;
 };
 
