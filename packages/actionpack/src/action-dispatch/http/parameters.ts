@@ -7,7 +7,7 @@ import {
   stderr,
 } from "@blazetrails/ruby-compat";
 
-import { merge, type Hash } from "@blazetrails/ruby-compat";
+import { block, fetch, merge, type Hash } from "@blazetrails/ruby-compat";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
 import { Mime, MimeType } from "./mime-type.js";
 import type { ParamHash } from "../request/utils.js";
@@ -147,8 +147,16 @@ export function parseFormattedParameters(
   if (this.contentLength === 0 || this.contentMimeType === null) {
     return fallback();
   }
-  const strategy = parsers[this.contentMimeType.symbol!];
-  if (!strategy) return fallback();
+  let yielded = false;
+  const strategy = fetch<ParameterParser>(
+    parsers,
+    this.contentMimeType.symbol!,
+    block(() => {
+      yielded = true;
+      return null as unknown as ParameterParser;
+    }),
+  );
+  if (yielded) return fallback();
 
   try {
     return strategy(this.rawPost);
