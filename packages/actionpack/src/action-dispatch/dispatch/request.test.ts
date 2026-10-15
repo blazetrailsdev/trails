@@ -820,16 +820,60 @@ describe("RequestParameters", () => {
     expect(req.params).toEqual({ view: "edit" });
   });
 
-  it.skip("parameters", () => {});
-  it.skip("parameters not accessible after rack parse error", () => {});
-  it.skip("path parameters with invalid UTF8 encoding", () => {});
+  it("parameters", async () => {
+    const request = await stubRequest({
+      CONTENT_TYPE: "application/json",
+      CONTENT_LENGTH: "9",
+      RAW_POST_DATA: '{"foo":1}',
+      QUERY_STRING: "bar=2",
+    });
+
+    assertEqual({ foo: 1, bar: "2" }, request.parameters);
+    assertEqual({ foo: 1 }, request.requestParameters);
+    assertEqual({ bar: "2" }, request.queryParameters);
+  });
+
+  it("parameters not accessible after rack parse error", async () => {
+    const request = await stubRequest({ QUERY_STRING: "x[y]=1&x[y][][w]=2" });
+
+    for (let i = 0; i < 2; i++) {
+      await assertRaises([BadRequest], {}, () => request.parameters);
+    }
+  });
+
+  it("path parameters with invalid UTF8 encoding", async () => {
+    const request = await stubRequest();
+
+    const err = await assertRaises([BadRequest], {}, () => {
+      request.pathParameters = { foo: "\udcbe" };
+    });
+
+    assertEqual("Invalid path parameters: Invalid encoding for parameter: \ufffd", err.message);
+  });
   it.skip("path parameters don't re-encode frozen strings", () => {});
-  it.skip("parameters containing an invalid UTF8 character", () => {});
-  it.skip("parameters containing a deeply nested invalid UTF8 character", () => {});
+  it("parameters containing an invalid UTF8 character", async () => {
+    const request = await stubRequest({ QUERY_STRING: "foo=%81E" });
+    await assertRaises([BadRequest], {}, () => request.parameters);
+  });
+
+  it("parameters containing a deeply nested invalid UTF8 character", async () => {
+    const request = await stubRequest({ QUERY_STRING: "foo[bar]=%81E" });
+    await assertRaises([BadRequest], {}, () => request.parameters);
+  });
+
   it.skip("POST parameters containing invalid UTF8 character", () => {});
   it.skip("query parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {});
   it.skip("POST parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {});
-  it.skip("parameters not accessible after rack parse error 1", () => {});
+  it("parameters not accessible after rack parse error 1", async () => {
+    const request = await stubRequest({
+      REQUEST_METHOD: "POST",
+      CONTENT_LENGTH: String("a%=".length),
+      CONTENT_TYPE: "application/x-www-form-urlencoded; charset=utf-8",
+      ":input": "a%=",
+    });
+
+    await assertRaises([BadRequest], {}, () => request.parameters);
+  });
   it.skip("we have access to the original exception", () => {});
 });
 
