@@ -141,9 +141,7 @@ describe("exceptions", () => {
 
 describe("MissingTranslation::Base", () => {
   it("holds PERMITTED_KEYS as its own constant", () => {
-    expect(
-      (MissingTranslation.Base as unknown as { PERMITTED_KEYS: string[] }).PERMITTED_KEYS,
-    ).toEqual(["scope", "default"]);
+    expect(MissingTranslation.Base.PERMITTED_KEYS).toEqual(["scope", "default"]);
     const data = new MissingTranslationData("en", "foo", { scope: "a", other: 1 });
     expect(data.options).toEqual({ scope: "a" });
   });

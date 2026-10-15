@@ -15,10 +15,7 @@ describe("transformKeys on a plain object", () => {
 
   it("keeps string keys yielded before the first object key", () => {
     const a = { name: "a" };
-    const result = transformKeys({ x: 1, y: 2 }, (k) => (k === "x" ? "x" : a)) as Hash<
-      unknown,
-      unknown
-    >;
+    const result = transformKeys({ x: 1, y: 2 }, (k) => (k === "x" ? "x" : a) as object);
     expect([...result.keys()]).toEqual(["x", a]);
   });
 
