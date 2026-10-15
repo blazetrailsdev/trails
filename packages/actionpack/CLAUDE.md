@@ -122,3 +122,52 @@ The cost is that `productPath(null, { id: "1" })` raises where Rails' Symbol-key
 
 `handlePositionalArgs` carries `@inventedArm block — PERMANENT` against this
 section. This is ratified here by the repo owner.
+
+## System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)
+
+Rails' system-testing files (`action_dispatch/system_test_case.rb`,
+`action_dispatch/system_testing/**`) hand driver, server, session and
+screenshot state to a third-party browser-session library. **trails does not
+port that library, vendor it, or use any of its names, registries or
+environment variables.** The repo owner ruled this on 2026-10-15 (RFC 0166).
+It is an owner ruling, not a TypeScript language shortcoming.
+
+Each call into that library is ported onto the Vitest, Vite or Playwright
+mechanism that holds the same fact:
+
+| Rails fact                                           | trails carrier                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------- |
+| driver registration under `name` (`driver.rb:41`)    | module-private launcher memo in `driver.ts`, keyed by `name`    |
+| current driver (`driver.rb:81`)                      | `SystemTestCase.driver` (`.name`)                               |
+| application (`system_test_case.rb:129`)              | Rack app mounted in an in-process Vite dev server               |
+| server choice and silence (`server.rb:25`)           | Vite dev server, `logLevel: "silent"` from `Server.silencePuma` |
+| always include port (`server.rb:29`)                 | the Vite server's resolved URL                                  |
+| server host and port (`system_test_case.rb:168-169`) | Vite `server.host` / `server.port`                              |
+| app host (`system_test_case.rb:185`)                 | configured host, else the Vite server URL, else `DEFAULT_HOST`  |
+| screenshot save path (`screenshot_helper.rb:95`)     | `ScreenshotHelper.screenshotDirectory`, seeded from `inject`    |
+| inline screenshot env (`screenshot_helper.rb:122`)   | `RAILS_SYSTEM_TESTING_SCREENSHOT` only                          |
+| session reset (`setup_and_teardown.rb:16`)           | close the test's browser context in `afterTeardown`             |
+| test `metadata` (`screenshot_helper.rb:57`)          | the Vitest task's `meta`                                        |
+
+Rules that follow:
+
+- **Test code runs in a Node Vitest worker**, not in Vitest browser mode. A
+  system test reads and writes records between browser steps, and the app
+  server runs in the same worker so the test's fixture transaction is visible
+  to the browser's requests, as Puma's shared connection gives Rails.
+- **The interaction surface is Vitest's**: a Playwright `page`, whose
+  locators are the API Vitest browser mode exposes, and `expect.element`. No
+  finder, matcher or action DSL is ported from the library Rails includes.
+- **The screenshot directory is a setting, not a config read.** Vitest does
+  not serialize `browser.screenshotDirectory` to a worker, and a value read
+  through `inject` cannot be changed by a test, where Rails' test sets the
+  save path and restores it (`screenshot_helper_test.rb:39-48`). So
+  `ScreenshotHelper.screenshotDirectory` holds it, seeded from
+  `inject("screenshotDirectory")`.
+- **The library's name is a token rename**, `capybara` → `vitest` in
+  `TOKEN_RENAMES`, so a Rails test name that spells it credits at the Vitest
+  spelling, as `erb` → `tse` does.
+
+Members and arms that exist only to serve this carry
+`@noRailsEquivalent PERMANENT` / `@inventedArm … PERMANENT` receipts against
+this section. A new instance is not a new decision to argue.

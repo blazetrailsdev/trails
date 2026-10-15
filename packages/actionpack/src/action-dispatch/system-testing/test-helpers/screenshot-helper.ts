@@ -1,4 +1,12 @@
+import { inject } from "vitest";
+import { presence } from "@blazetrails/activesupport";
 import { Encoding, File, getFs } from "@blazetrails/ruby-compat";
+
+declare module "vitest" {
+  export interface ProvidedContext {
+    screenshotDirectory?: string;
+  }
+}
 
 export interface ScreenshotPage {
   screenshot(options: { path: string }): Promise<Buffer>;
@@ -12,6 +20,11 @@ export interface ScreenshotHelperHost {
   _screenshotCounter?: number;
   metadata?: Record<string, unknown>;
 }
+
+/** @noRailsEquivalent PERMANENT */
+export const ScreenshotHelper: { screenshotDirectory: string | undefined } = {
+  screenshotDirectory: inject("screenshotDirectory"),
+};
 
 function env(key: string): string | undefined {
   return (globalThis as any).process?.env?.[key] as string | undefined;
@@ -42,10 +55,7 @@ export async function takeFailedScreenshot(this: ScreenshotHelperHost): Promise<
 
 /** @internal */
 function htmlFromEnv(): boolean {
-  return (
-    env("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML") === "1" ||
-    env("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML") === "1"
-  );
+  return env("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML") === "1";
 }
 
 /** @internal */
@@ -82,7 +92,7 @@ export function htmlPath(this: ScreenshotHelperHost): string {
 
 /** @internal */
 export function screenshotsDir(): string {
-  return env("CAPYBARA_SAVE_PATH") || "tmp/screenshots";
+  return presence(ScreenshotHelper.screenshotDirectory) || "tmp/screenshots";
 }
 
 /** @internal */
@@ -126,12 +136,7 @@ export async function saveImage(this: ScreenshotHelperHost): Promise<Buffer | un
 
 /** @internal */
 export function outputType(): string {
-  return (
-    env("RAILS_SYSTEM_TESTING_SCREENSHOT") ||
-    env("TRAILS_SYSTEM_TESTING_SCREENSHOT") ||
-    env("CAPYBARA_INLINE_SCREENSHOT") ||
-    "simple"
-  );
+  return env("RAILS_SYSTEM_TESTING_SCREENSHOT") || "simple";
 }
 
 /**

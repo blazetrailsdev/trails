@@ -1484,6 +1484,13 @@ resolves. actionview's template lookups and trailties' generators follow that
 section; the one-line rule is that an action goes by its method's camelCase
 name everywhere, and a file or locale key named for an action is kebab-case.
 
+## System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)
+
+Ratified in [packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#system-testing-runs-on-vitest-systemtestcase-systemtesting).
+The one-line rule: by repo-owner ruling, system testing is ported onto Vitest,
+Vite and Playwright with no third-party browser-session library, and test code
+runs in a Node Vitest worker.
+
 ## Trilogy is out of scope (`trilogy_adapter.rb`, `adapters/trilogy/`)
 
 Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#trilogy-is-out-of-scope-trilogy_adapterrb-adapterstrilogy).
