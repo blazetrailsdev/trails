@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
@@ -20,6 +20,9 @@ import { ArgumentError, JSON, Marshal } from "@blazetrails/ruby-compat";
 import { unescape } from "@blazetrails/rack";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 import { TestRequest } from "../testing/test-request.js";
+import { Base } from "../../action-controller/base.js";
+import { TestCase } from "../../action-controller/test-case.js";
+import { include } from "@blazetrails/activesupport";
 
 function jarWithSameSiteProtection(
   proc: (request: { userAgent?: string }) => unknown,
@@ -932,6 +935,7 @@ describe("CookiesTest", () => {
   it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {});
 
   it.skip("legacy hmac aes cbc encrypted cookie using 64 byte key is upgraded to authenticated encrypted cookie", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
     const message = Buffer.from(
       "566d4e75536d686e633246564e6b493062557079626c566d51574d30515430394c53315665564a694e4563786555744f57537454576b396a5a31566a626e52525054303d2d2d34663234333330623130623261306163363562316266323335396164666364613564643134623131",
       "hex",
@@ -957,6 +961,7 @@ describe("CookiesTest", () => {
   });
 
   it.skip("cookie with hash value not modified by rotation", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
     const request = cookieRequest({ "action_dispatch.signed_cookie_digest": "SHA256" });
     (request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate("signed", {
       digest: "SHA1",
@@ -972,255 +977,290 @@ describe("CookiesTest", () => {
     assertEqual({ bar: "baz" }, cookies.signed.get("foo"));
   });
 
-  it("cookie with all domain option", () => {
-    const cookies = new CookieJar(cookieRequest({}));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax",
-      cookies,
-    );
+  const DOMAINS = ["example1.com", "example2.com", ".example3.com"];
+
+  class TestController extends Base {
+    async setCookieWithDomain(): Promise<void> {
+      this.cookies().set("user_name", { value: "rizwanreza", domain: ":all" });
+      await this.head("ok");
+    }
+
+    async setCookieWithDomainProc(): Promise<void> {
+      this.cookies().set("user_name", {
+        value: "braindeaf",
+        domain: () => ".sub.www.nextangle.com",
+      });
+      await this.head("ok");
+    }
+
+    async setCookieWithDomainProcWithRequest(): Promise<void> {
+      this.cookies().set("user_name", {
+        value: "braindeaf",
+        domain: (req) => `.sub.${(req as { host: string }).host}`,
+      });
+      await this.head("ok");
+    }
+
+    async deleteCookieWithDomain(): Promise<void> {
+      this.cookies().delete("user_name", { domain: ":all" });
+      await this.head("ok");
+    }
+
+    async setCookieWithDomainAndTld(): Promise<void> {
+      this.cookies().set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
+      await this.head("ok");
+    }
+
+    async setCookieWithDomainAndLongerTld(): Promise<void> {
+      this.cookies().set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 4 });
+      await this.head("ok");
+    }
+
+    async deleteCookieWithDomainAndTld(): Promise<void> {
+      this.cookies().delete("user_name", { domain: ":all", tldLength: 2 });
+      await this.head("ok");
+    }
+
+    async setCookieWithDomains(): Promise<void> {
+      this.cookies().set("user_name", { value: "rizwanreza", domain: DOMAINS });
+      await this.head("ok");
+    }
+
+    async deleteCookieWithDomains(): Promise<void> {
+      this.cookies().delete("user_name", { domain: DOMAINS });
+      await this.head("ok");
+    }
+  }
+
+  class CookiesTestCase extends TestCase {
+    declare assertSetCookieHeader: (expected: string) => void;
+
+    static {
+      this.tests(TestController);
+      include(this, CookieAssertions);
+    }
+  }
+
+  let tc: CookiesTestCase;
+
+  beforeEach(async ({ task }) => {
+    tc = new CookiesTestCase(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+    Object.assign(tc.request.env, cookieEnv());
+    tc.request.host = "www.nextangle.com";
   });
 
-  it("cookie with all domain option using a non standard tld", () => {
-    const cookies = new CookieJar(cookieRequest({}, "two.subdomains.nextangle.local"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option", async () => {
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using australian style tld", () => {
-    const cookies = new CookieJar(cookieRequest({}, "nextangle.com.au"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option using a non standard tld", async () => {
+    tc.request.host = "two.subdomains.nextangle.local";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using australian style tld and two subdomains", () => {
-    const cookies = new CookieJar(cookieRequest({}, "x.nextangle.com.au"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option using australian style tld", async () => {
+    tc.request.host = "nextangle.com.au";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using uk style tld", () => {
-    const cookies = new CookieJar(cookieRequest({}, "nextangle.co.uk"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option using australian style tld and two subdomains", async () => {
+    tc.request.host = "x.nextangle.com.au";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using two letter one level tld", () => {
-    const cookies = new CookieJar(cookieRequest({}, "hawth.ca"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax", cookies);
+  it("cookie with all domain option using uk style tld", async () => {
+    tc.request.host = "nextangle.co.uk";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using two letter one level tld and subdomain", () => {
-    const cookies = new CookieJar(cookieRequest({}, "x.hawth.ca"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax", cookies);
+  it("cookie with all domain option using two letter one level tld", async () => {
+    tc.request.host = "hawth.ca";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using uk style tld and two subdomains", () => {
-    const cookies = new CookieJar(cookieRequest({}, "x.nextangle.co.uk"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option using two letter one level tld and subdomain", async () => {
+    tc.request.host = "x.hawth.ca";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using host with port", () => {
-    const cookies = new CookieJar(cookieRequest({}, "nextangle.local:3000"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option using uk style tld and two subdomains", async () => {
+    tc.request.host = "x.nextangle.co.uk";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using localhost", () => {
-    const cookies = new CookieJar(cookieRequest({}, "localhost"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  it("cookie with all domain option using host with port", async () => {
+    tc.request.host = "nextangle.local:3000";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using ipv4 address", () => {
-    const cookies = new CookieJar(cookieRequest({}, "192.168.1.1"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  it("cookie with all domain option using localhost", async () => {
+    tc.request.host = "localhost";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using ipv6 address", () => {
-    const cookies = new CookieJar(cookieRequest({}, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all" });
-    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  it("cookie with all domain option using ipv4 address", async () => {
+    tc.request.host = "192.168.1.1";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
-  it("deleting cookie with all domain option", () => {
-    const cookies = CookieJar.build(cookieRequest({}), { user_name: "Joe" });
-    cookies.delete("user_name", { domain: ":all" });
-    assertSetCookieHeader(
+  it("cookie with all domain option using ipv6 address", async () => {
+    tc.request.host = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+    await tc.get("setCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
+  });
+
+  it("deleting cookie with all domain option", async () => {
+    tc.request.cookies["user_name"] = "Joe";
+    await tc.get("deleteCookieWithDomain");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader(
       "user_name=; domain=nextangle.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
-      cookies,
     );
   });
 
-  it("cookie with all domain option and tld length", () => {
-    const cookies = new CookieJar(cookieRequest({}));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option and tld length", async () => {
+    await tc.get("setCookieWithDomainAndTld");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using a non standard tld and tld length", () => {
-    const cookies = new CookieJar(cookieRequest({}, "two.subdomains.nextangle.local"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option using a non standard tld and tld length", async () => {
+    tc.request.host = "two.subdomains.nextangle.local";
+    await tc.get("setCookieWithDomainAndTld");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using a non standard 2 letter tld", () => {
-    const cookies = new CookieJar(cookieRequest({}, "admin.lvh.me"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
-    assertSetCookieHeader("user_name=rizwanreza; domain=lvh.me; path=/; SameSite=Lax", cookies);
+  it("cookie with all domain option using a non standard 2 letter tld", async () => {
+    tc.request.host = "admin.lvh.me";
+    await tc.get("setCookieWithDomainAndTld");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=lvh.me; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using host with port and tld length", () => {
-    const cookies = new CookieJar(cookieRequest({}, "nextangle.local:3000"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with all domain option using host with port and tld length", async () => {
+    tc.request.host = "nextangle.local:3000";
+    await tc.get("setCookieWithDomainAndTld");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
-  it("cookie with all domain option using longer tld length", () => {
-    const cookies = new CookieJar(cookieRequest({}, "x.y.z.t.com"));
-    cookies.set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 4 });
-    assertSetCookieHeader("user_name=rizwanreza; domain=y.z.t.com; path=/; SameSite=Lax", cookies);
+  it("cookie with all domain option using longer tld length", async () => {
+    tc.request.host = "x.y.z.t.com";
+    await tc.get("setCookieWithDomainAndLongerTld");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=y.z.t.com; path=/; SameSite=Lax");
   });
 
-  it("deleting cookie with all domain option and tld length", () => {
-    const cookies = CookieJar.build(cookieRequest({}), { user_name: "Joe" });
-    cookies.delete("user_name", { domain: ":all", tldLength: 2 });
-    assertSetCookieHeader(
+  it("deleting cookie with all domain option and tld length", async () => {
+    tc.request.cookies["user_name"] = "Joe";
+    await tc.get("deleteCookieWithDomainAndTld");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader(
       "user_name=; domain=nextangle.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
-      cookies,
     );
   });
 
-  it("cookie with several preset domains using one of these domains", () => {
-    const cookies = new CookieJar(cookieRequest({}, "example1.com"));
-    cookies.set("user_name", {
-      value: "rizwanreza",
-      domain: ["example1.com", "example2.com", ".example3.com"],
-    });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with several preset domains using one of these domains", async () => {
+    tc.request.host = "example1.com";
+    await tc.get("setCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax");
   });
 
-  it("cookie with several preset domains using subdomain", () => {
-    const cookies = new CookieJar(cookieRequest({}, "subdomain.example1.com"));
-    cookies.set("user_name", {
-      value: "rizwanreza",
-      domain: ["example1.com", "example2.com", ".example3.com"],
-    });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with several preset domains using subdomain", async () => {
+    tc.request.host = "subdomain.example1.com";
+    await tc.get("setCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax");
   });
 
-  it("cookie with several preset domains using similar tld", () => {
-    const cookies = new CookieJar(cookieRequest({}, "example1.com.au"));
-    cookies.set("user_name", {
-      value: "rizwanreza",
-      domain: ["example1.com", "example2.com", ".example3.com"],
-    });
-    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  it("cookie with several preset domains using similar tld", async () => {
+    tc.request.host = "example1.com.au";
+    await tc.get("setCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
-  it("cookie with several preset domains using similar domain", () => {
-    const cookies = new CookieJar(cookieRequest({}, "myexample1.com"));
-    cookies.set("user_name", {
-      value: "rizwanreza",
-      domain: ["example1.com", "example2.com", ".example3.com"],
-    });
-    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  it("cookie with several preset domains using similar domain", async () => {
+    tc.request.host = "myexample1.com";
+    await tc.get("setCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
-  it("cookie with several preset domains using other domain", () => {
-    const cookies = new CookieJar(cookieRequest({}, "other-domain.com"));
-    cookies.set("user_name", {
-      value: "rizwanreza",
-      domain: ["example1.com", "example2.com", ".example3.com"],
-    });
-    assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax", cookies);
+  it("cookie with several preset domains using other domain", async () => {
+    tc.request.host = "other-domain.com";
+    await tc.get("setCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
-  it("cookie with several preset domains using shared domain", () => {
-    const cookies = new CookieJar(cookieRequest({}, "example3.com"));
-    cookies.set("user_name", {
-      value: "rizwanreza",
-      domain: ["example1.com", "example2.com", ".example3.com"],
-    });
-    assertSetCookieHeader(
-      "user_name=rizwanreza; domain=.example3.com; path=/; SameSite=Lax",
-      cookies,
-    );
+  it("cookie with several preset domains using shared domain", async () => {
+    tc.request.host = "example3.com";
+    await tc.get("setCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader("user_name=rizwanreza; domain=.example3.com; path=/; SameSite=Lax");
   });
 
-  it("cookie with domain proc", () => {
-    const cookies = new CookieJar(cookieRequest({}));
-    cookies.set("user_name", { value: "braindeaf", domain: () => ".sub.www.nextangle.com" });
-    assertSetCookieHeader(
+  it("cookie with domain proc", async () => {
+    await tc.get("setCookieWithDomainProc");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader(
       "user_name=braindeaf; domain=.sub.www.nextangle.com; path=/; SameSite=Lax",
-      cookies,
     );
   });
 
-  it("cookie with domain proc with request", () => {
-    const cookies = new CookieJar(cookieRequest({}));
-    cookies.set("user_name", {
-      value: "braindeaf",
-      domain: (req) => `.sub.${(req as { host: string }).host}`,
-    });
-    assertSetCookieHeader(
+  it("cookie with domain proc with request", async () => {
+    await tc.get("setCookieWithDomainProcWithRequest");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader(
       "user_name=braindeaf; domain=.sub.www.nextangle.com; path=/; SameSite=Lax",
-      cookies,
     );
   });
 
-  it("deleting cookie with several preset domains using one of these domains", () => {
-    const cookies = CookieJar.build(cookieRequest({}, "example2.com"), { user_name: "Joe" });
-    cookies.delete("user_name", { domain: ["example1.com", "example2.com", ".example3.com"] });
-    assertSetCookieHeader(
+  it("deleting cookie with several preset domains using one of these domains", async () => {
+    tc.request.host = "example2.com";
+    tc.request.cookies["user_name"] = "Joe";
+    await tc.get("deleteCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader(
       "user_name=; domain=example2.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
-      cookies,
     );
   });
 
-  it("deleting cookie with several preset domains using other domain", () => {
-    const cookies = CookieJar.build(cookieRequest({}, "other-domain.com"), { user_name: "Joe" });
-    cookies.delete("user_name", { domain: ["example1.com", "example2.com", ".example3.com"] });
-    assertSetCookieHeader(
+  it("deleting cookie with several preset domains using other domain", async () => {
+    tc.request.host = "other-domain.com";
+    tc.request.cookies["user_name"] = "Joe";
+    await tc.get("deleteCookieWithDomains");
+    tc.assertResponse("success");
+    tc.assertSetCookieHeader(
       "user_name=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
-      cookies,
     );
   });
 });
