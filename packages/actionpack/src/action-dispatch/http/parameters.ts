@@ -1,4 +1,4 @@
-import { Logger } from "@blazetrails/activesupport";
+import { ActiveSupportJSON, Logger } from "@blazetrails/activesupport";
 import {
   EOFError,
   Exception,
@@ -22,7 +22,7 @@ export type ParameterParsers = Record<string, ParameterParser>;
 
 export const DEFAULT_PARSERS: ParameterParsers = {
   [Mime.get(":json")!.symbol!]: (rawPost: string) => {
-    const data = JSON.parse(rawPost);
+    const data = ActiveSupportJSON.decode(rawPost);
     if (data !== null && typeof data === "object" && !Array.isArray(data)) {
       return data as Record<string, unknown>;
     }
@@ -166,7 +166,7 @@ export function parseFormattedParameters(
   } catch (e) {
     if (e instanceof Exception && !(e instanceof StandardError)) throw e;
     logParseErrorOnce.call(this);
-    throw new ParseError("Error occurred while parsing request parameters");
+    throw excSetupMessage(new ParseError("Error occurred while parsing request parameters"), e);
   }
 }
 

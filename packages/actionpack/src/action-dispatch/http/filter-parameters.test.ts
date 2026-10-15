@@ -28,6 +28,7 @@ function makeHost(overrides: Partial<FilterParametersHost> = {}): FilterParamete
       headers.delete(k);
     },
     hasHeader: (k) => headers.has(k),
+    fetchHeader: (k, fallback) => (headers.has(k) ? headers.get(k) : fallback(k)),
     queryParameters: {},
     requestParameters: {},
     contentLength: 0,
