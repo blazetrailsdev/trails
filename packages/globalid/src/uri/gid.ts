@@ -104,7 +104,7 @@ export class GID extends Generic {
   }
 
   override toString(): string {
-    return `gid://${this.host ?? ""}${this.path ?? ""}${this.query != null ? "?" + this.query : ""}`;
+    return `gid://${this.app ?? ""}${this.path ?? ""}${this.query != null ? "?" + this.query : ""}`;
   }
 
   deconstructKeys(_keys: readonly string[] | null): GidComponents {
@@ -113,7 +113,7 @@ export class GID extends Generic {
 
   /** @internal */
   protected override setPath(path: string | null): void {
-    if (!(this._modelName !== undefined && this._modelId)) this.setModelComponents(path!);
+    if (!(this._modelName !== undefined && this._modelId != null)) this.setModelComponents(path!);
     super.setPath(path);
   }
 
@@ -163,7 +163,7 @@ export class GID extends Generic {
   private setModelComponents(path: string, validate = false): string | string[] | null {
     const [, modelName, modelId] = stringSplit(path, "/", 3);
 
-    if (validate && !isBlank(this.validateComponent(modelName))) {
+    if (validate && this.validateComponent(modelName)) {
       this.validateModelIdSection(modelId, modelName);
     }
     this._modelName = modelName!;

@@ -70,13 +70,13 @@ export class Generic {
     } else if (args != null && typeof args === "object" && !Array.isArray(args)) {
       tmp = Generic.COMPONENT.map((c) => (Object.hasOwn(args, c) ? args[c] : null));
     } else {
-      const component = this.component();
+      const component = Generic.COMPONENT;
       throw new ArgumentError(
-        `expected Array of or Hash of components of ${this.name} (${component.join(", ")})`,
+        `expected Array of or Hash of components of Class (${component.join(", ")})`,
       );
     }
 
-    tmp.push(DEFAULT_PARSER);
+    tmp.push(null);
     tmp.push(true);
     return new (this as unknown as new (...a: unknown[]) => Generic)(...tmp);
   }

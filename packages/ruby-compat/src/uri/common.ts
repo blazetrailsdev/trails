@@ -1,5 +1,6 @@
 import { ArgumentError } from "../argument-error.js";
 import { Encoding } from "../encoding.js";
+import { rbObjClone } from "../include.js";
 import { bytes } from "../string/bytes.js";
 import { encode } from "../string/encode.js";
 import { forceEncoding, rbObjEncoding } from "../string/force-encoding.js";
@@ -155,11 +156,21 @@ export const Util = {
         .component()
         .slice(1)
         .forEach((c, i) => {
-          tmp[c] = arrayHash[i];
+          try {
+            tmp[c] = rbObjClone(arrayHash[i]);
+          } catch (error) {
+            if (!(error instanceof TypeError)) throw error;
+            tmp[c] = arrayHash[i];
+          }
         });
     } else if (arrayHash != null && typeof arrayHash === "object" && !Array.isArray(arrayHash)) {
       for (const [key, value] of Object.entries(arrayHash)) {
-        tmp[key] = value;
+        try {
+          tmp[key] = rbObjClone(value);
+        } catch (error) {
+          if (!(error instanceof TypeError)) throw error;
+          tmp[key] = value;
+        }
       }
     } else {
       throw new ArgumentError(
