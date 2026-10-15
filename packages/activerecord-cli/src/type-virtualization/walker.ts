@@ -28,7 +28,18 @@ export interface EnumCall {
   options: RecordLiteral;
 }
 
-export type RuntimeCall = AttributeCall | AssociationCall | ScopeCall | EnumCall;
+export interface AliasAttributeCall {
+  kind: "aliasAttribute";
+  name: string;
+  target: string;
+}
+
+export type RuntimeCall =
+  | AttributeCall
+  | AssociationCall
+  | ScopeCall
+  | EnumCall
+  | AliasAttributeCall;
 
 /** @internal */
 export interface IncludeCall {
@@ -47,7 +58,11 @@ export interface ClassInfo {
   calls: RuntimeCall[];
   existingMembers: Set<string>;
   existingStaticMembers: Set<string>;
+  existingMemberTypes: Map<string, string>;
   skip: boolean;
+  noSchema: boolean;
+  abstract: boolean;
+  dynamicTableName: boolean;
   skipSchemaColumns: Set<string>;
   tableName?: string;
 }
@@ -105,6 +120,10 @@ function recordMergedInterfaceMembers(sourceFile: ts.SourceFile, out: readonly C
           if (!name) continue;
           if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name)) {
             info.existingMembers.add(name.text);
+            const type = (m as { type?: ts.TypeNode }).type;
+            if (m.kind === ts.SyntaxKind.PropertySignature && type) {
+              info.existingMemberTypes.set(name.text, type.getText());
+            }
           }
         }
       }
@@ -144,7 +163,11 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     calls: [],
     existingMembers: new Set(),
     existingStaticMembers: new Set(),
+    existingMemberTypes: new Map(),
     skip: hasSkipMarker(cls, sourceFile),
+    noSchema: hasMarker(cls, sourceFile, /@trails-typegen\s+no-schema\b/),
+    abstract: false,
+    dynamicTableName: false,
     skipSchemaColumns: parseSkipColumns(cls, sourceFile),
   };
 
@@ -154,6 +177,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     recordExistingMember(member, info);
     if (ts.isClassStaticBlockDeclaration(member)) {
       for (const s of member.body.statements) {
+        readStaticAssignment(s, info);
         const call = readThisCall(s);
         if (call) info.calls.push(call);
       }
@@ -182,12 +206,34 @@ function findOpenBrace(text: string, cls: ts.ClassDeclaration): number {
 }
 
 function hasSkipMarker(cls: ts.ClassDeclaration, sf: ts.SourceFile): boolean {
+  return hasMarker(cls, sf, /@trails-typegen\s+skip(?!-)/);
+}
+
+function hasMarker(cls: ts.ClassDeclaration, sf: ts.SourceFile, pattern: RegExp): boolean {
   const ranges = ts.getLeadingCommentRanges(sf.text, cls.pos) ?? [];
   for (const r of ranges) {
-    const text = sf.text.slice(r.pos, r.end);
-    if (/@trails-typegen\s+skip(?!-)/.test(text)) return true;
+    if (pattern.test(sf.text.slice(r.pos, r.end))) return true;
   }
   return false;
+}
+
+function readStaticAssignment(stmt: ts.Statement, info: ClassInfo): void {
+  if (!ts.isExpressionStatement(stmt)) return;
+  const expr = stmt.expression;
+  if (!ts.isBinaryExpression(expr) || expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return;
+  const left = expr.left;
+  if (!ts.isPropertyAccessExpression(left)) return;
+  if (left.expression.kind !== ts.SyntaxKind.ThisKeyword) return;
+  readStaticValue(left.name.text, expr.right, info);
+}
+
+function readStaticValue(name: string, value: ts.Expression, info: ClassInfo): void {
+  if (name === "tableName") {
+    const literal = ts.isStringLiteralLikeNode(value);
+    info.tableName = literal ? value.text : undefined;
+    info.dynamicTableName = !literal;
+  }
+  if (name === "abstractClass" && value.kind === ts.SyntaxKind.TrueKeyword) info.abstract = true;
 }
 
 function parseSkipColumns(cls: ts.ClassDeclaration, sf: ts.SourceFile): Set<string> {
@@ -219,15 +265,9 @@ function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
   if (isStatic) info.existingStaticMembers.add(name);
   else info.existingMembers.add(name);
 
-  if (
-    isStatic &&
-    name === "tableName" &&
-    ts.isPropertyDeclaration(m) &&
-    m.initializer &&
-    ts.isStringLiteralLikeNode(m.initializer)
-  ) {
-    info.tableName = m.initializer.text;
-  }
+  if (!ts.isPropertyDeclaration(m)) return;
+  if (isStatic && m.initializer) readStaticValue(name, m.initializer, info);
+  if (!isStatic && m.type) info.existingMemberTypes.set(name, m.type.getText());
 }
 
 function readThisCall(stmt: ts.Statement): RuntimeCall | null {
@@ -251,6 +291,8 @@ function readThisCall(stmt: ts.Statement): RuntimeCall | null {
       return readScopeCall(call);
     case "enum":
       return readEnumCall(call);
+    case "aliasAttribute":
+      return readAliasAttributeCall(call);
     default:
       return null;
   }
@@ -266,6 +308,13 @@ function readAttributeCall(call: ts.CallExpression): AttributeCall | null {
     railsType: typeArg.text,
     options: readRecordLiteral(optsArg),
   };
+}
+
+function readAliasAttributeCall(call: ts.CallExpression): AliasAttributeCall | null {
+  const [newArg, oldArg] = call.arguments;
+  if (!newArg || !ts.isStringLiteralLikeNode(newArg)) return null;
+  if (!oldArg || !ts.isStringLiteralLikeNode(oldArg)) return null;
+  return { kind: "aliasAttribute", name: newArg.text, target: oldArg.text };
 }
 
 function readAssociationCall(
