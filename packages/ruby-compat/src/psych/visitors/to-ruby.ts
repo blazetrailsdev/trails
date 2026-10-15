@@ -1,3 +1,4 @@
+import { Hash } from "../../hash.js";
 import { Range } from "../../range.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
@@ -259,29 +260,39 @@ export class ToRuby {
   }
 
   private reviveHash(
-    hash: Record<string, unknown>,
+    h: Record<string, unknown>,
     o: YAMLMap,
     tagged = false,
   ): Record<string, unknown> {
-    const aset = (key: string, val: unknown) => {
+    const items = o.items as { key: ParsedNode; value: ParsedNode }[];
+    const keys = items.map(({ key: k }) =>
+      yaml.isScalar(k) && !k.tag && !k.anchor ? this.accept(k) : "",
+    );
+    let hash = h;
+    const widen = () => {
+      const upgraded = new Hash<unknown, unknown>();
+      for (const [k, v] of Object.entries(hash)) upgraded.set(k, v);
+      hash = this.register(o, upgraded as unknown as Record<string, unknown>);
+    };
+    const widenable = () => !tagged && Object.getPrototypeOf(hash) === null;
+    if (widenable() && keys.some((key) => typeof key !== "string")) widen();
+    const aset = (key: unknown, val: unknown) => {
+      if (typeof key !== "string" && widenable()) widen();
       if (hash instanceof Map) hash.set(key, val);
-      else hash[key] = val;
+      else hash[String(key)] = val;
     };
     const mergeBang = (val: object) => {
-      for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(String(k), v);
+      for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(k, v);
     };
-    for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
+    for (const { key: k, value: v } of items) {
       const key = this.accept(k);
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
         if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") mergeBang(val as object);
         else if (yaml.isSeq(v)) (val as object[]).slice().reverse().forEach(mergeBang);
-        else aset(String(key), val);
+        else aset(key, val);
       } else {
-        aset(
-          String(!tagged && this.symbolizeNames && typeof key === "string" ? `:${key}` : key),
-          val,
-        );
+        aset(!tagged && this.symbolizeNames && typeof key === "string" ? `:${key}` : key, val);
       }
     }
     return hash;

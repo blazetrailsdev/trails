@@ -30,9 +30,149 @@ import { ClassLoader } from "../class-loader.js";
 import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
 import { NotImplementedError } from "../../not-implemented-error.js";
+import { ArgumentError } from "../../argument-error.js";
 import { Omap } from "../omap.js";
 
 const yaml = backend as unknown as typeof Yaml;
+
+const BREAK = /[\r\n\u0085\u2028\u2029]/;
+const blankz = (c: string | undefined) =>
+  c === undefined || c === " " || c === "\t" || BREAK.test(c);
+const PRINTABLE = /^[\n\x20-\x7e\x85\xa0-\ud7ff\ue000-\ufefe\uff00-\ufffd\u{10000}-\u{10ffff}]$/u;
+
+function analyzeScalar(value: string): {
+  blockPlainAllowed: boolean;
+  singleQuotedAllowed: boolean;
+  blockAllowed: boolean;
+} {
+  if (value.length === 0) {
+    return { blockPlainAllowed: true, singleQuotedAllowed: true, blockAllowed: false };
+  }
+  const chars = Array.from(value);
+  let blockIndicators = false;
+  let leadingSpace = false;
+  let leadingBreak = false;
+  let trailingSpace = false;
+  let trailingBreak = false;
+  let breakSpace = false;
+  let spaceBreak = false;
+  let previousSpace = false;
+  let previousBreak = false;
+  let lineBreaks = false;
+  let specialCharacters = false;
+
+  if ((value.startsWith("---") || value.startsWith("...")) && blankz(chars[3])) {
+    blockIndicators = true;
+  }
+  let precededByWhitespace = true;
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
+    const followedByWhitespace = blankz(chars[i + 1]);
+    if (i === 0) {
+      if ("#,[]{}&*!|>'\"%@`".includes(c)) blockIndicators = true;
+      if ((c === "?" || c === ":" || c === "-") && followedByWhitespace) blockIndicators = true;
+    } else {
+      if (c === ":" && followedByWhitespace) blockIndicators = true;
+      if (c === "#" && precededByWhitespace) blockIndicators = true;
+    }
+    if (!PRINTABLE.test(c) || c === "\ufeff") specialCharacters = true;
+    if (BREAK.test(c)) lineBreaks = true;
+    if (c === " ") {
+      if (i === 0) leadingSpace = true;
+      if (i === chars.length - 1) trailingSpace = true;
+      if (previousBreak) breakSpace = true;
+      previousSpace = true;
+      previousBreak = false;
+    } else if (BREAK.test(c)) {
+      if (i === 0) leadingBreak = true;
+      if (i === chars.length - 1) trailingBreak = true;
+      if (previousSpace) spaceBreak = true;
+      previousBreak = true;
+      previousSpace = false;
+    } else {
+      previousSpace = false;
+      previousBreak = false;
+    }
+    precededByWhitespace = blankz(c);
+  }
+
+  let blockPlainAllowed = true;
+  let singleQuotedAllowed = true;
+  let blockAllowed = true;
+  if (leadingSpace || leadingBreak || trailingSpace || trailingBreak) blockPlainAllowed = false;
+  if (trailingSpace) blockAllowed = false;
+  if (breakSpace) {
+    blockPlainAllowed = false;
+    singleQuotedAllowed = false;
+  }
+  if (spaceBreak || specialCharacters) {
+    blockPlainAllowed = singleQuotedAllowed = blockAllowed = false;
+  }
+  if (lineBreaks) blockPlainAllowed = false;
+  if (blockIndicators) blockPlainAllowed = false;
+  return { blockPlainAllowed, singleQuotedAllowed, blockAllowed };
+}
+
+function writeSingleQuoted(
+  stringify: NonNullable<Yaml.ScalarTag["stringify"]>,
+): NonNullable<Yaml.ScalarTag["stringify"]> {
+  return (item, ctx, onComment, onChompKeep) => {
+    const { value, type } = item as Scalar<string>;
+    if (type !== yaml.Scalar.QUOTE_SINGLE || typeof value !== "string") {
+      return stringify(item, ctx, onComment, onChompKeep);
+    }
+    const lineWidth = ctx.options.lineWidth;
+    const bestWidth = lineWidth > 0 ? lineWidth : Infinity;
+    const allowBreaks = !ctx.implicitKey;
+    const chars = Array.from(value);
+    let out = "'";
+    let column =
+      (ctx.indentAtStart === undefined
+        ? ctx.indent === ""
+          ? "--- ".length
+          : ctx.indent.length
+        : ctx.indent.length - ctx.indentStep.length + ctx.indentAtStart) + 1;
+    let spaces = false;
+    let breaks = false;
+    const writeIndent = () => {
+      if (!out.endsWith("\n")) out += "\n";
+      out += ctx.indent;
+      column = ctx.indent.length;
+    };
+    for (let i = 0; i < chars.length; i++) {
+      const c = chars[i];
+      if (c === " ") {
+        if (
+          allowBreaks &&
+          !spaces &&
+          column > bestWidth &&
+          i !== 0 &&
+          i !== chars.length - 1 &&
+          chars[i + 1] !== " "
+        ) {
+          writeIndent();
+        } else {
+          out += c;
+          column++;
+        }
+        spaces = true;
+      } else if (BREAK.test(c)) {
+        if (!breaks && c === "\n") out += "\n";
+        out += "\n";
+        column = 0;
+        breaks = true;
+      } else {
+        if (breaks) writeIndent();
+        out += c === "'" ? "''" : c;
+        column += c === "'" ? 2 : 1;
+        spaces = false;
+        breaks = false;
+      }
+    }
+    if (breaks) writeIndent();
+    return `${out}'`;
+  };
+}
 
 type RubyTime = { isUtc(): boolean; strftime(format: string): string };
 type RubyDate = { gregorian(): { toS(): string } };
@@ -63,9 +203,20 @@ export interface YAMLTreeOptions {
 export class YAMLTree {
   /** @internal */
   protected readonly st = new Map<object, PsychNode>();
-  private readonly doc = new yaml.Document();
+  private readonly doc = new yaml.Document(undefined, {
+    customTags: (tags: Yaml.Tags) =>
+      tags.map((t) =>
+        typeof t === "object" && t.tag === "tag:yaml.org,2002:str"
+          ? {
+              ...(t as Yaml.ScalarTag),
+              stringify: writeSingleQuoted((t as Yaml.ScalarTag).stringify!),
+            }
+          : t,
+      ),
+  });
   private anchors = 0;
   private readonly ss: ScalarScanner;
+  private readonly lineWidth: number | null;
 
   /**
    * `YAMLTree.create` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:48`).
@@ -79,8 +230,18 @@ export class YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(ss: ScalarScanner, _options: YAMLTreeOptions = {}) {
+  constructor(ss: ScalarScanner, options: YAMLTreeOptions = {}) {
     this.ss = ss;
+    this.lineWidth = options.lineWidth ?? null;
+    if (this.lineWidth != null && this.lineWidth < 0) {
+      if (this.lineWidth === -1) {
+        this.lineWidth = null;
+      } else {
+        throw new ArgumentError(
+          `Invalid line_width ${this.lineWidth}, must be non-negative or -1 for unlimited.`,
+        );
+      }
+    }
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -94,7 +255,9 @@ export class YAMLTree {
     if (rbObjRespondTo(target, "encodeWith")) {
       return this.dumpCoder(target as { encodeWith(coder: Coder): void });
     }
-    if (typeof target === "string") return this.visitString(target);
+    if (typeof target === "string") {
+      return /^:./s.test(target) ? this.visitSymbol(target) : this.visitString(target);
+    }
     if (typeof target === "function") return this.visitClass(target);
     const tag = target == null ? null : temporalTag(target);
     const dateTime = registeredConstant("DateTime");
@@ -181,8 +344,47 @@ export class YAMLTree {
   }
 
   private visitString(o: string): Node {
+    let style: Scalar.Type = yaml.Scalar.PLAIN;
+    let tag: string | null = null;
+
+    if (/\n(?!\n?$)/.test(o)) {
+      style = yaml.Scalar.BLOCK_LITERAL;
+    } else if (o === "<<") {
+      style = yaml.Scalar.QUOTE_SINGLE;
+      tag = "tag:yaml.org,2002:str";
+    } else if (o === "y" || o === "n") {
+      style = yaml.Scalar.QUOTE_DOUBLE;
+    } else if (this.lineWidth != null && Array.from(o).length > this.lineWidth) {
+      style = yaml.Scalar.BLOCK_FOLDED;
+    } else if (/^[^\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}][^"]*$/mu.test(o)) {
+      style = yaml.Scalar.QUOTE_DOUBLE;
+    } else if (typeof this.ss.tokenize(o) !== "string" || /^0[0-7]*[89]/.test(o)) {
+      style = yaml.Scalar.QUOTE_SINGLE;
+    }
+
+    const analysis = analyzeScalar(o);
+    if (style === yaml.Scalar.PLAIN && !analysis.blockPlainAllowed) {
+      style = yaml.Scalar.QUOTE_SINGLE;
+    }
+    if (style === yaml.Scalar.QUOTE_SINGLE && !analysis.singleQuotedAllowed) {
+      style = yaml.Scalar.QUOTE_DOUBLE;
+    }
+    if (
+      (style === yaml.Scalar.BLOCK_LITERAL || style === yaml.Scalar.BLOCK_FOLDED) &&
+      !analysis.blockAllowed
+    ) {
+      style = yaml.Scalar.QUOTE_DOUBLE;
+    }
+
     const scalar = this.doc.createNode(o) as Scalar;
-    if (typeof this.ss.tokenize(o) !== "string") scalar.type = yaml.Scalar.QUOTE_SINGLE;
+    scalar.type = style;
+    if (tag) scalar.tag = tag;
+    return scalar;
+  }
+
+  private visitSymbol(o: string): Node {
+    const scalar = this.doc.createNode(o) as Scalar;
+    scalar.type = analyzeScalar(o).blockPlainAllowed ? yaml.Scalar.PLAIN : yaml.Scalar.QUOTE_SINGLE;
     return scalar;
   }
 

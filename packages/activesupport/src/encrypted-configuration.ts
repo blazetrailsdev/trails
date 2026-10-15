@@ -1,7 +1,8 @@
-import { rbObjId } from "@blazetrails/ruby-compat";
+import { rbObjId, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { EncryptedFile, MissingContentError } from "./encrypted-file.js";
 import { presence } from "./core-ext/object/blank.js";
+import { deepTransformKeys } from "./hash-utils.js";
 import { delegateMissingTo } from "./module-ext.js";
 import { OrderedOptions } from "./ordered-options.js";
 
@@ -64,13 +65,14 @@ export class EncryptedConfiguration extends EncryptedFile {
   }
 
   async validateBang(): Promise<void> {
-    for (const key of (await this.deserialize(await this.read())).keys()) {
+    const hash = this.deserialize(await this.read());
+    for (const key of hash instanceof Map ? hash.keys() : Object.keys(hash)) {
       if (typeof key !== "string") throw new InvalidKeyError(this.contentPath, key);
     }
   }
 
   async config(): Promise<Record<string, unknown>> {
-    return (this._config ??= this.deepSymbolizeKeys(await this.deserialize(await this.read())));
+    return (this._config ??= this.deepSymbolizeKeys(this.deserialize(await this.read())));
   }
 
   inspect(): string {
@@ -79,18 +81,11 @@ export class EncryptedConfiguration extends EncryptedFile {
   }
 
   /** @internal */
-  private deepSymbolizeKeys(hash: Map<unknown, unknown>): Record<string, unknown> {
-    const transform = (value: unknown): unknown => {
-      if (Array.isArray(value)) return value.map(transform);
-      if (!(value instanceof Map)) return value;
-      const result: Record<string, unknown> = {};
-      for (const [key, v] of value) {
-        if (typeof key !== "string") throw new InvalidKeyError(this.contentPath, key);
-        result[key] = transform(v);
-      }
-      return result;
-    };
-    return transform(hash) as Record<string, unknown>;
+  private deepSymbolizeKeys(hash: object): Record<string, unknown> {
+    return deepTransformKeys(hash, (key: unknown) => {
+      if (typeof key !== "string") throw new InvalidKeyError(this.contentPath, key);
+      return key;
+    }) as Record<string, unknown>;
   }
 
   /** @internal */
@@ -111,17 +106,18 @@ export class EncryptedConfiguration extends EncryptedFile {
   }
 
   /** @internal */
-  private async deserialize(content: string): Promise<Map<unknown, unknown>> {
-    const { parse } = await import("@blazetrails/ruby-compat/psych-adapter");
+  private deserialize(content: string): object {
     let config: unknown;
     try {
-      config = parse(content, { mapAsMap: true, version: "1.1" });
+      config = rbObjRespondTo(Psych, "unsafeLoad")
+        ? Psych.unsafeLoad(content, { filename: this.contentPath })
+        : Psych.load(content, { filename: this.contentPath });
     } catch (e) {
       if (e instanceof Psych.SyntaxError) {
         throw new InvalidContentError(this.contentPath, { cause: e });
       }
       throw e;
     }
-    return (presence(config) as Map<unknown, unknown> | undefined) ?? new Map();
+    return (presence(config) as object | undefined) ?? {};
   }
 }
