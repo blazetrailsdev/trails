@@ -20,6 +20,7 @@ describe("NonDispatchRoutedAppTest", () => {
   }
 
   let t: NonDispatchRoutedAppTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
   beforeEach(async ({ task }) => {
     t = new NonDispatchRoutedAppTest(task.name);
     await t.beforeSetup();
@@ -28,6 +29,6 @@ describe("NonDispatchRoutedAppTest", () => {
 
   it("does not except", async () => {
     await t.get("/foo");
-    t.assertResponse("success");
+    assertResponse("success");
   });
 });

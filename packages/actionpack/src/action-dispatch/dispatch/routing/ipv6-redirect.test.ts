@@ -48,6 +48,7 @@ describe("IPv6IntegrationTest", () => {
   }
 
   let t: IPv6IntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
   beforeEach(async ({ task }) => {
     t = new IPv6IntegrationTest(task.name);
     await t.beforeSetup();
@@ -63,7 +64,7 @@ describe("IPv6IntegrationTest", () => {
     };
 
     await t.get("/foo", { env: requestEnv });
-    t.assertResponse("redirect");
+    assertResponse("redirect");
     assertEqual("http://[fd07:2fa:6cff:2112:225:90ff:fec7:22aa]:3000/", t.redirectToUrl());
   });
 });

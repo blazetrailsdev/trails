@@ -46,6 +46,7 @@ describe("ControllerWithBeforeActionAndDefaultUrlOptionsTest", () => {
   }
 
   let tc: ControllerWithBeforeActionAndDefaultUrlOptionsTest;
+  const assertRedirectedTo = (options: string): boolean => tc.assertRedirectedTo(options);
 
   beforeEach(async ({ task }) => {
     tc = new ControllerWithBeforeActionAndDefaultUrlOptionsTest(task.name);
@@ -55,8 +56,6 @@ describe("ControllerWithBeforeActionAndDefaultUrlOptionsTest", () => {
 
   it("should redirect with correct locale :de", async () => {
     await tc.get("redirect", { params: { locale: "de" } });
-    tc.assertRedirectedTo(
-      "/controller_with_before_action_and_default_url_options/target?locale=de",
-    );
+    assertRedirectedTo("/controller_with_before_action_and_default_url_options/target?locale=de");
   });
 });
