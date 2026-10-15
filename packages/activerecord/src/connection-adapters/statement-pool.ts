@@ -1,6 +1,8 @@
 import {
   eachValue,
   Hash,
+  hashAref,
+  hashAset,
   hashDelete,
   last,
   NotImplementedError,
@@ -32,8 +34,8 @@ export class StatementPool<T = unknown> {
     return Object.hasOwn(this.cache, key);
   }
 
-  get(key: string): T | undefined {
-    return this.cache[key];
+  get(key: string): T | null {
+    return hashAref(this.cache, key) as T | null;
   }
 
   get length(): number {
@@ -46,7 +48,7 @@ export class StatementPool<T = unknown> {
       delete this.cache[shifted[0]];
       void this.dealloc(last(shifted) as T);
     }
-    this.cache[sql] = stmt;
+    hashAset(this.cache, sql, stmt);
     return stmt;
   }
 
@@ -61,8 +63,8 @@ export class StatementPool<T = unknown> {
     for (const key of Object.keys(this.cache)) delete this.cache[key];
   }
 
-  delete(key: string): T | undefined {
-    const stmt = hashDelete(this.cache, key) ?? undefined;
+  delete(key: string): T | null {
+    const stmt = hashDelete(this.cache, key);
     if (rtest(stmt)) {
       void this.dealloc(stmt);
     }
