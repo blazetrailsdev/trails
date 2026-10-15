@@ -9,12 +9,7 @@ import { cattrAccessor } from "@blazetrails/activesupport";
 import { deprecator } from "../deprecator.js";
 import { UploadedFile } from "./upload.js";
 import { QueryParser, type QueryPair } from "./query-parser.js";
-import {
-  CustomParamEncoder,
-  RequestUtils,
-  type ParamHash,
-  type ParamValue,
-} from "../request/utils.js";
+import { CustomParamEncoder, Utils, type ParamHash, type ParamValue } from "../request/utils.js";
 import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./param-error.js";
 
 export type EncodingTemplate = Hash<string, Encoding | string>;
@@ -110,9 +105,9 @@ export class ParamBuilder {
   ): ParamHash {
     hash = CustomParamEncoder.encodeForTemplate(hash, options.encodingTemplate);
 
-    RequestUtils.checkParamEncoding(hash);
+    Utils.checkParamEncoding(hash);
 
-    hash = RequestUtils.normalizeEncodeParams(hash) as ParamHash;
+    hash = Utils.normalizeEncodeParams(hash) as ParamHash;
 
     return hash;
   }
@@ -203,7 +198,7 @@ export class ParamBuilder {
 
     if (after === "") {
       if (k === "[]" && depth !== 0) {
-        return v !== null || !RequestUtils.performDeepMunge ? [v] : [];
+        return v !== null || !Utils.performDeepMunge ? [v] : [];
       }
       params[k] = v;
     } else if (after === "[") {
@@ -214,7 +209,7 @@ export class ParamBuilder {
       if (!Array.isArray(arr)) {
         throw new ParameterTypeError(`expected Array (got ${classNameOf(arr)}) for param \`${k}'`);
       }
-      if (v !== null || !RequestUtils.performDeepMunge) arr.push(v);
+      if (v !== null || !Utils.performDeepMunge) arr.push(v);
     } else if (after.startsWith("[]")) {
       let childKey: string;
       if (after[2] === "[" && after.endsWith("]")) {

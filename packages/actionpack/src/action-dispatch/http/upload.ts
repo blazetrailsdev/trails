@@ -1,4 +1,10 @@
-import { ArgumentError, type File, type Tempfile } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  hashAref,
+  type File,
+  type Hash,
+  type Tempfile,
+} from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export interface UploadedFileOptions {
@@ -14,20 +20,20 @@ export class UploadedFile {
   tempfile: Tempfile;
   headers: string | null;
 
-  constructor(hash: UploadedFileOptions) {
-    this.tempfile = hash.tempfile!;
+  constructor(hash: UploadedFileOptions | Hash<string, unknown>) {
+    this.tempfile = hashAref(hash, "tempfile") as Tempfile;
     if (this.tempfile == null) throw new ArgumentError(":tempfile is required");
 
-    this.contentType = hash.type ?? null;
+    this.contentType = (hashAref(hash, "type") as string | null) ?? null;
 
-    if (hash.filename != null) {
-      this.originalFilename = hash.filename;
+    if (hashAref(hash, "filename") != null) {
+      this.originalFilename = hashAref(hash, "filename") as string;
     } else {
       this.originalFilename = null;
     }
 
-    if (hash.head != null) {
-      this.headers = hash.head;
+    if (hashAref(hash, "head") != null) {
+      this.headers = hashAref(hash, "head") as string;
     } else {
       this.headers = null;
     }

@@ -6,7 +6,6 @@ import {
   X_REQUEST_ID,
   URL as HttpURL,
   QueryParser,
-  RequestUtils,
   CacheRequest,
   Response,
   ExceptionWrapper,
@@ -108,7 +107,7 @@ export class Trailtie extends BaseTrailtie {
 
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
-      RequestUtils.performDeepMunge = cfg.performDeepMunge;
+      ActionDispatch.Request.Utils.performDeepMunge = cfg.performDeepMunge;
       CacheRequest.strictFreshness = cfg.strictFreshness;
       Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
 

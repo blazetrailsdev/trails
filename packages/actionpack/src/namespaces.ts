@@ -7,7 +7,7 @@ import type { Parameters } from "./action-controller/metal/strong-parameters.js"
 import type { TemplateAssertions } from "./action-controller/template-assertions.js";
 import type { Testing } from "./action-controller/metal/testing.js";
 import type { TestCase, TestRequest } from "./action-controller/test-case.js";
-import type { Request } from "./action-dispatch/http/request.js";
+import type { MissingController, Request } from "./action-dispatch/http/request.js";
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
 import type { TestProcess } from "./action-dispatch/testing/test-process.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
@@ -33,6 +33,7 @@ export const ActionDispatch = {
   testApp: null,
 } as AutoloadModule & {
   Request: typeof Request;
+  MissingController: typeof MissingController;
   Routing: typeof Routing;
   Assertions: typeof Assertions;
   TestProcess: typeof TestProcess;

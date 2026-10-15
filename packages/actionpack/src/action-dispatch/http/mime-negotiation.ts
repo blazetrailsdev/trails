@@ -15,7 +15,7 @@ export interface MimeNegotiationHost {
   setHeader(key: string, value: unknown): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   parameters: Record<string, unknown>;
-  accept: string;
+  accept: string | undefined;
   xhr: boolean;
 }
 
@@ -29,6 +29,10 @@ export class MimeNegotiation {
     mattrAccessor.call(base, "ignoreAcceptHeader", { default: false });
   }
 
+  get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
+    return variant.call(this as unknown as MimeNegotiationHost);
+  }
+
   set variant(value: string | string[] | null | undefined) {
     const arr = Array.isArray(value) ? value : value == null ? [] : [value];
     if (!arr.every((v) => typeof v === "string")) {
@@ -36,6 +40,10 @@ export class MimeNegotiation {
     }
     this._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
       Record<string, () => boolean>;
+  }
+
+  get formats(): MimeType[] {
+    return formats.call(this as unknown as MimeNegotiationHost);
   }
 
   set formats(extensions: unknown[]) {

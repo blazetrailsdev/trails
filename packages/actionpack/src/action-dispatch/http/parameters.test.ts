@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { EOFError } from "@blazetrails/ruby-compat";
 import { Mime } from "./mime-type.js";
 import { Request } from "./request.js";
 import {
@@ -67,6 +68,16 @@ describe("ParseError", () => {
 });
 
 describe("parameters", () => {
+  it("falls back to the query parameters when the request body raises EOFError", () => {
+    const host = makeHost({ queryParameters: { q: "1" } });
+    Object.defineProperty(host, "requestParameters", {
+      get() {
+        throw new EOFError("bad content body");
+      },
+    });
+    expect(parameters.call(host)).toEqual({ q: "1" });
+  });
+
   it("merges request + query then path parameters", () => {
     const host = makeHost({
       queryParameters: { q: "1", shared: "query" },
@@ -190,7 +201,7 @@ describe("logParseErrorOnce", () => {
     const messages: string[] = [];
     const host = makeHost({
       rawPost: "garbage",
-      logger: { debug: (m) => messages.push(m) },
+      logger: { debug: (m: string) => messages.push(m) },
     });
     logParseErrorOnce.call(host);
     logParseErrorOnce.call(host);
