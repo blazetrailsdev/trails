@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { assertDomEqual, assertDomNotEqual } from "./dom-assertions.js";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { Testing } from "../testing.js";
 
 describe("DomAssertions", () => {
   it("ignores attribute order and entity spelling", () => {
@@ -48,5 +50,38 @@ describe("DomAssertions", () => {
     assertDomNotEqual('<a disabled href="x">y</a>', '<a href="x">y</a>');
     assertDomEqual("<a href=x DISABLED>y</A>", '<a disabled="" href="x">y</a>');
     assertDomEqual("a < b", "a &lt; b");
+  });
+});
+
+describe("Rails::Dom::Testing.html_document_fragment", () => {
+  it("raises ArgumentError for an unknown html_version", () => {
+    expect(() => assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html6" })).toThrow(
+      "html_version must be :html4 or :html5, received :html6",
+    );
+  });
+
+  it("has no HTML4 fragment parser yet", () => {
+    expect(() => assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html4" })).toThrow(
+      NotImplementedError,
+    );
+  });
+
+  it("selects the HTML5 fragment parser", () => {
+    assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html5" });
+  });
+});
+
+describe("Rails::Dom::Testing.html_document_fragment inspect", () => {
+  it("inspects a String html_version", () => {
+    expect(() => assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: "html6" })).toThrow(
+      'received "html6"',
+    );
+  });
+});
+
+describe("Rails::Dom::Testing.html_document", () => {
+  it("parses with the HTML5 document parser", () => {
+    const root = Testing.htmlDocument().parse("<p>hi</p>").root;
+    expect(root?.name).toBe("html");
   });
 });

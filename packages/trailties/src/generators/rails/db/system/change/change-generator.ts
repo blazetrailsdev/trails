@@ -10,29 +10,37 @@ const BUILD_PACKAGES = ["build-essential", "git"];
 
 export interface ChangeGeneratorOptions extends GeneratorOptions {
   to: string;
+  database?: string;
   appName?: string;
 }
 
 export class ChangeGenerator extends GeneratorBase {
-  readonly to: DatabaseName;
   /** @internal */
   readonly appName: string;
   private _database?: Database;
 
   constructor(options: ChangeGeneratorOptions) {
     super(options);
-    if (!(DATABASES as readonly string[]).includes(options.to)) {
+
+    if (!(DATABASES as readonly string[]).includes((this.options as ChangeGeneratorOptions).to)) {
       throw new Error(
         `Invalid value for --to option. Supported preconfigurations are: ${DATABASES.join(", ")}.`,
       );
     }
-    this.to = options.to as DatabaseName;
+
+    const opt = { ...this.options } as ChangeGeneratorOptions;
+    opt.database ||= opt.to;
+    this.options = Object.freeze(opt);
     this.appName = options.appName ?? File.basename(this.cwd);
   }
 
   /** @internal */
   get database(): Database {
-    if (!this._database) this._database = Database.build(this.to);
+    if (!this._database) {
+      this._database = Database.build(
+        (this.options as ChangeGeneratorOptions).database as DatabaseName,
+      );
+    }
     return this._database;
   }
 

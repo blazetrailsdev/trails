@@ -1,4 +1,4 @@
-import { parseFragment, serializeOuter, type DefaultTreeAdapterMap } from "parse5";
+import { parse, parseFragment, serializeOuter, type DefaultTreeAdapterMap } from "parse5";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
@@ -80,5 +80,19 @@ export class DocumentFragment {
 
   toString(): string {
     return this.children.map((child) => child.toString()).join("");
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+export class Document {
+  private constructor(private readonly _document: Parse5Parent) {}
+
+  static parse(string: string): Document {
+    return new Document(parse(string));
+  }
+
+  get root(): Node | null {
+    const root = childNodes(this._document).find((node) => node.isElement());
+    return root ?? null;
   }
 }
