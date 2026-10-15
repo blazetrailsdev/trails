@@ -91,5 +91,5 @@ function split(string: string): string[] {
 }
 
 function fragment(text: unknown): Html4DocumentFragment {
-  return HTML4.DocumentFragment.parse(String(text));
+  return HTML4.DocumentFragment.parse(String(text ?? ""));
 }

@@ -3,11 +3,13 @@ import { parseFragment, serializeOuter, type DefaultTreeAdapterMap } from "parse
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
+/** @noRailsEquivalent PERMANENT */
 export interface Attr {
   name: string;
   value: string;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class Node {
   static readonly ELEMENT_NODE = 1;
   static readonly TEXT_NODE = 3;
@@ -42,8 +44,10 @@ export class Node {
     return this.children.map((child) => child.text).join("");
   }
 
+  private _children?: Node[];
+
   get children(): Node[] {
-    return childNodes(this._node as Parse5Parent);
+    return (this._children ??= childNodes(this._node as Parse5Parent));
   }
 
   get attributeNodes(): Attr[] {
@@ -68,8 +72,10 @@ export class DocumentFragment {
     return new DocumentFragment(parseFragment(tags));
   }
 
+  private _children?: Node[];
+
   get children(): Node[] {
-    return childNodes(this._fragment);
+    return (this._children ??= childNodes(this._fragment));
   }
 
   toString(): string {
