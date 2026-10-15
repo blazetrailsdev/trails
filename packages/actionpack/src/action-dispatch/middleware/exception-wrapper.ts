@@ -364,14 +364,15 @@ export class ExceptionWrapper {
 
   /** @internal */
   cleanBacktrace(args: "silent" | "noise" | "all"): Array<BacktraceLine | string> {
+    if (this.backtraceCleaner) {
+      return this.backtraceCleaner.clean(this.backtrace, args);
+    }
     const lines = this.backtrace;
-    const partitioned =
-      args === "silent"
-        ? lines.filter((l) => !String(l).includes("node_modules"))
-        : args === "noise"
-          ? lines.filter((l) => String(l).includes("node_modules"))
-          : lines;
-    return this.backtraceCleaner ? this.backtraceCleaner.clean(partitioned) : partitioned;
+    return args === "silent"
+      ? lines.filter((l) => !String(l).includes("node_modules"))
+      : args === "noise"
+        ? lines.filter((l) => String(l).includes("node_modules"))
+        : lines;
   }
 
   /** @internal */

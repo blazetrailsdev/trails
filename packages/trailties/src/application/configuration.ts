@@ -1,7 +1,7 @@
 import {
+  ActionDispatch,
   ContentSecurityPolicy,
   PermissionsPolicy,
-  Session,
   type NonceGenerator,
 } from "@blazetrails/actionpack";
 import {
@@ -466,7 +466,7 @@ export class Configuration extends EngineConfiguration {
     }
     if (this._sessionStore === ":disabled") return null;
     if (typeof this._sessionStore === "string" && this._sessionStore.startsWith(":")) {
-      return Session.resolveStore(this._sessionStore);
+      return ActionDispatch.Session.resolveStore(this._sessionStore);
     }
     return this._sessionStore;
   }

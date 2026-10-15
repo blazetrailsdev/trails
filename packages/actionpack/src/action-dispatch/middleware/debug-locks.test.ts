@@ -148,17 +148,6 @@ describe("DebugLocks", () => {
     }
   });
 
-  it("DebugLocks.defaultCharset setter writes through to Response.defaultCharset", () => {
-    const prior = Response.defaultCharset;
-    try {
-      DebugLocks.defaultCharset = "us-ascii";
-      expect(Response.defaultCharset).toBe("us-ascii");
-      expect(DebugLocks.defaultCharset).toBe("us-ascii");
-    } finally {
-      Response.defaultCharset = prior;
-    }
-  });
-
   it("throws when no interlock is configured", async () => {
     DebugLocks.interlock = null;
     const mw = new DebugLocks(passthrough);

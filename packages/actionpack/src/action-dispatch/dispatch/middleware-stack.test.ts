@@ -76,14 +76,14 @@ describe("MiddlewareStackTest", () => {
   it("use should push middleware as class onto the stack", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
     expect(stack.get(0)?.klass).toBe(FooMiddleware);
   });
 
   it("use should push middleware class with arguments onto the stack", () => {
     const stack = new MiddlewareStack();
     stack.use(QuxMiddleware, "prefix");
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
     expect(stack.get(0)?.args).toEqual(["prefix"]);
   });
 
@@ -91,7 +91,7 @@ describe("MiddlewareStackTest", () => {
     const stack = new MiddlewareStack();
     const proc = block(() => {});
     stack.use(BlockMiddleware, proc);
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
     expect(stack.last()?.klass).toBe(BlockMiddleware);
     expect(stack.last()?.block).toBe(proc);
   });
@@ -101,7 +101,7 @@ describe("MiddlewareStackTest", () => {
     stack.use(FooMiddleware);
     stack.use(BazMiddleware);
     stack.insert(1, BarMiddleware);
-    expect(stack.length).toBe(3);
+    expect(stack.size).toBe(3);
     expect(stack.get(1)?.klass).toBe(BarMiddleware);
   });
 
@@ -135,7 +135,7 @@ describe("MiddlewareStackTest", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     stack.swap(FooMiddleware, BarMiddleware);
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
     expect(stack.get(0)?.klass).toBe(BarMiddleware);
   });
 
@@ -143,7 +143,7 @@ describe("MiddlewareStackTest", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     stack.swap(FooMiddleware, FooMiddleware);
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
     expect(stack.get(0)?.klass).toBe(FooMiddleware);
   });
 
@@ -152,7 +152,7 @@ describe("MiddlewareStackTest", () => {
     stack.use(FooMiddleware);
     stack.use(BarMiddleware);
     stack.delete(FooMiddleware);
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
     expect(stack.get(0)?.klass).toBe(BarMiddleware);
   });
 
@@ -160,14 +160,14 @@ describe("MiddlewareStackTest", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     stack.delete(BarMiddleware);
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
   });
 
   it("delete! deletes the middleware", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     stack.deleteBang(FooMiddleware);
-    expect(stack.length).toBe(0);
+    expect(stack.size).toBe(0);
   });
 
   it("delete! requires the middleware to be in the stack", () => {

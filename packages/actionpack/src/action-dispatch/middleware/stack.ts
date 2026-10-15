@@ -85,10 +85,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.entries = value;
   }
 
-  get length(): number {
-    return this.entries.length;
-  }
-
   get size(): number {
     return this.entries.length;
   }

@@ -101,7 +101,7 @@ export class GetIp {
   private readonly req: Request;
   private readonly checkIp: boolean;
   private readonly proxies: readonly Proxy[];
-  private memoized: string | null | undefined;
+  private ip: string | null | undefined;
 
   constructor(req: Request, checkIp: boolean, proxies: readonly Proxy[]) {
     this.req = req;
@@ -109,14 +109,8 @@ export class GetIp {
     this.proxies = proxies;
   }
 
-  toString(): string {
-    return this.calculate() ?? "";
-  }
-
-  calculate(): string | null {
-    if (this.memoized !== undefined) return this.memoized;
-    this.memoized = this.calculateIp();
-    return this.memoized;
+  toString(): string | null {
+    return (this.ip ??= this.calculateIp());
   }
 
   private calculateIp(): string | null {

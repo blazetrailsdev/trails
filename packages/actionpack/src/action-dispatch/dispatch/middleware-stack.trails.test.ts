@@ -70,7 +70,7 @@ describe("MiddlewareStackTest", () => {
     stack.use(FooMiddleware);
 
     expect(stack.delete(FooMiddleware)).toBe(stack.middlewares);
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
     expect(stack.get(0)?.klass).toBe(BarMiddleware);
   });
 
@@ -79,7 +79,7 @@ describe("MiddlewareStackTest", () => {
     stack.use(FooMiddleware);
 
     expect(stack.delete(BarMiddleware)).toBeNull();
-    expect(stack.length).toBe(1);
+    expect(stack.size).toBe(1);
   });
 
   it("delete! names the middleware it could not remove", () => {
