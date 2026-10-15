@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
-import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import {
   Relation,
   RecordNotFound,
@@ -194,7 +194,7 @@ describe("RelationTest", () => {
 
   it("to yaml", async () => {
     await expect(Bird.all().toYaml()).resolves.not.toThrow();
-    await expect((async () => YAML.toYaml(await Bird.all()))()).resolves.not.toThrow();
+    await expect((async () => toYaml(await Bird.all()))()).resolves.not.toThrow();
   });
 
   it("to xml", async () => {

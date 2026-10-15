@@ -62,7 +62,7 @@ describe("Psych::ClassLoader", () => {
     expect(loader.regexp()).toBe(RegExp);
     expect(loader.object()).toBe(Object);
     expect(loader.exception()).toBe(Exception);
-    expect(() => loader.psychOmap()).toThrow(new ArgumentError("undefined class/module Psych::"));
+    expect(loader.psychOmap()).toBe(Psych.Omap);
     expect(() => loader.bigDecimal()).toThrow(ArgumentError);
   });
 

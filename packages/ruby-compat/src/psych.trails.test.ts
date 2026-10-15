@@ -238,10 +238,83 @@ describe("Psych.dump options", () => {
 });
 
 describe("Psych.dump canonical", () => {
-  it("raises NotImplementedError for the canonical emitter option", async () => {
+  it("raises ArgumentError for the canonical emitter option", async () => {
+    const { Psych } = await import("./psych.js");
+    const { ArgumentError } = await import("./argument-error.js");
+    expect(() => Psych.dump({ a: 1 }, { canonical: true })).toThrow(ArgumentError);
+    expect(Psych.dump({ a: 1 }, { canonical: false })).toBe("---\na: 1\n");
+  });
+});
+
+describe("Psych.dump document marker and io", () => {
+  it("writes a one-line scalar root on the --- line", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.dump("str")).toBe("--- str\n");
+    expect(Psych.dump(1)).toBe("--- 1\n");
+    expect(Psych.dump(["ok"])).toBe("---\n- ok\n");
+  });
+
+  it("raises NotImplementedError for an io", async () => {
     const { Psych } = await import("./psych.js");
     const { NotImplementedError } = await import("./not-implemented-error.js");
-    expect(() => Psych.dump({ a: 1 }, { canonical: true })).toThrow(NotImplementedError);
-    expect(Psych.dump({ a: 1 }, { canonical: false })).toBe("---\na: 1\n");
+    expect(() => Psych.dump(1, 5 as never)).toThrow(NotImplementedError);
+    expect(() => Psych.safeDump(1, 5 as never)).toThrow(NotImplementedError);
+  });
+});
+
+describe("Psych.safe_dump", () => {
+  it("permits the default classes and refuses an alias unless aliases is true", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.safeDump({ a: [1, 1.5, "x", true, null] })).toBe(
+      "---\na:\n  - 1\n  - 1.5\n  - x\n  - true\n  - null\n",
+    );
+    const shared = ["x"];
+    expect(() => Psych.safeDump([shared, shared])).toThrow(Psych.BadAlias);
+    expect(Psych.safeDump([shared, shared], { aliases: true })).toContain("*");
+  });
+});
+
+describe("Psych::Omap", () => {
+  it("dumps as !!omap pairs and revives both !omap shapes", async () => {
+    const { Psych } = await import("./psych.js");
+    const o = new Psych.Omap<string, number>();
+    o.set("a", 1);
+    o.set("b", 2);
+    expect(Psych.dump(o)).toBe("--- !!omap\n- a: 1\n- b: 2\n");
+    const back = Psych.unsafeLoad(Psych.dump(o));
+    expect(back).toBeInstanceOf(Psych.Omap);
+    expect([...(back as Map<string, number>)]).toEqual([...o]);
+    const mapped = Psych.unsafeLoad("--- !omap\na: 1\nb: 2\n");
+    expect(mapped).toBeInstanceOf(Psych.Omap);
+    expect([...(mapped as Map<string, number>)]).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
+  });
+});
+
+describe("Object#to_yaml", () => {
+  it("dumps with the options it is given", async () => {
+    const { toYaml } = await import("./psych/core-ext.js");
+    expect(toYaml({ a: { b: 1 } }, { indentation: 4 })).toBe("---\na:\n    b: 1\n");
+    expect(toYaml("str")).toBe("--- str\n");
+  });
+});
+
+describe("Psych.load_file and Psych.unsafe_load_file", () => {
+  it("read the file, strip a BOM and answer each fallback for an empty file", async () => {
+    const { Psych } = await import("./psych.js");
+    const { File } = await import("./file.js");
+    const { Dir } = await import("./dir.js");
+    await Dir.mktmpdir("psych", null, {}, async (dir: string) => {
+      const yamlPath = File.join(dir, "a.yml");
+      const emptyPath = File.join(dir, "empty.yml");
+      File.write(yamlPath, "\uFEFFa: 1\n");
+      File.write(emptyPath, "");
+      expect(Psych.loadFile(yamlPath)).toEqual({ a: 1 });
+      expect(Psych.unsafeLoadFile(yamlPath)).toEqual({ a: 1 });
+      expect(Psych.unsafeLoadFile(emptyPath)).toBe(false);
+      expect(Psych.loadFile(emptyPath)).toBeNull();
+    });
   });
 });

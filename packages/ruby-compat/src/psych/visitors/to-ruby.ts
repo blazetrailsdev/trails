@@ -2,7 +2,7 @@ import { Range } from "../../range.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
 import type { Struct, StructInstance } from "../../struct.js";
-import type { Alias, Node, ParsedNode, Scalar, YAMLMap, YAMLSeq } from "yaml";
+import type { Alias, Node, Pair, ParsedNode, Scalar, YAMLMap, YAMLSeq } from "yaml";
 import { Psych } from "../../psych.js";
 import type * as Yaml from "yaml";
 import { yaml as backend, type PsychNode } from "../../psych-adapter.js";
@@ -113,8 +113,11 @@ export class ToRuby {
       return this.register(o, this.registerEmpty(o));
     } else if (o.tag === "!omap" || o.tag === "tag:yaml.org,2002:omap") {
       const map = this.register(o, new Omap());
-      for (const a of o.items as YAMLMap.Parsed[]) {
-        const { key, value } = a.items[0] as { key: ParsedNode; value: ParsedNode };
+      for (const a of o.items as (YAMLMap.Parsed | Pair<ParsedNode, ParsedNode>)[]) {
+        const { key, value } = (yaml.isPair(a) ? a : a.items[0]) as {
+          key: ParsedNode;
+          value: ParsedNode;
+        };
         map.set(this.accept(key), this.accept(value));
       }
       return map;
@@ -231,6 +234,13 @@ export class ToRuby {
         this.register(o, allocate(this.resolveClass(match[1])) as Record<string, unknown>),
         o,
       );
+    }
+    if (o.tag === "!omap" || o.tag === "tag:yaml.org,2002:omap") {
+      const map = this.register(o, new (this.classLoader.psychOmap() as typeof Omap)());
+      for (const { key: l, value: r } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
+        map.set(this.accept(l), this.accept(r));
+      }
+      return map;
     }
     return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
   }

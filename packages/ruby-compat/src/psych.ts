@@ -15,6 +15,10 @@ import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { Omap as PsychOmap } from "./psych/omap.js";
 import { isPlainHash, rbModToS } from "./object.js";
+import { File } from "./file.js";
+import { IO } from "./io.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+import { registerConstant } from "./variable.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
 const yaml = backend as unknown as typeof Yaml;
@@ -163,8 +167,8 @@ export namespace Psych {
   }
 
   /**
-   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505`). There is no
-   * `IO` to write to, so the `io` slot only ever carries the options Hash.
+   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505-514`). No caller
+   * dumps to an `IO`, so a non-Hash `io` raises.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -173,7 +177,11 @@ export namespace Psych {
     io: YAMLTreeOptions | null = null,
     options: YAMLTreeOptions = {},
   ): string {
-    if (isPlainHash(io)) options = io as YAMLTreeOptions;
+    if (isPlainHash(io)) {
+      options = io as YAMLTreeOptions;
+      io = null;
+    }
+    if (io != null) throw new NotImplementedError("Psych.dump to an IO");
 
     const visitor = YAMLTree.create(options);
     visitor.push(o);
@@ -181,8 +189,8 @@ export namespace Psych {
   }
 
   /**
-   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578`). There is
-   * no `IO` to write to, so the `io` slot only ever carries the options Hash.
+   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578-587`). No
+   * caller dumps to an `IO`, so a non-Hash `io` raises.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -191,20 +199,15 @@ export namespace Psych {
     io: YAMLTreeOptions | null = null,
     options: YAMLTreeOptions = {},
   ): string {
-    if (isPlainHash(io)) options = io as YAMLTreeOptions;
+    if (isPlainHash(io)) {
+      options = io as YAMLTreeOptions;
+      io = null;
+    }
+    if (io != null) throw new NotImplementedError("Psych.dump to an IO");
 
     const visitor = RestrictedYAMLTree.create(options);
     visitor.push(o);
     return visitor.tree.yaml(null, options);
-  }
-
-  /**
-   * `Object#to_yaml` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/core_ext.rb:12-14`).
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  export function toYaml(o: unknown): string {
-    return dump(o);
   }
 
   /**
@@ -213,7 +216,7 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function unsafeLoad(
-    yamlString: string | Uint8Array,
+    yamlString: string | Uint8Array | IO,
     { filename = null as string | null, fallback = false as unknown } = {},
   ): unknown {
     const result = parse(yamlString, { filename });
@@ -230,9 +233,10 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function parse(
-    yamlString: string | Uint8Array,
+    yamlString: string | Uint8Array | IO,
     { filename: _filename = null as string | null } = {},
   ): PsychNode | false {
+    if (yamlString instanceof IO) yamlString = yamlString.read();
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
     return yaml.parseDocument(yamlString).contents ?? false;
   }
@@ -243,7 +247,7 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function safeLoad(
-    yamlString: string | Uint8Array,
+    yamlString: string | Uint8Array | IO,
     {
       permittedClasses = [] as unknown[],
       permittedSymbols = [] as string[],
@@ -279,7 +283,7 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function load(
-    yamlString: string | Uint8Array,
+    yamlString: string | Uint8Array | IO,
     {
       permittedClasses = ["Symbol"] as unknown[],
       permittedSymbols = [] as string[],
@@ -302,4 +306,30 @@ export namespace Psych {
       strictInteger,
     });
   }
+
+  /**
+   * `Psych.unsafe_load_file` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:647-651`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function unsafeLoadFile(
+    filename: string,
+    kwargs: Omit<NonNullable<Parameters<typeof unsafeLoad>[1]>, "filename"> = {},
+  ): unknown {
+    return File.open(filename, "r:bom|utf-8", (f) => unsafeLoad(f, { filename, ...kwargs }));
+  }
+
+  /**
+   * `Psych.load_file` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:669-673`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function loadFile(
+    filename: string,
+    kwargs: Omit<NonNullable<Parameters<typeof load>[1]>, "filename"> = {},
+  ): unknown {
+    return File.open(filename, "r:bom|utf-8", (f) => load(f, { filename, ...kwargs }));
+  }
 }
+
+registerConstant("Psych", Psych);
