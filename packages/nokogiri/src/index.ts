@@ -13,8 +13,8 @@ export type { AttrNode } from "./xml/node.js";
 export type { SyntaxError };
 export type { Readable } from "./readable.js";
 import {
-  DocumentFragment as Html4DocumentFragment,
-  Node as Html4Node,
-} from "./html4/document-fragment.js";
-export const HTML4 = { DocumentFragment: Html4DocumentFragment, Node: Html4Node };
-export type { Html4DocumentFragment, Html4Node };
+  DocumentFragment as Html5DocumentFragment,
+  Node as Html5Node,
+} from "./html5/document-fragment.js";
+export const HTML5 = { DocumentFragment: Html5DocumentFragment, Node: Html5Node };
+export type { Html5DocumentFragment, Html5Node };

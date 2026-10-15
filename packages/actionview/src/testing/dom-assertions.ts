@@ -1,8 +1,8 @@
 import { assert, assertNot, isBlank } from "@blazetrails/activesupport";
-import { HTML4, type Html4DocumentFragment, type Html4Node } from "@blazetrails/nokogiri";
+import { HTML5, type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
 
-type Fragment = Html4DocumentFragment | Html4Node;
-type Attr = Html4Node["attributeNodes"][number];
+type Fragment = Html5DocumentFragment | Html5Node;
+type Attr = Html5Node["attributeNodes"][number];
 
 export function assertDomEqual(
   expected: unknown,
@@ -38,7 +38,7 @@ function compareDoms(expected: Fragment, actual: Fragment, strict: boolean): boo
   return true;
 }
 
-function extractChildren(node: Fragment, strict: boolean): Html4Node[] {
+function extractChildren(node: Fragment, strict: boolean): Html5Node[] {
   if (strict) {
     return node.children;
   } else {
@@ -46,7 +46,7 @@ function extractChildren(node: Fragment, strict: boolean): Html4Node[] {
   }
 }
 
-function isEqualChildren(child: Html4Node, otherChild: Html4Node, strict: boolean): boolean {
+function isEqualChildren(child: Html5Node, otherChild: Html5Node, strict: boolean): boolean {
   if (child.type !== otherChild.type) return false;
 
   if (child.isElement()) {
@@ -60,7 +60,7 @@ function isEqualChildren(child: Html4Node, otherChild: Html4Node, strict: boolea
   }
 }
 
-function isEqualChild(child: Html4Node, otherChild: Html4Node, strict: boolean): boolean {
+function isEqualChild(child: Html5Node, otherChild: Html5Node, strict: boolean): boolean {
   if (strict) {
     return child.toString() === otherChild.toString();
   } else {
@@ -90,6 +90,6 @@ function split(string: string): string[] {
   return string.trim() === "" ? [] : string.trim().split(/\s+/);
 }
 
-function fragment(text: unknown): Html4DocumentFragment {
-  return HTML4.DocumentFragment.parse(String(text ?? ""));
+function fragment(text: unknown): Html5DocumentFragment {
+  return HTML5.DocumentFragment.parse(String(text ?? ""));
 }

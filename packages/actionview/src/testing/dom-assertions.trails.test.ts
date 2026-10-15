@@ -35,7 +35,7 @@ describe("DomAssertions", () => {
     assertDomNotEqual("<div><p>a</div>b", "<div><p>a</p></div>");
   });
 
-  // PERMANENT-SKIP: libxml2 HTML4 closes a non-void `<x/>`; the parse5 tree builder the owner chose for HTML4.DocumentFragment cannot.
+  // PERMANENT-SKIP: libxml2 HTML4 closes a non-void `<x/>`; the HTML5 tree builder behind HTML5.DocumentFragment, like Nokogiri::HTML5, opens it.
   it.skip("closes a non-void `/>` element", () => {
     assertDomEqual("<x-icon/><b>a</b>", "<x-icon></x-icon><b>a</b>");
   });
