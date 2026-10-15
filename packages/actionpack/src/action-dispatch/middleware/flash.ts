@@ -162,7 +162,7 @@ export class FlashHash {
   }
 
   /** @internal */
-  private isNowIsLoaded(): boolean {
+  protected isNowIsLoaded(): boolean {
     return this._now != null;
   }
 
