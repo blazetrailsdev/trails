@@ -2,6 +2,7 @@ import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
+  rtest,
   rbEqq,
   rbFSystem,
   rbModConstSet,
@@ -135,15 +136,21 @@ export class PostgreSQLDatabaseTasks {
 
   private psqlEnv(): Record<string, string> {
     const env: Record<string, string> = {};
-    const c = this.configurationHash;
-    if (this.dbConfig.host) env.PGHOST = String(this.dbConfig.host);
-    if (c.port != null) env.PGPORT = String(c.port);
-    if (c.password != null) env.PGPASSWORD = String(c.password);
-    if (c.username != null) env.PGUSER = String(c.username);
-    if (c.sslmode != null) env.PGSSLMODE = String(c.sslmode);
-    if (c.sslcert != null) env.PGSSLCERT = String(c.sslcert);
-    if (c.sslkey != null) env.PGSSLKEY = String(c.sslkey);
-    if (c.sslrootcert != null) env.PGSSLROOTCERT = String(c.sslrootcert);
+    if (rtest(this.dbConfig.host)) env["PGHOST"] = String(this.dbConfig.host);
+    if (rtest(this.configurationHash["port"]))
+      env["PGPORT"] = String(this.configurationHash["port"]);
+    if (rtest(this.configurationHash["password"]))
+      env["PGPASSWORD"] = String(this.configurationHash["password"]);
+    if (rtest(this.configurationHash["username"]))
+      env["PGUSER"] = String(this.configurationHash["username"]);
+    if (rtest(this.configurationHash["sslmode"]))
+      env["PGSSLMODE"] = String(this.configurationHash["sslmode"]);
+    if (rtest(this.configurationHash["sslcert"]))
+      env["PGSSLCERT"] = String(this.configurationHash["sslcert"]);
+    if (rtest(this.configurationHash["sslkey"]))
+      env["PGSSLKEY"] = String(this.configurationHash["sslkey"]);
+    if (rtest(this.configurationHash["sslrootcert"]))
+      env["PGSSLROOTCERT"] = String(this.configurationHash["sslrootcert"]);
     return env;
   }
 

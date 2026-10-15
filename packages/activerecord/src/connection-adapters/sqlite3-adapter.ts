@@ -570,13 +570,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async addTimestamps(tableName: string, options?: Record<string, unknown>): Promise<void> {
-    const opts: Record<string, unknown> = { ...options };
-    if (opts.null == null) opts.null = false;
-    if (!("precision" in opts)) opts.precision = 6;
+    options = { ...options };
+    if (options["null"] == null) options["null"] = false;
+
+    if (!("precision" in options)) {
+      options["precision"] = 6;
+    }
 
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      definition.column("created_at", "datetime", opts);
-      definition.column("updated_at", "datetime", opts);
+      definition.column("created_at", "datetime", options);
+      definition.column("updated_at", "datetime", options);
     });
   }
 
@@ -1037,27 +1040,22 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   override async configureConnection(): Promise<void> {
-    const cfg = this._config as SQLite3Config;
-    if (rtest(cfg.timeout) && rtest(cfg.retries)) {
+    if (rtest(this._config["timeout"]) && rtest(this._config["retries"])) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
-    } else if (rtest(cfg.timeout)) {
-      const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
+    } else if (rtest(this._config["timeout"])) {
+      const timeout = SQLite3Adapter.typeCastConfigToInteger(this._config["timeout"]);
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
       await Pragmas.setBusyTimeout.call(this._rawConnection!, timeout);
-    } else if (rtest(cfg.retries)) {
+    } else if (rtest(this._config["retries"])) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
     }
     await super.configureConnection();
 
-    const pragmas = fetch<Record<string, string | number | boolean>>(
-      cfg as unknown as Record<string, unknown>,
-      "pragmas",
-      {},
-    );
+    const pragmas = fetch<Record<string, string | number | boolean>>(this._config, "pragmas", {});
     for (const [pragma, value] of Object.entries({
       ...SQLite3Adapter.DEFAULT_PRAGMAS,
       ...pragmas,

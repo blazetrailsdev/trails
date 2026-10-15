@@ -430,8 +430,17 @@ export class CommandRecorder {
         "change_column_default is only reversible if given a :from and :to option.",
       );
     }
-    const opts = options as Record<string, unknown>;
-    return ["changeColumnDefault", [table, column, { from: opts["to"], to: opts["from"] }]];
+    return [
+      "changeColumnDefault",
+      [
+        table,
+        column,
+        {
+          from: (options as Record<string, unknown>)["to"],
+          to: (options as Record<string, unknown>)["from"],
+        },
+      ],
+    ];
   }
 
   /** @internal */
@@ -455,8 +464,17 @@ export class CommandRecorder {
         "change_column_comment is only reversible if given a :from and :to option.",
       );
     }
-    const opts = options as Record<string, unknown>;
-    return ["changeColumnComment", [table, column, { from: opts["to"], to: opts["from"] }]];
+    return [
+      "changeColumnComment",
+      [
+        table,
+        column,
+        {
+          from: (options as Record<string, unknown>)["to"],
+          to: (options as Record<string, unknown>)["from"],
+        },
+      ],
+    ];
   }
 
   /** @internal */
@@ -474,8 +492,16 @@ export class CommandRecorder {
         "change_table_comment is only reversible if given a :from and :to option.",
       );
     }
-    const opts = options as Record<string, unknown>;
-    return ["changeTableComment", [table, { from: opts["to"], to: opts["from"] }]];
+    return [
+      "changeTableComment",
+      [
+        table,
+        {
+          from: (options as Record<string, unknown>)["to"],
+          to: (options as Record<string, unknown>)["from"],
+        },
+      ],
+    ];
   }
 
   /** @internal */
