@@ -238,27 +238,34 @@ describe("Psych.dump options", () => {
 });
 
 describe("Psych.dump canonical", () => {
-  it("raises ArgumentError for the canonical emitter option", async () => {
+  it("raises NotImplementedError for the canonical emitter option", async () => {
     const { Psych } = await import("./psych.js");
-    const { ArgumentError } = await import("./argument-error.js");
-    expect(() => Psych.dump({ a: 1 }, { canonical: true })).toThrow(ArgumentError);
+    const { NotImplementedError } = await import("./not-implemented-error.js");
+    expect(() => Psych.dump({ a: 1 }, { canonical: true })).toThrow(NotImplementedError);
     expect(Psych.dump({ a: 1 }, { canonical: false })).toBe("---\na: 1\n");
   });
 });
 
 describe("Psych.dump document marker and io", () => {
-  it("writes a one-line scalar root on the --- line", async () => {
+  it("writes a scalar root on the --- line as libyaml does", async () => {
     const { Psych } = await import("./psych.js");
     expect(Psych.dump("str")).toBe("--- str\n");
-    expect(Psych.dump(1)).toBe("--- 1\n");
+    expect(Psych.dump("")).toBe("--- ''\n");
+    expect(Psych.dump(null)).toBe("---\n");
+    expect(Psych.dump(1.5)).toBe("--- 1.5\n");
+    expect(Psych.dump("true")).toBe("--- 'true'\n");
+    expect(Psych.dump("x".repeat(100))).toBe(`--- ${"x".repeat(100)}\n`);
+    expect(Psych.dump("a\nb")).toBe("--- |-\n  a\n  b\n");
     expect(Psych.dump(["ok"])).toBe("---\n- ok\n");
   });
 
-  it("raises NotImplementedError for an io", async () => {
+  it("writes to an io and answers it", async () => {
     const { Psych } = await import("./psych.js");
-    const { NotImplementedError } = await import("./not-implemented-error.js");
-    expect(() => Psych.dump(1, 5 as never)).toThrow(NotImplementedError);
-    expect(() => Psych.safeDump(1, 5 as never)).toThrow(NotImplementedError);
+    const { StringIO } = await import("./string-io.js");
+    const io = new StringIO();
+    expect(Psych.dump(["ok"], io)).toBe(io);
+    expect(Psych.safeDump("str", io, {})).toBe(io);
+    expect(io.string()).toBe("---\n- ok\n--- str\n");
   });
 });
 

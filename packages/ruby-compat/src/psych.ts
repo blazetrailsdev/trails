@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `Psych` module is a
    namespace of module functions and classes; ESM syntax cannot spell `Psych.dump`. */
 import type * as Yaml from "yaml";
-import { yaml as backend, type PsychNode } from "./psych-adapter.js";
+import { yaml as backend, type PsychIO, type PsychNode } from "./psych-adapter.js";
 import { Coder as PsychCoder } from "./psych/coder.js";
 import { ClassLoader as PsychClassLoader } from "./psych/class-loader.js";
 import {
@@ -17,7 +17,6 @@ import { Omap as PsychOmap } from "./psych/omap.js";
 import { isPlainHash, rbModToS } from "./object.js";
 import { File } from "./file.js";
 import { IO } from "./io.js";
-import { NotImplementedError } from "./not-implemented-error.js";
 import { registerConstant } from "./variable.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
@@ -167,47 +166,51 @@ export namespace Psych {
   }
 
   /**
-   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505-514`). No caller
-   * dumps to an `IO`, so a non-Hash `io` raises.
+   * `Psych.dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:505-514`).
    *
    * @noRailsEquivalent PERMANENT
    */
+  export function dump(o: unknown, io?: YAMLTreeOptions | null, options?: YAMLTreeOptions): string;
+  export function dump<T extends PsychIO>(o: unknown, io: T, options?: YAMLTreeOptions): T;
   export function dump(
     o: unknown,
-    io: YAMLTreeOptions | null = null,
+    io: PsychIO | YAMLTreeOptions | null = null,
     options: YAMLTreeOptions = {},
-  ): string {
+  ): string | PsychIO {
     if (isPlainHash(io)) {
       options = io as YAMLTreeOptions;
       io = null;
     }
-    if (io != null) throw new NotImplementedError("Psych.dump to an IO");
 
     const visitor = YAMLTree.create(options);
     visitor.push(o);
-    return visitor.tree.yaml(null, options);
+    return visitor.tree.yaml(io as PsychIO | null, options);
   }
 
   /**
-   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578-587`). No
-   * caller dumps to an `IO`, so a non-Hash `io` raises.
+   * `Psych.safe_dump` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:578-587`).
    *
    * @noRailsEquivalent PERMANENT
    */
   export function safeDump(
     o: unknown,
-    io: YAMLTreeOptions | null = null,
+    io?: YAMLTreeOptions | null,
+    options?: YAMLTreeOptions,
+  ): string;
+  export function safeDump<T extends PsychIO>(o: unknown, io: T, options?: YAMLTreeOptions): T;
+  export function safeDump(
+    o: unknown,
+    io: PsychIO | YAMLTreeOptions | null = null,
     options: YAMLTreeOptions = {},
-  ): string {
+  ): string | PsychIO {
     if (isPlainHash(io)) {
       options = io as YAMLTreeOptions;
       io = null;
     }
-    if (io != null) throw new NotImplementedError("Psych.dump to an IO");
 
     const visitor = RestrictedYAMLTree.create(options);
     visitor.push(o);
-    return visitor.tree.yaml(null, options);
+    return visitor.tree.yaml(io as PsychIO | null, options);
   }
 
   /**

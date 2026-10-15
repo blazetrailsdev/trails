@@ -24,6 +24,16 @@ export interface PsychNode {
 }
 
 /**
+ * The `io` `Psych::Nodes::Node#yaml` writes to
+ * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:58-64`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface PsychIO {
+  write(string: string): unknown;
+}
+
+/**
  * The tree `YAMLTree#tree` answers, emitted by `Psych::Nodes::Node#yaml`
  * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:58-64`).
  *
@@ -31,9 +41,9 @@ export interface PsychNode {
  */
 export interface PsychDocument {
   yaml(
-    io?: null,
+    io?: PsychIO | null,
     options?: { indentation?: number; canonical?: boolean; lineWidth?: number },
-  ): string;
+  ): string | PsychIO;
 }
 
 const registry = new Map<string, PsychAdapter>();
