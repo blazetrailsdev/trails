@@ -1,4 +1,5 @@
 import { rbObjId } from "@blazetrails/ruby-compat";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { EncryptedFile, MissingContentError } from "./encrypted-file.js";
 import { presence } from "./core-ext/object/blank.js";
 import { delegateMissingTo } from "./module-ext.js";
@@ -9,9 +10,7 @@ export class InvalidContentError extends Error {
     const message = `Invalid YAML in '${contentPath}'.`;
     const cause = options.cause;
     super(
-      cause instanceof Error && cause.name === "YAMLParseError"
-        ? `${message}\n\n  ${cause.message}`
-        : message,
+      cause instanceof Psych.SyntaxError ? `${message}\n\n  ${cause.message}` : message,
       options,
     );
     this.name = "InvalidContentError";
@@ -118,7 +117,7 @@ export class EncryptedConfiguration extends EncryptedFile {
     try {
       config = parse(content, { mapAsMap: true, version: "1.1" });
     } catch (e) {
-      if (e instanceof Error && e.name === "YAMLParseError") {
+      if (e instanceof Psych.SyntaxError) {
         throw new InvalidContentError(this.contentPath, { cause: e });
       }
       throw e;

@@ -127,7 +127,10 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
   "core/kernel/catch_spec.rb": "kernel-catch.test.ts",
   "core/kernel/throw_spec.rb": "kernel-catch.test.ts",
   "library/yaml/dump_spec.rb": "psych-dump.test.ts",
+  "library/yaml/load_file_spec.rb": "psych-load-file.test.ts",
+  "library/yaml/load_spec.rb": "psych-load.test.ts",
   "library/yaml/to_yaml_spec.rb": "psych-to-yaml.test.ts",
+  "library/yaml/unsafe_load_spec.rb": "psych-unsafe-load.test.ts",
 };
 
 /**

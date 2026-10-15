@@ -1,4 +1,5 @@
 import { LoadError } from "./load-error.js";
+import { SyntaxError } from "./psych/syntax-error.js";
 
 /**
  * The libyaml binding `psych.so` stands behind (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`
@@ -137,7 +138,8 @@ export const yaml: PsychAdapter = new Proxy({} as PsychAdapter, {
  * `require 'psych.so'`. Not `Psych.parse` (`:398`), which answers a node tree.
  * libyaml reads the source's bytes (`yaml_parser_set_input_string`,
  * `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`), so a source held as its
- * bytes is decoded here; malformed bytes raise `SyntaxError` (`Psych::SyntaxError`).
+ * bytes is decoded here. Malformed bytes or a malformed document raise
+ * `Psych::SyntaxError`, as `make_exception` does (`psych_parser.c:80-100`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -146,10 +148,28 @@ export function parse(src: string | Uint8Array, ...options: unknown[]): unknown 
     try {
       src = new TextDecoder("utf-8", { fatal: true }).decode(src);
     } catch {
-      throw new SyntaxError("invalid leading UTF-8 octet");
+      throw new SyntaxError(null, 0, 0, 0, "invalid leading UTF-8 octet", null);
     }
   }
-  return resolve().parse(src, ...options);
+  try {
+    return resolve().parse(src, ...options);
+  } catch (error) {
+    const e = error as {
+      message?: string;
+      pos?: [number, number];
+      linePos?: { line: number; col: number }[];
+    };
+    if (!(error instanceof Error) || !Array.isArray(e.pos)) throw error;
+    const mark = e.linePos?.[0] ?? { line: 0, col: 0 };
+    throw new SyntaxError(
+      null,
+      mark.line,
+      mark.col,
+      e.pos[0],
+      error.message.split(" at line ")[0],
+      null,
+    );
+  }
 }
 
 /**

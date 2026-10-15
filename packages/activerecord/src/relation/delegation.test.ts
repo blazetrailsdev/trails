@@ -70,16 +70,10 @@ const ARRAY_DELEGATES = [
 
 function DelegationTests(target: () => object): void {
   for (const method of ARRAY_DELEGATES) {
-    if (method === "to_yaml") continue;
     it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
       assertRespondTo(target(), tsName(method));
     });
   }
-
-  it.skip("delegates to yaml to Array", () => {
-    // BLOCKED: missing surface — to_yaml is Psych's Object#to_yaml (psych-object-to-yaml), and respond_to? does not answer it (respond-to-answers-object-to-yaml)
-    assertRespondTo(target(), "toYaml");
-  });
 
   it("not respond to arel method", () => {
     assertNotRespondTo(target(), "exists");

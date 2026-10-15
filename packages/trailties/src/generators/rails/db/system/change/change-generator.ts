@@ -1,4 +1,6 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { any } from "@blazetrails/activesupport";
+import { aryDelete, compact, File, FileUtils, flatten } from "@blazetrails/ruby-compat";
+import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
 import { TEMPLATES } from "../../../app/templates.js";
@@ -170,55 +172,48 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   private editComposeYaml(): void {
-    const rel = ".devcontainer/compose.yaml";
-    if (!this.fileExists(rel)) return;
-    const full = File.join(this.cwd, rel);
-    let compose: {
+    const composeYamlPath = File.expandPath(".devcontainer/compose.yaml", this.cwd);
+    if (!File.isExist(composeYamlPath)) return;
+
+    const composeConfig = YAML.loadFile(composeYamlPath) as {
       services: Record<string, Record<string, unknown>>;
-      volumes?: Record<string, unknown>;
+      volumes?: Record<string, unknown> | null;
       [k: string]: unknown;
     };
-    try {
-      compose = JSON.parse(File.read(full));
-    } catch (e) {
-      throw new Error(
-        `Could not parse ${full}: ${(e as Error).message}. Fix the file and re-run.`,
-        {
-          cause: e,
-        },
-      );
-    }
-    const { services } = compose;
-    const volumes = compose.volumes ?? {};
-    const railsApp = services["rails-app"] as
-      | { depends_on?: string[]; [k: string]: unknown }
-      | undefined;
 
-    for (const d of Database.all()) {
-      delete services[d.name];
-      if (d.volume) delete volumes[d.volume];
-      if (railsApp?.depends_on) {
-        railsApp.depends_on = railsApp.depends_on.filter((dep) => dep !== d.name);
-      }
+    for (const database of Database.all()) {
+      delete composeConfig["services"][database.name];
+      if (composeConfig["volumes"] != null) delete composeConfig["volumes"][database.volume!];
+      const dependsOn = composeConfig["services"]["rails-app"]["depends_on"] as string[] | null;
+      if (dependsOn != null) aryDelete(dependsOn, database.name);
     }
 
     if (this.database.service) {
-      services[this.database.name] = this.database.service as unknown as Record<string, unknown>;
-      if (this.database.volume) volumes[this.database.volume] = null;
-      if (railsApp) {
-        railsApp.depends_on = [this.database.name, ...(railsApp.depends_on ?? [])];
-      }
+      composeConfig["services"][this.database.name] = this.database.service as unknown as Record<
+        string,
+        unknown
+      >;
+      composeConfig["volumes"] = {
+        [this.database.volume!]: null,
+        ...(composeConfig["volumes"] ?? {}),
+      };
+      composeConfig["services"]["rails-app"]["depends_on"] = compact(
+        flatten([this.database.name, composeConfig["services"]["rails-app"]["depends_on"]]),
+      );
     }
 
-    if (Object.keys(volumes).length > 0) {
-      compose.volumes = volumes;
-    } else {
-      delete compose.volumes;
+    if (!(composeConfig["volumes"] != null && Object.keys(composeConfig["volumes"]).length > 0)) {
+      delete composeConfig["volumes"];
+    }
+    const railsAppDependsOn = composeConfig["services"]["rails-app"]["depends_on"] as
+      | unknown[]
+      | null
+      | undefined;
+    if (!(railsAppDependsOn != null && any(railsAppDependsOn))) {
+      delete composeConfig["services"]["rails-app"]["depends_on"];
     }
 
-    if (railsApp?.depends_on?.length === 0) delete railsApp.depends_on;
-
-    this.writeOrUpdate(rel, JSON.stringify(compose, null, 2) + "\n");
+    File.write(composeYamlPath, toYaml(composeConfig));
   }
 }
 

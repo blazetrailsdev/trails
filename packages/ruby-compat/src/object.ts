@@ -569,7 +569,9 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * `lib/set.rb:499`, `hash.c:7219`), and `eachPair` for a `Map` or plain hash
  * (`hash.c:7218`). `isInfinite` and
  * `isFinite` are bound for a JS number and bigint, which spell Float
- * (`numeric.c:6376-6377`) and Integer (`numeric.rb:39-48`). A Temporal seat answers for the methods
+ * (`numeric.c:6376-6377`) and Integer (`numeric.rb:39-48`). `toYaml` is bound for
+ * every receiver: Psych defines `to_yaml` on `Object` (`ext/psych/lib/psych/core_ext.rb:12-14`),
+ * and trails ports it as the free `toYaml` in `psych/core-ext.ts`. A Temporal seat answers for the methods
  * {@link TEMPORAL_METHOD_TABLE} binds on it.
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
@@ -595,6 +597,7 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * (`vendor/ruby/v3.3.11/vm_method.c:2864`).
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
+  if (mid === "toYaml") return true;
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
   if (
