@@ -5,6 +5,20 @@ import { Response } from "@blazetrails/rack";
 import { CookieJar } from "../cookies.js";
 import { cookiesSameSiteProtection, type RequestCookieMethodsHost } from "../middleware/cookies.js";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
+import "@blazetrails/activesupport/message-pack";
+import {
+  assertEqual,
+  assertMatch,
+  assertNil,
+  assertNotEqual,
+  assertNotNil,
+  assertRaise,
+} from "@blazetrails/activesupport";
+import { ArgumentError, JSON, Marshal } from "@blazetrails/ruby-compat";
+import { unescape } from "@blazetrails/rack";
+import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 
 function jarWithSameSiteProtection(
   proc: (request: { userAgent?: string }) => unknown,
@@ -31,24 +45,33 @@ function cookieEnv(env: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     "action_dispatch.key_generator": new KeyGenerator(SECRET_KEY_BASE, { iterations: 2 }),
     "action_dispatch.cookies_rotations": new RotationConfiguration(),
+    "action_dispatch.secret_key_base": SECRET_KEY_BASE,
     "action_dispatch.signed_cookie_salt": "signed cookie",
     "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
     "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
+    "action_dispatch.authenticated_encrypted_cookie_salt": "authenticated encrypted cookie",
+    "action_dispatch.use_authenticated_cookie_encryption": true,
+    "action_dispatch.cookies_same_site_protection": () => ":lax",
     ...env,
   };
 }
 
-function cookieRequest(env: Record<string, unknown> = {}): RequestCookieMethodsHost {
+function cookieRequest(
+  env: Record<string, unknown> = {},
+  host = "www.nextangle.com",
+): RequestCookieMethodsHost {
   const e = cookieEnv(env);
   return {
     env: e,
+    host,
+    cookiesSameSiteProtection,
     getHeader: (name: string) => e[name],
     hasHeader: (name: string) => Object.hasOwn(e, name),
     fetchHeader: (name: string, block: (name: string) => unknown) =>
       Object.hasOwn(e, name) ? e[name] : block(name),
     setHeader: (name: string, value: unknown) => (e[name] = value),
     cookies: {},
-  };
+  } as RequestCookieMethodsHost;
 }
 
 function setCookieHeaders(jar: CookieJar): string[] {
@@ -57,6 +80,22 @@ function setCookieHeaders(jar: CookieJar): string[] {
   const header = response.headers["set-cookie"];
   if (header === undefined || header === null) return [];
   return Array.isArray(header) ? header : [header];
+}
+
+function responseCookies(jar: CookieJar): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  for (const [name, attributes] of CookieAssertions.parseSetCookiesHeaders(setCookieHeaders(jar))) {
+    cookies[name] = unescape(attributes["value"] as string);
+  }
+  return cookies;
+}
+
+function assertSetCookieHeader(expected: string, jar: CookieJar): void {
+  CookieAssertions.assertSetCookieHeader.call(
+    CookieAssertions as never,
+    expected,
+    setCookieHeaders(jar),
+  );
 }
 
 describe("CookieJarTest", () => {
@@ -359,13 +398,18 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie with no same site protection", () => {
-    const jar = new CookieJar(cookieRequest());
-    jar.set("foo", { value: "bar" });
-    const headers = setCookieHeaders(jar);
-    expect(headers[0]).not.toContain("samesite");
+    const jar = jarWithSameSiteProtection(() => ":none");
+    jar.set("user_name", "david");
+    assertSetCookieHeader("user_name=david; path=/; SameSite=None", jar);
+    assertEqual({ user_name: "david" }, responseCookies(jar));
   });
 
-  it.skip("setting cookie with secure on onion address", () => {});
+  it("setting cookie with secure on onion address", () => {
+    const jar = new CookieJar(cookieRequest({}, "fake.onion"));
+    jar.set("user_name", { value: "david", secure: true });
+    assertSetCookieHeader("user_name=david; path=/; secure; SameSite=Lax", jar);
+    assertEqual({ user_name: "david" }, responseCookies(jar));
+  });
 
   it("setting cookie with same site protection proc normal user agent", () => {
     const jar = jarWithSameSiteProtection((request) =>
@@ -597,53 +641,299 @@ describe("CookiesTest", () => {
     expect(headers[0]).not.toContain("samesite");
   });
 
-  it.skip("setting cookie with misspelled same site protection raises", () => {});
+  it("setting cookie with misspelled same site protection raises", async () => {
+    const jar = jarWithSameSiteProtection(() => ":funky");
+    jar.set("user_name", "david");
+    const error = await assertRaise([ArgumentError], {}, () => setCookieHeaders(jar));
+    assertMatch(/Invalid :?Same_?Site value: :funky/i, error.message);
+  });
 
-  it.skip("setting cookie with secure when always write cookie is true", () => {});
+  it("setting cookie with secure when always write cookie is true", () => {
+    const jar = new CookieJar(cookieRequest());
+    const oldCookie = jar.alwaysWriteCookie;
+    jar.alwaysWriteCookie = true;
+    try {
+      jar.set("user_name", { value: "david", secure: true });
+      assertSetCookieHeader("user_name=david; path=/; secure; SameSite=Lax", jar);
+      assertEqual({ user_name: "david" }, responseCookies(jar));
+    } finally {
+      jar.alwaysWriteCookie = oldCookie;
+    }
+  });
 
-  it.skip("signed cookie using custom digest", () => {});
+  it.skip("signed cookie using custom digest", () => {
+    const request = cookieRequest({ "action_dispatch.signed_cookie_digest": "SHA256" });
+    const cookies = new CookieJar(request);
+    cookies.signed.set("user_id", 45);
+    assertNotEqual(45, cookies.get("user_id"));
+    assertEqual(45, cookies.signed.get("user_id"));
 
-  it.skip("signed cookie rotating secret and digest", () => {});
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const secret = keyGenerator.generateKey(
+      request.env["action_dispatch.signed_cookie_salt"] as string,
+    );
 
-  it.skip("signed cookie using marshal serializer", () => {});
+    const verifier = new MessageVerifier(secret, {
+      serializer: Marshal,
+      digest: "SHA256",
+    });
+    assertEqual(verifier.generate(45), cookies.get("user_id"));
+  });
+
+  it.skip("signed cookie rotating secret and digest", () => {
+    let secret: string | ReturnType<KeyGenerator["generateKey"]> =
+      "b3c631c314c0bbca50c1b2843150fe33";
+
+    const request = cookieRequest({ "action_dispatch.signed_cookie_digest": "SHA256" });
+    (request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
+      "signed",
+      secret,
+      { digest: "SHA1" },
+    );
+
+    const oldMessage = new MessageVerifier(secret, {
+      digest: "SHA1",
+      serializer: Marshal,
+    }).generate(45);
+    const cookies = CookieJar.build(request, { user_id: oldMessage });
+
+    assertEqual(45, cookies.signed.get("user_id"));
+
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    secret = keyGenerator.generateKey(request.env["action_dispatch.signed_cookie_salt"] as string);
+    const verifier = new MessageVerifier(secret, { digest: "SHA256", serializer: Marshal });
+    assertEqual(45, verifier.verify(responseCookies(cookies)["user_id"]));
+  });
+
+  it("signed cookie using marshal serializer", () => {
+    const cookies = new CookieJar(
+      cookieRequest({ "action_dispatch.cookies_serializer": ":marshal" }),
+    );
+    cookies.signed.set("user_id", 45);
+    assertNotEqual(45, cookies.get("user_id"));
+    assertEqual(45, cookies.signed.get("user_id"));
+  });
 
   it.skip("wrapped signed cookie using json serializer", () => {});
 
-  it.skip("signed cookie using message pack serializer", () => {});
+  it("signed cookie using message pack serializer", () => {
+    const cookies = new CookieJar(
+      cookieRequest({ "action_dispatch.cookies_serializer": ":message_pack" }),
+    );
+    cookies.signed.set("user_id", 45);
+    assertNotEqual(45, cookies.get("user_id"));
+    assertEqual(45, cookies.signed.get("user_id"));
+  });
 
-  it.skip("signed cookie using marshal serializer can read from json dumped value", () => {});
+  it("signed cookie using marshal serializer can read from json dumped value", () => {
+    const request = cookieRequest({ "action_dispatch.cookies_serializer": ":marshal" });
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const secret = keyGenerator.generateKey(
+      request.env["action_dispatch.signed_cookie_salt"] as string,
+    );
 
-  it.skip("signed cookie using hybrid serializer can read from json dumped value", () => {});
+    const jsonValue = new MessageVerifier(secret, { serializer: JSON }).generate(45);
+    const cookies = CookieJar.build(request, { user_id: jsonValue });
 
-  it.skip("signed cookie using json serializer will drop marshal dumped value", () => {});
+    assertNotEqual(45, cookies.get("user_id"));
+    assertEqual(45, cookies.signed.get("user_id"));
+
+    assertNil(responseCookies(cookies)["user_id"]);
+  });
+
+  it("signed cookie using hybrid serializer can read from json dumped value", () => {
+    const request = cookieRequest({ "action_dispatch.cookies_serializer": ":hybrid" });
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const secret = keyGenerator.generateKey(
+      request.env["action_dispatch.signed_cookie_salt"] as string,
+    );
+
+    const jsonValue = new MessageVerifier(secret, { serializer: JSON }).generate(45);
+    const cookies = CookieJar.build(request, { user_id: jsonValue });
+
+    assertNotEqual(45, cookies.get("user_id"));
+    assertEqual(45, cookies.signed.get("user_id"));
+
+    assertNil(responseCookies(cookies)["user_id"]);
+  });
+
+  it("signed cookie using json serializer will drop marshal dumped value", () => {
+    const request = cookieRequest({ "action_dispatch.cookies_serializer": ":json" });
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const secret = keyGenerator.generateKey(
+      request.env["action_dispatch.signed_cookie_salt"] as string,
+    );
+
+    const marshalValue = new MessageVerifier(secret, { serializer: Marshal }).generate("bar");
+    const cookies = CookieJar.build(request, { foo: marshalValue });
+
+    assertNotEqual("bar", cookies.get("foo"));
+    assertNil(cookies.signed.get("foo"));
+    assertNil(responseCookies(cookies)["foo"]);
+  });
 
   it.skip("signed cookie using message pack serializer can migrate json dumped value to message pack", () => {});
 
-  it.skip("encrypted cookie using marshal serializer", () => {});
+  it("encrypted cookie using marshal serializer", () => {
+    const cookies = new CookieJar(
+      cookieRequest({ "action_dispatch.cookies_serializer": ":marshal" }),
+    );
+    cookies.encrypted.set("foo", "bar");
+    assertNotEqual("bar", cookies.get("foo"));
+    assertNil(cookies.signed.get("foo"));
+    assertEqual("bar", cookies.encrypted.get("foo"));
+  });
 
   it.skip("wrapped encrypted cookie using json serializer", () => {});
 
-  it.skip("encrypted cookie using message pack serializer", () => {});
+  it("encrypted cookie using message pack serializer", () => {
+    const cookies = new CookieJar(
+      cookieRequest({ "action_dispatch.cookies_serializer": ":message_pack" }),
+    );
+    cookies.encrypted.set("foo", "bar");
+    assertNotEqual("bar", cookies.get("foo"));
+    assertNil(cookies.signed.get("foo"));
+    assertEqual("bar", cookies.encrypted.get("foo"));
+  });
 
-  it.skip("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", () => {});
+  it.skip("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", () => {
+    const request = cookieRequest({ "action_dispatch.cookies_serializer": ":hybrid" });
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const secret = keyGenerator.generateKey(
+      request.env["action_dispatch.authenticated_encrypted_cookie_salt"] as string,
+      32,
+    ) as Buffer;
 
-  it.skip("encrypted cookie using hybrid serializer can read from json dumped value", () => {});
+    const encryptor = new MessageEncryptor(secret, {
+      cipher: "aes-256-gcm",
+      serializer: Marshal,
+    });
+    const marshalValue = encryptor.encryptAndSign("bar");
+    const cookies = CookieJar.build(request, { foo: marshalValue });
 
-  it.skip("encrypted cookie using json serializer will drop marshal dumped value", () => {});
+    assertNotEqual("bar", cookies.get("foo"));
+    assertEqual("bar", cookies.encrypted.get("foo"));
+
+    const jsonEncryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm", serializer: JSON });
+    assertNotNil(responseCookies(cookies)["foo"]);
+    assertEqual("bar", jsonEncryptor.decryptAndVerify(responseCookies(cookies)["foo"]));
+  });
+
+  it("encrypted cookie using hybrid serializer can read from json dumped value", () => {
+    const request = cookieRequest({ "action_dispatch.cookies_serializer": ":hybrid" });
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const secret = keyGenerator.generateKey(
+      request.env["action_dispatch.authenticated_encrypted_cookie_salt"] as string,
+      32,
+    ) as Buffer;
+
+    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm", serializer: JSON });
+    const jsonValue = encryptor.encryptAndSign("bar");
+    const cookies = CookieJar.build(request, { foo: jsonValue });
+
+    assertNotEqual("bar", cookies.get("foo"));
+    assertEqual("bar", cookies.encrypted.get("foo"));
+
+    assertNil(responseCookies(cookies)["foo"]);
+  });
+
+  it("encrypted cookie using json serializer will drop marshal dumped value", () => {
+    const request = cookieRequest({ "action_dispatch.cookies_serializer": ":json" });
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const secret = keyGenerator.generateKey(
+      request.env["action_dispatch.authenticated_encrypted_cookie_salt"] as string,
+      32,
+    ) as Buffer;
+
+    const encryptor = new MessageEncryptor(secret, {
+      cipher: "aes-256-gcm",
+      serializer: Marshal,
+    });
+    const marshalValue = encryptor.encryptAndSign("bar");
+    const cookies = CookieJar.build(request, { foo: marshalValue });
+
+    assertNotEqual("bar", cookies.get("foo"));
+    assertNil(cookies.encrypted.get("foo"));
+    assertNil(responseCookies(cookies)["foo"]);
+  });
 
   it.skip("encrypted cookie using message pack serializer can migrate json dumped value to message pack", () => {});
 
   it.skip("cookie jar mutated by request persists on future requests", () => {});
 
-  it.skip("permanent signed cookie", () => {});
+  it("permanent signed cookie", () => {
+    const cookies = new CookieJar(cookieRequest());
+    cookies.permanent.signed.set("remember_me", 100);
+    assertMatch(
+      new RegExp(`${new Date().getUTCFullYear() + 20}`),
+      setCookieHeaders(cookies).join("\n"),
+    );
+    assertEqual(100, cookies.signed.get("remember_me"));
+  });
 
-  it.skip("use authenticated cookie encryption uses legacy hmac aes cbc encryption when not enabled", () => {});
+  it.skip("use authenticated cookie encryption uses legacy hmac aes cbc encryption when not enabled", () => {
+    const request = cookieRequest({ "action_dispatch.use_authenticated_cookie_encryption": null });
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    const encryptedCookieSalt = request.env["action_dispatch.encrypted_cookie_salt"] as string;
+    const encryptedSignedCookieSalt = request.env[
+      "action_dispatch.encrypted_signed_cookie_salt"
+    ] as string;
+    const secret = keyGenerator.generateKey(
+      encryptedCookieSalt,
+      MessageEncryptor.keyLen("aes-256-cbc"),
+    ) as Buffer;
+    const signSecret = keyGenerator.generateKey(encryptedSignedCookieSalt) as Buffer;
+    const encryptor = new MessageEncryptor(secret, signSecret, {
+      cipher: "aes-256-cbc",
+      digest: "SHA1",
+      serializer: Marshal,
+    });
+
+    const cookies = new CookieJar(request);
+    cookies.encrypted.set("foo", "bar");
+
+    assertNotEqual("bar", cookies.get("foo"));
+    assertEqual("bar", cookies.encrypted.get("foo"));
+    assertEqual("bar", encryptor.decryptAndVerify(responseCookies(cookies)["foo"]));
+  });
 
   it.skip("rotating signed cookies digest", () => {});
 
   it.skip("legacy hmac aes cbc marshal mode falls back to authenticated encrypted cookie", () => {});
 
   it.skip("legacy hmac aes cbc json mode falls back to authenticated encrypted cookie", () => {});
+
+  it.skip("encrypted cookie rotating secret", () => {
+    let secret: string | Buffer = "b3c631c314c0bbca50c1b2843150fe33";
+
+    const request = cookieRequest({ "action_dispatch.encrypted_cookie_cipher": "aes-256-gcm" });
+    (request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
+      "encrypted",
+      secret,
+      { digest: "SHA1" },
+    );
+
+    const keyLen = MessageEncryptor.keyLen("aes-256-gcm");
+
+    const oldMessage = new MessageEncryptor(secret, {
+      cipher: "aes-256-gcm",
+      serializer: Marshal,
+    }).encryptAndSign(45);
+
+    const cookies = CookieJar.build(request, { foo: oldMessage });
+    assertEqual(45, cookies.encrypted.get("foo"));
+
+    const keyGenerator = request.env["action_dispatch.key_generator"] as KeyGenerator;
+    secret = keyGenerator.generateKey(
+      request.env["action_dispatch.authenticated_encrypted_cookie_salt"] as string,
+      keyLen,
+    ) as Buffer;
+    const encryptor = new MessageEncryptor(secret, {
+      cipher: "aes-256-gcm",
+      serializer: Marshal,
+    });
+    assertEqual(45, encryptor.decryptAndVerify(responseCookies(cookies)["foo"]));
+  });
 
   it.skip("legacy hmac aes cbc encrypted marshal cookie is upgraded to authenticated encrypted cookie", () => {});
 
