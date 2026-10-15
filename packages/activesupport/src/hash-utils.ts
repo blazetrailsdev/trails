@@ -300,7 +300,7 @@ export function transformKeys(
   }
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(hash)) {
-    result[(block as (key: string) => string)(key)] = hash[key];
+    hashAset(result, (block as (key: string) => string)(key), hash[key]);
   }
   return result;
 }

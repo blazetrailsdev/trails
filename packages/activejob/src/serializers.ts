@@ -1,6 +1,7 @@
 import { Autoload, extend, mattrAccessor, safeConstantize } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  rtest,
   rbInspect,
   rbModConstSet,
   rbModName,
@@ -36,7 +37,7 @@ export function serialize(argument: unknown): unknown {
 
 export function deserialize(argument: Record<string, unknown>): unknown {
   const serializerName = argument[ActiveJob.Arguments.OBJECT_SERIALIZER_KEY] as string | null;
-  if (serializerName == null) {
+  if (!rtest(serializerName)) {
     throw new ArgumentError(
       `Serializer name is not present in the argument: ${rbInspect(argument)}`,
     );

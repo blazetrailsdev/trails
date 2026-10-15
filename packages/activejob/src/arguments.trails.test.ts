@@ -52,6 +52,25 @@ describe("ActiveJob::Arguments", () => {
     ]);
   });
 
+  it("deserializes a Map hash, including a custom-serialized one", async () => {
+    const plain = new Hash<string, unknown>().set("a", 1).set("_aj_symbol_keys", ["a"]);
+    expect(await deserialize([plain])).toEqual([new Hash<string, unknown>().set(":a", 1)]);
+    const custom = new Hash<string, unknown>().set("_aj_serialized", "Nope::Missing");
+    await expect(deserialize([custom])).rejects.toThrow("Serializer Nope::Missing is not known");
+  });
+
+  it("treats a false key marker or serializer name as absent", async () => {
+    expect(await deserialize([{ a: 1, _aj_symbol_keys: false }])).toEqual([{ a: 1 }]);
+    await expect(deserialize([{ _aj_serialized: false }])).rejects.toThrow(
+      "Serializer name is not present in the argument",
+    );
+  });
+
+  it("keeps an ordinary __proto__ key when restoring symbol keys", async () => {
+    const [hash] = await deserialize([JSON.parse('{"__proto__": 1, "_aj_symbol_keys": []}')]);
+    expect(Object.keys(hash as object)).toEqual(["__proto__"]);
+  });
+
   it("raises on reserved and non-string keys", () => {
     expect(() => serialize([{ _aj_globalid: 1 }])).toThrow(
       new SerializationError('Can\'t serialize a Hash with reserved key "_aj_globalid"'),
@@ -84,7 +103,7 @@ describe("ActiveJob::Arguments", () => {
     }
     class MoneySerializer extends ObjectSerializer {
       serialize(money: unknown) {
-        return super.serialize({ amount: (money as Money).amount });
+        return super.serialize(new Hash<string, unknown>().set("amount", (money as Money).amount));
       }
       deserialize(hash: Record<string, unknown>) {
         return new Money(hash.amount as number);

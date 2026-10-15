@@ -3,12 +3,12 @@ import {
   rbModConstSet,
   rbModName,
   rbObjIsKindOf,
+  update,
 } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "../namespaces.js";
 import { Serializers } from "../serializers.js";
 
 export class ObjectSerializer {
-  /** @noRailsEquivalent PERMANENT */
   static instance<T extends ObjectSerializer>(this: new () => T): T {
     if (!Object.hasOwn(this, "_instance")) {
       Object.defineProperty(this, "_instance", { value: new this() });
@@ -33,7 +33,7 @@ export class ObjectSerializer {
   }
 
   serialize(hash: unknown): Record<string, unknown> {
-    return Object.assign(
+    return update(
       { [ActiveJob.Arguments.OBJECT_SERIALIZER_KEY]: rbModName(this.constructor) },
       hash as Record<string, unknown>,
     );

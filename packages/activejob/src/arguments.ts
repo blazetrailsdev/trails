@@ -10,7 +10,9 @@ import {
   Exception,
   excBacktrace,
   excSetBacktrace,
+  hashAref,
   hashAset,
+  hasKey,
   hashDelete,
   Hash,
   rbCFloat,
@@ -146,10 +148,10 @@ async function deserializeArgument(argument: unknown): Promise<unknown> {
   } else if (Array.isArray(argument)) {
     return Promise.all(argument.map((arg) => deserializeArgument(arg)));
   } else if (rbObjIsKindOf(argument, Hash)) {
-    if (isCustomSerialized(argument as Record<string, unknown>)) {
+    if (isCustomSerialized(argument as AnyHash)) {
       return Serializers.deserialize(argument as Record<string, unknown>);
     } else {
-      return deserializeHash(argument as Record<string, unknown>);
+      return deserializeHash(argument as AnyHash);
     }
   } else {
     throw new ArgumentError(`Can only deserialize primitive arguments: ${rbInspect(argument)}`);
@@ -157,8 +159,8 @@ async function deserializeArgument(argument: unknown): Promise<unknown> {
 }
 
 /** @internal */
-function isCustomSerialized(hash: Record<string, unknown>): boolean {
-  return Object.hasOwn(hash, OBJECT_SERIALIZER_KEY);
+function isCustomSerialized(hash: AnyHash): boolean {
+  return hasKey(hash, OBJECT_SERIALIZER_KEY);
 }
 
 /** @internal */
@@ -171,17 +173,15 @@ function serializeHash(argument: AnyHash): Record<string, unknown> {
 }
 
 /** @internal */
-async function deserializeHash(serializedHash: Record<string, unknown>): Promise<unknown> {
-  const pending = transformValues(serializedHash, (v) => deserializeArgument(v));
-  let result: Record<string, unknown> = Object.fromEntries(
-    await Promise.all(Object.entries(pending).map(async ([k, v]) => [k, await v])),
-  );
+async function deserializeHash(serializedHash: AnyHash): Promise<unknown> {
+  let result = transformValues(serializedHash, (v) => deserializeArgument(v)) as AnyHash;
+  for (const key of eachKey(result)) hashAset(result, key, await hashAref(result, key));
   let symbolKeys: unknown;
   if (rtest(hashDelete(result, WITH_INDIFFERENT_ACCESS_KEY))) {
-    result = withIndifferentAccess(result) as unknown as Record<string, unknown>;
-  } else if ((symbolKeys = hashDelete(result, SYMBOL_KEYS_KEY)) != null) {
+    result = withIndifferentAccess(result as Record<string, unknown>);
+  } else if (rtest((symbolKeys = hashDelete(result, SYMBOL_KEYS_KEY)))) {
     result = transformSymbolKeys(result, symbolKeys as string[]);
-  } else if ((symbolKeys = hashDelete(result, RUBY2_KEYWORDS_KEY)) != null) {
+  } else if (rtest((symbolKeys = hashDelete(result, RUBY2_KEYWORDS_KEY)))) {
     result = transformSymbolKeys(result, symbolKeys as string[]);
     result = rbHashSRuby2KeywordsHash(result);
   }
@@ -209,10 +209,7 @@ function serializeIndifferentHash(indifferentHash: AnyHash): Record<string, unkn
 }
 
 /** @internal */
-function transformSymbolKeys(
-  hash: Record<string, unknown>,
-  symbolKeys: string[],
-): Record<string, unknown> {
+function transformSymbolKeys(hash: AnyHash, symbolKeys: string[]): AnyHash {
   return transformKeys(toH(hash), (key: string) => {
     if (symbolKeys.includes(key)) {
       return stringToSym(key);
