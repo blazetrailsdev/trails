@@ -45,7 +45,7 @@ describe("Object#to_yaml", () => {
   // PERMANENT-SKIP: ruby-compat does not port Enumerable as a Module object.
   it.skip("returns the YAML representation of a Module object");
 
-  // PERMANENT-SKIP: Date lives in @blazetrails/date, which depends on ruby-compat; its dump is covered there.
+  // PERMANENT-SKIP: Date lives in @blazetrails/date, which depends on ruby-compat, so this package cannot build one.
   it.skip("returns the YAML representation of a Date object");
 
   it("returns the YAML representation of a FalseClass", () => {
@@ -101,7 +101,7 @@ describe("Object#to_yaml", () => {
     expect(cleanYaml(toYaml(":symbol"))).toBe(cleanYaml("--- :symbol\n"));
   });
 
-  // PERMANENT-SKIP: Time lives in @blazetrails/date, which depends on ruby-compat; its dump is covered there.
+  // PERMANENT-SKIP: Time lives in @blazetrails/date, which depends on ruby-compat, so this package cannot build one.
   it.skip("returns the YAML representation of a Time object");
 
   it("returns the YAML representation of a TrueClass", () => {
