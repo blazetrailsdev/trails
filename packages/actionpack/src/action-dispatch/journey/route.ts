@@ -5,7 +5,6 @@ import {
   dup,
   fetch,
   isSymbol,
-  merge,
   rbEqq,
   rbFSend,
   symbolToS,
@@ -245,7 +244,7 @@ export class Route {
   /** @missingRailsArgs delete_if — PERMANENT */
   get requirements(): Record<string, unknown> {
     return deleteIf(
-      merge(this.defaults, this.path.requirements),
+      { ...this.defaults, ...this.path.requirements },
       (_, v) => v instanceof RegExp && v.source === ".+?" && v.flags.includes("s"),
     );
   }

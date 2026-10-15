@@ -3,7 +3,6 @@ import {
   anybits,
   fetch,
   last,
-  merge,
   rbRegMatchP,
   rbStrPartition,
   registerConstant,
@@ -178,7 +177,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     classAttribute.call(this, "strictStringsByDefault", { default: false });
   }
 
-  /** @missingRailsName config — PERMANENT */
   constructor(config: SQLite3Config) {
     super(config);
 
@@ -207,11 +205,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (!("strict" in this._config)) {
       this._config.strict = SQLite3Adapter.strictStringsByDefault;
     }
-    this._connectionParameters = merge(this._config as SQLite3Config, {
+    this._connectionParameters = {
+      ...(this._config as SQLite3Config),
       database: rbObjAsString(this._config.database),
       resultsAsHash: true,
       defaultTransactionMode: "immediate",
-    });
+    };
   }
 
   override async databaseExists(): Promise<boolean> {

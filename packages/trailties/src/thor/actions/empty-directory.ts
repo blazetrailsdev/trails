@@ -3,7 +3,6 @@ import {
   FileUtils,
   File,
   getFs,
-  merge,
   rbFSend,
   rbObjRespondTo,
   rtest,
@@ -41,7 +40,7 @@ export class EmptyDirectory {
     config: Record<string, unknown> = {},
   ) {
     this.base = base;
-    this.config = merge({ verbose: true }, config);
+    this.config = { verbose: true, ...config };
     this.destination = destination;
   }
 

@@ -2,7 +2,6 @@ import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
-  merge,
   rbEqq,
   rbFSystem,
   rbModConstSet,
@@ -45,10 +44,10 @@ export class PostgreSQLDatabaseTasks {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
-    await conn.createDatabase(
-      this.dbConfig.database as string,
-      merge(this.configurationHash, { encoding: this.encoding() }),
-    );
+    await conn.createDatabase(this.dbConfig.database as string, {
+      ...this.configurationHash,
+      encoding: this.encoding(),
+    });
     return await this.establishConnection();
   }
 
@@ -185,7 +184,7 @@ export class PostgreSQLDatabaseTasks {
 
   /** @internal */
   private publicSchemaConfig(): ConfigHash {
-    return merge(this.configurationHash, { database: "postgres", schemaSearchPath: "public" });
+    return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
   }
 }
 

@@ -12,7 +12,6 @@ import {
   included,
   initialize,
   last,
-  merge,
   mergeBang,
   Module,
   Open3,
@@ -343,7 +342,7 @@ export async function runRubyScript(
   config: RunConfig = {},
 ): Promise<string | boolean | null | undefined> {
   if (this.behavior !== "invoke") return;
-  return this.run(command, merge(config, { with: rubyCommand() }));
+  return this.run(command, { ...config, with: rubyCommand() });
 }
 
 export async function thor(

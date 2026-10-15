@@ -1,5 +1,5 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { fetch, merge } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat";
 import { asJson, classAttribute, getEnv, included, onLoad } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
@@ -111,9 +111,10 @@ export function generatesTokenFor(
   { expiresIn }: { expiresIn?: number } = {},
   block?: (record: any) => unknown,
 ): void {
-  this.tokenDefinitions = merge(this.tokenDefinitions, {
+  this.tokenDefinitions = {
+    ...this.tokenDefinitions,
     [purpose]: new TokenDefinition(this, purpose, expiresIn, block),
-  });
+  };
 }
 
 export function generateTokenFor(this: Base, purpose: string): string {

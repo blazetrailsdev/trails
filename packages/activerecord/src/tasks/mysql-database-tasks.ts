@@ -1,4 +1,4 @@
-import { merge, rbEqq, rbFSystem, rbModConstSet, RuntimeError } from "@blazetrails/ruby-compat";
+import { rbEqq, rbFSystem, rbModConstSet, RuntimeError } from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -149,7 +149,7 @@ export class MySQLDatabaseTasks {
 
   /** @internal */
   private configurationHashWithoutDatabase(): ConfigHash {
-    return merge(this.configurationHash, { database: null });
+    return { ...this.configurationHash, database: null };
   }
 }
 

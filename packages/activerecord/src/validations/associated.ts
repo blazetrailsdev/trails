@@ -1,6 +1,6 @@
 import { EachValidator } from "@blazetrails/activemodel";
 import { any, kernelArray } from "@blazetrails/activesupport";
-import { aryReject as reject, merge } from "@blazetrails/ruby-compat";
+import { aryReject as reject } from "@blazetrails/ruby-compat";
 
 export function validatesAssociated(
   this: {
@@ -19,7 +19,7 @@ export class AssociatedValidator extends EachValidator {
     if (
       any(await reject(kernelArray(value), (association) => isValidObject(association, context)))
     ) {
-      record.errors.add(attribute, ":invalid", merge(this.options, { value }));
+      record.errors.add(attribute, ":invalid", { ...this.options, value });
     }
   }
 }

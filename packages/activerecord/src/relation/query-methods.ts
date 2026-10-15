@@ -8,7 +8,6 @@ import {
   isEmpty,
   isModuleIncluded,
   isSymbol,
-  merge,
   Module,
   rbBlockGivenP,
   partition,
@@ -966,7 +965,7 @@ function createWithBang(
 ): any {
   if (value) {
     value = sanitizeForbiddenAttributes(value);
-    this.createWithValue = merge(this.createWithValue, value);
+    this.createWithValue = { ...this.createWithValue, ...value };
   } else {
     this.createWithValue = {};
   }
