@@ -4,6 +4,7 @@ import {
   File,
   IO,
   IOError,
+  basicObjRespondTo,
   rbCheckArrayType,
   rbObjAsString,
   rbObjRespondTo,
@@ -121,7 +122,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
     if (this._strBody !== null) {
       yield this._strBody;
@@ -198,7 +199,7 @@ export class RackBody {
     if (Object.hasOwn(BODY_METHODS, method)) {
       return rbObjRespondTo(this._response.stream, method);
     } else {
-      return rbObjRespondTo(Object.getPrototypeOf(this), method, includePrivate);
+      return basicObjRespondTo(this, method, !includePrivate);
     }
   }
 
@@ -218,12 +219,12 @@ export class RackBody {
     return (this._response.stream as { toPath(): string }).toPath();
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
   [Symbol.iterator](): IterableIterator<unknown> {
     return this.each();
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
     const stream = this._response.stream as Partial<AsyncIterable<unknown>> & {
       each(): IterableIterator<unknown>;
