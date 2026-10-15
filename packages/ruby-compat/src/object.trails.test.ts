@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { rbClassNewInstance } from "./include.js";
 import { rbAbsintSize } from "./numeric.js";
 import {
+  rbCArray,
   rbCBasicObject,
   rbCFalseClass,
   rbCFloat,
@@ -1183,17 +1184,19 @@ describe("Kernel#send to a method on a core class seat", () => {
     expect(rbFSend(5.5, "isInteger")).toBe(false);
   });
 
-  it("reaches a Symbol's seat, not String's, and no seat for a plain record or an array", () => {
+  it("reaches a Symbol's seat, not String's, and Hash's / Array's seat for a plain record / an array", () => {
     seated(rbCString, () => "String");
     seated(Hash, () => "Hash");
     expect(rbFSend("s", "seatedSelf")).toBe("String");
     expect(rbFSend(new Hash(), "seatedSelf")).toBe("Hash");
-    for (const recv of [":s", {}, []]) {
-      expect(basicObjRespondTo(recv, "seatedSelf")).toBe(false);
-      expect(() => rbFSend(recv, "seatedSelf")).toThrow(NoMethodError);
-    }
+    expect(rbFSend({}, "seatedSelf")).toBe("Hash");
+    expect(() => rbFSend(":s", "seatedSelf")).toThrow(NoMethodError);
+    expect(() => rbFSend([], "seatedSelf")).toThrow(NoMethodError);
+    seated(rbCArray, () => "Array");
+    expect(rbFSend([], "seatedSelf")).toBe("Array");
     unseat(rbCString);
     unseat(Hash);
+    unseat(rbCArray);
   });
 });
 

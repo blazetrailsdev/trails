@@ -1,6 +1,7 @@
 import {
   Hash as RubyHash,
   include,
+  rbCArray,
   rbCFalseClass,
   rbCFloat,
   rbCInteger,
@@ -15,22 +16,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 import type { Packer } from "./packer.js";
-
-function toMsgpack<T>(
-  this: { toMsgpackWithPacker(self: T, packer: Packer): Packer },
-  self: T,
-  packerOrIo: unknown = null,
-): Uint8Array | Packer | null {
-  if (packerOrIo != null && packerOrIo !== false) {
-    if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
-      return this.toMsgpackWithPacker(self, packerOrIo as Packer);
-    } else {
-      return MessagePack.pack(self, packerOrIo);
-    }
-  } else {
-    return MessagePack.pack(self);
-  }
-}
 
 export const CoreExt = {
   name: "MessagePack::CoreExt",
@@ -85,30 +70,17 @@ rbModDefineMethod(
   },
 );
 
-export class Array {
-  static toMsgpack = toMsgpack;
-
-  /** @internal */
-  static toMsgpackWithPacker(self: unknown[], packer: Packer): Packer {
-    packer.writeArray(self);
-    return packer;
-  }
-}
+include(rbCArray, CoreExt);
+rbModDefineMethod(rbCArray, "toMsgpackWithPacker", function (this: unknown[], packer: Packer) {
+  packer.writeArray(this);
+  return packer;
+});
 
 include(RubyHash, CoreExt);
 rbModDefineMethod(RubyHash, "toMsgpackWithPacker", function (this: object, packer: Packer) {
-  return Hash.toMsgpackWithPacker(this, packer);
+  packer.writeHash(this);
+  return packer;
 });
-
-export class Hash {
-  static toMsgpack = toMsgpack;
-
-  /** @internal */
-  static toMsgpackWithPacker(self: object, packer: Packer): Packer {
-    packer.writeHash(self);
-    return packer;
-  }
-}
 
 include(rbCSymbol, CoreExt);
 rbModDefineMethod(rbCSymbol, "toMsgpackWithPacker", function (this: string, packer: Packer) {

@@ -9,7 +9,6 @@ import {
   rbFSend,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
-import { Array as ArrayExt, Hash } from "./core-ext.js";
 import { ExtensionValue, MessagePack, Packer } from "./index.js";
 
 class ValueOne {
@@ -126,8 +125,8 @@ describe("MessagePack::Packer", () => {
     expect(rbObjClass(rbFSend(1, "toMsgpack"))).toBe(rbCString);
     expect(rbObjClass(rbFSend(new Number(1.0), "toMsgpack"))).toBe(rbCString);
     expect(rbObjClass(rbFSend("", "toMsgpack"))).toBe(rbCString);
-    expect(rbObjClass(Hash.toMsgpack({}))).toBe(rbCString);
-    expect(rbObjClass(ArrayExt.toMsgpack([]))).toBe(rbCString);
+    expect(rbObjClass(rbFSend({}, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend([], "toMsgpack"))).toBe(rbCString);
   });
 
   it("to_msgpack with packer equals to_msgpack", () => {
@@ -140,8 +139,8 @@ describe("MessagePack::Packer", () => {
       rbFSend(new Number(1.0), "toMsgpack"),
     );
     expect(toStr(rbFSend("", "toMsgpack", new Packer()))).toEqual(rbFSend("", "toMsgpack"));
-    expect(toStr(Hash.toMsgpack({}, new Packer()))).toEqual(Hash.toMsgpack({}));
-    expect(toStr(ArrayExt.toMsgpack([], new Packer()))).toEqual(ArrayExt.toMsgpack([]));
+    expect(toStr(rbFSend({}, "toMsgpack", new Packer()))).toEqual(rbFSend({}, "toMsgpack"));
+    expect(toStr(rbFSend([], "toMsgpack", new Packer()))).toEqual(rbFSend([], "toMsgpack"));
   });
 
   class CustomPack01 {
@@ -156,15 +155,15 @@ describe("MessagePack::Packer", () => {
 
   class CustomPack02 {
     toMsgpack(pk: unknown = null): unknown {
-      return ArrayExt.toMsgpack([1, 2], pk);
+      return rbFSend([1, 2], "toMsgpack", pk);
     }
   }
 
   it("calls custom to_msgpack method", () => {
-    expect(MessagePack.pack(new CustomPack01())).toEqual(ArrayExt.toMsgpack([1, 2]));
-    expect(MessagePack.pack(new CustomPack02())).toEqual(ArrayExt.toMsgpack([1, 2]));
-    expect(new CustomPack01().toMsgpack()).toEqual(ArrayExt.toMsgpack([1, 2]));
-    expect(new CustomPack02().toMsgpack()).toEqual(ArrayExt.toMsgpack([1, 2]));
+    expect(MessagePack.pack(new CustomPack01())).toEqual(rbFSend([1, 2], "toMsgpack"));
+    expect(MessagePack.pack(new CustomPack02())).toEqual(rbFSend([1, 2], "toMsgpack"));
+    expect(new CustomPack01().toMsgpack()).toEqual(rbFSend([1, 2], "toMsgpack"));
+    expect(new CustomPack02().toMsgpack()).toEqual(rbFSend([1, 2], "toMsgpack"));
   });
 
   describe("#type_registered?", () => {

@@ -340,6 +340,14 @@ rbModDefineMethod(rbCInteger, "isInteger", () => true);
  * @noRailsEquivalent PERMANENT
  */
 export const rbCFloat = rbDefineClass("Float", rbCNumeric);
+
+/**
+ * `rb_cArray` (`vendor/ruby/v3.3.11/array.c:8605`): the seat a reopened
+ * `class Array` defines its methods on, since a JS array's prototype is the
+ * global `Array.prototype`.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCArray = rbDefineClass("Array");
 const rbCProc = rbDefineClass("Proc");
 
 const SPECIAL_CONST_CLASSES: ReadonlySet<unknown> = new Set([
@@ -1057,6 +1065,18 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (enumerable !== undefined) return enumerable(recv, ...args);
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
     return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);
+  }
+  for (
+    let o: object | null = Array.isArray(recv)
+      ? rbCArray.prototype
+      : isPlainHash(recv)
+        ? Hash.prototype
+        : null;
+    o && o !== Object.prototype;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    const desc = Object.getOwnPropertyDescriptor(o, mid);
+    if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
   }
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
