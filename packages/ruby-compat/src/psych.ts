@@ -19,6 +19,7 @@ import { isPlainHash, rbModToS } from "./object.js";
 import { File } from "./file.js";
 import { IO } from "./io.js";
 import { registerConstant } from "./variable.js";
+import { Emitter as VisitorsEmitter } from "./psych/visitors/emitter.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
 const yaml = backend as unknown as typeof Yaml;
@@ -128,6 +129,9 @@ export namespace Psych {
     },
     get RestrictedYAMLTree() {
       return RestrictedYAMLTree;
+    },
+    get Emitter() {
+      return VisitorsEmitter;
     },
   };
 

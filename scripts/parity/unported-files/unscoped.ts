@@ -34,16 +34,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "JS doesn't use YAML for AR column serialization.",
   },
   {
-    pattern: "coders/yaml_column.rb",
-    testFile: "coders/yaml_column_test.rb",
-    reason:
-      "YAML column coder. The store-column dump/load path and the Psych safe-dump class " +
-      "restriction are ported (coders/yaml-column.ts, backed by the `yaml` package — " +
-      '`store :col, coder: "YAML"`), but the Psych-specific safe-LOAD machinery ' +
-      "(permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those " +
-      "test cases stay Ruby-only.",
-  },
-  {
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: [
