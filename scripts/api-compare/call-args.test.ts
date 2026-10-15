@@ -1582,6 +1582,21 @@ describe("a native hash form's literal key (RFC 0190)", () => {
     expect(verdict(ruby, on("@in", "id:options", ["str:onlyPath"]))).toEqual(["match"]);
   });
 
+  it("pairs an ivar receiver with this._options and compares its key", () => {
+    const ruby = on("key?", "id:@options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:_options", ["str:onlyPath"]))).toEqual(["match"]);
+    const [pair] = pairCallSites([ruby], [on("@in", "id:_options", ["str:wrongKey"])]);
+    expect(compareCallArgs(pair.ruby, pair.ts)).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+    });
+  });
+
+  it("does not pair a Ruby local with this._options", () => {
+    const ruby = on("key?", "id:options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:_options", ["str:onlyPath"]))).toEqual([]);
+  });
+
   it("reads a colon-spelled key as the Symbol, and only for a Symbol", () => {
     const form = on("@delete", "id:env", ["str::params"]);
     expect(verdict(on("delete", "id:env", ["sym:params"]), form)).toEqual(["match"]);

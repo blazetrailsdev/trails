@@ -9,7 +9,6 @@ import { Base } from "./base.js";
 import type { CachingClassMethods } from "../abstract-controller/caching.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
 import {
-  eachPair,
   inspect,
   isEmpty,
   isSymbol,
@@ -27,7 +26,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     return Base.logger as BaseLogSubscriber["logger"];
   }
 
-  /** @missingRailsArgs each_pair — PERMANENT */
   startProcessing(event: Event): void {
     if (!this.logger?.["info?"]) return;
 
@@ -38,9 +36,9 @@ export class LogSubscriber extends BaseLogSubscriber {
       format?: string | null;
     };
     const params: Record<string, unknown> = {};
-    eachPair(payload.params, (k, v) => {
+    for (const [k, v] of Object.entries(payload.params)) {
       if (!INTERNAL_PARAMS.includes(k)) params[k] = v;
-    });
+    }
     let format = payload.format;
     if (isSymbol(format)) format = symbolToS(format).toUpperCase();
     if (format == null) format = "*/*";

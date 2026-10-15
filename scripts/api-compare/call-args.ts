@@ -1010,8 +1010,10 @@ function keyedFormName(rubyName: string): string | undefined {
 }
 
 function onSameHash(ruby: CallSite, ts: CallSite): boolean {
-  const tail = ruby.recv?.match(/^(?:id|call):@*(\w+)$/)?.[1];
-  return tail !== undefined && ts.recv === `id:${snakeToCamel(tail)}`;
+  const [, ivar, tail] = ruby.recv?.match(/^(?:id|call):(@*)(\w+)$/) ?? [];
+  if (tail === undefined) return false;
+  const name = snakeToCamel(tail);
+  return ts.recv === `id:${name}` || (ivar !== "" && ts.recv === `id:_${name}`);
 }
 
 function hashFormKeys(ruby: CallSite, ts: CallSite): [string, string] | CallArgSkipReason {

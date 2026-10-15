@@ -2,7 +2,6 @@ import {
   ArgumentError,
   aryDeleteIf,
   compact,
-  eachPair,
   env,
   Errno,
   exit,
@@ -250,7 +249,7 @@ ThorBase.attrWriter("options", "parentOptions", "args");
   if (!klass["strictArgsPosition?"](config)) toParse = toParse.concat(opts.remaining());
 
   const thorArgs = new Arguments(klass.arguments());
-  eachPair(thorArgs.parse(toParse), (k, v) => rbFSend(this, `${k}=`, v));
+  for (const [k, v] of Object.entries(thorArgs.parse(toParse))) rbFSend(this, `${k}=`, v);
   this.args = thorArgs.remaining();
 };
 
@@ -590,10 +589,10 @@ export const ClassMethods = {
 
   /** @internal */
   classOptionsHelp(this: BaseClass, shell: Basic, groups: OptionGroups = new Map()): void {
-    eachPair(this.classOptions(), (_, value) => {
+    for (const [, value] of Object.entries(this.classOptions())) {
       if (!groups.has(value.group)) groups.set(value.group, []);
       groups.get(value.group)!.push(value);
-    });
+    }
 
     const globalOptions = hashDelete(groups, null) || [];
     this.printOptions(shell, globalOptions);
@@ -656,9 +655,9 @@ export const ClassMethods = {
     options: Record<string, unknown>,
     scope: Record<string, Option>,
   ): void {
-    eachPair(options, (key, value) => {
+    for (const [key, value] of Object.entries(options)) {
       scope[key] = Option.parse(key, value);
-    });
+    }
   },
 
   /** @internal */

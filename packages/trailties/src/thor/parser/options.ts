@@ -1,11 +1,9 @@
 import {
   aryDelete,
   compact,
-  eachPair,
   isEmpty,
   keys,
   matchOperator,
-  mergeBang,
   rbFSend,
   rbInspect,
   rbModName,
@@ -92,10 +90,10 @@ export class Options extends Arguments {
     this.atLeastOnes = (relations.atLeastOneOptionNames ?? []).filter((array) => !isEmpty(array));
     this.disableRequiredCheck = disableRequiredCheck;
 
-    eachPair(defaults, (key, value) => {
+    for (const [key, value] of Object.entries(defaults)) {
       this.assigns[rbObjAsString(key)] = value;
       aryDelete(this.nonAssignedRequired, hashOptions[key]);
-    });
+    }
 
     this.shorts = Object.create(null) as Record<string, string>;
     this.switches = Object.create(null) as Record<string, Option>;
@@ -265,7 +263,7 @@ export class Options extends Arguments {
   /** @internal */
   protected assignResultBang(option: Option, result: unknown): void {
     if (rtest(option.repeatable) && option.type === "hash") {
-      mergeBang(
+      Object.assign(
         (this.assigns[option.humanName] ??= Object.create(null)) as Record<string, unknown>,
         result as Record<string, unknown>,
       );
