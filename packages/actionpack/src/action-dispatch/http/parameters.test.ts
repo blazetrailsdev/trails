@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { EOFError } from "@blazetrails/ruby-compat";
+import { EOFError, StringIO } from "@blazetrails/ruby-compat";
 import { Mime } from "./mime-type.js";
 import { Request } from "./request.js";
 import {
@@ -189,7 +189,7 @@ describe("parameterParsers registry", () => {
       REQUEST_METHOD: "POST",
       CONTENT_TYPE: "application/xml",
       CONTENT_LENGTH: "7",
-      "rack.input": "<root/>",
+      "rack.input": new StringIO("<root/>"),
     });
     expect(req.requestParameters).toEqual({ parsed: "<root/>" });
     expect(req.params).toMatchObject({ parsed: "<root/>" });

@@ -91,7 +91,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     return !this._aborted;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
+  /** @noRailsEquivalent PERMANENT */
   override each(block?: (chunk: unknown) => unknown): unknown {
     if (this._strBody !== null) {
       if (!block) return toEnum(this, "each");

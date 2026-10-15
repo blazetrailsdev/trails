@@ -1186,6 +1186,38 @@ ratified here so no port re-derives them.
 A test that depends on one of these ports the assertions that do not, and parks
 the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
 
+## `$!` is passed explicitly, and a response body is iterated async (`BadRequest#initialize`, `Response#each`)
+
+Ruby sets `$!` for the length of a `rescue`, so a constructor called there can
+read the exception being handled with no argument:
+`ActionController::BadRequest#initialize`
+(`vendor/rails/v8.0.2/actionpack/lib/action_controller/metal/exceptions.rb:10-13`)
+is `super(msg)` and then `set_backtrace $!.backtrace if $!`. JS has no
+equivalent: a `catch` binds its exception to a local only, and no hook runs on
+entry to a `catch` that could seat a carrier. **The exception being rescued is
+passed as a trailing `errinfo` parameter.** `excSetupMessage(mesg, errinfo)`
+(`ruby-compat/src/exception.ts`) is the shape for `raise`'s implicit `cause:`,
+and `new BadRequest(msg, errinfo)` is the shape for a constructor that reads
+`$!`. A carrier that every rescue site has to set would be an invented call at
+each site, and would still be wrong as soon as an `await` interleaved two
+handlers.
+
+Rails' `RackBody#each` and `Response#each`
+(`action_dispatch/http/response.rb:77-82`, `:526-528`) are synchronous, because
+a Ruby server iterates the body on the thread that waits for `Live::Buffer`'s
+queue. A Node handler cannot block its thread, so trails' Rack handlers write a
+body with `for await` (`packages/rack/src/handler/node.ts`), and a streamed
+body yields chunks as a `Live::Buffer` receives them. **`each` stays ported at
+its Rails name, and a body also answers `Symbol.asyncIterator`** (and
+`Symbol.iterator` where Rails' `each` is reached by a sync caller). Those
+protocol members are how a JS caller spells `body.each do |chunk|`. A
+sync-only protocol would have to buffer a whole live stream before its first
+byte was written.
+
+Both are genuine language shortcomings, ratified repo-wide here. The members
+and parameters that serve them carry `@noRailsEquivalent PERMANENT` /
+`@missingRailsCall … PERMANENT` receipts against this section.
+
 ## Fixtures load from `.ts` modules as well as YAML (`FixtureSet::File`)
 
 Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#fixtures-load-from-ts-modules-as-well-as-yaml-fixturesetfile).

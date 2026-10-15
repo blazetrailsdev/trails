@@ -245,7 +245,10 @@ export class ParamBuilder {
     return params;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall new — PERMANENT
+   */
   makeParams(): ParamHash {
     return Object.create(null) as ParamHash;
   }

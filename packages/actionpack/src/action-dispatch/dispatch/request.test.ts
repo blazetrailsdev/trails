@@ -24,6 +24,7 @@ import {
   assertPredicate,
   assertRaises,
   inflections,
+  isBlank,
   underscore,
   assertNil,
   assertNotPredicate,
@@ -802,7 +803,7 @@ describe.skipIf(!(release() < "3"))("RequestRewind", () => {
 describe("RequestParameters", () => {
   it("raw_post does not raise when rack.input is nil", () => {
     const req = new Request({});
-    expect(req.rawPost).toBe("");
+    assertPredicate(req.rawPost, isBlank);
   });
 
   it("parameters", async () => {
