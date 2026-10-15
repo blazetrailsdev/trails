@@ -34,6 +34,8 @@ describe("MessagePack::CoreExt", () => {
   it("reaches to_msgpack on a JS array and a plain record through the Array and Hash seats", () => {
     expect(rbFSend([1], "toMsgpack")).toEqual(Uint8Array.of(0x91, 0x01));
     expect(rbFSend({ a: 1 }, "toMsgpack")).toEqual(Uint8Array.of(0x81, 0xa1, 0x61, 0x01));
+    expect(rbObjRespondTo([], "toMsgpack")).toBe(true);
+    expect(rbObjRespondTo({}, "toMsgpack")).toBe(true);
     expect(Object.hasOwn(Array.prototype, "toMsgpack")).toBe(false);
   });
 

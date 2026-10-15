@@ -639,6 +639,17 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
+  for (
+    let o: object | null = Array.isArray(obj)
+      ? rbCArray.prototype
+      : isPlainHash(obj)
+        ? Hash.prototype
+        : null;
+    o && o !== Object.prototype;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
+  }
   let cme: PropertyDescriptor | undefined;
   for (
     let o: object | null = Object(obj);
