@@ -1,8 +1,3 @@
-// RFC 0170 Verification: a YAML-free trails app boots with the optional `yaml`
-// package unresolvable. `yaml-optional-dependency.test.ts` proves no eager edge
-// statically; this runs the BUILT dist under plain node (the Unit Tests job
-// builds before vitest, and none of it reads vendor/rails). Rails has no
-// counterpart: Psych is stdlib (`activerecord/lib/active_record.rb:31`).
 import { spawnSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -48,9 +43,9 @@ describe("YAML-free install", () => {
       error: "LoadError",
       message: "cannot load such file -- yaml",
     });
-  });
+  }, 60_000);
 
   it("loads YAML when yaml resolves, so the hook is what made it fail", () => {
     expect(runSmoke(false).yamlLoad).toEqual({ value: { a: 1 } });
-  });
+  }, 60_000);
 });

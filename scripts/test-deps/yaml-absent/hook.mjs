@@ -1,5 +1,3 @@
-// Makes the optional `yaml` package unresolvable for both `import` and
-// `require` (ruby-compat's psych-adapter loads it through `createRequire`).
 import { registerHooks } from "node:module";
 
 registerHooks({
