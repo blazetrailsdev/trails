@@ -131,7 +131,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
     const options = this.columnOptions(column);
 
-    if (options["collation"]) {
+    if (rtest(options["collation"])) {
       sql += ` COLLATE ${this.conn.quoteColumnName(String(options["collation"]))}`;
     }
     if (options["using"]) {
@@ -173,7 +173,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     sql: string,
     options: AddColumnOptions & Record<string, unknown>,
   ): Promise<string> {
-    if (options["collation"]) {
+    if (rtest(options["collation"])) {
       sql += ` COLLATE "${options["collation"]}"`;
     }
 
@@ -181,7 +181,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (rtest(as)) {
       sql += ` GENERATED ALWAYS AS (${as})`;
 
-      if (options["stored"] != null && options["stored"] !== false) {
+      if (rtest(options["stored"])) {
         sql += " STORED";
       } else {
         throw new ArgumentError(

@@ -417,14 +417,9 @@ export class CommandRecorder {
 
   /** @internal */
   invertChangeColumnDefault(args: unknown[]): [string, unknown[]] {
-    const [table, column, options] = args;
+    const [table, column, options] = args as [unknown, unknown, Record<string, unknown> | null];
     if (
-      !(
-        typeof options === "object" &&
-        options !== null &&
-        "from" in (options as Record<string, unknown>) &&
-        "to" in (options as Record<string, unknown>)
-      )
+      !(typeof options === "object" && options !== null && "from" in options && "to" in options)
     ) {
       throw new ActiveRecord.IrreversibleMigration(
         "change_column_default is only reversible if given a :from and :to option.",
@@ -436,8 +431,8 @@ export class CommandRecorder {
         table,
         column,
         {
-          from: (options as Record<string, unknown>)["to"],
-          to: (options as Record<string, unknown>)["from"],
+          from: options["to"],
+          to: options["from"],
         },
       ],
     ];
@@ -451,14 +446,9 @@ export class CommandRecorder {
 
   /** @internal */
   invertChangeColumnComment(args: unknown[]): [string, unknown[]] {
-    const [table, column, options] = args;
+    const [table, column, options] = args as [unknown, unknown, Record<string, unknown> | null];
     if (
-      !(
-        typeof options === "object" &&
-        options !== null &&
-        "from" in (options as Record<string, unknown>) &&
-        "to" in (options as Record<string, unknown>)
-      )
+      !(typeof options === "object" && options !== null && "from" in options && "to" in options)
     ) {
       throw new ActiveRecord.IrreversibleMigration(
         "change_column_comment is only reversible if given a :from and :to option.",
@@ -470,8 +460,8 @@ export class CommandRecorder {
         table,
         column,
         {
-          from: (options as Record<string, unknown>)["to"],
-          to: (options as Record<string, unknown>)["from"],
+          from: options["to"],
+          to: options["from"],
         },
       ],
     ];
@@ -479,14 +469,9 @@ export class CommandRecorder {
 
   /** @internal */
   invertChangeTableComment(args: unknown[]): [string, unknown[]] {
-    const [table, options] = args;
+    const [table, options] = args as [unknown, Record<string, unknown> | null];
     if (
-      !(
-        typeof options === "object" &&
-        options !== null &&
-        "from" in (options as Record<string, unknown>) &&
-        "to" in (options as Record<string, unknown>)
-      )
+      !(typeof options === "object" && options !== null && "from" in options && "to" in options)
     ) {
       throw new ActiveRecord.IrreversibleMigration(
         "change_table_comment is only reversible if given a :from and :to option.",
@@ -497,8 +482,8 @@ export class CommandRecorder {
       [
         table,
         {
-          from: (options as Record<string, unknown>)["to"],
-          to: (options as Record<string, unknown>)["from"],
+          from: options["to"],
+          to: options["from"],
         },
       ],
     ];
