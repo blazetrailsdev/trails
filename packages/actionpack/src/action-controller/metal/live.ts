@@ -91,7 +91,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     return !this._aborted;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
   override each(block?: (chunk: unknown) => unknown): unknown {
     if (this._strBody !== null) {
       if (!block) return toEnum(this, "each");
@@ -109,7 +109,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
         if (e instanceof ThreadError) for (const str of popped) void this._buf.push(str);
         throw e;
       }
-      if (!block) return popped[Symbol.iterator]();
+      if (!block) return toEnum(popped, "each");
 
       popped.forEach(block);
     }
