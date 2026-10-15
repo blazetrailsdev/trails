@@ -235,6 +235,14 @@ describe("parseFormattedParameters", () => {
     expect(out).toEqual({ y: 1 });
   });
 
+  it("calls a stored nil parser and raises ParseError rather than yielding", () => {
+    const host = makeHost({ contentLength: 1, contentMimeType: Mime.get(":json")!, rawPost: "x" });
+    const parsers = { ":json": null as unknown as ParameterParser };
+    expect(() => parseFormattedParameters.call(host, parsers, () => ({ y: 1 }))).toThrow(
+      ParseError,
+    );
+  });
+
   it("invokes the matching parser", () => {
     const host = makeHost({
       contentLength: 7,

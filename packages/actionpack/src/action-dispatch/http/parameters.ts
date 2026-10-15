@@ -138,7 +138,10 @@ export function pathParameters(this: ParametersHost): Record<string, unknown> {
   return empty;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 export function parseFormattedParameters(
   this: ParametersHost,
   parsers: ParameterParsers,
