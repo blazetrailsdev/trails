@@ -270,14 +270,22 @@ describe("MiddlewareStackTest", () => {
   it("can check if Middleware are equal - Class", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    expect(stack.includes(FooMiddleware)).toBe(true);
-    expect(stack.includes(BarMiddleware)).toBe(false);
+    stack.use(BarMiddleware);
+    expect(stack.last()!.equals(BarMiddleware)).toBe(true);
   });
 
   it("includes a class", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    expect(stack.includes(FooMiddleware)).toBe(true);
+    stack.use(BarMiddleware);
+    expect(stack.includes(BarMiddleware)).toBe(true);
+  });
+
+  it("can check if Middleware are equal - Middleware", () => {
+    const stack = new MiddlewareStack();
+    stack.use(FooMiddleware);
+    stack.use(BarMiddleware);
+    expect(stack.last()!.equals(stack.last())).toBe(true);
   });
 
   it("instruments the execution of middlewares", async () => {

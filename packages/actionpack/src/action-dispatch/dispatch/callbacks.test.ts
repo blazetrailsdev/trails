@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { bodyFromString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { Callbacks } from "./callbacks.js";
+import { Callbacks } from "../middleware/callbacks.js";
 
 const dummyApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,
