@@ -18,7 +18,8 @@ export class Node {
   get type(): number {
     if (this._node.nodeName === "#text") return Node.TEXT_NODE;
     if (this._node.nodeName === "#comment") return Node.COMMENT_NODE;
-    return Node.ELEMENT_NODE;
+    if ("tagName" in this._node) return Node.ELEMENT_NODE;
+    return 0;
   }
 
   get name(): string {
@@ -63,8 +64,8 @@ function childNodes(parent: Parse5Parent): Node[] {
 export class DocumentFragment {
   private constructor(private readonly _fragment: Parse5Parent) {}
 
-  static parse(tags: unknown): DocumentFragment {
-    return new DocumentFragment(parseFragment(String(tags ?? "")));
+  static parse(tags: string): DocumentFragment {
+    return new DocumentFragment(parseFragment(tags));
   }
 
   get children(): Node[] {
