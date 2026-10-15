@@ -273,7 +273,7 @@ function normalizeErb(s: string): string {
   return normalize(s)
     .replace(/erb/g, "tse")
     .replace(/rubocop/g, "eslint")
-    .replace(/capybara/g, "vitest");
+    .replace(/\bcapybara\b/g, "vitest");
 }
 
 /**
