@@ -12,7 +12,6 @@ export class ActionControllerError extends StandardError {
 }
 
 export class BadRequest extends ActionControllerError {
-  /** @inventedArm if — CONVERGEABLE response-async-each-and-bad-request-errinfo */
   constructor(msg?: string, errinfo?: Error | null) {
     super(msg);
     this.name = "ActionController::BadRequest";
