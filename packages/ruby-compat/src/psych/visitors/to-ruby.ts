@@ -1,3 +1,4 @@
+import { Hash } from "../../hash.js";
 import { Range } from "../../range.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
@@ -188,8 +189,13 @@ export class ToRuby {
   private visitMapping(o: YAMLMap): unknown {
     if (o.tag && this.loadTags[o.tag])
       return this.revive(this.resolveClass(this.loadTags[o.tag]), o);
-    if (!o.tag)
-      return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
+    const hash = () =>
+      (o.items as { key: ParsedNode }[]).every(
+        ({ key: k }) => yaml.isScalar(k) && typeof this.accept(k) === "string",
+      )
+        ? (Object.create(null) as Record<string, unknown>)
+        : (new Hash() as unknown as Record<string, unknown>);
+    if (!o.tag) return this.reviveHash(this.register(o, hash()), o);
 
     let match: RegExpExecArray | null;
     if ((match = /^!ruby\/struct:?(.*)?$/.exec(o.tag))) {
@@ -244,7 +250,7 @@ export class ToRuby {
       }
       return map;
     }
-    return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
+    return this.reviveHash(this.register(o, hash()), o);
   }
 
   private register<T>(node: Node, object: T): T {
@@ -263,12 +269,12 @@ export class ToRuby {
     o: YAMLMap,
     tagged = false,
   ): Record<string, unknown> {
-    const aset = (key: string, val: unknown) => {
+    const aset = (key: unknown, val: unknown) => {
       if (hash instanceof Map) hash.set(key, val);
-      else hash[key] = val;
+      else hash[String(key)] = val;
     };
     const mergeBang = (val: object) => {
-      for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(String(k), v);
+      for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(k, v);
     };
     for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
       const key = this.accept(k);
@@ -276,12 +282,9 @@ export class ToRuby {
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
         if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") mergeBang(val as object);
         else if (yaml.isSeq(v)) (val as object[]).slice().reverse().forEach(mergeBang);
-        else aset(String(key), val);
+        else aset(key, val);
       } else {
-        aset(
-          String(!tagged && this.symbolizeNames && typeof key === "string" ? `:${key}` : key),
-          val,
-        );
+        aset(!tagged && this.symbolizeNames && typeof key === "string" ? `:${key}` : key, val);
       }
     }
     return hash;

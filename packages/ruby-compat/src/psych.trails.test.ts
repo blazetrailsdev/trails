@@ -208,7 +208,11 @@ describe("ToRuby sequences and keys", () => {
 
   it("symbolizes only String keys", async () => {
     const { Psych } = await import("./psych.js");
-    expect(Psych.load("1: a\nb: c\n", { symbolizeNames: true })).toEqual({ "1": "a", ":b": "c" });
+    const hash = Psych.load("1: a\nb: c\n", { symbolizeNames: true }) as Map<unknown, unknown>;
+    expect([...hash]).toEqual([
+      [1, "a"],
+      [":b", "c"],
+    ]);
   });
 
   it("hands a load-tagged scalar's value to init_with through Coder#scalar", async () => {
@@ -348,5 +352,35 @@ describe("Psych::SyntaxError and a Struct subclass", () => {
     const { Struct } = await import("./struct.js");
     class PsychTrailsPair extends Struct.new("a") {}
     expect(Psych.dump(new PsychTrailsPair(1))).toBe("--- !ruby/struct:PsychTrailsPair\na: 1\n");
+  });
+});
+
+describe("Psych.dump string scalar style", () => {
+  it("single-quotes a string libyaml cannot write plain, doubling its quotes", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.dump("a: b")).toBe("--- 'a: b'\n");
+    expect(Psych.dump("it's: x")).toBe("--- 'it''s: x'\n");
+    expect(Psych.dump("x #y")).toBe("--- 'x #y'\n");
+    expect(Psych.dump("<<")).toBe("--- !!str '<<'\n");
+    expect(Psych.dump("x\n")).toBe("--- 'x\n\n  '\n");
+    expect(Psych.dump({ "a: b": 1 })).toBe("---\n'a: b': 1\n");
+    expect(Psych.dump("'x")).toBe('--- "\'x"\n');
+    expect(Psych.dump(" lead")).toBe('--- " lead"\n');
+    expect(Psych.dump("a\tb")).toBe('--- "a\\tb"\n');
+    expect(Psych.dump("y")).toBe('--- "y"\n');
+  });
+
+  it("folds a single-quoted scalar past 80 columns as libyaml does", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.dump("a b ".repeat(30))).toBe(
+      "--- 'a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a\n  b a b a b a b a b a b a b a b a b a b a b '\n",
+    );
+    expect(Psych.dump(`${"x".repeat(90)} y: z`)).toBe(`--- '${"x".repeat(90)}\n  y: z'\n`);
+    expect(Psych.dump(["a b ".repeat(30)])).toBe(
+      "---\n- 'a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b a b\n  a b a b a b a b a b a b a b a b a b a b '\n",
+    );
+    expect(Psych.dump({ n: { m: `it's: ${"x y ".repeat(25)}` } })).toBe(
+      "---\n\"n\":\n  m: 'it''s: x y x y x y x y x y x y x y x y x y x y x y x y x y x y x y x y x y x\n    y x y x y x y x y x y x y x y '\n",
+    );
   });
 });
