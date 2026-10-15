@@ -51,6 +51,15 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           'dispatch/request/multipart_params_parsing_test.rb:139 `files.bytesize` — rack.input stays one byte per character, but tag_multipart_encoding `body.force_encoding(UTF_8)` (rack parser.rb:483) only re-tags in Ruby; with no tag to set, forceEncoding must decode, and invalid UTF-8 cannot survive as a JS string — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
       },
     ],
+  "actiondispatch:dispatch/response_test.rb › ResponseTest › respond_to? accepts include_private": [
+    {
+      kind: "assert",
+      value: null,
+      as: null,
+      reason:
+        'dispatch/response_test.rb:381 `assert @response.respond_to?(:method_missing, true)` — a JS method entry carries no visibility, so no private `method_missing` exists to answer only at `include_private` (CLAUDE.md, "Method visibility is compile-time only")',
+    },
+  ],
   "activerecord:connection_pool_test.rb › pin connection synchronize the connection": [
     {
       kind: "assert_equal",

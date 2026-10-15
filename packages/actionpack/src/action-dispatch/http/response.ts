@@ -7,10 +7,12 @@ import {
   basicObjRespondTo,
   rbCheckArrayType,
   rbObjAsString,
+  rbFSend,
   rbObjRespondTo,
   strNew,
   stringSplit,
   Struct,
+  toEnum,
 } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
@@ -61,6 +63,7 @@ export class ContentTypeHeader extends Struct.new("mimeType", "charset") {
   declare charset: string | null;
 }
 const NULL_CONTENT_TYPE_HEADER = new ContentTypeHeader(null, null);
+type RubyArgs = unknown[] | [...unknown[], (...args: never[]) => unknown];
 const BODY_METHODS = { toAry: true, each: true, call: true, toPath: true } as const;
 
 export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>> {
@@ -87,7 +90,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   get body(): string {
     if (this._strBody !== null) return this._strBody;
     let buf = "";
-    for (const chunk of this.each()) {
+    for (const chunk of this.each() as Iterable<unknown>) {
       const str = rbObjAsString(chunk) as string | Uint8Array;
       buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
     }
@@ -112,13 +115,13 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     this._buf.push(string);
   }
 
-  *each(): IterableIterator<unknown> {
+  each(block?: (chunk: unknown) => unknown): unknown {
     if (this._strBody !== null) {
-      yield this._strBody;
+      if (!block) return toEnum(this, "each");
+
+      return block(this._strBody);
     } else {
-      const chunks: unknown[] = [];
-      this.eachChunk((chunk) => void chunks.push(chunk));
-      yield* chunks;
+      return this.eachChunk(block);
     }
   }
 
@@ -169,8 +172,8 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   }
 
   /** @internal */
-  protected eachChunk(block: (chunk: unknown) => void | Promise<void>): void | Promise<void> {
-    (this._buf as unknown as Array<unknown>).forEach(block);
+  protected eachChunk(block?: (chunk: unknown) => unknown): unknown {
+    return rbFSend(this._buf, "each", block);
   }
 }
 
@@ -207,14 +210,13 @@ export class RackBody {
     return (this._response.stream as unknown as { toAry(): unknown }).toAry();
   }
 
-  *each(): IterableIterator<unknown> {
-    yield* this._response.each();
+  each(...args: RubyArgs): unknown {
+    return (this._response.each as (...args: RubyArgs) => unknown).call(this._response, ...args);
   }
 
-  call(arguments_: unknown[] = [], block?: (...args: unknown[]) => unknown): unknown {
-    return (this._response.stream as unknown as { call(...a: unknown[]): unknown }).call(
+  call(...arguments_: RubyArgs): unknown {
+    return (this._response.stream as unknown as { call(...a: RubyArgs): unknown }).call(
       ...arguments_,
-      block,
     );
   }
 
@@ -223,21 +225,21 @@ export class RackBody {
   }
 
   /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
-  [Symbol.iterator](): IterableIterator<unknown> {
-    return this.each();
+  [Symbol.iterator](): Iterator<unknown> {
+    return (this.each() as Iterable<unknown>)[Symbol.iterator]();
   }
 
   /** @noRailsEquivalent CONVERGEABLE response-async-each-and-bad-request-errinfo */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
     const stream = this._response.stream as Partial<AsyncIterable<unknown>> & {
-      each(): IterableIterator<unknown>;
+      each(): unknown;
     };
     this._response.sendingBang();
     if (typeof stream[Symbol.asyncIterator] === "function") {
       for await (const chunk of stream as AsyncIterable<unknown>)
         yield chunk as string | Uint8Array;
     } else {
-      for (const chunk of stream.each()) yield chunk as string | Uint8Array;
+      for (const chunk of stream.each() as Iterable<unknown>) yield chunk as string | Uint8Array;
     }
     this._response.sentBang();
   }
@@ -393,10 +395,6 @@ export class Response {
       return;
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
-    this.setHeader(
-      "content-length",
-      String(globalThis.Buffer.byteLength(value as string | Uint8Array, "utf-8")),
-    );
   }
 
   get contentLength(): number | undefined {
@@ -511,9 +509,9 @@ export class Response {
   }
 
   bodyParts(): unknown[] {
-    const stream = this.stream as { each(): IterableIterator<unknown> };
+    const stream = this.stream as { each(): unknown };
     const parts: unknown[] = [];
-    for (const chunk of stream.each()) parts.push(chunk);
+    for (const chunk of stream.each() as Iterable<unknown>) parts.push(chunk);
     return parts;
   }
 
@@ -526,11 +524,11 @@ export class Response {
     this.stream = this.buildBuffer(this, []);
   }
 
-  *each(): IterableIterator<unknown> {
-    const stream = this.stream as { each(): IterableIterator<unknown> };
+  each(block?: (chunk: unknown) => unknown): unknown {
     this.sendingBang();
-    for (const chunk of stream.each()) yield chunk;
+    const x = (this.stream as { each(block?: (chunk: unknown) => unknown): unknown }).each(block);
     this.sentBang();
+    return x;
   }
 
   abort(): void {

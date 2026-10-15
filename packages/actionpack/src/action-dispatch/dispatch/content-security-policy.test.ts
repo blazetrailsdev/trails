@@ -705,10 +705,11 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
 
   class PolicyController extends ApplicationController {
     static {
-      this.contentSecurityPolicy(function (this: PolicyController, p) {
+      this.contentSecurityPolicy(function (this: unknown, p) {
+        const helpers = (this as PolicyController).helpers() as unknown as Probe;
         p.defaultSrc("https://example.com");
-        if ((this.helpers() as unknown as Probe).isSkyIsBlue()) p.scriptSrc("https://example.com");
-        if (!(this.helpers() as unknown as Probe).isPigsCanFly()) p.styleSrc("https://example.com");
+        if (helpers.isSkyIsBlue()) p.scriptSrc("https://example.com");
+        if (!helpers.isPigsCanFly()) p.styleSrc("https://example.com");
       });
     }
 

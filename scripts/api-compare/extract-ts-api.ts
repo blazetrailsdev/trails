@@ -7360,12 +7360,20 @@ function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): Param
 
 /** Can a function be passed in this parameter's position? An untyped parameter
  *  is judged by nothing, so it does not count. `any`/`unknown` do not either: a
- *  port that took Ruby's block would type it. */
+ *  port that took Ruby's block would type it. A rest typed as a tuple whose
+ *  element is a function (`...args: unknown[] | [...unknown[], Fn]`) is Ruby's
+ *  `*args, &block`, the block riding last in the splat. */
 function admitsFunction(p: ts.ParameterDeclaration): boolean {
   if (!p.type) return false;
   if (!currentChecker) return ts.isFunctionTypeNode(p.type);
-  let type = currentChecker.getTypeAtLocation(p.type);
-  if (p.dotDotDotToken) type = currentChecker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
+  const checker = currentChecker;
+  let type = checker.getTypeAtLocation(p.type);
+  if (p.dotDotDotToken) {
+    const tuples = (type.isUnion() ? type.types : [type]).filter((t) => checker.isTupleType(t));
+    const elements = tuples.flatMap((t) => checker.getTypeArguments(t as ts.TypeReference));
+    if (elements.some((t) => t.getCallSignatures().length > 0)) return true;
+    type = checker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
+  }
   const members = type.isUnion() ? type.types : [type];
   return members.some(
     (t) =>

@@ -684,7 +684,8 @@ function respondsToInclude(collection: unknown): boolean {
   return (
     typeof target?.include === "function" ||
     typeof target?.isInclude === "function" ||
-    typeof target?.has === "function"
+    typeof target?.has === "function" ||
+    basicObjRespondTo(collection, "isInclude")
   );
 }
 
@@ -699,7 +700,7 @@ function collectionIncludes(collection: unknown, obj: unknown): boolean | Promis
   if (typeof target.isInclude === "function") return target.isInclude(obj as never);
   if (typeof target.include === "function") return target.include(obj as never);
   if (typeof target.has === "function") return target.has(obj as never);
-  return false;
+  return rbFSend(collection, "isInclude", obj) as boolean;
 }
 
 function isEmptyCollection(actual: unknown): unknown {

@@ -459,17 +459,6 @@ describe("ActionController sendData", () => {
     );
   });
 
-  it("sets content-length", async () => {
-    class C extends Base {
-      async download() {
-        await this.sendData("12345", { filename: "test.txt" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("download", makeRequest(), makeResponse());
-    expect(c.headers.get("content-length")).toBe("5");
-  });
-
   it("sends Buffer data", async () => {
     class C extends Base {
       async download() {

@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Options, Session, type SessionStore } from "../../request/session.js";
 import { assertEqual, assertNil, MemoryStore } from "@blazetrails/activesupport";
-import { Lint, Request as RackRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import {
+  bodyFromString,
+  Lint,
+  Request as RackRequest,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
 import { RouteSet } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import { RoutedRackApp } from "../../../test-helpers/abstract-unit.js";
@@ -201,7 +207,7 @@ describe("Request", () => {
       call(env: RackEnv): RackResponse {
         const request = new RackRequest(env);
         (request.session as Session).set("hello", "Hello from MySessionApp!");
-        return [200, {}, ["Hello from MySessionApp!"]];
+        return [200, {}, bodyFromString("Hello from MySessionApp!")];
       }
     }
 

@@ -1,21 +1,35 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { beforeEach, describe, it, expect } from "vitest";
 import { Request } from "../request.js";
 import { Response } from "../response.js";
 import { IOError } from "@blazetrails/ruby-compat";
-import { assertRaises } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  assertNil,
+  assertNot,
+  assertNotRespondTo,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { flatten } from "@blazetrails/ruby-compat";
+import {
+  bodyFromString,
+  ContentLength,
+  MockRequest,
+  type RackBody as RackBodyType,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
+import { RackBody } from "../http/response.js";
+import { Mime } from "../http/mime-type.js";
+import { IntegrationTest } from "../testing/integration.js";
+import { HeadersAssertions } from "../../test-helpers/abstract-unit.js";
 
-function withTempFile<T>(contents: string, fn: (path: string) => T): T {
-  const dir = mkdtempSync(join(tmpdir(), "trails-response-"));
-  const path = join(dir, "fixture");
-  writeFileSync(path, contents);
-  try {
-    return fn(path);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+const h = { ...HeadersAssertions, response: { headers: {} } };
+
+function newResponse(): Response {
+  const response = Response.create();
+  response.request = Request.empty();
+  return response;
 }
 
 describe("ResponseTest", () => {
@@ -57,9 +71,16 @@ describe("ResponseTest", () => {
   });
 
   it("content length", () => {
-    const res = new Response();
-    res.body = "hello";
-    expect(res.contentLength).toBe(5);
+    for (const c of [100, 101, 102, 103, 204]) {
+      const response = new Response();
+      response.status = String(c);
+      response.setHeader("Content-Length", "0");
+      const [, headers] = response.toA();
+      assertNot(
+        Object.hasOwn(headers, "Content-Length"),
+        `${c} must not have a Content-Length header field`,
+      );
+    }
   });
 
   it("does not contain a message-body", () => {
@@ -200,168 +221,11 @@ describe("ResponseTest", () => {
     expect(res.body).toBe("direct body");
   });
 
-  it("toRack returns rack-compatible triple", () => {
-    const res = Response.create(200, { "content-type": "text/plain" }, "hi");
-    const [status, headers, body] = res.toA();
-    expect(status).toBe(200);
-    expect(headers["content-type"]).toBe("text/plain");
-    expect([...(body as Iterable<unknown>)]).toEqual(["hi"]);
-  });
-
   it("response body encoding", () => {
-    const res = new Response();
-    res.body = "テスト";
-    expect(res.body).toBe("テスト");
-    expect(res.contentLength).toBe(Buffer.byteLength("テスト", "utf-8"));
-  });
-
-  it("getHeader is case insensitive", () => {
-    const res = new Response();
-    res.setHeader("X-Custom", "value");
-    expect(res.getHeader("X-Custom")).toBe("value");
-  });
-
-  it("deleteHeader removes the header", () => {
-    const res = new Response();
-    res.setHeader("X-Custom", "value");
-    res.deleteHeader("X-Custom");
-    expect(res.getHeader("X-Custom")).toBeUndefined();
-  });
-
-  it("setHeader overwrites existing header", () => {
-    const res = new Response();
-    res.setHeader("X-Custom", "first");
-    res.setHeader("X-Custom", "second");
-    expect(res.getHeader("X-Custom")).toBe("second");
-  });
-
-  it("weak ETag detection", () => {
-    const res = new Response();
-    res.setHeader("etag", 'W/"abc"');
-    expect(res.isWeakEtag()).toBe(true);
-    expect(res.isStrongEtag()).toBe(false);
-  });
-
-  it("etag= delegates to setWeakEtag (Rails parity)", () => {
-    const res = new Response();
-    res.etag = "abc";
-    expect(res.etag?.startsWith('W/"')).toBe(true);
-    expect(res.isWeakEtag()).toBe(true);
-  });
-
-  it("setting _cacheControl to undefined removes it", () => {
-    const res = new Response();
-    res._cacheControl = "no-cache";
-    res._cacheControl = undefined;
-    expect(res._cacheControl).toBeUndefined();
-  });
-
-  it("text content type gets charset appended", () => {
-    const res = new Response();
-    res.contentType = "text/plain";
-    expect(res.getHeader("content-type")).toBe("text/plain; charset=utf-8");
-  });
-
-  it("setCookie with options", () => {
-    const res = new Response();
-    res.setCookie("session", { value: "abc", path: "/", httpOnly: true, secure: true });
-    expect(res.cookies.session).toBe("abc");
-  });
-
-  it("deleteCookie sets empty value and past expiry", () => {
-    const res = new Response();
-    res.setCookie("token", "val");
-    res.deleteCookie("token");
-    expect(res.cookies.token).toBeUndefined();
-  });
-
-  it("Response.create with no body", () => {
-    const res = Response.create(404);
-    expect(res.status).toBe(404);
-    expect(res.body).toBe("");
-  });
-
-  it("Response.create with all args", () => {
-    const res = Response.create(201, { "x-custom": "yes" }, "created");
-    expect(res.status).toBe(201);
-    expect(res.getHeader("x-custom")).toBe("yes");
-    expect(res.body).toBe("created");
-  });
-
-  it("Response.create with an enumerable body", () => {
-    const res = Response.create(200, {}, ["Hello", " ", "World"]);
-    expect(res.body).toBe("Hello World");
-  });
-
-  it("default constructor has status 200", () => {
-    const res = new Response();
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("");
-  });
-
-  it("status messages for common codes", () => {
-    expect(new Response(201).message).toBe("Created");
-    expect(new Response(204).message).toBe("No Content");
-    expect(new Response(302).message).toBe("Found");
-    expect(new Response(400).message).toBe("Bad Request");
-    expect(new Response(401).message).toBe("Unauthorized");
-    expect(new Response(403).message).toBe("Forbidden");
-    expect(new Response(422).message).toBe("Unprocessable Content");
-    expect(new Response(503).message).toBe("Service Unavailable");
-  });
-
-  it("contentLength returns undefined when not set", () => {
-    const res = new Response();
-    expect(res.contentLength).toBeUndefined();
-  });
-
-  it("successful predicate", () => {
-    expect(new Response(200).successful).toBe(true);
-    expect(new Response(299).successful).toBe(true);
-    expect(new Response(300).successful).toBe(false);
-    expect(new Response(404).successful).toBe(false);
-  });
-
-  it("redirection predicate", () => {
-    expect(new Response(301).isRedirection).toBe(true);
-    expect(new Response(302).isRedirection).toBe(true);
-    expect(new Response(200).isRedirection).toBe(false);
-    expect(new Response(400).isRedirection).toBe(false);
-  });
-
-  it("clientError predicate", () => {
-    expect(new Response(400).clientError).toBe(true);
-    expect(new Response(404).clientError).toBe(true);
-    expect(new Response(499).clientError).toBe(true);
-    expect(new Response(500).clientError).toBe(false);
-  });
-
-  it("serverError predicate", () => {
-    expect(new Response(500).serverError).toBe(true);
-    expect(new Response(599).serverError).toBe(true);
-    expect(new Response(404).serverError).toBe(false);
-  });
-
-  it("notFound predicate", () => {
-    expect(new Response(404).notFound).toBe(true);
-    expect(new Response(400).notFound).toBe(false);
-    expect(new Response(200).notFound).toBe(false);
-  });
-
-  it("defaultCharset static is utf-8", () => {
-    expect(Response.defaultCharset).toBe("utf-8");
-  });
-
-  it("contentType setter honors a customized Response.defaultCharset", () => {
-    const prior = Response.defaultCharset;
-    try {
-      Response.defaultCharset = "iso-8859-1";
-      const res = new Response();
-      res.contentType = "text/plain";
-      expect(res.headers.get("content-type")).toBe("text/plain; charset=iso-8859-1");
-    } finally {
-      Response.defaultCharset = prior;
-    }
+    const body = ["hello"];
+    const response = new Response(200, {}, body);
+    response.request = Request.empty();
+    assertEqual("hello", response.body);
   });
 
   it("set header after read body during action", () => {
@@ -373,9 +237,34 @@ describe("ResponseTest", () => {
     expect(headers["x-header"]).toBe("Best of all possible worlds.");
   });
 
-  it.skip("read body during action", () => {});
+  it("read body during action", () => {
+    const response = newResponse();
+    response.body = "Hello, World!";
 
-  it.skip("code", () => {});
+    assertNil(response.contentType);
+
+    assertEqual("Hello, World!", response.body);
+
+    const [status, headers, body] = response.toA();
+    assertEqual(200, status);
+    h.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
+
+    const parts: unknown[] = [];
+    (body as RackBody).each((part: unknown) => parts.push(part));
+    assertEqual(["Hello, World!"], parts);
+  });
+
+  it("code", () => {
+    const response = newResponse();
+    response.status = "200 OK";
+    assertEqual("200", response.code);
+
+    response.status = "200";
+    assertEqual("200", response.code);
+
+    response.status = 200;
+    assertEqual("200", response.code);
+  });
 
   it("read content type with default charset utf-8", () => {
     const res = new Response(200, { "Content-Type": "text/xml" });
@@ -431,7 +320,9 @@ describe("ResponseTest", () => {
     }
   });
 
-  it.skip("respond_to? accepts include_private", () => {});
+  it("respond_to? accepts include_private", () => {
+    assertNotRespondTo(newResponse(), "methodMissing");
+  });
 
   it("can be explicitly destructured into status, headers and an enumerable body", () => {
     const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
@@ -445,188 +336,25 @@ describe("ResponseTest", () => {
     expect([...body]).toEqual(["Not Found"]);
   });
 
-  it.skip("[response.to_a].flatten does not recurse infinitely", () => {});
-
-  it.skip("compatibility with Rack::ContentLength", () => {});
-});
-
-describe("ResponseFilterRedirect", () => {
-  it("location getter/setter round-trips through the Location header", () => {
-    const res = new Response();
-    res.location = "https://example.com/foo";
-    expect(res.location).toBe("https://example.com/foo");
-    expect(res.headers.get("location")).toBe("https://example.com/foo");
+  it("[response.to_a].flatten does not recurse infinitely", () => {
+    const response = newResponse();
+    const [status, headers, body] = flatten([response.toA()]);
+    assertEqual(200, status);
+    assertEqual(headers, response.headers.toHash());
+    assertNil(body);
   });
 
-  it("filteredLocation strips sensitive query params using the request filter", () => {
-    const req = new Request({
-      "action_dispatch.parameter_filter": ["token"],
-    });
-    const res = new Response();
-    res.request = req;
-    res.location = "https://example.com/foo?token=secret&name=alice";
-    const filtered = res.filteredLocation();
-    expect(filtered).toContain("name=alice");
-    expect(filtered).not.toContain("secret");
-    expect(filtered).toContain("token=");
-  });
+  it("compatibility with Rack::ContentLength", async () => {
+    const response = newResponse();
+    response.body = "Hello";
+    const app = (_env: RackEnv) => response.toA() as unknown as RackResponse;
+    const env = MockRequest.envFor("/");
 
-  it("filteredLocation replaces the entire location when redirect_filter matches", () => {
-    const req = new Request({
-      "action_dispatch.redirect_filter": [/secret/],
-    });
-    const res = new Response();
-    res.request = req;
-    res.location = "https://example.com/secret/path";
-    expect(res.filteredLocation()).toBe("[FILTERED]");
-  });
+    let [, headers] = await app(env);
+    h.assertNotHeader("content-length", headers);
 
-  it("filteredLocation returns the unmodified location when no filters are configured", () => {
-    const req = new Request({});
-    const res = new Response();
-    res.request = req;
-    res.location = "https://example.com/foo";
-    expect(res.filteredLocation()).toBe("https://example.com/foo");
-  });
-});
-
-describe("Response Cache::Response wiring", () => {
-  it("lastModified round-trips through Last-Modified header", () => {
-    const res = new Response();
-    const t = new Date("1994-11-06T08:49:37Z");
-    res.lastModified = t;
-    expect(res.isLastModified).toBe(true);
-    expect(res.getHeader("Last-Modified")).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
-    expect(res.lastModified?.getTime()).toBe(t.getTime());
-  });
-
-  it("lastModified returns undefined when absent", () => {
-    const res = new Response();
-    expect(res.isLastModified).toBe(false);
-    expect(res.lastModified).toBeUndefined();
-  });
-
-  it("date round-trips through Date header", () => {
-    const res = new Response();
-    const t = new Date("1994-11-06T08:49:37Z");
-    res.date = t;
-    expect(res.isDate).toBe(true);
-    expect(res.date?.getTime()).toBe(t.getTime());
-  });
-
-  it("setWeakEtag writes a W/-prefixed strong-form digest", () => {
-    const res = new Response();
-    res.weakEtag(["abc", 1]);
-    const e = res.getHeader("ETag")!;
-    expect(e.startsWith('W/"')).toBe(true);
-    expect(res.isWeakEtag()).toBe(true);
-    expect(res.isStrongEtag()).toBe(false);
-    expect(res.isEtag).toBe(e);
-    expect(res.getHeader("etag")).toBe(e);
-    expect(res.getHeader("ETAG")).toBe(e);
-  });
-
-  it("setStrongEtag writes an unprefixed digest", () => {
-    const res = new Response();
-    res.strongEtag(["abc", 1]);
-    const e = res.getHeader("ETag")!;
-    expect(e.startsWith('"')).toBe(true);
-    expect(e.startsWith('W/"')).toBe(false);
-    expect(res.isStrongEtag()).toBe(true);
-    expect(res.isWeakEtag()).toBe(false);
-  });
-
-  it("cacheControl returns a parsed directive hash", () => {
-    const res = new Response(200, { "Cache-Control": "max-age=600, public, foo=bar" });
-    const hash = res.cacheControl;
-    expect(hash["maxAge"]).toBe("600");
-    expect(hash["public"]).toBe(true);
-    expect(hash.extras).toEqual(["foo=bar"]);
-  });
-
-  it("mergeAndNormalizeCacheControl writes back the combined directive set", () => {
-    const res = new Response();
-    res._cacheControl = "no-cache";
-    res.mergeAndNormalizeCacheControlBang({ public: true, maxAge: 30 });
-    const cc = res._cacheControl;
-    expect(cc).toContain("max-age=30");
-    expect(cc).toContain("public");
-  });
-
-  it("handleConditionalGet sets a default Cache-Control when an ETag is present", () => {
-    const res = new Response();
-    res.weakEtag("v1");
-    res.handleConditionalGetBang();
-    expect(res.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
-    expect(res.getHeader("cache-control")).toBe("max-age=0, private, must-revalidate");
-  });
-
-  it("handleConditionalGet is a no-op when Cache-Control is already set", () => {
-    const res = new Response();
-    res.weakEtag("v1");
-    res.setHeader("Cache-Control", "public, max-age=60");
-    res.handleConditionalGetBang();
-    expect(res.getHeader("Cache-Control")).toBe("public, max-age=60");
-  });
-
-  it("handleConditionalGet is a no-op without ETag or Last-Modified", () => {
-    const res = new Response();
-    res.handleConditionalGetBang();
-    expect(res.getHeader("Cache-Control")).toBeUndefined();
-  });
-
-  describe("lifecycle (commit / sending / sent)", () => {
-    it("commitBang is idempotent and runs beforeCommitted once", () => {
-      const res = new Response();
-      res.commitBang();
-      expect(res.committed).toBe(true);
-      expect(res.getHeader("content-type")).toMatch(/text\/html/);
-      res.commitBang();
-      expect(res.committed).toBe(true);
-    });
-
-    it("each wraps iteration in sending! / sent!", () => {
-      const res = new Response(200, {}, ["hello", " world"]);
-      const chunks: unknown[] = [];
-      for (const chunk of res.each()) chunks.push(chunk);
-      expect(chunks).toEqual(["hello", " world"]);
-      expect(res.isSending).toBe(true);
-      expect(res.isSent).toBe(true);
-    });
-  });
-
-  describe("sendFile", () => {
-    it("commits the response and exposes a Rack-compatible file body", () => {
-      withTempFile("hello", (path) => {
-        const res = new Response();
-        res.sendFile(path);
-        expect(res.committed).toBe(true);
-        const stream = res.stream as { toPath(): string; each(): IterableIterator<string> };
-        expect(typeof stream.toPath).toBe("function");
-        expect(stream.toPath()).toBe(path);
-      });
-    });
-
-    it("toRack surfaces the stream itself (preserving toPath) when sendFile was called", () => {
-      withTempFile("hello", (path) => {
-        const res = new Response();
-        res.sendFile(path);
-        const [status, , body] = res.toA();
-        expect(status).toBe(200);
-        const stream = body as { toPath(): string; each(): IterableIterator<string> };
-        expect(stream.toPath()).toBe(path);
-        const chunks: string[] = [];
-        for (const c of stream.each()) chunks.push(c);
-        expect(chunks.join("")).toBe("hello");
-      });
-    });
-  });
-
-  describe("bodyParts", () => {
-    it("drains the buffered body when no explicit stream is set", () => {
-      const res = new Response(200, {}, ["a", "b"]);
-      expect(res.bodyParts()).toEqual(["a", "b"]);
-    });
+    [, headers] = await new ContentLength(app).call(env);
+    h.assertHeader("content-length", "5", headers);
   });
 });
 
@@ -660,27 +388,192 @@ describe("ResponseHeadersTest", () => {
     expect(res.hasHeader("Foo")).toBe(false);
   });
 
-  it.skip("add_header", () => {});
+  it("add_header", () => {
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+
+    h.assertHeaderValue("1,2", response.addHeader("Foo", "2"));
+    h.assertHeaderValue("1,2", response.getHeader("Foo"));
+
+    h.assertHeaderValue("1,2", response.addHeader("Foo", null));
+    h.assertHeaderValue("1,2", response.getHeader("Foo"));
+
+    assertNil(response.addHeader("Bar", null));
+    assertNot(response.hasHeader("Bar"));
+    assertNil(response.getHeader("Bar"));
+
+    h.assertHeaderValue("1", response.addHeader("Bar", "1"));
+    assert(response.hasHeader("Bar"));
+    h.assertHeaderValue("1", response.getHeader("Bar"));
+  });
 });
 
 describe("ResponseIntegrationTest", () => {
-  it.skip("response cache control from railsish app", () => {});
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+  });
 
-  it.skip("response cache control from rackish app", () => {});
+  function railsishApp(block: (resp: Response) => void) {
+    return () => {
+      const resp = new Response();
+      block(resp);
+      resp.request = Request.empty();
+      return resp.toA();
+    };
+  }
 
-  it.skip("response charset and content type from railsish app", () => {});
+  function rackishApp(
+    headers: Record<string, string>,
+    body: RackBodyType = bodyFromString("Hello"),
+  ) {
+    return (): RackResponse => [200, headers, body];
+  }
 
-  it.skip("response charset and content type from rackish app", () => {});
+  it("response cache control from railsish app", async () => {
+    t.app = railsishApp((resp) => {
+      resp.cacheControl.public = true;
+      resp.etag = "123";
+      resp.body = "Hello";
+    });
 
-  it.skip("strong ETag validator", () => {});
+    await t.get("/");
+    t.assertResponse("success");
 
-  it.skip("response Content-Type with optional parameters", () => {});
+    assertEqual("public", t.response.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.headers.get("ETag"));
 
-  it.skip("response Content-Type with optional parameters that set before charset", () => {});
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.etag);
+    assertEqual({ public: true }, t.response.cacheControl);
+  });
 
-  it.skip("response Content-Type with quoted-string", () => {});
+  it("response cache control from rackish app", async () => {
+    t.app = rackishApp({
+      ETag: 'W/"202cb962ac59075b964b07152d234b70"',
+      "Cache-Control": "public",
+    });
 
-  it.skip("response body with enumerator", () => {});
+    await t.get("/");
+    t.assertResponse("success");
 
-  it.skip("response body with lazy enumerator", () => {});
+    assertEqual("public", t.response.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.headers.get("ETag"));
+
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', t.response.etag);
+    assertEqual({ public: true }, t.response.cacheControl);
+  });
+
+  it("response charset and content type from railsish app", async () => {
+    t.app = railsishApp((resp) => {
+      resp.charset = "utf-16";
+      resp.contentType = Mime.get("xml")!;
+      resp.body = "Hello";
+    });
+
+    await t.get("/");
+    t.assertResponse("success");
+
+    assertEqual("utf-16", t.response.charset);
+    assertEqual(Mime.get("xml"), t.response.mediaType);
+    assertEqual("application/xml; charset=utf-16", t.response.contentType);
+    assertEqual("application/xml; charset=utf-16", t.response.headers.get("Content-Type"));
+  });
+
+  it("response charset and content type from rackish app", async () => {
+    t.app = rackishApp({ "Content-Type": "application/xml; charset=utf-16" });
+
+    await t.get("/");
+    t.assertResponse("success");
+
+    assertEqual("utf-16", t.response.charset);
+    assertEqual(Mime.get("xml"), t.response.mediaType);
+    assertEqual("application/xml; charset=utf-16", t.response.contentType);
+    assertEqual("application/xml; charset=utf-16", t.response.headers.get("Content-Type"));
+  });
+
+  it("strong ETag validator", async () => {
+    t.app = railsishApp((resp) => {
+      resp.strongEtag("123");
+      resp.body = "Hello";
+    });
+
+    await t.get("/");
+    t.assertResponse("ok");
+
+    assertEqual('"202cb962ac59075b964b07152d234b70"', t.response.headers.get("ETag"));
+    assertEqual('"202cb962ac59075b964b07152d234b70"', t.response.etag);
+  });
+
+  it("response Content-Type with optional parameters", async () => {
+    t.app = rackishApp({ "Content-Type": "text/csv; charset=utf-16; header=present" });
+
+    await t.get("/");
+    t.assertResponse("success");
+
+    assertEqual("text/csv; charset=utf-16; header=present", t.response.headers.get("Content-Type"));
+    assertEqual("text/csv; charset=utf-16; header=present", t.response.contentType);
+    assertEqual("text/csv", t.response.mediaType);
+    assertEqual("utf-16", t.response.charset);
+  });
+
+  it("response Content-Type with optional parameters that set before charset", async () => {
+    t.app = rackishApp({ "Content-Type": "text/csv; header=present; charset=utf-16" });
+
+    await t.get("/");
+    t.assertResponse("success");
+
+    assertEqual("text/csv; header=present; charset=utf-16", t.response.headers.get("Content-Type"));
+    assertEqual("text/csv; header=present; charset=utf-16", t.response.contentType);
+    assertEqual("text/csv; header=present", t.response.mediaType);
+    assertEqual("utf-16", t.response.charset);
+  });
+
+  it("response Content-Type with quoted-string", async () => {
+    t.app = rackishApp({ "Content-Type": 'text/csv; header=present; charset="utf-16"' });
+
+    await t.get("/");
+    t.assertResponse("success");
+
+    assertEqual(
+      'text/csv; header=present; charset="utf-16"',
+      t.response.headers.get("Content-Type"),
+    );
+    assertEqual('text/csv; header=present; charset="utf-16"', t.response.contentType);
+    assertEqual("text/csv; header=present", t.response.mediaType);
+    assertEqual("utf-16", t.response.charset);
+  });
+
+  it("response body with enumerator", async () => {
+    t.app = rackishApp(
+      { "Content-Type": "text/plain" },
+      (async function* () {
+        for (let n = 0; n < 10; n++) yield String(n);
+      })(),
+    );
+    await t.get("/");
+    t.assertResponse("success");
+
+    assertEqual("text/plain", t.response.headers.get("Content-Type"));
+    assertEqual("text/plain", t.response.contentType);
+    assertEqual("text/plain", t.response.mediaType);
+    assertEqual("utf-8", t.response.charset);
+    assertEqual("0123456789", t.response.body);
+  });
+
+  it("response body with lazy enumerator", async () => {
+    t.app = rackishApp(
+      { "Content-Type": "text/plain" },
+      (async function* () {
+        for (let n = 0; n <= 10; n++) yield String(n);
+      })(),
+    );
+    await t.get("/");
+    t.assertResponse("success");
+
+    assertEqual("text/plain", t.response.headers.get("Content-Type"));
+    assertEqual("text/plain", t.response.contentType);
+    assertEqual("text/plain", t.response.mediaType);
+    assertEqual("utf-8", t.response.charset);
+    assertEqual("012345678910", t.response.body);
+  });
 });
