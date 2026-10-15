@@ -199,7 +199,7 @@ describe("HostAuthorizationTest", () => {
 
   it("blocks requests to unallowed host supporting custom responses", async () => {
     testCase.app = buildApp(["w.example.co"], {
-      responseApp: async (_env: RackEnv) => [401, {}, ["Custom"]] as unknown as RackResponse,
+      responseApp: async (_env: RackEnv) => [401, {}, ["Custom"]],
     });
 
     await testCase.get("/");

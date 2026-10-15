@@ -23,6 +23,7 @@ import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
 class Boomer {
+  /** @missingRailsArgs new — CONVERGEABLE template-error-constructor-takes-template-and-errinfo */
   async call(env: RackEnv): Promise<RackResponse> {
     const req = new Request(env);
     switch (req.path) {
@@ -139,7 +140,7 @@ describe("ShowExceptionsTest", () => {
       assertKindOf(ActionNotFound, env["action_dispatch.exception"]);
       assertEqual("/404", env["PATH_INFO"]);
       assertEqual("/not_found_original_exception", env["action_dispatch.original_path"]);
-      return [404, { "content-type": "text/plain" }, ["YOU FAILED"]] as unknown as RackResponse;
+      return [404, { "content-type": "text/plain" }, ["YOU FAILED"]];
     };
 
     testCase.app = buildApp(exceptionsApp);
@@ -152,8 +153,11 @@ describe("ShowExceptionsTest", () => {
   });
 
   it("returns an empty response if custom exceptions app returns x-cascade pass", async () => {
-    const exceptionsApp = async (_env: RackEnv): Promise<RackResponse> =>
-      [404, { [X_CASCADE]: "pass" }, []] as unknown as RackResponse;
+    const exceptionsApp = async (_env: RackEnv): Promise<RackResponse> => [
+      404,
+      { [X_CASCADE]: "pass" },
+      [],
+    ];
 
     testCase.app = buildApp(exceptionsApp);
 

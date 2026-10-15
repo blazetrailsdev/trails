@@ -78,7 +78,7 @@ export class Events {
   }
 }
 
-interface EventBody extends RackBody {
+interface EventBody extends AsyncIterable<string | Uint8Array> {
   close(): void;
 }
 
