@@ -144,7 +144,7 @@ export class FlashHash {
   }
 
   initializeCopy(other: FlashHash): void {
-    if (other.isNowIsLoaded()) {
+    if (other.isNowIsLoaded() != null) {
       this._now = rbObjDup(other.now);
       this._now.flash = this;
     }
@@ -190,14 +190,15 @@ export class FlashHash {
     return Object.keys(this._flashes).length === 0;
   }
 
-  clear(): void {
+  clear(): Record<string, unknown> {
     this._discard.clear();
     for (const k of Object.keys(this._flashes)) delete this._flashes[k];
+    return this._flashes;
   }
 
-  each(block: (pair: [string, unknown]) => void): this {
+  each(block: (pair: [string, unknown]) => void): Record<string, unknown> {
     for (const pair of Object.entries(this._flashes)) block(pair);
-    return this;
+    return this._flashes;
   }
 
   declare mergeBang: FlashHash["update"];
@@ -246,8 +247,8 @@ export class FlashHash {
   }
 
   /** @internal */
-  protected isNowIsLoaded(): boolean {
-    return this._now != null;
+  protected isNowIsLoaded(): FlashNow | null {
+    return this._now;
   }
 
   /** @internal */
