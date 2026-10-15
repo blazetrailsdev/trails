@@ -6,6 +6,7 @@ import { Response } from "../../action-dispatch/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
 import { bodyToString } from "@blazetrails/rack";
+import { StringIO } from "@blazetrails/ruby-compat";
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -94,7 +95,7 @@ describe("Controller JSON rendering integration", () => {
         PATH_INFO: "/posts",
         CONTENT_TYPE: "application/json",
         CONTENT_LENGTH: "20",
-        "rack.input": JSON.stringify({ title: "New Post" }),
+        "rack.input": new StringIO(JSON.stringify({ title: "New Post" })),
       }),
       new Response(),
     );
@@ -198,7 +199,7 @@ describe("Controller JSON rendering integration", () => {
         QUERY_STRING: "page=2",
         CONTENT_TYPE: "application/json",
         CONTENT_LENGTH: "19",
-        "rack.input": JSON.stringify({ title: "Updated" }),
+        "rack.input": new StringIO(JSON.stringify({ title: "Updated" })),
         "action_dispatch.request.path_parameters": {
           controller: "posts",
           action: "update",
