@@ -615,6 +615,7 @@ export class TimeZone {
     this.initialize(name, utcOffset, tzinfo);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   initialize(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null): void {
     this.name = name;
     this._utcOffset = utcOffset;
