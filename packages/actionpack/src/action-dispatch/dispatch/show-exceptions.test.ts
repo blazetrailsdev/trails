@@ -18,6 +18,7 @@ import { ParseError } from "../http/parameters.js";
 import { Request } from "../http/request.js";
 import { PublicExceptions } from "../middleware/public-exceptions.js";
 import { ShowExceptions } from "../middleware/show-exceptions.js";
+import type { RackAppObject } from "../middleware/stack.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
@@ -52,11 +53,9 @@ class Boomer {
   }
 }
 
-function buildApp(exceptionsApp: unknown = null): RackApp {
+function buildApp(exceptionsApp: RackApp | RackAppObject | null = null): Lint {
   exceptionsApp ??= new PublicExceptions(`${FIXTURE_LOAD_PATH}/public`);
-  return new Lint(
-    new ShowExceptions(new Lint(new Boomer() as never) as never, exceptionsApp as never) as never,
-  ) as unknown as RackApp;
+  return new Lint(new ShowExceptions(new Lint(new Boomer()), exceptionsApp));
 }
 
 describe("ShowExceptionsTest", () => {
@@ -136,7 +135,7 @@ describe("ShowExceptionsTest", () => {
   });
 
   it("calls custom exceptions app", async () => {
-    const exceptionsApp = (env: RackEnv): RackResponse => {
+    const exceptionsApp = async (env: RackEnv): Promise<RackResponse> => {
       assertKindOf(ActionNotFound, env["action_dispatch.exception"]);
       assertEqual("/404", env["PATH_INFO"]);
       assertEqual("/not_found_original_exception", env["action_dispatch.original_path"]);
@@ -153,7 +152,7 @@ describe("ShowExceptionsTest", () => {
   });
 
   it("returns an empty response if custom exceptions app returns x-cascade pass", async () => {
-    const exceptionsApp = (_env: RackEnv): RackResponse =>
+    const exceptionsApp = async (_env: RackEnv): Promise<RackResponse> =>
       [404, { [X_CASCADE]: "pass" }, []] as unknown as RackResponse;
 
     testCase.app = buildApp(exceptionsApp);
@@ -178,7 +177,7 @@ describe("ShowExceptionsTest", () => {
   });
 
   it("failsafe prevents raising if exceptions_app raises", async () => {
-    testCase.app = buildApp((_env: RackEnv) => {
+    testCase.app = buildApp(async (_env: RackEnv) => {
       throw new RuntimeError();
     });
 

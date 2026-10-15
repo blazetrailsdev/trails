@@ -1,6 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import { Lint, SET_COOKIE } from "@blazetrails/rack";
-import type { RackApp, RackEnv } from "@blazetrails/rack";
+import type { RackEnv } from "@blazetrails/rack";
 import { assertEqual, assertNil, years } from "@blazetrails/activesupport";
 import { SSL, type SSLOptions } from "../middleware/ssl.js";
 import type { Request } from "../http/request.js";
@@ -11,14 +11,9 @@ import "../../test-helpers/abstract-unit.js";
 function buildApp({
   headers = {},
   sslOptions = {},
-}: { headers?: Record<string, unknown>; sslOptions?: SSLOptions } = {}): RackApp {
-  const app = (_env: RackEnv) => [200, headers, []];
-  return new Lint(
-    new SSL(new Lint(app as unknown as RackApp) as never, {
-      hsts: { subdomains: true },
-      ...sslOptions,
-    }) as never,
-  ) as unknown as RackApp;
+}: { headers?: Record<string, unknown>; sslOptions?: SSLOptions } = {}): Lint {
+  const app = (_env: RackEnv): [number, Record<string, unknown>, unknown[]] => [200, headers, []];
+  return new Lint(new SSL(new Lint(app), { hsts: { subdomains: true }, ...sslOptions }));
 }
 
 describe("RedirectSSLTest", () => {

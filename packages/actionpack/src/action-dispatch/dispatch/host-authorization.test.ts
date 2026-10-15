@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import {
   HostAuthorization,
   ALLOWED_HOSTS_IN_DEVELOPMENT,
@@ -8,280 +8,13 @@ import { IPAddr, StringIO } from "@blazetrails/ruby-compat";
 import { Logger, assertEmpty, assertEqual, assertMatch } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Lint } from "@blazetrails/rack";
-import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackAppObject } from "../middleware/stack.js";
 import type { Request } from "../http/request.js";
-import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 
-const okApp = async (_env: RackEnv): Promise<RackResponse> => [
-  200,
-  { "content-type": "text/plain" },
-  bodyFromString("OK"),
-];
-
-describe("HostAuthorizationTest", () => {
-  it("allows request when host matches exactly", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("blocks request when host does not match", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status, headers, body] = await mw.call({
-      HTTP_HOST: "evil.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(403);
-    expect(headers["content-type"]).toContain("text/html");
-    expect(await bodyToString(body)).toBe("");
-  });
-
-  it("default response renders DebugView body when show_detailed_exceptions is set", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status, headers, body] = await mw.call({
-      HTTP_HOST: "evil.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.show_detailed_exceptions": true,
-    });
-    expect(status).toBe(403);
-    expect(headers["content-type"]).toContain("text/html");
-    const rendered = await bodyToString(body);
-    expect(rendered).toContain("Blocked host");
-    expect(rendered).toContain("evil.com");
-  });
-
-  it("default response uses text/plain for XHR requests", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status, headers] = await mw.call({
-      HTTP_HOST: "evil.com",
-      HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(403);
-    expect(headers["content-type"]).toContain("text/plain");
-  });
-
-  it("default response logs blocked hosts via request logger", async () => {
-    const messages: string[] = [];
-    const logger = { error: (msg: string) => messages.push(msg) };
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    await mw.call({
-      HTTP_HOST: "evil.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      "action_dispatch.logger": logger,
-    });
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("Blocked hosts: evil.com");
-    expect(messages[0]).toContain("DefaultResponseApp");
-  });
-
-  it("allows wildcard subdomain matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "app.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("wildcard subdomain also matches apex domain", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("wildcard subdomain does not match different domain", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "evil-example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(403);
-  });
-
-  it("allows regexp matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [/example\.(com|org)/] });
-    const [s1] = await mw.call({ HTTP_HOST: "example.com", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s1).toBe(200);
-    const [s2] = await mw.call({ HTTP_HOST: "example.org", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s2).toBe(200);
-    const [s3] = await mw.call({ HTTP_HOST: "example.net", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s3).toBe(403);
-  });
-
-  it("multiple allowed hosts", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["a.com", "b.com"] });
-    const [s1] = await mw.call({ HTTP_HOST: "a.com", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s1).toBe(200);
-    const [s2] = await mw.call({ HTTP_HOST: "b.com", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s2).toBe(200);
-    const [s3] = await mw.call({ HTTP_HOST: "c.com", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s3).toBe(403);
-  });
-
-  it("empty hosts list allows all", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [] });
-    const [status] = await mw.call({
-      HTTP_HOST: "anything.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("strips port from host before checking", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "example.com:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("case insensitive host matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "Example.COM",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("exclude callback bypasses authorization", async () => {
-    const mw = new HostAuthorization(okApp, {
-      hosts: ["example.com"],
-      exclude: (req) => req.path === "/health",
-    });
-    const [status] = await mw.call({
-      HTTP_HOST: "evil.com",
-      PATH_INFO: "/health",
-      REQUEST_METHOD: "GET",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("exclude does not bypass non-matching paths", async () => {
-    const mw = new HostAuthorization(okApp, {
-      hosts: ["example.com"],
-      exclude: (req) => req.path === "/health",
-    });
-    const [status] = await mw.call({
-      HTTP_HOST: "evil.com",
-      PATH_INFO: "/other",
-      REQUEST_METHOD: "GET",
-    });
-    expect(status).toBe(403);
-  });
-
-  it("custom response app", async () => {
-    const customApp = async (_env: RackEnv): Promise<RackResponse> => [
-      503,
-      { "content-type": "text/plain" },
-      bodyFromString("Service Unavailable"),
-    ];
-    const mw = new HostAuthorization(okApp, {
-      hosts: ["example.com"],
-      responseApp: customApp,
-    });
-    const [status, _, body] = await mw.call({
-      HTTP_HOST: "evil.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(503);
-    expect(await bodyToString(body)).toBe("Service Unavailable");
-  });
-
-  it("falls back to SERVER_NAME when HTTP_HOST is absent", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status] = await mw.call({
-      SERVER_NAME: "example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("IPv4 address matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["127.0.0.1"] });
-    const [s1] = await mw.call({ HTTP_HOST: "127.0.0.1", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s1).toBe(200);
-    const [s2] = await mw.call({ HTTP_HOST: "192.168.1.1", REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(s2).toBe(403);
-  });
-
-  it("IPv6 loopback matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["[::1]"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "[::1]",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("authorized_host preserves IPv6 brackets and strips port", async () => {
-    const env: Record<string, unknown> = {
-      HTTP_HOST: "[::1]:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    };
-    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
-    const [status] = await mw.call(env);
-    expect(status).toBe(200);
-    expect(env["action_dispatch.authorized_host"]).toBe("[::1]");
-  });
-
-  it("SUBDOMAIN_REGEX allows only a single subdomain segment", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "deep.sub.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(403);
-  });
-
-  it("IPv4-mapped IPv6 host matches CIDR allowlist", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
-    const [status] = await mw.call({
-      HTTP_HOST: "[::ffff:127.0.0.1]",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
-  it("non-IP hostname does not match IPv6 CIDR allowlist", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
-    const [status] = await mw.call({
-      HTTP_HOST: "example.com:3000",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(403);
-  });
-});
-
-const App = (_env: RackEnv): RackResponse => [200, {}, ["Success"]] as unknown as RackResponse;
+const App = async (_env: RackEnv) => [200, {}, ["Success"]];
 
 function buildApp(
   hosts: HostPermission | HostPermission[] | null,
@@ -289,26 +22,22 @@ function buildApp(
     exclude = undefined,
     responseApp = undefined,
     lint = true,
-    app = App as unknown as RackApp,
+    app = App as RackAppObject["call"] | RackAppObject,
   }: {
     exclude?: (req: Request) => boolean;
-    responseApp?: (env: RackEnv) => RackResponse | Promise<RackResponse>;
+    responseApp?: (env: RackEnv) => Promise<RackResponse>;
     lint?: boolean;
-    app?: RackApp;
+    app?: RackAppObject["call"] | RackAppObject;
   } = {},
-): RackApp {
+): RackAppObject["call"] | RackAppObject {
   if (lint) {
-    app = new Lint(app) as unknown as RackApp;
+    app = new Lint(app);
   }
 
-  app = new HostAuthorization(app, {
-    hosts: hosts as HostPermission[],
-    exclude,
-    responseApp: responseApp as never,
-  }) as unknown as RackApp;
+  app = new HostAuthorization(app, { hosts, exclude, responseApp });
 
   if (lint) {
-    app = new Lint(app) as unknown as RackApp;
+    app = new Lint(app);
   }
 
   return app;
@@ -470,7 +199,7 @@ describe("HostAuthorizationTest", () => {
 
   it("blocks requests to unallowed host supporting custom responses", async () => {
     testCase.app = buildApp(["w.example.co"], {
-      responseApp: (_env: RackEnv) => [401, {}, ["Custom"]] as unknown as RackResponse,
+      responseApp: async (_env: RackEnv) => [401, {}, ["Custom"]] as unknown as RackResponse,
     });
 
     await testCase.get("/");

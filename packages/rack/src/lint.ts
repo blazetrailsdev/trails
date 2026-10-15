@@ -32,9 +32,9 @@ export class LintError extends Error {
 }
 
 export class Lint {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -45,7 +45,7 @@ export class Lint {
 
     this.checkEnv(env);
 
-    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const result = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
 
     if (!Array.isArray(result) || result.length !== 3) {
       throw new LintError("response is not a 3-element array");

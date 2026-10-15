@@ -99,12 +99,14 @@ export function extractHostname(host: string): string {
 }
 
 export interface HostAuthorizationOptions {
-  hosts: HostPermission[];
+  hosts: HostPermission[] | HostPermission | null | undefined;
   exclude?: (request: Request) => boolean;
   responseApp?: (env: RackEnv) => Promise<RackResponse>;
 }
 
-type RackApp = (env: RackEnv) => Promise<RackResponse>;
+type RackApp =
+  | ((env: RackEnv) => Promise<RackResponse>)
+  | { call(env: RackEnv): Promise<RackResponse> };
 
 export class HostAuthorization {
   private app: RackApp;
@@ -121,15 +123,14 @@ export class HostAuthorization {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    if (this.permissions.empty())
-      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    if (this.permissions.empty()) return rbFSend(this.app, "call", env) as Promise<RackResponse>;
 
     const request = new Request(env);
     const blocked = this.blockedHosts(request);
 
     if (blocked.length === 0 || this.isExcluded(request)) {
       this.markAsAuthorized(request);
-      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+      return rbFSend(this.app, "call", env) as Promise<RackResponse>;
     }
 
     env["action_dispatch.blocked_hosts"] = blocked;
