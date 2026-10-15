@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
@@ -10,6 +10,7 @@ import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import "@blazetrails/activesupport/message-pack";
 import {
   assertEqual,
+  assertNotIncludes,
   assertMatch,
   assertNil,
   assertNotEqual,
@@ -22,7 +23,9 @@ import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 import { TestRequest } from "../testing/test-request.js";
 import { Base } from "../../action-controller/base.js";
 import { TestCase } from "../../action-controller/test-case.js";
-import { include } from "@blazetrails/activesupport";
+import { Duration, include, isPresent } from "@blazetrails/activesupport";
+import { afterTeardown, travel, travelTo } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
 
 function jarWithSameSiteProtection(
   proc: (request: { userAgent?: string }) => unknown,
@@ -41,6 +44,10 @@ function jarWithSameSiteProtection(
     cookiesSameSiteProtection,
   };
   return CookieJar.build(request as never, {});
+}
+
+function cookieJarCookies(jar: CookieJar): Map<string, string> {
+  return (jar as unknown as { _cookies: Map<string, string> })._cookies;
 }
 
 const SECRET_KEY_BASE = "b3c631c314c0bbca50c1b2843150fe33";
@@ -854,7 +861,14 @@ describe("CookiesTest", () => {
 
   it.skip("encrypted cookie using message pack serializer can migrate json dumped value to message pack", () => {});
 
-  it.skip("cookie jar mutated by request persists on future requests", () => {});
+  it("cookie jar mutated by request persists on future requests", async () => {
+    await tc.get("authenticate");
+    const cookieJar = tc.request.cookieJar();
+    cookieJar.signed.set("user_id", 123);
+    assertEqual(["user_name", "user_id"], [...cookieJarCookies(tc.request.cookieJar()).keys()]);
+    await tc.get("getSignedCookie");
+    assertEqual(["user_name", "user_id"], [...cookieJarCookies(tc.request.cookieJar()).keys()]);
+  });
 
   it("permanent signed cookie", () => {
     const cookies = new CookieJar(cookieRequest());
@@ -980,6 +994,21 @@ describe("CookiesTest", () => {
   const DOMAINS = ["example1.com", "example2.com", ".example3.com"];
 
   class TestController extends Base {
+    async authenticate(): Promise<void> {
+      this.cookies().set("user_name", "david");
+      await this.head("ok");
+    }
+
+    async setCookieIfNotPresent(): Promise<void> {
+      if (!isPresent(this.cookies().get("user_name"))) this.cookies().set("user_name", "alice");
+      await this.head("ok");
+    }
+
+    async getSignedCookie(): Promise<void> {
+      this.cookies().signed.get("user_id");
+      await this.head("ok");
+    }
+
     async setCookieWithDomain(): Promise<void> {
       this.cookies().set("user_name", { value: "rizwanreza", domain: ":all" });
       await this.head("ok");
@@ -1030,6 +1059,89 @@ describe("CookiesTest", () => {
       this.cookies().delete("user_name", { domain: DOMAINS });
       await this.head("ok");
     }
+
+    async symbolKey(): Promise<void> {
+      this.cookies().set("user_name", "david");
+      await this.head("ok");
+    }
+
+    async stringKey(): Promise<void> {
+      this.cookies().set("user_name", "dhh");
+      await this.head("ok");
+    }
+
+    async symbolKeyMock(): Promise<void> {
+      if (this.cookies().get("user_name") === "andrew") this.cookies().set("user_name", "david");
+      await this.head("ok");
+    }
+
+    async stringKeyMock(): Promise<void> {
+      if (this.cookies().get("user_name") === "andrew") this.cookies().set("user_name", "david");
+      await this.head("ok");
+    }
+
+    async noop(): Promise<void> {
+      await this.head("ok");
+    }
+
+    encryptedCookie(): unknown {
+      return this.cookies().encrypted.get("foo");
+    }
+
+    async cookieExpiresInTwoHours(): Promise<void> {
+      this.cookies().set("user_name", { value: "assain", expires: Duration.hours(2) });
+      await this.head("ok");
+    }
+
+    async encryptedDiscountAndUserIdCookie(): Promise<void> {
+      this.cookies().encrypted.set("user_id", { value: 50, expires: Duration.hours(1) });
+      this.cookies().encrypted.set("discount_percentage", 10);
+
+      await this.head("ok");
+    }
+
+    async signedDiscountAndUserIdCookie(): Promise<void> {
+      this.cookies().signed.set("user_id", { value: 50, expires: Duration.hours(1) });
+      this.cookies().signed.set("discount_percentage", 10);
+
+      await this.head("ok");
+    }
+
+    async rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOn(): Promise<void> {
+      this.cookies().set(
+        "favorite",
+        "KvH5lIHvX5vPQkLIK63r/NuIMwzWky8M0Zwk8SZ6DwUv8+srf36geR4nWq5KmhsZIYXA8NRdCZYIfxMKJsOFlz77Gf+Fq8vBBCWJTp95rx39A28TCUTJEyMhCNJO5eie7Skef76Qt5Jo/SCnIADAhzyGQkGBopKRcA==--qXZZFWGbCy6N8AGy--WswoH+xHrNh9MzSXDpB2fA==",
+      );
+
+      await this.head("ok");
+    }
+
+    async rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOff(): Promise<void> {
+      this.cookies().set(
+        "favorite",
+        "rTG4zs5UufEFAr+ppKwh+MDMymKyAUMOSaWyYa3uUVmD8sMQqyiyQBxgYeAncDHVZIlo4y+kDVSzp66u1/7BNYpnmFe8ES/YT2m8ckNA23jBDmnRZ9CTNfMIRXjFtfxO9YxEOzzhn0ZiA0/zFtr5wkluXtxplOz959Q7MgLOyvTze2h9p8A=--QHOS3rAEGq/HCxXs--xQNra8dk24Idc2qBtpMLpg==",
+      );
+
+      await this.head("ok");
+    }
+
+    async rails52StableSignedCookieWithAuthenticatedEncryptionFlagOn(): Promise<void> {
+      this.cookies().set(
+        "favorite",
+        "eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaEpJaUUxTFRJdFUzUmhZbXhsSUVOb2IyTnZJRU5vYVhBZ1EyOXZhMmxsQmpvR1JWUT0iLCJleHAiOiIzMDE4LTA3LTExVDE2OjExOjI2Ljc1M1oiLCJwdXIiOm51bGx9fQ==--7df5d885b78b70a501d6e82140ae91b24060ac00",
+      );
+
+      await this.head("ok");
+    }
+
+    async rails52StableSignedCookieWithAuthenticatedEncryptionFlagOff(): Promise<void> {
+      this.cookies().set(
+        "favorite",
+        "BAhJIiE1LTItU3RhYmxlIENob2NvIENoaXAgQ29va2llBjoGRVQ=--50bbdbf8d64f5a3ec3e54878f54d4f55b6cb3aff",
+      );
+
+      await this.head("ok");
+    }
   }
 
   class CookiesTestCase extends TestCase {
@@ -1050,6 +1162,8 @@ describe("CookiesTest", () => {
     Object.assign(tc.request.env, cookieEnv());
     tc.request.host = "www.nextangle.com";
   });
+
+  afterEach(() => afterTeardown());
 
   it("cookie with all domain option", async () => {
     await tc.get("setCookieWithDomain");
@@ -1262,5 +1376,281 @@ describe("CookiesTest", () => {
     tc.assertSetCookieHeader(
       "user_name=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
     );
+  });
+  it("cookies hash is indifferent access", async () => {
+    await tc.get("symbolKey");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+    await tc.get("stringKey");
+    assertEqual("dhh", tc.cookies().get("user_name"));
+    assertEqual("dhh", tc.cookies().get("user_name"));
+  });
+
+  it("setting request cookies is indifferent access", async () => {
+    tc.cookies().clear();
+    tc.cookies().set("user_name", "andrew");
+    await tc.get("stringKeyMock");
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    tc.cookies().clear();
+    tc.cookies().set("user_name", "andrew");
+    await tc.get("symbolKeyMock");
+    assertEqual("david", tc.cookies().get("user_name"));
+  });
+
+  it("cookies retained across requests", async () => {
+    await tc.get("symbolKey");
+    tc.assertSetCookieHeader("user_name=david; path=/; SameSite=Lax");
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    await tc.get("noop");
+    assertNotIncludes(tc.response.headers, "Set-Cookie");
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    await tc.get("noop");
+    assertNotIncludes(tc.response.headers, "Set-Cookie");
+    assertEqual("david", tc.cookies().get("user_name"));
+  });
+
+  it("cookies can be cleared", async () => {
+    await tc.get("symbolKey");
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    tc.cookies().clear();
+    await tc.get("noop");
+    assertNil(tc.cookies().get("user_name"));
+
+    await tc.get("symbolKey");
+    assertEqual("david", tc.cookies().get("user_name"));
+  });
+
+  it("can set http cookie header", async () => {
+    tc.request.env["HTTP_COOKIE"] = "user_name=david";
+    await tc.get("noop");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    await tc.get("noop");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    tc.request.env["HTTP_COOKIE"] = "user_name=andrew";
+    await tc.get("noop");
+    assertEqual("andrew", tc.cookies().get("user_name"));
+    assertEqual("andrew", tc.cookies().get("user_name"));
+  });
+
+  it("can set request cookies", async () => {
+    tc.request.cookies["user_name"] = "david";
+    await tc.get("noop");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    await tc.get("noop");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    tc.request.cookies["user_name"] = "andrew";
+    await tc.get("noop");
+    assertEqual("andrew", tc.cookies().get("user_name"));
+    assertEqual("andrew", tc.cookies().get("user_name"));
+  });
+
+  it("cookies precedence over http cookie", async () => {
+    tc.request.env["HTTP_COOKIE"] = "user_name=andrew";
+    await tc.get("authenticate");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    await tc.get("noop");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+  });
+
+  it("cookies precedence over request cookies", async () => {
+    tc.request.cookies["user_name"] = "andrew";
+    await tc.get("authenticate");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+
+    await tc.get("noop");
+    assertEqual("david", tc.cookies().get("user_name"));
+    assertEqual("david", tc.cookies().get("user_name"));
+  });
+
+  it("cookies are not cleared", async () => {
+    tc.cookies().encrypted.set("foo", "bar");
+    await tc.get("noop");
+    assertEqual("bar", (tc.controller as TestController).encryptedCookie());
+  });
+
+  it("cookie override", async () => {
+    await tc.get("setCookieIfNotPresent");
+    assertEqual("alice", tc.cookies().get("user_name"));
+    tc.cookies().set("user_name", "bob");
+    await tc.get("setCookieIfNotPresent");
+    assertEqual("bob", tc.cookies().get("user_name"));
+  });
+
+  it("signed cookie with expires set relatively", () => {
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    tc.cookies().signed.set("user_name", { value: "assain", expires: Duration.hours(2) });
+
+    travel(Duration.hours(1));
+    assertEqual("assain", tc.cookies().signed.get("user_name"));
+
+    travel(Duration.hours(2));
+    assertNil(tc.cookies().signed.get("user_name"));
+  });
+
+  it("encrypted cookie with expires set relatively", () => {
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    tc.cookies().encrypted.set("user_name", { value: "assain", expires: Duration.hours(2) });
+
+    travel(Duration.hours(1));
+    assertEqual("assain", tc.cookies().encrypted.get("user_name"));
+
+    travel(Duration.hours(2));
+    assertNil(tc.cookies().encrypted.get("user_name"));
+  });
+
+  it("vanilla cookie with expires set relatively", async () => {
+    await travelTo(Time.utc(2017, 8, 15), {}, async () => {
+      await tc.get("cookieExpiresInTwoHours");
+      tc.assertSetCookieHeader(
+        "user_name=assain; path=/; expires=Tue, 15 Aug 2017 02:00:00 GMT; SameSite=Lax",
+      );
+    });
+  });
+
+  it("signed cookie with false value and metadata", () => {
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    tc.cookies().signed.set("foo", false);
+    assertEqual(false, tc.cookies().signed.get("foo"));
+  });
+
+  it("encrypted cookie with false value and metadata", () => {
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    tc.cookies().encrypted.set("foo", false);
+    assertEqual(false, tc.cookies().encrypted.get("foo"));
+  });
+
+  it("purpose metadata for encrypted cookies", async () => {
+    await tc.get("encryptedDiscountAndUserIdCookie");
+
+    tc.cookies().set("discount_percentage", tc.cookies().get("user_id")!);
+    assertEqual(50, tc.cookies().encrypted.get("discount_percentage"));
+
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    await tc.get("encryptedDiscountAndUserIdCookie");
+
+    tc.cookies().set("discount_percentage", tc.cookies().get("user_id")!);
+    assertNil(tc.cookies().encrypted.get("discount_percentage"));
+  });
+
+  it("purpose metadata for signed cookies", async () => {
+    await tc.get("signedDiscountAndUserIdCookie");
+
+    tc.cookies().set("discount_percentage", tc.cookies().get("user_id")!);
+    assertEqual(50, tc.cookies().signed.get("discount_percentage"));
+
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    await tc.get("signedDiscountAndUserIdCookie");
+
+    tc.cookies().set("discount_percentage", tc.cookies().get("user_id")!);
+    assertNil(tc.cookies().signed.get("discount_percentage"));
+  });
+
+  it("switch off metadata for encrypted cookies if config is false", async () => {
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = false;
+
+    await tc.get("encryptedDiscountAndUserIdCookie");
+
+    travel(Duration.hours(2));
+    assertNil(tc.cookies().signed.get("user_id"));
+  });
+
+  it("switch off metadata for signed cookies if config is false", async () => {
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = false;
+
+    await tc.get("signedDiscountAndUserIdCookie");
+
+    travel(Duration.hours(2));
+
+    assertNil(tc.cookies().signed.get("user_id"));
+  });
+
+  it.skip("read rails 5 2 stable encrypted cookies if config is false", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = false;
+
+    await tc.get("rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOn");
+
+    assertEqual("5-2-Stable Chocolate Cookies", tc.cookies().encrypted.get("favorite"));
+
+    travel(Duration.years(1001), {}, () => {
+      assertNil(tc.cookies().encrypted.get("favorite"));
+    });
+
+    await tc.get("rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOff");
+
+    assertEqual("5-2-Stable Chocolate Cookies", tc.cookies().encrypted.get("favorite"));
+  });
+
+  it.skip("read rails 5 2 stable signed cookies if config is false", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = false;
+
+    await tc.get("rails52StableSignedCookieWithAuthenticatedEncryptionFlagOn");
+
+    assertEqual("5-2-Stable Choco Chip Cookie", tc.cookies().signed.get("favorite"));
+
+    travel(Duration.years(1001), {}, () => {
+      assertNil(tc.cookies().signed.get("favorite"));
+    });
+
+    await tc.get("rails52StableSignedCookieWithAuthenticatedEncryptionFlagOff");
+
+    assertEqual("5-2-Stable Choco Chip Cookie", tc.cookies().signed.get("favorite"));
+  });
+
+  it.skip("read rails 5 2 stable encrypted cookies if use metadata config is true", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    await tc.get("rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOn");
+
+    assertEqual("5-2-Stable Chocolate Cookies", tc.cookies().encrypted.get("favorite"));
+
+    travel(Duration.years(1001), {}, () => {
+      assertNil(tc.cookies().encrypted.get("favorite"));
+    });
+
+    await tc.get("rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOff");
+
+    assertEqual("5-2-Stable Chocolate Cookies", tc.cookies().encrypted.get("favorite"));
+  });
+
+  it.skip("read rails 5 2 stable signed cookies if use metadata config is true", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+    tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
+
+    await tc.get("rails52StableSignedCookieWithAuthenticatedEncryptionFlagOn");
+
+    assertEqual("5-2-Stable Choco Chip Cookie", tc.cookies().signed.get("favorite"));
+
+    travel(Duration.years(1001), {}, () => {
+      assertNil(tc.cookies().signed.get("favorite"));
+    });
+
+    await tc.get("rails52StableSignedCookieWithAuthenticatedEncryptionFlagOff");
+
+    assertEqual("5-2-Stable Choco Chip Cookie", tc.cookies().signed.get("favorite"));
   });
 });

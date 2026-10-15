@@ -64,7 +64,7 @@ export interface SetCookieOptions {
   path?: string;
   domain?: string | string[] | ((request: unknown) => string | undefined);
   tldLength?: number;
-  expires?: CookieExpires;
+  expires?: CookieExpires | { fromNow(): CookieExpires };
   maxAge?: number;
   secure?: boolean;
   httpOnly?: boolean;
