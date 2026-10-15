@@ -42,7 +42,7 @@ describe("FlashHashTest", () => {
     const flash = new FlashHash({ foo: "bar" });
     expect(flash.toSessionValue()).toEqual({ discard: [], flashes: { foo: "bar" } });
 
-    flash.now("qux", 1);
+    flash.now.set("qux", 1);
     expect(flash.toSessionValue()).toEqual({ flashes: { foo: "bar" }, discard: [] });
 
     flash.discard("foo");

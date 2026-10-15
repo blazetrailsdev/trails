@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import {
   ActiveSupportJSON,
   Duration,
@@ -825,8 +826,8 @@ describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
     tc = new TestCase(task.name);
     tc.controller = new RequestForgeryProtectionControllerUsingNullSession();
     await tc.beforeSetup();
-    tc.request.env["action_dispatch.key_generator"] = new NullSessionDummyKeyGenerator();
-    tc.request.env["action_dispatch.cookies_rotations"] = new RotationConfiguration();
+    tc.request.env[Cookies.GENERATOR_KEY] = new NullSessionDummyKeyGenerator();
+    tc.request.env[Cookies.COOKIES_ROTATIONS] = new RotationConfiguration();
   });
 
   it("should allow to set signed cookies", async () => {
@@ -1414,8 +1415,8 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     {
       testCase: CookieCsrfTokenStorageStrategyControllerTest,
       setup(tc) {
-        tc.request.env["action_dispatch.key_generator"] = new NullSessionDummyKeyGenerator();
-        tc.request.env["action_dispatch.cookies_rotations"] = new RotationConfiguration();
+        tc.request.env[Cookies.GENERATOR_KEY] = new NullSessionDummyKeyGenerator();
+        tc.request.env[Cookies.COOKIES_ROTATIONS] = new RotationConfiguration();
       },
       initializeCsrfToken: (_tc, token) => initializeCsrfToken(token),
       assertNotBlocked: (_tc, block) => assertNotBlocked(block),

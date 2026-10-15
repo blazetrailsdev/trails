@@ -64,12 +64,40 @@ export function resetSession(this: FlashRequestHost): void {
   this.env[KEY] = null;
 }
 
+/** @internal */
+export class FlashNow {
+  flash: FlashHash;
+
+  constructor(flash: FlashHash) {
+    this.flash = flash;
+  }
+
+  set(k: string, v: unknown): unknown {
+    k = String(k);
+    this.flash.set(k, v);
+    this.flash.discard(k);
+    return v;
+  }
+
+  get(k: string): unknown {
+    return this.flash.get(String(k));
+  }
+
+  set alert(message: unknown) {
+    this.set("alert", message);
+  }
+
+  set notice(message: unknown) {
+    this.set("notice", message);
+  }
+}
+
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (`actionpack/lib/action_dispatch/middleware/flash.rb:120`); the class/interface merge is how a mixin surfaces on the type side. */
 export class FlashHash {
   private _flashes: Map<string, unknown> = new Map();
   private _discard: Set<string>;
   private _keep: Set<string> = new Set();
-  private _now: Map<string, unknown> = new Map();
+  private _now: FlashNow | null = null;
 
   constructor(flashes: Record<string, unknown> = {}, discard: readonly string[] = []) {
     this._discard = new Set(discard);
@@ -79,7 +107,7 @@ export class FlashHash {
   }
 
   get(key: string): unknown {
-    return this._now.get(key) ?? this._flashes.get(key);
+    return this._flashes.get(key);
   }
 
   set(key: string, value: unknown): void {
@@ -88,7 +116,7 @@ export class FlashHash {
   }
 
   has(key: string): boolean {
-    return this._flashes.has(key) || this._now.has(key);
+    return this._flashes.has(key);
   }
 
   delete(key: string): unknown {
@@ -98,26 +126,20 @@ export class FlashHash {
   }
 
   get keys(): string[] {
-    return [...new Set([...this._flashes.keys(), ...this._now.keys()])];
+    return [...this._flashes.keys()];
   }
 
   isEmpty(): boolean {
-    return this._flashes.size === 0 && this._now.size === 0;
+    return this._flashes.size === 0;
   }
 
   each(block: (pair: [string, unknown]) => void): void {
     for (const [k, v] of this._flashes) block([k, v]);
-    for (const [k, v] of this._now) {
-      if (!this._flashes.has(k)) block([k, v]);
-    }
   }
 
   toHash(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [k, v] of this._flashes) result[k] = v;
-    for (const [k, v] of this._now) {
-      if (!(k in result)) result[k] = v;
-    }
     return result;
   }
 
@@ -135,8 +157,13 @@ export class FlashHash {
     this.set("notice", value);
   }
 
-  now(key: string, value: unknown): void {
-    this._now.set(key, value);
+  get now(): FlashNow {
+    return (this._now ??= new FlashNow(this));
+  }
+
+  /** @internal */
+  isNowLoaded(): boolean {
+    return this._now != null;
   }
 
   keep(k?: string): Record<string, unknown> {
@@ -176,14 +203,12 @@ export class FlashHash {
     for (const k of this._flashes.keys()) {
       this._discard.add(k);
     }
-    this._now.clear();
   }
 
   clear(): void {
     this._flashes.clear();
     this._discard.clear();
     this._keep.clear();
-    this._now.clear();
   }
 
   replace(h: Record<string, unknown>): void {
@@ -211,8 +236,10 @@ export class FlashHash {
 
   dup(): FlashHash {
     const copy = new FlashHash();
+    if (this.isNowLoaded()) {
+      copy._now = new FlashNow(copy);
+    }
     for (const [k, v] of this._flashes) copy._flashes.set(k, v);
-    for (const [k, v] of this._now) copy._now.set(k, v);
     for (const k of this._discard) copy._discard.add(k);
     for (const k of this._keep) copy._keep.add(k);
     return copy;
