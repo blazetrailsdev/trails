@@ -65,7 +65,7 @@ export class Redirect<B = unknown> extends Endpoint {
       payload.status = this.status;
       payload.location = response.headers.get("Location");
       payload.request = request;
-      return response.toRack();
+      return response.toA();
     });
   }
 

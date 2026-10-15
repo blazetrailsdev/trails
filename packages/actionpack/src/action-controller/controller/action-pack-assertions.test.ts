@@ -424,10 +424,10 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("assert redirection with status", async () => {
     await tc.get("redirectToPath");
-    expect(tc.response.statusCode).toBe(302);
+    expect(tc.response.status).toBe(302);
     tc.assertRedirectedTo("http://test.host/some/path");
     await tc.get("redirectPermanently");
-    expect(tc.response.statusCode).toBe(301);
+    expect(tc.response.status).toBe(301);
     tc.assertRedirectedTo("http://test.host/some/path");
   });
 

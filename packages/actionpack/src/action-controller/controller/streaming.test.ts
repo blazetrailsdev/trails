@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
 import "../../test-helpers/abstract-unit.js";
-import type { ResponseBuffer } from "../../action-dispatch/http/response.js";
+import type { Buffer as ResponseBuffer } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 

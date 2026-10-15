@@ -423,7 +423,7 @@ async function processControllerResponse(
         cookies.update(this.response.cookies as Record<string, string>);
       }
     }
-    this.response.toRack();
+    this.response.toA();
 
     const flashValue = this.request.flash!.toSessionValue();
     if (flashValue) {

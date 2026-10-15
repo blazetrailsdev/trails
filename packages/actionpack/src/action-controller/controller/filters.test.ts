@@ -840,7 +840,7 @@ describe("FilterTest", () => {
           "call",
           tc.request.env,
         ) as Promise<RackResponse>)
-      ).at(-1) as Response;
+      ).at(-1) as unknown as Response;
       expect(response.body).toBe(action);
     }
   });
