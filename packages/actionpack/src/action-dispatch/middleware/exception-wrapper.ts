@@ -1,6 +1,7 @@
 import {
   excBacktraceLocations,
   File,
+  Pathname,
   rbObjRespondTo,
   type Location,
 } from "@blazetrails/ruby-compat";
@@ -419,19 +420,17 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall open — CONVERGEABLE source-fragment-resolves-against-cwd-not-rails-root
-   * @missingRailsArgs join — CONVERGEABLE source-fragment-resolves-against-cwd-not-rails-root
-   */
+  /** @internal */
   sourceFragment(
     path: string,
     line: number,
   ): Record<number, string | [string, string, string]> | null {
-    if (!(rbObjRespondTo(TopLevel.Trails, "root") && TopLevel.Trails!.root())) return null;
-    const fullPath = File.join(TopLevel.Trails!.root()!, path);
+    if (!(rbObjRespondTo(TopLevel.Trails, "root") && TopLevel.Trails!.root() != null)) return null;
+    const fullPath = new Pathname(TopLevel.Trails!.root()!).join(path).toString();
     if (File.isExist(fullPath)) {
-      return this.extractSourceFragmentLines(File.read(fullPath).split(/(?<=\n)/), line);
+      return File.open(fullPath, "r", (file) =>
+        this.extractSourceFragmentLines(file.read().split(/(?<=\n)/), line),
+      );
     }
     return null;
   }

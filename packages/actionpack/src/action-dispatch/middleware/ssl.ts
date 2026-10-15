@@ -13,7 +13,7 @@ export interface RedirectOptions {
 }
 
 export interface SSLOptions {
-  redirect?: false | RedirectOptions;
+  redirect?: false | null | RedirectOptions;
   hsts?: boolean | HSTSOptions | null;
   secureCookies?: boolean;
   sslDefaultRedirectStatus?: number | null;
@@ -32,7 +32,7 @@ const PERMANENT_REDIRECT_REQUEST_METHODS = ["GET", "HEAD"];
 
 export class SSL {
   private app: RackApp;
-  private redirect: false | RedirectOptions;
+  private redirect: false | null | RedirectOptions;
   private exclude: (request: Request) => boolean;
   private secureCookies: boolean;
   private hstsHeader: string;
@@ -55,7 +55,11 @@ export class SSL {
 
     this.redirect = redirect;
 
-    this.exclude = (this.redirect && this.redirect.exclude) || (() => !this.redirect);
+    const exclude = this.redirect != null && this.redirect !== false && this.redirect.exclude;
+    this.exclude =
+      exclude != null && exclude !== false
+        ? exclude
+        : () => this.redirect == null || this.redirect === false;
     this.secureCookies = secureCookies;
 
     this.hstsHeader = this.buildHstsHeader(this.normalizeHstsOptions(hsts));
@@ -129,7 +133,7 @@ export class SSL {
         [CONTENT_TYPE]: "text/html; charset=utf-8",
         [LOCATION]: this.httpsLocationFor(request),
       },
-      bodyFromString((redirect.body || []).join("")),
+      bodyFromString((redirect.body ?? []).join("")),
     ];
   }
 
@@ -147,8 +151,8 @@ export class SSL {
   /** @internal */
   private httpsLocationFor(request: Request): string {
     const redirect = this.redirect as RedirectOptions;
-    const host = redirect.host || request.host;
-    const port = redirect.port || request.port;
+    const host = redirect.host ?? request.host;
+    const port = redirect.port ?? request.port;
 
     let location = `https://${host}`;
     if (port !== 80 && port !== 443) location += `:${port}`;

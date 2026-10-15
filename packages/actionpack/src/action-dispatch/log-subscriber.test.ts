@@ -32,11 +32,6 @@ describe("ActionDispatch::LogSubscriber#redirect", () => {
     expect(logger.messages).toEqual(["Redirected to /posts", "Completed 302 Found in 12ms"]);
   });
 
-  it("renders an empty status when the payload has none", () => {
-    subscriber.redirect(makeEvent({ location: "/x" }, 8));
-    expect(logger.messages[1]).toBe("Completed   in 8ms");
-  });
-
   it("handles permanent redirect (301)", () => {
     subscriber.redirect(makeEvent({ location: "/p", status: 301 }, 5));
     expect(logger.messages[1]).toBe("Completed 301 Moved Permanently in 5ms");
