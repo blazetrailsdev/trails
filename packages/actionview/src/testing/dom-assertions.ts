@@ -1,5 +1,6 @@
 import { assert, assertNot, isBlank } from "@blazetrails/activesupport";
-import { HTML5, type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
+import { type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
+import { Testing } from "../testing.js";
 
 type Fragment = Html5DocumentFragment | Html5Node;
 type Attr = Html5Node["attributeNodes"][number];
@@ -8,9 +9,12 @@ export function assertDomEqual(
   expected: unknown,
   actual: unknown,
   message: string | null = null,
-  { strict = false }: { strict?: boolean } = {},
+  { strict = false, htmlVersion = null }: { strict?: boolean; htmlVersion?: string | null } = {},
 ): void {
-  const [expectedDom, actualDom] = [fragment(expected), fragment(actual)];
+  const [expectedDom, actualDom] = [
+    fragment(expected, { htmlVersion }),
+    fragment(actual, { htmlVersion }),
+  ];
   message ??= `Expected: ${String(expected)}\nActual: ${String(actual)}`;
   assert(compareDoms(expectedDom, actualDom, strict), message);
 }
@@ -19,9 +23,12 @@ export function assertDomNotEqual(
   expected: unknown,
   actual: unknown,
   message: string | null = null,
-  { strict = false }: { strict?: boolean } = {},
+  { strict = false, htmlVersion = null }: { strict?: boolean; htmlVersion?: string | null } = {},
 ): void {
-  const [expectedDom, actualDom] = [fragment(expected), fragment(actual)];
+  const [expectedDom, actualDom] = [
+    fragment(expected, { htmlVersion }),
+    fragment(actual, { htmlVersion }),
+  ];
   message ??= `Expected: ${String(expected)}\nActual: ${String(actual)}`;
   assertNot(compareDoms(expectedDom, actualDom, strict), message);
 }
@@ -90,6 +97,9 @@ function split(string: string): string[] {
   return string.trim() === "" ? [] : string.trim().split(/\s+/);
 }
 
-function fragment(text: unknown): Html5DocumentFragment {
-  return HTML5.DocumentFragment.parse(String(text ?? ""));
+function fragment(
+  text: unknown,
+  { htmlVersion = null }: { htmlVersion?: string | null } = {},
+): Html5DocumentFragment {
+  return Testing.htmlDocumentFragment({ htmlVersion }).parse(String(text ?? ""));
 }

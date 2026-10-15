@@ -15,6 +15,9 @@ export interface ControllerRunOptions {
 }
 
 export class ControllerGenerator extends GeneratorBase {
+  private actions: string[] = [];
+  private namespaceParts: string[] = [];
+
   constructor(options: GeneratorOptions) {
     super(options);
   }
@@ -30,7 +33,10 @@ export class ControllerGenerator extends GeneratorBase {
       test = true,
       parent = "ApplicationController",
     } = options;
+    this.options = { ...this.options, skipRoutes } as GeneratorOptions;
+    this.actions = actions;
     const paths = controllerPathHelpers(name);
+    this.namespaceParts = paths.namespaceParts;
     const ts = this.isTypeScript();
     const ext = this.ext();
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
@@ -42,7 +48,7 @@ export class ControllerGenerator extends GeneratorBase {
     });
     this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
 
-    await this.addRoutes(paths.namespaceParts, actions, skipRoutes);
+    await this.addRoutes();
 
     if (test) {
       const importPrefix = "../".repeat(depth + 2);
@@ -78,18 +84,14 @@ ${cases}
     return this.getCreatedFiles();
   }
 
-  private async addRoutes(
-    namespaceParts: string[],
-    actions: string[],
-    skipRoutes: boolean,
-  ): Promise<void> {
-    if (skipRoutes) return;
-    if (actions.length === 0) return;
-    const fileName = underscore(namespaceParts[namespaceParts.length - 1]);
-    const routingCode = actions
+  private async addRoutes(): Promise<void> {
+    if ((this.options as ControllerRunOptions).skipRoutes) return;
+    if (this.actions.length === 0) return;
+    const fileName = underscore(this.namespaceParts[this.namespaceParts.length - 1]);
+    const routingCode = this.actions
       .map((action) => `this.get(${JSON.stringify(`${fileName}/${action}`)});`)
       .join("\n");
-    const regularClassPath = namespaceParts.slice(0, -1).map((p) => underscore(p));
+    const regularClassPath = this.namespaceParts.slice(0, -1).map((p) => underscore(p));
     await this.route(routingCode, { namespace: regularClassPath });
   }
 }

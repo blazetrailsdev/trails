@@ -399,6 +399,7 @@ const otherSetupFiles = [
   "./packages/activesupport/src/testing/autorun.ts",
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
+  "./packages/actionview/src/test-setup-dom-testing.ts",
 ];
 
 export default defineConfig({

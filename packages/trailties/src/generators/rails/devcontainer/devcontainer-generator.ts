@@ -218,8 +218,9 @@ services:
   private dependencies(): string[] {
     const dependencies: string[] = [];
 
-    if (this.opts.systemTest) dependencies.push("selenium");
-    if (this.opts.redis) dependencies.push("redis");
+    const options = this.options as DevcontainerGeneratorOptions;
+    if (options.systemTest) dependencies.push("selenium");
+    if (options.redis) dependencies.push("redis");
     if (this.database.service) dependencies.push(this.database.name);
     return dependencies;
   }
@@ -227,7 +228,8 @@ services:
   private volumes(): string[] {
     const volumes: string[] = [];
 
-    if (this.opts.redis) volumes.push("redis-data");
+    const options = this.options as DevcontainerGeneratorOptions;
+    if (options.redis) volumes.push("redis-data");
     if (this.database.volume) volumes.push(this.database.volume);
 
     return volumes;
