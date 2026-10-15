@@ -35,7 +35,7 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
 }
 
 export function javascriptTag(
-  this: TagHelperHost & { contentSecurityPolicyNonce?(): string | null },
+  this: TagHelperHost & { contentSecurityPolicyNonce(): string | null },
   contentOrOptionsWithBlock: unknown = null,
   htmlOptions: Record<string, unknown> = {},
   block?: () => unknown,
@@ -51,7 +51,7 @@ export function javascriptTag(
   }
 
   if (htmlOptions.nonce === true) {
-    htmlOptions.nonce = this.contentSecurityPolicyNonce?.() ?? null;
+    htmlOptions.nonce = this.contentSecurityPolicyNonce();
   }
 
   return contentTag.call(this, "script", javascriptCdataSection(content), htmlOptions);

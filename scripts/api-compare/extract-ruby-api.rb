@@ -3097,11 +3097,11 @@ class ApiExtractor
   # literal (`as_options(polymorphic).merge(conditional_options).merge(...)`,
   # `connection_adapters/abstract/schema_definitions.rb:259`, is
   # `{ ...this.asOptions(this.polymorphic), ...this.conditionalOptions(), ... }`).
-  # A `(x || {})` operand names `x` alone (`persistence.rb:746`).
+  # A `(x || {})` operand names `x` alone (`persistence.rb:746`), and
+  # `Hash[pairs]` (`rb_hash_s_create`, `vendor/ruby/v3.3.11/hash.c:1843`) names
+  # `from_entries`, its `Object.fromEntries(pairs)` port (`routing/mapper.rb:153-155`).
   def merge_receiver_name(recv)
     return "super" if recv.is_a?(Array) && %i[zsuper super].include?(recv[0])
-    # `Hash[pairs]` (`rb_hash_s_create`, `vendor/ruby/v3.3.11/hash.c:1843`) is
-    # `Object.fromEntries(pairs)` (`routing/mapper.rb:153-155`).
     return "from_entries" if recv.is_a?(Array) && recv[0] == :aref && const_name(recv[1]) == "Hash"
 
     if recv.is_a?(Array) && recv[0] == :method_add_arg && recv[1].is_a?(Array) &&

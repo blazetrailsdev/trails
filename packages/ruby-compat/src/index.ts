@@ -379,6 +379,7 @@ export { byteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js"
 export { scrub } from "./string/scrub.js";
 export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
+export { rbStrEnumerateLines } from "./string/each.js";
 export { rbStrDump, rbStrHex, rbStrToF, rbStrToI } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";

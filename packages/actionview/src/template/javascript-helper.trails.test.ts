@@ -8,7 +8,11 @@ import { javascriptTag } from "../helpers/javascript-helper.js";
 
 describe("JavaScriptHelperTest", () => {
   it("javascript tag with block", () => {
-    const ctx = { outputBuffer: new OutputBuffer(), viewFlow: new OutputFlow() };
+    const ctx = {
+      outputBuffer: new OutputBuffer(),
+      viewFlow: new OutputFlow(),
+      contentSecurityPolicyNonce: () => null,
+    };
     const result = javascriptTag
       .call(ctx, { type: "application/javascript" }, undefined, () => {
         concat.call(ctx, htmlSafe("alert('hello')"));

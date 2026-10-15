@@ -1,5 +1,10 @@
 import { chomp, classAttribute, tokenize } from "@blazetrails/activesupport";
-import { NotImplementedError, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  rbEqual,
+  rbStrEnumerateLines,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
@@ -23,11 +28,6 @@ export interface Spot {
 }
 
 type OffsetToken = [name: string, str: string | null, offset: number];
-
-export function sourceLines(source: string): string[] {
-  if (source.length === 0) return [];
-  return source.split(/(?<=\n)/);
-}
 
 export interface TseTemplate {
   type?: unknown;
@@ -70,9 +70,9 @@ export class Tse implements TemplateHandler {
 
   translateLocation(spot: Spot, backtraceLocation: BacktraceLocation, source: string): Spot | null {
     try {
-      const sourceLinesList = sourceLines(source);
-      if (sourceLinesList.length < backtraceLocation.lineno) return null;
-      const tokens = tokenize(sourceLinesList[backtraceLocation.lineno - 1]);
+      const sourceLines = rbStrEnumerateLines(source, []);
+      if (sourceLines.length < backtraceLocation.lineno) return null;
+      const tokens = tokenize(sourceLines[backtraceLocation.lineno - 1]);
       const newFirstColumn = this.findOffset(spot.snippet, tokens, spot.firstColumn);
       const linenoDelta = spot.firstLineno - backtraceLocation.lineno;
       spot.firstLineno -= linenoDelta;
@@ -81,7 +81,7 @@ export class Tse implements TemplateHandler {
       const columnDelta = spot.firstColumn - newFirstColumn;
       spot.firstColumn -= columnDelta;
       spot.lastColumn -= columnDelta;
-      spot.scriptLines = sourceLinesList;
+      spot.scriptLines = sourceLines;
 
       return spot;
     } catch (e) {

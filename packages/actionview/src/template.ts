@@ -12,6 +12,7 @@ import {
   forceEncoding,
   isValidEncoding,
   rbObjRespondTo,
+  rbStrEnumerateLines,
 } from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
@@ -23,7 +24,7 @@ import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
 import { SimpleType } from "./template/types.js";
 import { File as SourcesFile } from "./template/sources/file.js";
-import { sourceLines, type BacktraceLocation, type Spot } from "./template/handlers/tse.js";
+import { type BacktraceLocation, type Spot } from "./template/handlers/tse.js";
 
 type LocationTranslatingHandler = TemplateHandler & {
   translateLocation?: (
@@ -219,7 +220,7 @@ export class Template {
    * @missingRailsCall parse — PERMANENT
    */
   spot(location: BacktraceLocation): Spot | null {
-    const scriptLines = sourceLines(this.compiledSource());
+    const scriptLines = rbStrEnumerateLines(this.compiledSource(), []);
     const found = scriptLines[location.lineno - 1];
     if (found === undefined) return null;
 
